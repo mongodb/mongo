@@ -183,6 +183,10 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
             elem.type() == String);
 
+    uassert(ErrorCodes::InvalidOptions,
+            "$out can only be used with the 'local' read concern level",
+            !pExpCtx->opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
+
     NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
     uassert(17385, "Can't $out to special collection: " + elem.str(), !outputNs.isSpecial());
     return new DocumentSourceOut(outputNs, pExpCtx);

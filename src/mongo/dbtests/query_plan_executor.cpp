@@ -279,13 +279,12 @@ public:
         std::shared_ptr<PlanExecutor> innerExec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
 
         // Create the aggregation pipeline.
-        boost::intrusive_ptr<ExpressionContext> expCtx =
-            new ExpressionContext(&_txn, NamespaceString(nss.ns()));
+        std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
+        boost::intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(
+            &_txn, AggregationRequest(NamespaceString(nss.ns()), rawPipeline));
 
-        string errmsg;
-        BSONObj inputBson = fromjson("{$match: {a: {$gte: 7, $lte: 10}}}");
-        boost::intrusive_ptr<Pipeline> pipeline = Pipeline::parseCommand(errmsg, inputBson, expCtx);
-        ASSERT_EQUALS(errmsg, "");
+        auto statusWithPipeline = Pipeline::parse(rawPipeline, expCtx);
+        auto pipeline = assertGet(statusWithPipeline);
 
         // Create the output PlanExecutor that pulls results from the pipeline.
         auto ws = make_unique<WorkingSet>();

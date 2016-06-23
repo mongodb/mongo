@@ -43,6 +43,7 @@
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
@@ -68,16 +69,18 @@ using std::stringstream;
 using std::unique_ptr;
 using stdx::make_unique;
 
+namespace {
+
 /**
  * Returns true if we need to keep a ClientCursor saved for this pipeline (for future getMore
  * requests).  Otherwise, returns false.
  */
-static bool handleCursorCommand(OperationContext* txn,
-                                const string& ns,
-                                ClientCursorPin* pin,
-                                PlanExecutor* exec,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder& result) {
+bool handleCursorCommand(OperationContext* txn,
+                         const string& ns,
+                         ClientCursorPin* pin,
+                         PlanExecutor* exec,
+                         const BSONObj& cmdObj,
+                         BSONObjBuilder& result) {
     ClientCursor* cursor = pin ? pin->c() : NULL;
     if (pin) {
         invariant(cursor);
@@ -156,10 +159,42 @@ static bool handleCursorCommand(OperationContext* txn,
     return static_cast<bool>(cursor);
 }
 
+/**
+ * Round trips the pipeline through serialization by calling serialize(), then Pipeline::parse().
+ * fasserts if it fails to parse after being serialized.
+ */
+boost::intrusive_ptr<Pipeline> reparsePipeline(
+    const boost::intrusive_ptr<Pipeline>& pipeline,
+    const AggregationRequest& request,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto serialized = pipeline->serialize();
+
+    // Convert vector<Value> to vector<BSONObj>.
+    std::vector<BSONObj> parseableSerialization;
+    parseableSerialization.reserve(serialized.size());
+    for (auto&& serializedStage : serialized) {
+        invariant(serializedStage.getType() == BSONType::Object);
+        parseableSerialization.push_back(serializedStage.getDocument().toBson());
+    }
+
+    auto reparsedPipeline = Pipeline::parse(parseableSerialization, expCtx);
+    if (!reparsedPipeline.isOK()) {
+        error() << "Aggregation command did not round trip through parsing and serialization "
+                   "correctly. Input pipeline: "
+                << Value(request.getPipeline()).toString()
+                << ", serialized pipeline: " << Value(serialized).toString();
+        fassertFailedWithStatusNoTrace(40175, reparsedPipeline.getStatus());
+    }
+
+    return reparsedPipeline.getValue();
+}
+
+}  // namespace
 
 class PipelineCommand : public Command {
 public:
-    PipelineCommand() : Command(Pipeline::commandName) {}  // command is called "aggregate"
+    PipelineCommand()
+        : Command(AggregationRequest::kCommandName) {}  // command is called "aggregate"
 
     // Locks are managed manually, in particular by DocumentSourceCursor.
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -210,24 +245,29 @@ public:
         }
         NamespaceString nss(ns);
 
-        intrusive_ptr<ExpressionContext> pCtx = new ExpressionContext(txn, nss);
-        pCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+        // Parse the options for this request.
+        auto request = AggregationRequest::parseFromBSON(nss, cmdObj);
+        if (!request.isOK()) {
+            return appendCommandStatus(result, request.getStatus());
+        }
 
-        /* try to parse the command; if this fails, then we didn't run */
-        intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);
-        if (!pPipeline.get())
-            return false;
+        // Set up the ExpressionContext.
+        intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(txn, request.getValue());
+        expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
-        // This is outside of the if block to keep the object alive until the pipeline is finished.
-        BSONObj parsed;
-        if (kDebugBuild && !pPipeline->isExplain() && !pCtx->inShard) {
-            // Make sure all operations round-trip through Pipeline::toBson() correctly by
-            // reparsing every command in debug builds. This is important because sharded
-            // aggregations rely on this ability.  Skipping when inShard because this has
-            // already been through the transformation (and this unsets pCtx->inShard).
-            parsed = pPipeline->serialize().toBson();
-            pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
-            verify(pPipeline);
+        // Parse the pipeline.
+        auto statusWithPipeline = Pipeline::parse(request.getValue().getPipeline(), expCtx);
+        if (!statusWithPipeline.isOK()) {
+            return appendCommandStatus(result, statusWithPipeline.getStatus());
+        }
+        auto pipeline = std::move(statusWithPipeline.getValue());
+
+        if (kDebugBuild && !expCtx->isExplain && !expCtx->inShard) {
+            // Make sure all operations round-trip through Pipeline::serialize() correctly by
+            // re-parsing every command in debug builds. This is important because sharded
+            // aggregations rely on this ability.  Skipping when inShard because this has already
+            // been through the transformation (and this un-sets expCtx->inShard).
+            pipeline = reparsePipeline(pipeline, request.getValue(), expCtx);
         }
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
@@ -246,22 +286,21 @@ public:
 
             // If the pipeline does not have a user-specified collation, set it from the
             // collection default.
-            if (pPipeline->getContext()->collation.isEmpty() && collection &&
+            if (request.getValue().getCollation().isEmpty() && collection &&
                 collection->getDefaultCollator()) {
-                pPipeline->setCollator(collection->getDefaultCollator()->clone());
+                pipeline->setCollator(collection->getDefaultCollator()->clone());
             }
 
             // This does mongod-specific stuff like creating the input PlanExecutor and adding
             // it to the front of the pipeline if needed.
             std::shared_ptr<PlanExecutor> input =
-                PipelineD::prepareCursorSource(txn, collection, nss, pPipeline, pCtx);
-            pPipeline->stitch();
+                PipelineD::prepareCursorSource(txn, collection, nss, pipeline, expCtx);
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
             // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
             // PlanExecutor.
             auto ws = make_unique<WorkingSet>();
-            auto proxy = make_unique<PipelineProxyStage>(txn, pPipeline, input, ws.get());
+            auto proxy = make_unique<PipelineProxyStage>(txn, pipeline, input, ws.get());
 
             auto statusWithPlanExecutor = (NULL == collection)
                 ? PlanExecutor::make(
@@ -327,8 +366,8 @@ public:
             }
 
             // If both explain and cursor are specified, explain wins.
-            if (pPipeline->isExplain()) {
-                result << "stages" << Value(pPipeline->writeExplainOps());
+            if (expCtx->isExplain) {
+                result << "stages" << Value(pipeline->writeExplainOps());
             } else if (isCursorCommand) {
                 keepCursor = handleCursorCommand(txn,
                                                  nss.ns(),
@@ -337,10 +376,10 @@ public:
                                                  cmdObj,
                                                  result);
             } else {
-                pPipeline->run(result);
+                pipeline->run(result);
             }
 
-            if (!pPipeline->isExplain()) {
+            if (!expCtx->isExplain) {
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(pin ? *pin->c()->getExecutor() : *exec.get(), &stats);
                 curOp->debug().setPlanSummaryMetrics(stats);

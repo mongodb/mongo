@@ -208,7 +208,7 @@ public:
         : _service(makeTestServiceContext()),
           _client(_service->makeClient("DocumentSourceTest")),
           _opCtx(_client->makeOperationContext()),
-          _ctx(new ExpressionContext(_opCtx.get(), NamespaceString(ns))) {}
+          _ctx(new ExpressionContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}))) {}
 
 protected:
     intrusive_ptr<ExpressionContext> ctx() {
@@ -447,7 +447,7 @@ protected:
         BSONElement specElement = namedSpec.firstElement();
 
         intrusive_ptr<ExpressionContext> expressionContext =
-            new ExpressionContext(_opCtx.get(), NamespaceString(ns));
+            new ExpressionContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}));
         expressionContext->inShard = inShard;
         expressionContext->inRouter = inRouter;
         // Won't spill to disk properly if it needs to.

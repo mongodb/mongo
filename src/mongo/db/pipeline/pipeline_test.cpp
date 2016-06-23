@@ -28,6 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/intrusive_ptr.hpp>
+#include <string>
+#include <vector>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -47,6 +51,7 @@ namespace PipelineTests {
 
 using boost::intrusive_ptr;
 using std::string;
+using std::vector;
 
 namespace Optimizations {
 using namespace mongo;
@@ -75,16 +80,18 @@ public:
         const BSONObj outputPipeExpected = pipelineFromJsonArray(outputPipeJson());
         const BSONObj serializePipeExpected = pipelineFromJsonArray(serializedPipeJson());
 
-        intrusive_ptr<ExpressionContext> ctx =
-            new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
-        string errmsg;
-        intrusive_ptr<Pipeline> outputPipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
-        ASSERT_EQUALS(errmsg, "");
-        ASSERT(outputPipe != NULL);
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        vector<BSONObj> rawPipeline;
+        for (auto&& stageElem : inputBson["pipeline"].Array()) {
+            ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+            rawPipeline.push_back(stageElem.embeddedObject());
+        }
+        AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
+        intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(&_opCtx, request);
+        auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
 
         ASSERT_EQUALS(Value(outputPipe->writeExplainOps()), Value(outputPipeExpected["pipeline"]));
-        ASSERT_EQUALS(outputPipe->serialize()["pipeline"],
-                      Value(serializePipeExpected["pipeline"]));
+        ASSERT_EQUALS(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
     }
 
     virtual ~Base() {}
@@ -719,15 +726,18 @@ public:
         const BSONObj shardPipeExpected = pipelineFromJsonArray(shardPipeJson());
         const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson());
 
-        intrusive_ptr<ExpressionContext> ctx =
-            new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
-        string errmsg;
-        mergePipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
-        ASSERT_EQUALS(errmsg, "");
-        ASSERT(mergePipe != NULL);
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        vector<BSONObj> rawPipeline;
+        for (auto&& stageElem : inputBson["pipeline"].Array()) {
+            ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+            rawPipeline.push_back(stageElem.embeddedObject());
+        }
+        AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
+        intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(&_opCtx, request);
+        mergePipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
 
         shardPipe = mergePipe->splitForSharded();
-        ASSERT(shardPipe != NULL);
+        ASSERT(shardPipe != nullptr);
 
         ASSERT_EQUALS(Value(shardPipe->writeExplainOps()), Value(shardPipeExpected["pipeline"]));
         ASSERT_EQUALS(Value(mergePipe->writeExplainOps()), Value(mergePipeExpected["pipeline"]));
@@ -1063,57 +1073,40 @@ class LookUp : public needsPrimaryShardMergerBase {
 namespace {
 
 TEST(PipelineInitialSource, GeoNearInitialQuery) {
-    const BSONObj inputBson =
-        fromjson("{pipeline: [{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}]}");
-
     OperationContextNoop _opCtx;
-    intrusive_ptr<ExpressionContext> ctx =
-        new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
-    string errmsg;
-    intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+    const std::vector<BSONObj> rawPipeline = {
+        fromjson("{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}")};
+    intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(
+        &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
+    auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
     ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 1));
 }
 
 TEST(PipelineInitialSource, MatchInitialQuery) {
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {'a': 4}}]}");
-
     OperationContextNoop _opCtx;
-    intrusive_ptr<ExpressionContext> ctx =
-        new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
-    string errmsg;
-    intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {'a': 4}}")};
+    intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(
+        &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
+
+    auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
     ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 4));
-}
-
-TEST(PipelineInitialSource, CollationNotAnObjectFailsToParse) {
-    QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
-
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], collation: 1}");
-
-    intrusive_ptr<ExpressionContext> ctx =
-        new ExpressionContext(txn.get(), NamespaceString("a.collection"));
-    string errmsg;
-    ASSERT_THROWS(Pipeline::parseCommand(errmsg, inputBson, ctx), UserException);
 }
 
 TEST(PipelineInitialSource, ParseCollation) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], collation: {locale: 'reverse'}}");
+    auto request = AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson);
+    ASSERT_OK(request.getStatus());
 
-    intrusive_ptr<ExpressionContext> ctx =
-        new ExpressionContext(txn.get(), NamespaceString("a.collection"));
-    string errmsg;
-    intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+    intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(opCtx.get(), request.getValue());
     ASSERT(ctx->collator.get());
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_TRUE(CollatorInterface::collatorsMatch(ctx->collator.get(), &collator));
 }
 }
-
 
 class All : public Suite {
 public:

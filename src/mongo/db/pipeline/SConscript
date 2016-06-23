@@ -1,5 +1,18 @@
+# -*- mode: python -*-
 
 Import('env')
+
+env.Library(
+    target='aggregation',
+    source=[
+    ],
+    LIBDEPS=[
+        'aggregation_request',
+        'document_source',
+        'expression_context',
+        'pipeline',
+    ]
+)
 
 env.Library(
     target='field_path',
@@ -40,6 +53,42 @@ env.CppUnitTest(
         'document_value',
         ],
     )
+
+env.Library(
+    target='aggregation_request',
+    source=[
+        'aggregation_request.cpp',
+    ],
+    LIBDEPS=[
+        'document_value',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+    ]
+)
+
+env.CppUnitTest(
+    target='aggregation_request_test',
+    source='aggregation_request_test.cpp',
+    LIBDEPS=[
+    'aggregation_request',
+    ],
+)
+
+env.Library(
+    target='expression_context',
+    source=[
+        'expression_context.cpp',
+    ],
+    LIBDEPS=[
+        'aggregation_request',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/intrusive_counter',
+    ]
+)
 
 env.CppUnitTest(
     target='document_source_test',
@@ -130,6 +179,7 @@ docSourceEnv.Library(
         'dependencies',
         'document_value',
         'expression',
+        'expression_context',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/matcher/expressions',
@@ -145,7 +195,6 @@ docSourceEnv.Library(
         # which is not uniquely defined
         'incomplete'
     ],
-
 )
 
 env.Library(
@@ -157,6 +206,7 @@ env.Library(
         'dependencies',
         'document_source',
         'document_value',
+        'expression_context',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/authcore',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',

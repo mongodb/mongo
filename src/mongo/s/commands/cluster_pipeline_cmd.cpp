@@ -39,6 +39,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -72,7 +73,7 @@ namespace {
  */
 class PipelineCommand : public Command {
 public:
-    PipelineCommand() : Command(Pipeline::commandName, false) {}
+    PipelineCommand() : Command(AggregationRequest::kCommandName, false) {}
 
     virtual bool slaveOk() const {
         return true;
@@ -117,19 +118,22 @@ public:
             return aggPassthrough(txn, conf, cmdObj, result, options);
         }
 
-        intrusive_ptr<ExpressionContext> mergeCtx =
-            new ExpressionContext(txn, NamespaceString(fullns));
+        auto request = AggregationRequest::parseFromBSON(NamespaceString(fullns), cmdObj);
+        if (!request.isOK()) {
+            return appendCommandStatus(result, request.getStatus());
+        }
+
+        intrusive_ptr<ExpressionContext> mergeCtx = new ExpressionContext(txn, request.getValue());
         mergeCtx->inRouter = true;
         // explicitly *not* setting mergeCtx->tempDir
 
-        // Parse the pipeline specification
-        intrusive_ptr<Pipeline> pipeline(Pipeline::parseCommand(errmsg, cmdObj, mergeCtx));
-        if (!pipeline.get()) {
-            // There was some parsing error
-            return false;
+        // Parse the pipeline specification.
+        auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
+        if (!pipeline.isOK()) {
+            return appendCommandStatus(result, pipeline.getStatus());
         }
 
-        for (auto&& ns : pipeline->getInvolvedCollections()) {
+        for (auto&& ns : pipeline.getValue()->getInvolvedCollections()) {
             uassert(
                 28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
         }
@@ -140,30 +144,34 @@ public:
 
         // If the first $match stage is an exact match on the shard key, we only have to send it
         // to one shard, so send the command to that shard.
-        BSONObj firstMatchQuery = pipeline->getInitialQuery();
+        BSONObj firstMatchQuery = pipeline.getValue()->getInitialQuery();
         ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, fullns);
         BSONObj shardKeyMatches = uassertStatusOK(
             chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, firstMatchQuery));
 
         // Don't need to split pipeline if the first $match is an exact match on shard key, unless
         // there is a stage that needs to be run on the primary shard.
-        const bool needPrimaryShardMerger = pipeline->needsPrimaryShardMerger();
+        const bool needPrimaryShardMerger = pipeline.getValue()->needsPrimaryShardMerger();
         const bool needSplit = shardKeyMatches.isEmpty() || needPrimaryShardMerger;
 
         // Split the pipeline into pieces for mongod(s) and this mongos. If needSplit is true,
         // 'pipeline' will become the merger side.
-        intrusive_ptr<Pipeline> shardPipeline(needSplit ? pipeline->splitForSharded() : pipeline);
+        intrusive_ptr<Pipeline> shardPipeline(needSplit ? pipeline.getValue()->splitForSharded()
+                                                        : pipeline.getValue());
 
-        // Create the command for the shards. The 'fromRouter' field means produce output to
-        // be merged.
-        MutableDocument commandBuilder(shardPipeline->serialize());
+        // Create the command for the shards. The 'fromRouter' field means produce output to be
+        // merged.
+        MutableDocument commandBuilder(request.getValue().serializeToCommandObj());
+        commandBuilder[AggregationRequest::kPipelineName] = Value(shardPipeline->serialize());
         if (needSplit) {
-            commandBuilder.setField("fromRouter", Value(true));
-            commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
+            commandBuilder[AggregationRequest::kFromRouterName] = Value(true);
+            commandBuilder["cursor"] = Value(DOC("batchSize" << 0));
         } else {
-            commandBuilder.setField("cursor", Value(cmdObj["cursor"]));
+            commandBuilder["cursor"] = Value(cmdObj["cursor"]);
         }
 
+        // These fields are not part of the AggregationRequest since they are not handled by the
+        // aggregation subsystem, so we serialize them separately.
         const std::initializer_list<StringData> fieldsToPropagateToShards = {
             "$queryOptions", "readConcern", QueryRequest::cmdOptionMaxTimeMS,
         };
@@ -180,14 +188,14 @@ public:
         Strategy::commandOp(
             txn, dbname, shardedCommand, options, fullns, shardQuery, &shardResults);
 
-        if (pipeline->isExplain()) {
+        if (mergeCtx->isExplain) {
             // This must be checked before we start modifying result.
             uassertAllShardsSupportExplain(shardResults);
 
             if (needSplit) {
                 result << "needsPrimaryShardMerger" << needPrimaryShardMerger << "splitPipeline"
                        << DOC("shardsPart" << shardPipeline->writeExplainOps() << "mergerPart"
-                                           << pipeline->writeExplainOps());
+                                           << pipeline.getValue()->writeExplainOps());
             } else {
                 result << "splitPipeline" << BSONNULL;
             }
@@ -215,10 +223,11 @@ public:
             return reply["ok"].trueValue();
         }
 
-        pipeline->addInitialSource(
+        pipeline.getValue()->addInitialSource(
             DocumentSourceMergeCursors::create(parseCursors(shardResults), mergeCtx));
 
-        MutableDocument mergeCmd(pipeline->serialize());
+        MutableDocument mergeCmd(request.getValue().serializeToCommandObj());
+        mergeCmd["pipeline"] = Value(pipeline.getValue()->serialize());
         mergeCmd["cursor"] = Value(cmdObj["cursor"]);
 
         if (cmdObj.hasField("$queryOptions")) {
@@ -235,7 +244,8 @@ public:
         // Not propagating readConcern to merger since it doesn't do local reads.
 
         string outputNsOrEmpty;
-        if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pipeline->output())) {
+        if (DocumentSourceOut* out =
+                dynamic_cast<DocumentSourceOut*>(pipeline.getValue()->output())) {
             outputNsOrEmpty = out->getOutputNs().ns();
         }
 
