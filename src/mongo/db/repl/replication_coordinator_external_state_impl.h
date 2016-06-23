@@ -134,9 +134,6 @@ private:
     // Thread running runSyncThread().
     std::unique_ptr<stdx::thread> _applierThread;
 
-    // Thread running BackgroundSync::producerThread().
-    std::unique_ptr<stdx::thread> _producerThread;
-
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
     stdx::mutex _nextThreadIdMutex;
     // Number used to uniquely name threads.

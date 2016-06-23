@@ -136,6 +136,9 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
     _initialSyncThread.reset(new stdx::thread{[finished, this]() {
         Client::initThreadIfNotAlready("initial sync");
+
+        // "_bgSync" should not be initialized before this.
+        invariant(!_bgSync);
         {
             auto txn = cc().makeOperationContext();
             invariant(txn);
@@ -143,11 +146,10 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
             log() << "Starting replication fetcher thread";
 
             // Start bgsync.
-            _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer(txn.get())));
+            _bgSync.reset(new BackgroundSync(this, makeSteadyStateOplogBuffer(txn.get())));
+            _bgSync->startup(txn.get());
         }
-        invariant(!_producerThread);  // The producer thread should not be init'd before this.
-        _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
+
         // Do initial sync.
         syncDoInitialSync(_bgSync.get());
         finished();
@@ -166,11 +168,10 @@ void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
 }
 
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(OperationContext* txn) {
-    if (!_producerThread) {
+    if (!_bgSync) {
         log() << "Starting replication fetcher thread";
-        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer(txn)));
-        _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
+        _bgSync.reset(new BackgroundSync(this, makeSteadyStateOplogBuffer(txn)));
+        _bgSync->startup(txn);
     }
     log() << "Starting replication applier threads";
     invariant(!_applierThread);
@@ -213,9 +214,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
             _applierThread->join();
         }
 
-        if (_producerThread) {
+        if (_bgSync) {
             _bgSync->shutdown(txn);
-            _producerThread->join();
+            _bgSync->join(txn);
         }
         if (_snapshotThread)
             _snapshotThread->shutdown();

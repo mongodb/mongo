@@ -60,7 +60,6 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -153,17 +152,28 @@ static ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxS
                                                                &bufferMaxSizeGauge);
 
 
-BackgroundSync::BackgroundSync(std::unique_ptr<OplogBuffer> oplogBuffer)
+BackgroundSync::BackgroundSync(
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+    std::unique_ptr<OplogBuffer> oplogBuffer)
     : _oplogBuffer(std::move(oplogBuffer)),
       _threadPoolTaskExecutor(makeThreadPool(),
                               executor::makeNetworkInterface("NetworkInterfaceASIO-BGSync")),
       _replCoord(getGlobalReplicationCoordinator()),
+      _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
       _syncSourceResolver(_replCoord),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()) {
     // Update "repl.buffer.maxSizeBytes" server status metric to reflect the current oplog buffer's
     // max size.
     bufferMaxSizeGauge.increment(_oplogBuffer->getMaxSize() - bufferMaxSizeGauge.get());
+}
+
+void BackgroundSync::startup(OperationContext* txn) {
+    _oplogBuffer->startup(txn);
+    _threadPoolTaskExecutor.startup();
+
+    invariant(!_producerThread);
+    _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::_run, this)));
 }
 
 void BackgroundSync::shutdown(OperationContext* txn) {
@@ -179,28 +189,20 @@ void BackgroundSync::shutdown(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::producerThread(
-    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void BackgroundSync::join(OperationContext* txn) {
+    _producerThread->join();
+    _threadPoolTaskExecutor.shutdown();
+    _threadPoolTaskExecutor.join();
+    _oplogBuffer->shutdown(txn);
+}
+
+void BackgroundSync::_run() {
     Client::initThread("rsBackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
-    {
-        auto txn = cc().makeOperationContext();
-        _oplogBuffer->startup(txn.get());
-    }
-
-    _threadPoolTaskExecutor.startup();
-    ON_BLOCK_EXIT([this]() {
-        _threadPoolTaskExecutor.shutdown();
-        _threadPoolTaskExecutor.join();
-
-        auto txn = cc().makeOperationContext();
-        _oplogBuffer->shutdown(txn.get());
-    });
-
     while (!inShutdown()) {
         try {
-            _producerThread(replicationCoordinatorExternalState);
+            _runProducer();
         } catch (const DBException& e) {
             std::string msg(str::stream() << "sync producer problem: " << e.toString());
             error() << msg;
@@ -226,8 +228,7 @@ void BackgroundSync::_signalNoNewDataForApplier(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::_producerThread(
-    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void BackgroundSync::_runProducer() {
     const MemberState state = _replCoord->getMemberState();
     // Stop when the state changes to primary.
     if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
@@ -261,12 +262,10 @@ void BackgroundSync::_producerThread(
         start(txn.get());
     }
 
-    _produce(txn.get(), replicationCoordinatorExternalState);
+    _produce(txn.get());
 }
 
-void BackgroundSync::_produce(
-    OperationContext* txn,
-    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void BackgroundSync::_produce(OperationContext* txn) {
     // this oplog reader does not do a handshake because we don't want the server it's syncing
     // from to track how far it has synced
     {
@@ -347,7 +346,7 @@ void BackgroundSync::_produce(
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
-        _replCoord, replicationCoordinatorExternalState, this);
+        _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
         auto config = _replCoord->getConfig();

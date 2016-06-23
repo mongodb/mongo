@@ -42,6 +42,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -62,23 +63,30 @@ class ReplicationCoordinatorExternalState;
  */
 class BackgroundSync {
 public:
-    BackgroundSync(std::unique_ptr<OplogBuffer> oplogBuffer);
+    BackgroundSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+                   std::unique_ptr<OplogBuffer> oplogBuffer);
     MONGO_DISALLOW_COPYING(BackgroundSync);
 
     // stop syncing (when this node becomes a primary, e.g.)
     void stop();
 
+    /**
+     * Starts oplog buffer, task executor and producer thread, in that order.
+     */
+    void startup(OperationContext* txn);
+
+    /**
+     * Signals producer thread to stop.
+     */
     void shutdown(OperationContext* txn);
+
+    /**
+     * Waits for producer thread to stop before shutting down the task executor and oplog buffer.
+     */
+    void join(OperationContext* txn);
 
     bool isStopped() const;
 
-    /**
-     * Starts the producer thread which runs until shutdown. Upon resolving the current sync source
-     * the producer thread uses the OplogFetcher (which requires the replication coordinator
-     * external state at construction) to fetch oplog entries from the source's oplog via a long
-     * running find query.
-     */
-    void producerThread(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
     // starts the sync target notifying thread
     void notifierThread();
 
@@ -115,10 +123,16 @@ public:
     void pushTestOpToBuffer(OperationContext* txn, const BSONObj& op);
 
 private:
-    // Production thread
-    void _producerThread(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
-    void _produce(OperationContext* txn,
-                  ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
+    /**
+     * Starts the producer thread which runs until shutdown. Upon resolving the current sync source
+     * the producer thread uses the OplogFetcher (which requires the replication coordinator
+     * external state at construction) to fetch oplog entries from the source's oplog via a long
+     * running find query.
+     */
+    void _run();
+    // Production thread inner loop.
+    void _runProducer();
+    void _produce(OperationContext* txn);
 
     /**
      * Signals to the applier that we have no new data,
@@ -164,6 +178,9 @@ private:
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;
 
+    // A pointer to the replication coordinator external state.
+    ReplicationCoordinatorExternalState* _replicationCoordinatorExternalState;
+
     // Used to determine sync source.
     // TODO(dannenberg) move into DataReplicator.
     SyncSourceResolver _syncSourceResolver;
@@ -176,6 +193,9 @@ private:
     // lastFetchedHash is used to match ops to determine if we need to rollback, when
     // a secondary.
     long long _lastFetchedHash = 0LL;
+
+    // Thread running producerThread().
+    std::unique_ptr<stdx::thread> _producerThread;
 
     // if producer thread should not be running
     bool _stopped = true;
