@@ -32,6 +32,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
@@ -42,7 +43,6 @@
 namespace mongo {
 
 class Client;
-class Command;
 class CurOp;
 class OperationContext;
 struct PlanSummaryStats;
@@ -314,6 +314,11 @@ public:
     void setCommand_inlock(Command* command) {
         _command = command;
     }
+
+    /**
+     * Returns whether the current operation is a read, write, or command.
+     */
+    Command::ReadWriteType getReadWriteType() const;
 
     /**
      * Appends information about this CurOp to "builder".

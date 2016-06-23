@@ -71,6 +71,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/atomic_word.h"
@@ -686,6 +687,9 @@ void assembleResponse(OperationContext* txn,
     debug.executionTime = currentOp.totalTimeMillis();
 
     logThreshold += currentOp.getExpectedLatencyMs();
+    Top::get(txn->getServiceContext())
+        .incrementGlobalLatencyStats(
+            txn, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
 
     if (shouldLogOpDebug || debug.executionTime > logThreshold) {
         Locker::LockerInfo lockerInfo;
