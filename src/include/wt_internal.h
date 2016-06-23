@@ -356,6 +356,11 @@ union __wt_rand_state;
 #include "connection.h"
 
 #include "extern.h"
+#ifdef _WIN32
+#include "extern_win.h"
+#else
+#include "extern_posix.h"
+#endif
 #include "verify_build.h"
 
 #include "ctype.i"			/* required by packing.i */

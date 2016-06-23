@@ -813,7 +813,7 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 		    (bits >> (valid - max)) : (bits << (max - valid)));
 		symbol = huffman->code2symbol[pattern & mask];
 		len = huffman->codes[symbol].length;
-		valid -= len;
+		valid -= (uint8_t)len;
 
 		/*
 		 * from_len_bits is the total number of input bits, reduced by

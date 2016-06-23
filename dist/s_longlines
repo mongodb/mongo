@@ -11,6 +11,8 @@ l=`(cd .. &&
     sed -e '/checksum\/power8/d' \
         -e '/dist\/stat_data\.py/d' \
         -e '/include\/extern\.h/d' \
+        -e '/include\/extern_posix\.h/d' \
+        -e '/include\/extern_win\.h/d' \
         -e '/support\/stat\.c/d'`
 
 for f in $l ; do

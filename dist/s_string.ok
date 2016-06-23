@@ -133,6 +133,7 @@ GIDs
 Gcc
 Geoff
 GetEnvironmentVariableA
+GetFileAttributesA
 GetFileAttributesEx
 GetFileSizeEx
 GetLastError
@@ -215,6 +216,7 @@ Mewhort
 Mitzenmacher
 MongoDB
 MoveFile
+MoveFileA
 Multi
 Multithreaded
 Mutex
@@ -647,6 +649,7 @@ fmterr
 fnv
 foc
 fopen
+formatmessage
 fp
 fprintf
 free'd

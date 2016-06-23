@@ -60,11 +60,13 @@ else
 		echo "$f: use TAILQ for all lists"
 	fi
 
-	if ! expr "$f" : 'src/os_common/.*' > /dev/null &&
+	if ! expr "$f" : 'src/include/extern.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern_posix.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern_win.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	   ! expr "$f" : 'src/os_common/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
-	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&
-	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
 	    grep '__wt_errno' $f > $t; then
 		echo "$f: upper-level code should not call __wt_errno"
 		cat $t
