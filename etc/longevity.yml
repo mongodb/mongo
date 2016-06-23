@@ -304,7 +304,7 @@ buildvariants:
   tasks:
     - name: compile
       distros:
-      - rhel55
+      - rhel70
     - name: shard_cluster_test
 
 - name: linux-mmapv1-shard
@@ -323,5 +323,5 @@ buildvariants:
   tasks:
     - name: compile
       distros:
-      - rhel55
+      - rhel70
     - name: shard_cluster_MMAPv1_test

@@ -102,7 +102,6 @@ variables:
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
   - enterprise-osx-107
-  - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
@@ -116,7 +115,6 @@ variables:
   - enterprise-debian81-64
   - linux-64
   - amazon
-  - rhel55
   - rhel62
   - rhel70
   - suse11
@@ -136,7 +134,6 @@ variables:
 
 - &packaging_variants
   - enterprise-linux-64-amazon-ami
-  - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
@@ -148,7 +145,6 @@ variables:
   - enterprise-ubuntu1604-64
   - enterprise-debian71-64
   - enterprise-debian81-64
-  - rhel55
   - rhel62
   - rhel70
   - suse11
@@ -2656,8 +2652,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2670,7 +2665,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2712,25 +2707,12 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
-    distros:
-    - rhel55-test
   - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2790,7 +2772,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2800,7 +2782,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: dbtest
   - name: dbtest_WT
   - name: integration_tests_standalone
@@ -2821,8 +2803,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2835,7 +2816,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2875,28 +2856,28 @@ buildvariants:
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_replication
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_replication_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_sharded
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_sharded_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_simultaneous
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_simultaneous_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
@@ -2926,8 +2907,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2941,7 +2921,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2957,25 +2937,12 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
-    distros:
-    - rhel55-test
   - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3006,8 +2973,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -3017,7 +2983,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation_WT
   - name: auth_WT
   - name: dbtest_WT
@@ -3031,16 +2997,9 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough_WT
@@ -4397,57 +4356,6 @@ buildvariants:
 #          Redhat buildvariants           #
 ###########################################
 
-- name: enterprise-rhel-57-64-bit
-  display_name: Enterprise RHEL 5.7
-  modules:
-  - enterprise
-  - mongo-tools
-  run_on:
-  - rhel55-test
-  batchtime: 1440 # 1 day
-  expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl) -L/usr/lib64/sasl2" -tags 'sasl ssl'
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel57
-    compile_flags: --ssl MONGO_DISTMOD=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: true
-    packager_script: packager-enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel57
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: audit
-  - name: audit_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: ese_WT
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: replicasets_auth
-  - name: sasl
-  - name: sharding_auth
-  - name: snmp
-  - name: snmp_WT
-  - name: ssl
-  - name: sslSpecial
-  - name: unittests
-  - name: push
-    distros:
-    - rhel55-test
-
 - name: enterprise-rhel-62-64-bit
   display_name: "* Enterprise RHEL 6.2"
   modules:
@@ -4674,131 +4582,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
-  - name: push
-    distros:
-    - rhel55-test
-
-- name: rhel55
-  display_name: SSL RHEL 5.5
-  modules:
-  - mongo-tools
-  run_on:
-  - rhel55
-  - rhel55-test
-  batchtime: 1440 # 1 day
-  expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-rhel55
-    compile_flags: --ssl MONGO_DISTMOD=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: rhel55
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_auth
-  - name: auth
-  - name: auth_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: durability
-  - name: dur_jscore_passthrough
-  - name: failpoints
-  - name: failpoints_auth
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_auth
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_decimal
-  - name: jsCore_decimal_WT
-  - name: jsCore_small_oplog
-  - name: jsCore_small_oplog_WT
-  - name: jsCore_small_oplog_rs
-  - name: jsCore_small_oplog_rs_WT
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
-  - name: jstestfuzz
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_replication
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_sharded
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
-  - name: mmap
-  - name: mongosTest
-  - name: multiversion
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: replicasets
-  - name: replicasets_WT
-  - name: replicasets_auth
-  - name: replication
-  - name: replication_WT
-  - name: replication_auth
-  - name: sharding
-  - name: sharding_WT
-  - name: sharding_auth
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_last_stable_mongos
-  - name: ssl
-  - name: sslSpecial
-  - name: tool
-  - name: tool_WT
   - name: unittests
   - name: push
     distros:
@@ -6302,8 +6085,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -6313,7 +6095,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -6344,16 +6126,9 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   # Disabled due to SERVER-21965
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   # - name: jstestfuzz_WT
-  #   distros:
-  #   - rhel55-test
   # - name: jstestfuzz_replication_WT
-  #   distros:
-  #   - rhel55-test
   # - name: jstestfuzz_sharded_WT
-  #   distros:
-  #   - rhel55-test
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod

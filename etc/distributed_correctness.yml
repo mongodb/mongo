@@ -336,6 +336,6 @@ buildvariants:
   tasks:
     - name: compile
       distros:
-      - rhel55
+      - rhel70
     - name: distributed_correctness_suite_1_wiredTiger
     - name: distributed_correctness_suite_1_MMAPv1

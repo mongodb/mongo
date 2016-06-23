@@ -534,7 +534,7 @@ buildvariants:
   tasks:
     - name: compile
       distros:
-      - rhel55
+      - rhel70
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
