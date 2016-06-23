@@ -148,20 +148,16 @@ private:
     bool _stopRequested();
 
     /**
-     * Signals the beginning of a balancing round.
+     * Signals the beginning and end of a balancing round.
      */
     void _beginRound(OperationContext* txn);
+    void _endRound(OperationContext* txn, Seconds waitTimeout);
 
     /**
      * Blocks the caller for the specified timeout or until the balancer condition variable is
      * signaled, whichever comes first.
      */
-    void _endRound(OperationContext* txn, Seconds waitTimeout);
-
-    /**
-     * Ensures that the balancer can connect to all shards and that they are consistent.
-     */
-    bool _init(OperationContext* txn);
+    void _sleepFor(OperationContext* txn, Seconds waitTimeout);
 
     /**
      * Returns true if all the servers listed in configdb as being shards are reachable and are
