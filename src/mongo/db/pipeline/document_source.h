@@ -348,6 +348,12 @@ public:
 
         virtual bool hasUniqueIdIndex(const NamespaceString& ns) const = 0;
 
+        /**
+         * Appends operation latency statistics for collection "nss" to "builder"
+         */
+        virtual void appendLatencyStats(const NamespaceString& nss,
+                                        BSONObjBuilder* builder) const = 0;
+
         // Add new methods as needed.
     };
 
@@ -1746,4 +1752,29 @@ public:
 private:
     DocumentSourceCount() = default;
 };
-}
+
+/**
+ * Provides a document source interface to retrieve collection-level statistics for a given
+ * collection.
+ */
+class DocumentSourceCollStats : public DocumentSourceNeedsMongod {
+public:
+    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+        : DocumentSourceNeedsMongod(pExpCtx) {}
+
+    boost::optional<Document> getNext() final;
+
+    const char* getSourceName() const final;
+
+    bool isValidInitialSource() const final;
+
+    Value serialize(bool explain = false) const;
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    bool _latencySpecified = false;
+    bool _finished = false;
+};
+}  // namespace mongo
