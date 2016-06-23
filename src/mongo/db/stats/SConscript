@@ -28,9 +28,12 @@ env.Library(
     target='top',
     source=[
         'top.cpp',
+        'operation_latency_histogram.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/curop',
     ],
 )
 
@@ -43,6 +46,16 @@ env.CppUnitTest(
         'top',
     ],
 )
+
+env.CppUnitTest(
+    target='operation_latency_histogram_test',
+    source=[
+        'operation_latency_histogram_test.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/stats/top',
+        ])
 
 env.Library(
     target='counters',
