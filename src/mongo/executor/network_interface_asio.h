@@ -232,6 +232,7 @@ private:
      */
     class AsyncOp {
         friend class NetworkInterfaceASIO;
+        friend class connection_pool_asio::ASIOConnection;
 
     public:
         /**
