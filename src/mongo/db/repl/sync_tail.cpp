@@ -815,6 +815,9 @@ void SyncTail::oplogApplication() {
 bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* ops) {
     {
         BSONObj op;
+        // We must abandon the snapshot for collection based implementations of the oplog buffer.
+        // This ensures that we always read data that is up to date.
+        txn->recoveryUnit()->abandonSnapshot();
         // Check to see if there are ops waiting in the bgsync queue
         bool peek_success = peek(txn, &op);
         if (!peek_success) {
