@@ -217,6 +217,14 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(
 	    session, stats, cache_bytes_overflow, cache->bytes_overflow);
 	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
+
+	/*
+	 * The number of files with active walks ~= number of hazard pointers
+	 * in the walk session.  Note: reading without locking.
+	 */
+	if (conn->evict_session != NULL)
+		WT_STAT_SET(session, stats, cache_eviction_walks_active,
+		    conn->evict_session->nhazard);
 }
 
 /*
