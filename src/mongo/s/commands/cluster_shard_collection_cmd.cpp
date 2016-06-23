@@ -34,6 +34,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -43,6 +44,8 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
@@ -153,6 +156,35 @@ public:
 
         uassert(ErrorCodes::IllegalOperation, "can't shard system namespaces", !nss.isSystem());
 
+        bool simpleCollationSpecified = false;
+        {
+            BSONElement collationElement;
+            Status collationStatus =
+                bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
+            if (collationStatus.isOK()) {
+                // Ensure that the collation is valid. Currently we only allow the simple collation.
+                auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                    ->makeFromBSON(collationElement.Obj());
+                if (!collator.getStatus().isOK()) {
+                    return appendCommandStatus(result, collator.getStatus());
+                }
+
+                if (collator.getValue()) {
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::BadValue,
+                         str::stream()
+                             << "The collation for shardCollection must be {locale: 'simple'}, "
+                             << "but found: "
+                             << collationElement.Obj()});
+                }
+
+                simpleCollationSpecified = true;
+            } else if (collationStatus != ErrorCodes::NoSuchKey) {
+                return appendCommandStatus(result, collationStatus);
+            }
+        }
+
         vector<ShardId> shardIds;
         grid.shardRegistry()->getAllShardIds(&shardIds);
         int numShards = shardIds.size();
@@ -179,7 +211,8 @@ public:
 
         ScopedDbConnection conn(shardConnString);
 
-        // check that collection is not capped
+        // Retrieve the collection metadata in order to verify that it is legal to shard this
+        // collection.
         BSONObj res;
         {
             list<BSONObj> all =
@@ -189,11 +222,27 @@ public:
             }
         }
 
-        if (res["options"].type() == Object &&
-            res["options"].embeddedObject()["capped"].trueValue()) {
+        BSONObj collectionOptions;
+        if (res["options"].type() == BSONType::Object) {
+            collectionOptions = res["options"].Obj();
+        }
+
+        // Check that collection is not capped.
+        if (collectionOptions["capped"].trueValue()) {
             errmsg = "can't shard capped collection";
             conn.done();
             return false;
+        }
+
+        // If the collection has a non-simple default collation but the user did not specify the
+        // simple collation explicitly, return an error.
+        if (collectionOptions["collation"] && !simpleCollationSpecified) {
+            return appendCommandStatus(result,
+                                       {ErrorCodes::BadValue,
+                                        str::stream()
+                                            << "Collection has default collation: "
+                                            << collectionOptions["collation"]
+                                            << ". Must specify collation {locale: 'simple'}"});
         }
 
         // The proposed shard key must be validated against the set of existing indexes.
@@ -207,7 +256,7 @@ public:
         //    is "useful" for the proposed key.  A "useful" index is defined as follows
         //    Useful Index:
         //         i. contains proposedKey as a prefix
-        //         ii. is not a sparse index or partial index
+        //         ii. is not a sparse index, partial index, or index with a non-simple collation
         //         iii. contains no null values
         //         iv. is not multikey (maybe lift this restriction later)
         //         v. if a hashed index, has default seed (lift this restriction later)
@@ -250,7 +299,7 @@ public:
             BSONObj idx = *it;
             BSONObj currentKey = idx["key"].embeddedObject();
             // Check 2.i. and 2.ii.
-            if (!idx["sparse"].trueValue() && idx["filter"].eoo() &&
+            if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
                 proposedKey.isPrefixOf(currentKey)) {
                 // We can't currently use hashed indexes with a non-default hash seed
                 // Check v.

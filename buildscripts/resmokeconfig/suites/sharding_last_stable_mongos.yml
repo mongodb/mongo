@@ -28,6 +28,9 @@ selector:
     - jstests/sharding/map_reduce_validation.js
     # TODO Assumes mapReduce can handle the collation option; enable when 3.4 becomes 'last-stable'.
     - jstests/sharding/mapReduce_inSharded.js
+    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
+    # 'last-stable'.
+    - jstests/sharding/shard_collection_basic.js
 
 executor:
   js_test:
