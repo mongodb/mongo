@@ -155,16 +155,9 @@ void ShardingTestFixture::setUp() {
                 shardId, connStr, targeterFactoryPtr->create(connStr));
         };
 
-    ShardFactory::BuilderCallable customBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
-
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::SET, std::move(setBuilder)},
         {ConnectionString::MASTER, std::move(masterBuilder)},
-        {ConnectionString::CUSTOM, std::move(customBuilder)},
     };
 
     auto shardFactory =

@@ -81,6 +81,12 @@ StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& 
     }
     ConnectionString connString = std::move(swConnString.getValue());
 
+    if (connString.type() != ConnectionString::MASTER &&
+        connString.type() != ConnectionString::SET) {
+        return {ErrorCodes::FailedToParse,
+                stream() << "Invalid connection string " << connString.toString()};
+    }
+
     AddShardRequest request(std::move(connString));
 
     // optional fields

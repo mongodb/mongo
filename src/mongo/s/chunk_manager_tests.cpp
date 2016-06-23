@@ -163,7 +163,7 @@ TEST_F(ChunkManagerTests, Basic) {
 
     std::vector<BSONObj> shards{
         BSON(ShardType::name() << _shardId << ShardType::host()
-                               << ConnectionString(HostAndPort("$hostFooBar:27017")).toString())};
+                               << ConnectionString(HostAndPort("hostFooBar:27017")).toString())};
 
     // Generate and save a set of chunks with metadata using a temporary ChunkManager.
 
