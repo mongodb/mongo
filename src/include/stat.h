@@ -292,6 +292,8 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_slow;
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_eviction_force_fail;
+	int64_t cache_eviction_walks_active;
+	int64_t cache_eviction_walks_started;
 	int64_t cache_eviction_hazard;
 	int64_t cache_hazard_checks;
 	int64_t cache_hazard_walks;
@@ -306,15 +308,19 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_max;
 	int64_t cache_eviction_maximum_page_size;
 	int64_t cache_eviction_dirty;
+	int64_t cache_eviction_app_dirty;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
 	int64_t cache_pages_inuse;
 	int64_t cache_eviction_force;
 	int64_t cache_eviction_force_delete;
 	int64_t cache_eviction_app;
+	int64_t cache_eviction_pages_queued;
+	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
 	int64_t cache_pages_requested;
+	int64_t cache_eviction_pages_seen;
 	int64_t cache_eviction_fail;
 	int64_t cache_eviction_walk;
 	int64_t cache_write;

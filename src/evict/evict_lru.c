@@ -1285,7 +1285,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, uint32_t queue_index, u_int *slotp)
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
-	uint64_t pages_walked;
+	uint64_t pages_seen, refs_walked;
 	uint32_t walk_flags;
 	int internal_pages, restarts;
 	bool enough, modified;
@@ -1320,16 +1320,20 @@ __evict_walk_file(WT_SESSION_IMPL *session, uint32_t queue_index, u_int *slotp)
 	 * Once we hit the page limit, do one more step through the walk in
 	 * case we are appending and only the last page in the file is live.
 	 */
-	for (evict = start, pages_walked = 0;
+	for (evict = start, pages_seen = refs_walked = 0;
 	    evict < end && !enough && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk_count(
-	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
-		enough = pages_walked > cache->evict_max_refs_per_file;
+	    session, &btree->evict_ref, &refs_walked, walk_flags)) {
+		enough = refs_walked > cache->evict_max_refs_per_file;
 		if ((ref = btree->evict_ref) == NULL) {
 			if (++restarts == 2 || enough)
 				break;
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_walks_started);
 			continue;
 		}
+
+		++pages_seen;
 
 		/* Ignore root pages entirely. */
 		if (__wt_ref_is_root(ref))
@@ -1358,9 +1362,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, uint32_t queue_index, u_int *slotp)
 		}
 
 		/* Pages we no longer need (clean or dirty), are found money. */
+		if (page->read_gen == WT_READGEN_OLDEST) {
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_pages_queued_oldest);
+			goto fast;
+		}
 		if (__wt_page_is_empty(page) ||
-		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-		    page->read_gen == WT_READGEN_OLDEST)
+		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 			goto fast;
 
 		/* Skip clean pages if appropriate. */
@@ -1426,6 +1434,8 @@ fast:		/* If the page can't be evicted, give up. */
 	WT_RET_NOTFOUND_OK(ret);
 
 	*slotp += (u_int)(evict - start);
+	WT_STAT_FAST_CONN_INCRV(
+	    session, cache_eviction_pages_queued, (u_int)(evict - start));
 
 	/*
 	 * If we happen to end up on the root page, clear it.  We have to track
@@ -1444,10 +1454,11 @@ fast:		/* If the page can't be evicted, give up. */
 		else if (ref->page->read_gen == WT_READGEN_OLDEST)
 			WT_RET_NOTFOUND_OK(__wt_tree_walk_count(
 			    session, &btree->evict_ref,
-			    &pages_walked, walk_flags));
+			    &refs_walked, walk_flags));
 	}
 
-	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
+	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, refs_walked);
+	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_pages_seen, pages_seen);
 
 	return (0);
 }
@@ -1633,6 +1644,9 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 			cache->worker_evicts++;
 		}
 	} else {
+		if (__wt_page_is_modified(ref->page))
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_app_dirty);
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
 		cache->app_evicts++;
 	}
