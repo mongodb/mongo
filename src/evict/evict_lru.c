@@ -232,6 +232,13 @@ __evict_thread_run(void *arg)
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction thread exiting"));
 
+	/*
+	 * The only two cases when eviction workers are expected to stop are
+	 * when recovery is finished or when the connection is closing. Check
+	 * otherwise fewer eviction worker threads may be running than
+	 * expected.
+	 */
+	WT_ASSERT(session, F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_RECOVERING));
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
 	}
@@ -363,7 +370,7 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 			F_SET(&workers[i], WT_EVICT_WORKER_RUN);
 			WT_ERR(__wt_thread_create(workers[i].session,
 			    &workers[i].tid, __evict_thread_run,
-			    &workers[i].session));
+			    workers[i].session));
 		}
 	}
 
