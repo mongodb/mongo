@@ -153,7 +153,6 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 	case WT_ST_REMOVE:
 	case WT_ST_SET:
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 
 	__meta_track_clear(session, trk);
@@ -215,7 +214,6 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 			__wt_err(session, ret,
 			    "metadata unroll update %s to %s", trk->a, trk->b);
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 
 	__meta_track_clear(session, trk);

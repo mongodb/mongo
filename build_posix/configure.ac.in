@@ -9,19 +9,20 @@ AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([RELEASE_INFO])
 
-# If CFLAGS/CXXFLAGS were not set on entry, default to "-O3 -g"
-: ${CFLAGS=-O3 -g}
-: ${CXXFLAGS=-O3 -g}
-
 # We rely on some automake features for testing (like AM_TEST_ENVIRONMENT)
 # that didn't work before 1.11.6.
 AM_INIT_AUTOMAKE([1.11.6 foreign parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 
-# Configure options.  The AM_OPTIONS and the libtool configuration
-# need to stay here.  Moving them below the compiler and other
-# configurations causes -Wcast_align warnings and other warnings
-# on OS X.
+# If CFLAGS/CXXFLAGS were not set on entry, default to "-O3 -g"
+: ${CFLAGS=-O3 -g}
+: ${CXXFLAGS=-O3 -g}
+
+AC_PROG_CC(cc gcc)
+AC_PROG_CXX(c++ g++)
+AM_PROG_AS(as gas)
+
+# Configure options.
 AM_OPTIONS
 
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
@@ -30,9 +31,23 @@ LT_PREREQ(2.2.6)
 LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
 
-AC_PROG_CC(cc gcc)
-AC_PROG_CXX(c++ g++)
-AM_PROG_AS(as gas)
+# If enable-strict is configured, turn on as much error checking as we can for
+# this compiler. Intended for developers, and only works for gcc/clang, but it
+# fills a need.
+if test "$wt_cv_enable_strict" = "yes"; then
+	wt_cv_cc_version="`$CC --version | sed -eq`"
+	case "$wt_cv_cc_version" in
+	*clang*)
+		AM_CLANG_WARNINGS;;
+	*gcc*|*GCC*)
+		AM_GCC_WARNINGS;;
+	*)
+		AC_MSG_ERROR(
+		    [--enable-strict does not support "$wt_cv_cc_version".]);;
+	esac
+
+	AM_CFLAGS="$AM_CFLAGS $wt_cv_strict_warnings"
+fi
 
 AM_CONDITIONAL([POSIX_HOST], [true])
 AM_CONDITIONAL([WINDOWS_HOST], [false])

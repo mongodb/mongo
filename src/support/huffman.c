@@ -230,19 +230,19 @@ set_codes(WT_FREQTREE_NODE *node,
 		 * lower-order bits for consecutive numbering.
 		 */
 		if (len < MAX_CODE_LENGTH &&
-		    ((half = 1 << (remaining - 1)) < node->left->weight ||
-		    half < node->right->weight)) {
-			pattern = pattern << remaining;
+		    ((half = (uint16_t)(1 << (remaining - 1))) <
+		    node->left->weight || half < node->right->weight)) {
+			pattern = (uint16_t)(pattern << remaining);
 			len = MAX_CODE_LENGTH;
 		}
 
 		if (len < MAX_CODE_LENGTH) {
-			patternleft = (pattern << 1) | 0;
-			patternright = (pattern << 1) | 1;
+			patternleft = (uint16_t)((pattern << 1) | 0);
+			patternright = (uint16_t)((pattern << 1) | 1);
 			len++;
 		} else {			/* "low bit mode" */
 			patternleft = pattern;
-			patternright = pattern + node->left->weight;
+			patternright = (uint16_t)(pattern + node->left->weight);
 						/* len unchanged */
 		}
 
@@ -284,12 +284,12 @@ make_table(WT_SESSION_IMPL *session, uint8_t *code2symbol,
 		 * than necessary, we allocate (2 ^ max-code-length) of them.
 		 */
 		c = codes[i].pattern;
-		shift = max_depth - len;
+		shift = (uint8_t)(max_depth - len);
 		c1 = (uint32_t)c << shift;
 		c2 = (uint32_t)(c + 1) << shift;
 		for (j = c1; j < c2; j++) {
 			WT_ASSERT(session, code2symbol[j] == 0);
-			code2symbol[j] = i;
+			code2symbol[j] = (uint8_t)i;
 		}
 	}
 }
@@ -694,7 +694,7 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	 * used in the last byte, unless they're 0, in which case there are 8
 	 * bits used in the last byte.
 	 */
-	padding_info = (bitpos % 8) << (8 - WT_HUFFMAN_HEADER);
+	padding_info = (uint8_t)((bitpos % 8) << (8 - WT_HUFFMAN_HEADER));
 	((uint8_t *)tmp->mem)[0] |= padding_info;
 
 	/* Copy result of exact known size into caller's buffer. */
@@ -808,11 +808,12 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 			valid += 8;
 			from_bytes--;
 		}
-		pattern = valid >= max ?	/* short patterns near end */
-		    (bits >> (valid - max)) : (bits << (max - valid));
+		pattern = (uint16_t)
+		    (valid >= max ?	/* short patterns near end */
+		    (bits >> (valid - max)) : (bits << (max - valid)));
 		symbol = huffman->code2symbol[pattern & mask];
 		len = huffman->codes[symbol].length;
-		valid -= len;
+		valid -= (uint8_t)len;
 
 		/*
 		 * from_len_bits is the total number of input bits, reduced by

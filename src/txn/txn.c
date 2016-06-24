@@ -257,7 +257,7 @@ __txn_oldest_scan(WT_SESSION_IMPL *session,
  *	Sweep the running transactions to update the oldest ID required.
  */
 int
-__wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
+__wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -265,9 +265,12 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t current_id, last_running, oldest_id;
 	uint64_t prev_last_running, prev_oldest_id;
+	bool strict, wait;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
+	strict = LF_ISSET(WT_TXN_OLDEST_STRICT);
+	wait = LF_ISSET(WT_TXN_OLDEST_WAIT);
 
 	current_id = last_running = txn_global->current;
 	prev_last_running = txn_global->last_running;
@@ -278,11 +281,11 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	 * oldest ID isn't too far behind, avoid scanning.
 	 */
 	if (prev_oldest_id == current_id ||
-	    (!force && WT_TXNID_LT(current_id, prev_oldest_id + 100)))
+	    (!strict && WT_TXNID_LT(current_id, prev_oldest_id + 100)))
 		return (0);
 
 	/* First do a read-only scan. */
-	if (force)
+	if (wait)
 		WT_RET(__wt_readlock(session, txn_global->scan_rwlock));
 	else if ((ret =
 	    __wt_try_readlock(session, txn_global->scan_rwlock)) != 0)
@@ -295,13 +298,13 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	 * non-forced updates), give up.
 	 */
 	if ((oldest_id == prev_oldest_id ||
-	    (!force && WT_TXNID_LT(oldest_id, prev_oldest_id + 100))) &&
+	    (!strict && WT_TXNID_LT(oldest_id, prev_oldest_id + 100))) &&
 	    ((last_running == prev_last_running) ||
-	    (!force && WT_TXNID_LT(last_running, prev_last_running + 100))))
+	    (!strict && WT_TXNID_LT(last_running, prev_last_running + 100))))
 		return (0);
 
 	/* It looks like an update is necessary, wait for exclusive access. */
-	if (force)
+	if (wait)
 		WT_RET(__wt_writelock(session, txn_global->scan_rwlock));
 	else if ((ret =
 	    __wt_try_writelock(session, txn_global->scan_rwlock)) != 0)
@@ -343,6 +346,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	if (WT_TXNID_LT(txn_global->last_running, last_running)) {
 		txn_global->last_running = last_running;
 
+#ifdef HAVE_VERBOSE
 		/* Output a verbose message about long-running transactions,
 		 * but only when some progress is being made. */
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
@@ -355,6 +359,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 			    oldest_session->lastop,
 			    oldest_session->txn.snap_min));
 		}
+#endif
 	}
 
 done:	WT_TRET(__wt_writeunlock(session, txn_global->scan_rwlock));

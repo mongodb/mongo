@@ -216,9 +216,8 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			__wt_cursor_set_raw_value(&asyncop->c, &val);
 			break;
 		case WT_AOP_NONE:
-		default:
-			WT_RET_MSG(session, EINVAL, "Unknown async optype %d\n",
-			    op->optype);
+			WT_RET_MSG(session, EINVAL,
+			    "Unknown async optype %d\n", op->optype);
 	}
 	return (0);
 }

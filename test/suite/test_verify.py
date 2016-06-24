@@ -151,7 +151,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 75) as f:
             for i in range(0, 4096):
                 f.write(struct.pack('B', 0))
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
+        self.runWt(["verify", "table:" + self.tablename],
+            errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
 
     def test_verify_process_25pct_junk(self):
@@ -165,7 +166,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 25) as f:
             for i in range(0, 100):
                 f.write('\x01\xff\x80')
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
+        self.runWt(["verify", "table:" + self.tablename],
+            errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
 
     def test_verify_process_truncated(self):
@@ -178,7 +180,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         with self.open_and_position(self.tablename, 75) as f:
             f.truncate(0)
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
+        self.runWt(["verify", "table:" + self.tablename],
+            errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
 
     def test_verify_process_zero_length(self):
@@ -190,7 +193,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         with self.open_and_position(self.tablename, 0) as f:
             f.truncate(0)
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
+        self.runWt(["verify", "table:" + self.tablename],
+            errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
 
 

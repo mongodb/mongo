@@ -309,6 +309,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
+	F_CLR(conn, WT_CONN_CACHE_POOL);
 
 	__wt_spin_lock(session, &cp->cache_pool_lock);
 	cp_locked = true;

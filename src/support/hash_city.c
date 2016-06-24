@@ -85,6 +85,7 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 	return (result);
 }
 
+#ifdef WORDS_BIGENDIAN
 #ifdef _MSC_VER
 
 #include <stdlib.h>
@@ -132,7 +133,6 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 
 #endif
 
-#ifdef WORDS_BIGENDIAN
 #define	uint32_in_expected_order(x) (bswap_32(x))
 #define	uint64_in_expected_order(x) (bswap_64(x))
 #else

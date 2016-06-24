@@ -17,6 +17,7 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *directory,
     const char *prefix, char ***dirlistp, uint32_t *countp)
 {
+	DWORD windows_error;
 	HANDLE findhandle;
 	WIN32_FIND_DATA finddata;
 	WT_DECL_ITEM(pathbuf);
@@ -45,9 +46,13 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
 	WT_ERR(__wt_buf_fmt(session, pathbuf, "%s\\*", dir_copy));
 
 	findhandle = FindFirstFileA(pathbuf->data, &finddata);
-	if (findhandle == INVALID_HANDLE_VALUE)
-		WT_ERR_MSG(session, __wt_getlasterror(),
-		    "%s: directory-list: FindFirstFile", pathbuf->data);
+	if (findhandle == INVALID_HANDLE_VALUE) {
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: directory-list: FindFirstFile: %s",
+		    pathbuf->data, __wt_formatmessage(session, windows_error));
+		WT_ERR(__wt_map_windows_error(windows_error));
+	}
 
 	count = 0;
 	do {
@@ -74,7 +79,16 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
 	*countp = count;
 
 err:	if (findhandle != INVALID_HANDLE_VALUE)
-		(void)FindClose(findhandle);
+		if (FindClose(findhandle) == 0) {
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
+			    "%s: directory-list: FindClose: %s",
+			    pathbuf->data,
+			    __wt_formatmessage(session, windows_error));
+			if (ret == 0)
+				ret = __wt_map_windows_error(windows_error);
+		}
+
 	__wt_free(session, dir_copy);
 	__wt_scr_free(session, &pathbuf);
 

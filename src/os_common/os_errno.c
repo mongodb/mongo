@@ -23,24 +23,8 @@ __wt_errno(void)
 }
 
 /*
- * __wt_map_error_rdonly --
- *	Map an error into a  WiredTiger error code specific for
- *	read-only operation which intercepts based on certain types
- *	of failures.
- */
-int
-__wt_map_error_rdonly(int error)
-{
-	if (error == ENOENT)
-		return (WT_NOTFOUND);
-	else if (error == EACCES)
-		return (WT_PERM_DENIED);
-	return (error);
-}
-
-/*
  * __wt_strerror --
- *	POSIX implementation of WT_SESSION.strerror and wiredtiger_strerror.
+ *	WT_SESSION.strerror and wiredtiger_strerror.
  */
 const char *
 __wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
@@ -68,4 +52,29 @@ __wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 
 	/* Defeated. */
 	return ("Unable to return error string");
+}
+
+/*
+ * __wt_ext_map_windows_error --
+ *	Extension API call to map a Windows system error to a POSIX/ANSI error.
+ */
+int
+__wt_ext_map_windows_error(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, uint32_t windows_error)
+{
+	WT_UNUSED(wt_api);
+	WT_UNUSED(wt_session);
+
+	/*
+	 * This extension API only makes sense in Windows builds, but it's hard
+	 * to exclude it otherwise (there's no way to return an error, anyway).
+	 * Call an underlying function on Windows, else panic so callers figure
+	 * out what they're doing wrong.
+	 */
+#ifdef _WIN32
+	return (__wt_map_windows_error(windows_error));
+#else
+	WT_UNUSED(windows_error);
+	return (WT_PANIC);
+#endif
 }

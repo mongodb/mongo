@@ -22,13 +22,13 @@ typedef struct {
 
 #define	WT_VRFY_DUMP(vs)						\
 	((vs)->dump_address ||						\
-	    (vs)->dump_blocks || (vs)->dump_pages || (vs)->dump_shape)
+	    (vs)->dump_blocks || (vs)->dump_layout || (vs)->dump_pages)
 	bool dump_address;			/* Configure: dump special */
 	bool dump_blocks;
+	bool dump_layout;
 	bool dump_pages;
-	bool dump_shape;
-
-	u_int depth, depth_internal[100], depth_leaf[100];
+						/* Page layout information */
+	uint64_t depth, depth_internal[100], depth_leaf[100];
 
 	WT_ITEM *tmp1, *tmp2, *tmp3, *tmp4;	/* Temporary buffers */
 } WT_VSTUFF;
@@ -59,11 +59,11 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 	WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
 	vs->dump_blocks = cval.val != 0;
 
+	WT_RET(__wt_config_gets(session, cfg, "dump_layout", &cval));
+	vs->dump_layout = cval.val != 0;
+
 	WT_RET(__wt_config_gets(session, cfg, "dump_pages", &cval));
 	vs->dump_pages = cval.val != 0;
-
-	WT_RET(__wt_config_gets(session, cfg, "dump_shape", &cval));
-	vs->dump_shape = cval.val != 0;
 
 #if !defined(HAVE_DIAGNOSTIC)
 	if (vs->dump_blocks || vs->dump_pages)
@@ -112,33 +112,38 @@ __verify_config_offsets(
 }
 
 /*
- * __verify_tree_shape --
+ * __verify_layout --
  *	Dump the tree shape.
  */
 static int
-__verify_tree_shape(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
+__verify_layout(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
-	uint32_t total;
+	uint64_t total;
 	size_t i;
 
 	for (i = 0, total = 0; i < WT_ELEMENTS(vs->depth_internal); ++i)
 		total += vs->depth_internal[i];
 	WT_RET(__wt_msg(
-	    session, "Internal page tree-depth (total %" PRIu32 "):", total));
+	    session, "Internal page tree-depth (total %" PRIu64 "):", total));
 	for (i = 0; i < WT_ELEMENTS(vs->depth_internal); ++i)
-		if (vs->depth_internal[i] != 0)
+		if (vs->depth_internal[i] != 0) {
 			WT_RET(__wt_msg(session,
-			    "\t%03zu: %u", i, vs->depth_internal[i]));
+			    "\t%03" WT_SIZET_FMT ": %" PRIu64,
+			    i, vs->depth_internal[i]));
+			vs->depth_internal[i] = 0;
+		}
 
 	for (i = 0, total = 0; i < WT_ELEMENTS(vs->depth_leaf); ++i)
 		total += vs->depth_leaf[i];
 	WT_RET(__wt_msg(
-	    session, "Leaf page tree-depth (total %" PRIu32 "):", total));
+	    session, "Leaf page tree-depth (total %" PRIu64 "):", total));
 	for (i = 0; i < WT_ELEMENTS(vs->depth_leaf); ++i)
-		if (vs->depth_leaf[i] != 0)
+		if (vs->depth_leaf[i] != 0) {
 			WT_RET(__wt_msg(session,
-			    "\t%03zu: %u", i, vs->depth_leaf[i]));
-
+			    "\t%03" WT_SIZET_FMT ": %" PRIu64,
+			    i, vs->depth_leaf[i]));
+			vs->depth_leaf[i] = 0;
+		}
 	return (0);
 }
 
@@ -200,9 +205,11 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
 
-		if (WT_VRFY_DUMP(vs))
+		if (WT_VRFY_DUMP(vs)) {
+			WT_ERR(__wt_msg(session, "%s", WT_DIVIDER));
 			WT_ERR(__wt_msg(session, "%s: checkpoint %s",
 			    btree->dhandle->name, ckpt->name));
+		}
 
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
@@ -234,8 +241,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(ret);
 
 		/* Display the tree shape. */
-		if (vs->dump_shape)
-			WT_ERR(__verify_tree_shape(session, vs));
+		if (vs->dump_layout)
+			WT_ERR(__verify_layout(session, vs));
 	}
 
 done:

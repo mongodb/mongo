@@ -84,7 +84,7 @@ __wt_raw_to_esc_hex(
 	WT_RET(__wt_buf_init(session, to, size * 3 + 1));
 
 	for (p = from, t = to->mem, i = size; i > 0; --i, ++p)
-		if (isprint((int)*p)) {
+		if (__wt_isprint((u_char)*p)) {
 			if (*p == '\\')
 				*t++ = '\\';
 			*t++ = *p;

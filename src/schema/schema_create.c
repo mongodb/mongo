@@ -578,7 +578,7 @@ __create_table(WT_SESSION_IMPL *session,
 			WT_ERR(EEXIST);
 		exists = true;
 	}
-	WT_RET_NOTFOUND_OK(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));
 	WT_ERR(__wt_config_subinit(session, &conf, &cval));

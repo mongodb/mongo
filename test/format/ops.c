@@ -1465,7 +1465,7 @@ print_item(const char *tag, WT_ITEM *item)
 	static const char hex[] = "0123456789abcdef";
 	const uint8_t *data;
 	size_t size;
-	int ch;
+	u_char ch;
 
 	data = item->data;
 	size = item->size;
@@ -1476,8 +1476,8 @@ print_item(const char *tag, WT_ITEM *item)
 	else
 		for (; size > 0; --size, ++data) {
 			ch = data[0];
-			if (isprint(ch))
-				fprintf(stderr, "%c", ch);
+			if (__wt_isprint(ch))
+				fprintf(stderr, "%c", (int)ch);
 			else
 				fprintf(stderr, "%x%x",
 				    hex[(data[0] & 0xf0) >> 4],

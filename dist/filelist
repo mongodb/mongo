@@ -107,6 +107,7 @@ src/meta/meta_turtle.c
 src/os_common/filename.c
 src/os_common/os_abort.c
 src/os_common/os_alloc.c
+src/os_common/os_errno.c
 src/os_common/os_fhandle.c
 src/os_common/os_fs_inmemory.c
 src/os_common/os_fstream.c
@@ -115,7 +116,6 @@ src/os_common/os_getopt.c
 src/os_common/os_strtouq.c
 src/os_posix/os_dir.c			POSIX_HOST
 src/os_posix/os_dlopen.c		POSIX_HOST
-src/os_posix/os_errno.c			POSIX_HOST
 src/os_posix/os_fallocate.c		POSIX_HOST
 src/os_posix/os_fs.c			POSIX_HOST
 src/os_posix/os_getenv.c		POSIX_HOST
@@ -132,7 +132,6 @@ src/os_posix/os_time.c			POSIX_HOST
 src/os_posix/os_yield.c			POSIX_HOST
 src/os_win/os_dir.c			WINDOWS_HOST
 src/os_win/os_dlopen.c			WINDOWS_HOST
-src/os_win/os_errno.c			WINDOWS_HOST
 src/os_win/os_fs.c			WINDOWS_HOST
 src/os_win/os_getenv.c			WINDOWS_HOST
 src/os_win/os_map.c			WINDOWS_HOST
@@ -147,6 +146,7 @@ src/os_win/os_snprintf.c		WINDOWS_HOST
 src/os_win/os_thread.c			WINDOWS_HOST
 src/os_win/os_time.c			WINDOWS_HOST
 src/os_win/os_vsnprintf.c		WINDOWS_HOST
+src/os_win/os_winerr.c			WINDOWS_HOST
 src/os_win/os_yield.c			WINDOWS_HOST
 src/packing/pack_api.c
 src/packing/pack_impl.c

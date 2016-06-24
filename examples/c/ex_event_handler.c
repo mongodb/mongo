@@ -68,7 +68,7 @@ handle_wiredtiger_error(WT_EVENT_HANDLER *handler,
 	/* Report the error on the console. */
 	fprintf(stderr,
 	    "app_id %s, thread context %p, error %d, message %s\n",
-	    custom_handler->app_id, session, error, message);
+	    custom_handler->app_id, (void *)session, error, message);
 
 	return (0);
 }
@@ -83,7 +83,8 @@ handle_wiredtiger_message(
 {
 	/* Cast the handler back to our custom handler. */
 	printf("app id %s, thread context %p, message %s\n",
-	    ((CUSTOM_EVENT_HANDLER *)handler)->app_id, session, message);
+	    ((CUSTOM_EVENT_HANDLER *)handler)->app_id,
+	    (void *)session, message);
 
 	return (0);
 }

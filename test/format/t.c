@@ -32,7 +32,8 @@ GLOBAL g;
 
 static void format_die(void);
 static void startup(void);
-static void usage(void);
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 extern int __wt_optind;
 extern char *__wt_optarg;

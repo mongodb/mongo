@@ -52,8 +52,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
-				u = _mm_load_si128((__m128i *)userp);
-				t = _mm_load_si128((__m128i *)treep);
+				u = _mm_load_si128((const __m128i *)userp);
+				t = _mm_load_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -62,8 +62,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
-				u = _mm_loadu_si128((__m128i *)userp);
-				t = _mm_loadu_si128((__m128i *)treep);
+				u = _mm_loadu_si128((const __m128i *)userp);
+				t = _mm_loadu_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -123,8 +123,8 @@ __wt_lex_compare_skip(
 	tsz = tree_item->size;
 	len = WT_MIN(usz, tsz) - *matchp;
 
-	userp = (uint8_t *)user_item->data + *matchp;
-	treep = (uint8_t *)tree_item->data + *matchp;
+	userp = (const uint8_t *)user_item->data + *matchp;
+	treep = (const uint8_t *)tree_item->data + *matchp;
 
 #ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
@@ -139,8 +139,8 @@ __wt_lex_compare_skip(
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
 			    *matchp += WT_VECTOR_SIZE) {
-				u = _mm_load_si128((__m128i *)userp);
-				t = _mm_load_si128((__m128i *)treep);
+				u = _mm_load_si128((const __m128i *)userp);
+				t = _mm_load_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
@@ -150,8 +150,8 @@ __wt_lex_compare_skip(
 			    len -= WT_VECTOR_SIZE,
 			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
 			    *matchp += WT_VECTOR_SIZE) {
-				u = _mm_loadu_si128((__m128i *)userp);
-				t = _mm_loadu_si128((__m128i *)treep);
+				u = _mm_loadu_si128((const __m128i *)userp);
+				t = _mm_loadu_si128((const __m128i *)treep);
 				res_eq = _mm_cmpeq_epi8(u, t);
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;

@@ -144,10 +144,16 @@ __wt_stats_clear(void *stats_arg, int slot)
 
 #define	WT_STAT_DECRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
+#define	WT_STAT_DECRV_ATOMIC(session, stats, fld, value)		\
+	__wt_atomic_addi64(						\
+	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_DECR(session, stats, fld)				\
 	WT_STAT_DECRV(session, stats, fld, 1)
 #define	WT_STAT_INCRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value)
+#define	WT_STAT_INCRV_ATOMIC(session, stats, fld, value)		\
+	__wt_atomic_subi64(						\
+	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_INCR(session, stats, fld)				\
 	WT_STAT_INCRV(session, stats, fld, 1)
 #define	WT_STAT_SET(session, stats, fld, value) do {			\
@@ -164,12 +170,20 @@ __wt_stats_clear(void *stats_arg, int slot)
 } while (0)
 #define	WT_STAT_FAST_DECR(session, stats, fld)				\
 	WT_STAT_FAST_DECRV(session, stats, fld, 1)
+#define	WT_STAT_FAST_DECRV_ATOMIC(session, stats, fld, value) do {	\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		WT_STAT_DECRV_ATOMIC(session, stats, fld, value);	\
+} while (0)
 #define	WT_STAT_FAST_INCRV(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_INCRV(session, stats, fld, value);		\
 } while (0)
 #define	WT_STAT_FAST_INCR(session, stats, fld)				\
 	WT_STAT_FAST_INCRV(session, stats, fld, 1)
+#define	WT_STAT_FAST_INCRV_ATOMIC(session, stats, fld, value) do {	\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		WT_STAT_INCRV_ATOMIC(session, stats, fld, value);	\
+} while (0)
 #define	WT_STAT_FAST_SET(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
 		WT_STAT_SET(session, stats, fld, value);		\
@@ -180,10 +194,14 @@ __wt_stats_clear(void *stats_arg, int slot)
  */
 #define	WT_STAT_FAST_CONN_DECR(session, fld)				\
 	WT_STAT_FAST_DECR(session, S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_DECR_ATOMIC(session, fld)			\
+	WT_STAT_FAST_DECRV_ATOMIC(session, S2C(session)->stats, fld, 1)
 #define	WT_STAT_FAST_CONN_DECRV(session, fld, value)			\
 	WT_STAT_FAST_DECRV(session, S2C(session)->stats, fld, value)
 #define	WT_STAT_FAST_CONN_INCR(session, fld)				\
 	WT_STAT_FAST_INCR(session, S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_INCR_ATOMIC(session, fld)			\
+	WT_STAT_FAST_INCRV_ATOMIC(session, S2C(session)->stats, fld, 1)
 #define	WT_STAT_FAST_CONN_INCRV(session, fld, value)			\
 	WT_STAT_FAST_INCRV(session, S2C(session)->stats, fld, value)
 #define	WT_STAT_FAST_CONN_SET(session, fld, value)			\
@@ -274,6 +292,8 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_slow;
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_eviction_force_fail;
+	int64_t cache_eviction_walks_active;
+	int64_t cache_eviction_walks_started;
 	int64_t cache_eviction_hazard;
 	int64_t cache_hazard_checks;
 	int64_t cache_hazard_walks;
@@ -288,15 +308,19 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_max;
 	int64_t cache_eviction_maximum_page_size;
 	int64_t cache_eviction_dirty;
+	int64_t cache_eviction_app_dirty;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
 	int64_t cache_pages_inuse;
 	int64_t cache_eviction_force;
 	int64_t cache_eviction_force_delete;
 	int64_t cache_eviction_app;
+	int64_t cache_eviction_pages_queued;
+	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
 	int64_t cache_pages_requested;
+	int64_t cache_eviction_pages_seen;
 	int64_t cache_eviction_fail;
 	int64_t cache_eviction_walk;
 	int64_t cache_write;
@@ -317,6 +341,7 @@ struct __wt_connection_stats {
 	int64_t cond_wait;
 	int64_t rwlock_read;
 	int64_t rwlock_write;
+	int64_t fsync_io;
 	int64_t read_io;
 	int64_t write_io;
 	int64_t cursor_create;
@@ -359,7 +384,9 @@ struct __wt_connection_stats {
 	int64_t log_write_lsn;
 	int64_t log_write_lsn_skip;
 	int64_t log_sync;
+	int64_t log_sync_duration;
 	int64_t log_sync_dir;
+	int64_t log_sync_dir_duration;
 	int64_t log_writes;
 	int64_t log_slot_consolidated;
 	int64_t log_max_filesize;
@@ -381,6 +408,9 @@ struct __wt_connection_stats {
 	int64_t rec_split_stashed_objects;
 	int64_t session_cursor_open;
 	int64_t session_open;
+	int64_t fsync_active;
+	int64_t read_active;
+	int64_t write_active;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
 	int64_t page_locked_blocked;
@@ -397,6 +427,10 @@ struct __wt_connection_stats {
 	int64_t txn_checkpoint_time_total;
 	int64_t txn_checkpoint;
 	int64_t txn_fail_cache;
+	int64_t txn_checkpoint_fsync_post;
+	int64_t txn_checkpoint_fsync_pre;
+	int64_t txn_checkpoint_fsync_post_duration;
+	int64_t txn_checkpoint_fsync_pre_duration;
 	int64_t txn_pinned_range;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
@@ -517,9 +551,11 @@ struct __wt_dsrc_stats {
  */
 #define	WT_JOIN_STATS_BASE	3000
 struct __wt_join_stats {
-	int64_t accesses;
-	int64_t actual_count;
+	int64_t main_access;
 	int64_t bloom_false_positive;
+	int64_t membership_check;
+	int64_t bloom_insert;
+	int64_t iterated;
 };
 
 /* Statistics section: END */

@@ -439,7 +439,7 @@ connection_runtime_config = [
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),
-        Config('path', '', r'''
+        Config('path', '"."', r'''
             the path to a directory into which the log files are written.
             If the value is not an absolute path name, the files are created
             relative to the database home'''),
@@ -959,16 +959,17 @@ methods = {
         Display the contents of on-disk blocks as they are verified,
         using the application's message handler, intended for debugging''',
         type='boolean'),
+    Config('dump_layout', 'false', r'''
+        Display the layout of the files as they are verified, using the
+        application's message handler, intended for debugging; requires
+        optional support from the block manager''',
+        type='boolean'),
     Config('dump_offsets', '', r'''
         Display the contents of specific on-disk blocks,
         using the application's message handler, intended for debugging''',
         type='list'),
     Config('dump_pages', 'false', r'''
         Display the contents of in-memory pages as they are verified,
-        using the application's message handler, intended for debugging''',
-        type='boolean'),
-    Config('dump_shape', 'false', r'''
-        Display the shape of the tree after verification,
         using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('strict', 'false', r'''

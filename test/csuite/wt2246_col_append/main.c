@@ -45,7 +45,7 @@
 void (*custom_die)(void) = NULL;
 
 /* Needs to be global for signal handling. */
-TEST_OPTS *opts, _opts;
+static TEST_OPTS *opts, _opts;
 
 static void
 page_init(uint64_t n)
