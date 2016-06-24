@@ -201,15 +201,23 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return Pipeline::aggSupportsWriteConcern(cmd);
     }
+
     virtual bool slaveOk() const {
         return false;
     }
+
     virtual bool slaveOverrideOk() const {
         return true;
     }
+
     bool supportsReadConcern() const final {
         return true;
     }
+
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kRead;
+    }
+
     virtual void help(stringstream& help) const {
         help << "{ pipeline: [ { $operator: {...}}, ... ]"
              << ", explain: <bool>"

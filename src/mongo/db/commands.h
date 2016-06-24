@@ -78,6 +78,8 @@ protected:
 public:
     typedef StringMap<Command*> CommandMap;
 
+    enum class ReadWriteType { kCommand, kRead, kWrite };
+
     /**
      * Constructs a new command and causes it to be registered with the global commands list. It is
      * not safe to construct commands other than when the server is starting up.
@@ -266,6 +268,16 @@ public:
 
     virtual LogicalOp getLogicalOp() const {
         return LogicalOp::opCommand;
+    }
+
+    /**
+     * Returns whether this operation is a read, write, or command.
+     *
+     * Commands which implement database read or write logic should override this to return kRead
+     * or kWrite as appropriate.
+     */
+    virtual ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kCommand;
     }
 
 protected:
