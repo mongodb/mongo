@@ -25,6 +25,7 @@ env.SConscript(
         'sorter',
         'stats',
         'storage',
+        'views',
     ],
 )
 
@@ -757,6 +758,7 @@ serveronlyLibdeps = [
     "storage/storage_engine_metadata",
     "storage/storage_options",
     "update_index_data",
+    "views/views",
 ]
 
 if wiredtiger:

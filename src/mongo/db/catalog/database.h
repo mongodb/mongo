@@ -30,11 +30,16 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/views/view.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 
@@ -151,6 +156,8 @@ public:
                                  const CollectionOptions& options = CollectionOptions(),
                                  bool createDefaultIndexes = true);
 
+    Status createView(OperationContext* txn, StringData viewName, const CollectionOptions& options);
+
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
@@ -158,6 +165,14 @@ public:
 
     Collection* getCollection(const NamespaceString& ns) const {
         return getCollection(ns.ns());
+    }
+
+    /**
+     * Get the view catalog, which holds the definition for all views created on this database. You
+     * must be holding a database lock to use this accessor.
+     */
+    ViewCatalog* getViewCatalog() {
+        return &_views;
     }
 
     Collection* getOrCreateCollection(OperationContext* txn, StringData ns);
@@ -191,6 +206,10 @@ public:
         return _indexesName;
     }
 
+    const std::string& getSystemViewsName() const {
+        return _viewsName;
+    }
+
 private:
     /**
      * Gets or creates collection instance from existing metadata,
@@ -202,6 +221,11 @@ private:
     Collection* _getOrCreateCollectionInstance(OperationContext* txn, StringData fullns);
 
     /**
+     * Throws if there is a reason 'ns' cannot be created as a user collection.
+     */
+    void _checkCanCreateCollection(const NamespaceString& nss, const CollectionOptions& options);
+
+    /**
      * Deregisters and invalidates all cursors on collection 'fullns'.  Callers must specify
      * 'reason' for why the cache is being cleared.
      */
@@ -210,16 +234,18 @@ private:
     class AddCollectionChange;
     class RemoveCollectionChange;
 
-    const std::string _name;  // "alleyinsider"
+    const std::string _name;  // "dbname"
 
     DatabaseCatalogEntry* _dbEntry;  // not owned here
 
-    const std::string _profileName;  // "alleyinsider.system.profile"
-    const std::string _indexesName;  // "alleyinsider.system.indexes"
+    const std::string _profileName;  // "dbname.system.profile"
+    const std::string _indexesName;  // "dbname.system.indexes"
+    const std::string _viewsName;    // "dbname.system.views"
 
     int _profile;  // 0=off.
 
     CollectionMap _collections;
+    ViewCatalog _views;
 
     friend class Collection;
     friend class NamespaceDetails;

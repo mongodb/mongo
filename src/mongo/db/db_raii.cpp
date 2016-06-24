@@ -46,16 +46,18 @@ AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
 
 AutoGetCollection::AutoGetCollection(OperationContext* txn,
                                      const NamespaceString& nss,
-                                     LockMode modeAll)
-    : AutoGetCollection(txn, nss, modeAll, modeAll) {}
-
-AutoGetCollection::AutoGetCollection(OperationContext* txn,
-                                     const NamespaceString& nss,
                                      LockMode modeDB,
-                                     LockMode modeColl)
-    : _autoDb(txn, nss.db(), modeDB),
+                                     LockMode modeColl,
+                                     ViewMode viewMode)
+    : _viewMode(viewMode),
+      _autoDb(txn, nss.db(), modeDB),
       _collLock(txn->lockState(), nss.ns(), modeColl),
-      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {}
+      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {
+    Database* db = _autoDb.getDb();
+    if (_viewMode == ViewMode::kViewsForbidden && db && db->getViewCatalog()->lookup(nss.ns()))
+        uasserted(ErrorCodes::CommandNotSupportedOnView,
+                  str::stream() << "Namespace " << nss.ns() << " is a view, not a collection");
+}
 
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode)
     : _transaction(txn, MODE_IX),
@@ -73,14 +75,13 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockM
     }
 }
 
-AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn, const std::string& ns)
-    : AutoGetCollectionForRead(txn, NamespaceString(ns)) {}
-
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
-                                                   const NamespaceString& nss)
+                                                   const NamespaceString& nss,
+                                                   AutoGetCollection::ViewMode viewMode)
     : _txn(txn), _transaction(txn, MODE_IS) {
     {
-        _autoColl.emplace(txn, nss, MODE_IS);
+        _autoColl.emplace(txn, nss, MODE_IS, MODE_IS, viewMode);
+
         auto curOp = CurOp::get(_txn);
         stdx::lock_guard<Client> lk(*_txn->getClient());
 
@@ -151,6 +152,18 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
         // Relock.
         _autoColl.emplace(_txn, nss, MODE_IS);
     }
+}
+
+AutoGetCollectionOrViewForRead::AutoGetCollectionOrViewForRead(OperationContext* txn,
+                                                               const NamespaceString& nss)
+    : AutoGetCollectionForRead(txn, nss, AutoGetCollection::ViewMode::kViewsPermitted),
+      _view(_autoColl->getDb() ? _autoColl->getDb()->getViewCatalog()->lookup(nss.ns()) : nullptr) {
+}
+
+void AutoGetCollectionOrViewForRead::releaseLocksForView() noexcept {
+    invariant(_view);
+    _view = nullptr;
+    _autoColl = boost::none;
 }
 
 OldClientContext::OldClientContext(OperationContext* txn,

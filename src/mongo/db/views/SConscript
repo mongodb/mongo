@@ -1,0 +1,15 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='views',
+    source=[
+        'view.cpp',
+        'view_catalog.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters',
+    ]
+)

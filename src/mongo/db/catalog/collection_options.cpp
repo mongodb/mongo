@@ -106,10 +106,16 @@ void CollectionOptions::reset() {
     validationLevel = "";
     validationAction = "";
     collation = BSONObj();
+    viewOn = "";
+    pipeline = BSONObj();
 }
 
 bool CollectionOptions::isValid() const {
     return validate().isOK();
+}
+
+bool CollectionOptions::isView() const {
+    return !viewOn.empty();
 }
 
 Status CollectionOptions::validate() const {
@@ -220,7 +226,26 @@ Status CollectionOptions::parse(const BSONObj& options) {
             }
 
             collation = e.Obj().getOwned();
+        } else if (fieldName == "viewOn") {
+            if (e.type() != mongo::String) {
+                return Status(ErrorCodes::BadValue, "'viewOn' has to be a string.");
+            }
+
+            viewOn = e.String();
+            if (viewOn.empty()) {
+                return Status(ErrorCodes::BadValue, "'viewOn' cannot be empty.'");
+            }
+        } else if (fieldName == "pipeline") {
+            if (e.type() != mongo::Array) {
+                return Status(ErrorCodes::BadValue, "'pipeline' has to be an array.");
+            }
+
+            pipeline = e.Obj().getOwned();
         }
+    }
+
+    if (viewOn.empty() && !pipeline.isEmpty()) {
+        return Status(ErrorCodes::BadValue, "'pipeline' cannot be specified without 'viewOn'");
     }
 
     return Status::OK();
@@ -272,6 +297,14 @@ BSONObj CollectionOptions::toBSON() const {
 
     if (!collation.isEmpty()) {
         b.append("collation", collation);
+    }
+
+    if (!viewOn.empty()) {
+        b.append("viewOn", viewOn);
+    }
+
+    if (!pipeline.isEmpty()) {
+        b.append("pipeline", pipeline);
     }
 
     return b.obj();

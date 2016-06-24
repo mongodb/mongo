@@ -234,4 +234,23 @@ TEST(CollectionOptions, CollationFieldNotDumpedToBSONWhenOmitted) {
     BSONObj asBSON = options.toBSON();
     ASSERT_FALSE(asBSON["collation"]);
 }
+
+TEST(CollectionOptions, ViewParsesCorrectly) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{viewOn: 'c', pipeline: [{$match: {}}]}")));
+    ASSERT_EQ(options.viewOn, "c");
+    ASSERT_EQ(options.pipeline, fromjson("[{$match: {}}]"));
+}
+
+TEST(CollectionOptions, ViewParsesCorrectlyWithoutPipeline) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{viewOn: 'c'}")));
+    ASSERT_EQ(options.viewOn, "c");
+    ASSERT_EQ(options.pipeline, BSONObj());
+}
+
+TEST(CollectionOptions, PipelineFieldRequiresViewOn) {
+    CollectionOptions options;
+    ASSERT_NOT_OK(options.parse(fromjson("{pipeline: [{$match: {}}]}")));
+}
 }

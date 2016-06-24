@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/views/view.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -73,13 +74,29 @@ private:
 class AutoGetCollection {
     MONGO_DISALLOW_COPYING(AutoGetCollection);
 
+    enum class ViewMode;
+
 public:
-    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode modeAll);
+    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode modeAll)
+        : AutoGetCollection(txn, nss, modeAll, modeAll, ViewMode::kViewsForbidden) {}
 
     AutoGetCollection(OperationContext* txn,
                       const NamespaceString& nss,
                       LockMode modeDB,
-                      LockMode modeColl);
+                      LockMode modeColl)
+        : AutoGetCollection(txn, nss, modeDB, modeColl, ViewMode::kViewsForbidden) {}
+
+    /**
+     * This constructor is inteded for internal use and should not be used outside this file.
+     * AutoGetCollectionForRead and AutoGetCollectionOrViewForRead use ViewMode to determine whether
+     * or not it is permissible to obtain a handle on a view namespace. Use another constructor or
+     * another AutoGet class instead.
+     */
+    AutoGetCollection(OperationContext* txn,
+                      const NamespaceString& nss,
+                      LockMode modeDB,
+                      LockMode modeColl,
+                      ViewMode viewMode);
 
     Database* getDb() const {
         return _autoDb.getDb();
@@ -90,9 +107,15 @@ public:
     }
 
 private:
+    enum class ViewMode { kViewsPermitted, kViewsForbidden };
+
+    const ViewMode _viewMode;
     const AutoGetDb _autoDb;
     const Lock::CollectionLock _collLock;
     Collection* const _coll;
+
+    friend class AutoGetCollectionForRead;
+    friend class AutoGetCollectionOrViewForRead;
 };
 
 /**
@@ -143,8 +166,13 @@ class AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
 
 public:
-    AutoGetCollectionForRead(OperationContext* txn, const std::string& ns);
-    AutoGetCollectionForRead(OperationContext* txn, const NamespaceString& nss);
+    AutoGetCollectionForRead(OperationContext* txn, const std::string& ns)
+        : AutoGetCollectionForRead(
+              txn, NamespaceString(ns), AutoGetCollection::ViewMode::kViewsForbidden) {}
+
+    AutoGetCollectionForRead(OperationContext* txn, const NamespaceString& nss)
+        : AutoGetCollectionForRead(txn, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
+
     ~AutoGetCollectionForRead();
 
     Database* getDb() const {
@@ -156,13 +184,53 @@ public:
     }
 
 private:
-    void _init(const std::string& ns, StringData coll);
     void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss);
 
     const Timer _timer;
     OperationContext* const _txn;
     const ScopedTransaction _transaction;
+
+protected:
+    AutoGetCollectionForRead(OperationContext* txn,
+                             const NamespaceString& nss,
+                             AutoGetCollection::ViewMode viewMode);
+
+    /**
+     * This protected section must come after the private section because
+     * AutoGetCollectionOrViewForRead needs access to _autoColl, but _autoColl must be initialized
+     * after _transaction.
+     */
     boost::optional<AutoGetCollection> _autoColl;
+};
+
+/**
+ * RAII-style class for obtaining a collection or view for reading. The pointer to a view definition
+ * is nullptr if it does not exist.
+ */
+class AutoGetCollectionOrViewForRead final : public AutoGetCollectionForRead {
+    MONGO_DISALLOW_COPYING(AutoGetCollectionOrViewForRead);
+
+public:
+    AutoGetCollectionOrViewForRead(OperationContext* txn, const std::string& ns)
+        : AutoGetCollectionOrViewForRead(txn, NamespaceString(ns)) {}
+
+    AutoGetCollectionOrViewForRead(OperationContext* txn, const NamespaceString& nss);
+
+    ViewDefinition* getView() const {
+        return _view;
+    }
+
+    /**
+     * Unlock this view or collection and release all resources. After calling this function, it is
+     * illegal to access this object's database, collection and view pointers.
+     *
+     * TODO(SERVER-24909): Consider having the constructor release locks instead, or otherwise
+     * remove the need for this method.
+     */
+    void releaseLocksForView() noexcept;
+
+private:
+    ViewDefinition* _view;
 };
 
 /**

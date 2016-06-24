@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
+#include <memory>
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
@@ -62,6 +63,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/views/view_catalog.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -199,7 +202,9 @@ Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry*
     : _name(name.toString()),
       _dbEntry(dbEntry),
       _profileName(_name + ".system.profile"),
-      _indexesName(_name + ".system.indexes") {
+      _indexesName(_name + ".system.indexes"),
+      _viewsName(_name + ".system.views"),
+      _views(txn, this) {
     Status status = validateDBName(_name);
     if (!status.isOK()) {
         warning() << "tried to open invalid db: " << _name << endl;
@@ -439,7 +444,6 @@ Collection* Database::getCollection(StringData ns) const {
     return NULL;
 }
 
-
 Status Database::renameCollection(OperationContext* txn,
                                   StringData fromNS,
                                   StringData toNS,
@@ -482,33 +486,55 @@ Collection* Database::getOrCreateCollection(OperationContext* txn, StringData ns
     return c;
 }
 
+void Database::_checkCanCreateCollection(const NamespaceString& nss,
+                                         const CollectionOptions& options) {
+    massert(17399, "collection already exists", getCollection(nss.ns()) == nullptr);
+    massertNamespaceNotIndex(nss.ns(), "createCollection");
+
+    uassert(14037,
+            "can't create user databases on a --configsvr instance",
+            serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOnInternalDb());
+
+    // This check only applies for actual collections, not indexes or other types of ns.
+    uassert(17381,
+            str::stream() << "fully qualified namespace " << nss.ns() << " is too long "
+                          << "(max is "
+                          << NamespaceString::MaxNsCollectionLen
+                          << " bytes)",
+            !nss.isNormal() || nss.size() <= NamespaceString::MaxNsCollectionLen);
+
+    uassert(17316, "cannot create a blank collection", nss.coll() > 0);
+    uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
+}
+
+Status Database::createView(OperationContext* txn,
+                            StringData ns,
+                            const CollectionOptions& options) {
+    invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+    invariant(options.isView());
+
+    NamespaceString nss(ns);
+    NamespaceString viewOnNss(nss.db(), options.viewOn);
+    _checkCanCreateCollection(nss, options);
+    audit::logCreateCollection(&cc(), ns);
+
+    if (nss.isOplog())
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid namespace name for a view: " + nss.toString());
+
+    return _views.createView(txn, nss, viewOnNss, options.pipeline);
+}
+
+
 Collection* Database::createCollection(OperationContext* txn,
                                        StringData ns,
                                        const CollectionOptions& options,
                                        bool createIdIndex) {
-    massert(17399, "collection already exists", getCollection(ns) == NULL);
-    massertNamespaceNotIndex(ns, "createCollection");
     invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
-
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        !(ns.startsWith("config.") || ns.startsWith("local.") || ns.startsWith("admin."))) {
-        uasserted(14037, "can't create user databases on a --configsvr instance");
-    }
-
-    if (NamespaceString::normal(ns)) {
-        // This check only applies for actual collections, not indexes or other types of ns.
-        uassert(17381,
-                str::stream() << "fully qualified namespace " << ns << " is too long "
-                              << "(max is "
-                              << NamespaceString::MaxNsCollectionLen
-                              << " bytes)",
-                ns.size() <= NamespaceString::MaxNsCollectionLen);
-    }
+    invariant(!options.isView());
 
     NamespaceString nss(ns);
-    uassert(17316, "cannot create a blank collection", nss.coll() > 0);
-    uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
-
+    _checkCanCreateCollection(nss, options);
     audit::logCreateCollection(&cc(), ns);
 
     txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns));
@@ -614,7 +640,12 @@ Status userCreateNS(OperationContext* txn,
     Collection* collection = db->getCollection(ns);
 
     if (collection)
-        return Status(ErrorCodes::NamespaceExists, "collection already exists");
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "a collection '" << ns.toString() << "' already exists");
+
+    if (db->getViewCatalog()->lookup(ns))
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "a view '" << ns.toString() << "' already exists");
 
     CollectionOptions collectionOptions;
     Status status = collectionOptions.parse(options);
@@ -660,7 +691,11 @@ Status userCreateNS(OperationContext* txn,
         }
     }
 
-    invariant(db->createCollection(txn, ns, collectionOptions, createDefaultIndexes));
+    if (collectionOptions.isView()) {
+        uassertStatusOK(db->createView(txn, ns, collectionOptions));
+    } else {
+        invariant(db->createCollection(txn, ns, collectionOptions, createDefaultIndexes));
+    }
 
     return Status::OK();
 }
