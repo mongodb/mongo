@@ -38,7 +38,6 @@
 #define HAVE_NL_TYPES_H 1
 #define HAVE_POSIX_MEMALIGN 1
 #define HAVE_SETLOCALE 1
-#define HAVE_SINCOS 1
 #define HAVE_SSIZE_T 1
 #define HAVE_STRNDUP 1
 #define HAVE_SYS_CDEFS_H 1
