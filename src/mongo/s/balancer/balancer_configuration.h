@@ -163,7 +163,7 @@ private:
 /**
  * Utility class to parse the sharding autoSplit settings document, which has the following format:
  *
- * sharding: { autoSplit: <true|false> }
+ * autosplit: { enabled: <true|false> }
  */
 class AutoSplitSettingsType {
 public:
