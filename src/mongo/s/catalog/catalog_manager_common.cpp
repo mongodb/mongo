@@ -352,9 +352,6 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
         return result;
     }
 
-    // Make sure the new shard is visible
-    grid.shardRegistry()->reload(txn);
-
     // Add all databases which were discovered on the new shard
     for (const string& dbName : dbNamesStatus.getValue()) {
         DatabaseType dbt;
@@ -375,6 +372,12 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
     shardDetails.append("host", shardConnectionString.toString());
 
     logChange(txn, "addShard", "", shardDetails.obj());
+
+    // Make sure the new shard is visible from this point on. Do the reload twice in case there was
+    // a concurrent reload, which started before we added the shard.
+    if (!grid.shardRegistry()->reload(txn)) {
+        grid.shardRegistry()->reload(txn);
+    }
 
     return shardType.getName();
 }
