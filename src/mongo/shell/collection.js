@@ -141,8 +141,6 @@ DBCollection.prototype.help = function() {
     print(
         "\tdb." + shortName +
         ".unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the collection");
-    print("\tdb." + shortName +
-          ".latencyStats() - display operation latency histograms for this collection");
     // print("\tdb." + shortName + ".getDiskStorageStats({...}) - prints a summary of disk usage
     // statistics");
     // print("\tdb." + shortName + ".getPagesInRAM({...}) - prints a summary of storage pages
@@ -1752,10 +1750,6 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
 
 DBCollection.prototype._distinct = function(keyString, query) {
     return this._dbReadCommand({distinct: this._shortName, key: keyString, query: query || {}});
-};
-
-DBCollection.prototype.latencyStats = function() {
-    return this.aggregate([{$collStats: {latencyStats: {}}}]);
 };
 
 /**

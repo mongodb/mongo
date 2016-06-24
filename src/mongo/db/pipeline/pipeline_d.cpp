@@ -55,7 +55,6 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/s/chunk_version.h"
@@ -128,10 +127,6 @@ public:
         }
 
         return collection->getIndexCatalog()->findIdIndex(_ctx->opCtx);
-    }
-
-    void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const {
-        Top::get(_ctx->opCtx->getServiceContext()).appendLatencyStats(nss.ns(), builder);
     }
 
 private:
