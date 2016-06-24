@@ -60,6 +60,7 @@ struct MigrateInfo {
           minKey(a_chunk.getMin()),
           maxKey(a_chunk.getMax()) {}
 
+    std::string getName() const;
     std::string toString() const;
 
     std::string ns;
