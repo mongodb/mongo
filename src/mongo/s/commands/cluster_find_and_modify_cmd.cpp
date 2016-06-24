@@ -175,9 +175,7 @@ public:
         bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
-            if (mongosGlobalParams.shouldAutoSplit) {
-                chunk->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
-            }
+            chunk->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
         }
 
         return ok;

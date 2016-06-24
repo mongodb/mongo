@@ -47,6 +47,7 @@ namespace mongo {
 namespace {
 
 const char kValue[] = "value";
+const char kEnabled[] = "enabled";
 const char kStopped[] = "stopped";
 const char kMode[] = "mode";
 const char kActiveWindow[] = "activeWindow";
@@ -62,9 +63,12 @@ const char* BalancerSettingsType::kBalancerModes[] = {"full", "autoSplitOnly", "
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
 
+const char AutoSplitSettingsType::kKey[] = "autosplit";
+
 BalancerConfiguration::BalancerConfiguration()
     : _balancerSettings(BalancerSettingsType::createDefault()),
-      _maxChunkSizeBytes(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes) {}
+      _maxChunkSizeBytes(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
+      _shouldAutoSplit(true) {}
 
 BalancerConfiguration::~BalancerConfiguration() = default;
 
@@ -144,6 +148,14 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
                               << chunkSizeStatus.toString()};
     }
 
+    // AutoSplit settings
+    Status autoSplitStatus = _refreshAutoSplitSettings(txn);
+    if (!autoSplitStatus.isOK()) {
+        return {autoSplitStatus.code(),
+                str::stream() << "Failed to refresh the autoSplit settings due to "
+                              << autoSplitStatus.toString()};
+    }
+
     return Status::OK();
 }
 
@@ -190,6 +202,32 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
               << " to " << settings.getMaxChunkSizeBytes() / (1024 * 1024) << "MB";
 
         _maxChunkSizeBytes.store(settings.getMaxChunkSizeBytes());
+    }
+
+    return Status::OK();
+}
+
+Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* txn) {
+    AutoSplitSettingsType settings = AutoSplitSettingsType::createDefault();
+
+    auto settingsObjStatus =
+        grid.catalogClient(txn)->getGlobalSettings(txn, AutoSplitSettingsType::kKey);
+    if (settingsObjStatus.isOK()) {
+        auto settingsStatus = AutoSplitSettingsType::fromBSON(settingsObjStatus.getValue());
+        if (!settingsStatus.isOK()) {
+            return settingsStatus.getStatus();
+        }
+
+        settings = std::move(settingsStatus.getValue());
+    } else if (settingsObjStatus != ErrorCodes::NoMatchingDocument) {
+        return settingsObjStatus.getStatus();
+    }
+
+    if (settings.getShouldAutoSplit() != getShouldAutoSplit()) {
+        log() << "ShouldAutoSplit changing from " << getShouldAutoSplit() << " to "
+              << settings.getShouldAutoSplit();
+
+        _shouldAutoSplit.store(settings.getShouldAutoSplit());
     }
 
     return Status::OK();
@@ -351,5 +389,22 @@ bool ChunkSizeSettingsType::checkMaxChunkSizeValid(uint64_t maxChunkSizeBytes) {
     return false;
 }
 
+AutoSplitSettingsType::AutoSplitSettingsType() = default;
+
+AutoSplitSettingsType AutoSplitSettingsType::createDefault() {
+    return AutoSplitSettingsType();
+}
+
+StatusWith<AutoSplitSettingsType> AutoSplitSettingsType::fromBSON(const BSONObj& obj) {
+    bool shouldAutoSplit;
+    Status status = bsonExtractBooleanField(obj, kEnabled, &shouldAutoSplit);
+    if (!status.isOK())
+        return status;
+
+    AutoSplitSettingsType settings;
+    settings._shouldAutoSplit = shouldAutoSplit;
+
+    return settings;
+}
 
 }  // namespace mongo

@@ -171,7 +171,8 @@ var checkAllUpdateQueries = function(makeMongosStaleFunc) {
     doUpdate(multiPointQuery, oUpdate, multi, makeMongosStaleFunc);
 };
 
-var st = new ShardingTest({shards: 2, mongos: 2, other: {mongosOptions: {noAutoSplit: ""}}});
+var st = new ShardingTest({shards: 2, mongos: 2});
+st.disableAutoSplit();
 var dbName = 'test';
 var collNS = dbName + '.foo';
 var numShardKeys = 10;

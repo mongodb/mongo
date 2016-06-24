@@ -319,6 +319,19 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
 
         TicketHolderReleaser releaser(&(_manager->_splitHeuristics._splitTickets));
 
+        const auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
+
+        Status refreshStatus = balancerConfig->refreshAndCheck(txn);
+        if (!refreshStatus.isOK()) {
+            warning() << "Unable to refresh balancer settings" << causedBy(refreshStatus);
+            return false;
+        }
+
+        bool shouldAutoSplit = balancerConfig->getShouldAutoSplit();
+        if (!shouldAutoSplit) {
+            return false;
+        }
+
         LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten
                << " splitThreshold: " << splitThreshold;
 
@@ -339,15 +352,8 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             _dataWritten = 0;
         }
 
-        const auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
-
-        Status refreshStatus = balancerConfig->refreshAndCheck(txn);
-        if (!refreshStatus.isOK()) {
-            warning() << "Unable to refresh balancer settings" << causedBy(refreshStatus);
-            return false;
-        }
-
         bool shouldBalance = balancerConfig->shouldBalanceForAutoSplit();
+
         if (shouldBalance) {
             auto collStatus = grid.catalogClient(txn)->getCollection(txn, _manager->getns());
             if (!collStatus.isOK()) {

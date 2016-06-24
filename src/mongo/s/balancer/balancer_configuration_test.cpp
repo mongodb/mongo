@@ -100,6 +100,7 @@ TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
 
     expectSettingsQuery(BalancerSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
+    expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
 
     future.timed_get(kFutureTimeout);
 
@@ -108,6 +109,7 @@ TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT(config.getShouldAutoSplit());
 }
 
 TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
@@ -119,6 +121,7 @@ TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
 
     expectSettingsQuery(BalancerSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>(BSON("value" << 3)));
+    expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
 
     future.timed_get(kFutureTimeout);
 
@@ -127,6 +130,7 @@ TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(3 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT(config.getShouldAutoSplit());
 }
 
 TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
@@ -139,6 +143,7 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     expectSettingsQuery(BalancerSettingsType::kKey,
                         boost::optional<BSONObj>(BSON("stopped" << true)));
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
+    expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
 
     future.timed_get(kFutureTimeout);
 
@@ -147,6 +152,29 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT(config.getShouldAutoSplit());
+}
+
+TEST_F(BalancerConfigurationTestFixture, AutoSplitSettingsDocumentOnly) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    BalancerConfiguration config;
+
+    auto future = launchAsync([&] { ASSERT_OK(config.refreshAndCheck(operationContext())); });
+
+    expectSettingsQuery(BalancerSettingsType::kKey, boost::optional<BSONObj>());
+    expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
+    expectSettingsQuery(AutoSplitSettingsType::kKey,
+                        boost::optional<BSONObj>(BSON("enabled" << false)));
+
+    future.timed_get(kFutureTimeout);
+
+    ASSERT(config.shouldBalance());
+    ASSERT(config.shouldBalanceForAutoSplit());
+    ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
+              config.getSecondaryThrottle().getSecondaryThrottle());
+    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT(!config.getShouldAutoSplit());
 }
 
 TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentBalanceForAutoSplitOnly) {
@@ -160,6 +188,8 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentBalanceForAutoS
                         boost::optional<BSONObj>(BSON("mode"
                                                       << "autoSplitOnly")));
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
+    expectSettingsQuery(AutoSplitSettingsType::kKey,
+                        boost::optional<BSONObj>(BSON("enabled" << true)));
 
     future.timed_get(kFutureTimeout);
 

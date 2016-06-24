@@ -123,17 +123,6 @@ Status addMongosOptions(moe::OptionSection* options) {
     options->addSection(ssl_options);
 #endif
 
-    options
-        ->addOptionChaining(
-            "noAutoSplit", "noAutoSplit", moe::Switch, "do not send split commands with writes")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    options
-        ->addOptionChaining("sharding.autoSplit", "", moe::Bool, "send split commands with writes")
-        .setSources(moe::SourceYAMLConfig);
-
-
     return Status::OK();
 }
 
@@ -183,20 +172,6 @@ Status canonicalizeMongosOptions(moe::Environment* params) {
     }
 #endif
 
-    // "sharding.autoSplit" comes from the config file, so override it if "noAutoSplit" is set
-    // since that comes from the command line.
-    if (params->count("noAutoSplit")) {
-        Status ret =
-            params->set("sharding.autoSplit", moe::Value(!(*params)["noAutoSplit"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("noAutoSplit");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
     return Status::OK();
 }
 
@@ -224,13 +199,6 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
 
     if (params.count("noscripting")) {
         // This option currently has no effect for mongos
-    }
-
-    if (params.count("sharding.autoSplit")) {
-        mongosGlobalParams.shouldAutoSplit = params["sharding.autoSplit"].as<bool>();
-        if (!mongosGlobalParams.shouldAutoSplit) {
-            warning() << "running with auto-splitting disabled";
-        }
     }
 
     if (!params.count("sharding.configDB")) {

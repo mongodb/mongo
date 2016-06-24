@@ -79,6 +79,9 @@ sh.help = function() {
     print("\tsh.status()                               prints a general overview of the cluster");
     print(
         "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
+    print("\tsh.disableAutoSplit()                   disable autoSplit on one collection");
+    print("\tsh.enableAutoSplit()                    re-eable autoSplit on one colleciton");
+    print("\tsh.getShouldAutoSplit                   returns whether autosplit is enabled");
 };
 
 sh.status = function(verbose, configDB) {
@@ -186,6 +189,33 @@ sh.startBalancer = function(timeoutMs, interval) {
     }
 
     return assert.commandWorked(result);
+};
+
+sh.enableAutoSplit = function(configDB) {
+    if (configDB === undefined)
+        configDB = sh._getConfigDB();
+    return assert.writeOK(configDB.settings.update({_id: 'autosplit'},
+                                                   {$set: {enabled: true}},
+                                                   {upsert: true, writeConcern: {w: 'majority'}}));
+};
+
+sh.disableAutoSplit = function(configDB) {
+    if (configDB === undefined)
+        configDB = sh._getConfigDB();
+    return assert.writeOK(configDB.settings.update({_id: 'autosplit'},
+                                                   {$set: {enabled: false}},
+                                                   {upsert: true, writeConcern: {w: 'majority'}}));
+};
+
+sh.getShouldAutoSplit = function(configDB) {
+    if (configDB === undefined)
+        configDB = sh._getConfigDB();
+    var autosplit = configDB.settings.findOne({_id: 'autosplit'});
+    if (autosplit == null) {
+        print("config.settings collection empty or missing. be sure you are connected to a mongos");
+        return true;
+    }
+    return autosplit.enabled;
 };
 
 sh._waitForDLock = function(lockId, onOrNot, timeout, interval) {
@@ -611,6 +641,11 @@ function printShardingStatus(configDB, verbose) {
                 });
         }
     }
+
+    output(" autosplit:");
+
+    // Is autosplit currently enabled
+    output("\tCurrently enabled: " + (sh.getShouldAutoSplit(configDB) ? "yes" : "no"));
 
     output("  balancer:");
 

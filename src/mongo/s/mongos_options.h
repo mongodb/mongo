@@ -46,9 +46,6 @@ namespace moe = mongo::optionenvironment;
 struct MongosGlobalParams {
     // The config server connection string
     ConnectionString configdbs;
-
-    // Whether auto-splitting is enabled
-    bool shouldAutoSplit{true};
 };
 
 extern MongosGlobalParams mongosGlobalParams;

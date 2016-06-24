@@ -161,6 +161,37 @@ private:
 };
 
 /**
+ * Utility class to parse the sharding autoSplit settings document, which has the following format:
+ *
+ * sharding: { autoSplit: <true|false> }
+ */
+class AutoSplitSettingsType {
+public:
+    // The key under which this setting is stored on the config server
+    static const char kKey[];
+
+    /**
+     * Constructs a settings object with the default values. To be used when no AutoSplit settings
+     * have been specified.
+     */
+    static AutoSplitSettingsType createDefault();
+
+    /**
+     * Interprets the BSON content as chunk size settings and extracts the respective values
+     */
+    static StatusWith<AutoSplitSettingsType> fromBSON(const BSONObj& obj);
+
+    bool getShouldAutoSplit() const {
+        return _shouldAutoSplit;
+    }
+
+private:
+    AutoSplitSettingsType();
+
+    bool _shouldAutoSplit{true};
+};
+
+/**
  * Contains settings, which control the behaviour of the balancer.
  */
 class BalancerConfiguration {
@@ -210,6 +241,10 @@ public:
         return _maxChunkSizeBytes.loadRelaxed();
     }
 
+    bool getShouldAutoSplit() const {
+        return _shouldAutoSplit.loadRelaxed();
+    }
+
     /**
      * Blocking method, which refreshes the balancer configuration from the settings in the
      * config.settings collection. It will stop at the first bad configuration value and return an
@@ -235,6 +270,12 @@ private:
      */
     Status _refreshChunkSizeSettings(OperationContext* txn);
 
+    /**
+     * Reloads the autosplit configuration from the settings document. Fails if the settings
+     * document cannot be read.
+     */
+    Status _refreshAutoSplitSettings(OperationContext* txn);
+
     // The latest read balancer settings and a mutex to protect its swaps
     mutable stdx::mutex _balancerSettingsMutex;
     BalancerSettingsType _balancerSettings;
@@ -242,6 +283,7 @@ private:
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value
     // is read on the critical path after each write operation, that's why it is cached.
     AtomicUInt64 _maxChunkSizeBytes;
+    AtomicBool _shouldAutoSplit;
 };
 
 }  // namespace mongo

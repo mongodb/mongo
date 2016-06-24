@@ -47,21 +47,6 @@ expectedResult = {
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole.json"},
                          expectedResult);
 
-// Auto Splitting
-jsTest.log("Testing \"noAutoSplit\" command line option");
-var expectedResult = {"parsed": {"sharding": {"autoSplit": false}}};
-testGetCmdLineOptsMongos({noAutoSplit: ""}, expectedResult);
-
-jsTest.log("Testing \"sharding.autoSplit\" config file option");
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/enable_autosplit.json",
-        "sharding": {"autoSplit": true}
-    }
-};
-testGetCmdLineOptsMongos({config: "jstests/libs/config_files/enable_autosplit.json"},
-                         expectedResult);
-
 // Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
 jsTest.log("Testing explicitly disabled \"moveParanoia\" config file option");
 expectedResult = {
@@ -81,16 +66,6 @@ expectedResult = {
     }
 };
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nomoveparanoia.ini"},
-                         expectedResult);
-
-jsTest.log("Testing explicitly disabled \"noAutoSplit\" config file option");
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/disable_noautosplit.ini",
-        "sharding": {"autoSplit": true}
-    }
-};
-testGetCmdLineOptsMongos({config: "jstests/libs/config_files/disable_noautosplit.ini"},
                          expectedResult);
 
 print(baseName + " succeeded.");

@@ -4,10 +4,10 @@
 
 var options = {
     chunkSize: 1,  // MB
-    mongosOptions: {noAutoSplit: ""}
 };
 
 var st = new ShardingTest({shards: 1, mongos: 1, other: options});
+st.disableAutoSplit();
 st.stopBalancer();
 
 var mongos = st.s0;

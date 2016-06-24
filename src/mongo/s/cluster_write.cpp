@@ -111,10 +111,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
  * Splits the chunks touched based from the targeter stats if needed.
  */
 void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const TargeterStats& stats) {
-    if (!mongosGlobalParams.shouldAutoSplit) {
-        return;
-    }
-
     auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
     if (!status.isOK()) {
         warning() << "failed to get database config for " << nss
