@@ -12,6 +12,8 @@
  */
 #define	WT_UNUSED(var)		(void)(var)
 
+#define	WT_DIVIDER	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
 /* Basic constants. */
 #define	WT_THOUSAND	(1000)
 #define	WT_MILLION	(1000000)
@@ -31,12 +33,12 @@
  */
 #define	WT_STORE_SIZE(s)	((uint32_t)(s))
 #define	WT_PTRDIFF(end, begin)						\
-	((size_t)((uint8_t *)(end) - (uint8_t *)(begin)))
+	((size_t)((const uint8_t *)(end) - (const uint8_t *)(begin)))
 #define	WT_PTRDIFF32(end, begin)					\
 	WT_STORE_SIZE(WT_PTRDIFF((end), (begin)))
 #define	WT_BLOCK_FITS(p, len, begin, maxlen)				\
-	((uint8_t *)(p) >= (uint8_t *)(begin) &&			\
-	((uint8_t *)(p) + (len) <= (uint8_t *)(begin) + (maxlen)))
+	((const uint8_t *)(p) >= (const uint8_t *)(begin) &&		\
+	((const uint8_t *)(p) + (len) <= (const uint8_t *)(begin) + (maxlen)))
 #define	WT_PTR_IN_RANGE(p, begin, maxlen)				\
 	WT_BLOCK_FITS((p), 1, (begin), (maxlen))
 

@@ -551,4 +551,4 @@ def runsuite(suite, parallel):
 
 def run(name='__main__'):
     result = runsuite(unittest.TestLoader().loadTestsFromName(name), False)
-    sys.exit(not result.wasSuccessful())
+    sys.exit(0 if result.wasSuccessful() else 1)

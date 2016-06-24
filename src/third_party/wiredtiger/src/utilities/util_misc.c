@@ -108,7 +108,7 @@ util_str2recno(WT_SESSION *session, const char *p, uint64_t *recnop)
 	 * forth -- none of them are OK with us.  Check the string starts with
 	 * digit, that turns off the special processing.
 	 */
-	if (!isdigit(p[0]))
+	if (!__wt_isdigit((u_char)p[0]))
 		goto format;
 
 	errno = 0;

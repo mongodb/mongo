@@ -87,10 +87,10 @@ handle_message(WT_EVENT_HANDLER *handler,
 
 	/* Write and flush the message so we're up-to-date on error. */
 	if (g.logfp == NULL) {
-		out = printf("%p:%s\n", session, message);
+		out = printf("%p:%s\n", (void *)session, message);
 		(void)fflush(stdout);
 	} else {
-		out = fprintf(g.logfp, "%p:%s\n", session, message);
+		out = fprintf(g.logfp, "%p:%s\n", (void *)session, message);
 		(void)fflush(g.logfp);
 	}
 	return (out < 0 ? EIO : 0);

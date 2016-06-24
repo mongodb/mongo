@@ -328,7 +328,6 @@ __wt_curbulk_init(WT_SESSION_IMPL *session,
 		c->insert = skip_sort_check ?
 		    __curbulk_insert_row_skip_check : __curbulk_insert_row;
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 
 	cbulk->first_insert = true;

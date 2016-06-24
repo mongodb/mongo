@@ -143,8 +143,8 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate_check(self, uri, self.nentries)
 
         # Re-load the object again, but confirm -n (no overwrite) fails.
-        self.runWt(['-h', self.dir,
-            'load', '-n', '-f', 'dump.out'], errfilename='errfile.out')
+        self.runWt(['-h', self.dir, 'load', '-n', '-f', 'dump.out'],
+            errfilename='errfile.out', failure=True)
         self.check_non_empty_file('errfile.out')
 
         # If there are indices, dump one of them and check the output.

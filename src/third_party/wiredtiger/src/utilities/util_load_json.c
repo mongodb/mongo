@@ -248,7 +248,7 @@ json_data(WT_SESSION *session,
 	keyformat = cursor->key_format;
 	isrec = strcmp(keyformat, "r") == 0;
 	for (nkeys = 0; *keyformat; keyformat++)
-		if (!isdigit(*keyformat))
+		if (!__wt_isdigit((u_char)*keyformat))
 			nkeys++;
 
 	recno = 0;
@@ -427,6 +427,9 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 				    flags)) != 0)
 					goto err;
 				config_list_free(&cl);
+				free(ins->kvraw);
+				ins->kvraw = NULL;
+				config_list_free(&cl);
 				break;
 			}
 			else
@@ -468,7 +471,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 
 	if (!ins->peeking) {
 		while (!ins->ateof) {
-			while (isspace(*ins->p))
+			while (__wt_isspace((u_char)*ins->p))
 				ins->p++;
 			if (*ins->p)
 				break;
@@ -544,15 +547,14 @@ json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 	const char *hit;
 	const char **match;
 
-	if (ins->kvraw != NULL)
-		return (1);
-
+	WT_ASSERT((WT_SESSION_IMPL *)session, ins->kvraw == NULL);
 	hit = NULL;
 	while (!ins->ateof) {
 		for (match = matches; *match != NULL; match++)
 			if ((hit = strstr(ins->p, *match)) != NULL)
 				goto out;
-		if (util_read_line(session, &ins->line, true, &ins->ateof)) {
+		if (util_read_line(session, &ins->line, true, &ins->ateof)
+		    != 0) {
 			ins->toktype = -1;
 			return (1);
 		}

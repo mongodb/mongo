@@ -13,6 +13,7 @@
 static inline int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
+	WT_DECL_RET;
 	WT_FILE_HANDLE *handle;
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
@@ -21,12 +22,20 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 	    session, WT_VERB_HANDLEOPS, "%s: handle-sync", fh->handle->name));
 
 	handle = fh->handle;
+	/*
+	 * There is no way to check when the non-blocking sync-file-range is
+	 * complete, but we track the time taken in the call for completeness.
+	 */
+	WT_STAT_FAST_CONN_INCR_ATOMIC(session, fsync_active);
+	WT_STAT_FAST_CONN_INCR(session, fsync_io);
 	if (block)
-		return (handle->fh_sync == NULL ? 0 :
+		ret = (handle->fh_sync == NULL ? 0 :
 		    handle->fh_sync(handle, (WT_SESSION *)session));
 	else
-		return (handle->fh_sync_nowait == NULL ? 0 :
+		ret = (handle->fh_sync_nowait == NULL ? 0 :
 		    handle->fh_sync_nowait(handle, (WT_SESSION *)session));
+	WT_STAT_FAST_CONN_DECR_ATOMIC(session, fsync_active);
+	return (ret);
 }
 
 /*
@@ -92,14 +101,20 @@ static inline int
 __wt_read(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
+	WT_DECL_RET;
+
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: handle-read: %" WT_SIZET_FMT " at %" PRIuMAX,
 	    fh->handle->name, len, (uintmax_t)offset));
 
+	WT_STAT_FAST_CONN_INCR_ATOMIC(session, read_active);
 	WT_STAT_FAST_CONN_INCR(session, read_io);
 
-	return (fh->handle->fh_read(
-	    fh->handle, (WT_SESSION *)session, offset, len, buf));
+	ret = fh->handle->fh_read(
+	    fh->handle, (WT_SESSION *)session, offset, len, buf);
+
+	WT_STAT_FAST_CONN_DECR_ATOMIC(session, read_active);
+	return (ret);
 }
 
 /*
@@ -140,6 +155,8 @@ static inline int
 __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
+	WT_DECL_RET;
+
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
 	    WT_STRING_MATCH(fh->name,
 	    WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
@@ -148,8 +165,12 @@ __wt_write(WT_SESSION_IMPL *session,
 	    "%s: handle-write: %" WT_SIZET_FMT " at %" PRIuMAX,
 	    fh->handle->name, len, (uintmax_t)offset));
 
+	WT_STAT_FAST_CONN_INCR_ATOMIC(session, write_active);
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
-	return (fh->handle->fh_write(
-	    fh->handle, (WT_SESSION *)session, offset, len, buf));
+	ret = fh->handle->fh_write(
+	    fh->handle, (WT_SESSION *)session, offset, len, buf);
+
+	WT_STAT_FAST_CONN_DECR_ATOMIC(session, write_active);
+	return (ret);
 }

@@ -28,36 +28,52 @@ proto()
 	    -e 's/\* /\*/g' \
 	    -e 's/  */ /g' \
 	    -e 's/^/extern /' \
-	    -e 's/WT_GCC_FUNC_/WT_GCC_FUNC_DECL_/' \
-	    -e 's/$/;/p' < $1
+	    -e 's/WT_GCC_FUNC_/WT_GCC_FUNC_DECL_/g' \
+	    -e '# If a line ends in #endif, appending a semicolon will result' \
+	    -e '# in an illegal expression, force an appended newline using' \
+	    -e '# the H command because substitute may not allow newline in' \
+	    -e '# the RHS of the expression.' \
+	    -e '/#endif$/{' \
+		-e x \
+		-e 's/.*//' \
+		-e H \
+		-e x \
+	    -e '}' \
+	    -e 's/$/;/' \
+	    -e p < $1
 }
 
-(
-cat <<EOF
+# proto --
+#	generate the list of prototypes given a file list
+externs()
+{
+(cat <<EOF
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
 EOF
+	for i in $l; do
+		proto ../$i
+	done) > $t
+	cmp $t $f > /dev/null 2>&1 ||
+	    (echo "Building $f" && rm -f $f && cp $t $f)
+}
 
-# First, get prototypes for everything but the OS directories.
-# Second, get prototypes for the OS directories.
-# The reason for this is because the OS directories repeat names (that is, there
-# are common names in both os_posix and os_win), and so we sort the prototypes
-# to avoid repeating them in the output (which some compilers won't tolerate).
-# We'd sort everything and discard duplicates, but we can't sort when function
-# signatures are on multiple lines, that is, #ifdef'd function signatures. Since
-# the OS directories are the only places with repeated names, and they have no
-# #ifdef'd signatures, we do it this way.
-l=`sed -e '/^[a-z]/!d' -e '/src\/os/d' -e 's/[	 ].*$//' filelist`
-for i in $l; do
-	proto ../$i
-done
-l=`echo ../src\/os*/*.c`
+f=../src/include/extern_win.h
+l=`sed \
+    -e '/os_win/!d' \
+    -e 's/[	 ].*$//' filelist`
+externs
 
-for i in $l; do
-	proto $i
-done | env LC_ALL=C sort -u
-) > $t
+f=../src/include/extern_posix.h
+l=`sed \
+    -e '/os_posix/!d' \
+    -e 's/[	 ].*$//' filelist`
+externs
 
 f=../src/include/extern.h
-cmp $t $f > /dev/null 2>&1 ||
-    (echo "Building $f" && rm -f $f && cp $t $f)
+l=`sed \
+    -e '/^[a-z]/!d' \
+    -e '/os_posix/d' \
+    -e '/os_win/d' \
+    -e 's/[	 ].*$//' filelist`
+externs

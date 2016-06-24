@@ -350,6 +350,7 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session,
 static int
 __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	struct timespec fsync_start, fsync_stop;
 	struct timespec start, stop, verb_timer;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -359,6 +360,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN_STATE *txn_state;
 	void *saved_meta_next;
 	u_int i;
+	uint64_t fsync_duration_usecs;
 	bool full, idle, logging, tracking;
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
@@ -404,7 +406,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * This is particularly important for compact, so that all dirty pages
 	 * can be fully written.
 	 */
-	WT_ERR(__wt_txn_update_oldest(session, true));
+	WT_ERR(__wt_txn_update_oldest(
+	    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
 	/* Flush data-sources before we start the checkpoint. */
 	WT_ERR(__checkpoint_data_source(session, cfg));
@@ -424,7 +427,13 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * completion. Do it after flushing the pages to give the
 	 * asynchronous flush as much time as possible before we wait.
 	 */
+	WT_ERR(__wt_epoch(session, &fsync_start));
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+	WT_ERR(__wt_epoch(session, &fsync_stop));
+	fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
+	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint_fsync_pre);
+	WT_STAT_FAST_CONN_INCRV(session,
+	    txn_checkpoint_fsync_pre_duration, fsync_duration_usecs);
 
 	/* Tell logging that we are about to start a database checkpoint. */
 	if (full && logging)
@@ -523,7 +532,13 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
+	WT_ERR(__wt_epoch(session, &fsync_start));
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+	WT_ERR(__wt_epoch(session, &fsync_stop));
+	fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
+	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint_fsync_post);
+	WT_STAT_FAST_CONN_INCRV(session,
+	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "sync completed", &verb_timer));
@@ -1284,7 +1299,8 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	 * for active readers.
 	 */
 	if (!btree->modified && !bulk) {
-		WT_RET(__wt_txn_update_oldest(session, true));
+		WT_RET(__wt_txn_update_oldest(
+		    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 		return (__wt_txn_visible_all(session, btree->rec_max_txn) ?
 		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
 	}

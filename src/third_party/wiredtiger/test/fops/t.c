@@ -41,7 +41,8 @@ static char home[512];
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
-static void onint(int);
+static void onint(int)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void shutdown(void);
 static int  usage(void);
 static void wt_startup(char *);

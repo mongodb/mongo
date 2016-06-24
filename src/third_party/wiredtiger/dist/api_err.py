@@ -58,8 +58,6 @@ errors = [
         more than the configured cache size to complete. The operation
         may be retried; if a transaction is in progress, it should be
         rolled back and the operation retried in a new transaction.'''),
-    Error('WT_PERM_DENIED', -31808,
-        'permission denied (internal)', undoc=True),
 ]
 
 # Update the #defines in the wiredtiger.in file.

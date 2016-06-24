@@ -559,7 +559,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 
 		ret = __cursor_row_modify(session, cbt, false);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -640,7 +639,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		break;
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-	WT_ILLEGAL_VALUE_ERR(session);
+		WT_ERR(__wt_illegal_value(session, NULL));
+		break;
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -718,7 +718,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 
 		ret = __cursor_row_modify(session, cbt, true);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -809,7 +808,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		}
 		ret = __cursor_row_modify(session, cbt, false);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -976,7 +974,6 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 		WT_RET(__wt_compare(
 		    session, a_arg->btree->collator, &a->key, &b->key, cmpp));
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 	return (0);
 }
@@ -1027,6 +1024,7 @@ __wt_btcur_equals(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
 
 	a = (WT_CURSOR *)a_arg;
 	b = (WT_CURSOR *)b_arg;
+	cmp = 0;
 	session = (WT_SESSION_IMPL *)a->session;
 
 	/* Confirm both cursors reference the same object. */
@@ -1114,7 +1112,7 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
     int (*rmfunc)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, bool))
 {
 	WT_DECL_RET;
-	uint8_t *value;
+	const uint8_t *value;
 
 	/*
 	 * Handle fixed-length column-store objects separately: for row-store
@@ -1143,7 +1141,7 @@ retry:	WT_RET(__wt_btcur_remove(start));
 		if ((ret = __wt_btcur_next(start, true)) != 0)
 			break;
 		start->compare = 0;	/* Exact match */
-		value = (uint8_t *)start->iface.value.data;
+		value = (const uint8_t *)start->iface.value.data;
 		if (*value != 0 &&
 		    (ret = rmfunc(session, start, 1)) != 0)
 			break;

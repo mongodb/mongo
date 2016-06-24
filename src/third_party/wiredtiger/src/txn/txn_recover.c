@@ -424,6 +424,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	    false, WT_SESSION_NO_LOGGING, &session));
 	r.session = session;
 
+	F_SET(conn, WT_CONN_RECOVERING);
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
 	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
 	WT_ERR(__wt_metadata_cursor_open(session, NULL, &metac));
@@ -566,6 +567,7 @@ err:	WT_TRET(__recovery_free(&r));
 		WT_TRET(__wt_evict_destroy(session));
 
 	WT_TRET(session->iface.close(&session->iface, NULL));
+	F_CLR(conn, WT_CONN_RECOVERING);
 
 	return (ret);
 }

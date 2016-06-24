@@ -57,7 +57,8 @@ class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, self.session_params)
 
         errfile = 'writeerr.txt'
-        self.runWt(['write', 'table:' + self.tablename], errfilename=errfile)
+        self.runWt(['write', 'table:' + self.tablename],
+            errfilename=errfile, failure=True)
         self.check_file_contains(errfile, 'usage:')
 
     def test_write_overwrite(self):
@@ -82,7 +83,7 @@ class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, self.session_params)
         errfile = 'writeerr.txt'
         self.runWt(['write', 'table:' + self.tablename,
-                    'def', '456', 'abc'], errfilename=errfile)
+                    'def', '456', 'abc'], errfilename=errfile, failure=True)
         self.check_file_contains(errfile, 'usage:')
 
 

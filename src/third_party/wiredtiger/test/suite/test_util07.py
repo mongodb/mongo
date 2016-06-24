@@ -71,7 +71,8 @@ class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, self.session_params)
         outfile = "readout.txt"
         errfile = "readerr.txt"
-        self.runWt(["read", 'table:' + self.tablename, 'NoMatch'], outfilename=outfile, errfilename=errfile)
+        self.runWt(["read", 'table:' + self.tablename, 'NoMatch'],
+            outfilename=outfile, errfilename=errfile, failure=True)
         self.check_empty_file(outfile)
         self.check_file_contains(errfile, 'NoMatch: not found\n')
 
@@ -83,10 +84,12 @@ class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         outfile = "readout.txt"
         errfile = "readerr.txt"
-        self.runWt(["read", 'table:' + self.tablename, 'KEY49'], outfilename=outfile, errfilename=errfile)
+        self.runWt(["read", 'table:' + self.tablename, 'KEY49'],
+            outfilename=outfile, errfilename=errfile)
         self.check_file_content(outfile, 'VAL49\n')
         self.check_empty_file(errfile)
-        self.runWt(["read", 'table:' + self.tablename, 'key49'], outfilename=outfile, errfilename=errfile)
+        self.runWt(["read", 'table:' + self.tablename, 'key49'],
+            outfilename=outfile, errfilename=errfile, failure=True)
         self.check_empty_file(outfile)
         self.check_file_contains(errfile, 'key49: not found\n')
 

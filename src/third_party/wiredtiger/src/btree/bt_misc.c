@@ -129,19 +129,3 @@ __wt_addr_string(WT_SESSION_IMPL *session,
 	}
 	return (buf->data);
 }
-
-/*
- * __wt_buf_set_printable --
- *	Set the contents of the buffer to a printable representation of a
- * byte string.
- */
-const char *
-__wt_buf_set_printable(
-    WT_SESSION_IMPL *session, const void *p, size_t size, WT_ITEM *buf)
-{
-	if (__wt_raw_to_esc_hex(session, p, size, buf)) {
-		buf->data = "[Error]";
-		buf->size = strlen("[Error]");
-	}
-	return (buf->data);
-}

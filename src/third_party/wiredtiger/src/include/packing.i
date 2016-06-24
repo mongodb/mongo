@@ -138,7 +138,7 @@ __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 next:	if (pack->cur == pack->end)
 		return (WT_NOTFOUND);
 
-	if (isdigit(*pack->cur)) {
+	if (__wt_isdigit((u_char)*pack->cur)) {
 		pv->havesize = 1;
 		pv->size = WT_STORE_SIZE(strtoul(pack->cur, &endsize, 10));
 		pack->cur = endsize;
@@ -540,7 +540,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;
 	case 'R':
 		WT_SIZE_CHECK_UNPACK(sizeof(uint64_t), maxlen);
-		pv->u.u = *(uint64_t *)*pp;
+		pv->u.u = *(const uint64_t *)*pp;
 		*pp += sizeof(uint64_t);
 		break;
 	default:

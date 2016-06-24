@@ -211,6 +211,8 @@ config_list_free(CONFIG_LIST *clp)
 			free(*entry);
 	free(clp->list);
 	clp->list = NULL;
+	clp->entry = 0;
+	clp->max_entry = 0;
 }
 
 /*

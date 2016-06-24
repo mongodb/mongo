@@ -131,6 +131,19 @@ struct __wt_extension_api {
 	    WT_EXTENSION_API *, WT_SESSION *session, int error);
 
 	/*!
+	 * Map a Windows system error code to a POSIX 1003.1/ANSI C error.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param windows_error a Windows system error code
+	 * @returns a string representation of the error
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION_API map_windows_error
+	 */
+	int (*map_windows_error)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, uint32_t windows_error);
+
+	/*!
 	 * Allocate short-term use scratch memory.
 	 *
 	 * @param wt_api the extension handle

@@ -66,7 +66,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
     u_char *buf, size_t bufsz, WT_CONFIG_ITEM *name)
 {
 	WT_PACK_VALUE *pv;
-	const char *p, *end;
+	const u_char *p, *end;
 	size_t s, n;
 
 	pv = (WT_PACK_VALUE *)voidpv;
@@ -86,7 +86,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
 	case 'S':
 		/* Account for '"' quote in front and back. */
 		s += 2;
-		p = (const char *)pv->u.s;
+		p = (const u_char *)pv->u.s;
 		if (bufsz > 0) {
 			*buf++ = '"';
 			bufsz--;
@@ -122,7 +122,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
 	case 'U':
 	case 'u':
 		s += 2;
-		p = (const char *)pv->u.item.data;
+		p = (const u_char *)pv->u.item.data;
 		end = p + pv->u.item.size;
 		if (bufsz > 0) {
 			*buf++ = '"';
@@ -314,14 +314,14 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
  *	Can be called with null buf for sizing.
  */
 size_t
-__wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
+__wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
 {
-	char abbrev;
+	u_char abbrev;
 
 	if (!force_unicode) {
-		if (isprint(ch) && ch != '\\' && ch != '"') {
+		if (__wt_isprint(ch) && ch != '\\' && ch != '"') {
 			if (bufsz >= 1)
-				*buf = (u_char)ch;
+				*buf = ch;
 			return (1);
 		} else {
 			abbrev = '\0';
@@ -346,7 +346,7 @@ __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
 			if (abbrev != '\0') {
 				if (bufsz >= 2) {
 					*buf++ = '\\';
-					*buf = (u_char)abbrev;
+					*buf = abbrev;
 				}
 				return (2);
 			}
@@ -390,7 +390,7 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 	}
 
 	for (nkeys = 0; *keyformat; keyformat++)
-		if (!isdigit(*keyformat))
+		if (!__wt_isdigit((u_char)*keyformat))
 			nkeys++;
 
 	p = beginkey;
@@ -413,12 +413,13 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 
 #define	MATCH_KEYWORD(session, in, result, keyword, matchval) 	do {	\
 	size_t _kwlen = strlen(keyword);				\
-	if (strncmp(in, keyword, _kwlen) == 0 && !isalnum(in[_kwlen])) { \
+	if (strncmp(in, keyword, _kwlen) == 0 &&			\
+	    !__wt_isalnum((u_char)in[_kwlen])) {			\
 		in += _kwlen;						\
 		result = matchval;					\
 	} else {							\
 		const char *_bad = in;					\
-		while (isalnum(*in))					\
+		while (__wt_isalnum((u_char)*in))			\
 			in++;						\
 		__wt_errx(session, "unknown keyword \"%.*s\" in JSON",	\
 		    (int)(in - _bad), _bad);				\
@@ -460,7 +461,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 
 	result = -1;
 	session = (WT_SESSION_IMPL *)wt_session;
-	while (isspace(*src))
+	while (__wt_isspace((u_char)*src))
 		src++;
 	*tokstart = src;
 
@@ -520,13 +521,12 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 		isfloat = false;
 		if (*src == '-')
 			src++;
-		while ((ch = *src) != '\0' && isdigit(ch))
+		while ((ch = *src) != '\0' && __wt_isdigit((u_char)ch))
 			src++;
 		if (*src == '.') {
 			isfloat = true;
 			src++;
-			while ((ch = *src) != '\0' &&
-			    isdigit(ch))
+			while ((ch = *src) != '\0' && __wt_isdigit((u_char)ch))
 				src++;
 		}
 		if (*src == 'e' || *src == 'E') {
@@ -534,8 +534,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 			src++;
 			if (*src == '+' || *src == '-')
 				src++;
-			while ((ch = *src) != '\0' &&
-			    isdigit(ch))
+			while ((ch = *src) != '\0' && __wt_isdigit((u_char)ch))
 				src++;
 		}
 		result = isfloat ? 'f' : 'i';
@@ -560,10 +559,10 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 	default:
 		/* An illegal token, move past it anyway */
 		bad = src;
-		isalph = isalnum(*src);
+		isalph = __wt_isalnum((u_char)*src);
 		src++;
 		if (isalph)
-			while (*src != '\0' && isalnum(*src))
+			while (*src != '\0' && __wt_isalnum((u_char)*src))
 				src++;
 		__wt_errx(session, "unknown token \"%.*s\" in JSON",
 		    (int)(src - bad), bad);

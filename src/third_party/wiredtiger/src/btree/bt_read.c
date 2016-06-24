@@ -326,7 +326,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_page_evict_soon(page);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
-	WT_RET(__wt_txn_update_oldest(session, false));
+	WT_RET(__wt_txn_update_oldest(session, 0));
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, ref, NULL));

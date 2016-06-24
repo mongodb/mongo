@@ -2608,7 +2608,7 @@ wtperf_rand(CONFIG_THREAD *thread)
 		S2 = wtperf_value_range(cfg) *
 		    (cfg->pareto / 100.0) * (PARETO_SHAPE - 1);
 		U = 1 - (double)rval / (double)UINT32_MAX;
-		rval = (pow(U, S1) - 1) * S2;
+		rval = (uint64_t)((pow(U, S1) - 1) * S2);
 		/*
 		 * This Pareto calculation chooses out of range values about
 		 * 2% of the time, from my testing. That will lead to the

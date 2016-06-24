@@ -122,8 +122,8 @@ do_rotate(char *buf, size_t len, int rotn)
 	 * Now rotate
 	 */
 	for (i = 0; i < len; i++)
-		if (isalpha(buf[i])) {
-			if (islower(buf[i]))
+		if (isalpha((unsigned char)buf[i])) {
+			if (islower((unsigned char)buf[i]))
 				buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
 			else
 				buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';

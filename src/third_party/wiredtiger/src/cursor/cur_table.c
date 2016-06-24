@@ -972,7 +972,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (*cursorp != NULL) {
-			WT_TRET(__wt_cursor_close(*cursorp));
+			if (*cursorp != cursor)
+				WT_TRET(__wt_cursor_close(*cursorp));
 			*cursorp = NULL;
 		}
 		WT_TRET(__curtable_close(cursor));

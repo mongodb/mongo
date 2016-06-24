@@ -170,7 +170,7 @@ __curjoin_iter_set_entry(WT_CURSOR_JOIN_ITER *iter, u_int entry_pos)
 		iter->entry_count = 1;
 	WT_ASSERT(iter->session, iter->entry_pos < iter->entry_count);
 
-	entry->stats.actual_count = 0;
+	entry->stats.iterated = 0;
 
 	if (entry->subjoin == NULL) {
 		for (topjoin = iter->cjoin; topjoin->parent != NULL;
@@ -303,8 +303,7 @@ again:
 	    cursor, iter->cursor, iter->entry->repack_format,
 	    iter->entry->index != NULL));
 	iter->curkey = &cursor->key;
-	iter->entry->stats.actual_count++;
-	iter->entry->stats.accesses++;
+	iter->entry->stats.iterated++;
 	return (0);
 }
 
@@ -608,7 +607,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	    F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))))
 		return (0);	/* no checks to make */
 
-	entry->stats.accesses++;
+	entry->stats.membership_check++;
 	bloom_found = false;
 
 	if (entry->bloom != NULL) {
@@ -652,6 +651,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 			memset(&v, 0, sizeof(v));  /* Keep lint quiet. */
 			c = entry->main;
 			c->set_key(c, key);
+			entry->stats.main_access++;
 			if ((ret = c->search(c)) == 0)
 				ret = c->get_value(c, &v);
 			else if (ret == WT_NOTFOUND)
@@ -801,6 +801,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
 		WT_ERR(c->get_key(c, &curkey));
+		entry->stats.iterated++;
 		if (entry->index != NULL) {
 			/*
 			 * Repack so it's comparable to the
@@ -875,7 +876,7 @@ insert:
 		else
 			WT_ERR(c->get_key(c, &curvalue));
 		WT_ERR(__wt_bloom_insert(bloom, &curvalue));
-		entry->stats.actual_count++;
+		entry->stats.bloom_insert++;
 advance:
 		if ((ret = c->next(c)) == WT_NOTFOUND)
 			break;
@@ -1107,6 +1108,7 @@ __curjoin_next(WT_CURSOR *cursor)
 		 * A failed search is not expected, convert WT_NOTFOUND into a
 		 * generic error.
 		 */
+		iter->entry->stats.main_access++;
 		if ((ret = c->search(c)) == WT_NOTFOUND)
 			ret = WT_ERROR;
 		WT_ERR(ret);

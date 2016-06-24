@@ -431,12 +431,12 @@ __debug_tree_shape_info(WT_PAGE *page)
 	v = page->memory_footprint;
 	if (v >= WT_GIGABYTE)
 		snprintf(buf, sizeof(buf),
-		    "(%p %" PRIu64 "G)", page, v / WT_GIGABYTE);
+		    "(%p %" PRIu64 "G)", (void *)page, v / WT_GIGABYTE);
 	else if (v >= WT_MEGABYTE)
 		snprintf(buf, sizeof(buf),
-		    "(%p %" PRIu64 "M)", page, v / WT_MEGABYTE);
+		    "(%p %" PRIu64 "M)", (void *)page, v / WT_MEGABYTE);
 	else
-		snprintf(buf, sizeof(buf), "(%p %" PRIu64 ")", page, v);
+		snprintf(buf, sizeof(buf), "(%p %" PRIu64 ")", (void *)page, v);
 	return (buf);
 }
 
@@ -636,7 +636,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	page = ref->page;
 	mod = page->modify;
 
-	__dmsg(ds, "%p", page);
+	__dmsg(ds, "%p", (void *)page);
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
@@ -663,7 +663,8 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	}
 
 	__dmsg(ds, ": %s\n", __wt_page_type_string(page->type));
-	__dmsg(ds, "\t" "disk %p, entries %" PRIu32, page->dsk, entries);
+	__dmsg(ds,
+	    "\t" "disk %p, entries %" PRIu32, (void *)page->dsk, entries);
 	__dmsg(ds, ", %s", __wt_page_is_modified(page) ? "dirty" : "clean");
 	__dmsg(ds, ", %s", __wt_fair_islocked(
 	    session, &page->page_lock) ? "locked" : "unlocked");
@@ -894,7 +895,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
+		WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
 		__debug_item(ds, "K", key->data, key->size);
 
 		if ((cell = __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
@@ -990,10 +991,10 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
 		__dmsg(ds, "deleted");
 		break;
 	case WT_REF_LOCKED:
-		__dmsg(ds, "locked %p", ref->page);
+		__dmsg(ds, "locked %p", (void *)ref->page);
 		break;
 	case WT_REF_MEM:
-		__dmsg(ds, "memory %p", ref->page);
+		__dmsg(ds, "memory %p", (void *)ref->page);
 		break;
 	case WT_REF_READING:
 		__dmsg(ds, "reading");
@@ -1155,14 +1156,14 @@ static void
 __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 {
 	size_t i;
-	int ch;
+	u_char ch;
 	const uint8_t *data;
 
 	__dmsg(ds, "\t%s%s{", tag == NULL ? "" : tag, tag == NULL ? "" : " ");
 	for (data = data_arg, i = 0; i < size; ++i, ++data) {
 		ch = data[0];
-		if (isprint(ch))
-			__dmsg(ds, "%c", ch);
+		if (__wt_isprint(ch))
+			__dmsg(ds, "%c", (int)ch);
 		else
 			__debug_hex_byte(ds, data[0]);
 	}

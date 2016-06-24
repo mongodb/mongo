@@ -1103,6 +1103,7 @@ static const uint32_t g_crc_slicing[8][256] = {
 #endif
 };
 
+#if !defined(__powerpc64__)
 /*
  * __wt_cksum_sw --
  *	Return a checksum for a chunk of memory, computed in software.
@@ -1171,6 +1172,7 @@ __wt_cksum_sw(const void *chunk, size_t len)
 #endif
 	return (~crc);
 }
+#endif
 
 #if (defined(__amd64) || defined(__x86_64))
 /*

@@ -94,6 +94,17 @@ retry:
 	if (WT_LOG_SLOT_DONE(new_state))
 		*releasep = 1;
 	slot->slot_end_lsn = slot->slot_start_lsn;
+	/*
+	 * A thread setting the unbuffered flag sets the unbuffered size after
+	 * setting the flag.  There could be a delay between a thread setting
+	 * the flag, a thread closing the slot, and the original thread setting
+	 * that value.  If the state is unbuffered, wait for the unbuffered
+	 * size to be set.
+	 */
+	while (WT_LOG_SLOT_UNBUFFERED_ISSET(old_state) &&
+	    slot->slot_unbuffered == 0)
+		__wt_yield();
+
 	end_offset =
 	    WT_LOG_SLOT_JOINED_BUFFERED(old_state) + slot->slot_unbuffered;
 	slot->slot_end_lsn.l.offset += (uint32_t)end_offset;
