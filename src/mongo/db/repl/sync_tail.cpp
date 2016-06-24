@@ -467,6 +467,75 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>* writerVectors,
     }
 }
 
+void initializeWriterThread() {
+    // Only do this once per thread
+    if (!ClientBasic::getCurrent()) {
+        Client::initThreadIfNotAlready();
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
+    }
+}
+
+// Schedules the writes to the oplog for 'ops' into threadPool. The caller must guarantee that 'ops'
+// stays valid until all scheduled work in the thread pool completes.
+// Returns true if more than one thread will be used to write to the oplog.
+bool scheduleWritesToOplog(OperationContext* txn,
+                           OldThreadPool* threadPool,
+                           const MultiApplier::Operations& ops) {
+
+    auto makeOplogWriterForRange = [&ops](size_t begin, size_t end) {
+        // The returned function will be run in a separate thread after this returns. Therefore all
+        // captures other than 'ops' must be by value since they will not be available. The caller
+        // guarantees that 'ops' will stay in scope until the spawned threads complete.
+        return [&ops, begin, end] {
+            initializeWriterThread();
+            const auto txnHolder = cc().makeOperationContext();
+            const auto txn = txnHolder.get();
+            txn->lockState()->setIsBatchWriter(true);
+            txn->setReplicatedWrites(false);
+
+            std::vector<BSONObj> docs;
+            docs.reserve(end - begin);
+            for (size_t i = begin; i < end; i++) {
+                // Add as unowned BSON to avoid unnecessary ref-count bumps.
+                // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
+                docs.emplace_back(ops[i].raw.objdata());
+            }
+
+            fassertStatusOK(40141,
+                            StorageInterface::get(txn)->insertDocuments(
+                                txn, NamespaceString(rsOplogName), docs));
+        };
+    };
+
+    // We want to be able to take advantage of bulk inserts so we don't use multiple threads if it
+    // would result too little work per thread. This also ensures that we can amortize the
+    // setup/teardown overhead across many writes.
+    const size_t kMinOplogEntriesPerThread = 16;
+    const bool enoughToMultiThread =
+        ops.size() >= kMinOplogEntriesPerThread * threadPool->getNumThreads();
+
+    // Only doc-locking engines support parallel writes to the oplog because they are required to
+    // ensure that oplog entries are ordered correctly, even if inserted out-of-order. Additionally,
+    // there would be no way to take advantage of multiple threads if a storage engine doesn't
+    // support document locking.
+    if (!enoughToMultiThread ||
+        !txn->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
+
+        threadPool->schedule(makeOplogWriterForRange(0, ops.size()));
+        return false;
+    }
+
+
+    const size_t numOplogThreads = threadPool->getNumThreads();
+    const size_t numOpsPerThread = ops.size() / numOplogThreads;
+    for (size_t thread = 0; thread < numOplogThreads; thread++) {
+        size_t begin = thread * numOpsPerThread;
+        size_t end = (thread == numOplogThreads - 1) ? ops.size() : begin + numOpsPerThread;
+        threadPool->schedule(makeOplogWriterForRange(begin, end));
+    }
+    return true;
+}
+
 /**
  * A caching functor that returns true if a namespace refers to a capped collection.
  * Collections that don't exist are implicitly not capped.
@@ -989,14 +1058,6 @@ bool SyncTail::shouldRetry(OperationContext* txn, const BSONObj& o) {
     MONGO_UNREACHABLE;
 }
 
-static void initializeWriterThread() {
-    // Only do this once per thread
-    if (!ClientBasic::getCurrent()) {
-        Client::initThreadIfNotAlready();
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
-    }
-}
-
 // This free function is used by the writer threads to apply each op
 void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail*) {
     initializeWriterThread();
@@ -1201,7 +1262,8 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
     // because all readers are blocked anyway.
     stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
 
-    // stop all readers until we're done
+    // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
+    // entries from the oplog until we finish writing.
     Lock::ParallelBatchWriterMode pbwm(txn->lockState());
 
     auto replCoord = ReplicationCoordinator::get(txn);
@@ -1217,30 +1279,14 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         std::vector<MultiApplier::OperationPtrs> writerVectors;
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
-        // Start writing ops to the oplog on another thread while this thread distributes and
-        // schedules the work of applying the operations.
-        workerPool->schedule([&ops] {
-            initializeWriterThread();
-            const auto txnHolder = cc().makeOperationContext();
-            const auto txn = txnHolder.get();
-            txn->lockState()->setIsBatchWriter(true);
-            txn->setReplicatedWrites(false);
-
-            std::vector<BSONObj> docs;
-            docs.reserve(ops.size());
-            for (const auto& op : ops) {
-                // Add as unowned BSON to avoid unnecessary ref-count bumps.
-                // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
-                docs.emplace_back(op.raw.objdata());
-            }
-
-            fassertStatusOK(40141,
-                            StorageInterface::get(txn)->insertDocuments(
-                                txn, NamespaceString(rsOplogName), docs));
-        });
-
-        // We claimed 1 thread for oplog writing, so use 1 less for oplog application.
-        writerVectors.resize(std::max(workerPool->getNumThreads() - 1, size_t(1)));
+        const bool multiThreadedOplogWrites = scheduleWritesToOplog(txn, workerPool, ops);
+        if (multiThreadedOplogWrites) {
+            // Use all threads for oplog application.
+            writerVectors.resize(workerPool->getNumThreads());
+        } else {
+            // We claimed 1 thread for oplog writing, so use 1 less for oplog application.
+            writerVectors.resize(std::max(workerPool->getNumThreads() - 1, size_t(1)));
+        }
 
         fillWriterVectors(txn, &ops, &writerVectors);
         applyOps(&writerVectors, workerPool, applyOperation);
