@@ -40,7 +40,7 @@ class ShardLocal : public Shard {
     MONGO_DISALLOW_COPYING(ShardLocal);
 
 public:
-    explicit ShardLocal(const ShardId& id) : Shard(id) {}
+    explicit ShardLocal(const ShardId& id);
 
     ~ShardLocal() = default;
 

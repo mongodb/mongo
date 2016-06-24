@@ -249,6 +249,7 @@ env.Library(
         'balancer/balancer_policy.cpp',
         'balancer/cluster_statistics.cpp',
         'balancer/cluster_statistics_impl.cpp',
+        'balancer/migration_manager.cpp',
         'catalog/catalog_cache.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
@@ -334,6 +335,18 @@ env.CppUnitTest(
     LIBDEPS=[
         'coreshard',
         'sharding_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
+    target='migration_manager_test',
+    source=[
+        'balancer/migration_manager_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        'config_server_test_fixture',
+        'coreshard',
     ]
 )
 
