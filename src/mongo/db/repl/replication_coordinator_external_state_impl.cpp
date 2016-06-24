@@ -151,22 +151,8 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
     _initialSyncThread.reset(new stdx::thread{[finished, this]() {
         Client::initThreadIfNotAlready("initial sync");
-
-        // "_bgSync" should not be initialized before this.
-        invariant(!_bgSync);
-        {
-            auto txn = cc().makeOperationContext();
-            invariant(txn);
-            invariant(txn->getClient());
-            log() << "Starting replication fetcher thread";
-
-            // Start bgsync.
-            _bgSync.reset(new BackgroundSync(this, makeSteadyStateOplogBuffer(txn.get())));
-            _bgSync->startup(txn.get());
-        }
-
         // Do initial sync.
-        syncDoInitialSync(_bgSync.get());
+        syncDoInitialSync(this);
         finished();
     }});
 }
@@ -183,11 +169,11 @@ void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
 }
 
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(OperationContext* txn) {
-    if (!_bgSync) {
-        log() << "Starting replication fetcher thread";
-        _bgSync.reset(new BackgroundSync(this, makeSteadyStateOplogBuffer(txn)));
-        _bgSync->startup(txn);
-    }
+    invariant(!_bgSync);
+    log() << "Starting replication fetcher thread";
+    _bgSync = stdx::make_unique<BackgroundSync>(this, makeSteadyStateOplogBuffer(txn));
+    _bgSync->startup(txn);
+
     log() << "Starting replication applier threads";
     invariant(!_applierThread);
     _applierThread.reset(new stdx::thread(stdx::bind(&runSyncThread, _bgSync.get())));

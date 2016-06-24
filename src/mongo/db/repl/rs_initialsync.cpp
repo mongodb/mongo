@@ -32,6 +32,8 @@
 
 #include "mongo/db/repl/rs_initialsync.h"
 
+#include <memory>
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -50,14 +52,17 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
@@ -513,23 +518,34 @@ Status checkAdminDatabase(OperationContext* txn, Database* adminDb) {
     return Status::OK();
 }
 
-void syncDoInitialSync(BackgroundSync* bgsync) {
+void syncDoInitialSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
     stdx::unique_lock<stdx::mutex> lk(_initialSyncMutex, stdx::defer_lock);
     if (!lk.try_lock()) {
         uasserted(34474, "Initial Sync Already Active.");
     }
 
+    std::unique_ptr<BackgroundSync> bgsync;
     {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
-        createOplog(&txn);
+        log() << "Starting replication fetcher thread for initial sync";
+        auto txn = cc().makeOperationContext();
+        bgsync = stdx::make_unique<BackgroundSync>(
+            replicationCoordinatorExternalState,
+            replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(txn.get()));
+        bgsync->startup(txn.get());
+        createOplog(txn.get());
     }
+    ON_BLOCK_EXIT([&bgsync]() {
+        log() << "Stopping replication fetcher thread for initial sync";
+        auto txn = cc().makeOperationContext();
+        bgsync->shutdown(txn.get());
+        bgsync->join(txn.get());
+    });
 
     int failedAttempts = 0;
     while (failedAttempts < kMaxFailedAttempts) {
         try {
             // leave loop when successful
-            Status status = _initialSync(bgsync);
+            Status status = _initialSync(bgsync.get());
             if (status.isOK()) {
                 break;
             } else {
