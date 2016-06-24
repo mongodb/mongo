@@ -912,7 +912,7 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
 
     bool processTerminated = false;
     bool killSignalSent = (signal == SIGKILL);
-    for (int i = 0; i < 1300; ++i) {
+    for (int i = 0; i < 6000; ++i) {
         if (i == 600) {
             log() << "process on port " << port << ", with pid " << pid
                   << " not terminated, sending sigkill";
