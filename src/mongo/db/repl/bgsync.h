@@ -85,6 +85,11 @@ public:
      */
     void join(OperationContext* txn);
 
+    /**
+     * Returns true if shutdown() has been called.
+     */
+    bool inShutdown() const;
+
     bool isStopped() const;
 
     // starts the sync target notifying thread
@@ -123,6 +128,8 @@ public:
     void pushTestOpToBuffer(OperationContext* txn, const BSONObj& op);
 
 private:
+    bool _inShutdown_inlock() const;
+
     /**
      * Starts the producer thread which runs until shutdown. Upon resolving the current sync source
      * the producer thread uses the OplogFetcher (which requires the replication coordinator
@@ -196,6 +203,9 @@ private:
 
     // Thread running producerThread().
     std::unique_ptr<stdx::thread> _producerThread;
+
+    // Set to true if shutdown() has been called.
+    bool _inShutdown = false;
 
     // if producer thread should not be running
     bool _stopped = true;

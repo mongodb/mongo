@@ -56,7 +56,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -180,13 +179,14 @@ void BackgroundSync::shutdown(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
-    invariant(inShutdown());
     clearBuffer(txn);
     _stopped = true;
 
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();
     }
+
+    _inShutdown = true;
 }
 
 void BackgroundSync::join(OperationContext* txn) {
@@ -194,6 +194,15 @@ void BackgroundSync::join(OperationContext* txn) {
     _threadPoolTaskExecutor.shutdown();
     _threadPoolTaskExecutor.join();
     _oplogBuffer->shutdown(txn);
+}
+
+bool BackgroundSync::inShutdown() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _inShutdown_inlock();
+}
+
+bool BackgroundSync::_inShutdown_inlock() const {
+    return _inShutdown;
 }
 
 void BackgroundSync::_run() {
@@ -279,7 +288,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
         }
 
         if (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary() ||
-            inShutdownStrict()) {
+            _inShutdown_inlock()) {
             return;
         }
     }
