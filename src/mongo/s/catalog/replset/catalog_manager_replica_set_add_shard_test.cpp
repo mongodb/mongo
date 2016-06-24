@@ -308,6 +308,9 @@ TEST_F(AddShardTest, Standalone) {
 
     expectInserts(NamespaceString(ShardType::ConfigNS), {expectedShard.toBSON()});
 
+    // Shards are being reloaded
+    expectGetShards({expectedShard});
+
     // Add the existing database from the newly added shard
     {
         DatabaseType dbTestDB1;
@@ -329,9 +332,6 @@ TEST_F(AddShardTest, Standalone) {
 
     // Expect the change log operation
     expectAddShardChangeLog("StandaloneShard", "StandaloneHost:12345");
-
-    // Shards are being reloaded
-    expectGetShards({expectedShard});
 
     future.timed_get(kFutureTimeout);
 }
@@ -402,6 +402,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     expectInserts(NamespaceString(ShardType::ConfigNS), {expectedShard.toBSON()});
 
+    // Shards are being reloaded
+    expectGetShards({expectedShard});
+
     // Add the existing database from the newly added shard
     {
         DatabaseType dbTestDB1;
@@ -423,9 +426,6 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     // Expect the change log operation
     expectAddShardChangeLog("shard0006", "StandaloneHost:12345");
-
-    // Shards are being reloaded
-    expectGetShards({expectedShard});
 
     future.timed_get(kFutureTimeout);
 }
@@ -895,6 +895,8 @@ TEST_F(AddShardTest, ReplicaSet) {
 
     expectInserts(NamespaceString(ShardType::ConfigNS), {newShard.toBSON()});
 
+    expectGetShards({newShard});
+
     // Add the existing database from the newly added shard
     DatabaseType shardDB;
     shardDB.setName("shardDB");
@@ -904,8 +906,6 @@ TEST_F(AddShardTest, ReplicaSet) {
     expectDatabaseUpdate(shardDB);
 
     expectAddShardChangeLog(expectedShardName, connString.toString());
-
-    expectGetShards({newShard});
 
     future.timed_get(kFutureTimeout);
 }
@@ -949,6 +949,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
 
     expectInserts(NamespaceString(ShardType::ConfigNS), {newShard.toBSON()});
 
+    expectGetShards({newShard});
+
     // Add the existing database from the newly added shard
     DatabaseType shardDB;
     shardDB.setName("shardDB");
@@ -980,8 +982,6 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     });
 
     expectAddShardChangeLog(expectedShardName, connString.toString());
-
-    expectGetShards({newShard});
 
     future.timed_get(kFutureTimeout);
 }
@@ -1023,9 +1023,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     expectInserts(NamespaceString(ShardType::ConfigNS), {newShard.toBSON()});
 
-    expectAddShardChangeLog(expectedShardName, seedString.toString());
-
     expectGetShards({newShard});
+
+    expectAddShardChangeLog(expectedShardName, seedString.toString());
 
     future.timed_get(kFutureTimeout);
 }
