@@ -43,6 +43,8 @@ class DataReplicatorExternalStateMock : public DataReplicatorExternalState {
 public:
     DataReplicatorExternalStateMock();
 
+    executor::TaskExecutor* getTaskExecutor() const override;
+
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
     void processMetadata(const rpc::ReplSetMetadata& metadata) override;

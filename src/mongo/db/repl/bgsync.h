@@ -38,7 +38,6 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -178,9 +177,6 @@ private:
 
     // Production thread
     std::unique_ptr<OplogBuffer> _oplogBuffer;
-
-    // Task executor used to run find/getMore commands on sync source.
-    executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
 
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;

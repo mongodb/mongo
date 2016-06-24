@@ -83,6 +83,11 @@ Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(Operati
 }
 
 void ReplicationCoordinatorExternalStateMock::shutdown(OperationContext*) {}
+
+executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor() const {
+    return nullptr;
+}
+
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
 OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {

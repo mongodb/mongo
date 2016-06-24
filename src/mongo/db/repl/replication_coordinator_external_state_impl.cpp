@@ -66,6 +66,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -73,6 +75,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -120,6 +123,18 @@ MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
     }
 
     return Status::OK();
+}
+
+/**
+ * Returns new thread pool for thread pool task executor.
+ */
+std::unique_ptr<ThreadPool> makeThreadPool() {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.poolName = "replication";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    return stdx::make_unique<ThreadPool>(threadPoolOptions);
 }
 
 }  // namespace
@@ -193,6 +208,10 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     }
     getGlobalServiceContext()->getGlobalStorageEngine()->setJournalListener(this);
 
+    _taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        makeThreadPool(), executor::makeNetworkInterface("NetworkInterfaceASIO-RS"));
+    _taskExecutor->startup();
+
     _writerPool = SyncTail::makeWriterPool();
 
     _startedThreads = true;
@@ -220,7 +239,14 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
         }
         if (_snapshotThread)
             _snapshotThread->shutdown();
+
+        _taskExecutor->shutdown();
+        _taskExecutor->join();
     }
+}
+
+executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor() const {
+    return _taskExecutor.get();
 }
 
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* txn,

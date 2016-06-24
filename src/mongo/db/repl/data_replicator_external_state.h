@@ -38,6 +38,11 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+namespace executor {
+class TaskExecutor;
+}  // namespace executor
+
 namespace repl {
 
 class DataReplicator;
@@ -60,6 +65,11 @@ public:
     DataReplicatorExternalState() = default;
 
     virtual ~DataReplicatorExternalState() = default;
+
+    /**
+     * Returns task executor for scheduling tasks to be run asynchronously.
+     */
+    virtual executor::TaskExecutor* getTaskExecutor() const = 0;
 
     /**
      * Returns the current term and last committed optime.

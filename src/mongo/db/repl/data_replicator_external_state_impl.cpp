@@ -45,6 +45,10 @@ DataReplicatorExternalStateImpl::DataReplicatorExternalStateImpl(
     : _replicationCoordinator(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState) {}
 
+executor::TaskExecutor* DataReplicatorExternalStateImpl::getTaskExecutor() const {
+    return _replicationCoordinatorExternalState->getTaskExecutor();
+}
+
 OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOpTime() {
     if (!_replicationCoordinator->isV1ElectionProtocol()) {
         return {OpTime::kUninitializedTerm, OpTime()};

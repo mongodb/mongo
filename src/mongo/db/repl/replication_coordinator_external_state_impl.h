@@ -64,6 +64,7 @@ public:
 
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown(OperationContext* txn);
+    virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
@@ -145,6 +146,9 @@ private:
     StartInitialSyncFn _startInitialSyncIfNeededFn;
     StartSteadyReplicationFn _startSteadReplicationFn;
     std::unique_ptr<stdx::thread> _initialSyncThread;
+
+    // Task executor used to run replication tasks.
+    std::unique_ptr<executor::TaskExecutor> _taskExecutor;
 
     // Used by repl::multiApply() to apply the sync source's operations in parallel.
     std::unique_ptr<OldThreadPool> _writerPool;

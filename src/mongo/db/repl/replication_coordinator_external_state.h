@@ -113,6 +113,11 @@ public:
     virtual void shutdown(OperationContext* txn) = 0;
 
     /**
+     * Returns task executor for scheduling tasks to be run asynchronously.
+     */
+    virtual executor::TaskExecutor* getTaskExecutor() const = 0;
+
+    /**
      * Creates the oplog, writes the first entry and stores the replica set config document.
      */
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config) = 0;

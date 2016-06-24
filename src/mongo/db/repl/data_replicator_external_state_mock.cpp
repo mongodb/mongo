@@ -41,6 +41,10 @@ DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
                       const MultiApplier::Operations& ops,
                       MultiApplier::ApplyOperationFn) { return ops.back().getOpTime(); }) {}
 
+executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const {
+    return nullptr;
+}
+
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
     return {currentTerm, lastCommittedOpTime};
 }
