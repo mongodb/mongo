@@ -31,9 +31,6 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include "mongo/db/commands.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/string_map.h"
@@ -81,59 +78,22 @@ public:
         UsageData update;
         UsageData remove;
         UsageData commands;
-        OperationLatencyHistogram opLatencyHistogram;
     };
 
     typedef StringMap<CollectionData> UsageMap;
 
 public:
-    void record(OperationContext* txn,
-                StringData ns,
-                LogicalOp logicalOp,
-                int lockType,
-                long long micros,
-                bool command);
-
+    void record(StringData ns, LogicalOp logicalOp, int lockType, long long micros, bool command);
     void append(BSONObjBuilder& b);
-
     void cloneMap(UsageMap& out) const;
-
     void collectionDropped(StringData ns);
 
-    /**
-     * Appends the collection-level latency statistics
-     */
-    void appendLatencyStats(StringData ns, BSONObjBuilder* builder);
-
-    /**
-     * Increments the global histogram.
-     */
-    void incrementGlobalLatencyStats(OperationContext* txn, uint64_t latency);
-
-    /**
-     * Appends the global latency statistics.
-     */
-    void appendGlobalLatencyStats(BSONObjBuilder* builder);
-
 private:
-    static Command::ReadWriteType _getReadWriteType(Command* cmd, LogicalOp logicalOp);
-
     void _appendToUsageMap(BSONObjBuilder& b, const UsageMap& map) const;
-
     void _appendStatsEntry(BSONObjBuilder& b, const char* statsName, const UsageData& map) const;
-
-    void _record(OperationContext* txn,
-                 CollectionData& c,
-                 LogicalOp logicalOp,
-                 int lockType,
-                 long long micros);
-
-    void _incrementHistogram(OperationContext* txn,
-                             long long latency,
-                             OperationLatencyHistogram* histogram);
+    void _record(CollectionData& c, LogicalOp logicalOp, int lockType, long long micros);
 
     mutable SimpleMutex _lock;
-    OperationLatencyHistogram _globalHistogramStats;
     UsageMap _usage;
     std::string _lastDropped;
 };

@@ -33,8 +33,6 @@
 
 #include "mongo/db/stats/top.h"
 
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
@@ -74,12 +72,7 @@ Top& Top::get(ServiceContext* service) {
     return getTop(service);
 }
 
-void Top::record(OperationContext* txn,
-                 StringData ns,
-                 LogicalOp logicalOp,
-                 int lockType,
-                 long long micros,
-                 bool command) {
+void Top::record(StringData ns, LogicalOp logicalOp, int lockType, long long micros, bool command) {
     if (ns[0] == '?')
         return;
 
@@ -94,14 +87,10 @@ void Top::record(OperationContext* txn,
     }
 
     CollectionData& coll = _usage[hashedNs];
-    _record(txn, coll, logicalOp, lockType, micros);
+    _record(coll, logicalOp, lockType, micros);
 }
 
-void Top::_record(
-    OperationContext* txn, CollectionData& c, LogicalOp logicalOp, int lockType, long long micros) {
-
-    _incrementHistogram(txn, micros, &c.opLatencyHistogram);
-
+void Top::_record(CollectionData& c, LogicalOp logicalOp, int lockType, long long micros) {
     c.total.inc(micros);
 
     if (lockType > 0)
@@ -191,66 +180,4 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
     bb.appendNumber("count", map.count);
     bb.done();
 }
-
-void Top::appendLatencyStats(StringData ns, BSONObjBuilder* builder) {
-    auto hashedNs = UsageMap::HashedKey(ns);
-    stdx::lock_guard<SimpleMutex> lk(_lock);
-    BSONObjBuilder latencyStatsBuilder;
-    _usage[hashedNs].opLatencyHistogram.append(&latencyStatsBuilder);
-    builder->append("latencyStats", latencyStatsBuilder.obj());
 }
-
-void Top::incrementGlobalLatencyStats(OperationContext* txn, uint64_t latency) {
-    stdx::lock_guard<SimpleMutex> guard(_lock);
-    _incrementHistogram(txn, latency, &_globalHistogramStats);
-}
-
-void Top::appendGlobalLatencyStats(BSONObjBuilder* builder) {
-    stdx::lock_guard<SimpleMutex> guard(_lock);
-    _globalHistogramStats.append(builder);
-}
-
-Command::ReadWriteType Top::_getReadWriteType(Command* cmd, LogicalOp logicalOp) {
-    // For legacy operations, cmd may be a nullptr.
-    if (cmd) {
-        return cmd->getReadWriteType();
-    }
-    switch (logicalOp) {
-        case LogicalOp::opGetMore:
-        case LogicalOp::opQuery:
-            return Command::ReadWriteType::kRead;
-        case LogicalOp::opUpdate:
-        case LogicalOp::opInsert:
-        case LogicalOp::opDelete:
-            return Command::ReadWriteType::kWrite;
-        default:
-            return Command::ReadWriteType::kCommand;
-    }
-}
-
-void Top::_incrementHistogram(OperationContext* txn,
-                              long long latency,
-                              OperationLatencyHistogram* histogram) {
-    // Only update histogram if operation came from a user.
-    Client* client = txn->getClient();
-    if (client->isFromUserConnection() && !client->isInDirectClient()) {
-        CurOp* curOp = CurOp::get(txn);
-        Command* cmd = curOp->getCommand();
-        Command::ReadWriteType readWriteType = _getReadWriteType(cmd, curOp->getLogicalOp());
-        histogram->increment(latency, readWriteType);
-    }
-}
-
-/**
- * Appends the global histogram to the server status.
- */
-class GlobalHistogramServerStatusMetric : public ServerStatusMetric {
-public:
-    GlobalHistogramServerStatusMetric() : ServerStatusMetric(".metrics.latency") {}
-    virtual void appendAtLeaf(BSONObjBuilder& builder) const {
-        BSONObjBuilder latencyBuilder;
-        Top::get(getGlobalServiceContext()).appendGlobalLatencyStats(&latencyBuilder);
-        builder.append("latency", latencyBuilder.obj());
-    }
-} globalHistogramServerStatusMetric;
-}  // namespace mongo

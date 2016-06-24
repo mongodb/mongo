@@ -69,10 +69,6 @@ public:
         return true;
     }
 
-    ReadWriteType getReadWriteType() const {
-        return ReadWriteType::kCommand;
-    }
-
     virtual Status checkAuthForCommand(ClientBasic* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {

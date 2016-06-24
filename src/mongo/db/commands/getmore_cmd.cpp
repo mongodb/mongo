@@ -102,10 +102,6 @@ public:
         return false;
     }
 
-    ReadWriteType getReadWriteType() const {
-        return ReadWriteType::kRead;
-    }
-
     void help(std::stringstream& help) const override {
         help << "retrieve more results from an existing cursor";
     }

@@ -86,8 +86,7 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
 
         recordCurOpMetrics(txn);
         Top::get(txn->getServiceContext())
-            .record(txn,
-                    curOp->getNS(),
+            .record(curOp->getNS(),
                     curOp->getLogicalOp(),
                     1,  // "write locked"
                     curOp->totalTimeMicros(),
@@ -393,8 +392,7 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
         // top-level curOp. The rest is handled by the top-level entrypoint.
         curOp.done();
         Top::get(txn->getServiceContext())
-            .record(txn,
-                    wholeOp.ns.ns(),
+            .record(wholeOp.ns.ns(),
                     LogicalOp::opInsert,
                     1 /* write locked*/,
                     curOp.totalTimeMicros(),
@@ -554,14 +552,7 @@ WriteResult performUpdates(OperationContext* txn, const UpdateOp& wholeOp) {
     out.results.reserve(wholeOp.updates.size());
     for (auto&& singleOp : wholeOp.updates) {
         // TODO: don't create nested CurOp for legacy writes.
-        // Add Command pointer to the nested CurOp.
-        auto& parentCurOp = *CurOp::get(txn);
-        Command* cmd = parentCurOp.getCommand();
         CurOp curOp(txn);
-        {
-            stdx::lock_guard<Client>(*txn->getClient());
-            curOp.setCommand_inlock(cmd);
-        }
         ON_BLOCK_EXIT([&] { finishCurOp(txn, &curOp); });
         try {
             lastOpFixer.startingOp();
@@ -656,14 +647,7 @@ WriteResult performDeletes(OperationContext* txn, const DeleteOp& wholeOp) {
     out.results.reserve(wholeOp.deletes.size());
     for (auto&& singleOp : wholeOp.deletes) {
         // TODO: don't create nested CurOp for legacy writes.
-        // Add Command pointer to the nested CurOp.
-        auto& parentCurOp = *CurOp::get(txn);
-        Command* cmd = parentCurOp.getCommand();
         CurOp curOp(txn);
-        {
-            stdx::lock_guard<Client>(*txn->getClient());
-            curOp.setCommand_inlock(cmd);
-        }
         ON_BLOCK_EXIT([&] { finishCurOp(txn, &curOp); });
         try {
             lastOpFixer.startingOp();

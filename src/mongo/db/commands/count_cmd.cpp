@@ -56,40 +56,28 @@ using std::stringstream;
 class CmdCount : public Command {
 public:
     CmdCount() : Command("count") {}
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-
     virtual bool slaveOk() const {
         // ok on --slave setups
         return repl::getGlobalReplicationCoordinator()->getSettings().isSlave();
     }
-
     virtual bool slaveOverrideOk() const {
         return true;
     }
-
     virtual bool maintenanceOk() const {
         return false;
     }
-
     virtual bool adminOnly() const {
         return false;
     }
-
     bool supportsReadConcern() const final {
         return true;
     }
-
-    ReadWriteType getReadWriteType() const {
-        return ReadWriteType::kRead;
-    }
-
     virtual void help(stringstream& help) const {
         help << "count objects in collection";
     }
-
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
