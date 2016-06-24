@@ -6,7 +6,6 @@
 # description: Mongo is a scalable, document-oriented database.
 # processname: mongod
 # config: /etc/mongod.conf
-# pidfile: /var/run/mongodb/mongod.pid
 
 . /etc/rc.d/init.d/functions
 
