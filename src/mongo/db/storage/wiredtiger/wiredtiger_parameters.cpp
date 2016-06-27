@@ -55,12 +55,14 @@ void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn,
 Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueElement) {
     try {
         return setFromString(newValueElement.String());
-    } catch (MsgAssertionException msg) {
+    } catch (const MsgAssertionException& msg) {
         return Status(
             ErrorCodes::BadValue,
             mongoutils::str::stream()
                 << "Invalid value for wiredTigerEngineRuntimeConfig via setParameter command: "
-                << newValueElement);
+                << newValueElement
+                << ", exception: "
+                << msg.what());
     }
 }
 
