@@ -112,17 +112,15 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
             if (!readCommittedStatus.isOK()) {
                 return readCommittedStatus;
             }
+
             if (levelString == kLocalReadConcernStr) {
                 _level = ReadConcernLevel::kLocalReadConcern;
             } else if (levelString == kMajorityReadConcernStr) {
                 _level = ReadConcernLevel::kMajorityReadConcern;
-            } else if (levelString == kLinearizableReadConcernStr) {
-                _level = ReadConcernLevel::kLinearizableReadConcern;
             } else {
-                return Status(
-                    ErrorCodes::FailedToParse,
-                    str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
-                                  << " must be either 'local', 'majority' or 'linearizable'");
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
+                                            << " must be either 'local' or 'majority'");
             }
         } else {
             return Status(ErrorCodes::InvalidOptions,
