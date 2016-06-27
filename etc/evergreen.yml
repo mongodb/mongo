@@ -2278,24 +2278,24 @@ tasks:
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
 
           # Extract shell and banner files out of scons-made archive for separate shell archive
-          ${platform_decompress|tar zxvf} mongodb-binaries.${ext|tgz} mongodb-\*/bin/mongo${exe} mongodb-\*/[A-Z]\*
+          ${platform_decompress|tar --wildcards -zxvf} mongodb-binaries.${ext|tgz} mongodb-*/bin/mongo${exe} mongodb-*/\[A-Z\]*
 
           # Create new shell archive (make_archive.py uses filename to determine what format archive to create)
           ${python|python} buildscripts/make_archive.py -o mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} $(ls -d mongodb-*/bin/mongo${exe} mongodb-*/[A-Z]*)
 
-          notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
+          /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
 
           if [ "${has_packages|}" = "true" ] ; then
             for rpm in $(find repo/ -name \*.rpm) ; do
               pushd $(dirname $rpm)
               # Use --package-file-suffix "" to overwrite existing RPM's instead of saving new "-signed.rpm" RPM files
               #
-              notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
+              /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
               popd
             done
             for release_file in $(find repo/ -name Release) ; do
               pushd $(dirname $release_file)
-              notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
+              /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
               popd
             done
           fi
@@ -2869,7 +2869,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+      - rhel70
 
 - name: linux-64-repeated-execution
   stepback: false
@@ -3239,8 +3239,6 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
 
 - name: ubuntu1404
   display_name: SSL Ubuntu 14.04
@@ -3354,9 +3352,6 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
-
 
 - name: ubuntu1604
   display_name: SSL Ubuntu 16.04
@@ -3467,8 +3462,6 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
 
 
 - name: enterprise-linux-64-amazon-ami
@@ -3550,8 +3543,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: amazon
   display_name: SSL Amazon Linux
@@ -3665,8 +3657,6 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
 
 ###########################################
 #         Windows buildvariants           #
@@ -3774,7 +3764,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-64-2k8
   display_name: Windows 2008R2
@@ -3883,7 +3873,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-64-2k8-debug
   display_name: "* Windows 2008R2 DEBUG"
@@ -4061,7 +4051,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: enterprise-windows-64-inmem
   display_name: Enterprise Windows (inMemory)
@@ -4212,7 +4202,7 @@ buildvariants:
   - name: sslSpecial
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #             OSX buildvariants           #
@@ -4312,7 +4302,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: osx-107-ssl
   display_name: SSL OS X 10.7
@@ -4407,7 +4397,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: osx-107-debug
   display_name: "* OS X 10.7 DEBUG"
@@ -4496,7 +4486,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #          Redhat buildvariants           #
@@ -4683,7 +4673,8 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+      - rhel70
+
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0
@@ -4732,8 +4723,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: rhel62
   display_name: SSL RHEL 6.2
@@ -4846,7 +4836,8 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+      - rhel70
+
 
 - name: rhel70
   display_name: SSL RHEL 7.0
@@ -4958,8 +4949,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
@@ -5094,7 +5084,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -5228,7 +5218,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -5282,8 +5272,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-ubuntu1404-64
   display_name: Enterprise Ubuntu 14.04
@@ -5336,8 +5325,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-ubuntu1604-64
   display_name: Enterprise Ubuntu 16.04
@@ -5387,8 +5375,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-ubuntu1404-clang-3.4-libc
   display_name: "~Enterprise Ubuntu 14.04 (Clang 3.4/libc++)"
@@ -5541,8 +5528,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: suse12
   display_name: SSL SUSE 12
@@ -5652,8 +5638,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-suse11-64
   display_name: Enterprise SLES 11
@@ -5703,8 +5688,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: suse11
   display_name: SSL SUSE 11
@@ -5814,8 +5798,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
+
 
 ###########################################
 #          Solaris buildvariants          #
@@ -5900,7 +5883,7 @@ buildvariants:
   - name: views_WT
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #          Debian buildvariants           #
@@ -5954,8 +5937,7 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-debian81-64
   display_name: Enterprise Debian 8.1
@@ -6005,8 +5987,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 
 - name: debian71
@@ -6120,8 +6100,6 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
 
 
 - name: debian81
@@ -6235,8 +6213,6 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
 
 
 ################################
@@ -7029,8 +7005,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
