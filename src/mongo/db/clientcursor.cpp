@@ -71,6 +71,7 @@ static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut
                                                                 &cursorStatsTimedOut);
 
 MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis, int, 10 * 60 * 1000 /* 10 minutes */);
+MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, int, 4);
 
 long long ClientCursor::totalOpen() {
     return cursorStatsOpen.get();
@@ -263,7 +264,6 @@ public:
     void run() {
         Client::initThread("clientcursormon");
         Timer t;
-        const int Secs = 4;
         while (!inShutdown()) {
             {
                 const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
@@ -271,7 +271,7 @@ public:
                 cursorStatsTimedOut.increment(
                     CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
             }
-            sleepsecs(Secs);
+            sleepsecs(clientCursorMonitorFrequencySecs);
         }
     }
 };

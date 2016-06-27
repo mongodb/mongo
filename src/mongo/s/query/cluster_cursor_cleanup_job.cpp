@@ -51,6 +51,9 @@ ExportedServerParameter<long long, ServerParameterType::kStartupAndRuntime>
                               "cursorTimeoutMillis",
                               &cursorTimeoutMillis);
 
+// Frequency with which ClusterCursorCleanupJob is run.
+MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, long long, 4);
+
 }  // namespace
 
 ClusterCursorCleanupJob clusterCursorCleanupJob;
@@ -67,8 +70,8 @@ void ClusterCursorCleanupJob::run() {
     while (!inShutdown()) {
         manager->killMortalCursorsInactiveSince(Date_t::now() -
                                                 Milliseconds(cursorTimeoutMillis.load()));
-        manager->reapZombieCursors();
-        sleepFor(Seconds(4));
+        manager->incrementCursorsTimedOut(manager->reapZombieCursors());
+        sleepsecs(clientCursorMonitorFrequencySecs);
     }
 }
 

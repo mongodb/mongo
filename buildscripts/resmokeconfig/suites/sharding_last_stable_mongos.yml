@@ -36,6 +36,9 @@ selector:
     # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
     # 'last-stable'.
     - jstests/sharding/shard_collection_basic.js
+    # TODO Requires mongos to have the 'clientCursorMonitorFrequencySecs' server parameter; enable
+    # when 3.4 becomes 'last-stable'.
+    - jstests/sharding/cursor_timeout.js
 
 executor:
   js_test:

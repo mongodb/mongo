@@ -332,6 +332,7 @@ void ClusterCursorManager::killMortalCursorsInactiveSince(Date_t cutoff) {
             CursorEntry& entry = cursorIdEntryPair.second;
             if (entry.getLifetimeType() == CursorLifetime::Mortal &&
                 entry.getLastActive() <= cutoff) {
+                entry.setInactive();
                 log() << "Marking cursor id " << cursorIdEntryPair.first
                       << " for deletion, idle since " << entry.getLastActive().toString();
                 entry.setKillPending();
@@ -350,13 +351,22 @@ void ClusterCursorManager::killAllCursors() {
     }
 }
 
-void ClusterCursorManager::reapZombieCursors() {
+std::size_t ClusterCursorManager::reapZombieCursors() {
+    struct CursorDescriptor {
+        CursorDescriptor(NamespaceString ns, CursorId cursorId, bool isInactive)
+            : ns(std::move(ns)), cursorId(cursorId), isInactive(isInactive) {}
+
+        NamespaceString ns;
+        CursorId cursorId;
+        bool isInactive;
+    };
+
     // List all zombie cursors under the manager lock, and kill them one-by-one while not holding
     // the lock (ClusterClientCursor::kill() is blocking, so we don't want to hold a lock while
     // issuing the kill).
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    std::vector<std::pair<NamespaceString, CursorId>> zombieCursorDescriptors;
+    std::vector<CursorDescriptor> zombieCursorDescriptors;
     for (auto& nsContainerPair : _namespaceToContainerMap) {
         const NamespaceString& nss = nsContainerPair.first;
         for (auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
@@ -365,13 +375,15 @@ void ClusterCursorManager::reapZombieCursors() {
             if (!entry.getKillPending()) {
                 continue;
             }
-            zombieCursorDescriptors.emplace_back(nss, cursorId);
+            zombieCursorDescriptors.emplace_back(nss, cursorId, entry.isInactive());
         }
     }
 
-    for (auto& namespaceCursorIdPair : zombieCursorDescriptors) {
+    std::size_t cursorsTimedOut = 0;
+
+    for (auto& cursorDescriptor : zombieCursorDescriptors) {
         StatusWith<std::unique_ptr<ClusterClientCursor>> zombieCursor =
-            detachCursor_inlock(namespaceCursorIdPair.first, namespaceCursorIdPair.second);
+            detachCursor_inlock(cursorDescriptor.ns, cursorDescriptor.cursorId);
         if (!zombieCursor.isOK()) {
             // Cursor in use, or has already been deleted.
             continue;
@@ -381,7 +393,12 @@ void ClusterCursorManager::reapZombieCursors() {
         zombieCursor.getValue()->kill();
         zombieCursor.getValue().reset();
         lk.lock();
+
+        if (cursorDescriptor.isInactive) {
+            ++cursorsTimedOut;
+        }
     }
+    return cursorsTimedOut;
 }
 
 ClusterCursorManager::Stats ClusterCursorManager::stats() const {

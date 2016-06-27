@@ -41,18 +41,23 @@ namespace {
 
 class ClusterCursorStats final : public ServerStatusMetric {
 public:
-    ClusterCursorStats() : ServerStatusMetric("cursor.open") {}
+    ClusterCursorStats() : ServerStatusMetric("cursor") {}
 
     void appendAtLeaf(BSONObjBuilder& b) const final {
-        BSONObjBuilder openBob(b.subobjStart(_leafName));
-        auto stats = grid.getCursorManager()->stats();
-
-        openBob.append("multiTarget", static_cast<long long>(stats.cursorsSharded));
-        openBob.append("singleTarget", static_cast<long long>(stats.cursorsNotSharded));
-        openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
-        openBob.append("total",
-                       static_cast<long long>(stats.cursorsSharded + stats.cursorsNotSharded));
-        openBob.done();
+        BSONObjBuilder cursorBob(b.subobjStart(_leafName));
+        cursorBob.append("timedOut",
+                         static_cast<long long>(grid.getCursorManager()->cursorsTimedOut()));
+        {
+            BSONObjBuilder openBob(cursorBob.subobjStart("open"));
+            auto stats = grid.getCursorManager()->stats();
+            openBob.append("multiTarget", static_cast<long long>(stats.cursorsSharded));
+            openBob.append("singleTarget", static_cast<long long>(stats.cursorsNotSharded));
+            openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
+            openBob.append("total",
+                           static_cast<long long>(stats.cursorsSharded + stats.cursorsNotSharded));
+            openBob.doneFast();
+        }
+        cursorBob.done();
     }
 } clusterCursorStats;
 

@@ -15,8 +15,14 @@
         shards: 2,
         other: {
             chunkSize: 1,
-            shardOptions: {setParameter: "cursorTimeoutMillis=1000"},
-            mongosOptions: {setParameter: "cursorTimeoutMillis=1000"}
+            shardOptions: {
+                verbose: 1,
+                setParameter: {cursorTimeoutMillis: 1000, clientCursorMonitorFrequencySecs: 1}
+            },
+            mongosOptions: {
+                verbose: 1,
+                setParameter: {cursorTimeoutMillis: 1000, clientCursorMonitorFrequencySecs: 1}
+            }
         }
     });
 
@@ -66,9 +72,20 @@
     cursorWithNoTimeout.next();
 
     // Wait until the idle cursor background job has killed the cursors that do not have the "no
-    // timeout" flag set.  We use the "cursorTimeoutMillis" setParameter above to reduce the amount
-    // of time we need to wait here.
-    sleep(5000);
+    // timeout" flag set.  We use the "cursorTimeoutMillis" and "clientCursorMonitorFrequencySecs"
+    // setParameters above to reduce the amount of time we need to wait here.
+    assert.soon(function() {
+        return coll.getDB().serverStatus().metrics.cursor.timedOut > 0;
+    }, "sharded cursor failed to time out", 5000);
+
+    // Wait for the shard to have two open cursors on it (shardedCursorWithNoTimeout and
+    // cursorWithNoTimeout).
+    // We cannot reliably use metrics.cursor.timedOut here, because this will be 2 if
+    // shardedCursorWithTimeout is killed for timing out on the shard, and 1 if
+    // shardedCursorWithTimeout is killed by a killCursors command from the mongos.
+    assert.soon(function() {
+        return shardColl.getDB().serverStatus().metrics.cursor.open.total == 2;
+    }, "cursor failed to time out", 5000);
 
     assert.throws(function() {
         shardedCursorWithTimeout.itcount();

@@ -309,7 +309,7 @@ public:
 
     /**
      * Attempts to performs a blocking kill and deletion of all non-pinned cursors that are marked
-     * as 'kill pending'.
+     * as 'kill pending'. Returns the number of cursors that were marked as inactive.
      *
      * If no other non-const methods are called simultaneously, it is guaranteed that this method
      * will delete all non-pinned cursors marked as 'kill pending'.  Otherwise, no such guarantee is
@@ -318,7 +318,7 @@ public:
      *
      * Can block.
      */
-    void reapZombieCursors();
+    std::size_t reapZombieCursors();
 
     /**
      * Returns the number of open cursors on a ClusterCursorManager, broken down by type.
@@ -339,6 +339,14 @@ public:
      * Does not block.
      */
     boost::optional<NamespaceString> getNamespaceForCursorId(CursorId cursorId) const;
+
+    void incrementCursorsTimedOut(size_t inc) {
+        _cursorsTimedOut += inc;
+    }
+
+    size_t cursorsTimedOut() const {
+        return _cursorsTimedOut;
+    }
 
 private:
     class CursorEntry;
@@ -410,6 +418,10 @@ private:
             return _killPending;
         }
 
+        bool isInactive() const {
+            return _isInactive;
+        }
+
         CursorType getCursorType() const {
             return _cursorType;
         }
@@ -447,6 +459,10 @@ private:
             _killPending = true;
         }
 
+        void setInactive() {
+            _isInactive = true;
+        }
+
         void setLastActive(Date_t lastActive) {
             _lastActive = lastActive;
         }
@@ -454,6 +470,7 @@ private:
     private:
         std::unique_ptr<ClusterClientCursor> _cursor;
         bool _killPending = false;
+        bool _isInactive = false;
         CursorType _cursorType = CursorType::NamespaceNotSharded;
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
         Date_t _lastActive;
@@ -508,6 +525,8 @@ private:
     // when the last cursor on the given namespace is destroyed.
     std::unordered_map<NamespaceString, CursorEntryContainer, NamespaceString::Hasher>
         _namespaceToContainerMap;
+
+    size_t _cursorsTimedOut = 0;
 };
 
 }  // namespace
