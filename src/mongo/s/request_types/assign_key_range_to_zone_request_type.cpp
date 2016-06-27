@@ -57,7 +57,7 @@ StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::parseFromCo
 }
 
 void AssignKeyRangeToZoneRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append(kConfigsvrAssignKeyRangeToZone, _shardName);
+    cmdBuilder->append(kConfigsvrAssignKeyRangeToZone, _ns.ns());
     _range.append(cmdBuilder);
 
     if (_isRemove) {
@@ -69,14 +69,19 @@ void AssignKeyRangeToZoneRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuild
 
 StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::_parseFromCommand(
     const BSONObj& cmdObj, bool forMongos) {
-    string shardName;
-    auto parseShardNameStatus = bsonExtractStringField(
-        cmdObj,
-        (forMongos ? kMongosAssignKeyRangeToZone : kConfigsvrAssignKeyRangeToZone),
-        &shardName);
+    string rawNS;
+    auto parseNamespaceStatus = bsonExtractStringField(
+        cmdObj, (forMongos ? kMongosAssignKeyRangeToZone : kConfigsvrAssignKeyRangeToZone), &rawNS);
 
-    if (!parseShardNameStatus.isOK()) {
-        return parseShardNameStatus;
+    if (!parseNamespaceStatus.isOK()) {
+        return parseNamespaceStatus;
+    }
+
+    NamespaceString ns(rawNS);
+
+    if (!ns.isValid()) {
+        return {ErrorCodes::InvalidNamespace,
+                str::stream() << rawNS << " is not a valid namespace"};
     }
 
     auto parseRangeStatus = ChunkRange::fromBSON(cmdObj);
@@ -109,16 +114,15 @@ StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::_parseFromC
     }
 
     if (isRemove) {
-        return AssignKeyRangeToZoneRequest(std::move(shardName),
-                                           std::move(parseRangeStatus.getValue()));
+        return AssignKeyRangeToZoneRequest(std::move(ns), std::move(parseRangeStatus.getValue()));
     }
 
     return AssignKeyRangeToZoneRequest(
-        std::move(shardName), std::move(parseRangeStatus.getValue()), std::move(zoneName));
+        std::move(ns), std::move(parseRangeStatus.getValue()), std::move(zoneName));
 }
 
-const string& AssignKeyRangeToZoneRequest::getShardName() const {
-    return _shardName;
+const NamespaceString& AssignKeyRangeToZoneRequest::getNS() const {
+    return _ns;
 }
 
 const ChunkRange& AssignKeyRangeToZoneRequest::getRange() const {
@@ -134,13 +138,13 @@ const string& AssignKeyRangeToZoneRequest::getZoneName() const {
     return _zoneName;
 }
 
-AssignKeyRangeToZoneRequest::AssignKeyRangeToZoneRequest(std::string shardName, ChunkRange range)
-    : _shardName(std::move(shardName)), _range(std::move(range)), _isRemove(true) {}
+AssignKeyRangeToZoneRequest::AssignKeyRangeToZoneRequest(NamespaceString ns, ChunkRange range)
+    : _ns(std::move(ns)), _range(std::move(range)), _isRemove(true) {}
 
-AssignKeyRangeToZoneRequest::AssignKeyRangeToZoneRequest(std::string shardName,
+AssignKeyRangeToZoneRequest::AssignKeyRangeToZoneRequest(NamespaceString ns,
                                                          ChunkRange range,
                                                          std::string zoneName)
-    : _shardName(std::move(shardName)),
+    : _ns(std::move(ns)),
       _range(std::move(range)),
       _isRemove(false),
       _zoneName(std::move(zoneName)) {}

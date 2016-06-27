@@ -30,6 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
@@ -43,7 +44,7 @@ public:
      * correct, constructs an AssignKeyRangeToZoneRequest object from it.
      *
      * {
-     *   assignKeyRangeToZone: <string shardName>,
+     *   assignKeyRangeToZone: <string namespace>,
      *   min: <BSONObj min>,
      *   max: <BSONObj max>,
      *   zone: <string zoneName>
@@ -56,7 +57,7 @@ public:
      * if it contains the correct types, constructs an AssignKeyRangeToZoneRequest object from it.
      *
      * {
-     *   _configsvrRemoveShardFromZone: <string shardName>,
+     *   _configsvrAssignKeyRangeToZone: <string namespace>,
      *   min: <BSONObj min>,
      *   max: <BSONObj max>,
      *   zone: <string zone|null>,
@@ -71,7 +72,7 @@ public:
      */
     void appendAsConfigCommand(BSONObjBuilder* cmdBuilder);
 
-    const std::string& getShardName() const;
+    const NamespaceString& getNS() const;
     const ChunkRange& getRange() const;
 
     /**
@@ -85,16 +86,16 @@ private:
     /**
      * Constructor for remove type AssignKeyRangeToZoneRequest.
      */
-    AssignKeyRangeToZoneRequest(std::string shardName, ChunkRange range);
+    AssignKeyRangeToZoneRequest(NamespaceString ns, ChunkRange range);
 
     /**
      * Constructor for assign type AssignKeyRangeToZoneRequest.
      */
-    AssignKeyRangeToZoneRequest(std::string shardName, ChunkRange range, std::string zoneName);
+    AssignKeyRangeToZoneRequest(NamespaceString ns, ChunkRange range, std::string zoneName);
 
     static StatusWith<AssignKeyRangeToZoneRequest> _parseFromCommand(const BSONObj& cmdObj,
                                                                      bool forMongos);
-    std::string _shardName;
+    NamespaceString _ns;
     ChunkRange _range;
     bool _isRemove;
     std::string _zoneName;
