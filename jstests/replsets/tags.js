@@ -88,6 +88,7 @@
         },
     });
 
+    replTest.waitForState(replTest.nodes[2], ReplSetTest.State.PRIMARY, 60 * 1000);
     replTest.awaitReplication();
 
     // Create collection to guard against timeouts due to file allocation.
