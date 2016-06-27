@@ -56,15 +56,16 @@ namespace mongo {
  *     BSONField<bool> MyCollFields::draining("draining");
  *     BSONField<int> MyCollFields::count("count");
  *
- *     In an insert:
- *     conn->insert(myColl,
- *                  BSON(MyCollFields::name("id_for_this_doc") <<
- *                       MyCollFields::draining(true) <<
- *                       MyCollFields::count(0)));
+ *     // Use BSONField::operator()(const T&) to instantiate a typed element for the field:
+ *     BSONObj obj = BSON(MyCollFields::name("id_for_this_doc") <<
+ *                        MyCollFields::draining(true) <<
+ *                        MyCollFields::count(0));
  *
- *     In a query:
- *     conn->findOne(myColl, BSON(MyCollFields::count.gt(10))) ;
+ *     // Use BSONField::gt() and friends to construct a basic query predicate over the field:
+ *     BSONObj obj = BSON(MyCollFields::count.gt(10));
  *
+ *     // Use BSONField::operator()() to retrieve the name of the field:
+ *     BSONObj obj = BSON(MyCollFields::draining() << 1);
  */
 
 template <typename T>
