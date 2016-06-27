@@ -88,6 +88,7 @@ private:
                     path != seenPath && !expression::isPathPrefixOf(path, seenPath) &&
                         !expression::isPathPrefixOf(seenPath, path));
         }
+        _seenPaths.insert(path.toString());
     }
 
     /**
@@ -100,7 +101,7 @@ private:
         uassert(40177, "$project specification must have at least one field", !_rawObj.isEmpty());
 
         for (auto&& elem : _rawObj) {
-            parseElement(elem, elem.fieldName());
+            parseElement(elem, FieldPath(elem.fieldName()));
         }
 
         // Default to inclusion if nothing (except maybe '_id') is explicitly included or excluded.
@@ -118,7 +119,7 @@ private:
      * Throws a UserException if the path to 'elem' conflicts with a path that has already been
      * specified, or if this element represents a mix of projection types.
      */
-    void parseElement(const BSONElement& elem, StringData pathToElem) {
+    void parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
         if (elem.type() == BSONType::Object) {
             return parseNestedObject(elem.Obj(), pathToElem);
         }
@@ -126,7 +127,7 @@ private:
         if ((elem.isBoolean() || elem.isNumber()) && !elem.trueValue()) {
             // A top-level exclusion of "_id" is allowed in either an inclusion projection or an
             // exclusion projection, so doesn't affect '_parsedType'.
-            if (pathToElem != "_id") {
+            if (pathToElem.fullPath() != "_id") {
                 uassert(40178,
                         str::stream() << "Bad projection specification, cannot exclude fields "
                                          "other than '_id' in an inclusion projection: "
@@ -145,8 +146,7 @@ private:
                     !_parsedType || (*_parsedType == ProjectionType::kInclusion));
             _parsedType = ProjectionType::kInclusion;
         }
-        ensurePathDoesNotConflictOrThrow(pathToElem);
-        _seenPaths.insert(pathToElem.toString());
+        ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
     }
 
     /**
@@ -156,11 +156,11 @@ private:
      * 'thisLevelSpec' contains a dotted path, or if 'thisLevelSpec' represents an invalid
      * expression.
      */
-    void parseNestedObject(const BSONObj& thisLevelSpec, StringData prefix) {
+    void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix) {
         uassert(40180,
                 str::stream() << "an empty object is not a valid value in a $project. Found "
                                  "empty object at path "
-                              << prefix,
+                              << prefix.fullPath(),
                 !thisLevelSpec.isEmpty());
 
         for (auto elem : thisLevelSpec) {
@@ -184,8 +184,7 @@ private:
                                          "add computed fields during an exclusion projection: "
                                       << _rawObj.toString(),
                         !_parsedType || _parsedType == ProjectionType::kInclusion);
-                ensurePathDoesNotConflictOrThrow(prefix);
-                _seenPaths.insert(prefix.toString());
+                ensurePathDoesNotConflictOrThrow(prefix.fullPath());
                 continue;
             }
 
@@ -195,7 +194,7 @@ private:
                                   << _rawObj.toString(),
                     fieldName.find('.') == std::string::npos);
 
-            parseElement(elem, FieldPath::getFullyQualifiedPath(prefix, fieldName));
+            parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
         }
     }
 

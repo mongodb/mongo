@@ -202,7 +202,23 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectDottedFieldInSubDocument) {
                   UserException);
 }
 
-TEST(ParsedAggregationProjectionErrors, ShouldRejectTopLevelExpression) {
+TEST(ParsedAggregationProjectionErrors, ShouldRejectFieldNamesStartingWithADollar) {
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("$dollar" << 0)), UserException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("$dollar" << 1)), UserException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("b.$dollar" << 0)), UserException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("b.$dollar" << 1)), UserException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("b" << BSON("$dollar" << 0))),
+                  UserException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("b" << BSON("$dollar" << 1))),
+                  UserException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("$add" << 0)), UserException);
+    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("$add" << 1)), UserException);
+}
+
+TEST(ParsedAggregationProjectionErrors, ShouldRejectTopLevelExpressions) {
     ASSERT_THROWS(ParsedAggregationProjection::create(BSON("$add" << BSON_ARRAY(4 << 2))),
                   UserException);
 }
