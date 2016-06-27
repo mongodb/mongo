@@ -179,8 +179,8 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(Operat
     _applierThread.reset(new stdx::thread(stdx::bind(&runSyncThread, _bgSync.get())));
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread.reset(new stdx::thread(
-        stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback, _bgSync.get())));
+    _syncSourceFeedbackThread.reset(new stdx::thread(stdx::bind(
+        &SyncSourceFeedback::run, &_syncSourceFeedback, _taskExecutor.get(), _bgSync.get())));
 }
 
 void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
