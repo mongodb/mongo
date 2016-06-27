@@ -31,15 +31,25 @@
 #include <memory>
 #include <string>
 
-#include "mongo/db/query/canonical_query.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo {
+
+class BSONObj;
+class CanonicalQuery;
+class ExtensionsCallback;
+class NamespaceString;
+class OperationContext;
 
 /**
  * The parsed form of the distinct command request.
  */
 class ParsedDistinct {
 public:
+    static const char kKeyField[];
+    static const char kQueryField[];
+    static const char kCollationField[];
+
     ParsedDistinct(std::unique_ptr<CanonicalQuery> query, const std::string key)
         : _query(std::move(query)), _key(std::move(key)) {}
 
@@ -58,6 +68,16 @@ public:
     const std::string& getKey() const {
         return _key;
     }
+
+    /**
+     * 'extensionsCallback' allows for additional mongod parsing. If called from mongos, an
+     * ExtensionsCallbackNoop object should be passed to skip this parsing.
+     */
+    static StatusWith<ParsedDistinct> parse(OperationContext* txn,
+                                            const NamespaceString& nss,
+                                            const BSONObj& cmdObj,
+                                            const ExtensionsCallback& extensionsCallback,
+                                            bool isExplain);
 
 private:
     std::unique_ptr<CanonicalQuery> _query;

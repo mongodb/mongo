@@ -66,14 +66,6 @@ using std::stringstream;
 
 namespace dps = ::mongo::dotted_path_support;
 
-namespace {
-
-const char kKeyField[] = "key";
-const char kQueryField[] = "query";
-const char kCollationField[] = "collation";
-
-}  // namespace
-
 class DistinctCommand : public Command {
 public:
     DistinctCommand() : Command("distinct") {}
@@ -114,60 +106,6 @@ public:
         help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
-    StatusWith<ParsedDistinct> parse(OperationContext* txn,
-                                     const NamespaceString& nss,
-                                     const BSONObj& cmdObj,
-                                     bool isExplain) const {
-        // Extract the key field.
-        BSONElement keyElt;
-        auto statusKey = bsonExtractTypedField(cmdObj, kKeyField, BSONType::String, &keyElt);
-        if (!statusKey.isOK()) {
-            return {statusKey};
-        }
-        auto key = keyElt.valuestrsafe();
-
-        auto qr = stdx::make_unique<QueryRequest>(nss);
-
-        // Extract the query field. If the query field is nonexistent, an empty query is used.
-        if (BSONElement queryElt = cmdObj[kQueryField]) {
-            if (queryElt.type() == BSONType::Object) {
-                qr->setFilter(queryElt.embeddedObject());
-            } else if (queryElt.type() != BSONType::jstNULL) {
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << "\"" << kQueryField
-                                            << "\" had the wrong type. Expected "
-                                            << typeName(BSONType::Object)
-                                            << " or "
-                                            << typeName(BSONType::jstNULL)
-                                            << ", found "
-                                            << typeName(queryElt.type()));
-            }
-        }
-
-        // Extract the collation field, if it exists.
-        if (BSONElement collationElt = cmdObj[kCollationField]) {
-            if (collationElt.type() != BSONType::Object) {
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << "\"" << kCollationField
-                                            << "\" had the wrong type. Expected "
-                                            << typeName(BSONType::Object)
-                                            << ", found "
-                                            << typeName(collationElt.type()));
-            }
-            qr->setCollation(collationElt.embeddedObject());
-        }
-
-        qr->setExplain(isExplain);
-
-        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
-        auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
-        if (!cq.isOK()) {
-            return cq.getStatus();
-        }
-
-        return ParsedDistinct(std::move(cq.getValue()), std::move(key));
-    }
-
     virtual Status explain(OperationContext* txn,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
@@ -177,7 +115,8 @@ public:
         const string ns = parseNs(dbname, cmdObj);
         const NamespaceString nss(ns);
 
-        auto parsedDistinct = parse(txn, nss, cmdObj, true);
+        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
+        auto parsedDistinct = ParsedDistinct::parse(txn, nss, cmdObj, extensionsCallback, true);
         if (!parsedDistinct.isOK()) {
             return parsedDistinct.getStatus();
         }
@@ -207,7 +146,8 @@ public:
         const string ns = parseNs(dbname, cmdObj);
         const NamespaceString nss(ns);
 
-        auto parsedDistinct = parse(txn, nss, cmdObj, false);
+        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
+        auto parsedDistinct = ParsedDistinct::parse(txn, nss, cmdObj, extensionsCallback, false);
         if (!parsedDistinct.isOK()) {
             return appendCommandStatus(result, parsedDistinct.getStatus());
         }
@@ -228,7 +168,7 @@ public:
                 Explain::getPlanSummary(executor.getValue().get()));
         }
 
-        string key = cmdObj[kKeyField].valuestrsafe();
+        string key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
 
         int bufSize = BSONObjMaxUserSize - 4096;
         BufBuilder bb(bufSize);

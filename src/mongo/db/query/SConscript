@@ -77,6 +77,7 @@ env.Library(
         "collation/collator_factory_icu_decoration.cpp",
         "find_common.cpp",
         "explain_common.cpp",
+        "parsed_distinct.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
