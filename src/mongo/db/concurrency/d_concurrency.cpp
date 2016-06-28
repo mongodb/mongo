@@ -53,6 +53,12 @@ Lock::TempRelease::~TempRelease() {
     }
 }
 
+namespace {
+AtomicWord<uint64_t> lastResourceMutexHash{0};
+}  // namespace
+
+Lock::ResourceMutex::ResourceMutex() : _rid(RESOURCE_MUTEX, lastResourceMutexHash.fetchAndAdd(1)) {}
+
 Lock::GlobalLock::GlobalLock(Locker* locker)
     : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {}
 
