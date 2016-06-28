@@ -4678,127 +4678,129 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			2038
 /*! btree: row-store leaf pages */
 #define	WT_STAT_DSRC_BTREE_ROW_LEAF			2039
+/*! cache: bytes currently in the cache */
+#define	WT_STAT_DSRC_CACHE_BYTES_INUSE			2040
 /*! cache: bytes read into cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_READ			2040
+#define	WT_STAT_DSRC_CACHE_BYTES_READ			2041
 /*! cache: bytes written from cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			2041
+#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			2042
 /*! cache: checkpoint blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		2042
+#define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		2043
 /*! cache: data source pages selected for eviction unable to be evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2043
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2044
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		2044
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		2045
 /*! cache: in-memory page passed criteria to be split */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLITTABLE		2045
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLITTABLE		2046
 /*! cache: in-memory page splits */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2046
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2047
 /*! cache: internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2047
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2048
 /*! cache: internal pages split during eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_INTERNAL	2048
+#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_INTERNAL	2049
 /*! cache: leaf pages split during eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_LEAF		2049
+#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_LEAF		2050
 /*! cache: modified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2050
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2051
 /*! cache: overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2051
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2052
 /*! cache: overflow values cached in memory */
-#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		2052
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		2053
 /*! cache: page split during eviction deepened the tree */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DEEPEN		2053
+#define	WT_STAT_DSRC_CACHE_EVICTION_DEEPEN		2054
 /*! cache: page written requiring lookaside records */
-#define	WT_STAT_DSRC_CACHE_WRITE_LOOKASIDE		2054
+#define	WT_STAT_DSRC_CACHE_WRITE_LOOKASIDE		2055
 /*! cache: pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				2055
+#define	WT_STAT_DSRC_CACHE_READ				2056
 /*! cache: pages read into cache requiring lookaside entries */
-#define	WT_STAT_DSRC_CACHE_READ_LOOKASIDE		2056
+#define	WT_STAT_DSRC_CACHE_READ_LOOKASIDE		2057
 /*! cache: pages requested from the cache */
-#define	WT_STAT_DSRC_CACHE_PAGES_REQUESTED		2057
+#define	WT_STAT_DSRC_CACHE_PAGES_REQUESTED		2058
 /*! cache: pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			2058
+#define	WT_STAT_DSRC_CACHE_WRITE			2059
 /*! cache: pages written requiring in-memory restoration */
-#define	WT_STAT_DSRC_CACHE_WRITE_RESTORE		2059
+#define	WT_STAT_DSRC_CACHE_WRITE_RESTORE		2060
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2060
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2061
 /*! compression: compressed pages read */
-#define	WT_STAT_DSRC_COMPRESS_READ			2061
+#define	WT_STAT_DSRC_COMPRESS_READ			2062
 /*! compression: compressed pages written */
-#define	WT_STAT_DSRC_COMPRESS_WRITE			2062
+#define	WT_STAT_DSRC_COMPRESS_WRITE			2063
 /*! compression: page written failed to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2063
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2064
 /*! compression: page written was too small to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2064
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2065
 /*! compression: raw compression call failed, additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2065
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2066
 /*! compression: raw compression call failed, no additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2066
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2067
 /*! compression: raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2067
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2068
 /*! cursor: bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2068
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2069
 /*! cursor: create calls */
-#define	WT_STAT_DSRC_CURSOR_CREATE			2069
+#define	WT_STAT_DSRC_CURSOR_CREATE			2070
 /*! cursor: cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2070
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2071
 /*! cursor: cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2071
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2072
 /*! cursor: cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2072
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2073
 /*! cursor: insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			2073
+#define	WT_STAT_DSRC_CURSOR_INSERT			2074
 /*! cursor: next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			2074
+#define	WT_STAT_DSRC_CURSOR_NEXT			2075
 /*! cursor: prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			2075
+#define	WT_STAT_DSRC_CURSOR_PREV			2076
 /*! cursor: remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			2076
+#define	WT_STAT_DSRC_CURSOR_REMOVE			2077
 /*! cursor: reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			2077
+#define	WT_STAT_DSRC_CURSOR_RESET			2078
 /*! cursor: restarted searches */
-#define	WT_STAT_DSRC_CURSOR_RESTART			2078
+#define	WT_STAT_DSRC_CURSOR_RESTART			2079
 /*! cursor: search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			2079
+#define	WT_STAT_DSRC_CURSOR_SEARCH			2080
 /*! cursor: search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2080
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2081
 /*! cursor: truncate calls */
-#define	WT_STAT_DSRC_CURSOR_TRUNCATE			2081
+#define	WT_STAT_DSRC_CURSOR_TRUNCATE			2082
 /*! cursor: update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			2082
+#define	WT_STAT_DSRC_CURSOR_UPDATE			2083
 /*! reconciliation: dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2083
+#define	WT_STAT_DSRC_REC_DICTIONARY			2084
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2084
+#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2085
 /*! reconciliation: internal page key bytes discarded using suffix
  * compression */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2085
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2086
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2086
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2087
 /*! reconciliation: internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2087
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2088
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2088
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2089
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2089
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2090
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2090
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2091
 /*! reconciliation: maximum blocks required for a page */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2091
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2092
 /*! reconciliation: overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2092
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2093
 /*! reconciliation: page checksum matches */
-#define	WT_STAT_DSRC_REC_PAGE_MATCH			2093
+#define	WT_STAT_DSRC_REC_PAGE_MATCH			2094
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2094
+#define	WT_STAT_DSRC_REC_PAGES				2095
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2095
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2096
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2096
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2097
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2097
+#define	WT_STAT_DSRC_SESSION_COMPACT			2098
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2098
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2099
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2099
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2100
 
 /*!
  * @}

@@ -235,7 +235,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	 */
 	if (conn->evict_session != NULL)
 		WT_STAT_SET(session, stats, cache_eviction_walks_active,
-		    conn->evict_session->nhazard);
+		    cache->walk_session->nhazard);
 }
 
 /*

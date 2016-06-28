@@ -155,6 +155,23 @@ randomize_value(CONFIG_THREAD *thread, char *value_buf)
 }
 
 /*
+ * Partition data by key ranges.
+ */
+static uint32_t
+map_key_to_table(CONFIG *cfg, uint64_t k)
+{
+	if (cfg->range_partition) {
+		/* Take care to return a result in [0..table_count-1]. */
+		if (k > cfg->icount + cfg->random_range)
+			return (0);
+		return ((uint32_t)((k - 1) /
+		    ((cfg->icount + cfg->random_range + cfg->table_count - 1) /
+		    cfg->table_count)));
+	} else
+		return ((uint32_t)(k % cfg->table_count));
+}
+
+/*
  * Figure out and extend the size of the value string, used for growing
  * updates. We know that the value to be updated is in the threads value
  * scratch buffer.
@@ -393,7 +410,7 @@ worker_async(void *arg)
 		 * Then retry to get an async op.
 		 */
 		while ((ret = conn->async_new_op(
-		    conn, cfg->uris[next_val % cfg->table_count],
+		    conn, cfg->uris[map_key_to_table(cfg, next_val)],
 		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
 		if (ret != 0)
@@ -611,7 +628,7 @@ worker(void *arg)
 		/*
 		 * Spread the data out around the multiple databases.
 		 */
-		cursor = cursors[next_val % cfg->table_count];
+		cursor = cursors[map_key_to_table(cfg, next_val)];
 
 		/*
 		 * Skip the first time we do an operation, when trk->ops
@@ -1010,7 +1027,7 @@ populate_thread(void *arg)
 		/*
 		 * Figure out which table this op belongs to.
 		 */
-		cursor = cursors[op % cfg->table_count];
+		cursor = cursors[map_key_to_table(cfg, op)];
 		generate_key(cfg, key_buf, op);
 		measure_latency =
 		    cfg->sample_interval != 0 &&
@@ -1148,7 +1165,7 @@ populate_async(void *arg)
 		 * Allocate an async op for whichever table.
 		 */
 		while ((ret = conn->async_new_op(
-		    conn, cfg->uris[op % cfg->table_count],
+		    conn, cfg->uris[map_key_to_table(cfg, op)],
 		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
 		if (ret != 0)
@@ -2024,6 +2041,7 @@ start_run(CONFIG *cfg)
 {
 	pthread_t monitor_thread;
 	uint64_t total_ops;
+	uint32_t run_time;
 	int monitor_created, ret, t_ret;
 	char helium_buf[256];
 
@@ -2083,7 +2101,8 @@ start_run(CONFIG *cfg)
 			goto err;
 
 		/* Didn't create, set insert count. */
-		if (cfg->create == 0 && find_table_count(cfg) != 0)
+		if (cfg->create == 0 && cfg->random_range == 0 &&
+		    find_table_count(cfg) != 0)
 			goto err;
 		/* Start the checkpoint thread. */
 		if (cfg->checkpoint_threads != 0) {
@@ -2108,26 +2127,27 @@ start_run(CONFIG *cfg)
 		cfg->ckpt_ops = sum_ckpt_ops(cfg);
 		total_ops = cfg->read_ops + cfg->insert_ops + cfg->update_ops;
 
+		run_time = cfg->run_time == 0 ? 1 : cfg->run_time;
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " read operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->read_ops, (cfg->read_ops * 100) / total_ops,
-		    cfg->read_ops / cfg->run_time);
+		    cfg->read_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " insert operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->insert_ops, (cfg->insert_ops * 100) / total_ops,
-		    cfg->insert_ops / cfg->run_time);
+		    cfg->insert_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " truncate operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->truncate_ops, (cfg->truncate_ops * 100) / total_ops,
-		    cfg->truncate_ops / cfg->run_time);
+		    cfg->truncate_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->update_ops, (cfg->update_ops * 100) / total_ops,
-		    cfg->update_ops / cfg->run_time);
+		    cfg->update_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations",
 		    cfg->ckpt_ops);
@@ -2615,7 +2635,7 @@ wtperf_rand(CONFIG_THREAD *thread)
 		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))
-			rval = wtperf_value_range(cfg);
+			rval = 0;
 	}
 	/*
 	 * Wrap the key to within the expected range and avoid zero: we never
