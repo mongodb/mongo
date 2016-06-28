@@ -69,7 +69,11 @@ var doTest = function(useDollarQuerySyntax) {
     var conn = st.s;
 
     // Wait until the ReplicaSetMonitor refreshes its view and see the tags
-    ReplSetTest.awaitRSClientHosts(conn, primaryNode, {ok: true, tags: PRI_TAG}, replTest.name);
+    var replConfig = replTest.getReplSetConfigFromNode();
+    replConfig.members.forEach(function(node) {
+        var nodeConn = new Mongo(node.host);
+        ReplSetTest.awaitRSClientHosts(conn, nodeConn, {ok: true, tags: node.tags}, replTest);
+    });
     replTest.awaitReplication();
 
     jsTest.log('New rs config: ' + tojson(primaryNode.getDB('local').system.replset.findOne()));

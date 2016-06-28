@@ -1310,6 +1310,32 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
                 // Check that *all* host properties are set correctly
                 var propOk = true;
                 for (var prop in hostOk) {
+                    // Use special comparator for tags because isMaster can return the fields in
+                    // different order. The fields of the tags should be treated like a set of
+                    // strings and 2 tags should be considered the same if the set is equal.
+                    if (prop == 'tags') {
+                        if (!clientHost.tags) {
+                            propOk = false;
+                            break;
+                        }
+
+                        for (var hostTag in hostOk.tags) {
+                            if (clientHost.tags[hostTag] != hostOk.tags[hostTag]) {
+                                propOk = false;
+                                break;
+                            }
+                        }
+
+                        for (var clientTag in clientHost.tags) {
+                            if (clientHost.tags[clientTag] != hostOk.tags[clientTag]) {
+                                propOk = false;
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
+
                     if (isObject(hostOk[prop])) {
                         if (!friendlyEqual(hostOk[prop], clientHost[prop])) {
                             propOk = false;
