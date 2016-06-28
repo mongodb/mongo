@@ -55,11 +55,11 @@ public:
     static BSONObj extractEmbeddedOplogDocument(const BSONObj& orig);
 
     /**
-     * Returns a new BSONObj with an '_id' field equal to the 'ts' field of the provided document
-     * and an 'entry' field equal to the provided document. Assumes there is a 'ts' field in the
-     * original document.
+     * Returns a pair of a BSONObj with an '_id' field equal to the 'ts' field of the provided
+     * document and an 'entry' field equal to the provided document, and the timestamp of the
+     * BSONObj. Assumes there is a 'ts' field in the original document.
      */
-    static BSONObj addIdToDocument(const BSONObj& orig);
+    static std::pair<BSONObj, Timestamp> addIdToDocument(const BSONObj& orig);
 
     explicit OplogBufferCollection(StorageInterface* storageInterface);
     OplogBufferCollection(StorageInterface* storageInterface, const NamespaceString& nss);
@@ -73,6 +73,10 @@ public:
     void shutdown(OperationContext* txn) override;
     void pushEvenIfFull(OperationContext* txn, const Value& value) override;
     void push(OperationContext* txn, const Value& value) override;
+    /**
+     * Pushing documents with 'pushAllNonBlocking' will not handle sentinel documents properly. If
+     * pushing sentinel documents is required, use 'push' or 'pushEvenIfFull'.
+     */
     bool pushAllNonBlocking(OperationContext* txn,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
@@ -87,6 +91,9 @@ public:
     bool blockingPeek(OperationContext* txn, Value* value, Seconds waitDuration) override;
     bool peek(OperationContext* txn, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
+
+    // ---- Testing API ----
+    std::queue<Timestamp> getSentinels_forTest() const;
 
 
 private:
@@ -130,6 +137,12 @@ private:
 
     // Size of documents in buffer.
     std::size_t _size;
+
+    std::queue<Timestamp> _sentinels;
+
+    Timestamp _lastPushedTimestamp;
+
+    Timestamp _lastPoppedTimestamp;
 };
 
 }  // namespace repl

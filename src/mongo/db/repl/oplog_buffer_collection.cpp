@@ -55,11 +55,13 @@ NamespaceString OplogBufferCollection::getDefaultNamespace() {
     return NamespaceString(kDefaultOplogCollectionNamespace);
 }
 
-BSONObj OplogBufferCollection::addIdToDocument(const BSONObj& orig) {
+std::pair<BSONObj, Timestamp> OplogBufferCollection::addIdToDocument(const BSONObj& orig) {
+    invariant(!orig.isEmpty());
     BSONObjBuilder bob;
-    bob.append("_id", orig["ts"].timestamp());
+    Timestamp ts = orig["ts"].timestamp();
+    bob.append("_id", ts);
     bob.append(kOplogEntryFieldName, orig);
-    return bob.obj();
+    return std::pair<BSONObj, Timestamp>{bob.obj(), ts};
 }
 
 BSONObj OplogBufferCollection::extractEmbeddedOplogDocument(const BSONObj& orig) {
@@ -90,6 +92,14 @@ void OplogBufferCollection::shutdown(OperationContext* txn) {
 }
 
 void OplogBufferCollection::pushEvenIfFull(OperationContext* txn, const Value& value) {
+    // This oplog entry is a sentinel
+    if (value.isEmpty()) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _sentinels.push(_lastPushedTimestamp);
+        _count++;
+        _cvNoLongerEmpty.notify_all();
+        return;
+    }
     Batch valueBatch = {value};
     pushAllNonBlocking(txn, valueBatch.begin(), valueBatch.end());
 }
@@ -103,12 +113,18 @@ bool OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
                                                Batch::const_iterator end) {
     size_t numDocs = std::distance(begin, end);
     Batch docsToInsert(numDocs);
-    std::transform(begin, end, docsToInsert.begin(), addIdToDocument);
+    Timestamp ts;
+    std::transform(begin, end, docsToInsert.begin(), [&ts](const Value& value) {
+        auto pair = addIdToDocument(value);
+        ts = pair.second;
+        return pair.first;
+    });
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto status = _storageInterface->insertDocuments(txn, _nss, docsToInsert);
     fassertStatusOK(40161, status);
 
+    _lastPushedTimestamp = ts;
     _count += numDocs;
     _size += std::accumulate(begin, end, 0U, [](const size_t& docSize, const Value& value) {
         return docSize + size_t(value.objsize());
@@ -144,6 +160,7 @@ void OplogBufferCollection::clear(OperationContext* txn) {
     _createCollection(txn);
     _size = 0;
     _count = 0;
+    std::queue<Timestamp>().swap(_sentinels);
 }
 
 bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
@@ -196,6 +213,14 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
 }
 
 bool OplogBufferCollection::_doPop_inlock(OperationContext* txn, Value* value) {
+    // If there is a sentinel, and it was pushed right after the last BSONObj to be popped was
+    // pushed, then we pop off a sentinel instead and decrease the count by 1.
+    if (!_sentinels.empty() && (_lastPoppedTimestamp == _sentinels.front())) {
+        _sentinels.pop();
+        _count--;
+        *value = BSONObj();
+        return true;
+    }
     auto scanDirection = StorageInterface::ScanDirection::kForward;
     auto result = _storageInterface->deleteOne(txn, _nss, kIdObj, scanDirection);
     if (!result.isOK()) {
@@ -204,6 +229,7 @@ bool OplogBufferCollection::_doPop_inlock(OperationContext* txn, Value* value) {
         }
         return false;
     }
+    _lastPoppedTimestamp = result.getValue()["_id"].timestamp();
     *value = extractEmbeddedOplogDocument(result.getValue()).getOwned();
     invariant(_count > 0);
     invariant(_size >= std::size_t(value->objsize()));
@@ -215,6 +241,12 @@ bool OplogBufferCollection::_doPop_inlock(OperationContext* txn, Value* value) {
 bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
                                                 Value* value,
                                                 bool front) const {
+    // If there is a sentinel, and it was pushed right after the last BSONObj to be popped was
+    // pushed, then we return an empty BSONObj for the sentinel.
+    if (!_sentinels.empty() && (_lastPoppedTimestamp == _sentinels.front())) {
+        *value = BSONObj();
+        return true;
+    }
     auto scanDirection = front ? StorageInterface::ScanDirection::kForward
                                : StorageInterface::ScanDirection::kBackward;
     auto result = _storageInterface->findOne(txn, _nss, kIdObj, scanDirection);
@@ -236,6 +268,11 @@ void OplogBufferCollection::_createCollection(OperationContext* txn) {
 
 void OplogBufferCollection::_dropCollection(OperationContext* txn) {
     fassert(40155, _storageInterface->dropCollection(txn, _nss));
+}
+
+std::queue<Timestamp> OplogBufferCollection::getSentinels_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _sentinels;
 }
 
 }  // namespace repl
