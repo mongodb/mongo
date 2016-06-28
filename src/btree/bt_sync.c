@@ -26,12 +26,14 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
 	uint64_t oldest_id, saved_snap_min;
 	uint32_t flags;
+	u_int saved_evict_walk_period;
 
 	conn = S2C(session);
 	btree = S2BT(session);
 	walk = NULL;
 	txn = &session->txn;
 	saved_snap_min = WT_SESSION_TXN_STATE(session)->snap_min;
+	saved_evict_walk_period = btree->evict_walk_period;
 	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 
 	internal_bytes = leaf_bytes = 0;
@@ -236,10 +238,10 @@ err:	/* On error, clear any left-over tree walk. */
 		WT_FULL_BARRIER();
 
 		/*
-		 * If this tree was being skipped by the eviction server during
-		 * the checkpoint, clear the wait.
+		 * In case this tree was being skipped by the eviction server
+		 * during the checkpoint, restore the previous state.
 		 */
-		btree->evict_walk_period = 0;
+		btree->evict_walk_period = saved_evict_walk_period;
 
 		/*
 		 * Wake the eviction server, in case application threads have
