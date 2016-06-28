@@ -22,7 +22,7 @@ env.CppUnitTest(
         'mongo_uri_test.cpp',
     ],
     LIBDEPS=[
-        'connection_string',
+        'clientdriver',
     ]
 )
 

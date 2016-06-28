@@ -163,6 +163,10 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
 
 DBClientBase* MongoURI::connect(std::string& errmsg, double socketTimeout) const {
     auto ret = _connectString.connect(errmsg, socketTimeout);
+    if (!ret) {
+        return ret;
+    }
+
     if (!_user.empty()) {
         ret->auth(_makeAuthObjFromOptions(ret->getMaxWireVersion()));
     }
