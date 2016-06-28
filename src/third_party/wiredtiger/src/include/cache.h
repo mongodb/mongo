@@ -13,7 +13,6 @@
 #define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
 					   pages by this many increments of the
 					   read generation. */
-#define	WT_EVICT_WALK_PER_FILE	 10	/* Pages to queue per file */
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
 
@@ -24,6 +23,7 @@
 struct __wt_evict_entry {
 	WT_BTREE *btree;		/* Enclosing btree object */
 	WT_REF	 *ref;			/* Page to flush/evict */
+	uint64_t  score;		/* Relative eviction priority */
 };
 
 /*

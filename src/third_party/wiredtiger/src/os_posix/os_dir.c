@@ -36,7 +36,7 @@ __wt_posix_directory_list(WT_SESSION_IMPL *session, const char *dir,
 	dirsz = 0;
 	entries = NULL;
 
-	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? 1 : 0), ret);
+	WT_SYSCALL_RETRY(((dirp = opendir(path)) == NULL ? -1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "%s: directory-list: opendir", path);
 

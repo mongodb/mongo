@@ -439,6 +439,7 @@ bzDecompressInit
 bzalloc
 bzfree
 bzip
+call's
 calloc
 cas
 catfmt
@@ -1067,6 +1068,7 @@ unescaped
 unicode
 uninstantiated
 unistd
+unlink
 unlinked
 unmap
 unmarshall

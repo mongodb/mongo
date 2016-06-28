@@ -55,6 +55,27 @@ __wt_btree_block_free(
 }
 
 /*
+ * __wt_btree_bytes_inuse --
+ *	Return the number of bytes in use.
+ */
+static inline uint64_t
+__wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+	uint64_t bytes_inuse;
+
+	cache = S2C(session)->cache;
+
+	/* Adjust the cache size to take allocation overhead into account. */
+	bytes_inuse = S2BT(session)->bytes_inmem;
+	if (cache->overhead_pct != 0)
+		bytes_inuse +=
+		    (bytes_inuse * (uint64_t)cache->overhead_pct) / 100;
+
+	return (bytes_inuse);
+}
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -66,6 +87,7 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_ASSERT(session, size < WT_EXABYTE);
 
 	cache = S2C(session)->cache;
+	(void)__wt_atomic_add64(&S2BT(session)->bytes_inmem, size);
 	(void)__wt_atomic_add64(&cache->bytes_inmem, size);
 	(void)__wt_atomic_addsize(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
@@ -196,6 +218,8 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_ASSERT(session, size < WT_EXABYTE);
 
 	__wt_cache_decr_check_uint64(
+	    session, &S2BT(session)->bytes_inmem, size, "WT_BTREE.bytes_inmem");
+	__wt_cache_decr_check_uint64(
 	    session, &cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
 	__wt_cache_decr_check_size(
 	    session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
@@ -274,8 +298,9 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	modify = page->modify;
 
 	/* Update the bytes in-memory to reflect the eviction. */
-	__wt_cache_decr_check_uint64(session,
-	    &cache->bytes_inmem,
+	__wt_cache_decr_check_uint64(session, &S2BT(session)->bytes_inmem,
+	    page->memory_footprint, "WT_BTREE.bytes_inmem");
+	__wt_cache_decr_check_uint64(session, &cache->bytes_inmem,
 	    page->memory_footprint, "WT_CACHE.bytes_inmem");
 
 	/* Update the bytes_internal value to reflect the eviction */

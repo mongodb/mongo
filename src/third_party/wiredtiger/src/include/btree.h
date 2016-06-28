@@ -129,6 +129,8 @@ struct __wt_btree {
 	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
 
+	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+
 	WT_REF	   *evict_ref;		/* Eviction thread's location */
 	uint64_t    evict_priority;	/* Relative priority of cached pages */
 	u_int	    evict_walk_period;	/* Skip this many LRU walks */

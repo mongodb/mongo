@@ -5,6 +5,7 @@ no_scale_per_second_list = [
     'async: maximum work queue length',
     'cache: bytes currently in the cache',
     'cache: eviction currently operating in aggressive mode',
+    'cache: files with active eviction walks',
     'cache: maximum bytes configured',
     'cache: maximum page size at eviction',
     'cache: pages currently held in the cache',
@@ -59,6 +60,7 @@ no_scale_per_second_list = [
     'btree: overflow pages',
     'btree: row-store internal pages',
     'btree: row-store leaf pages',
+    'cache: bytes currently in the cache',
     'cache: overflow values cached in memory',
     'LSM: bloom filters in the LSM tree',
     'LSM: chunks in the LSM tree',
@@ -71,6 +73,7 @@ no_clear_list = [
     'async: maximum work queue length',
     'cache: bytes currently in the cache',
     'cache: eviction currently operating in aggressive mode',
+    'cache: files with active eviction walks',
     'cache: maximum bytes configured',
     'cache: maximum page size at eviction',
     'cache: pages currently held in the cache',
@@ -102,6 +105,7 @@ no_clear_list = [
     'transaction: transaction range of IDs currently pinned by a checkpoint',
     'transaction: transaction range of IDs currently pinned by named snapshots',
     'btree: btree checkpoint generation',
+    'cache: bytes currently in the cache',
     'session: open cursor count',
 ]
 prefix_list = [
