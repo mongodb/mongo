@@ -1450,7 +1450,7 @@ __block_extlist_dump(
 		    tag, el->name, el->entries,
 		    __wt_buf_set_size(session, el->bytes, true, t1)));
 
-	if (ret != 0 || el->entries == 0)
+	if (el->entries == 0)
 		goto done;
 
 	memset(sizes, 0, sizeof(sizes));
