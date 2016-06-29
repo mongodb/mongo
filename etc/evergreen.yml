@@ -694,8 +694,12 @@ post:
     params:
       working_dir: src
       script: |
-        set -o verbose
-        ${tar|tar} cvzf diagnostic-data.tgz $(find /data/db -type d -name diagnostic.data)
+        if [ -d /data/db ]; then
+            file_list=$(cd /data/db && find . -type d -name diagnostic.data)
+            if [ -n "$file_list" ]; then
+                ${tar|tar} cvzf diagnostic-data.tgz -C /data/db $file_list
+            fi
+        fi
   - command: archive.targz_pack
     params:
       target: "diskstats.tgz"
