@@ -549,7 +549,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteConcernError) {
     auto future = launchAsync([this] {
         auto status =
             catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
-        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
+        ASSERT_EQUALS(ErrorCodes::NotMaster, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -558,8 +558,8 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteConcernError) {
                 ok: 1,
                 value: null,
                 writeConcernError: {
-                    code: 64,
-                    errmsg: "waiting for replication timed out"
+                    code: 10107,
+                    errmsg: "Not master while waiting for write concern"
                 }
             })");
     });

@@ -1295,7 +1295,7 @@ void ShardingCatalogClientImpl::_runBatchWriteCommand(OperationContext* txn,
         Status status = Shard::CommandResponse::processBatchWriteResponse(response, batchResponse);
         if (retry < kMaxWriteRetry && configShard->isRetriableError(status.code(), retryPolicy)) {
             batchResponse->clear();
-            LOG(1) << "Batch write command failed with retriable error and will be retried"
+            LOG(2) << "Batch write command failed with retriable error and will be retried"
                    << causedBy(status);
             continue;
         }

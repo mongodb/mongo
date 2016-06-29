@@ -107,7 +107,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
         if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
-            LOG(3) << "Command " << cmdObj << " failed with retriable error and will be retried"
+            LOG(2) << "Command " << cmdObj << " failed with retriable error and will be retried"
                    << causedBy(commandStatus);
             continue;
         }
