@@ -387,20 +387,36 @@ functions:
         working_dir: src
         script: |
           # On each LXC host do the following:
-          #   Copy the mongodb tarball to /root
+          #   Check to see if it's running, if not try to restart it.
+          #   Copy the mongodb tarball to /root.
           numVms=5
           exit_failure_code=0
           ${set_sudo}
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
-            scp mongo-binaries.tgz root@$hostn:
+            $sudo lxc-wait -n $hostn -s 'RUNNING' -t 0
+            lxc_code=$?
+            lxc_restarts=0
+            # If the LXC host is not running, try 5 times to start it.
+            while [ $lxc_code -ne 0 ]
+            do
+              lxc_restarts=$((lxc_restarts+1))
+              echo "Restarting host $hostn"
+              $sudo lxc-start -n $hostn -d
+              $sudo lxc-wait -n $hostn -s 'RUNNING' -t 5
+              lxc_code=$?
+              if [ $lxc_restarts -eq 5 ]; then
+                break
+              fi
+            done
+            scp -o ConnectTimeout=5 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
             exit_code=$?
             # If the copy fails, then tail the LXC host log.
             if [ $exit_code -ne 0 ]; then
-              exit_failure_code=$exit_code
               echo "Copy to host $hostn failed!"
-              $sudo tail /var/log/lxc/$hostn.log
+              $sudo tail -n 100 /var/log/lxc/$hostn.log
+              exit_failure_code=$exit_code
             fi
           done
           exit $exit_failure_code
