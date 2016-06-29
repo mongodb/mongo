@@ -28,11 +28,13 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
 class ConnectionString;
+class OperationContext;
+class Status;
 
 /**
  * Initialize the sharding components of this server. This can be used on both shard and config
@@ -40,6 +42,8 @@ class ConnectionString;
  *
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
-Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS);
+Status initializeGlobalShardingStateForMongod(OperationContext* txn,
+                                              const ConnectionString& configCS,
+                                              StringData distLockProcessId);
 
 }  // namespace mongo

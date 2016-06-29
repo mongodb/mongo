@@ -68,11 +68,11 @@ public:
 
     virtual std::string getProcessID() override;
 
-    virtual StatusWith<DistLockManager::ScopedDistLock> lock(OperationContext* txn,
-                                                             StringData name,
-                                                             StringData whyMessage,
-                                                             Milliseconds waitFor,
-                                                             Milliseconds lockTryInterval) override;
+    virtual StatusWith<ScopedDistLock> lock(OperationContext* txn,
+                                            StringData name,
+                                            StringData whyMessage,
+                                            Milliseconds waitFor,
+                                            Milliseconds lockTryInterval) override;
 
     virtual StatusWith<ScopedDistLock> lockWithSessionID(OperationContext* txn,
                                                          StringData name,

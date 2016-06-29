@@ -61,10 +61,11 @@ public:
 
         // Note: this assumes that globalInit will always be called on the same thread as the main
         // test thread.
-        ShardingState::get(txn())->setGlobalInitMethodForTest([this](const ConnectionString&) {
-            _initCallCount++;
-            return Status::OK();
-        });
+        ShardingState::get(txn())->setGlobalInitMethodForTest(
+            [this](OperationContext*, const ConnectionString&, StringData) {
+                _initCallCount++;
+                return Status::OK();
+            });
     }
 
     void tearDown() override {}

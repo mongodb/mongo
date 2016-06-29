@@ -80,13 +80,7 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<Network
 
 std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
                                                          ShardRegistry* shardRegistry,
-                                                         const HostAndPort& thisHost) {
-    std::unique_ptr<SecureRandom> rng(SecureRandom::create());
-    std::string distLockProcessId = str::stream()
-        << thisHost.toString() << ':'
-        << durationCount<Seconds>(service->getPreciseClockSource()->now().toDurationSinceEpoch())
-        << ':' << static_cast<int32_t>(rng->nextInt64());
-
+                                                         StringData distLockProcessId) {
     auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
     auto distLockManager =
         stdx::make_unique<ReplSetDistLockManager>(service,
@@ -126,7 +120,21 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
 
 }  // namespace
 
-Status initializeGlobalShardingState(const ConnectionString& configCS,
+const StringData kDistLockProcessIdForConfigServer("ConfigServer");
+
+std::string generateDistLockProcessId(OperationContext* txn) {
+    std::unique_ptr<SecureRandom> rng(SecureRandom::create());
+
+    return str::stream()
+        << HostAndPort(getHostName(), serverGlobalParams.port).toString() << ':'
+        << durationCount<Seconds>(
+               txn->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
+        << ':' << rng->nextInt64();
+}
+
+Status initializeGlobalShardingState(OperationContext* txn,
+                                     const ConnectionString& configCS,
+                                     StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder) {
@@ -144,9 +152,8 @@ Status initializeGlobalShardingState(const ConnectionString& configCS,
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
-    auto catalogClient = makeCatalogClient(getGlobalServiceContext(),
-                                           shardRegistry.get(),
-                                           HostAndPort(getHostName(), serverGlobalParams.port));
+    auto catalogClient =
+        makeCatalogClient(txn->getServiceContext(), shardRegistry.get(), distLockProcessId);
 
     auto rawCatalogClient = catalogClient.get();
 

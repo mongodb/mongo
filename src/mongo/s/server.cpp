@@ -241,7 +241,9 @@ static Status initializeSharding(OperationContext* txn) {
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     Status status = initializeGlobalShardingState(
+        txn,
         mongosGlobalParams.configdbs,
+        generateDistLockProcessId(txn),
         std::move(shardFactory),
         []() { return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(); },
         [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor) {

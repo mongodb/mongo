@@ -485,6 +485,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
                 // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
                 return;
             }
+
             fassertFailedWithStatus(40184,
                                     Status(status.code(),
                                            str::stream()
@@ -492,6 +493,10 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
                                                   "server's first transition to primary"
                                                << causedBy(status)));
         }
+
+        // Free any leftover locks from previous instantiations
+        auto distLockManager = Grid::get(txn)->catalogClient(txn)->getDistLockManager();
+        distLockManager->unlockAll(txn, distLockManager->getProcessID());
 
         // If this is a config server node becoming a primary, start the balancer
         auto balancer = Balancer::get(txn);

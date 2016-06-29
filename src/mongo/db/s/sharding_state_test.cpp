@@ -132,7 +132,8 @@ public:
         _client = _service.makeClient("ShardingStateTest");
         _opCtx = _client->makeOperationContext();
 
-        _shardingState.setGlobalInitMethodForTest([this](const ConnectionString& connStr) {
+        _shardingState.setGlobalInitMethodForTest([&](
+            OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
             initGrid(_opCtx.get(), connStr);
             return Status::OK();
         });
@@ -172,7 +173,7 @@ TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(txn()).toString());
@@ -185,22 +186,27 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::ShutdownInProgress, "shutting down"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::ShutdownInProgress, "shutting down"};
+        });
 
     {
-        auto status = shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max());
+        auto status =
+            shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max());
         ASSERT_EQ(ErrorCodes::ShutdownInProgress, status);
     }
 
     // ShardingState is now in error state, attempting to call it again will still result in error.
 
     shardingState()->setGlobalInitMethodForTest(
-        [](const ConnectionString& connStr) { return Status::OK(); });
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status::OK();
+        });
 
     {
-        auto status = shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max());
+        auto status =
+            shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max());
         ASSERT_EQ(ErrorCodes::ManualInterventionRequired, status);
     }
 
@@ -215,7 +221,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -223,11 +229,12 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     shardIdentity2.setShardName("a");
     shardIdentity2.setClusterId(clusterID);
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::InternalError, "should not reach here"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::InternalError, "should not reach here"};
+        });
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity2, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max()));
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
@@ -242,7 +249,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -250,11 +257,12 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     shardIdentity2.setShardName("a");
     shardIdentity2.setClusterId(clusterID);
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::InternalError, "should not reach here"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::InternalError, "should not reach here"};
+        });
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity2, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max()));
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
@@ -269,7 +277,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -277,11 +285,13 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
     shardIdentity2.setShardName("a");
     shardIdentity2.setClusterId(clusterID);
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::InternalError, "should not reach here"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::InternalError, "should not reach here"};
+        });
 
-    auto status = shardingState()->initializeFromShardIdentity(shardIdentity2, Date_t::max());
+    auto status =
+        shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max());
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
@@ -297,7 +307,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -305,11 +315,13 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
     shardIdentity2.setShardName("b");
     shardIdentity2.setClusterId(clusterID);
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::InternalError, "should not reach here"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::InternalError, "should not reach here"};
+        });
 
-    auto status = shardingState()->initializeFromShardIdentity(shardIdentity2, Date_t::max());
+    auto status =
+        shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max());
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
@@ -324,7 +336,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithPreviouslyUnsetClusterIdSucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID());
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -332,11 +344,12 @@ TEST_F(ShardingStateTest, InitializeAgainWithPreviouslyUnsetClusterIdSucceeds) {
     shardIdentity2.setShardName("a");
     shardIdentity2.setClusterId(OID::gen());
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::InternalError, "should not reach here"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::InternalError, "should not reach here"};
+        });
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity2, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max()));
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
@@ -350,7 +363,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -358,11 +371,13 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     shardIdentity2.setShardName("a");
     shardIdentity2.setClusterId(OID::gen());
 
-    shardingState()->setGlobalInitMethodForTest([](const ConnectionString& connStr) {
-        return Status{ErrorCodes::InternalError, "should not reach here"};
-    });
+    shardingState()->setGlobalInitMethodForTest(
+        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+            return Status{ErrorCodes::InternalError, "should not reach here"};
+        });
 
-    auto status = shardingState()->initializeFromShardIdentity(shardIdentity2, Date_t::max());
+    auto status =
+        shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max());
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());

@@ -60,9 +60,9 @@ public:
         : _txn(txn), _shardIdentity(std::move(shardIdentity)) {}
 
     void commit() override {
-        fassertNoTrace(
-            40071,
-            ShardingState::get(_txn)->initializeFromShardIdentity(_shardIdentity, Date_t::max()));
+        fassertNoTrace(40071,
+                       ShardingState::get(_txn)->initializeFromShardIdentity(
+                           _txn, _shardIdentity, Date_t::max()));
     }
 
     void rollback() override {}

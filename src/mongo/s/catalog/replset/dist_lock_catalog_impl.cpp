@@ -69,6 +69,10 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
 
+const WriteConcernOptions kLocalWriteConcern(1,
+                                             WriteConcernOptions::SyncMode::UNSET,
+                                             Milliseconds(0));
+
 /**
  * Returns the resulting new object from the findAndModify response object.
  * Returns LockStateChangeFailed if value field was null, which indicates that
@@ -325,7 +329,7 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 
     BatchedCommandRequest request(updateRequest.release());
     request.setNS(_locksNS);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(kLocalWriteConcern.toBSON());
 
     BSONObj cmdObj = request.toBSON();
 

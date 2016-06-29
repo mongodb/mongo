@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/status.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
@@ -47,7 +48,9 @@
 
 namespace mongo {
 
-Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) {
+Status initializeGlobalShardingStateForMongod(OperationContext* txn,
+                                              const ConnectionString& configCS,
+                                              StringData distLockProcessId) {
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
@@ -78,7 +81,9 @@ Status initializeGlobalShardingStateForMongod(const ConnectionString& configCS) 
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     return initializeGlobalShardingState(
+        txn,
         configCS,
+        distLockProcessId,
         std::move(shardFactory),
         []() { return stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(); },
         [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor)

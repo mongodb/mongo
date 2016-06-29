@@ -31,6 +31,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -55,10 +57,22 @@ using ShardingEgressMetadataHookBuilder =
 }  // namespace rpc
 
 /**
+ * Fixed process identifier for the dist lock manager running on a config server.
+ */
+extern const StringData kDistLockProcessIdForConfigServer;
+
+/**
+ * Generates a uniform string to be used as a process id for the distributed lock manager.
+ */
+std::string generateDistLockProcessId(OperationContext* txn);
+
+/**
  * Takes in the connection string for reaching the config servers and initializes the global
  * ShardingCatalogClient, ShardingCatalogManager, ShardRegistry, and Grid objects.
  */
-Status initializeGlobalShardingState(const ConnectionString& configCS,
+Status initializeGlobalShardingState(OperationContext* txn,
+                                     const ConnectionString& configCS,
+                                     StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder);

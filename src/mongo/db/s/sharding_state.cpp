@@ -418,7 +418,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn) {
         return parseStatus.getStatus();
     }
 
-    auto status = initializeFromShardIdentity(parseStatus.getValue(), txn->getDeadline());
+    auto status = initializeFromShardIdentity(txn, parseStatus.getValue(), txn->getDeadline());
     if (!status.isOK()) {
         return status;
     }
@@ -428,7 +428,8 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn) {
 
 // NOTE: This method can be called inside a database lock so it should never take any database
 // locks, perform I/O, or any long running operations.
-Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shardIdentity,
+Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
+                                                  const ShardIdentityType& shardIdentity,
                                                   Date_t deadline) {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
         return Status::OK();
@@ -500,7 +501,7 @@ Status ShardingState::initializeFromShardIdentity(const ShardIdentityType& shard
         ShardedConnectionInfo::addHook();
 
         try {
-            Status status = _globalInit(configSvrConnStr);
+            Status status = _globalInit(txn, configSvrConnStr, generateDistLockProcessId(txn));
 
             // For backwards compatibility with old style inits from metadata commands.
             if (status.isOK()) {
@@ -538,7 +539,7 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
     ShardedConnectionInfo::addHook();
 
     try {
-        Status status = _globalInit(configSvr);
+        Status status = _globalInit(txn.get(), configSvr, generateDistLockProcessId(txn.get()));
 
         if (status.isOK()) {
             ReplicaSetMonitor::setSynchronousConfigChangeHook(

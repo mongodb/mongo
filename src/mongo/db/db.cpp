@@ -779,7 +779,10 @@ static void _initAndListen(int listenPort) {
                 uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            uassertStatusOK(initializeGlobalShardingStateForMongod(ConnectionString::forLocal()));
+            uassertStatusOK(
+                initializeGlobalShardingStateForMongod(startupOpCtx.get(),
+                                                       ConnectionString::forLocal(),
+                                                       kDistLockProcessIdForConfigServer));
             Balancer::create(startupOpCtx->getServiceContext());
         }
 
@@ -788,7 +791,8 @@ static void _initAndListen(int listenPort) {
         auto parseStatus = ShardIdentityType::fromBSON(serverGlobalParams.overrideShardIdentity);
         uassertStatusOK(parseStatus);
         uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                            ->initializeFromShardIdentity(parseStatus.getValue(), Date_t::max()));
+                            ->initializeFromShardIdentity(
+                                startupOpCtx.get(), parseStatus.getValue(), Date_t::max()));
         uassertStatusOK(reloadShardRegistryUntilSuccess(startupOpCtx.get()));
     }
 
