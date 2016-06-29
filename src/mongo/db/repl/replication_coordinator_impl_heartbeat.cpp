@@ -49,6 +49,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -60,7 +61,9 @@ namespace repl {
 
 namespace {
 
-typedef ReplicationExecutor::CallbackHandle CBHandle;
+using CBHandle = ReplicationExecutor::CallbackHandle;
+using CBHStatus = StatusWith<CBHandle>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 }  // namespace
 

@@ -71,12 +71,6 @@ namespace {
 using std::list;
 using std::string;
 
-// Failpoint which fails initial sync and leaves on oplog entry in the buffer.
-MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
-
-// Failpoint which causes the initial sync function to hang before copying databases.
-MONGO_FP_DECLARE(initialSyncHangBeforeCopyingDatabases);
-
 /**
  * Truncates the oplog (removes any documents) and resets internal variables that were
  * originally initialized or affected by using values from the oplog at startup time.  These

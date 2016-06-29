@@ -46,6 +46,13 @@
 
 namespace mongo {
 namespace repl {
+namespace {
+
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
+
+}  // namespace
+
+class StorageInterface;
 
 class DatabaseCloner : public BaseCloner {
     MONGO_DISALLOW_COPYING(DatabaseCloner);
@@ -92,7 +99,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& listCollectionsFilter,
                    const ListCollectionsPredicateFn& listCollectionsPredicate,
-                   CollectionCloner::StorageInterface* storageInterface,
+                   StorageInterface* storageInterface,
                    const CollectionCallbackFn& collectionWork,
                    const CallbackFn& onCompletion);
 
@@ -153,32 +160,35 @@ private:
      */
     void _finishCallback(const Status& status);
 
-    // Not owned by us.
-    ReplicationExecutor* _executor;
+    /**
+     * Calls the above method after unlocking.
+     */
+    void _finishCallback_inlock(UniqueLock& lk, const Status& status);
 
-    HostAndPort _source;
-    std::string _dbname;
-    BSONObj _listCollectionsFilter;
-    ListCollectionsPredicateFn _listCollectionsPredicate;
-    CollectionCloner::StorageInterface* _storageInterface;
+    std::string _getDiagnosticString_inlock() const;
 
-    // Invoked once for every successfully started collection cloner.
-    CollectionCallbackFn _collectionWork;
-
-    // Invoked once when cloning completes or fails.
-    CallbackFn _onCompletion;
-
-    // Protects member data of this database cloner.
+    //
+    // All member variables are labeled with one of the following codes indicating the
+    // synchronization rules for accessing them.
+    //
+    // (R)  Read-only in concurrent operation; no synchronization required.
+    // (M)  Reads and writes guarded by _mutex
+    // (S)  Self-synchronizing; access in any way from any context.
+    // (RT)  Read-only in concurrent operation; synchronized externally by tests
+    //
     mutable stdx::mutex _mutex;
-
-    mutable stdx::condition_variable _condition;
-
-    // _active is true when database cloner is started.
-    bool _active;
-
-    // Fetcher instance for running listCollections command.
-    Fetcher _listCollectionsFetcher;
-
+    mutable stdx::condition_variable _condition;                 // (M)
+    ReplicationExecutor* _executor;                              // (R)
+    const HostAndPort _source;                                   // (R)
+    const std::string _dbname;                                   // (R)
+    const BSONObj _listCollectionsFilter;                        // (R)
+    const ListCollectionsPredicateFn _listCollectionsPredicate;  // (R)
+    StorageInterface* _storageInterface;                         // (R)
+    CollectionCallbackFn
+        _collectionWork;       // (R) Invoked once for every successfully started collection cloner.
+    CallbackFn _onCompletion;  // (R) Invoked once when cloning completes or fails.
+    bool _active = false;      // _active is true when database cloner is started.
+    Fetcher _listCollectionsFetcher;  // (R) Fetcher instance for running listCollections command.
     // Collection info objects returned from listCollections.
     // Format of each document:
     // {
@@ -186,17 +196,14 @@ private:
     //     options: <collection options>
     // }
     // Holds all collection infos from listCollections.
-    std::vector<BSONObj> _collectionInfos;
-
-    std::vector<NamespaceString> _collectionNamespaces;
-
-    std::list<CollectionCloner> _collectionCloners;
-    std::list<CollectionCloner>::iterator _currentCollectionClonerIter;
-
-    // Function for scheduling database work using the executor.
-    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;
-
-    StartCollectionClonerFn _startCollectionCloner;
+    std::vector<BSONObj> _collectionInfos;                               // (M)
+    std::vector<NamespaceString> _collectionNamespaces;                  // (M)
+    std::list<CollectionCloner> _collectionCloners;                      // (M)
+    std::list<CollectionCloner>::iterator _currentCollectionClonerIter;  // (M)
+    std::vector<std::pair<Status, NamespaceString>> _failedNamespaces;   // (M)
+    CollectionCloner::ScheduleDbWorkFn
+        _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
+    StartCollectionClonerFn _startCollectionCloner;  // (RT)
 };
 
 }  // namespace repl

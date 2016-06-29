@@ -25,7 +25,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -35,12 +34,26 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/collection_cloner.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
+using namespace unittest;
+
+class MockCallbackState final : public mongo::executor::TaskExecutor::CallbackState {
+public:
+    MockCallbackState() = default;
+    void cancel() override {}
+    void waitForCompletion() override {}
+    bool isCanceled() const override {
+        return false;
+    }
+};
 
 class CollectionClonerTest : public BaseClonerTest {
 public:
@@ -52,12 +65,14 @@ protected:
 
     CollectionOptions options;
     std::unique_ptr<CollectionCloner> collectionCloner;
+    CollectionMockStats collectionStats;  // Used by the _loader.
+    CollectionBulkLoaderMock* _loader;    // Owned by CollectionCloner.
 };
 
 void CollectionClonerTest::setUp() {
     BaseClonerTest::setUp();
     options.reset();
-    options.storageEngine = BSON("storageEngine1" << BSONObj());
+    collectionCloner.reset(nullptr);
     collectionCloner.reset(new CollectionCloner(
         &getReplExecutor(),
         target,
@@ -65,12 +80,24 @@ void CollectionClonerTest::setUp() {
         options,
         stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
         storageInterface.get()));
+    collectionStats = CollectionMockStats();
+    storageInterface->createCollectionForBulkFn =
+        [this](const NamespaceString& nss,
+               const CollectionOptions& options,
+               const BSONObj idIndexSpec,
+               const std::vector<BSONObj>& secondaryIndexSpecs) {
+            (_loader = new CollectionBulkLoaderMock(&collectionStats))
+                ->init(nullptr, nullptr, secondaryIndexSpecs);
+
+            return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
+                std::unique_ptr<CollectionBulkLoader>(_loader));
+        };
 }
 
 void CollectionClonerTest::tearDown() {
     BaseClonerTest::tearDown();
     // Executor may still invoke collection cloner's callback before shutting down.
-    collectionCloner.reset();
+    collectionCloner.reset(nullptr);
     options.reset();
 }
 
@@ -85,7 +112,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
 
     // Null executor.
     {
-        CollectionCloner::StorageInterface* si = storageInterface.get();
+        StorageInterface* si = storageInterface.get();
         ASSERT_THROWS(CollectionCloner(nullptr, target, nss, options, cb, si), UserException);
     }
 
@@ -95,7 +122,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
     // Invalid namespace.
     {
         NamespaceString badNss("db.");
-        CollectionCloner::StorageInterface* si = storageInterface.get();
+        StorageInterface* si = storageInterface.get();
         ASSERT_THROWS(CollectionCloner(&executor, target, badNss, options, cb, si), UserException);
     }
 
@@ -104,7 +131,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
         CollectionOptions invalidOptions;
         invalidOptions.storageEngine = BSON("storageEngine1"
                                             << "not a document");
-        CollectionCloner::StorageInterface* si = storageInterface.get();
+        StorageInterface* si = storageInterface.get();
         ASSERT_THROWS(CollectionCloner(&executor, target, nss, invalidOptions, cb, si),
                       UserException);
     }
@@ -112,7 +139,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
     // Callback function cannot be null.
     {
         CollectionCloner::CallbackFn nullCb;
-        CollectionCloner::StorageInterface* si = storageInterface.get();
+        StorageInterface* si = storageInterface.get();
         ASSERT_THROWS(CollectionCloner(&executor, target, nss, options, nullCb, si), UserException);
     }
 }
@@ -180,16 +207,16 @@ TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {
 TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
     ASSERT_OK(collectionCloner->start());
 
-    // Replace scheduleDbWork function so that the callback for beginCollection is canceled
-    // immediately after scheduling.
+    // Replace scheduleDbWork function so that the callback runs with a cancelled status.
     auto&& executor = getReplExecutor();
     collectionCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
-        // Schedule as non-exclusive task to allow us to cancel it before the executor is able
-        // to invoke the callback.
-        auto scheduleResult = executor.scheduleWork(workFn);
-        ASSERT_OK(scheduleResult.getStatus());
-        executor.cancel(scheduleResult.getValue());
-        return scheduleResult;
+        ReplicationExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
+        mongo::executor::TaskExecutor::CallbackArgs args{
+            &executor,
+            handle,
+            {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
+        workFn(args);
+        return StatusWith<ReplicationExecutor::CallbackHandle>(handle);
     });
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
@@ -202,10 +229,10 @@ TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
 TEST_F(CollectionClonerTest, BeginCollectionFailed) {
     ASSERT_OK(collectionCloner->start());
 
-    storageInterface->beginCollectionFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const CollectionOptions& theOptions,
-                                              const std::vector<BSONObj>& theIndexSpecs) {
+    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
+                                                      const CollectionOptions& theOptions,
+                                                      const BSONObj idIndexSpec,
+                                                      const std::vector<BSONObj>& theIndexSpecs) {
         return Status(ErrorCodes::OperationFailed, "");
     };
 
@@ -220,39 +247,43 @@ TEST_F(CollectionClonerTest, BeginCollectionFailed) {
 TEST_F(CollectionClonerTest, BeginCollection) {
     ASSERT_OK(collectionCloner->start());
 
+    CollectionMockStats stats;
+    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
     NamespaceString collNss;
     CollectionOptions collOptions;
     std::vector<BSONObj> collIndexSpecs;
-    storageInterface->beginCollectionFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const CollectionOptions& theOptions,
-                                              const std::vector<BSONObj>& theIndexSpecs) {
-        ASSERT(txn);
-        collNss = theNss;
-        collOptions = theOptions;
-        collIndexSpecs = theIndexSpecs;
-        return Status::OK();
-    };
+    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
+                                                      const CollectionOptions& theOptions,
+                                                      const BSONObj idIndexSpec,
+                                                      const std::vector<BSONObj>& theIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+            collNss = theNss;
+            collOptions = theOptions;
+            collIndexSpecs = theIndexSpecs;
+            return std::unique_ptr<CollectionBulkLoader>(loader);
+        };
 
-    // Split listIndexes response into 2 batches: first batch contains specs[0] and specs[1];
-    // second batch contains specs[2]
-    const std::vector<BSONObj> specs = {idIndexSpec,
-                                        BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
-                                                 << "a_1"
-                                                 << "ns"
-                                                 << nss.ns()),
-                                        BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
-                                                 << "b_1"
-                                                 << "ns"
-                                                 << nss.ns())};
+    // Split listIndexes response into 2 batches: first batch contains idIndexSpec and
+    // second batch contains specs
+    std::vector<BSONObj> specs{BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
+                                        << "a_1"
+                                        << "ns"
+                                        << nss.ns()),
+                               BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
+                                        << "b_1"
+                                        << "ns"
+                                        << nss.ns())};
 
-    processNetworkResponse(createListIndexesResponse(1, BSON_ARRAY(specs[0] << specs[1])));
+    // First batch contains the _id_ index spec.
+    processNetworkResponse(createListIndexesResponse(1, BSON_ARRAY(idIndexSpec)));
 
     // 'status' should not be modified because cloning is not finished.
     ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
     ASSERT_TRUE(collectionCloner->isActive());
 
-    processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(specs[2]), "nextBatch"));
+    // Second batch contains the other index specs.
+    processNetworkResponse(
+        createListIndexesResponse(0, BSON_ARRAY(specs[0] << specs[1]), "nextBatch"));
 
     collectionCloner->waitForDbWorker();
 
@@ -275,15 +306,18 @@ TEST_F(CollectionClonerTest, FindFetcherScheduleFailed) {
 
     // Shut down executor while in beginCollection callback.
     // This will cause the fetcher to fail to schedule the find command.
+    CollectionMockStats stats;
+    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
     bool collectionCreated = false;
-    storageInterface->beginCollectionFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const CollectionOptions& theOptions,
-                                              const std::vector<BSONObj>& theIndexSpecs) {
-        collectionCreated = true;
-        getExecutor().shutdown();
-        return Status::OK();
-    };
+    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
+                                                      const CollectionOptions& theOptions,
+                                                      const BSONObj idIndexSpec,
+                                                      const std::vector<BSONObj>& theIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+            collectionCreated = true;
+            getExecutor().shutdown();
+            return std::unique_ptr<CollectionBulkLoader>(loader);
+        };
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
 
@@ -297,14 +331,17 @@ TEST_F(CollectionClonerTest, FindFetcherScheduleFailed) {
 TEST_F(CollectionClonerTest, FindCommandAfterBeginCollection) {
     ASSERT_OK(collectionCloner->start());
 
+    CollectionMockStats stats;
+    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
     bool collectionCreated = false;
-    storageInterface->beginCollectionFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const CollectionOptions& theOptions,
-                                              const std::vector<BSONObj>& theIndexSpecs) {
-        collectionCreated = true;
-        return Status::OK();
-    };
+    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
+                                                      const CollectionOptions& theOptions,
+                                                      const BSONObj idIndexSpec,
+                                                      const std::vector<BSONObj>& theIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+            collectionCreated = true;
+            return std::unique_ptr<CollectionBulkLoader>(loader);
+        };
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
 
@@ -327,8 +364,9 @@ TEST_F(CollectionClonerTest, FindCommandFailed) {
     ASSERT_OK(collectionCloner->start());
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-
+    ASSERT_TRUE(collectionCloner->isActive());
     collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
 
     processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                      << ""
@@ -342,17 +380,22 @@ TEST_F(CollectionClonerTest, FindCommandFailed) {
 TEST_F(CollectionClonerTest, FindCommandCanceled) {
     ASSERT_OK(collectionCloner->start());
 
+    ASSERT_TRUE(collectionCloner->isActive());
     scheduleNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    ASSERT_TRUE(collectionCloner->isActive());
 
     auto net = getNet();
     net->runReadyNetworkOperations();
 
     collectionCloner->waitForDbWorker();
 
+    ASSERT_TRUE(collectionCloner->isActive());
     scheduleNetworkResponse(BSON("ok" << 1));
+    ASSERT_TRUE(collectionCloner->isActive());
 
     collectionCloner->cancel();
 
+    getNet()->logQueues();
     net->runReadyNetworkOperations();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getStatus().code());
@@ -386,21 +429,19 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
 
     collectionCloner->waitForDbWorker();
 
-    // Replace scheduleDbWork function so that the callback for insertDocuments is canceled
-    // immediately after scheduling.
+    // Replace scheduleDbWork function so that the callback runs with a cancelled status.
     auto&& executor = getReplExecutor();
     collectionCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
-        // Schedule as non-exclusive task to allow us to cancel it before the executor is able
-        // to invoke the callback.
-        auto scheduleResult = executor.scheduleWork(workFn);
-        ASSERT_OK(scheduleResult.getStatus());
-        executor.cancel(scheduleResult.getValue());
-        return scheduleResult;
+        ReplicationExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
+        mongo::executor::TaskExecutor::CallbackArgs args{
+            &executor,
+            handle,
+            {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
+        workFn(args);
+        return StatusWith<ReplicationExecutor::CallbackHandle>(handle);
     });
 
-    const BSONObj doc = BSON("_id" << 1);
-    processNetworkResponse(createCursorResponse(0, BSON_ARRAY(doc)));
-
+    processNetworkResponse(createCursorResponse(0, BSON_ARRAY(BSON("_id" << 1))));
     collectionCloner->waitForDbWorker();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getStatus().code());
     ASSERT_FALSE(collectionCloner->isActive());
@@ -408,49 +449,50 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
 
 TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
     ASSERT_OK(collectionCloner->start());
+    ASSERT_TRUE(collectionCloner->isActive());
 
-    bool insertDocumentsCalled = false;
-    storageInterface->insertDocumentsFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const std::vector<BSONObj>& theDocuments) {
-        insertDocumentsCalled = true;
+    processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    ASSERT_TRUE(collectionCloner->isActive());
+    getNet()->logQueues();
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
+
+    ASSERT(_loader != nullptr);
+    _loader->insertDocsFn = [](const std::vector<BSONObj>::const_iterator begin,
+                               const std::vector<BSONObj>::const_iterator end) {
         return Status(ErrorCodes::OperationFailed, "");
     };
 
-    processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-
-    collectionCloner->waitForDbWorker();
-
-    processNetworkResponse(createCursorResponse(0, BSONArray()));
+    processNetworkResponse(createCursorResponse(0, BSON_ARRAY(BSON("_id" << 1))));
 
     collectionCloner->wait();
+    ASSERT_FALSE(collectionCloner->isActive());
+    ASSERT_EQUALS(0, collectionStats.insertCount);
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus().code());
-    ASSERT_FALSE(collectionCloner->isActive());
 }
 
 TEST_F(CollectionClonerTest, InsertDocumentsSingleBatch) {
     ASSERT_OK(collectionCloner->start());
-
-    std::vector<BSONObj> collDocuments;
-    storageInterface->insertDocumentsFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const std::vector<BSONObj>& theDocuments) {
-        ASSERT(txn);
-        collDocuments = theDocuments;
-        return Status::OK();
-    };
+    ASSERT_TRUE(collectionCloner->isActive());
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    ASSERT_TRUE(collectionCloner->isActive());
 
     collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
 
     const BSONObj doc = BSON("_id" << 1);
     processNetworkResponse(createCursorResponse(0, BSON_ARRAY(doc)));
 
     collectionCloner->waitForDbWorker();
-    ASSERT_EQUALS(1U, collDocuments.size());
-    ASSERT_EQUALS(doc, collDocuments[0]);
+    // TODO: record the documents during insert and compare them
+    //       -- maybe better done using a real storage engine, like ephemeral for test.
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+    ASSERT_TRUE(collectionStats.commitCalled);
 
     ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());
@@ -458,26 +500,22 @@ TEST_F(CollectionClonerTest, InsertDocumentsSingleBatch) {
 
 TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
     ASSERT_OK(collectionCloner->start());
-
-    std::vector<BSONObj> collDocuments;
-    storageInterface->insertDocumentsFn = [&](OperationContext* txn,
-                                              const NamespaceString& theNss,
-                                              const std::vector<BSONObj>& theDocuments) {
-        ASSERT(txn);
-        collDocuments = theDocuments;
-        return Status::OK();
-    };
+    ASSERT_TRUE(collectionCloner->isActive());
 
     processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    ASSERT_TRUE(collectionCloner->isActive());
 
     collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
 
     const BSONObj doc = BSON("_id" << 1);
     processNetworkResponse(createCursorResponse(1, BSON_ARRAY(doc)));
 
     collectionCloner->waitForDbWorker();
-    ASSERT_EQUALS(1U, collDocuments.size());
-    ASSERT_EQUALS(doc, collDocuments[0]);
+    // TODO: record the documents during insert and compare them
+    //       -- maybe better done using a real storage engine, like ephemeral for test.
+    ASSERT_EQUALS(1, collectionStats.insertCount);
 
     ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
     ASSERT_TRUE(collectionCloner->isActive());
@@ -486,8 +524,10 @@ TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
     processNetworkResponse(createCursorResponse(0, BSON_ARRAY(doc2), "nextBatch"));
 
     collectionCloner->waitForDbWorker();
-    ASSERT_EQUALS(1U, collDocuments.size());
-    ASSERT_EQUALS(doc2, collDocuments[0]);
+    // TODO: record the documents during insert and compare them
+    //       -- maybe better done using a real storage engine, like ephemeral for test.
+    ASSERT_EQUALS(2, collectionStats.insertCount);
+    ASSERT_TRUE(collectionStats.commitCalled);
 
     ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());

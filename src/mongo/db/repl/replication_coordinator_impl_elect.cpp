@@ -35,11 +35,14 @@
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
+
+using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 namespace {
 class LoseElectionGuard {

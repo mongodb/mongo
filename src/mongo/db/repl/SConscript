@@ -396,6 +396,7 @@ env.Library('repl_coordinator_impl',
                      '$BUILD_DIR/mongo/rpc/command_status',
                      '$BUILD_DIR/mongo/rpc/metadata',
                      '$BUILD_DIR/mongo/util/fail_point',
+                     'collection_cloner',
                      'data_replicator',
                      'data_replicator_external_state_impl',
                      'repl_coordinator_global',
@@ -743,6 +744,7 @@ env.Library(
     LIBDEPS=[
         'replication_executor',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/base',
     ],
@@ -773,6 +775,26 @@ env.CppUnitTest(
     LIBDEPS=[
         'database_cloner',
         'base_cloner_test_fixture',
+    ],
+)
+
+env.Library(
+    target='databases_cloner',
+    source=[
+        'databases_cloner.cpp',
+    ],
+    LIBDEPS=[
+        'database_cloner',
+    ],
+)
+
+env.CppUnitTest(
+    target='databases_cloner_test',
+    source='databases_cloner_test.cpp',
+    LIBDEPS=[
+        'databases_cloner',
+        'base_cloner_test_fixture',
+        'oplog_entry',
     ],
 )
 
@@ -940,12 +962,13 @@ env.Library(
         'applier',
         'collection_cloner',
         'database_cloner',
+        'databases_cloner',
         'multiapplier',
         'oplog_buffer_blocking_queue',
         'oplog_fetcher',
         'optime',
         'reporter',
-	'rollback_checker',
+        'rollback_checker',
         'storage_interface',
         '$BUILD_DIR/mongo/client/fetcher',
     ],
@@ -962,6 +985,7 @@ env.CppUnitTest(
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )

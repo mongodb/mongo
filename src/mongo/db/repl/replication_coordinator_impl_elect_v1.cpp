@@ -37,11 +37,13 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
+using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 class ReplicationCoordinatorImpl::LoseElectionGuardV1 {
     MONGO_DISALLOW_COPYING(LoseElectionGuardV1);

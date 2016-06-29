@@ -73,8 +73,10 @@ std::string MultiApplier::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     str::stream output;
     output << "MultiApplier";
-    output << " executor: " << _executor->getDiagnosticString();
     output << " active: " << _active;
+    output << ", ops: " << _operations.front().ts.timestamp().toString();
+    output << " - " << _operations.back().ts.timestamp().toString();
+    output << ", executor: " << _executor->getDiagnosticString();
     return output;
 }
 
@@ -156,15 +158,19 @@ void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
         _finishCallback(applyStatus.getStatus(), _operations);
         return;
     }
-    _finishCallback(applyStatus.getValue().getTimestamp(), Operations());
+    _finishCallback(applyStatus.getValue().getTimestamp(), _operations);
 }
 
 void MultiApplier::_finishCallback(const StatusWith<Timestamp>& result,
                                    const Operations& operations) {
-    _onCompletion(result, operations);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _active = false;
     _condition.notify_all();
+    auto finish = _onCompletion;
+    lk.unlock();
+
+    // This instance may be destroyed during the "finish" call.
+    finish(result, operations);
 }
 
 namespace {

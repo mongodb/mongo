@@ -34,12 +34,13 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
-
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using namespace unittest;
 
 const HostAndPort BaseClonerTest::target("localhost", -1);
 const NamespaceString BaseClonerTest::nss("db.coll");
@@ -100,7 +101,7 @@ void BaseClonerTest::setUp() {
     ReplicationExecutorTest::setUp();
     clear();
     launchExecutorThread();
-    storageInterface.reset(new ClonerStorageInterfaceMock());
+    storageInterface.reset(new StorageInterfaceMock());
 }
 
 void BaseClonerTest::tearDown() {
@@ -128,6 +129,7 @@ void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi, const
     Milliseconds millis(0);
     RemoteCommandResponse response(obj, BSONObj(), millis);
     ReplicationExecutor::ResponseStatus responseStatus(response);
+    log() << "Scheduling response to request:" << noi->getDiagnosticString() << " -- resp:" << obj;
     net->scheduleResponse(noi, net->now(), responseStatus);
 }
 
@@ -136,10 +138,21 @@ void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi,
                                              const std::string& reason) {
     auto net = getNet();
     ReplicationExecutor::ResponseStatus responseStatus(code, reason);
+    log() << "Scheduling error response to request:" << noi->getDiagnosticString()
+          << " -- status:" << responseStatus.getStatus().toString();
     net->scheduleResponse(noi, net->now(), responseStatus);
 }
 
 void BaseClonerTest::scheduleNetworkResponse(const BSONObj& obj) {
+    if (!getNet()->hasReadyRequests()) {
+        log() << "Expected network request for resp: " << obj;
+        log() << "      replExec: " << getExecutor().getDiagnosticString();
+        log() << "      net:" << getNet()->getDiagnosticString();
+    }
+    if (getStatus() != getDetectableErrorStatus()) {
+        log() << "Status has changed during network response playback to: " << getStatus();
+        return;
+    }
     ASSERT_TRUE(getNet()->hasReadyRequests());
     scheduleNetworkResponse(getNet()->getNextReadyRequest(), obj);
 }
@@ -222,34 +235,6 @@ void BaseClonerTest::testLifeCycle() {
     finishProcessingNetworkResponse();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getStatus().code());
     ASSERT_FALSE(getCloner()->isActive());
-}
-
-Status ClonerStorageInterfaceMock::beginCollection(OperationContext* txn,
-                                                   const NamespaceString& nss,
-                                                   const CollectionOptions& options,
-                                                   const std::vector<BSONObj>& specs) {
-    return beginCollectionFn ? beginCollectionFn(txn, nss, options, specs) : Status::OK();
-}
-
-Status ClonerStorageInterfaceMock::insertDocuments(OperationContext* txn,
-                                                   const NamespaceString& nss,
-                                                   const std::vector<BSONObj>& docs) {
-    return insertDocumentsFn ? insertDocumentsFn(txn, nss, docs) : Status::OK();
-}
-
-Status ClonerStorageInterfaceMock::commitCollection(OperationContext* txn,
-                                                    const NamespaceString& nss) {
-    return Status::OK();
-}
-
-Status ClonerStorageInterfaceMock::insertMissingDoc(OperationContext* txn,
-                                                    const NamespaceString& nss,
-                                                    const BSONObj& doc) {
-    return Status::OK();
-}
-
-Status ClonerStorageInterfaceMock::dropUserDatabases(OperationContext* txn) {
-    return dropUserDatabasesFn ? dropUserDatabasesFn(txn) : Status::OK();
 }
 
 }  // namespace repl

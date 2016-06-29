@@ -36,6 +36,7 @@
 #include <limits>
 
 #include "mongo/base/status.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -73,6 +74,7 @@
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -84,10 +86,14 @@
 namespace mongo {
 namespace repl {
 
-using executor::NetworkInterface;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
+using CBHandle = ReplicationExecutor::CallbackHandle;
+using CBHStatus = StatusWith<CBHandle>;
 using EventHandle = executor::TaskExecutor::EventHandle;
+using executor::NetworkInterface;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+using NextAction = Fetcher::NextAction;
 
 namespace {
 
@@ -258,7 +264,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _canServeNonLocalReads(0U),
       _dr(createDataReplicatorOptions(this),
           stdx::make_unique<DataReplicatorExternalStateImpl>(this, externalState),
-          &_replExecutor),
+          &_replExecutor,
+          storage),
       _isDurableStorageEngine(isDurableStorageEngineFn ? *isDurableStorageEngineFn : []() -> bool {
           return getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
       }) {
@@ -505,9 +512,10 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
     // Do initial sync.
     if (_externalState->shouldUseDataReplicatorInitialSync()) {
         _externalState->runOnInitialSyncThread([this](OperationContext* txn) {
-            const auto status = _dr.initialSync(txn);
+            const auto status = _dr.doInitialSync(txn);
             fassertStatusOK(40088, status);
-            _setMyLastAppliedOpTime_inlock({status.getValue(), -1}, false);
+            const auto lastApplied = status.getValue();
+            _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
             _externalState->startSteadyStateReplication(txn);
 
         });

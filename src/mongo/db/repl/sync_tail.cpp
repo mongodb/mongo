@@ -56,6 +56,7 @@
 #include "mongo/db/prefetch.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
@@ -117,12 +118,6 @@ static Counter64 opsAppliedStats;
 
 // The oplog entries applied
 static ServerStatusMetricField<Counter64> displayOpsApplied("repl.apply.ops", &opsAppliedStats);
-
-MONGO_FP_DECLARE(rsSyncApplyStop);
-
-// Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
-// operation.
-MONGO_FP_DECLARE(initialSyncHangBeforeGettingMissingDocument);
 
 // Number and time of each ApplyOps worker pool round
 static TimerStats applyBatchStats;

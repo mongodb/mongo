@@ -50,6 +50,9 @@ namespace repl {
 
 namespace {
 
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
+
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
 
@@ -79,7 +82,7 @@ DatabaseCloner::DatabaseCloner(ReplicationExecutor* executor,
                                const std::string& dbname,
                                const BSONObj& listCollectionsFilter,
                                const ListCollectionsPredicateFn& listCollectionsPred,
-                               CollectionCloner::StorageInterface* si,
+                               StorageInterface* si,
                                const CollectionCallbackFn& collWork,
                                const CallbackFn& onCompletion)
     : _executor(executor),
@@ -90,7 +93,6 @@ DatabaseCloner::DatabaseCloner(ReplicationExecutor* executor,
       _storageInterface(si),
       _collectionWork(collWork),
       _onCompletion(onCompletion),
-      _active(false),
       _listCollectionsFetcher(_executor,
                               _source,
                               _dbname,
@@ -117,12 +119,16 @@ DatabaseCloner::~DatabaseCloner() {
 }
 
 const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LockGuard lk(_mutex);
     return _collectionInfos;
 }
 
 std::string DatabaseCloner::getDiagnosticString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LockGuard lk(_mutex);
+    return _getDiagnosticString_inlock();
+}
+
+std::string DatabaseCloner::_getDiagnosticString_inlock() const {
     str::stream output;
     output << "DatabaseCloner";
     output << " executor: " << _executor->getDiagnosticString();
@@ -136,12 +142,12 @@ std::string DatabaseCloner::getDiagnosticString() const {
 }
 
 bool DatabaseCloner::isActive() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LockGuard lk(_mutex);
     return _active;
 }
 
 Status DatabaseCloner::start() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LockGuard lk(_mutex);
 
     if (_active) {
         return Status(ErrorCodes::IllegalOperation, "database cloner already started");
@@ -149,6 +155,8 @@ Status DatabaseCloner::start() {
 
     Status scheduleResult = _listCollectionsFetcher.schedule();
     if (!scheduleResult.isOK()) {
+        error() << "Error scheduling listCollections for database: " << _dbname
+                << ", error:" << scheduleResult;
         return scheduleResult;
     }
 
@@ -159,7 +167,7 @@ Status DatabaseCloner::start() {
 
 void DatabaseCloner::cancel() {
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        LockGuard lk(_mutex);
 
         if (!_active) {
             return;
@@ -170,12 +178,12 @@ void DatabaseCloner::cancel() {
 }
 
 void DatabaseCloner::wait() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    UniqueLock lk(_mutex);
     _condition.wait(lk, [this]() { return !_active; });
 }
 
 void DatabaseCloner::setScheduleDbWorkFn(const CollectionCloner::ScheduleDbWorkFn& work) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LockGuard lk(_mutex);
 
     _scheduleDbWorkFn = work;
 }
@@ -189,13 +197,20 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                                               Fetcher::NextAction* nextAction,
                                               BSONObjBuilder* getMoreBob) {
     if (!result.isOK()) {
-        _finishCallback(result.getStatus());
+        _finishCallback({result.getStatus().code(),
+                         str::stream() << "While issuing listCollections on db '" << _dbname
+                                       << "' (host:"
+                                       << _source.toString()
+                                       << ") there was an error '"
+                                       << result.getStatus().reason()
+                                       << "'"});
         return;
     }
 
     auto batchData(result.getValue());
     auto&& documents = batchData.documents;
 
+    UniqueLock lk(_mutex);
     // We may be called with multiple batches leading to a need to grow _collectionInfos.
     _collectionInfos.reserve(_collectionInfos.size() + documents.size());
     std::copy_if(documents.begin(),
@@ -213,7 +228,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
 
     // Nothing to do for an empty database.
     if (_collectionInfos.empty()) {
-        _finishCallback(Status::OK());
+        _finishCallback_inlock(lk, Status::OK());
         return;
     }
 
@@ -222,52 +237,57 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     for (auto&& info : _collectionInfos) {
         BSONElement nameElement = info.getField(kNameFieldName);
         if (nameElement.eoo()) {
-            _finishCallback(
-                Status(ErrorCodes::FailedToParse,
-                       str::stream() << "collection info must contain '" << kNameFieldName << "' "
-                                     << "field : "
-                                     << info));
+            _finishCallback_inlock(
+                lk,
+                {ErrorCodes::FailedToParse,
+                 str::stream() << "collection info must contain '" << kNameFieldName << "' "
+                               << "field : "
+                               << info});
             return;
         }
         if (nameElement.type() != mongo::String) {
-            _finishCallback(Status(
-                ErrorCodes::TypeMismatch,
-                str::stream() << "'" << kNameFieldName << "' field must be a string: " << info));
+            _finishCallback_inlock(
+                lk,
+                {ErrorCodes::TypeMismatch,
+                 str::stream() << "'" << kNameFieldName << "' field must be a string: " << info});
             return;
         }
         const std::string collectionName = nameElement.String();
         if (seen.find(collectionName) != seen.end()) {
-            _finishCallback(Status(ErrorCodes::DuplicateKey,
-                                   str::stream()
-                                       << "collection info contains duplicate collection name "
-                                       << "'"
-                                       << collectionName
-                                       << "': "
-                                       << info));
+            _finishCallback_inlock(lk,
+                                   {ErrorCodes::DuplicateKey,
+                                    str::stream()
+                                        << "collection info contains duplicate collection name "
+                                        << "'"
+                                        << collectionName
+                                        << "': "
+                                        << info});
             return;
         }
 
         BSONElement optionsElement = info.getField(kOptionsFieldName);
         if (optionsElement.eoo()) {
-            _finishCallback(Status(
-                ErrorCodes::FailedToParse,
-                str::stream() << "collection info must contain '" << kOptionsFieldName << "' "
-                              << "field : "
-                              << info));
+            _finishCallback_inlock(
+                lk,
+                {ErrorCodes::FailedToParse,
+                 str::stream() << "collection info must contain '" << kOptionsFieldName << "' "
+                               << "field : "
+                               << info});
             return;
         }
         if (!optionsElement.isABSONObj()) {
-            _finishCallback(Status(ErrorCodes::TypeMismatch,
-                                   str::stream() << "'" << kOptionsFieldName
-                                                 << "' field must be an object: "
-                                                 << info));
+            _finishCallback_inlock(lk,
+                                   Status(ErrorCodes::TypeMismatch,
+                                          str::stream() << "'" << kOptionsFieldName
+                                                        << "' field must be an object: "
+                                                        << info));
             return;
         }
         const BSONObj optionsObj = optionsElement.Obj();
         CollectionOptions options;
         Status parseStatus = options.parse(optionsObj);
         if (!parseStatus.isOK()) {
-            _finishCallback(parseStatus);
+            _finishCallback_inlock(lk, parseStatus);
             return;
         }
         seen.insert(collectionName);
@@ -285,7 +305,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                     &DatabaseCloner::_collectionClonerCallback, this, stdx::placeholders::_1, nss),
                 _storageInterface);
         } catch (const UserException& ex) {
-            _finishCallback(ex.toStatus());
+            _finishCallback_inlock(lk, ex.toStatus());
             return;
         }
     }
@@ -303,41 +323,66 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     if (!startStatus.isOK()) {
         LOG(1) << "    failed to start collection cloning on "
                << _currentCollectionClonerIter->getSourceNamespace() << ": " << startStatus;
-        _finishCallback(startStatus);
+        _finishCallback_inlock(lk, startStatus);
         return;
     }
 }
 
 void DatabaseCloner::_collectionClonerCallback(const Status& status, const NamespaceString& nss) {
+    auto newStatus = status;
+
+    UniqueLock lk(_mutex);
+    if (!status.isOK()) {
+        newStatus = {status.code(),
+                     str::stream() << "While cloning collection '" << nss.toString()
+                                   << "' there was an error '"
+                                   << status.reason()
+                                   << "'"};
+        _failedNamespaces.push_back({newStatus, nss});
+    }
     // Forward collection cloner result to caller.
     // Failure to clone a collection does not stop the database cloner
     // from cloning the rest of the collections in the listCollections result.
-    _collectionWork(status, nss);
-
+    lk.unlock();
+    _collectionWork(newStatus, nss);
+    lk.lock();
     _currentCollectionClonerIter++;
-
-    LOG(1) << "    cloning collection " << _currentCollectionClonerIter->getSourceNamespace();
 
     if (_currentCollectionClonerIter != _collectionCloners.end()) {
         Status startStatus = _startCollectionCloner(*_currentCollectionClonerIter);
         if (!startStatus.isOK()) {
             LOG(1) << "    failed to start collection cloning on "
                    << _currentCollectionClonerIter->getSourceNamespace() << ": " << startStatus;
-            _finishCallback(startStatus);
+            _finishCallback_inlock(lk, startStatus);
             return;
         }
         return;
     }
 
-    _finishCallback(Status::OK());
+    Status finalStatus(Status::OK());
+    if (_failedNamespaces.size() > 0) {
+        finalStatus = {ErrorCodes::InitialSyncFailure,
+                       str::stream() << "Failed to clone " << _failedNamespaces.size()
+                                     << " collection(s) in '"
+                                     << _dbname
+                                     << "' from "
+                                     << _source.toString()};
+    }
+    _finishCallback_inlock(lk, finalStatus);
 }
 
 void DatabaseCloner::_finishCallback(const Status& status) {
     _onCompletion(status);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LockGuard lk(_mutex);
     _active = false;
     _condition.notify_all();
 }
 
+void DatabaseCloner::_finishCallback_inlock(UniqueLock& lk, const Status& status) {
+    if (lk.owns_lock()) {
+        lk.unlock();
+    }
+    _finishCallback(status);
+}
 }  // namespace repl
 }  // namespace mongo

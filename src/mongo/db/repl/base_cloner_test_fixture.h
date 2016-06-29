@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -50,7 +51,6 @@ class OperationContext;
 namespace repl {
 
 class BaseCloner;
-class ClonerStorageInterfaceMock;
 
 class BaseClonerTest : public ReplicationExecutorTest {
 public:
@@ -119,7 +119,7 @@ protected:
     void setUp() override;
     void tearDown() override;
 
-    std::unique_ptr<ClonerStorageInterfaceMock> storageInterface;
+    std::unique_ptr<StorageInterfaceMock> storageInterface;
 
 private:
     // Protects member data of this base cloner fixture.
@@ -128,41 +128,6 @@ private:
     stdx::condition_variable _setStatusCondition;
 
     Status _status;
-};
-
-class ClonerStorageInterfaceMock : public CollectionCloner::StorageInterface {
-public:
-    using InsertCollectionFn = stdx::function<Status(
-        OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>;
-    using BeginCollectionFn = stdx::function<Status(OperationContext*,
-                                                    const NamespaceString&,
-                                                    const CollectionOptions&,
-                                                    const std::vector<BSONObj>&)>;
-    using InsertMissingDocFn =
-        stdx::function<Status(OperationContext*, const NamespaceString&, const BSONObj&)>;
-    using DropUserDatabases = stdx::function<Status(OperationContext*)>;
-
-    Status beginCollection(OperationContext* txn,
-                           const NamespaceString& nss,
-                           const CollectionOptions& options,
-                           const std::vector<BSONObj>& specs) override;
-
-    Status insertDocuments(OperationContext* txn,
-                           const NamespaceString& nss,
-                           const std::vector<BSONObj>& docs) override;
-
-    Status commitCollection(OperationContext* txn, const NamespaceString& nss) override;
-
-    Status insertMissingDoc(OperationContext* txn,
-                            const NamespaceString& nss,
-                            const BSONObj& doc) override;
-
-    Status dropUserDatabases(OperationContext* txn);
-
-    BeginCollectionFn beginCollectionFn;
-    InsertCollectionFn insertDocumentsFn;
-    InsertMissingDocFn insertMissingDocFn;
-    DropUserDatabases dropUserDatabasesFn;
 };
 
 }  // namespace repl
