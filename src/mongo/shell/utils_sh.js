@@ -44,7 +44,7 @@ sh._pchunk = function(chunk) {
 
 /**
  * Internal method to write the balancer state to the config.settings collection. Should not be used
- * directly, instead go through the start/stopBalancer calls and the controlBalancer command.
+ * directly, instead go through the start/stopBalancer calls and the balancerStart/Stop commands.
  */
 sh._writeBalancerStateDeprecated = function(onOrNot) {
     return assert.writeOK(
@@ -165,7 +165,7 @@ sh.getBalancerHost = function(configDB) {
 sh.stopBalancer = function(timeoutMs, interval) {
     timeoutMs = timeoutMs || 60000;
 
-    var result = db.adminCommand({controlBalancer: 'stop', maxTimeMS: timeoutMs});
+    var result = db.adminCommand({balancerStop: 1, maxTimeMS: timeoutMs});
     if (result.code === ErrorCodes.CommandNotFound) {
         // For backwards compatibility, use the legacy balancer stop method
         result = sh._writeBalancerStateDeprecated(false);
@@ -177,7 +177,7 @@ sh.stopBalancer = function(timeoutMs, interval) {
 };
 
 sh.startBalancer = function(timeoutMs, interval) {
-    var result = db.adminCommand({controlBalancer: 'start', maxTimeMS: timeoutMs});
+    var result = db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
     if (result.code === ErrorCodes.CommandNotFound) {
         // For backwards compatibility, use the legacy balancer start method
         result = sh._writeBalancerStateDeprecated(true);

@@ -32,6 +32,8 @@
 
 #include "mongo/s/balancer/balancer_configuration.h"
 
+#include <algorithm>
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,6 +48,7 @@ namespace {
 
 const char kValue[] = "value";
 const char kStopped[] = "stopped";
+const char kMode[] = "mode";
 const char kActiveWindow[] = "activeWindow";
 const char kWaitForDelete[] = "_waitForDelete";
 
@@ -54,6 +57,7 @@ const NamespaceString kSettingsNamespace("config", "settings");
 }  // namespace
 
 const char BalancerSettingsType::kKey[] = "balancer";
+const char* BalancerSettingsType::kBalancerModes[] = {"full", "autoSplitOnly", "off"};
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
@@ -64,12 +68,19 @@ BalancerConfiguration::BalancerConfiguration()
 
 BalancerConfiguration::~BalancerConfiguration() = default;
 
-Status BalancerConfiguration::setBalancerActive(OperationContext* txn, bool active) {
+BalancerSettingsType::BalancerMode BalancerConfiguration::getBalancerMode() const {
+    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    return _balancerSettings.getMode();
+}
+
+Status BalancerConfiguration::setBalancerMode(OperationContext* txn,
+                                              BalancerSettingsType::BalancerMode mode) {
     auto updateStatus = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
         txn,
         kSettingsNamespace.ns(),
         BSON("_id" << BalancerSettingsType::kKey),
-        BSON("$set" << BSON(kStopped << !active)),
+        BSON("$set" << BSON(kStopped << (mode == BalancerSettingsType::kOff) << kMode
+                                     << BalancerSettingsType::kBalancerModes[mode])),
         true,
         ShardingCatalogClient::kMajorityWriteConcern);
 
@@ -78,7 +89,7 @@ Status BalancerConfiguration::setBalancerActive(OperationContext* txn, bool acti
         return refreshStatus;
     }
 
-    if (!updateStatus.isOK() && (isBalancerActive() != active)) {
+    if (!updateStatus.isOK() && (getBalancerMode() != mode)) {
         return {updateStatus.getStatus().code(),
                 str::stream() << "Failed to update balancer configuration due to "
                               << updateStatus.getStatus().reason()};
@@ -87,9 +98,19 @@ Status BalancerConfiguration::setBalancerActive(OperationContext* txn, bool acti
     return Status::OK();
 }
 
-bool BalancerConfiguration::isBalancerActive() const {
+bool BalancerConfiguration::shouldBalance() const {
     stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
-    if (!_balancerSettings.shouldBalance()) {
+    if (_balancerSettings.getMode() == BalancerSettingsType::kOff ||
+        _balancerSettings.getMode() == BalancerSettingsType::kAutoSplitOnly) {
+        return false;
+    }
+
+    return _balancerSettings.isTimeInBalancingWindow(boost::posix_time::second_clock::local_time());
+}
+
+bool BalancerConfiguration::shouldBalanceForAutoSplit() const {
+    stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
+    if (_balancerSettings.getMode() == BalancerSettingsType::kOff) {
         return false;
     }
 
@@ -190,7 +211,20 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
         Status status = bsonExtractBooleanFieldWithDefault(obj, kStopped, false, &stopped);
         if (!status.isOK())
             return status;
-        settings._shouldBalance = !stopped;
+        if (stopped) {
+            settings._mode = kOff;
+        } else {
+            std::string modeStr;
+            status = bsonExtractStringFieldWithDefault(obj, kMode, kBalancerModes[kFull], &modeStr);
+            if (!status.isOK())
+                return status;
+            auto it = std::find(std::begin(kBalancerModes), std::end(kBalancerModes), modeStr);
+            if (it == std::end(kBalancerModes)) {
+                return Status(ErrorCodes::BadValue, "Invalid balancer mode");
+            }
+
+            settings._mode = static_cast<BalancerMode>(it - std::begin(kBalancerModes));
+        }
     }
 
     {

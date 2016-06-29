@@ -1,8 +1,9 @@
 /**
  * This test overrides the ShardingTest start/stopBalancer methods to go directly against the config
  * server. The reason is that tests with 3.2 mongos and 3.4 mongod are failing because in that
- * intermediate state neither the new shell is able to stop the balancer (missing controlBalancer
- * command on mongos), nor the old shell works (because the balancer lock session id never changes).
+ * intermediate state neither the new shell is able to stop the balancer (missing balancerStart/Stop
+ * commands on mongos), nor the old shell works (because the balancer lock session id does not
+ * change since the balancer lock is held permanently).
  */
 (function() {
     'use strict';
@@ -37,16 +38,14 @@
         var controlMongoSConn = MongoRunner.runMongos(controlMongoSStartupOptions);
 
         // Override the start/stopBalancer methods
-        function _controlBalancerFn(action, timeoutMs) {
-            return controlMongoSConn.adminCommand({controlBalancer: action, maxTimeMS: timeoutMs});
-        }
 
         var originalStartBalancer = this.startBalancer;
         this.startBalancer = function(timeoutMs, interval) {
             timeoutMs = timeoutMs || 60000;
 
             var result;
-            var fn = _controlBalancerFn.bind(this, 'start', timeoutMs);
+            var fn = controlMongoSConn.adminCommand.bind(controlMongoSConn,
+                                                         {balancerStart: 1, maxTimeMS: timeoutMs});
             if (controlMongoSStartupOptions.keyFile) {
                 result =
                     authutil.asCluster(controlMongoSConn, controlMongoSStartupOptions.keyFile, fn);
@@ -67,7 +66,8 @@
             timeoutMs = timeoutMs || 60000;
 
             var result;
-            var fn = _controlBalancerFn.bind(this, 'stop', timeoutMs);
+            var fn = controlMongoSConn.adminCommand.bind(controlMongoSConn,
+                                                         {balancerStop: 1, maxTimeMS: timeoutMs});
             if (controlMongoSStartupOptions.keyFile) {
                 result =
                     authutil.asCluster(controlMongoSConn, controlMongoSStartupOptions.keyFile, fn);
@@ -81,6 +81,18 @@
             }
 
             return assert.commandWorked(result);
+        };
+
+        var originalAwaitBalancerRound = this.awaitBalancerRound;
+        this.awaitBalancerRound = function(timeoutMs) {
+            timeoutMs = timeoutMs || 60000;
+
+            var fn = originalAwaitBalancerRound.bind(this, timeoutMs, controlMongoSConn);
+            if (controlMongoSStartupOptions.keyFile) {
+                authutil.asCluster(controlMongoSConn, controlMongoSStartupOptions.keyFile, fn);
+            } else {
+                fn();
+            }
         };
 
         // Override the stop method to also stop the control mongos

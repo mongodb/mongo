@@ -562,26 +562,21 @@ var ShardingTest = function(params) {
 
     /**
      * Waits up to the specified timeout (with a default of 60s) for the balancer to execute one
-     * round.
+     * round. If no round has been executed, throws an error.
+     *
+     * The mongosConnection parameter is optional and allows callers to specify a connection
+     * different than the first mongos instance in the list.
      */
-    this.awaitBalancerRound = function(timeoutMs) {
+    this.awaitBalancerRound = function(timeoutMs, mongosConnection) {
         timeoutMs = timeoutMs || 60000;
+        mongosConnection = mongosConnection || self.s0;
 
         // Get the balancer section from the server status of the config server primary
         function getBalancerStatus() {
-            var csrsPrimary = self.configRS.getPrimary();
-            var serverStatus = csrsPrimary.adminCommand({serverStatus: 1, sharding: 1});
-            if (!serverStatus) {
-                throw Error('Unable to run serverStatus on "' + csrsPrimary + '"');
-            }
-
-            var balancerStatus = serverStatus.sharding.balancer;
-            if (!balancerStatus) {
-                throw Error('Host "' + csrsPrimary + '" does not have the balancer component');
-            }
-
-            if (balancerStatus.state !== 'running') {
-                throw Error('Balancer is stopped');
+            var balancerStatus =
+                assert.commandWorked(mongosConnection.adminCommand({balancerStatus: 1}));
+            if (balancerStatus.mode !== 'full') {
+                throw Error('Balancer is not enabled');
             }
 
             return balancerStatus;
@@ -705,43 +700,6 @@ var ShardingTest = function(params) {
 
         printjson(result);
         assert(result.ok);
-    };
-
-    /**
-     * Returns true after the balancer has completed a balancing round.
-     *
-     * Checks that three pings were sent to config.mongos. The balancer writes a ping
-     * at the start and end of a balancing round. If the balancer is in the middle of
-     * a round, there could be three pings before the first full balancing round
-     * completes: end ping of a round, and start and end pings of the following round.
-     */
-    this.waitForBalancerRound = function() {
-        if (typeof db == "undefined") {
-            db = undefined;
-        }
-        var oldDB = db;
-        db = this.config;
-
-        var getPings = function() {
-            return sh._getConfigDB().mongos.find().toArray();
-        };
-
-        try {
-            // If sh.waitForPingChange returns a non-empty array, config.mongos
-            // was not successfully updated and no balancer round was reported.
-            for (var i = 0; i < 3; ++i) {
-                if (sh.waitForPingChange(getPings()).length != 0) {
-                    return false;
-                }
-            }
-
-            db = oldDB;
-            return true;
-        } catch (e) {
-            print("Error running waitForPingChange: " + tojson(e));
-            db = oldDB;
-            return false;
-        }
     };
 
     /**

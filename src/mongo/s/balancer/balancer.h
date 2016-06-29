@@ -96,6 +96,12 @@ public:
     void joinThread();
 
     /**
+     * Potentially blocking method, which will return immediately if the balancer is not running a
+     * balancer round and will block until the current round completes otherwise.
+     */
+    void joinCurrentRound(OperationContext* txn);
+
+    /**
      * Blocking call, which requests the balancer to move a single chunk to a more appropriate
      * shard, in accordance with the active balancer policy. It is not guaranteed that the chunk
      * will actually move because it may already be at the best shard. An error will be returned if
@@ -121,21 +127,17 @@ public:
     /**
      * Appends the runtime state of the balancer instance to the specified builder.
      */
-    void report(BSONObjBuilder* builder);
+    void report(OperationContext* txn, BSONObjBuilder* builder);
 
 private:
     /**
      * Possible runtime states of the balancer. The comments indicate the allowed next state.
      */
     enum State {
-        kStopped,     // kRunning
-        kRunning,     // kStopping
-        kStopping,    // kStopped
-        kStateCount,  // Never reached
+        kStopped,   // kRunning
+        kRunning,   // kStopping
+        kStopping,  // kStopped
     };
-
-    // String representation of the balancer states for reporting purposes
-    static const char* kStateNames[kStateCount];
 
     /**
      * The main balancer loop, which runs in a separate thread.
@@ -187,15 +189,21 @@ private:
     // The main balancer thread
     stdx::thread _thread;
 
-    // Utilities to stop the balancer
+    // Protects the state below
     stdx::mutex _mutex;
-    stdx::condition_variable _condVar;
+
+    // Indicates the current state of the balancer
     State _state{kStopped};
 
-    // Counts the number of balancing rounds done by this instance, since the balancer was first
-    // activated
+    // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};
+
+    // Counts the number of balancing rounds performed since the balancer thread was first activated
     int64_t _numBalancerRounds{0};
+
+    // Condition variable, which is signalled every time the above runtime state of the balancer
+    // changes (in particular, state/balancer round and number of balancer rounds).
+    stdx::condition_variable _condVar;
 
     // Number of moved chunks in last round
     int _balancedLastTime;

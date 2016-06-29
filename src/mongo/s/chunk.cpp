@@ -347,7 +347,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             return false;
         }
 
-        bool shouldBalance = balancerConfig->isBalancerActive();
+        bool shouldBalance = balancerConfig->shouldBalanceForAutoSplit();
         if (shouldBalance) {
             auto collStatus = grid.catalogClient(txn)->getCollection(txn, _manager->getns());
             if (!collStatus.isOK()) {

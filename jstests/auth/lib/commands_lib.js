@@ -722,16 +722,64 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "controlBalancer",
-          command: {controlBalancer: "x"},
+          testname: "balancerStart",
+          command: {balancerStart: 1},
           skipStandalone: true,
           testcases: [
               {
                 runOnDb: adminDbName,
                 privileges:
                     [{resource: {db: 'config', collection: 'settings'}, actions: ['update']}],
-                expectFail: true  // 'x' is not a vaild parameter
+                expectFail: true  // Command cannot be run on non-config server
               },
+          ]
+        },
+        {
+          testname: "_configsvrBalancerStart",
+          command: {_configsvrBalancerStart: 1},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
+        {
+          testname: "balancerStop",
+          command: {balancerStop: 1},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges:
+                    [{resource: {db: 'config', collection: 'settings'}, actions: ['update']}],
+                expectFail: true  // Command cannot be run on non-config server
+              },
+          ]
+        },
+        {
+          testname: "_configsvrBalancerStop",
+          command: {_configsvrBalancerStop: 1},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
+        {
+          testname: "balancerStatus",
+          command: {balancerStatus: 1},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {db: 'config', collection: 'settings'}, actions: ['find']}],
+              },
+          ]
+        },
+        {
+          testname: "_configsvrBalancerStatus",
+          command: {_configsvrBalancerStatus: 1},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
           ]
         },
         {
@@ -2630,14 +2678,6 @@ var authCommandsLib = {
         {
           testname: "_configsvrAddShard",
           command: {_configsvrAddShard: "x"},
-          skipSharded: true,
-          testcases: [
-              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
-          ]
-        },
-        {
-          testname: "_configsvrControlBalancer",
-          command: {_configsvrControlBalancer: "x"},
           skipSharded: true,
           testcases: [
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
