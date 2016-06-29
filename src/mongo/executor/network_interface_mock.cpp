@@ -39,6 +39,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -62,9 +63,41 @@ NetworkInterfaceMock::~NetworkInterfaceMock() {
     invariant(_blackHoled.empty());
 }
 
+void NetworkInterfaceMock::logQueues() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _logQueues_inlock();
+}
+
 std::string NetworkInterfaceMock::getDiagnosticString() {
-    // TODO something better.
-    return "NetworkInterfaceMock diagnostics here";
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _getDiagnosticString_inlock();
+}
+
+std::string NetworkInterfaceMock::_getDiagnosticString_inlock() const {
+    return str::stream() << "NetworkInterfaceMock -- waitingToRunMask:" << _waitingToRunMask
+                         << ", now:" << _now_inlock().toString() << ", hasStarted:" << _hasStarted
+                         << ", inShutdown: " << _inShutdown.load()
+                         << ", processing: " << _processing.size()
+                         << ", scheduled: " << _scheduled.size()
+                         << ", blackHoled: " << _blackHoled.size()
+                         << ", unscheduled: " << _unscheduled.size();
+}
+
+void NetworkInterfaceMock::_logQueues_inlock() const {
+    std::vector<std::pair<std::string, const NetworkOperationList*>> queues{
+        {"unscheduled", &_unscheduled},
+        {"scheduled", &_scheduled},
+        {"processing", &_processing},
+        {"blackholes", &_blackHoled}};
+    for (auto&& queue : queues) {
+        if (queue.second->empty()) {
+            continue;
+        }
+        log() << "**** queue: " << queue.first << " ****";
+        for (auto&& item : *queue.second) {
+            log() << "\t\t " << item.getDiagnosticString();
+        }
+    }
 }
 
 void NetworkInterfaceMock::appendConnectionStats(ConnectionPoolStats* stats) const {}
@@ -539,6 +572,16 @@ NetworkInterfaceMock::NetworkOperation::NetworkOperation(const CallbackHandle& c
       _onFinish(onFinish) {}
 
 NetworkInterfaceMock::NetworkOperation::~NetworkOperation() {}
+
+std::string NetworkInterfaceMock::NetworkOperation::getDiagnosticString() const {
+    return str::stream() << "NetworkOperation -- request:'" << _request.toString()
+                         << "', responseStatus: '" << _response.getStatus().toString()
+                         << "', responseBody: '"
+                         << (_response.getStatus().isOK() ? _response.getValue().toString() : "")
+                         << "', reqDate: " << _requestDate.toString()
+                         << ", nextConsiderDate: " << _nextConsiderationDate.toString()
+                         << ", respDate: " << _responseDate.toString();
+}
 
 void NetworkInterfaceMock::NetworkOperation::setNextConsiderationDate(
     Date_t nextConsiderationDate) {

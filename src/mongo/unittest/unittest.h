@@ -157,18 +157,21 @@
  * Behaves like ASSERT_THROWS, above, but also fails if PREDICATE(ex) for the throw exception, ex,
  * is false.
  */
-#define ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, PREDICATE)                              \
-    do {                                                                                      \
-        try {                                                                                 \
-            STATEMENT;                                                                        \
-            FAIL("Expected statement " #STATEMENT " to throw " #EXCEPTION_TYPE                \
-                 " but it threw nothing.");                                                   \
-        } catch (const EXCEPTION_TYPE& ex) {                                                  \
-            if (!(PREDICATE(ex))) {                                                           \
-                FAIL("Expected " #STATEMENT " to throw an exception of type " #EXCEPTION_TYPE \
-                     " where " #PREDICATE "(ex) was true, but it was false.");                \
-            }                                                                                 \
-        }                                                                                     \
+#define ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, PREDICATE)                                \
+    do {                                                                                        \
+        try {                                                                                   \
+            STATEMENT;                                                                          \
+            FAIL("Expected statement " #STATEMENT " to throw " #EXCEPTION_TYPE                  \
+                 " but it threw nothing.");                                                     \
+        } catch (const EXCEPTION_TYPE& ex) {                                                    \
+            if (!(PREDICATE(ex))) {                                                             \
+                ::mongoutils::str::stream err;                                                  \
+                err << "Expected " #STATEMENT " to throw an exception of type " #EXCEPTION_TYPE \
+                       " where " #PREDICATE "(ex) was true, but it was false: "                 \
+                    << ex.what();                                                               \
+                FAIL(err);                                                                      \
+            }                                                                                   \
+        }                                                                                       \
     } while (false)
 
 #define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                                            \
@@ -176,7 +179,7 @@
         std::string myString(BIG_STRING);                                                       \
         std::string myContains(CONTAINS);                                                       \
         if (myString.find(myContains) == std::string::npos) {                                   \
-            str::stream err;                                                                    \
+            ::mongoutils::str::stream err;                                                      \
             err << "Expected to find " #CONTAINS " (" << myContains << ") in " #BIG_STRING " (" \
                 << myString << ")";                                                             \
             ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream();          \
@@ -480,6 +483,10 @@ public:
     }
     void setMessage(const std::string& message) {
         _message = message;
+    }
+
+    const std::string& what() const {
+        return getMessage();
     }
 
     std::string toString() const;

@@ -43,7 +43,6 @@ class TaskExecutor;
 namespace repl {
 
 class ReplicationExecutor;
-class StorageInterfaceMock;
 
 /**
  * Test fixture for tests that require a ReplicationExecutor backed by
@@ -61,8 +60,6 @@ protected:
 private:
     std::unique_ptr<executor::TaskExecutor> makeTaskExecutor(
         std::unique_ptr<executor::NetworkInterfaceMock> net) override;
-
-    StorageInterfaceMock* _storage{nullptr};
 
     std::unique_ptr<ReplicationExecutor> _executor;
     bool _executorStarted{false};

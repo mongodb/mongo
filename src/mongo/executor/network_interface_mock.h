@@ -72,13 +72,18 @@ class NetworkConnectionHook;
 class NetworkInterfaceMock : public NetworkInterface {
 public:
     class NetworkOperation;
-    typedef stdx::list<NetworkOperation> NetworkOperationList;
-    typedef NetworkOperationList::iterator NetworkOperationIterator;
+    using NetworkOperationList = stdx::list<NetworkOperation>;
+    using NetworkOperationIterator = NetworkOperationList::iterator;
 
     NetworkInterfaceMock();
     virtual ~NetworkInterfaceMock();
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const;
     virtual std::string getDiagnosticString();
+
+    /**
+     * Logs the contents of the queues for diagnostics.
+     */
+    virtual void logQueues();
 
     ////////////////////////////////////////////////////////////////////////////////
     //
@@ -237,6 +242,15 @@ private:
      */
     enum ThreadType { kNoThread = 0, kExecutorThread = 1, kNetworkThread = 2 };
 
+    /**
+     * Returns information about the state of this mock for diagnostic purposes.
+     */
+    std::string _getDiagnosticString_inlock() const;
+
+    /**
+     * Logs the contents of the queues for diagnostics.
+     */
+    void _logQueues_inlock() const;
     /**
      * Returns the current virtualized time.
      */
@@ -416,6 +430,11 @@ public:
      * Delivers the response, by invoking the onFinish callback passed into the constructor.
      */
     void finishResponse();
+
+    /**
+     * Returns a printable diagnostic string.
+     */
+    std::string getDiagnosticString() const;
 
 private:
     Date_t _requestDate;
