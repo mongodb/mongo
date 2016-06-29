@@ -430,14 +430,23 @@ var runner = (function() {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
+        var phase = 'before workload ' + workload + ' teardown';
+
         try {
             // Ensure that all data has replicated correctly to the secondaries before calling the
             // workload's teardown method.
-            var phase = 'before workload ' + workload + ' teardown';
             cluster.checkReplicationConsistency(dbHashBlacklist, phase, ttlIndexExists);
         } catch (e) {
             errors.push(new WorkloadFailure(
                 e.toString(), e.stack, 'main', header + ' checking consistency on secondaries'));
+            return false;
+        }
+
+        try {
+            cluster.validateAllCollections(phase);
+        } catch (e) {
+            errors.push(new WorkloadFailure(
+                e.toString(), e.stack, 'main', header + ' validating collections'));
             return false;
         }
 

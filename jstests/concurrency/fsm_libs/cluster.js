@@ -3,6 +3,7 @@
 /**
  * Represents a MongoDB cluster.
  */
+load('jstests/hooks/validate_collections.js'); // Loads the validateCollections function.
 
 var Cluster = function(options) {
     if (!(this instanceof Cluster)) {
@@ -390,6 +391,28 @@ var Cluster = function(options) {
 
     this.isBalancerEnabled = function isBalancerEnabled() {
         return this.isSharded() && options.enableBalancer;
+    };
+
+    this.validateAllCollections = function validateAllCollections(phase) {
+        assert(initialized, 'cluster must be initialized first');
+
+        var _validateCollections = function _validateCollections(db) {
+            // Validate all the collections on each node.
+            var res = db.adminCommand({listDatabases: 1});
+            assert.commandWorked(res);
+            res.databases.forEach(dbInfo => {
+                if (!validateCollections(db.getSiblingDB(dbInfo.name), {full: true})) {
+                    throw new Error(phase + ' collection validation failed');
+                }
+            });
+        };
+
+        var startTime = Date.now();
+        jsTest.log('Starting to validate collections ' + phase);
+        this.executeOnMongodNodes(_validateCollections);
+        this.executeOnMongosNodes(_validateCollections);
+        var totalTime = Date.now() - startTime;
+        jsTest.log('Finished validating collections in ' + totalTime + ' ms, ' + phase);
     };
 
     this.checkDBHashes = function checkDBHashes(rst, dbBlacklist, phase) {
