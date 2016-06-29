@@ -1196,6 +1196,9 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
                                    stdx::placeholders::_3);
 
     auto lambda = [this](const TimestampStatus& ts, const Operations& theOps) {
+        if (ErrorCodes::CallbackCanceled == ts) {
+            return;
+        }
         CBHStatus status = _exec->scheduleWork(stdx::bind(&DataReplicator::_onApplyBatchFinish,
                                                           this,
                                                           stdx::placeholders::_1,
@@ -1212,7 +1215,8 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
         _exec->wait(status.getValue());
     };
 
-    _applier.reset(new MultiApplier(_exec, ops, applierFn, multiApplyFn, lambda));
+    auto executor = _dataReplicatorExternalState->getTaskExecutor();
+    _applier = stdx::make_unique<MultiApplier>(executor, ops, applierFn, multiApplyFn, lambda);
     return _applier->start();
 }
 

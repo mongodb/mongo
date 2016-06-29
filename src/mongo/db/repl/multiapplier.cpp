@@ -34,15 +34,15 @@
 
 #include <algorithm>
 
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {
 namespace repl {
 
-MultiApplier::MultiApplier(ReplicationExecutor* executor,
+MultiApplier::MultiApplier(executor::TaskExecutor* executor,
                            const Operations& operations,
                            const ApplyOperationFn& applyOperation,
                            const MultiApplyFn& multiApply,
@@ -90,8 +90,8 @@ Status MultiApplier::start() {
         return Status(ErrorCodes::IllegalOperation, "applier already started");
     }
 
-    auto scheduleResult = _executor->scheduleDBWork(
-        stdx::bind(&MultiApplier::_callback, this, stdx::placeholders::_1));
+    auto scheduleResult =
+        _executor->scheduleWork(stdx::bind(&MultiApplier::_callback, this, stdx::placeholders::_1));
     if (!scheduleResult.isOK()) {
         return scheduleResult.getStatus();
     }
@@ -103,7 +103,7 @@ Status MultiApplier::start() {
 }
 
 void MultiApplier::cancel() {
-    ReplicationExecutor::CallbackHandle dbWorkCallbackHandle;
+    executor::TaskExecutor::CallbackHandle dbWorkCallbackHandle;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -128,19 +128,19 @@ void MultiApplier::wait() {
 }
 
 // TODO change the passed in function to be multiapply instead of apply inlock
-void MultiApplier::_callback(const ReplicationExecutor::CallbackArgs& cbd) {
+void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
     if (!cbd.status.isOK()) {
         _finishCallback(cbd.status, _operations);
         return;
     }
 
-    invariant(cbd.txn);
+    auto txn = cc().makeOperationContext();
 
     // Refer to multiSyncApply() and multiInitialSyncApply() in sync_tail.cpp.
-    cbd.txn->setReplicatedWrites(false);
+    txn->setReplicatedWrites(false);
 
     // allow us to get through the magic barrier
-    cbd.txn->lockState()->setIsBatchWriter(true);
+    txn->lockState()->setIsBatchWriter(true);
 
     StatusWith<OpTime> applyStatus(ErrorCodes::InternalError, "not mutated");
 
@@ -148,7 +148,7 @@ void MultiApplier::_callback(const ReplicationExecutor::CallbackArgs& cbd) {
     try {
         // TODO restructure to support moving _operations into this call. Can't do it today since
         // _finishCallback gets _operations on failure.
-        applyStatus = _multiApply(cbd.txn, _operations, _applyOperation);
+        applyStatus = _multiApply(txn.get(), _operations, _applyOperation);
     } catch (...) {
         applyStatus = exceptionToStatus();
     }
@@ -182,7 +182,7 @@ void pauseBeforeCompletion(const StatusWith<Timestamp>& result,
 }  // namespace
 
 StatusWith<std::pair<std::unique_ptr<MultiApplier>, MultiApplier::Operations>> applyUntilAndPause(
-    ReplicationExecutor* executor,
+    executor::TaskExecutor* executor,
     const MultiApplier::Operations& operations,
     const MultiApplier::ApplyOperationFn& applyOperation,
     const MultiApplier::MultiApplyFn& multiApply,

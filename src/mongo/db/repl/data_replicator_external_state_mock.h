@@ -56,6 +56,9 @@ public:
 
     std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* txn) const override;
 
+    // Task executor. Not owned by us.
+    executor::TaskExecutor* taskExecutor = nullptr;
+
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;
     OpTime lastCommittedOpTime;

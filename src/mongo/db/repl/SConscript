@@ -879,7 +879,8 @@ env.Library(
     ],
     LIBDEPS=[
         'oplog_entry',
-        'replication_executor',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
 
@@ -959,6 +960,7 @@ env.CppUnitTest(
         'data_replicator',
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
