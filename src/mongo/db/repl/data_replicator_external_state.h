@@ -29,10 +29,12 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -101,6 +103,11 @@ public:
      */
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* txn) const = 0;
+
+    /**
+     * Returns the current replica set config if there is one, or an error why there isn't.
+     */
+    virtual StatusWith<ReplicaSetConfig> getCurrentConfig() const = 0;
 
 private:
     /**

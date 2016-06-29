@@ -699,7 +699,7 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
                     OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
                     _syncSource,
                     _opts.remoteOplogNS,
-                    _opts.getReplSetConfig(),
+                    uassertStatusOK(_dataReplicatorExternalState->getCurrentConfig()),
                     _dataReplicatorExternalState.get(),
                     stdx::bind(&DataReplicator::_enqueueDocuments,
                                this,
@@ -1262,22 +1262,23 @@ Status DataReplicator::_scheduleFetch_inlock() {
         long long startHash = 0LL;
         const auto remoteOplogNS = _opts.remoteOplogNS;
 
-        _fetcher = stdx::make_unique<OplogFetcher>(_exec,
-                                                   OpTimeWithHash(startHash, startOptime),
-                                                   _syncSource,
-                                                   remoteOplogNS,
-                                                   _opts.getReplSetConfig(),
-                                                   _dataReplicatorExternalState.get(),
-                                                   stdx::bind(&DataReplicator::_enqueueDocuments,
-                                                              this,
-                                                              stdx::placeholders::_1,
-                                                              stdx::placeholders::_2,
-                                                              stdx::placeholders::_3,
-                                                              stdx::placeholders::_4),
-                                                   stdx::bind(&DataReplicator::_onOplogFetchFinish,
-                                                              this,
-                                                              stdx::placeholders::_1,
-                                                              stdx::placeholders::_2));
+        _fetcher = stdx::make_unique<OplogFetcher>(
+            _exec,
+            OpTimeWithHash(startHash, startOptime),
+            _syncSource,
+            remoteOplogNS,
+            uassertStatusOK(_dataReplicatorExternalState->getCurrentConfig()),
+            _dataReplicatorExternalState.get(),
+            stdx::bind(&DataReplicator::_enqueueDocuments,
+                       this,
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2,
+                       stdx::placeholders::_3,
+                       stdx::placeholders::_4),
+            stdx::bind(&DataReplicator::_onOplogFetchFinish,
+                       this,
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2));
     }
     if (!_fetcher->isActive()) {
         Status status = _fetcher->startup();

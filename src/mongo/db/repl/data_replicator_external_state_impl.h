@@ -59,6 +59,8 @@ public:
 
     std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* txn) const override;
 
+    StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
+
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,
                                    MultiApplier::Operations ops,

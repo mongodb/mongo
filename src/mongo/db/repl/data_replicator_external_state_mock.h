@@ -56,6 +56,8 @@ public:
 
     std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* txn) const override;
 
+    StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
+
     // Task executor. Not owned by us.
     executor::TaskExecutor* taskExecutor = nullptr;
 
@@ -76,6 +78,8 @@ public:
 
     // Override to change multiApply behavior.
     MultiApplier::MultiApplyFn multiApplyFn;
+
+    ReplicaSetConfig replSetConfig;
 
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,

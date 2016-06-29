@@ -115,9 +115,6 @@ struct DataReplicatorOptions {
     /** Function to get this node's slaveDelay. */
     using GetSlaveDelayFn = stdx::function<Seconds()>;
 
-    /** Function to get current replica set configuration */
-    using GetReplSetConfigFn = stdx::function<ReplicaSetConfig()>;
-
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
@@ -143,7 +140,6 @@ struct DataReplicatorOptions {
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;
     GetSlaveDelayFn getSlaveDelay;
-    GetReplSetConfigFn getReplSetConfig;
 
     SyncSourceSelector* syncSourceSelector = nullptr;
 

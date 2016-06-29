@@ -211,21 +211,6 @@ protected:
         };
         options.getSlaveDelay = [this]() { return Seconds(0); };
         options.syncSourceSelector = this;
-        options.getReplSetConfig = []() {
-            ReplicaSetConfig config;
-            ASSERT_OK(config.initialize(BSON("_id"
-                                             << "myset"
-                                             << "version"
-                                             << 1
-                                             << "protocolVersion"
-                                             << 1
-                                             << "members"
-                                             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                      << "localhost:12345"))
-                                             << "settings"
-                                             << BSON("electionTimeoutMillis" << 10000))));
-            return config;
-        };
 
         ThreadPool::Options threadPoolOptions;
         threadPoolOptions.poolName = "replication";
@@ -245,6 +230,21 @@ protected:
         dataReplicatorExternalState->taskExecutor = _applierTaskExecutor.get();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
+        {
+            ReplicaSetConfig config;
+            ASSERT_OK(config.initialize(BSON("_id"
+                                             << "myset"
+                                             << "version"
+                                             << 1
+                                             << "protocolVersion"
+                                             << 1
+                                             << "members"
+                                             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                      << "localhost:12345"))
+                                             << "settings"
+                                             << BSON("electionTimeoutMillis" << 10000))));
+            dataReplicatorExternalState->replSetConfig = config;
+        };
         _externalState = dataReplicatorExternalState.get();
 
         try {
