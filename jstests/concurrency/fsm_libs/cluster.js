@@ -3,7 +3,7 @@
 /**
  * Represents a MongoDB cluster.
  */
-load('jstests/hooks/validate_collections.js'); // Loads the validateCollections function.
+load('jstests/hooks/validate_collections.js');  // Loads the validateCollections function.
 
 var Cluster = function(options) {
     if (!(this instanceof Cluster)) {
