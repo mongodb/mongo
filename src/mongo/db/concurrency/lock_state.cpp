@@ -524,7 +524,8 @@ ResourceId LockerImpl<IsForMMAPV1>::getWaitingResource() const {
 
     LockRequestsMap::ConstIterator it = _requests.begin();
     while (!it.finished()) {
-        if (it->status != LockRequest::STATUS_GRANTED) {
+        if (it->status == LockRequest::STATUS_WAITING ||
+            it->status == LockRequest::STATUS_CONVERTING) {
             return it.key();
         }
 
