@@ -1379,7 +1379,6 @@ intrusive_ptr<Expression> ExpressionFilter::parse(BSONElement expr,
     }
 
     uassert(28648, "Missing 'input' parameter to $filter", !inputElem.eoo());
-    uassert(28649, "Missing 'as' parameter to $filter", !asElem.eoo());
     uassert(28650, "Missing 'cond' parameter to $filter", !condElem.eoo());
 
     // Parse "input", only has outer variables.
@@ -1387,7 +1386,10 @@ intrusive_ptr<Expression> ExpressionFilter::parse(BSONElement expr,
 
     // Parse "as".
     VariablesParseState vpsSub(vpsIn);  // vpsSub gets our variable, vpsIn doesn't.
-    string varName = asElem.str();
+
+    // If "as" is not specified, then use "this" by default.
+    auto varName = asElem.eoo() ? "this" : asElem.str();
+
     Variables::uassertValidNameForUserWrite(varName);
     Variables::Id varId = vpsSub.defineVariable(varName);
 
@@ -1595,7 +1597,6 @@ intrusive_ptr<Expression> ExpressionMap::parse(BSONElement expr, const Variables
     }
 
     uassert(16880, "Missing 'input' parameter to $map", !inputElem.eoo());
-    uassert(16881, "Missing 'as' parameter to $map", !asElem.eoo());
     uassert(16882, "Missing 'in' parameter to $map", !inElem.eoo());
 
     // parse "input"
@@ -1603,7 +1604,10 @@ intrusive_ptr<Expression> ExpressionMap::parse(BSONElement expr, const Variables
 
     // parse "as"
     VariablesParseState vpsSub(vpsIn);  // vpsSub gets our vars, vpsIn doesn't.
-    string varName = asElem.str();
+
+    // If "as" is not specified, then use "this" by default.
+    auto varName = asElem.eoo() ? "this" : asElem.str();
+
     Variables::uassertValidNameForUserWrite(varName);
     Variables::Id varId = vpsSub.defineVariable(varName);
 

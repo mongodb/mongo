@@ -18,6 +18,7 @@ function test(expression, expected) {
 
 test({$map: {input: "$simple", as: "var", in : '$$var'}}, [1, 2, 3, 4]);
 test({$map: {input: "$simple", as: "var", in : {$add: [10, '$$var']}}}, [11, 12, 13, 14]);
+test({$map: {input: "$simple", in : '$$this'}}, [1, 2, 3, 4]);
 
 test({$map: {input: "$nested", as: "var", in : '$$var.a'}}, [1, 2]);
 test({$map: {input: "$nested", as: "CURRENT", in : '$a'}}, [1, 2]);
@@ -37,5 +38,7 @@ assertErrorCode(t, {$project: {a: {$map: {input: "$notArray", as: "var", in : '$
 assertErrorCode(
     t, {$project: {a: {$map: {x: 1, input: "$simple", as: "var", in : '$$var'}}}}, 16879);
 assertErrorCode(t, {$project: {a: {$map: {as: "var", in : '$$var'}}}}, 16880);
-assertErrorCode(t, {$project: {a: {$map: {input: "$simple", in : '$$var'}}}}, 16881);
 assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "var"}}}}, 16882);
+
+// 'in' uses undefined variable name.
+assertErrorCode(t, {$project: {a: {$map: {input: "$simple", in : '$$var'}}}}, 17276);
