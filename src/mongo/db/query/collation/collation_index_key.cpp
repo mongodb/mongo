@@ -30,19 +30,69 @@
 
 #include "mongo/db/query/collation/collation_index_key.h"
 
+#include <stack>
+
+#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-void CollationIndexKey::translate(StringData fieldName,
-                                  BSONElement element,
-                                  const CollatorInterface* collator,
-                                  BSONObjBuilder* out) {
-    invariant(collator);
+namespace {
 
+// To implement string translation iteratively, we utilize TranslateContext.  A translate context
+// holds necessary information for in-progress translations.  TranslateContexts are held by a
+// TranslateStack, which acts like a heap-allocated call stack.
+class TranslateContext {
+    MONGO_DISALLOW_COPYING(TranslateContext);
+
+public:
+    TranslateContext(BSONObjIterator&& iter, BufBuilder* buf)
+        : bob(*buf), _objIterator(std::move(iter)) {}
+
+    /**
+     * Returns true if the underlying iterator has additional elements.
+     */
+    bool more() {
+        return _objIterator.more();
+    }
+
+    /**
+     * Access the next element in the underlying iterator, and advance it.
+     *
+     * *Precondition*: A call to next() is only valid if a prior call to more() returned true.
+     */
+    BSONElement next() {
+        return _objIterator.next();
+    }
+
+    BSONObjBuilder& getBuilder() {
+        return bob;
+    }
+
+private:
+    BSONObjBuilder bob;
+    BSONObjIterator _objIterator;
+};
+
+using TranslateStack = std::stack<TranslateContext>;
+
+// Translate a single element, using the provided collator, appending the result to 'out'.
+//
+// If the element is an object or array, a new context is added to 'ctxStack', and the function
+// returns without modifying 'out'.
+//
+// If ctxStack is null, _translate must *not* be called with an object or array.  Additionally,
+// an empty string will be used for the field name when appending 'element' to 'out'.
+void translateElement(StringData fieldName,
+                      const BSONElement& element,
+                      const CollatorInterface* collator,
+                      BSONObjBuilder* out,
+                      TranslateStack* ctxStack) {
     switch (element.type()) {
         case BSONType::String: {
             out->append(fieldName,
@@ -50,19 +100,13 @@ void CollationIndexKey::translate(StringData fieldName,
             return;
         }
         case BSONType::Object: {
-            BSONObjBuilder bob(out->subobjStart(fieldName));
-            for (const BSONElement& elt : element.embeddedObject()) {
-                translate(elt.fieldNameStringData(), elt, collator, &bob);
-            }
-            bob.doneFast();
+            invariant(ctxStack);
+            ctxStack->emplace(element.Obj().begin(), &out->subobjStart(fieldName));
             return;
         }
         case BSONType::Array: {
-            BSONArrayBuilder bab(out->subarrayStart(fieldName));
-            for (const BSONElement& elt : element.Array()) {
-                translate(elt, collator, &bab);
-            }
-            bab.doneFast();
+            invariant(ctxStack);
+            ctxStack->emplace(element.Obj().begin(), &out->subarrayStart(fieldName));
             return;
         }
         default:
@@ -70,35 +114,27 @@ void CollationIndexKey::translate(StringData fieldName,
     }
 }
 
-void CollationIndexKey::translate(BSONElement element,
-                                  const CollatorInterface* collator,
-                                  BSONArrayBuilder* out) {
+// Translate all strings in 'obj' into comparison keys using 'collator'. The result is
+// appended to 'out'.
+void translate(BSONObj obj, const CollatorInterface* collator, BufBuilder* out) {
     invariant(collator);
 
-    switch (element.type()) {
-        case BSONType::String: {
-            out->append(collator->getComparisonKey(element.valueStringData()).getKeyData());
-            return;
+    TranslateStack ctxStack;
+    ctxStack.emplace(obj.begin(), out);
+
+    while (!ctxStack.empty()) {
+        TranslateContext& ctx = ctxStack.top();
+
+        if (!ctx.more()) {
+            ctxStack.pop();
+            continue;
         }
-        case BSONType::Object: {
-            BSONObjBuilder bob(out->subobjStart());
-            for (const BSONElement& elt : element.embeddedObject()) {
-                translate(elt.fieldNameStringData(), elt, collator, &bob);
-            }
-            bob.doneFast();
-            return;
-        }
-        case BSONType::Array: {
-            BSONArrayBuilder bab(out->subarrayStart());
-            for (const BSONElement& elt : element.Array()) {
-                translate(elt, collator, &bab);
-            }
-            bab.doneFast();
-            return;
-        }
-        default:
-            out->append(element);
+
+        BSONElement element = ctx.next();
+        translateElement(
+            element.fieldNameStringData(), element, collator, &ctx.getBuilder(), &ctxStack);
     }
+}
 }
 
 // TODO SERVER-24674: We may want to check that objects and arrays actually do contain strings
@@ -117,7 +153,13 @@ void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
         return;
     }
 
-    translate("", elt, collator, out);
+    if (elt.isABSONObj()) {
+        translate(elt.Obj(),
+                  collator,
+                  elt.type() == BSONType::Array ? &out->subarrayStart("") : &out->subobjStart(""));
+    } else {
+        translateElement("", elt, collator, out, nullptr);
+    }
 }
 
 }  // namespace mongo

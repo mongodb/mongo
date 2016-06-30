@@ -64,20 +64,6 @@ public:
     static void collationAwareIndexKeyAppend(BSONElement elt,
                                              const CollatorInterface* collator,
                                              BSONObjBuilder* out);
-
-private:
-    // Translate all strings in 'element' into comparison keys using 'collator'. The result is
-    // appended to the BSONObjBuilder out, with field name fieldName.
-    static void translate(StringData fieldName,
-                          BSONElement element,
-                          const CollatorInterface* collator,
-                          BSONObjBuilder* out);
-
-    // Translate all strings in 'element' into comparison keys using 'collator'.  The result is
-    // append to the BSONArrayBuilder out.
-    static void translate(BSONElement element,
-                          const CollatorInterface* collator,
-                          BSONArrayBuilder* out);
 };
 
 }  // namespace mongo
