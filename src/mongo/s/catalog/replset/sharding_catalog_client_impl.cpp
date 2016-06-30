@@ -1492,9 +1492,7 @@ Status ShardingCatalogClientImpl::_checkDbDoesNotExist(OperationContext* txn,
 Status ShardingCatalogClientImpl::_createCappedConfigCollection(OperationContext* txn,
                                                                 StringData collName,
                                                                 int cappedSize) {
-    BSONObj createCmd =
-        BSON("create" << collName << "capped" << true << "size" << cappedSize << "writeConcern"
-                      << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize);
 
     auto result = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,
