@@ -22,7 +22,7 @@
     assert.eq(db.foo.count(), 0, '2.3');
 
     s.adminCommand({enablesharding: "test"});
-    s.getDB('admin').runCommand({movePrimary: 'test', to: 'rename-rs0'});
+    s.ensurePrimaryShard("test", "rename-rs0");
 
     jsTest.log("Testing write concern (1)");
 
