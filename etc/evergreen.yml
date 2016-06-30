@@ -6468,8 +6468,7 @@ buildvariants:
     path_prefix: PATH=$PATH:/usr/lib/llvm-3.8/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: -j1 # Avoid starting too many mongod's under ASAN build.
+    num_jobs_available: $(echo "$(grep -c ^processor /proc/cpuinfo)/3" | bc) # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
   - name: aggregation
@@ -6593,8 +6592,7 @@ buildvariants:
     path_prefix: PATH=$PATH:/usr/lib/llvm-3.8/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: -j1 # Avoid starting too many mongod's under ASAN build.
+    num_jobs_available: $(echo "$(grep -c ^processor /proc/cpuinfo)/3" | bc) # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
   - name: jstestfuzz
