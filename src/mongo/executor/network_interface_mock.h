@@ -44,6 +44,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class BSONObj;
+
 namespace executor {
 
 class NetworkConnectionHook;
@@ -171,6 +174,33 @@ public:
     void scheduleResponse(NetworkOperationIterator noi,
                           Date_t when,
                           const TaskExecutor::ResponseStatus& response);
+
+    /**
+     * Schedules a successful "response" to "noi" at virtual time "when".
+     * "noi" defaults to next ready request.
+     * "when" defaults to now().
+     * Returns the "request" that the response was scheduled for.
+     */
+    RemoteCommandRequest scheduleSuccessfulResponse(const BSONObj& response);
+    RemoteCommandRequest scheduleSuccessfulResponse(const RemoteCommandResponse& response);
+    RemoteCommandRequest scheduleSuccessfulResponse(NetworkOperationIterator noi,
+                                                    const RemoteCommandResponse& response);
+    RemoteCommandRequest scheduleSuccessfulResponse(NetworkOperationIterator noi,
+                                                    Date_t when,
+                                                    const RemoteCommandResponse& response);
+
+    /**
+     * Schedules an error "response" to "noi" at virtual time "when".
+     * "noi" defaults to next ready request.
+     * "when" defaults to now().
+     */
+    RemoteCommandRequest scheduleErrorResponse(const Status& response);
+    RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
+                                               const Status& response);
+    RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
+                                               Date_t when,
+                                               const Status& response);
+
 
     /**
      * Swallows "noi", causing the network interface to not respond to it until

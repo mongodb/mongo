@@ -52,18 +52,12 @@ class FetcherTest : public executor::ThreadPoolExecutorTest {
 public:
     FetcherTest();
     void clear();
-    void scheduleNetworkResponse(const BSONObj& obj);
-    void scheduleNetworkResponse(const BSONObj& obj, Milliseconds elapsed);
-    void scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason);
-    void scheduleNetworkResponseFor(const BSONObj& filter, const BSONObj& obj);
-    void scheduleNetworkResponseFor(NetworkInterfaceMock::NetworkOperationIterator noi,
-                                    const BSONObj& obj);
 
     enum class ReadyQueueState { kEmpty, kHasReadyRequests };
 
     enum class FetcherState { kInactive, kActive };
 
-    // Calls scheduleNetworkResponse + finishProcessingNetworkResponse
+    // Calls scheduleSuccessfulResponse/scheduleErrorResponse + finishProcessingNetworkResponse
     void processNetworkResponse(const BSONObj& obj,
                                 ReadyQueueState readyQueueStateAfterProcessing,
                                 FetcherState fetcherStateAfterProcessing);
@@ -137,50 +131,11 @@ void FetcherTest::clear() {
     nextAction = Fetcher::NextAction::kInvalid;
 }
 
-void FetcherTest::scheduleNetworkResponse(const BSONObj& obj) {
-    scheduleNetworkResponse(obj, Milliseconds(0));
-}
-
-void FetcherTest::scheduleNetworkResponse(const BSONObj& obj, Milliseconds elapsed) {
-    NetworkInterfaceMock* net = getNet();
-    ASSERT_TRUE(net->hasReadyRequests());
-    executor::RemoteCommandResponse response(obj, BSONObj(), elapsed);
-    TaskExecutor::ResponseStatus responseStatus(response);
-    net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
-}
-void FetcherTest::scheduleNetworkResponseFor(const BSONObj& filter, const BSONObj& obj) {
-    ASSERT_TRUE(filter[1].eoo());  // The filter should only have one field, to match the cmd name
-    NetworkInterfaceMock* net = getNet();
-    ASSERT_TRUE(net->hasReadyRequests());
-    Milliseconds elapsed(0);
-    executor::RemoteCommandResponse response(obj, BSONObj(), elapsed);
-    TaskExecutor::ResponseStatus responseStatus(response);
-    auto req = net->getNextReadyRequest();
-    ASSERT_EQ(req->getRequest().cmdObj[0], filter[0]);
-    net->scheduleResponse(req, net->now(), responseStatus);
-}
-
-void FetcherTest::scheduleNetworkResponseFor(NetworkInterfaceMock::NetworkOperationIterator noi,
-                                             const BSONObj& obj) {
-    NetworkInterfaceMock* net = getNet();
-    Milliseconds elapsed(0);
-    executor::RemoteCommandResponse response(obj, BSONObj(), elapsed);
-    TaskExecutor::ResponseStatus responseStatus(response);
-    net->scheduleResponse(noi, net->now(), responseStatus);
-}
-
-void FetcherTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason) {
-    NetworkInterfaceMock* net = getNet();
-    ASSERT_TRUE(net->hasReadyRequests());
-    TaskExecutor::ResponseStatus responseStatus(code, reason);
-    net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
-}
-
 void FetcherTest::processNetworkResponse(const BSONObj& obj,
                                          ReadyQueueState readyQueueStateAfterProcessing,
                                          FetcherState fetcherStateAfterProcessing) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-    scheduleNetworkResponse(obj);
+    getNet()->scheduleSuccessfulResponse(obj);
     finishProcessingNetworkResponse(readyQueueStateAfterProcessing, fetcherStateAfterProcessing);
 }
 
@@ -189,7 +144,7 @@ void FetcherTest::processNetworkResponse(const BSONObj& obj,
                                          ReadyQueueState readyQueueStateAfterProcessing,
                                          FetcherState fetcherStateAfterProcessing) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-    scheduleNetworkResponse(obj, elapsed);
+    getNet()->scheduleSuccessfulResponse({obj, {}, elapsed});
     finishProcessingNetworkResponse(readyQueueStateAfterProcessing, fetcherStateAfterProcessing);
 }
 
@@ -198,7 +153,7 @@ void FetcherTest::processNetworkResponse(ErrorCodes::Error code,
                                          ReadyQueueState readyQueueStateAfterProcessing,
                                          FetcherState fetcherStateAfterProcessing) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-    scheduleNetworkResponse(code, reason);
+    getNet()->scheduleErrorResponse({code, reason});
     finishProcessingNetworkResponse(readyQueueStateAfterProcessing, fetcherStateAfterProcessing);
 }
 
@@ -375,7 +330,7 @@ TEST_F(FetcherTest, ScheduleAndCancel) {
     auto net = getNet();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        scheduleNetworkResponse(BSON("ok" << 1));
+        net->scheduleSuccessfulResponse(BSON("ok" << 1));
     }
 
     fetcher->cancel();
@@ -394,7 +349,7 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
     auto net = getNet();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        scheduleNetworkResponse(BSON("ok" << 1));
+        net->scheduleSuccessfulResponse(BSON("ok" << 1));
         // Network interface should not deliver mock response to callback
         // until runReadyNetworkOperations() is called.
     }
@@ -933,7 +888,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         ASSERT_EQUALS(cursorId, cursors.front().numberLong());
 
         // Failed killCursors command response should be logged.
-        scheduleNetworkResponseFor(noi, BSON("ok" << false));
+        getNet()->scheduleSuccessfulResponse(noi, {BSON("ok" << false), {}});
         getNet()->runReadyNetworkOperations();
     }
 

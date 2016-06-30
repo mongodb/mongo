@@ -51,6 +51,9 @@ namespace executor {
 struct RemoteCommandResponse {
     RemoteCommandResponse() = default;
 
+    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj)
+        : RemoteCommandResponse(dataObj, metadataObj, Milliseconds(0)) {}
+
     RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
         : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {
         // The buffer backing the default empty BSONObj has static duration so it is effectively

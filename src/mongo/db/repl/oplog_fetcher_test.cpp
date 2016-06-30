@@ -73,12 +73,6 @@ protected:
     void tearDown() override;
 
     /**
-     * Schedules response to the current network request.
-     * Returns remote command request in network request.
-     */
-    RemoteCommandRequest scheduleNetworkResponse(RemoteCommandResponse response);
-
-    /**
      * Schedules network response and instructs network interface to process response.
      * Returns remote command request in network request.
      */
@@ -155,21 +149,11 @@ void OplogFetcherTest::tearDown() {
     executor::ThreadPoolExecutorTest::tearDown();
 }
 
-RemoteCommandRequest OplogFetcherTest::scheduleNetworkResponse(RemoteCommandResponse response) {
-    auto net = getNet();
-    ASSERT_TRUE(net->hasReadyRequests());
-    Milliseconds millis(0);
-    executor::TaskExecutor::ResponseStatus responseStatus(response);
-    auto noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), responseStatus);
-    return noi->getRequest();
-}
-
 RemoteCommandRequest OplogFetcherTest::processNetworkResponse(
     RemoteCommandResponse response, bool expectReadyRequestsAfterProcessing) {
     auto net = getNet();
     net->enterNetwork();
-    auto request = scheduleNetworkResponse(response);
+    auto request = net->scheduleSuccessfulResponse(response);
     net->runReadyNetworkOperations();
     ASSERT_EQUALS(expectReadyRequestsAfterProcessing, net->hasReadyRequests());
     net->exitNetwork();
@@ -178,13 +162,8 @@ RemoteCommandRequest OplogFetcherTest::processNetworkResponse(
 
 RemoteCommandRequest OplogFetcherTest::processNetworkResponse(
     BSONObj obj, bool expectReadyRequestsAfterProcessing) {
-    auto net = getNet();
-    net->enterNetwork();
-    auto request = scheduleNetworkResponse({obj, rpc::makeEmptyMetadata(), Milliseconds(0)});
-    net->runReadyNetworkOperations();
-    ASSERT_EQUALS(expectReadyRequestsAfterProcessing, net->hasReadyRequests());
-    net->exitNetwork();
-    return request;
+    return processNetworkResponse({obj, rpc::makeEmptyMetadata(), Milliseconds(0)},
+                                  expectReadyRequestsAfterProcessing);
 }
 
 HostAndPort source("localhost:12345");

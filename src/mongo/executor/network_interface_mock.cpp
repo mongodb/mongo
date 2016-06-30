@@ -305,6 +305,43 @@ void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
     _scheduled.splice(insertBefore, _processing, noi);
 }
 
+RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(const BSONObj& response) {
+    BSONObj metadata;
+    return scheduleSuccessfulResponse(RemoteCommandResponse(response, metadata));
+}
+
+RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(
+    const RemoteCommandResponse& response) {
+    return scheduleSuccessfulResponse(getNextReadyRequest(), response);
+}
+
+RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(
+    NetworkOperationIterator noi, const RemoteCommandResponse& response) {
+    return scheduleSuccessfulResponse(noi, now(), response);
+}
+
+RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(
+    NetworkOperationIterator noi, Date_t when, const RemoteCommandResponse& response) {
+    scheduleResponse(noi, when, response);
+    return noi->getRequest();
+}
+
+RemoteCommandRequest NetworkInterfaceMock::scheduleErrorResponse(const Status& response) {
+    return scheduleErrorResponse(getNextReadyRequest(), response);
+}
+
+RemoteCommandRequest NetworkInterfaceMock::scheduleErrorResponse(NetworkOperationIterator noi,
+                                                                 const Status& response) {
+    return scheduleErrorResponse(noi, now(), response);
+}
+
+RemoteCommandRequest NetworkInterfaceMock::scheduleErrorResponse(NetworkOperationIterator noi,
+                                                                 Date_t when,
+                                                                 const Status& response) {
+    scheduleResponse(noi, when, response);
+    return noi->getRequest();
+}
+
 void NetworkInterfaceMock::blackHole(NetworkOperationIterator noi) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);

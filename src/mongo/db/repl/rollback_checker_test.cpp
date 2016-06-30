@@ -49,21 +49,6 @@ class RollbackCheckerTest : public ReplicationExecutorTest {
 public:
     RollbackChecker* getRollbackChecker() const;
 
-    void scheduleNetworkResponse(const BSONObj& obj) {
-        NetworkInterfaceMock* net = getNet();
-        ASSERT_TRUE(net->hasReadyRequests());
-        scheduleNetworkResponse(net->getNextReadyRequest(), obj);
-    }
-
-    void scheduleNetworkResponse(NetworkInterfaceMock::NetworkOperationIterator noi,
-                                 const BSONObj& obj) {
-        NetworkInterfaceMock* net = getNet();
-        Milliseconds millis(0);
-        RemoteCommandResponse response(obj, BSONObj(), millis);
-        ReplicationExecutor::ResponseStatus responseStatus(response);
-        net->scheduleResponse(noi, net->now(), responseStatus);
-    }
-
 protected:
     void setUp() override;
 
@@ -106,7 +91,7 @@ TEST_F(RollbackCheckerTest, reset) {
     ASSERT(cbh);
 
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    scheduleNetworkResponse(commandResponse);
+    getNet()->scheduleSuccessfulResponse(commandResponse);
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
 
@@ -127,7 +112,7 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     auto refreshCBH = getRollbackChecker()->reset([](const Status& status) {});
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    scheduleNetworkResponse(commandResponse);
+    getNet()->scheduleSuccessfulResponse(commandResponse);
     getNet()->runReadyNetworkOperations();
     getReplExecutor().wait(refreshCBH);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID_forTest(), 3);
@@ -137,7 +122,7 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 4);
-    scheduleNetworkResponse(commandResponse);
+    getNet()->scheduleSuccessfulResponse(commandResponse);
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
 
@@ -162,7 +147,7 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     auto refreshCBH = getRollbackChecker()->reset(callback);
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    scheduleNetworkResponse(commandResponse);
+    getNet()->scheduleSuccessfulResponse(commandResponse);
     getNet()->runReadyNetworkOperations();
     getReplExecutor().wait(refreshCBH);
     ASSERT_EQUALS(getRollbackChecker()->getBaseRBID_forTest(), 3);
@@ -172,7 +157,7 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 3);
-    scheduleNetworkResponse(commandResponse);
+    getNet()->scheduleSuccessfulResponse(commandResponse);
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
 
