@@ -926,6 +926,7 @@ env.Library(
         'oplog_buffer_blocking_queue',
         'oplog_entry',
         'optime',
+        'replica_set_messages',
         '$BUILD_DIR/mongo/util/net/hostandport',
     ],
 )
