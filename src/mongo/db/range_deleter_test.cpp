@@ -121,8 +121,8 @@ TEST(QueuedDelete, ShouldWaitCursor) {
     const DeletedRange deletedChunk(env->getLastDelete());
 
     ASSERT_EQUALS(ns, deletedChunk.ns);
-    ASSERT_TRUE(deletedChunk.min.equal(BSON("x" << 0)));
-    ASSERT_TRUE(deletedChunk.max.equal(BSON("x" << 10)));
+    ASSERT_BSONOBJ_EQ(deletedChunk.min, BSON("x" << 0));
+    ASSERT_BSONOBJ_EQ(deletedChunk.max, BSON("x" << 10));
 
     deleter.stopWorkers();
 }
@@ -209,9 +209,9 @@ TEST(ImmediateDelete, ShouldWaitCursor) {
     const DeletedRange deletedChunk(env->getLastDelete());
 
     ASSERT_EQUALS(ns, deletedChunk.ns);
-    ASSERT_TRUE(deletedChunk.min.equal(BSON("x" << 0)));
-    ASSERT_TRUE(deletedChunk.max.equal(BSON("x" << 10)));
-    ASSERT_TRUE(deletedChunk.shardKeyPattern.equal(BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(deletedChunk.min, BSON("x" << 0));
+    ASSERT_BSONOBJ_EQ(deletedChunk.max, BSON("x" << 10));
+    ASSERT_BSONOBJ_EQ(deletedChunk.shardKeyPattern, BSON("x" << 1));
 }
 
 // Should terminate when stop is requested.
@@ -328,9 +328,9 @@ TEST(MixedDeletes, MultipleDeletes) {
     DeletedRange deleted1(env->getLastDelete());
 
     ASSERT_EQUALS(ns, deleted1.ns);
-    ASSERT_TRUE(deleted1.min.equal(BSON("x" << 10)));
-    ASSERT_TRUE(deleted1.max.equal(BSON("x" << 20)));
-    ASSERT_TRUE(deleted1.shardKeyPattern.equal(BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(deleted1.min, BSON("x" << 10));
+    ASSERT_BSONOBJ_EQ(deleted1.max, BSON("x" << 20));
+    ASSERT_BSONOBJ_EQ(deleted1.shardKeyPattern, BSON("x" << 1));
 
     // Let the second delete proceed.
     env->resumeOneDelete();
@@ -342,9 +342,9 @@ TEST(MixedDeletes, MultipleDeletes) {
     // cursors open for blockedNS.
 
     ASSERT_EQUALS(ns, deleted2.ns);
-    ASSERT_TRUE(deleted2.min.equal(BSON("x" << 30)));
-    ASSERT_TRUE(deleted2.max.equal(BSON("x" << 40)));
-    ASSERT_TRUE(deleted2.shardKeyPattern.equal(BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(deleted2.min, BSON("x" << 30));
+    ASSERT_BSONOBJ_EQ(deleted2.max, BSON("x" << 40));
+    ASSERT_BSONOBJ_EQ(deleted2.shardKeyPattern, BSON("x" << 1));
 
     env->removeCursorId(blockedNS, 345);
     // Let the last delete proceed.
@@ -354,9 +354,9 @@ TEST(MixedDeletes, MultipleDeletes) {
     DeletedRange deleted3(env->getLastDelete());
 
     ASSERT_EQUALS(blockedNS, deleted3.ns);
-    ASSERT_TRUE(deleted3.min.equal(BSON("x" << 20)));
-    ASSERT_TRUE(deleted3.max.equal(BSON("x" << 30)));
-    ASSERT_TRUE(deleted3.shardKeyPattern.equal(BSON("x" << 1)));
+    ASSERT_BSONOBJ_EQ(deleted3.min, BSON("x" << 20));
+    ASSERT_BSONOBJ_EQ(deleted3.max, BSON("x" << 30));
+    ASSERT_BSONOBJ_EQ(deleted3.shardKeyPattern, BSON("x" << 1));
 
     deleter.stopWorkers();
 }

@@ -357,7 +357,7 @@ TEST_F(MetadataLoaderFixture, SingleChunkGetShardKey) {
                                                     NULL, /* no old metadata */
                                                     &metadata);
         ChunkType chunkInfo;
-        ASSERT_TRUE(metadata.getKeyPattern().equal(BSON("a" << 1)));
+        ASSERT_BSONOBJ_EQ(metadata.getKeyPattern(), BSON("a" << 1));
     });
 
     expectFindOnConfigSendCollectionDefault();

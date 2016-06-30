@@ -46,21 +46,6 @@ namespace mongo {
 using namespace std;
 /* BSONObj ------------------------------------------------------------*/
 
-// deep (full) equality
-bool BSONObj::equal(const BSONObj& rhs) const {
-    BSONObjIterator i(*this);
-    BSONObjIterator j(rhs);
-    BSONElement l, r;
-    do {
-        // so far, equal...
-        l = i.next();
-        r = j.next();
-        if (l.eoo())
-            return r.eoo();
-    } while (l == r);
-    return false;
-}
-
 void BSONObj::_assertInvalid() const {
     StringBuilder ss;
     int os = objsize();

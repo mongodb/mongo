@@ -174,9 +174,8 @@ void keyTest(const BSONObj& o, bool mustBeCompact = false) {
     ASSERT(!k.isCompactFormat() || k.dataSize() < o.objsize());
 
     {
-        // check BSONObj::equal.  this part not a KeyV1 test.
         int res = o.woCompare(last);
-        ASSERT((res == 0) == o.equal(last));
+        ASSERT((res == 0) == SimpleBSONObjComparator::kInstance.evaluate(o == last));
     }
 
     if (kLast) {
@@ -802,7 +801,7 @@ public:
     // check (non)equality
     BSONObj a = BSONObjBuilder().appendBinData("", 8, (BinDataType)1, "abcdefgh").obj();
     BSONObj b = BSONObjBuilder().appendBinData("", 8, (BinDataType)1, "abcdefgj").obj();
-    ASSERT(!a.equal(b));
+    ASSERT_BSONOBJ_NE(a, b);
     int res_ab = a.woCompare(b);
     ASSERT(res_ab != 0);
     keyTest(a, true);
@@ -811,11 +810,11 @@ public:
     // check subtypes do not equal
     BSONObj c = BSONObjBuilder().appendBinData("", 8, (BinDataType)4, "abcdefgh").obj();
     BSONObj d = BSONObjBuilder().appendBinData("", 8, (BinDataType)0x81, "abcdefgh").obj();
-    ASSERT(!a.equal(c));
+    ASSERT_BSONOBJ_NE(a, c);
     int res_ac = a.woCompare(c);
     ASSERT(res_ac != 0);
     keyTest(c, true);
-    ASSERT(!a.equal(d));
+    ASSERT_BSONOBJ_NE(a, d);
     int res_ad = a.woCompare(d);
     ASSERT(res_ad != 0);
     keyTest(d, true);

@@ -665,7 +665,7 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
         if (desc) {
             // index already exists with same name
 
-            if (desc->keyPattern().equal(key) &&
+            if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key) &&
                 SimpleBSONObjComparator::kInstance.evaluate(
                     desc->infoObj().getObjectField("collation") != collation)) {
                 // key patterns are equal but collations differ.
@@ -680,7 +680,7 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
                                   << spec);
             }
 
-            if (!desc->keyPattern().equal(key) ||
+            if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
                 SimpleBSONObjComparator::kInstance.evaluate(
                     desc->infoObj().getObjectField("collation") != collation)) {
                 return Status(ErrorCodes::IndexKeySpecsConflict,

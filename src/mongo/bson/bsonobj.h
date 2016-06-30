@@ -474,8 +474,6 @@ public:
         return DeferredComparison(DeferredComparison::Type::kNE, *this, other);
     }
 
-    bool equal(const BSONObj& r) const;
-
     /**
      * Functor compatible with std::hash for std::unordered_{map,set}
      * Warning: The hash function is subject to change. Do not use in cases where hashes need
