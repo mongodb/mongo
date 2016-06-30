@@ -32,14 +32,27 @@
 
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/unittest/task_executor_proxy.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace executor {
 
 Status TaskExecutorTest::getDetectableErrorStatus() {
     return Status(ErrorCodes::InternalError, "Not mutated");
+}
+
+void TaskExecutorTest::assertRemoteCommandNameEquals(StringData cmdName,
+                                                     const RemoteCommandRequest& request) {
+    auto&& cmdObj = request.cmdObj;
+    ASSERT_FALSE(cmdObj.isEmpty());
+    if (cmdName != cmdObj.firstElementFieldName()) {
+        std::string msg = str::stream()
+            << "Expected command name \"" << cmdName << "\" in remote command request but found \""
+            << cmdObj.firstElementFieldName() << "\" instead: " << request.toString();
+        FAIL(msg);
+    }
 }
 
 TaskExecutorTest::~TaskExecutorTest() = default;

@@ -330,7 +330,7 @@ TEST_F(FetcherTest, ScheduleAndCancel) {
     auto net = getNet();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        net->scheduleSuccessfulResponse(BSON("ok" << 1));
+        assertRemoteCommandNameEquals("find", net->scheduleSuccessfulResponse(BSON("ok" << 1)));
     }
 
     fetcher->cancel();
@@ -349,7 +349,7 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
     auto net = getNet();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        net->scheduleSuccessfulResponse(BSON("ok" << 1));
+        assertRemoteCommandNameEquals("find", net->scheduleSuccessfulResponse(BSON("ok" << 1)));
         // Network interface should not deliver mock response to callback
         // until runReadyNetworkOperations() is called.
     }
