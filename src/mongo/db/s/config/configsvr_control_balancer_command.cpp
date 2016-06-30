@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -106,8 +107,7 @@ private:
         uassertStatusOK(Grid::get(txn)->getBalancerConfiguration()->setBalancerMode(
             txn, BalancerSettingsType::kFull));
     }
-
-} configSvrBalancerStartCmd;
+};
 
 class ConfigSvrBalancerStopCommand : public ConfigSvrBalancerControlCommand {
 public:
@@ -119,8 +119,7 @@ private:
             txn, BalancerSettingsType::kOff));
         Balancer::get(txn)->joinCurrentRound(txn);
     }
-
-} configSvrBalancerStopCmd;
+};
 
 class ConfigSvrBalancerStatusCommand : public ConfigSvrBalancerControlCommand {
 public:
@@ -131,8 +130,15 @@ private:
     void _run(OperationContext* txn, BSONObjBuilder* result) override {
         Balancer::get(txn)->report(txn, result);
     }
+};
 
-} configSvrBalancerStatusCmd;
+MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
+    new ConfigSvrBalancerStartCommand();
+    new ConfigSvrBalancerStopCommand();
+    new ConfigSvrBalancerStatusCommand();
+
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo

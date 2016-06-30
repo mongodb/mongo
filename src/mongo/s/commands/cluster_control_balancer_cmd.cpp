@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -106,19 +107,27 @@ class BalancerStartCommand : public BalancerControlCommand {
 public:
     BalancerStartCommand()
         : BalancerControlCommand("balancerStart", "_configsvrBalancerStart", ActionType::update) {}
-} balancerStartCmd;
+};
 
 class BalancerStopCommand : public BalancerControlCommand {
 public:
     BalancerStopCommand()
         : BalancerControlCommand("balancerStop", "_configsvrBalancerStop", ActionType::update) {}
-} balancerStopCmd;
+};
 
 class BalancerStatusCommand : public BalancerControlCommand {
 public:
     BalancerStatusCommand()
         : BalancerControlCommand("balancerStatus", "_configsvrBalancerStatus", ActionType::find) {}
-} balancerStatusCmd;
+};
+
+MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
+    new BalancerStartCommand();
+    new BalancerStopCommand();
+    new BalancerStatusCommand();
+
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo
