@@ -113,6 +113,50 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_bytes_image --
+ *	Return the number of page image bytes in use.
+ */
+static inline uint64_t
+__wt_cache_bytes_image(WT_CACHE *cache)
+{
+	uint64_t bytes_image;
+
+	bytes_image = cache->bytes_image;
+	if (cache->overhead_pct != 0)
+		bytes_image +=
+		    (bytes_image * (uint64_t)cache->overhead_pct) / 100;
+
+	return (bytes_image);
+}
+
+/*
+ * __wt_cache_bytes_other --
+ *	Return the number of bytes in use not for page images.
+ */
+static inline uint64_t
+__wt_cache_bytes_other(WT_CACHE *cache)
+{
+	uint64_t bytes_image, bytes_inmem, bytes_other;
+
+	bytes_image = cache->bytes_image;
+	bytes_inmem = cache->bytes_inmem;
+
+	/*
+	 * The reads above could race with changes to the values, so protect
+	 * against underflow.
+	 */
+	if (bytes_image > bytes_inmem)
+		return (0);
+
+	bytes_other = bytes_inmem - bytes_image;
+	if (cache->overhead_pct != 0)
+		bytes_other +=
+		    (bytes_other * (uint64_t)cache->overhead_pct) / 100;
+
+	return (bytes_other);
+}
+
+/*
  * __wt_session_can_wait --
  *	Return if a session available for a potentially slow operation.
  */
@@ -136,17 +180,6 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 		return (0);
 
 	return (1);
-}
-
-/*
- * __wt_eviction_dirty_target --
- *	Return if the eviction server is running to reduce the number of dirty
- * pages (versus running to discard pages from the cache).
- */
-static inline bool
-__wt_eviction_dirty_target(WT_SESSION_IMPL *session)
-{
-	return (FLD_ISSET(S2C(session)->cache->state, WT_EVICT_PASS_DIRTY));
 }
 
 /*
@@ -186,14 +219,6 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
 	if (pct_fullp != NULL)
 		*pct_fullp = pct_full;
-	/*
-	 * If the connection is closing we do not need eviction from an
-	 * application thread.  The eviction subsystem is already closed.
-	 * We return here because some callers depend on the percent full
-	 * having been filled in.
-	 */
-	if (F_ISSET(conn, WT_CONN_CLOSING))
-		return (false);
 
 	if (pct_full > cache->eviction_trigger)
 		return (true);

@@ -285,6 +285,34 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_cache_page_image_decr --
+ *	Decrement a page image's size to the cache.
+ */
+static inline void
+__wt_cache_page_image_decr(WT_SESSION_IMPL *session, uint32_t size)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
+	__wt_cache_decr_check_uint64(
+	    session, &cache->bytes_image, size, "WT_CACHE.image_inmem");
+}
+
+/*
+ * __wt_cache_page_image_incr --
+ *	Increment a page image's size to the cache.
+ */
+static inline void
+__wt_cache_page_image_incr(WT_SESSION_IMPL *session, uint32_t size)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	(void)__wt_atomic_add64(&cache->bytes_image, size);
+}
+
+/*
  * __wt_cache_page_evict --
  *	Evict pages from the cache.
  */
@@ -340,16 +368,6 @@ __wt_update_list_memsize(WT_UPDATE *upd)
 		upd_size += WT_UPDATE_MEMSIZE(upd);
 
 	return (upd_size);
-}
-
-/*
- * __wt_page_evict_soon --
- *      Set a page to be evicted as soon as possible.
- */
-static inline void
-__wt_page_evict_soon(WT_PAGE *page)
-{
-	page->read_gen = WT_READGEN_OLDEST;
 }
 
 /*
@@ -1124,23 +1142,27 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline bool
-__wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
+__wt_page_can_evict(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *evict_flagsp)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	bool modified;
 
-	if (inmem_splitp != NULL)
-		*inmem_splitp = false;
+	if (evict_flagsp != NULL)
+		*evict_flagsp = WT_EVICTING;
 
 	btree = S2BT(session);
 	page = ref->page;
 	mod = page->modify;
 
 	/* Pages that have never been modified can always be evicted. */
-	if (mod == NULL)
+	if (mod == NULL) {
+		if (evict_flagsp != NULL)
+			FLD_SET(*evict_flagsp, WT_EVICT_CLEAN);
 		return (true);
+	}
 
 	/*
 	 * Check for in-memory splits before other eviction tests. If the page
@@ -1149,8 +1171,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * won't be written or discarded from the cache.
 	 */
 	if (__wt_leaf_page_can_split(session, page)) {
-		if (inmem_splitp != NULL)
-			*inmem_splitp = true;
+		if (evict_flagsp != NULL)
+			FLD_SET(*evict_flagsp, WT_EVICT_INMEM_SPLIT);
 		return (true);
 	}
 
@@ -1189,6 +1211,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
 		return (false);
 
+	/* If the cache is stuck, try anything else. */
+	if (F_ISSET(S2C(session)->cache, WT_CACHE_STUCK))
+		return (true);
+
 	/*
 	 * If the oldest transaction hasn't changed since the last time
 	 * this page was written, it's unlikely we can make progress.
@@ -1197,62 +1223,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * attempt to avoid repeated attempts to evict the same page.
 	 */
 	if (modified &&
-	    !F_ISSET(S2C(session)->cache, WT_CACHE_STUCK) &&
 	    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
 	    !__wt_txn_visible_all(session, mod->update_txn)))
 		return (false);
 
 	return (true);
-}
-
-/*
- * __wt_page_release_evict --
- *	Release a reference to a page, and attempt to immediately evict it.
- */
-static inline int
-__wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_BTREE *btree;
-	WT_DECL_RET;
-	WT_PAGE *page;
-	bool locked, too_big;
-
-	btree = S2BT(session);
-	page = ref->page;
-
-	/*
-	 * Take some care with order of operations: if we release the hazard
-	 * reference without first locking the page, it could be evicted in
-	 * between.
-	 */
-	locked = __wt_atomic_casv32(
-	    &ref->state, WT_REF_MEM, WT_REF_LOCKED) ? true : false;
-	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
-		if (locked)
-			ref->state = WT_REF_MEM;
-		return (ret == 0 ? EBUSY : ret);
-	}
-
-	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
-
-	too_big = page->memory_footprint > btree->maxmempage;
-	if ((ret = __wt_evict(session, ref, false)) == 0) {
-		if (too_big)
-			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-		else
-			/*
-			 * If the page isn't too big, we are evicting it because
-			 * it had a chain of deleted entries that make traversal
-			 * expensive.
-			 */
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_force_delete);
-	} else
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
-
-	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
-
-	return (ret);
 }
 
 /*

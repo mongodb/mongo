@@ -548,7 +548,9 @@ static const char * const __stats_connection_desc[] = {
 	"block-manager: bytes written",
 	"block-manager: mapped blocks read",
 	"block-manager: mapped bytes read",
+	"cache: bytes belonging to page images in the cache",
 	"cache: bytes currently in the cache",
+	"cache: bytes not belonging to page images in the cache",
 	"cache: bytes read into cache",
 	"cache: bytes written from cache",
 	"cache: checkpoint blocked page eviction",
@@ -770,7 +772,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->block_byte_write = 0;
 	stats->block_map_read = 0;
 	stats->block_byte_map_read = 0;
+		/* not clearing cache_bytes_image */
 		/* not clearing cache_bytes_inuse */
+		/* not clearing cache_bytes_other */
 	stats->cache_bytes_read = 0;
 	stats->cache_bytes_write = 0;
 	stats->cache_eviction_checkpoint = 0;
@@ -984,7 +988,9 @@ __wt_stat_connection_aggregate(
 	to->block_byte_write += WT_STAT_READ(from, block_byte_write);
 	to->block_map_read += WT_STAT_READ(from, block_map_read);
 	to->block_byte_map_read += WT_STAT_READ(from, block_byte_map_read);
+	to->cache_bytes_image += WT_STAT_READ(from, cache_bytes_image);
 	to->cache_bytes_inuse += WT_STAT_READ(from, cache_bytes_inuse);
+	to->cache_bytes_other += WT_STAT_READ(from, cache_bytes_other);
 	to->cache_bytes_read += WT_STAT_READ(from, cache_bytes_read);
 	to->cache_bytes_write += WT_STAT_READ(from, cache_bytes_write);
 	to->cache_eviction_checkpoint +=

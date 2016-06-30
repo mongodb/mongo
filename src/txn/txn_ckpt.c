@@ -400,6 +400,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    session, cfg, __wt_checkpoint_get_handles, NULL))));
 	WT_ERR(ret);
 
+	/* Reset the maximum page size seen by eviction. */
+	conn->cache->evict_max_page_size = 0;
+
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
 	 *

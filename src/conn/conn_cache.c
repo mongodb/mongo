@@ -176,6 +176,10 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 		    &cache->evict_queues[i].evict_lock, "cache eviction"));
 	}
 
+	/* Ensure there is always a non-NULL current queue. */
+	cache->evict_current_queue =
+	    &cache->evict_queues[WT_EVICT_URGENT_QUEUE + 1];
+
 	/*
 	 * We get/set some values in the cache statistics (rather than have
 	 * two copies), configure them.
@@ -213,21 +217,25 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 
 	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
 	WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
-
 	WT_STAT_SET(session, stats, cache_overhead, cache->overhead_pct);
+
+	WT_STAT_SET(
+	    session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
+	WT_STAT_SET(
+	    session, stats, cache_bytes_image, __wt_cache_bytes_image(cache));
 	WT_STAT_SET(
 	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
 	WT_STAT_SET(
-	    session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
+	    session, stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
+	WT_STAT_SET(
+	    session, stats, cache_bytes_other, __wt_cache_bytes_other(cache));
+	WT_STAT_SET(
+	    session, stats, cache_bytes_overflow, cache->bytes_overflow);
+
 	WT_STAT_SET(session, stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
 	WT_STAT_SET(session, stats, cache_pages_dirty, cache->pages_dirty);
-
-	WT_STAT_SET(
-	    session, stats, cache_bytes_internal, cache->bytes_internal);
-	WT_STAT_SET(
-	    session, stats, cache_bytes_overflow, cache->bytes_overflow);
-	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
 
 	/*
 	 * The number of files with active walks ~= number of hazard pointers
@@ -286,6 +294,7 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 		__wt_spin_destroy(session, &cache->evict_queues[i].evict_lock);
 		__wt_free(session, cache->evict_queues[i].evict_queue);
 	}
+
 	__wt_free(session, conn->cache);
 	return (ret);
 }
