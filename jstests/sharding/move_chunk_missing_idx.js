@@ -8,7 +8,7 @@ var st = new ShardingTest({shards: 2});
 var testDB = st.s.getDB('test');
 
 testDB.adminCommand({enableSharding: 'test'});
-testDB.adminCommand({movePrimary: 'test', to: 'shard0001'});
+st.ensurePrimaryShard(testDB.toString(), "shard0001");
 testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
 // Test procedure:
