@@ -96,8 +96,7 @@ using NextAction = Fetcher::NextAction;
 
 namespace {
 
-Status shutDownInProgressStatus(ErrorCodes::ShutdownInProgress,
-                                "replication system is shutting down");
+const char kLocalDB[] = "local";
 
 void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -1060,6 +1059,10 @@ OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
 
 Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
                                                           const ReadConcernArgs& settings) {
+    // We should never wait for replication if we are holding any locks, because this can
+    // potentially block for long time while doing network activity.
+    invariant(!txn->lockState()->isLocked());
+
     const bool isMajorityReadConcern =
         settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
 
@@ -1501,6 +1504,10 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     const OpTime& opTime,
     SnapshotName minSnapshot,
     const WriteConcernOptions& writeConcern) {
+    // We should never wait for writes to replicate if we are holding any locks, because the this
+    // can potentially block for long time while doing network activity.
+    invariant(!txn->lockState()->isLocked());
+
     const Mode replMode = getReplicationMode();
     if (replMode == modeNone) {
         // no replication check needed (validated above)
@@ -1808,7 +1815,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
     if (_canAcceptNonLocalWrites) {
         return true;
     }
-    if (dbName == "local") {
+    if (dbName == kLocalDB) {
         return true;
     }
     return !replAllDead && _settings.isMaster();
@@ -1860,7 +1867,7 @@ bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* 
     if (idx->isIdIndex()) {
         return false;
     }
-    if (nsToDatabaseSubstring(idx->parentNS()) == "local") {
+    if (nsToDatabaseSubstring(idx->parentNS()) == kLocalDB) {
         // always enforce on local
         return false;
     }
@@ -2971,7 +2978,7 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
         };
         Fetcher candidateProber(&_replExecutor,
                                 candidate,
-                                "local",
+                                kLocalDB,
                                 BSON("find"
                                      << "oplog.rs"
                                      << "limit"

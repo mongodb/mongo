@@ -180,7 +180,7 @@ bool WriteConcernOptions::shouldWaitForOtherNodes() const {
 }
 
 bool WriteConcernOptions::validForConfigServers() const {
-    return wNumNodes == 1 || wMode == kMajority;
+    return wMode == kMajority;
 }
 
 }  // namespace mongo

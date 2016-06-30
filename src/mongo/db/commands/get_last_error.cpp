@@ -44,6 +44,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
 
 using std::string;
 using std::stringstream;
@@ -219,11 +220,9 @@ public:
         //
         // Validate write concern no matter what, this matches 2.4 behavior
         //
-
-
         if (status.isOK()) {
             // Ensure options are valid for this host
-            status = validateWriteConcern(txn, writeConcern, dbname);
+            status = validateWriteConcern(txn, writeConcern);
         }
 
         if (!status.isOK()) {
@@ -316,4 +315,6 @@ public:
         return true;
     }
 } cmdGetPrevError;
-}
+
+}  // namespace
+}  // namespace mongo

@@ -70,6 +70,10 @@ BSONObj ReadConcernArgs::toBSON() const {
     return bob.obj();
 }
 
+bool ReadConcernArgs::isEmpty() const {
+    return getOpTime().isNull() && getLevel() == repl::ReadConcernLevel::kLocalReadConcern;
+}
+
 ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }

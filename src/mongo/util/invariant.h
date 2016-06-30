@@ -55,12 +55,12 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
 
 #define invariant MONGO_invariant
 
-/* dassert is 'debug assert' -- might want to turn off for production as these
-   could be slow.
-*/
+// Behaves like invariant in debug builds and is compiled out in release. Use for checks, which can
+// potentially be slow or on a critical path.
 #define MONGO_dassert(x) \
     if (kDebugBuild)     \
     invariant(x)
 
 #define dassert MONGO_dassert
+
 }  // namespace mongo

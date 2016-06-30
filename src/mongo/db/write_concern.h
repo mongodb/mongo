@@ -54,9 +54,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
 /**
  * Verifies that a WriteConcern is valid for this particular host.
  */
-Status validateWriteConcern(OperationContext* txn,
-                            const WriteConcernOptions& writeConcern,
-                            const std::string& dbName);
+Status validateWriteConcern(OperationContext* txn, const WriteConcernOptions& writeConcern);
 
 struct WriteConcernResult {
     WriteConcernResult() {

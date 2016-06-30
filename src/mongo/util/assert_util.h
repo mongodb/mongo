@@ -326,6 +326,11 @@ inline void massertNoTraceStatusOK(const Status& status) {
         }                                                                                     \
     } while (false)
 
+#define dassertOK MONGO_dassertOK
+#define MONGO_dassertOK(expression) \
+    if (kDebugBuild)                \
+    invariantOK(expression)
+
 // some special ids that we want to duplicate
 
 // > 10000 asserts

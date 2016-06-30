@@ -99,7 +99,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"  // for SendStaleConfigException
+#include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -1473,7 +1473,7 @@ bool Command::run(OperationContext* txn,
             }
         } else {
             // Skip waiting for the OpTime when testing snapshot behavior.
-            if (!testingSnapshotBehaviorInIsolation) {
+            if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
                 // Wait for readConcern to be satisfied.
                 auto readConcernStatus = replCoord->waitUntilOpTimeForRead(txn, readConcernArgs);
                 if (!readConcernStatus.isOK()) {

@@ -79,8 +79,8 @@ public:
     bool shouldWaitForOtherNodes() const;
 
     /**
-     * Returns true if this is a valid write concern to use against a config server.
-     * TODO(spencer): Once we stop supporting SCCC config servers, forbid this from allowing w:1
+     * Returns true if this is a {w:majority} write concern, which is the only valid write concern
+     * to use against a config server.
      */
     bool validForConfigServers() const;
 
