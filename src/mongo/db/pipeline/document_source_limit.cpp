@@ -81,7 +81,9 @@ Value DocumentSourceLimit::serialize(bool explain) const {
 intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx, long long limit) {
     uassert(15958, "the limit must be positive", limit > 0);
-    return new DocumentSourceLimit(pExpCtx, limit);
+    intrusive_ptr<DocumentSourceLimit> source(new DocumentSourceLimit(pExpCtx, limit));
+    source->injectExpressionContext(pExpCtx);
+    return source;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceLimit::createFromBson(

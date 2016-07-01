@@ -52,7 +52,10 @@ const char* DocumentSourceMergeCursors::getSourceName() const {
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
     std::vector<CursorDescriptor> cursorDescriptors,
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
+    intrusive_ptr<DocumentSourceMergeCursors> source(
+        new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx));
+    source->injectExpressionContext(pExpCtx);
+    return source;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(

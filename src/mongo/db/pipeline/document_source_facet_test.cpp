@@ -38,6 +38,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -194,7 +195,7 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     auto output = facetStage->getNext();
     ASSERT_TRUE(output);
-    ASSERT_EQ(*output, Document(fromjson("{results: [{_id: 0}, {_id: 1}]}")));
+    ASSERT_DOCUMENT_EQ(*output, Document(fromjson("{results: [{_id: 0}, {_id: 1}]}")));
 
     // Should be exhausted now.
     ASSERT_FALSE(facetStage->getNext());
@@ -224,8 +225,8 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
     std::vector<Value> expectedOutputs(inputs.begin(), inputs.end());
     ASSERT_TRUE(output);
     ASSERT_EQ((*output).size(), 2UL);
-    ASSERT_EQ((*output)["first"], Value(expectedOutputs));
-    ASSERT_EQ((*output)["second"], Value(expectedOutputs));
+    ASSERT_VALUE_EQ((*output)["first"], Value(expectedOutputs));
+    ASSERT_VALUE_EQ((*output)["second"], Value(expectedOutputs));
 
     // Should be exhausted now.
     ASSERT_FALSE(facetStage->getNext());
@@ -248,7 +249,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 
     auto output = facetStage->getNext();
     ASSERT_TRUE(output);
-    ASSERT_EQ(*output, Document(fromjson("{subPipe: [{_id: 0}, {_id: 1}]}")));
+    ASSERT_DOCUMENT_EQ(*output, Document(fromjson("{subPipe: [{_id: 0}, {_id: 1}]}")));
 }
 
 //
@@ -287,10 +288,10 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
     // Should have two fields: "skippedOne" and "skippedTwo".
     auto serializedStage = serialization[0].getDocument()["$facet"].getDocument();
     ASSERT_EQ(serializedStage.size(), 2UL);
-    ASSERT_EQ(serializedStage["skippedOne"],
-              Value(std::vector<Value>{Value(Document{{"$skip", 1}})}));
-    ASSERT_EQ(serializedStage["skippedTwo"],
-              Value(std::vector<Value>{Value(Document{{"$skip", 2}})}));
+    ASSERT_VALUE_EQ(serializedStage["skippedOne"],
+                    Value(std::vector<Value>{Value(Document{{"$skip", 1}})}));
+    ASSERT_VALUE_EQ(serializedStage["skippedTwo"],
+                    Value(std::vector<Value>{Value(Document{{"$skip", 2}})}));
 
     auto serializedBson = serialization[0].getDocument().toBson();
     auto roundTripped = DocumentSourceFacet::createFromBson(serializedBson.firstElement(), ctx);
@@ -300,7 +301,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
     roundTripped->serializeToArray(newSerialization);
 
     ASSERT_EQ(newSerialization.size(), 1UL);
-    ASSERT_EQ(newSerialization[0], serialization[0]);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {

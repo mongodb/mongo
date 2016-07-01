@@ -116,4 +116,9 @@ DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker
         return SEE_NEXT;
     }
 }
+
+void DocumentSourceProject::doInjectExpressionContext() {
+    _parsedProject->injectExpressionContext(pExpCtx);
 }
+
+}  // namespace mongo

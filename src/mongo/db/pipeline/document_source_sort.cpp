@@ -170,6 +170,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx, BSONObj sortOrder, long long limit) {
     intrusive_ptr<DocumentSourceSort> pSort = new DocumentSourceSort(pExpCtx);
+    pSort->injectExpressionContext(pExpCtx);
     pSort->_sort = sortOrder.getOwned();
 
     /* check for then iterate over the sort object */

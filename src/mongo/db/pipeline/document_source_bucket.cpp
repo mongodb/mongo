@@ -121,6 +121,8 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                                       << typeName(upper.getType())
                                       << ".",
                         lowerCanonicalType == upperCanonicalType);
+                // TODO SERVER-25038: This check must be deferred so that it respects the final
+                // collator, which is not necessarily the same as the collator at parse time.
                 uassert(40194,
                         str::stream()
                             << "The 'boundaries' option to $bucket must be sorted, but elements "
@@ -132,7 +134,7 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                             << " is not less than "
                             << upper.toString()
                             << ").",
-                        lower < upper);
+                        pExpCtx->getValueComparator().evaluate(lower < upper));
             }
         } else if ("default" == argName) {
             // If there is a default, make sure that it parses to a constant expression then add
@@ -173,11 +175,15 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     Value upperValue = boundaryValues.back();
     if (canonicalizeBSONType(defaultValue.getType()) ==
         canonicalizeBSONType(lowerValue.getType())) {
-        // If the default has the same canonical type as the bucket's boundaries, then make sure
-        // the default is less than the lowest boundary or greater than or equal to the highest
+        // If the default has the same canonical type as the bucket's boundaries, then make sure the
+        // default is less than the lowest boundary or greater than or equal to the highest
         // boundary.
-        const bool hasValidDefault =
-            defaultValue < lowerValue || Value::compare(defaultValue, upperValue) >= 0;
+        //
+        // TODO SERVER-25038: This check must be deferred so that it respects the final collator,
+        // which is not necessarily the same as the collator at parse time.
+        const auto& valueCmp = pExpCtx->getValueComparator();
+        const bool hasValidDefault = valueCmp.evaluate(defaultValue < lowerValue) ||
+            valueCmp.evaluate(defaultValue >= upperValue);
         uassert(40199,
                 "The $bucket 'default' field must be less than the lowest boundary or greater than "
                 "or equal to the highest boundary.",

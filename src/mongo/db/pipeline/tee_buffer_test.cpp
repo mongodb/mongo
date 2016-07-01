@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/tee_buffer.h"
 
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -63,7 +64,7 @@ TEST(TeeBufferTest, ShouldProvideIteratorOverSingleDocument) {
     // Should be able to establish an iterator and get the document back.
     auto it = teeBuffer->begin();
     ASSERT(it != teeBuffer->end());
-    ASSERT_EQ(*it, inputDoc);
+    ASSERT_DOCUMENT_EQ(*it, inputDoc);
     ++it;
     ASSERT(it == teeBuffer->end());
 }
@@ -77,10 +78,10 @@ TEST(TeeBufferTest, ShouldProvideIteratorOverTwoDocuments) {
 
     auto it = teeBuffer->begin();
     ASSERT(it != teeBuffer->end());
-    ASSERT_EQ(*it, inputDocs.front());
+    ASSERT_DOCUMENT_EQ(*it, inputDocs.front());
     ++it;
     ASSERT(it != teeBuffer->end());
-    ASSERT_EQ(*it, inputDocs.back());
+    ASSERT_DOCUMENT_EQ(*it, inputDocs.back());
     ++it;
     ASSERT(it == teeBuffer->end());
 }
@@ -97,18 +98,18 @@ TEST(TeeBufferTest, ShouldBeAbleToProvideMultipleIteratorsOverTheSameInputs) {
 
     // Advance both once.
     ASSERT(firstIt != teeBuffer->end());
-    ASSERT_EQ(*firstIt, inputDocs.front());
+    ASSERT_DOCUMENT_EQ(*firstIt, inputDocs.front());
     ++firstIt;
     ASSERT(secondIt != teeBuffer->end());
-    ASSERT_EQ(*secondIt, inputDocs.front());
+    ASSERT_DOCUMENT_EQ(*secondIt, inputDocs.front());
     ++secondIt;
 
     // Advance them both again.
     ASSERT(firstIt != teeBuffer->end());
-    ASSERT_EQ(*firstIt, inputDocs.back());
+    ASSERT_DOCUMENT_EQ(*firstIt, inputDocs.back());
     ++firstIt;
     ASSERT(secondIt != teeBuffer->end());
-    ASSERT_EQ(*secondIt, inputDocs.back());
+    ASSERT_DOCUMENT_EQ(*secondIt, inputDocs.back());
     ++secondIt;
 
     // Assert they've both reached the end.

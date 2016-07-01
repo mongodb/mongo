@@ -22,8 +22,8 @@ env.Library(
         'framework_options_init.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/unittest/unittest',
         'framework_options',
     ],
@@ -112,6 +112,7 @@ dbtest = env.Program(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        '$BUILD_DIR/mongo/db/pipeline/document_value_test_util',
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",

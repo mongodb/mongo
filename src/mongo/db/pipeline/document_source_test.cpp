@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/service_context.h"
@@ -230,27 +231,27 @@ private:
 TEST(Mock, OneDoc) {
     auto doc = DOC("a" << 1);
     auto source = DocumentSourceMock::create(doc);
-    ASSERT_EQ(*source->getNext(), doc);
+    ASSERT_DOCUMENT_EQ(*source->getNext(), doc);
     ASSERT(!source->getNext());
 }
 
 TEST(Mock, DequeDocuments) {
     auto source = DocumentSourceMock::create({DOC("a" << 1), DOC("a" << 2)});
-    ASSERT_EQ(*source->getNext(), DOC("a" << 1));
-    ASSERT_EQ(*source->getNext(), DOC("a" << 2));
+    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 1));
+    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 2));
     ASSERT(!source->getNext());
 }
 
 TEST(Mock, StringJSON) {
     auto source = DocumentSourceMock::create("{a : 1}");
-    ASSERT_EQ(*source->getNext(), DOC("a" << 1));
+    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 1));
     ASSERT(!source->getNext());
 }
 
 TEST(Mock, DequeStringJSONs) {
     auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}"});
-    ASSERT_EQ(*source->getNext(), DOC("a" << 1));
-    ASSERT_EQ(*source->getNext(), DOC("a" << 2));
+    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 1));
+    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 2));
     ASSERT(!source->getNext());
 }
 
@@ -331,7 +332,7 @@ public:
         // The limit's result is as expected.
         boost::optional<Document> next = limit()->getNext();
         ASSERT(bool(next));
-        ASSERT_EQUALS(Value(1), next->getField("a"));
+        ASSERT_VALUE_EQ(Value(1), next->getField("a"));
         // The limit is exhausted.
         ASSERT(!limit()->getNext());
     }
@@ -373,7 +374,7 @@ public:
         // The limit is not exhauted.
         boost::optional<Document> next = limit()->getNext();
         ASSERT(bool(next));
-        ASSERT_EQUALS(Value(1), next->getField("a"));
+        ASSERT_VALUE_EQ(Value(1), next->getField("a"));
         // The limit is exhausted.
         ASSERT(!limit()->getNext());
     }
@@ -458,6 +459,7 @@ protected:
         expressionContext->tempDir = _tempDir.path();
 
         _group = DocumentSourceGroup::createFromBson(specElement, expressionContext);
+        _group->injectExpressionContext(expressionContext);
         assertRoundTrips(_group);
     }
     DocumentSourceGroup* group() {
@@ -1014,19 +1016,19 @@ public:
 
         auto res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id"), Value(0));
+        ASSERT_VALUE_EQ(res->getField("_id"), Value(0));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("a"), Value(1));
+        ASSERT_VALUE_EQ(res->getField("a"), Value(1));
 
         assertExhausted(source);
 
         res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id"), Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id"), Value(1));
 
         assertExhausted(group());
 
@@ -1049,20 +1051,20 @@ public:
 
         auto res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id")["x"], Value(1));
-        ASSERT_EQUALS(res->getField("_id")["y"], Value(2));
+        ASSERT_VALUE_EQ(res->getField("_id")["x"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["y"], Value(2));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id")["x"], Value(1));
-        ASSERT_EQUALS(res->getField("_id")["y"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["x"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["y"], Value(1));
 
         res = source->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("a"), Value(2));
-        ASSERT_EQUALS(res->getField("b"), Value(1));
+        ASSERT_VALUE_EQ(res->getField("a"), Value(2));
+        ASSERT_VALUE_EQ(res->getField("b"), Value(1));
 
         assertExhausted(source);
 
@@ -1089,13 +1091,13 @@ public:
 
         auto res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id")["x"]["y"]["z"], Value(3));
+        ASSERT_VALUE_EQ(res->getField("_id")["x"]["y"]["z"], Value(3));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("a")["b"]["c"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("a")["b"]["c"], Value(1));
 
         assertExhausted(source);
 
@@ -1125,16 +1127,16 @@ public:
 
         auto res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id")["sub"]["x"], Value(1));
-        ASSERT_EQUALS(res->getField("_id")["sub"]["y"], Value(1));
-        ASSERT_EQUALS(res->getField("_id")["sub"]["z"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["x"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["y"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["z"], Value(1));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("a"), Value(2));
-        ASSERT_EQUALS(res->getField("b"), Value(3));
+        ASSERT_VALUE_EQ(res->getField("a"), Value(2));
+        ASSERT_VALUE_EQ(res->getField("b"), Value(3));
 
         BSONObjSet outputSort = group()->getOutputSorts();
 
@@ -1160,16 +1162,16 @@ public:
 
         auto res = group()->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("_id")["sub"]["x"], Value(5));
-        ASSERT_EQUALS(res->getField("_id")["sub"]["y"], Value(1));
-        ASSERT_EQUALS(res->getField("_id")["sub"]["z"], Value("c"));
+        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["x"], Value(5));
+        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["y"], Value(1));
+        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["z"], Value("c"));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
         ASSERT_TRUE(bool(res));
-        ASSERT_EQUALS(res->getField("a"), Value(3));
-        ASSERT_EQUALS(res->getField("b"), Value(1));
+        ASSERT_VALUE_EQ(res->getField("a"), Value(3));
+        ASSERT_VALUE_EQ(res->getField("b"), Value(1));
 
         BSONObjSet outputSort = group()->getOutputSorts();
         ASSERT_EQUALS(outputSort.size(), 2U);
@@ -1903,7 +1905,7 @@ public:
 
         vector<Value> arr;
         sort()->serializeToArray(arr);
-        ASSERT_EQUALS(
+        ASSERT_VALUE_EQ(
             Value(arr),
             DOC_ARRAY(DOC("$sort" << DOC("a" << 1)) << DOC("$limit" << sort()->getLimit())));
 
@@ -3043,8 +3045,8 @@ using std::unique_ptr;
 
 // Helpers to make a DocumentSourceMatch from a query object or json string
 intrusive_ptr<DocumentSourceMatch> makeMatch(const BSONObj& query) {
-    intrusive_ptr<DocumentSource> uncasted =
-        DocumentSourceMatch::createFromBson(BSON("$match" << query).firstElement(), NULL);
+    intrusive_ptr<DocumentSource> uncasted = DocumentSourceMatch::createFromBson(
+        BSON("$match" << query).firstElement(), new ExpressionContext());
     return dynamic_cast<DocumentSourceMatch*>(uncasted.get());
 }
 intrusive_ptr<DocumentSourceMatch> makeMatch(const string& queryJson) {
@@ -3458,11 +3460,11 @@ public:
         ASSERT_EQUALS(explainedStages.size(), 2UL);
 
         auto groupExplain = explainedStages[0];
-        ASSERT_EQ(groupExplain["$group"], expectedGroupExplain);
+        ASSERT_VALUE_EQ(groupExplain["$group"], expectedGroupExplain);
 
         auto sortExplain = explainedStages[1];
         auto expectedSortExplain = Value{Document{{"sortKey", Document{{"count", -1}}}}};
-        ASSERT_EQ(sortExplain["$sort"], expectedSortExplain);
+        ASSERT_VALUE_EQ(sortExplain["$sort"], expectedSortExplain);
     }
 };
 
@@ -3553,11 +3555,11 @@ public:
             Value{Document{{"_id", Document{{"$const", BSONNULL}}},
                            {countName, Document{{"$sum", Document{{"$const", 1}}}}}}};
         auto groupExplain = explainedStages[0];
-        ASSERT_EQ(groupExplain["$group"], expectedGroupExplain);
+        ASSERT_VALUE_EQ(groupExplain["$group"], expectedGroupExplain);
 
         Value expectedProjectExplain = Value{Document{{"_id", false}, {countName, true}}};
         auto projectExplain = explainedStages[1];
-        ASSERT_EQ(projectExplain["$project"], expectedProjectExplain);
+        ASSERT_VALUE_EQ(projectExplain["$project"], expectedProjectExplain);
     }
 };
 
@@ -3644,12 +3646,12 @@ public:
         ASSERT_EQUALS(explainedStages.size(), 2UL);
 
         auto groupExplain = explainedStages[0];
-        ASSERT_EQ(groupExplain["$group"], expectedGroupExplain);
+        ASSERT_VALUE_EQ(groupExplain["$group"], expectedGroupExplain);
 
         auto sortExplain = explainedStages[1];
 
         auto expectedSortExplain = Value{Document{{"sortKey", Document{{"_id", 1}}}}};
-        ASSERT_EQ(sortExplain["$sort"], expectedSortExplain);
+        ASSERT_VALUE_EQ(sortExplain["$sort"], expectedSortExplain);
     }
 };
 

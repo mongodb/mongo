@@ -54,6 +54,16 @@ void InclusionNode::optimize() {
     }
 }
 
+void InclusionNode::injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    for (auto&& expressionIt : _expressions) {
+        expressionIt.second->injectExpressionContext(expCtx);
+    }
+
+    for (auto&& childPair : _children) {
+        childPair.second->injectExpressionContext(expCtx);
+    }
+}
+
 void InclusionNode::serialize(MutableDocument* output, bool explain) const {
     // Always put "_id" first if it was included (implicitly or explicitly).
     if (_inclusions.find("_id") != _inclusions.end()) {

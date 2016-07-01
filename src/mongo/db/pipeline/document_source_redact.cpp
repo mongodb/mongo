@@ -127,11 +127,12 @@ Value DocumentSourceRedact::redactValue(const Value& in) {
 boost::optional<Document> DocumentSourceRedact::redactObject() {
     const Value expressionResult = _expression->evaluate(_variables.get());
 
-    if (expressionResult == keepVal) {
+    ValueComparator simpleValueCmp;
+    if (simpleValueCmp.evaluate(expressionResult == keepVal)) {
         return _variables->getDocument(_currentId);
-    } else if (expressionResult == pruneVal) {
+    } else if (simpleValueCmp.evaluate(expressionResult == pruneVal)) {
         return boost::optional<Document>();
-    } else if (expressionResult == descendVal) {
+    } else if (simpleValueCmp.evaluate(expressionResult == descendVal)) {
         const Document in = _variables->getDocument(_currentId);
         MutableDocument out;
         out.copyMetaDataFrom(in);
@@ -158,6 +159,10 @@ boost::optional<Document> DocumentSourceRedact::redactObject() {
 intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
     _expression = _expression->optimize();
     return this;
+}
+
+void DocumentSourceRedact::doInjectExpressionContext() {
+    _expression->injectExpressionContext(pExpCtx);
 }
 
 Value DocumentSourceRedact::serialize(bool explain) const {

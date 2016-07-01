@@ -73,11 +73,11 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
     performSearch();
 
     std::vector<Value> results;
-    while (!_visited.empty()) {
+    while (!_visited->empty()) {
         // Remove elements one at a time to avoid consuming more memory.
-        auto it = _visited.begin();
+        auto it = _visited->begin();
         results.push_back(Value(it->second));
-        _visited.erase(it);
+        _visited->erase(it);
     }
 
     MutableDocument output(*_input);
@@ -85,7 +85,7 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
 
     _visitedUsageBytes = 0;
 
-    invariant(_visited.empty());
+    invariant(_visited->empty());
 
     return output.freeze();
 }
@@ -96,7 +96,7 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNextUnwound() {
     // If the unwind is not preserving empty arrays, we might have to process multiple inputs before
     // we get one that will produce an output.
     while (true) {
-        if (_visited.empty()) {
+        if (_visited->empty()) {
             // No results are left for the current input, so we should move on to the next one and
             // perform a new search.
             if (!(_input = pSource->getNext())) {
@@ -110,7 +110,7 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNextUnwound() {
         }
         MutableDocument unwound(*_input);
 
-        if (_visited.empty()) {
+        if (_visited->empty()) {
             if ((*_unwind)->preserveNullAndEmptyArrays()) {
                 // Since "preserveNullAndEmptyArrays" was specified, output a document even though
                 // we had no result.
@@ -124,13 +124,13 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNextUnwound() {
                 continue;
             }
         } else {
-            auto it = _visited.begin();
+            auto it = _visited->begin();
             unwound.setNestedField(_as, Value(it->second));
             if (indexPath) {
                 unwound.setNestedField(*indexPath, Value(_outputIndex));
                 ++_outputIndex;
             }
-            _visited.erase(it);
+            _visited->erase(it);
         }
 
         return unwound.freeze();
@@ -139,8 +139,8 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNextUnwound() {
 
 void DocumentSourceGraphLookUp::dispose() {
     _cache.clear();
-    _frontier.clear();
-    _visited.clear();
+    _frontier->clear();
+    _visited->clear();
     pSource->dispose();
 }
 
@@ -154,8 +154,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
         BSONObjSet cached;
         auto query = constructQuery(&cached);
 
-        std::unordered_set<Value, Value::Hash> queried;
-        _frontier.swap(queried);
+        ValueUnorderedSet queried = pExpCtx->getValueComparator().makeUnorderedValueSet();
+        _frontier->swap(queried);
         _frontierUsageBytes = 0;
 
         // Process cached values, populating '_frontier' for the next iteration of search.
@@ -186,7 +186,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     } while (shouldPerformAnotherQuery && depth < std::numeric_limits<long long>::max() &&
              (!_maxDepth || depth <= *_maxDepth));
 
-    _frontier.clear();
+    _frontier->clear();
     _frontierUsageBytes = 0;
 }
 
@@ -204,7 +204,7 @@ BSONObj addDepthFieldToObject(const std::string& field, long long depth, BSONObj
 bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long long depth) {
     Value _id = Value(result.getField("_id"));
 
-    if (_visited.find(_id) != _visited.end()) {
+    if (_visited->find(_id) != _visited->end()) {
         // We've already seen this object, don't repeat any work.
         return false;
     }
@@ -215,7 +215,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
         _depthField ? addDepthFieldToObject(_depthField->fullPath(), depth, result) : result;
 
     // Add the object to our '_visited' list.
-    _visited[_id] = fullObject;
+    (*_visited)[_id] = fullObject;
 
     // Update the size of '_visited' appropriately.
     _visitedUsageBytes += _id.getApproximateSize();
@@ -231,12 +231,12 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
         Value recurseOn = Value(elem);
         if (recurseOn.isArray()) {
             for (auto&& subElem : recurseOn.getArray()) {
-                _frontier.insert(subElem);
+                _frontier->insert(subElem);
                 _frontierUsageBytes += subElem.getApproximateSize();
             }
         } else if (!recurseOn.missing()) {
             // Don't recurse on a missing value.
-            _frontier.insert(recurseOn);
+            _frontier->insert(recurseOn);
             _frontierUsageBytes += recurseOn.getApproximateSize();
         }
     }
@@ -246,7 +246,7 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
 }
 
 void DocumentSourceGraphLookUp::addToCache(const BSONObj& result,
-                                           const unordered_set<Value, Value::Hash>& queried) {
+                                           const ValueUnorderedSet& queried) {
     BSONElementSet cacheByValues;
     dps::extractAllElementsAlongPath(result, _connectToField.fullPath(), cacheByValues);
 
@@ -271,13 +271,13 @@ void DocumentSourceGraphLookUp::addToCache(const BSONObj& result,
 
 boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* cached) {
     // Add any cached values to 'cached' and remove them from '_frontier'.
-    for (auto it = _frontier.begin(); it != _frontier.end();) {
+    for (auto it = _frontier->begin(); it != _frontier->end();) {
         if (auto entry = _cache[*it]) {
             for (auto&& obj : *entry) {
                 cached->insert(obj);
             }
             size_t valueSize = it->getApproximateSize();
-            it = _frontier.erase(it);
+            it = _frontier->erase(it);
 
             // If the cached value increased in size while in the cache, we don't want to underflow
             // '_frontierUsageBytes'.
@@ -302,7 +302,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* c
                 BSONObjBuilder subObj(connectToObj.subobjStart(_connectToField.fullPath()));
                 {
                     BSONArrayBuilder in(subObj.subarrayStart("$in"));
-                    for (auto&& value : _frontier) {
+                    for (auto&& value : *_frontier) {
                         in << value;
                     }
                 }
@@ -310,7 +310,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* c
         }
     }
 
-    return _frontier.empty() ? boost::none : boost::optional<BSONObj>(query.obj());
+    return _frontier->empty() ? boost::none : boost::optional<BSONObj>(query.obj());
 }
 
 void DocumentSourceGraphLookUp::performSearch() {
@@ -324,11 +324,11 @@ void DocumentSourceGraphLookUp::performSearch() {
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     if (startingValue.isArray()) {
         for (auto value : startingValue.getArray()) {
-            _frontier.insert(value);
+            _frontier->insert(value);
             _frontierUsageBytes += value.getApproximateSize();
         }
     } else {
-        _frontier.insert(startingValue);
+        _frontier->insert(startingValue);
         _frontierUsageBytes += startingValue.getApproximateSize();
     }
 
@@ -408,6 +408,11 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
     if (_unwind && !explain) {
         (*_unwind)->serializeToArray(array);
     }
+}
+
+void DocumentSourceGraphLookUp::doInjectExpressionContext() {
+    _frontier = pExpCtx->getValueComparator().makeUnorderedValueSet();
+    _visited = pExpCtx->getValueComparator().makeUnorderedValueMap<BSONObj>();
 }
 
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(

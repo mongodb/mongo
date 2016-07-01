@@ -357,9 +357,8 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
 void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other) {
     _predicate = BSON("$and" << BSON_ARRAY(_predicate << other->getQuery()));
 
-    // TODO SERVER-23349: Pass the appropriate CollatorInterface* instead of nullptr.
     StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), nullptr));
+        MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator()));
     _expression = std::move(status.getValue());
 }
 
@@ -486,14 +485,18 @@ void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
     });
 }
 
+void DocumentSourceMatch::doInjectExpressionContext() {
+    _expression->setCollator(pExpCtx->getCollator());
+}
+
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
-    // TODO SERVER-23349: Pass the appropriate CollatorInterface* instead of nullptr.
     StatusWithMatchExpression status = uassertStatusOK(
-        MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), nullptr));
+        MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator()));
 
     _expression = std::move(status.getValue());
     getDependencies(&_dependencies);
 }
+
 }  // namespace mongo

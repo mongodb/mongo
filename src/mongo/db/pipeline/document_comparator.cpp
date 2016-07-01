@@ -28,41 +28,30 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/pipeline/document_comparator.h"
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-ExpressionContext::ExpressionContext(OperationContext* opCtx, const AggregationRequest& request)
-    : isExplain(request.isExplain()),
-      inShard(request.isFromRouter()),
-      extSortAllowed(request.shouldAllowDiskUse()),
-      bypassDocumentValidation(request.shouldBypassDocumentValidation()),
-      ns(request.getNamespaceString()),
-      opCtx(opCtx),
-      collation(request.getCollation()) {
-    if (!collation.isEmpty()) {
-        auto statusWithCollator =
-            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
-        uassertStatusOK(statusWithCollator.getStatus());
-        setCollator(std::move(statusWithCollator.getValue()));
+bool DocumentComparator::evaluate(Document::DeferredComparison deferredComparison) const {
+    int cmp = Document::compare(deferredComparison.lhs, deferredComparison.rhs, _stringComparator);
+    switch (deferredComparison.type) {
+        case Document::DeferredComparison::Type::kLT:
+            return cmp < 0;
+        case Document::DeferredComparison::Type::kLTE:
+            return cmp <= 0;
+        case Document::DeferredComparison::Type::kEQ:
+            return cmp == 0;
+        case Document::DeferredComparison::Type::kGTE:
+            return cmp >= 0;
+        case Document::DeferredComparison::Type::kGT:
+            return cmp > 0;
+        case Document::DeferredComparison::Type::kNE:
+            return cmp != 0;
     }
-}
 
-void ExpressionContext::checkForInterrupt() {
-    // This check could be expensive, at least in relative terms, so don't check every time.
-    if (--interruptCounter == 0) {
-        opCtx->checkForInterrupt();
-        interruptCounter = kInterruptCheckPeriod;
-    }
-}
-
-void ExpressionContext::setCollator(std::unique_ptr<CollatorInterface> coll) {
-    _collator = std::move(coll);
-
-    // Document/Value comparisons must be aware of the collation.
-    _documentComparator = DocumentComparator(_collator.get());
-    _valueComparator = ValueComparator(_collator.get());
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

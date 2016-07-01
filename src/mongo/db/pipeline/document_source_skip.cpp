@@ -94,6 +94,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
     intrusive_ptr<DocumentSourceSkip> pSource(new DocumentSourceSkip(pExpCtx));
+    pSource->injectExpressionContext(pExpCtx);
     return pSource;
 }
 

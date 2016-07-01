@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <deque>
 #include <list>
 #include <string>
@@ -52,6 +53,7 @@
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/stdx/functional.h"
@@ -230,6 +232,18 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) {}
 
     /**
+     * Injects a new ExpressionContext into this DocumentSource and propagates the ExpressionContext
+     * to all child expressions, accumulators, etc.
+     *
+     * Stages which require work to propagate the ExpressionContext to their private execution
+     * machinery should override doInjectExpressionContext().
+     */
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        pExpCtx = expCtx;
+        doInjectExpressionContext();
+    }
+
+    /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
     static std::vector<boost::intrusive_ptr<DocumentSource>> parse(
@@ -263,6 +277,15 @@ protected:
        Base constructor.
      */
     explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
+     * DocumentSources which need to update their internal state when attaching to a new
+     * ExpressionContext should override this method.
+     *
+     * Any stage subclassing from DocumentSource should override this method if it contains
+     * expressions or accumulators which need to attach to the newly injected ExpressionContext.
+     */
+    virtual void doInjectExpressionContext() {}
 
     /*
       Most DocumentSources have an underlying source they get their data
@@ -491,6 +514,9 @@ public:
 
     const PlanSummaryStats& getPlanSummaryStats() const;
 
+protected:
+    void doInjectExpressionContext() final;
+
 private:
     DocumentSourceCursor(const std::string& ns,
                          const std::shared_ptr<PlanExecutor>& exec,
@@ -524,7 +550,7 @@ private:
 class DocumentSourceGroup final : public DocumentSource, public SplittableDocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
-    using GroupsMap = std::unordered_map<Value, Accumulators, Value::Hash>;
+    using GroupsMap = ValueUnorderedMap<Accumulators>;
 
     // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
@@ -572,6 +598,9 @@ public:
     // Virtuals for SplittableDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+protected:
+    void doInjectExpressionContext() final;
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -647,7 +676,10 @@ private:
     Value _currentId;
     Accumulators _currentAccumulators;
 
-    GroupsMap groups;
+    // We use boost::optional to defer initialization until the ExpressionContext containing the
+    // correct comparator is injected, since the groups must be built using the comparator's
+    // definition of equality.
+    boost::optional<GroupsMap> _groups;
 
     bool _spilled;
 
@@ -789,6 +821,8 @@ public:
         const std::string& path,
         boost::intrusive_ptr<ExpressionContext> expCtx);
 
+    void doInjectExpressionContext();
+
 private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -914,11 +948,17 @@ public:
         return this;
     }
 
+    void doInjectExpressionContext() override {
+        isExpCtxInjected = true;
+    }
+
     // Return documents from front of queue.
     std::deque<Document> queue;
+
     bool isDisposed = false;
     bool isDetachedFromOpCtx = false;
     bool isOptimized = false;
+    bool isExpCtxInjected = false;
 
     BSONObjSet sorts;
 };
@@ -1001,6 +1041,8 @@ public:
      */
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
+    void doInjectExpressionContext() final;
+
     /**
      * Parse the projection from the user-supplied BSON.
      */
@@ -1027,6 +1069,8 @@ public:
      */
     Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
                                                    Pipeline::SourceContainer* container) final;
+
+    void doInjectExpressionContext() final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -1063,6 +1107,8 @@ public:
         return _size;
     }
 
+    void doInjectExpressionContext() final;
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -1085,6 +1131,8 @@ public:
     const char* getSourceName() const final;
     Value serialize(bool explain = false) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
+    void doInjectExpressionContext() final;
 
     static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1111,8 +1159,9 @@ private:
     std::string _idField;
 
     // Keeps track of the documents that have been returned, since a random cursor is allowed to
-    // return duplicates.
-    ValueSet _seenDocs;
+    // return duplicates. We use boost::optional to defer initialization until the ExpressionContext
+    // containing the correct comparator is injected.
+    boost::optional<ValueUnorderedSet> _seenDocs;
 
     // The approximate number of documents in the collection (includes orphans).
     const long long _nDocsInColl;
@@ -1188,6 +1237,7 @@ private:
     long long count;
 };
 
+// TODO SERVER-23349: Make aggregation sort respect the collation.
 class DocumentSourceSort final : public DocumentSource, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
@@ -1473,6 +1523,7 @@ private:
     std::unique_ptr<Unwinder> _unwinder;
 };
 
+// TODO SERVER-23349: Make geoNear agg stage respect the collation.
 class DocumentSourceGeoNear : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     static const long long kDefaultLimit;
@@ -1543,6 +1594,8 @@ private:
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
+ *
+ * TODO SERVER-23349: Make $lookup respect the collation.
  */
 class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
                                    public SplittableDocumentSource {
@@ -1620,6 +1673,7 @@ private:
     boost::optional<Document> _input;
 };
 
+// TODO SERVER-23349: Make $graphLookup respect the collation.
 class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod {
 public:
     boost::optional<Document> getNext() final;
@@ -1646,6 +1700,8 @@ public:
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
         collections->push_back(_from);
     }
+
+    void doInjectExpressionContext() final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -1698,7 +1754,7 @@ private:
      * Updates '_cache' with 'result' appropriately, given that 'result' was retrieved when querying
      * for 'queried'.
      */
-    void addToCache(const BSONObj& result, const unordered_set<Value, Value::Hash>& queried);
+    void addToCache(const BSONObj& result, const ValueUnorderedSet& queried);
 
     /**
      * Assert that '_visited' and '_frontier' have not exceeded the maximum meory usage, and then
@@ -1731,11 +1787,15 @@ private:
     size_t _frontierUsageBytes = 0;
 
     // Only used during the breadth-first search, tracks the set of values on the current frontier.
-    std::unordered_set<Value, Value::Hash> _frontier;
+    // We use boost::optional to defer initialization until the ExpressionContext containing the
+    // correct comparator is injected.
+    boost::optional<ValueUnorderedSet> _frontier;
 
     // Tracks nodes that have been discovered for a given input. Keys are the '_id' value of the
-    // document from the foreign collection, value is the document itself.
-    std::unordered_map<Value, BSONObj, Value::Hash> _visited;
+    // document from the foreign collection, value is the document itself.  We use boost::optional
+    // to defer initialization until the ExpressionContext containing the correct comparator is
+    // injected.
+    boost::optional<ValueUnorderedMap<BSONObj>> _visited;
 
     // Caches query results to avoid repeating any work. This structure is maintained across calls
     // to getNext().

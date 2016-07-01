@@ -39,6 +39,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -83,17 +84,17 @@ TEST(ExclusionProjection, ShouldSerializeToEquivalentProjection) {
     // fields is subject to change.
     auto serialization = exclusion.serialize();
     ASSERT_EQ(serialization.size(), 4UL);
-    ASSERT_EQ(serialization["a"], Value(false));
-    ASSERT_EQ(serialization["_id"], Value(false));
+    ASSERT_VALUE_EQ(serialization["a"], Value(false));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(false));
 
     ASSERT_EQ(serialization["b"].getType(), BSONType::Object);
     ASSERT_EQ(serialization["b"].getDocument().size(), 2UL);
-    ASSERT_EQ(serialization["b"].getDocument()["c"], Value(false));
-    ASSERT_EQ(serialization["b"].getDocument()["d"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"].getDocument()["c"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"].getDocument()["d"], Value(false));
 
     ASSERT_EQ(serialization["x"].getType(), BSONType::Object);
     ASSERT_EQ(serialization["x"].getDocument().size(), 1UL);
-    ASSERT_EQ(serialization["x"].getDocument()["y"], Value(false));
+    ASSERT_VALUE_EQ(serialization["x"].getDocument()["y"], Value(false));
 }
 
 TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
@@ -127,22 +128,22 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeTopLevelField) {
     // More than one field in document.
     auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}});
     auto expectedResult = Document{{"b", 2}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is the only field in the document.
     result = exclusion.applyProjection(Document{{"a", 1}});
     expectedResult = Document{};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the document.
     result = exclusion.applyProjection(Document{{"c", 1}});
     expectedResult = Document{{"c", 1}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in the document.
     result = exclusion.applyProjection(Document{});
     expectedResult = Document{};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
@@ -152,7 +153,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
 
     auto result = exclusion.applyProjection(Document{{"_id", "ID"}, {"a", 1}, {"b", 2}, {"c", 3}});
     auto expectedResult = Document{{"_id", "ID"}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
@@ -160,7 +161,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
     exclusion.parse(BSON("second" << false));
     auto result = exclusion.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
     auto expectedResult = Document{{"first", 0}, {"third", 2}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
@@ -168,7 +169,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
     exclusion.parse(BSON("a" << false));
     auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
     auto expectedResult = Document{{"b", 2}, {"_id", "ID"}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
@@ -176,7 +177,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     exclusion.parse(BSON("a" << false << "_id" << false));
     auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
     auto expectedResult = Document{{"b", 2}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 //
@@ -189,7 +190,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeSubFieldsOfId) {
     auto result = exclusion.applyProjection(
         Document{{"_id", Document{{"x", 1}, {"y", 2}, {"z", 3}}}, {"a", 1}});
     auto expectedResult = Document{{"_id", Document{{"z", 3}}}, {"a", 1}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeSimpleDottedFieldFromSubDoc) {
@@ -199,22 +200,22 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeSimpleDottedFieldFromSubDoc)
     // More than one field in sub document.
     auto result = exclusion.applyProjection(Document{{"a", Document{{"b", 1}, {"c", 2}}}});
     auto expectedResult = Document{{"a", Document{{"c", 2}}}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is the only field in the sub document.
     result = exclusion.applyProjection(Document{{"a", Document{{"b", 1}}}});
     expectedResult = Document{{"a", Document{}}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the sub document.
     result = exclusion.applyProjection(Document{{"a", Document{{"c", 1}}}});
     expectedResult = Document{{"a", Document{{"c", 1}}}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in sub document.
     result = exclusion.applyProjection(Document{{"a", Document{}}});
     expectedResult = Document{{"a", Document{}}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFieldDoesNotExist) {
@@ -224,12 +225,12 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFiel
     // Should not add the path if it doesn't exist.
     auto result = exclusion.applyProjection(Document{});
     auto expectedResult = Document{};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should not replace non-documents with documents.
     result = exclusion.applyProjection(Document{{"sub", "notADocument"}});
     expectedResult = Document{{"sub", "notADocument"}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldApplyDottedExclusionToEachElementInArray) {
@@ -252,7 +253,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldApplyDottedExclusionToEachElementIn
         Value(vector<Value>{Value(1), Value(Document{{"c", 1}})})};
     auto result = exclusion.applyProjection(Document{{"a", nestedValues}});
     auto expectedResult = Document{{"a", expectedNestedValues}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
@@ -263,7 +264,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
     auto result = exclusion.applyProjection(
         Document{{"a", Document{{"b", 1}, {"c", 2}, {"d", 3}, {"e", 4}, {"f", 5}}}});
     auto expectedResult = Document{{"a", Document{{"f", 5}}}};
-    ASSERT_EQ(result, expectedResult);
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) {
@@ -279,7 +280,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 
     MutableDocument expectedDoc(Document{{"_id", "ID"}});
     expectedDoc.copyMetaDataFrom(inputDoc);
-    ASSERT_EQ(result, expectedDoc.freeze());
+    ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
 
 }  // namespace

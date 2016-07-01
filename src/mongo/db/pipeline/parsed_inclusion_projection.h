@@ -33,6 +33,7 @@
 #include <unordered_set>
 
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/stdx/memory.h"
 
@@ -118,6 +119,8 @@ public:
         return _pathToNode;
     }
 
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 private:
     // Helpers for the Document versions above. These will apply the transformation recursively to
     // each element of any arrays, and ensure non-documents are handled appropriately.
@@ -200,6 +203,10 @@ public:
      */
     void optimize() final {
         _root->optimize();
+    }
+
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        _root->injectExpressionContext(expCtx);
     }
 
     void addDependencies(DepsTracker* deps) const final {

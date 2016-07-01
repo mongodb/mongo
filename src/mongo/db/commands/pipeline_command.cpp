@@ -188,6 +188,7 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
         fassertFailedWithStatusNoTrace(40175, reparsedPipeline.getStatus());
     }
 
+    reparsedPipeline.getValue()->injectExpressionContext(expCtx);
     reparsedPipeline.getValue()->optimizePipeline();
     return reparsedPipeline.getValue();
 }
@@ -262,15 +263,6 @@ public:
             return appendCommandStatus(result, statusWithPipeline.getStatus());
         }
         auto pipeline = std::move(statusWithPipeline.getValue());
-        pipeline->optimizePipeline();
-
-        if (kDebugBuild && !expCtx->isExplain && !expCtx->inShard) {
-            // Make sure all operations round-trip through Pipeline::serialize() correctly by
-            // re-parsing every command in debug builds. This is important because sharded
-            // aggregations rely on this ability.  Skipping when inShard because this has already
-            // been through the transformation (and this un-sets expCtx->inShard).
-            pipeline = reparsePipeline(pipeline, request.getValue(), expCtx);
-        }
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
         unique_ptr<PlanExecutor> exec;
@@ -307,11 +299,30 @@ public:
                 return this->run(txn, db, viewCmd, options, errmsg, result);
             }
 
-            // If the pipeline does not have a user-specified collation, set it from the
-            // collection default.
+            // If the pipeline does not have a user-specified collation, set it from the collection
+            // default.
             if (request.getValue().getCollation().isEmpty() && collection &&
                 collection->getDefaultCollator()) {
-                pipeline->setCollator(collection->getDefaultCollator()->clone());
+                invariant(!expCtx->getCollator());
+                expCtx->setCollator(collection->getDefaultCollator()->clone());
+            }
+
+            // Propagate the ExpressionContext throughout all of the pipeline's stages and
+            // expressions.
+            pipeline->injectExpressionContext(expCtx);
+
+            // The pipeline must be optimized after the correct collator has been set on it (by
+            // injecting the ExpressionContext containing the collator). This is necessary because
+            // optimization may make string comparisons, e.g. optimizing {$eq: [<str1>, <str2>]} to
+            // a constant.
+            pipeline->optimizePipeline();
+
+            if (kDebugBuild && !expCtx->isExplain && !expCtx->inShard) {
+                // Make sure all operations round-trip through Pipeline::serialize() correctly by
+                // re-parsing every command in debug builds. This is important because sharded
+                // aggregations rely on this ability.  Skipping when inShard because this has
+                // already been through the transformation (and this un-sets expCtx->inShard).
+                pipeline = reparsePipeline(pipeline, request.getValue(), expCtx);
             }
 
             // This does mongod-specific stuff like creating the input PlanExecutor and adding

@@ -33,6 +33,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
@@ -66,6 +67,28 @@ class Position;
  */
 class Document {
 public:
+    /**
+     * Operator overloads for relops return a DeferredComparison which can subsequently be evaluated
+     * by a DocumentComparator.
+     */
+    struct DeferredComparison {
+        enum class Type {
+            kLT,
+            kLTE,
+            kEQ,
+            kGT,
+            kGTE,
+            kNE,
+        };
+
+        DeferredComparison(Type type, const Document& lhs, const Document& rhs)
+            : type(type), lhs(lhs), rhs(rhs) {}
+
+        Type type;
+        const Document& lhs;
+        const Document& rhs;
+    };
+
     /// Empty Document (does no allocation)
     Document() {}
 
@@ -130,12 +153,19 @@ public:
      */
     size_t getApproximateSize() const;
 
-    /** Compare two documents.
+    /**
+     * Compare two documents. Most callers should prefer using DocumentComparator instead. See
+     * document_comparator.h for details.
      *
      *  BSON document field order is significant, so this just goes through
      *  the fields in order.  The comparison is done in roughly the same way
      *  as strings are compared, but comparing one field at a time instead
      *  of one character at a time.
+     *
+     *  Pass a non-null StringData::ComparatorInterface if special string comparison semantics are
+     *  required. If the comparator is null, then a simple binary compare is used for strings. This
+     *  comparator is only used for string *values*; field names are always compared using simple
+     *  binary compare.
      *
      *  Note: This does not consider metadata when comparing documents.
      *
@@ -143,7 +173,9 @@ public:
      *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
      *  Warning: may return values other than -1, 0, or 1
      */
-    static int compare(const Document& lhs, const Document& rhs);
+    static int compare(const Document& lhs,
+                       const Document& rhs,
+                       const StringData::ComparatorInterface* stringComparator = nullptr);
 
     std::string toString() const;
 
@@ -246,25 +278,38 @@ private:
     boost::intrusive_ptr<const DocumentStorage> _storage;
 };
 
-inline bool operator==(const Document& l, const Document& r) {
-    return Document::compare(l, r) == 0;
-}
-inline bool operator!=(const Document& l, const Document& r) {
-    return Document::compare(l, r) != 0;
-}
-inline bool operator<(const Document& l, const Document& r) {
-    return Document::compare(l, r) < 0;
-}
-inline bool operator<=(const Document& l, const Document& r) {
-    return Document::compare(l, r) <= 0;
-}
-inline bool operator>(const Document& l, const Document& r) {
-    return Document::compare(l, r) > 0;
-}
-inline bool operator>=(const Document& l, const Document& r) {
-    return Document::compare(l, r) >= 0;
+//
+// Comparison API.
+//
+// Document instances can be compared either using Document::compare() or via operator overloads.
+// Most callers should prefer operator overloads. Note that the operator overloads return a
+// DeferredComparison, which must be subsequently evaluated by a DocumentComparator. See
+// document_comparator.h for details.
+//
+
+inline Document::DeferredComparison operator==(const Document& lhs, const Document& rhs) {
+    return Document::DeferredComparison(Document::DeferredComparison::Type::kEQ, lhs, rhs);
 }
 
+inline Document::DeferredComparison operator!=(const Document& lhs, const Document& rhs) {
+    return Document::DeferredComparison(Document::DeferredComparison::Type::kNE, lhs, rhs);
+}
+
+inline Document::DeferredComparison operator<(const Document& lhs, const Document& rhs) {
+    return Document::DeferredComparison(Document::DeferredComparison::Type::kLT, lhs, rhs);
+}
+
+inline Document::DeferredComparison operator<=(const Document& lhs, const Document& rhs) {
+    return Document::DeferredComparison(Document::DeferredComparison::Type::kLTE, lhs, rhs);
+}
+
+inline Document::DeferredComparison operator>(const Document& lhs, const Document& rhs) {
+    return Document::DeferredComparison(Document::DeferredComparison::Type::kGT, lhs, rhs);
+}
+
+inline Document::DeferredComparison operator>=(const Document& lhs, const Document& rhs) {
+    return Document::DeferredComparison(Document::DeferredComparison::Type::kGTE, lhs, rhs);
+}
 
 /** This class is returned by MutableDocument to allow you to modify its values.
  *  You are not allowed to hold variables of this type (enforced by the type system).

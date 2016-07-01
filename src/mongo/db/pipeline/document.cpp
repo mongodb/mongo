@@ -381,7 +381,9 @@ void Document::hash_combine(size_t& seed) const {
     }
 }
 
-int Document::compare(const Document& rL, const Document& rR) {
+int Document::compare(const Document& rL,
+                      const Document& rR,
+                      const StringData::ComparatorInterface* stringComparator) {
     DocumentStorageIterator lIt = rL.storage().iterator();
     DocumentStorageIterator rIt = rR.storage().iterator();
 
@@ -410,7 +412,7 @@ int Document::compare(const Document& rL, const Document& rR) {
         if (nameCmp)
             return nameCmp;  // field names are unequal
 
-        const int valueCmp = Value::compare(lField.val, rField.val);
+        const int valueCmp = Value::compare(lField.val, rField.val, stringComparator);
         if (valueCmp)
             return valueCmp;  // fields are unequal
 

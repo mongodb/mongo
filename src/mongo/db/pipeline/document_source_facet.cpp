@@ -122,6 +122,12 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
     return this;
 }
 
+void DocumentSourceFacet::doInjectExpressionContext() {
+    for (auto&& facet : _facetPipelines) {
+        facet.second->injectExpressionContext(pExpCtx);
+    }
+}
+
 void DocumentSourceFacet::doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
     for (auto&& facet : _facetPipelines) {
         for (auto&& stage : facet.second->getSources()) {

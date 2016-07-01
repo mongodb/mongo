@@ -41,6 +41,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -56,6 +57,9 @@ using boost::multi_index::indexed_by;
  * limit, but includes the ability to evict down to both a specific number of elements, and down to
  * a specific amount of memory. Memory usage includes only the size of the elements in the cache at
  * the time of insertion, not the overhead incurred by the data structures in use.
+ *
+ * TODO SERVER-23349: This class must make all comparisons of user data using the aggregation
+ * operation's collation.
  */
 class LookupSetCache {
 public:
@@ -167,9 +171,12 @@ private:
     // a container of std::pair<Value, BSONObjSet>, that is both sequenced, and has a unique
     // index on the Value. From this, we are able to evict the least-recently-used member, and
     // maintain key uniqueness.
-    using IndexedContainer = multi_index_container<
-        Cached,
-        indexed_by<sequenced<>, hashed_unique<member<Cached, Value, &Cached::first>, Value::Hash>>>;
+    using IndexedContainer =
+        multi_index_container<Cached,
+                              indexed_by<sequenced<>,
+                                         hashed_unique<member<Cached, Value, &Cached::first>,
+                                                       Value::Hash,
+                                                       ValueComparator::EqualTo>>>;
 
     IndexedContainer _container;
 

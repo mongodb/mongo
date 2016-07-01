@@ -107,15 +107,6 @@ public:
     void reattachToOperationContext(OperationContext* opCtx);
 
     /**
-     * Sets the collator on this Pipeline. parseCommand() will return a Pipeline with its collator
-     * already set from the parsed request (if applicable), but this setter method can be used to
-     * later override the Pipeline's original collator.
-     *
-     * The Pipeline's collator can be retrieved with getContext()->collator.
-     */
-    void setCollator(std::unique_ptr<CollatorInterface> collator);
-
-    /**
       Split the current Pipeline into a Pipeline for each shard, and
       a Pipeline that combines the results within mongos.
 
@@ -140,6 +131,12 @@ public:
      * Modifies the pipeline, optimizing it by combining and swapping stages.
      */
     void optimizePipeline();
+
+    /**
+     * Propagates a reference to the ExpressionContext to all of the pipeline's contained stages and
+     * expressions.
+     */
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Returns any other collections involved in the pipeline in addition to the collection the

@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -57,7 +58,7 @@ static void assertExpectedResults(
                     accum->process(val, false);
                 }
                 Value result = accum->getValue(false);
-                ASSERT_EQUALS(op.second, result);
+                ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
 
@@ -70,7 +71,7 @@ static void assertExpectedResults(
                 }
                 accum->process(shard->getValue(true), true);
                 Value result = accum->getValue(false);
-                ASSERT_EQUALS(op.second, result);
+                ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
 
@@ -83,7 +84,7 @@ static void assertExpectedResults(
                     accum->process(shard->getValue(true), true);
                 }
                 Value result = accum->getValue(false);
-                ASSERT_EQUALS(op.second, result);
+                ASSERT_VALUE_EQ(op.second, result);
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
         } catch (...) {

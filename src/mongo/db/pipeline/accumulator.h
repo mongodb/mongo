@@ -31,12 +31,15 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 #include <unordered_set>
 #include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/summation.h"
 
@@ -108,12 +111,35 @@ public:
         return false;
     }
 
+    /**
+     * Injects the ExpressionContext so that it may be used during evaluation of the Accumulator.
+     * Construction of accumulators is done at parse time, but the ExpressionContext isn't finalized
+     * until later, at which point it is injected using this method.
+     */
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        _expCtx = expCtx;
+        doInjectExpressionContext();
+    }
+
 protected:
     /// Update subclass's internal state based on input
     virtual void processInternal(const Value& input, bool merging) = 0;
 
+    /**
+     * Accumulators which need to update their internal state when attaching to a new
+     * ExpressionContext should override this method.
+     */
+    virtual void doInjectExpressionContext() {}
+
+    const boost::intrusive_ptr<ExpressionContext>& getExpressionContext() const {
+        return _expCtx;
+    }
+
     /// subclasses are expected to update this as necessary
     int _memUsageBytes = 0;
+
+private:
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 
@@ -136,9 +162,13 @@ public:
         return true;
     }
 
+    void doInjectExpressionContext() final;
+
 private:
-    typedef std::unordered_set<Value, Value::Hash> SetType;
-    SetType set;
+    // We use boost::optional to defer initialization until the ExpressionContext containing the
+    // correct comparator is injected, since this set must use the comparator's definition of
+    // equality.
+    boost::optional<ValueUnorderedSet> _set;
 };
 
 

@@ -226,8 +226,8 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     //
     // If pipeline has a null collator (representing the "simple" collation), we simply set the
     // collation option to the original user BSON.
-    qr->setCollation(pExpCtx->collator ? pExpCtx->collator->getSpec().toBSON()
-                                       : pExpCtx->collation);
+    qr->setCollation(pExpCtx->getCollator() ? pExpCtx->getCollator()->getSpec().toBSON()
+                                            : pExpCtx->collation);
 
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 

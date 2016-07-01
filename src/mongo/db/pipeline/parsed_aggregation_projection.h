@@ -28,13 +28,15 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
 #include <memory>
 
 namespace mongo {
 
 class BSONObj;
-struct DepsTracker;
 class Document;
+struct DepsTracker;
+struct ExpressionContext;
 
 namespace parsed_aggregation_projection {
 
@@ -78,6 +80,11 @@ public:
      * Optimize any expressions contained within this projection.
      */
     virtual void optimize() {}
+
+    /**
+     * Inject the ExpressionContext into any expressions contained within this projection.
+     */
+    virtual void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) {}
 
     /**
      * Add any dependencies needed by this projection or any sub-expressions to 'deps'.

@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -94,8 +95,9 @@ public:
         auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         outputPipe->optimizePipeline();
 
-        ASSERT_EQUALS(Value(outputPipe->writeExplainOps()), Value(outputPipeExpected["pipeline"]));
-        ASSERT_EQUALS(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(outputPipe->writeExplainOps()),
+                        Value(outputPipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
     }
 
     virtual ~Base() {}
@@ -744,8 +746,8 @@ public:
         shardPipe = mergePipe->splitForSharded();
         ASSERT(shardPipe != nullptr);
 
-        ASSERT_EQUALS(Value(shardPipe->writeExplainOps()), Value(shardPipeExpected["pipeline"]));
-        ASSERT_EQUALS(Value(mergePipe->writeExplainOps()), Value(mergePipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(shardPipe->writeExplainOps()), Value(shardPipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(mergePipe->writeExplainOps()), Value(mergePipeExpected["pipeline"]));
     }
 
     virtual ~Base() {}
@@ -1092,9 +1094,9 @@ TEST(PipelineInitialSource, ParseCollation) {
     ASSERT_OK(request.getStatus());
 
     intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(opCtx.get(), request.getValue());
-    ASSERT(ctx->collator.get());
+    ASSERT(ctx->getCollator());
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    ASSERT_TRUE(CollatorInterface::collatorsMatch(ctx->collator.get(), &collator));
+    ASSERT_TRUE(CollatorInterface::collatorsMatch(ctx->getCollator(), &collator));
 }
 
 namespace Dependencies {

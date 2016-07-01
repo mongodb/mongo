@@ -75,7 +75,7 @@ boost::optional<Document> DocumentSourceGroup::getNextSpilled() {
 
     _currentId = _firstPartOfNextGroup.first;
     const size_t numAccumulators = vpAccumulatorFactory.size();
-    while (_currentId == _firstPartOfNextGroup.first) {
+    while (pExpCtx->getValueComparator().evaluate(_currentId == _firstPartOfNextGroup.first)) {
         // Inside of this loop, _firstPartOfNextGroup is the current data being processed.
         // At loop exit, it is the first value to be processed in the next group.
         switch (numAccumulators) {  // mirrors switch in spill()
@@ -104,12 +104,12 @@ boost::optional<Document> DocumentSourceGroup::getNextSpilled() {
 
 boost::optional<Document> DocumentSourceGroup::getNextStandard() {
     // Not spilled, and not streaming.
-    if (groups.empty())
+    if (_groups->empty())
         return boost::none;
 
     Document out = makeDocument(groupsIterator->first, groupsIterator->second, pExpCtx->inShard);
 
-    if (++groupsIterator == groups.end())
+    if (++groupsIterator == _groups->end())
         dispose();
 
     return out;
@@ -146,7 +146,7 @@ boost::optional<Document> DocumentSourceGroup::getNextStreaming() {
         // Compute the id. If it does not match _currentId, we will exit the loop, leaving
         // _firstDocOfNextGroup set for the next time getNext() is called.
         id = computeId(_variables.get());
-    } while (_currentId == id);
+    } while (pExpCtx->getValueComparator().evaluate(_currentId == id));
 
     Document out = makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
     _currentId = std::move(id);
@@ -156,11 +156,11 @@ boost::optional<Document> DocumentSourceGroup::getNextStreaming() {
 
 void DocumentSourceGroup::dispose() {
     // Free our resources.
-    GroupsMap().swap(groups);
+    GroupsMap().swap(*_groups);
     _sorterIterator.reset();
 
     // Make us look done.
-    groupsIterator = groups.end();
+    groupsIterator = _groups->end();
 
     _firstDocOfNextGroup = boost::none;
 
@@ -181,6 +181,23 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
     }
 
     return this;
+}
+
+void DocumentSourceGroup::doInjectExpressionContext() {
+    // Groups map must respect new comparator.
+    _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
+
+    for (auto&& idExpr : _idExpressions) {
+        idExpr->injectExpressionContext(pExpCtx);
+    }
+
+    for (auto&& expr : vpExpression) {
+        expr->injectExpressionContext(pExpCtx);
+    }
+
+    for (auto&& accum : _currentAccumulators) {
+        accum->injectExpressionContext(pExpCtx);
+    }
 }
 
 Value DocumentSourceGroup::serialize(bool explain) const {
@@ -237,7 +254,9 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceGroup(pExpCtx);
+    intrusive_ptr<DocumentSourceGroup> source(new DocumentSourceGroup(pExpCtx));
+    source->injectExpressionContext(pExpCtx);
+    return source;
 }
 
 DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx)
@@ -435,6 +454,7 @@ void DocumentSourceGroup::initialize() {
         _currentAccumulators.reserve(numAccumulators);
         for (size_t i = 0; i < numAccumulators; i++) {
             _currentAccumulators.push_back(vpAccumulatorFactory[i]());
+            _currentAccumulators.back()->injectExpressionContext(pExpCtx);
         }
 
         // We only need to load the first document.
@@ -477,9 +497,9 @@ void DocumentSourceGroup::initialize() {
           Look for the _id value in the map; if it's not there, add a
           new entry with a blank accumulator.
         */
-        const size_t oldSize = groups.size();
-        vector<intrusive_ptr<Accumulator>>& group = groups[id];
-        const bool inserted = groups.size() != oldSize;
+        const size_t oldSize = _groups->size();
+        vector<intrusive_ptr<Accumulator>>& group = (*_groups)[id];
+        const bool inserted = _groups->size() != oldSize;
 
         if (inserted) {
             memoryUsageBytes += id.getApproximateSize();
@@ -488,6 +508,7 @@ void DocumentSourceGroup::initialize() {
             group.reserve(numAccumulators);
             for (size_t i = 0; i < numAccumulators; i++) {
                 group.push_back(vpAccumulatorFactory[i]());
+                group.back()->injectExpressionContext(pExpCtx);
             }
         } else {
             for (size_t i = 0; i < numAccumulators; i++) {
@@ -524,12 +545,12 @@ void DocumentSourceGroup::initialize() {
     // These blocks do any final steps necessary to prepare to output results.
     if (!sortedFiles.empty()) {
         _spilled = true;
-        if (!groups.empty()) {
+        if (!_groups->empty()) {
             sortedFiles.push_back(spill());
         }
 
         // We won't be using groups again so free its memory.
-        GroupsMap().swap(groups);
+        GroupsMap().swap(*_groups);
 
         _sorterIterator.reset(
             Sorter<Value, Value>::Iterator::merge(sortedFiles, SortOptions(), SorterComparator()));
@@ -538,20 +559,21 @@ void DocumentSourceGroup::initialize() {
         _currentAccumulators.reserve(numAccumulators);
         for (size_t i = 0; i < numAccumulators; i++) {
             _currentAccumulators.push_back(vpAccumulatorFactory[i]());
+            _currentAccumulators.back()->injectExpressionContext(pExpCtx);
         }
 
         verify(_sorterIterator->more());  // we put data in, we should get something out.
         _firstPartOfNextGroup = _sorterIterator->next();
     } else {
         // start the group iterator
-        groupsIterator = groups.begin();
+        groupsIterator = _groups->begin();
     }
 }
 
 shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
-    ptrs.reserve(groups.size());
-    for (GroupsMap::const_iterator it = groups.begin(), end = groups.end(); it != end; ++it) {
+    ptrs.reserve(_groups->size());
+    for (GroupsMap::const_iterator it = _groups->begin(), end = _groups->end(); it != end; ++it) {
         ptrs.push_back(&*it);
     }
 
@@ -583,7 +605,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
             break;
     }
 
-    groups.clear();
+    _groups->clear();
 
     return shared_ptr<Sorter<Value, Value>::Iterator>(writer.done());
 }
@@ -761,7 +783,7 @@ void DocumentSourceGroup::parseIdExpression(BSONElement groupField,
         _idExpressions.push_back(ExpressionFieldPath::parse(groupField.str(), vps));
     } else {
         // constant id - single group
-        _idExpressions.push_back(ExpressionConstant::create(Value(groupField)));
+        _idExpressions.push_back(ExpressionConstant::create(pExpCtx, Value(groupField)));
     }
 }
 

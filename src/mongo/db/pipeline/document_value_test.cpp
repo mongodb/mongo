@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/dbtests/dbtests.h"
@@ -67,7 +68,7 @@ void assertRoundTrips(const Document& document1) {
     Document document2 = fromBson(obj1);
     BSONObj obj2 = toBson(document2);
     ASSERT_EQUALS(obj1, obj2);
-    ASSERT_EQUALS(document1, document2);
+    ASSERT_DOCUMENT_EQ(document1, document2);
 }
 
 TEST(DocumentConstruction, Default) {
@@ -185,26 +186,26 @@ public:
         md.remove("c");
         ASSERT(md.peek().empty());
         ASSERT_EQUALS(0U, md.peek().size());
-        ASSERT_EQUALS(md.peek(), Document());
+        ASSERT_DOCUMENT_EQ(md.peek(), Document());
         ASSERT(!FieldIterator(md.peek()).more());
         ASSERT(md.peek()["c"].missing());
         assertRoundTrips(md.peek());
 
         // Set a nested field using []
         md["x"]["y"]["z"] = Value("nested");
-        ASSERT_EQUALS(md.peek()["x"]["y"]["z"], Value("nested"));
+        ASSERT_VALUE_EQ(md.peek()["x"]["y"]["z"], Value("nested"));
 
         // Set a nested field using setNestedField
         FieldPath xxyyzz = string("xx.yy.zz");
         md.setNestedField(xxyyzz, Value("nested"));
-        ASSERT_EQUALS(md.peek().getNestedField(xxyyzz), Value("nested"));
+        ASSERT_VALUE_EQ(md.peek().getNestedField(xxyyzz), Value("nested"));
 
         // Set a nested fields through an existing empty document
         md["xxx"] = Value(Document());
         md["xxx"]["yyy"] = Value(Document());
         FieldPath xxxyyyzzz = string("xxx.yyy.zzz");
         md.setNestedField(xxxyyyzzz, Value("nested"));
-        ASSERT_EQUALS(md.peek().getNestedField(xxxyyyzzz), Value("nested"));
+        ASSERT_VALUE_EQ(md.peek().getNestedField(xxxyyyzzz), Value("nested"));
 
         // Make sure nothing moved
         ASSERT_EQUALS(apos, md.peek().positionOf("a"));
@@ -269,7 +270,7 @@ public:
         MutableDocument cloneOnDemand(document);
 
         // Check equality.
-        ASSERT_EQUALS(document, cloneOnDemand.peek());
+        ASSERT_DOCUMENT_EQ(document, cloneOnDemand.peek());
         // Check pointer equality of sub document.
         ASSERT_EQUALS(document["a"].getDocument().getPtr(),
                       cloneOnDemand.peek()["a"].getDocument().getPtr());
@@ -277,21 +278,21 @@ public:
 
         // Change field in clone and ensure the original document's field is unchanged.
         cloneOnDemand.setField(StringData("a"), Value(2));
-        ASSERT_EQUALS(Value(1), document.getNestedField(FieldPath("a.b")));
+        ASSERT_VALUE_EQ(Value(1), document.getNestedField(FieldPath("a.b")));
 
 
         // setNestedField and ensure the original document is unchanged.
 
         cloneOnDemand.reset(document);
         vector<Position> path;
-        ASSERT_EQUALS(Value(1), document.getNestedField(FieldPath("a.b"), &path));
+        ASSERT_VALUE_EQ(Value(1), document.getNestedField(FieldPath("a.b"), &path));
 
         cloneOnDemand.setNestedField(path, Value(2));
 
-        ASSERT_EQUALS(Value(1), document.getNestedField(FieldPath("a.b")));
-        ASSERT_EQUALS(Value(2), cloneOnDemand.peek().getNestedField(FieldPath("a.b")));
-        ASSERT_EQUALS(DOC("a" << DOC("b" << 1)), document);
-        ASSERT_EQUALS(DOC("a" << DOC("b" << 2)), cloneOnDemand.freeze());
+        ASSERT_VALUE_EQ(Value(1), document.getNestedField(FieldPath("a.b")));
+        ASSERT_VALUE_EQ(Value(2), cloneOnDemand.peek().getNestedField(FieldPath("a.b")));
+        ASSERT_DOCUMENT_EQ(DOC("a" << DOC("b" << 1)), document);
+        ASSERT_DOCUMENT_EQ(DOC("a" << DOC("b" << 2)), cloneOnDemand.freeze());
     }
 };
 
@@ -301,7 +302,7 @@ public:
     void run() {
         Document document = fromBson(fromjson("{a:1,b:['ra',4],c:{z:1},d:'lal'}"));
         Document clonedDocument = document.clone();
-        ASSERT_EQUALS(document, clonedDocument);
+        ASSERT_DOCUMENT_EQ(document, clonedDocument);
     }
 };
 
@@ -404,7 +405,7 @@ public:
 
         // logical equality
         ASSERT_EQUALS(obj, obj2);
-        ASSERT_EQUALS(doc, doc2);
+        ASSERT_DOCUMENT_EQ(doc, doc2);
 
         // binary equality
         ASSERT_EQUALS(obj.objsize(), obj2.objsize());
@@ -482,7 +483,7 @@ protected:
     void assertRoundTrips(const Document& input) {
         // Round trip to/from a buffer.
         auto output = roundTrip(input);
-        ASSERT_EQ(output, input);
+        ASSERT_DOCUMENT_EQ(output, input);
         ASSERT_EQ(output.hasTextScore(), input.hasTextScore());
         ASSERT_EQ(output.hasRandMetaField(), input.hasRandMetaField());
         if (input.hasTextScore())
@@ -564,15 +565,15 @@ void assertRoundTrips(const Value& value1) {
     Value value2 = fromBson(obj1);
     BSONObj obj2 = toBson(value2);
     ASSERT_EQUALS(obj1, obj2);
-    ASSERT_EQUALS(value1, value2);
+    ASSERT_VALUE_EQ(value1, value2);
     ASSERT_EQUALS(value1.getType(), value2.getType());
 }
 
 class BSONArrayTest {
 public:
     void run() {
-        ASSERT_EQUALS(Value(BSON_ARRAY(1 << 2 << 3)), DOC_ARRAY(1 << 2 << 3));
-        ASSERT_EQUALS(Value(BSONArray()), Value(vector<Value>()));
+        ASSERT_VALUE_EQ(Value(BSON_ARRAY(1 << 2 << 3)), DOC_ARRAY(1 << 2 << 3));
+        ASSERT_VALUE_EQ(Value(BSONArray()), Value(vector<Value>()));
     }
 };
 
@@ -1661,10 +1662,10 @@ public:
         arrayOfMissing.serializeForSorter(bb);
 
         BufReader reader(bb.buf(), bb.len());
-        ASSERT_EQUALS(missing,
-                      Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
-        ASSERT_EQUALS(arrayOfMissing,
-                      Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
+        ASSERT_VALUE_EQ(missing,
+                        Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
+        ASSERT_VALUE_EQ(arrayOfMissing,
+                        Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
     }
 };
 }  // namespace Value

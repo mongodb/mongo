@@ -37,7 +37,9 @@ env.Library(
     target='document_value',
     source=[
         'document.cpp',
+        'document_comparator.cpp',
         'value.cpp',
+        'value_comparator.cpp',
         ],
     LIBDEPS=[
         'field_path',
@@ -47,11 +49,29 @@ env.Library(
         ]
     )
 
+env.Library(
+    target='document_value_test_util',
+    source=[
+        'document_value_test_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'document_value',
+    ],
+)
+
 env.CppUnitTest(
     target='document_value_test',
-    source='document_value_test.cpp',
+    source=[
+        'document_comparator_test.cpp',
+        'document_value_test.cpp',
+        'document_value_test_util_self_test.cpp',
+        'value_comparator_test.cpp',
+    ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'document_value',
+        'document_value_test_util',
         ],
     )
 
@@ -75,7 +95,8 @@ env.CppUnitTest(
     target='aggregation_request_test',
     source='aggregation_request_test.cpp',
     LIBDEPS=[
-    'aggregation_request',
+        'aggregation_request',
+        'document_value_test_util',
     ],
 )
 
@@ -97,6 +118,7 @@ env.CppUnitTest(
     source='document_source_test.cpp',
     LIBDEPS=[
         'document_source',
+        'document_value_test_util',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
@@ -124,6 +146,7 @@ env.Library(
     LIBDEPS=[
         'dependencies',
         'document_value',
+        'expression_context',
         '$BUILD_DIR/mongo/util/summation',
     ]
 )
@@ -182,7 +205,6 @@ docSourceEnv.Library(
         'dependencies',
         'document_value',
         'expression',
-        'expression_context',
         'parsed_aggregation_projection',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -238,10 +260,11 @@ env.CppUnitTest(
     target='document_source_facet_test',
     source='document_source_facet_test.cpp',
     LIBDEPS=[
-        'document_source_facet',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'document_source_facet',
+        'document_value_test_util',
     ],
 )
 
@@ -249,9 +272,10 @@ env.CppUnitTest(
     target='tee_buffer_test',
     source='tee_buffer_test.cpp',
     LIBDEPS=[
-        'document_source_facet',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'document_source_facet',
+        'document_value_test_util',
     ],
 )
 
@@ -260,6 +284,7 @@ env.CppUnitTest(
     source='expression_test.cpp',
     LIBDEPS=[
         'accumulator',
+        'document_value_test_util',
         'expression',
         ],
     )
@@ -269,6 +294,7 @@ env.CppUnitTest(
     source='accumulator_test.cpp',
     LIBDEPS=[
         'accumulator',
+        'document_value_test_util',
         ],
     )
 
@@ -276,12 +302,13 @@ env.CppUnitTest(
     target='pipeline_test',
     source='pipeline_test.cpp',
     LIBDEPS=[
-        'pipeline',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'document_value_test_util',
+        'pipeline',
         ],
     )
 
@@ -314,6 +341,7 @@ env.CppUnitTest(
     target='parsed_exclusion_projection_test',
     source='parsed_exclusion_projection_test.cpp',
     LIBDEPS=[
+        'document_value_test_util',
         'parsed_aggregation_projection',
     ],
 )
@@ -330,6 +358,7 @@ env.CppUnitTest(
     target='parsed_inclusion_projection_test',
     source='parsed_inclusion_projection_test.cpp',
     LIBDEPS=[
+        'document_value_test_util',
         'parsed_aggregation_projection',
     ],
 )
