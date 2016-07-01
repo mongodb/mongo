@@ -1506,6 +1506,300 @@ TEST_F(ProjectStageTest, ExclusionShouldNotAddDependencies) {
 
 }  // namespace DocumentSourceProject
 
+
+namespace DocumentSourceReplaceRoot {
+
+using mongo::DocumentSourceReplaceRoot;
+using mongo::DocumentSourceMock;
+
+class ReplaceRootBasics : public Mock::Base, public unittest::Test {
+public:
+    ReplaceRootBasics() : _mock(DocumentSourceMock::create()) {}
+
+protected:
+    virtual void createReplaceRoot(const BSONObj& replaceRoot) {
+        BSONObj spec = BSON("$replaceRoot" << replaceRoot);
+        BSONElement specElement = spec.firstElement();
+        _replaceRoot = DocumentSourceReplaceRoot::createFromBson(specElement, ctx());
+        _replaceRoot->setSource(source());
+    }
+
+    DocumentSource* replaceRoot() {
+        return _replaceRoot.get();
+    }
+
+    DocumentSourceMock* source() {
+        return _mock.get();
+    }
+
+    /**
+     * Assert that iterator state accessors consistently report the source is exhausted.
+     */
+    void assertExhausted() const {
+        ASSERT(!_replaceRoot->getNext());
+        ASSERT(!_replaceRoot->getNext());
+        ASSERT(!_replaceRoot->getNext());
+    }
+
+    intrusive_ptr<DocumentSource> _replaceRoot;
+    intrusive_ptr<DocumentSourceMock> _mock;
+};
+
+// Verify that sending $newRoot a field path that contains an object in the document results
+// in the replacement of the root with that object.
+TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocument) {
+    createReplaceRoot(BSON("newRoot"
+                           << "$a"));
+    Document subdoc = Document{{"b", 1}, {"c", "hello"}, {"d", Document{{"e", 2}}}};
+    source()->queue.push_back(Document{{"a", subdoc}});
+    auto next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, subdoc);
+    assertExhausted();
+}
+
+// Verify that sending $newRoot a dotted field path that contains an object in the document results
+// in the replacement of the root with that object.
+TEST_F(ReplaceRootBasics, DottedFieldPathAsNewRootPromotesSubdocument) {
+    createReplaceRoot(BSON("newRoot"
+                           << "$a.b"));
+    // source document: {a: {b: {c: 3}}}
+    Document subdoc = Document{{"c", 3}};
+    source()->queue.push_back(Document{{"a", Document{{"b", subdoc}}}});
+    auto next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, subdoc);
+    assertExhausted();
+}
+
+// Verify that sending $newRoot a dotted field path that contains an object in two different
+// documents results in the replacement of the root with that object in both documents.
+TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocumentInMultipleDocuments) {
+    createReplaceRoot(BSON("newRoot"
+                           << "$a"));
+    Document subdoc1 = Document{{"b", 1}, {"c", 2}};
+    Document subdoc2 = Document{{"b", 3}, {"c", 4}};
+    source()->queue.push_back(Document{{"a", subdoc1}});
+    source()->queue.push_back(Document{{"a", subdoc2}});
+
+    // Verify that the first document that comes out is the first document we put in.
+    auto next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, subdoc1);
+
+    next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, subdoc2);
+    assertExhausted();
+}
+
+// Verify that when newRoot contains an expression object, the document is replaced with that
+// object.
+TEST_F(ReplaceRootBasics, ExpressionObjectForNewRootReplacesRootWithThatObject) {
+    createReplaceRoot(BSON("newRoot" << BSON("b" << 1)));
+    source()->queue.push_back(Document{{"a", 2}});
+    auto next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, (Document{{"b", 1}}));
+    assertExhausted();
+
+    BSONObj newObject = BSON("a" << 1 << "b" << 2 << "arr" << BSON_ARRAY(3 << 4 << 5));
+    createReplaceRoot(BSON("newRoot" << newObject));
+    source()->queue.push_back(Document{{"c", 2}});
+    next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, Document(newObject));
+    assertExhausted();
+
+    createReplaceRoot(BSON("newRoot" << BSON("a" << BSON("b" << 1))));
+    source()->queue.push_back(DOC("c" << 2));
+    next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, (Document{{"a", Document{{"b", 1}}}}));
+    assertExhausted();
+
+    createReplaceRoot(BSON("newRoot" << BSON("a"
+                                             << "$b")));
+    source()->queue.push_back(DOC("b" << 2));
+    next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, (Document{{"a", 2}}));
+    assertExhausted();
+}
+
+// Verify that when newRoot contains a system variable, the document is replaced with the correct
+// object corresponding to that system variable.
+TEST_F(ReplaceRootBasics, SystemVariableForNewRootReplacesRootWithThatObject) {
+    // System variables
+    createReplaceRoot(BSON("newRoot"
+                           << "$$CURRENT"));
+    Document inputDoc = Document{{"b", 2}};
+    source()->queue.push_back(inputDoc);
+    auto next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, inputDoc);
+    assertExhausted();
+
+    createReplaceRoot(BSON("newRoot"
+                           << "$$ROOT"));
+    source()->queue.push_back(inputDoc);
+    next = replaceRoot()->getNext();
+    ASSERT_TRUE(bool(next));
+    ASSERT_DOCUMENT_EQ(*next, inputDoc);
+    assertExhausted();
+}
+
+// Verify that when the expression at newRoot does not resolve to an object, as per the spec we
+// throw a user assertion.
+TEST_F(ReplaceRootBasics, ErrorsWhenNewRootDoesNotEvaluateToAnObject) {
+    createReplaceRoot(BSON("newRoot"
+                           << "$a"));
+
+    // A string is not an object.
+    source()->queue.push_back(Document{{"a", "hello"}});
+    ASSERT_THROWS_CODE(replaceRoot()->getNext(), UserException, 40228);
+    assertExhausted();
+
+    // An integer is not an object.
+    source()->queue.push_back(Document{{"a", 5}});
+    ASSERT_THROWS_CODE(replaceRoot()->getNext(), UserException, 40228);
+    assertExhausted();
+
+    // Literals are not objects.
+    createReplaceRoot(BSON("newRoot" << BSON("$literal" << 1)));
+    source()->queue.push_back(Document());
+    ASSERT_THROWS_CODE(replaceRoot()->getNext(), UserException, 40228);
+    assertExhausted();
+
+    // Most operator expressions do not resolve to objects.
+    createReplaceRoot(BSON("newRoot" << BSON("$and"
+                                             << "$a")));
+    source()->queue.push_back(Document{{"a", true}});
+    ASSERT_THROWS_CODE(replaceRoot()->getNext(), UserException, 40228);
+    assertExhausted();
+}
+
+// Verify that when newRoot contains a field path and that field path doesn't exist, we throw a user
+// error. This error happens whenever the expression evaluates to a "missing" Value.
+TEST_F(ReplaceRootBasics, ErrorsIfNewRootFieldPathDoesNotExist) {
+    createReplaceRoot(BSON("newRoot"
+                           << "$a"));
+
+    source()->queue.push_back(Document());
+    ASSERT_THROWS_CODE(replaceRoot()->getNext(), UserException, 40232);
+    assertExhausted();
+
+    source()->queue.push_back(Document{{"e", Document{{"b", Document{{"c", 3}}}}}});
+    ASSERT_THROWS_CODE(replaceRoot()->getNext(), UserException, 40232);
+    assertExhausted();
+}
+
+// Verify that the only dependent field is the root we are replacing with.
+TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
+    createReplaceRoot(BSON("newRoot"
+                           << "$a.b"));
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_FIELDS, replaceRoot()->getDependencies(&dependencies));
+
+    // Should only depend on field a.b
+    ASSERT_EQUALS(1U, dependencies.fields.size());
+    ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
+    ASSERT_EQUALS(0U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(0U, dependencies.fields.count("b"));
+
+    // Should not need any other fields.
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+};
+
+/**
+ * Fixture to test error cases of initializing the $replaceRoot stage.
+ */
+class ReplaceRootSpec : public Mock::Base, public unittest::Test {
+public:
+    intrusive_ptr<DocumentSource> createReplaceRoot(BSONObj replaceRootSpec) {
+        auto specElem = replaceRootSpec.firstElement();
+        return DocumentSourceReplaceRoot::createFromBson(specElem, ctx());
+    }
+
+    BSONObj createSpec(BSONObj spec) {
+        return BSON("$replaceRoot" << spec);
+    }
+
+    BSONObj createFullSpec(BSONObj spec) {
+        return BSON("$replaceRoot" << BSON("newRoot" << spec));
+    }
+};
+
+// Verify that the creation of a $replaceRoot stage requires an object specification
+TEST_F(ReplaceRootSpec, CreationRequiresObjectSpecification) {
+    ASSERT_THROWS_CODE(createReplaceRoot(BSON("$replaceRoot" << 1)), UserException, 40229);
+    ASSERT_THROWS_CODE(createReplaceRoot(BSON("$replaceRoot"
+                                              << "string")),
+                       UserException,
+                       40229);
+}
+
+// Verify that the only valid option for the $replaceRoot object specification is newRoot.
+TEST_F(ReplaceRootSpec, OnlyValidOptionInObjectSpecIsNewRoot) {
+    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("newRoot"
+                                                         << "$a"
+                                                         << "root"
+                                                         << 2))),
+                       UserException,
+                       40230);
+    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("newRoot"
+                                                         << "$a"
+                                                         << "path"
+                                                         << 2))),
+                       UserException,
+                       40230);
+    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("path"
+                                                         << "$a"))),
+                       UserException,
+                       40230);
+}
+
+// Verify that $replaceRoot requires a valid expression as input to the newRoot option.
+TEST_F(ReplaceRootSpec, RequiresExpressionForNewRootOption) {
+    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSONObj())), UserException, 40231);
+    ASSERT_THROWS(createReplaceRoot(createSpec(BSON("newRoot"
+                                                    << "$$$a"))),
+                  UserException);
+    ASSERT_THROWS(createReplaceRoot(createSpec(BSON("newRoot"
+                                                    << "$$a"))),
+                  UserException);
+    ASSERT_THROWS(createReplaceRoot(createFullSpec(BSON("$map" << BSON("a" << 1)))), UserException);
+}
+
+// Verify that newRoot accepts all types of expressions.
+TEST_F(ReplaceRootSpec, NewRootAcceptsAllTypesOfExpressions) {
+    // Field Path and system variables
+    ASSERT_TRUE(createReplaceRoot(createSpec(BSON("newRoot"
+                                                  << "$a.b.c.d.e"))));
+    ASSERT_TRUE(createReplaceRoot(createSpec(BSON("newRoot"
+                                                  << "$$CURRENT"))));
+
+    // Literals
+    ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("$literal" << 1))));
+
+    // Expression Objects
+    ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("a" << BSON("b" << 1)))));
+
+    // Operator Expressions
+    ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("$and"
+                                                      << "$a"))));
+    ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("$gt" << BSON_ARRAY("$a" << 1)))));
+    ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("$sqrt"
+                                                      << "$a"))));
+
+    // Accumulators
+    ASSERT_TRUE(createReplaceRoot(createFullSpec(BSON("$sum"
+                                                      << "$a"))));
+}
+
+}  // namespace DocumentSourceReplaceRoot
+
 namespace DocumentSourceSample {
 
 using mongo::DocumentSourceSample;

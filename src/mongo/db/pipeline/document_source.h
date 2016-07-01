@@ -1110,6 +1110,45 @@ private:
     boost::intrusive_ptr<Expression> _expression;
 };
 
+/*
+ * $replaceRoot takes an object containing only an expression in the newRoot field, and replaces
+ * each incoming document with the result of evaluating that expression.
+ * Throws an error if the given expression is not an object, and returns an empty document if the
+ * expression evaluates to the "missing" Value.
+ */
+class DocumentSourceReplaceRoot final : public DocumentSource {
+public:
+    // virtuals from DocumentSource
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    boost::intrusive_ptr<DocumentSource> optimize() final;
+    Value serialize(bool explain = false) const final;
+    GetDepsReturn getDependencies(DepsTracker* deps) const;
+
+    /**
+     * Since every document that is input to this stage is output as one document (and the documents
+     * that have invalid objects throw an error), we can move skip and limit ahead of this stage.
+     * If we decide to skip documents that don't have the desired field, we will no longer
+     * be able to move skip and limit ahead of this stage.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
+
+    /**
+     * Creates a new replaceRoot DocumentSource from the BSON specification of the $replaceRoot
+     * stage.
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceReplaceRoot(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                              const boost::intrusive_ptr<Expression> expr);
+
+    std::unique_ptr<Variables> _variables;
+    boost::intrusive_ptr<Expression> _newRoot;
+};
+
 class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
 public:
     boost::optional<Document> getNext() final;
