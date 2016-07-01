@@ -335,9 +335,11 @@ public:
 
     public:
         explicit ParallelBatchWriterMode(Locker* lockState);
+        ~ParallelBatchWriterMode();
 
     private:
         ResourceLock _pbwm;
+        Locker* const _lockState;
     };
 };
 

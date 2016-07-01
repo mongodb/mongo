@@ -185,7 +185,14 @@ void Lock::OplogIntentWriteLock::serializeIfNeeded() {
 }
 
 Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
-    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X) {}
+    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X), _lockState(lockState) {
+    invariant(!_lockState->isBatchWriter());  // Otherwise we couldn't clear in destructor.
+    _lockState->setIsBatchWriter(true);
+}
+
+Lock::ParallelBatchWriterMode::~ParallelBatchWriterMode() {
+    _lockState->setIsBatchWriter(false);
+}
 
 void Lock::ResourceLock::lock(LockMode mode) {
     invariant(_result == LOCK_INVALID);
