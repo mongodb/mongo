@@ -1569,7 +1569,7 @@ __evict_get_ref(
 	 */
 	for (;;) {
 		/* Verify there are still pages available. */
-		if (queue->evict_current == NULL ||
+		if (queue->evict_current == NULL || (uint32_t)
 		    (queue->evict_current - queue->evict_queue) >= candidates) {
 			WT_STAT_FAST_CONN_INCR(
 			    session, cache_eviction_get_ref_empty2);
