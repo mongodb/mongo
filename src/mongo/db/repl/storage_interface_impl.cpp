@@ -328,6 +328,7 @@ Status StorageInterfaceImpl::insertDocuments(OperationContext* txn,
                               << " - no documents provided"};
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IX);
         AutoGetCollection autoColl(txn, nss, MODE_IX);
         auto collection = autoColl.getCollection();
         if (!collection) {
@@ -364,6 +365,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* txn,
                                               const NamespaceString& nss,
                                               const CollectionOptions& options) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IX);
         AutoGetOrCreateDb databaseWriteGuard(txn, nss.db(), MODE_X);
         auto db = databaseWriteGuard.getDb();
         invariant(db);
@@ -424,6 +426,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
+        ScopedTransaction transaction(txn, collectionAccessMode);
         AutoGetCollection collectionGuard(txn, nss, collectionAccessMode);
         auto collection = collectionGuard.getCollection();
         if (!collection) {
