@@ -28,6 +28,7 @@
 
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
 
+#include "mongo/base/secure_allocator.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/sasl_authentication_session.h"
 #include "mongo/util/base64.h"
@@ -42,17 +43,51 @@ SaslPLAINServerConversation::SaslPLAINServerConversation(SaslAuthenticationSessi
 SaslPLAINServerConversation::~SaslPLAINServerConversation(){};
 
 StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::string* outputData) {
-    // Expecting user input on the form: user\0user\0pwd
-    std::string input = inputData.toString();
-    std::string pwd = "";
+    if (_saslAuthSession->getAuthenticationDatabase() == "$external") {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "PLAIN mechanism must be used with internal users");
+    }
 
+    // Expecting user input on the form: [authz-id]\0authn-id\0pwd
+    std::string input = inputData.toString();
+
+    SecureString pwd = "";
     try {
-        _user = input.substr(0, inputData.find('\0'));
-        pwd = input.substr(inputData.find('\0', _user.size() + 1) + 1);
+        size_t firstNull = inputData.find('\0');
+        if (firstNull == std::string::npos) {
+            return Status(
+                ErrorCodes::AuthenticationFailed,
+                str::stream()
+                    << "Incorrectly formatted PLAIN client message, missing first NULL delimiter");
+        }
+        size_t secondNull = inputData.find('\0', firstNull + 1);
+        if (secondNull == std::string::npos) {
+            return Status(
+                ErrorCodes::AuthenticationFailed,
+                str::stream()
+                    << "Incorrectly formatted PLAIN client message, missing second NULL delimiter");
+        }
+
+        std::string authorizationIdentity = input.substr(0, firstNull);
+        _user = input.substr(firstNull + 1, (secondNull - firstNull) - 1);
+        if (_user.empty()) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          str::stream()
+                              << "Incorrectly formatted PLAIN client message, empty username");
+        } else if (!authorizationIdentity.empty() && authorizationIdentity != _user) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          str::stream()
+                              << "SASL authorization identity must match authentication identity");
+        }
+        pwd = SecureString(input.substr(secondNull + 1).c_str());
+        if (pwd->empty()) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          str::stream()
+                              << "Incorrectly formatted PLAIN client message, empty password");
+        }
     } catch (std::out_of_range& exception) {
-        return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                                mongoutils::str::stream()
-                                    << "Incorrectly formatted PLAIN client message");
+        return Status(ErrorCodes::AuthenticationFailed,
+                      mongoutils::str::stream() << "Incorrectly formatted PLAIN client message");
     }
 
     User* userObj;
@@ -70,7 +105,7 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
     const User::CredentialData creds = userObj->getCredentials();
     _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().releaseUser(userObj);
 
-    std::string authDigest = createPasswordDigest(_user, pwd);
+    std::string authDigest = createPasswordDigest(_user, pwd->c_str());
 
     if (!creds.password.empty()) {
         // Handle schemaVersion26Final (MONGODB-CR/SCRAM mixed mode)
