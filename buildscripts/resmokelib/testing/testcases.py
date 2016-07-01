@@ -298,6 +298,8 @@ class JSTestCase(TestCase):
         def _get_exception(self):
             return self.err
 
+    DEFAULT_CLIENT_NUM = 1
+
     def __init__(self,
                  logger,
                  js_filename,
@@ -313,8 +315,9 @@ class JSTestCase(TestCase):
 
         self.js_filename = js_filename
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
+        self.num_clients = self.DEFAULT_CLIENT_NUM
 
-    def configure(self, fixture):
+    def configure(self, fixture, num_clients=DEFAULT_CLIENT_NUM):
         TestCase.configure(self, fixture)
 
         if self.fixture.port is not None:
@@ -345,6 +348,8 @@ class JSTestCase(TestCase):
 
         shutil.rmtree(data_dir, ignore_errors=True)
 
+        self.num_clients = num_clients
+
         try:
             os.makedirs(data_dir)
         except os.error:
@@ -369,12 +374,12 @@ class JSTestCase(TestCase):
         threads = []
         try:
             # Don't thread if there is only one client.
-            if config.NUM_CLIENTS_PER_FIXTURE == 1:
+            if self.num_clients == 1:
                 shell = self._make_process(self.logger)
                 self._execute(shell)
             else:
                 # If there are multiple clients, make a new thread for each client.
-                for i in xrange(config.NUM_CLIENTS_PER_FIXTURE):
+                for i in xrange(self.num_clients):
                     t = self.ExceptionThread(my_target=self._run_test_in_thread, my_args=[i])
                     t.start()
                     threads.append(t)
