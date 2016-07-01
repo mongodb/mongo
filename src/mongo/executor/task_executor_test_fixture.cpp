@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/task_executor_proxy.h"
 
 namespace mongo {
 namespace executor {
@@ -47,33 +48,42 @@ void TaskExecutorTest::setUp() {
     auto net = stdx::make_unique<NetworkInterfaceMock>();
     _net = net.get();
     _executor = makeTaskExecutor(std::move(net));
+    _executorState = LifecycleState::kPreStart;
 }
 
 void TaskExecutorTest::tearDown() {
-    if (_executorStarted) {
-        _executor->shutdown();
-        if (!_executorJoined) {
-            joinExecutorThread();
-        }
+    if (_executorState == LifecycleState::kRunning) {
+        shutdownExecutorThread();
     }
-    _executorStarted = false;
-    _executorJoined = false;
+    if (_executorState == LifecycleState::kJoinRequired) {
+        joinExecutorThread();
+    }
+    invariant(_executorState == LifecycleState::kPreStart ||
+              _executorState == LifecycleState::kShutdownComplete);
     _executor.reset();
 }
 
 void TaskExecutorTest::launchExecutorThread() {
-    invariant(!_executorStarted);
-    _executorStarted = true;
+    invariant(_executorState == LifecycleState::kPreStart);
     _executor->startup();
+    _executorState = LifecycleState::kRunning;
     postExecutorThreadLaunch();
 }
 
+void TaskExecutorTest::shutdownExecutorThread() {
+    invariant(_executorState == LifecycleState::kRunning);
+    _executor->shutdown();
+    _executorState = LifecycleState::kJoinRequired;
+}
+
 void TaskExecutorTest::joinExecutorThread() {
-    invariant(_executorStarted);
-    invariant(!_executorJoined);
+    // Tests may call shutdown() directly, bypassing the state change in shutdownExecutorThread().
+    invariant(_executorState == LifecycleState::kRunning ||
+              _executorState == LifecycleState::kJoinRequired);
     _net->exitNetwork();
-    _executorJoined = true;
+    _executorState = LifecycleState::kJoining;
     _executor->join();
+    _executorState = LifecycleState::kShutdownComplete;
 }
 
 void TaskExecutorTest::postExecutorThreadLaunch() {}

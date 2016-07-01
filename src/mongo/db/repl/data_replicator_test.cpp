@@ -256,11 +256,14 @@ protected:
     }
 
     void tearDown() override {
-        ReplicationExecutorTest::tearDown();
-        _dr.reset();
         _applierTaskExecutor->shutdown();
+        ReplicationExecutorTest::shutdownExecutorThread();
+        ReplicationExecutorTest::joinExecutorThread();
         _applierTaskExecutor->join();
-        // Executor may still invoke callback before shutting down.
+
+        _dr.reset();
+        // tearDown() destroys the task executor which was referenced by the data replicator.
+        ReplicationExecutorTest::tearDown();
     }
 
     DataReplicatorOptions::RollbackFn _rollbackFn;
