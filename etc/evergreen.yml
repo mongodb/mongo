@@ -6433,6 +6433,9 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
+    # We use machines with more RAM to avoid OOM issues when validating collections.
+    distros:
+    - ubuntu1404-build
   - name: concurrency_simultaneous
   - name: replicasets
   - name: replicasets_auth
