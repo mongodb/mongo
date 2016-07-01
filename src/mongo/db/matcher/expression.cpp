@@ -55,6 +55,17 @@ bool MatchExpression::matchesBSON(const BSONObj& doc, MatchDetails* details) con
     return matches(&mydoc, details);
 }
 
+void MatchExpression::setCollator(const CollatorInterface* collator) {
+    auto children = getChildVector();
+    if (children) {
+        for (auto child : *children) {
+            child->setCollator(collator);
+        }
+    }
+
+    _doSetCollator(collator);
+}
+
 void FalseMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
     debug << "$all: []\n";

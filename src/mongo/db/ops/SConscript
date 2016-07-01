@@ -146,6 +146,7 @@ env.CppUnitTest(
     target='modifier_push_sorter_test',
     source='modifier_push_sorter_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'update',
     ],
 )

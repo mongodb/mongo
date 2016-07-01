@@ -101,7 +101,7 @@ public:
     /**
      * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
      */
-    void setCollator(const CollatorInterface* collator) {
+    virtual void _doSetCollator(const CollatorInterface* collator) {
         _collator = collator;
     }
 
@@ -330,7 +330,7 @@ public:
     /**
      * 'collator' must outlive the InMatchExpression and any clones made of it.
      */
-    void setCollator(const CollatorInterface* collator);
+    virtual void _doSetCollator(const CollatorInterface* collator);
 
     Status addEquality(const BSONElement& elt);
 

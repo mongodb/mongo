@@ -388,7 +388,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                 }
             }
 
-            _sort = PatternElementCmp(sortElem.embeddedObject());
+            _sort = PatternElementCmp(sortElem.embeddedObject(), opts.collator);
         } else {
             // Ensure the sortElem number is valid.
             if (!isPatternElement(sortElem)) {
@@ -396,13 +396,20 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                               "The $sort element value must be either 1 or -1");
             }
 
-            _sort = PatternElementCmp(BSON("" << sortElem.number()));
+            _sort = PatternElementCmp(BSON("" << sortElem.number()), opts.collator);
         }
 
         _sortPresent = true;
     }
 
     return Status::OK();
+}
+
+void ModifierPush::setCollator(const CollatorInterface* collator) {
+    invariant(!_sort.collator);
+    if (_sortPresent) {
+        _sort.collator = collator;
+    }
 }
 
 Status ModifierPush::prepare(mutablebson::Element root,

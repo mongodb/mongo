@@ -223,55 +223,13 @@ Status CanonicalQuery::init(std::unique_ptr<QueryRequest> qr,
     return Status::OK();
 }
 
-namespace {
-
-bool isComparisonMatchExpression(const MatchExpression* expr) {
-    switch (expr->matchType()) {
-        case MatchExpression::LT:
-        case MatchExpression::LTE:
-        case MatchExpression::EQ:
-        case MatchExpression::GTE:
-        case MatchExpression::GT:
-            return true;
-        default:
-            return false;
-    }
-}
-
-/**
- * Recursively set the collator on the MatchExpression 'root'. Currently, only
- * ComparisonMatchExpression and InMatchExpression are collation-aware, so we ignore other leaf
- * nodes.
- *
- * TODO: consider converting to a virtual MatchExpression::setCollator() method, especially if
- * adding new match expressions that can do string comparisons.
- */
-void setCollatorOnMatchExpression(MatchExpression* root, const CollatorInterface* collator) {
-    if (isComparisonMatchExpression(root)) {
-        auto compExpr = static_cast<ComparisonMatchExpression*>(root);
-        compExpr->setCollator(collator);
-    } else if (root->matchType() == MatchExpression::MATCH_IN) {
-        auto inExpr = static_cast<InMatchExpression*>(root);
-        inExpr->setCollator(collator);
-    }
-
-    if (!root->getChildVector()) {
-        return;
-    }
-    for (auto child : *root->getChildVector()) {
-        setCollatorOnMatchExpression(child, collator);
-    }
-}
-
-}  // namespace
-
 void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
     _collator = std::move(collator);
 
     // The collator associated with the match expression tree is now invalid, since we have reset
     // the object owned by '_collator'. We must associate the match expression tree with the new
     // value of '_collator'.
-    setCollatorOnMatchExpression(_root.get(), _collator.get());
+    _root->setCollator(_collator.get());
 }
 
 // static

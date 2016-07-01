@@ -84,6 +84,7 @@ public:
     virtual Status log(LogBuilder* logBuilder) const;
 
     virtual void setCollator(const CollatorInterface* collator) {
+        invariant(!_collator);
         _collator = collator;
     }
 

@@ -152,9 +152,16 @@ public:
      * Set the collation on the modifier.  This is a no-op on modifiers that are not
      * collation-aware.
      *
+     * setCollator() should update any initialization that occured during init() to respect the
+     * provided collator, which may be different than the collator provided in the modifier
+     * options.
+     *
+     * If setCollator() is called, it is required that the current collator of the modifier is
+     * the simple collator (nullptr).
+     *
      * The collator must outlive the modifier interface.
      */
-    virtual void setCollator(const CollatorInterface* collator){};
+    virtual void setCollator(const CollatorInterface* collator) = 0;
 };
 
 /**

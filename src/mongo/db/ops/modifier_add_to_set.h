@@ -64,9 +64,7 @@ public:
     /** Converts the effects of this $addToSet into one or more equivalent $set operations. */
     virtual Status log(LogBuilder* logBuilder) const;
 
-    virtual void setCollator(const CollatorInterface* collator) {
-        _collator = collator;
-    }
+    virtual void setCollator(const CollatorInterface* collator);
 
 private:
     // Access to each component of fieldName that's the target of this mod.

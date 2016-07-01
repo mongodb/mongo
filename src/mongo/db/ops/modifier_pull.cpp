@@ -134,6 +134,14 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
     return Status::OK();
 }
 
+void ModifierPull::setCollator(const CollatorInterface* collator) {
+    invariant(!_collator);
+    _collator = collator;
+    if (_matchExpr) {
+        _matchExpr->setCollator(_collator);
+    }
+}
+
 Status ModifierPull::prepare(mb::Element root, StringData matchedField, ExecInfo* execInfo) {
     _preparedState.reset(new PreparedState(root.getDocument()));
 

@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 class MatchExpression;
 class TreeMatchExpression;
 
@@ -234,6 +235,13 @@ public:
     }
 
     /**
+     * Set the collator 'collator' on this match expression and all its children.
+     *
+     * 'collator' must outlive the match expression.
+     */
+    void setCollator(const CollatorInterface* collator);
+
+    /**
      * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
      * to be a valid query object, that, when parsed, produces a logically equivalent
      * MatchExpression.
@@ -247,6 +255,12 @@ public:
     virtual void debugString(StringBuilder& debug, int level = 0) const = 0;
 
 protected:
+    /**
+     * Subclasses that are collation-aware must implement this method in order to capture changes
+     * to the collator that occur after initialization time.
+     */
+    virtual void _doSetCollator(const CollatorInterface* collator){};
+
     void _debugAddSpace(StringBuilder& debug, int level) const;
 
 private:

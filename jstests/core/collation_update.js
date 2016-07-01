@@ -85,4 +85,141 @@
     assert.writeOK(coll.update({}, {$addToSet: {a: "FOO"}}));
     var set = coll.findOne().a;
     assert.eq(set.length, 1);
+
+    // $pull respects query collation.
+    if (db.getMongo().writeMode() === "commands") {
+        coll.drop();
+
+        // "foo" != "FOO" (case-sensitive), so it is not pulled.
+        assert.writeOK(coll.insert({a: ["foo", "FOO"]}));
+        assert.writeOK(coll.update({}, {$pull: {a: "foo"}}, caseSensitive));
+        var arr = coll.findOne().a;
+        assert.eq(arr.length, 1);
+        assert(arr.includes("FOO"));
+
+        // "foo" == "FOO" (case-insensitive), so "FOO" is pulled.
+        assert.writeOK(coll.update({}, {$pull: {a: "foo"}}, caseInsensitive));
+        arr = coll.findOne().a;
+        assert.eq(arr.length, 0);
+
+        // collation-aware $pull removes all instances that match.
+        coll.drop();
+        assert.writeOK(coll.insert({a: ["foo", "FOO"]}));
+        assert.writeOK(coll.update({}, {$pull: {a: "foo"}}, caseInsensitive));
+        arr = coll.findOne().a;
+        assert.eq(arr.length, 0);
+
+        // collation-aware $pull with comparisons removes matching instances.
+        coll.drop();
+
+        // "124" > "1234" (case-sensitive), so it is not removed.
+        assert.writeOK(coll.insert({a: ["124", "1234"]}));
+        assert.writeOK(coll.update({}, {$pull: {a: {$lt: "1234"}}}, caseSensitive));
+        arr = coll.findOne().a;
+        assert.eq(arr.length, 2);
+
+        // 124 < 1234 (numeric ordering), so it is removed.
+        assert.writeOK(coll.update({}, {$pull: {a: {$lt: "1234"}}}, numericOrdering));
+        arr = coll.findOne().a;
+        assert.eq(arr.length, 1);
+        assert(arr.includes("1234"));
+    }
+
+    // $pull respects collection default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
+    assert.writeOK(coll.insert({a: ["foo", "FOO"]}));
+    assert.writeOK(coll.update({}, {$pull: {a: "foo"}}));
+    var arr = coll.findOne().a;
+    assert.eq(arr.length, 0);
+
+    // $pullAll respects query collation.
+    if (db.getMongo().writeMode() === "commands") {
+        coll.drop();
+
+        // "foo" != "FOO" (case-sensitive), so no changes are made.
+        assert.writeOK(coll.insert({a: ["foo", "bar"]}));
+        assert.writeOK(coll.update({}, {$pullAll: {a: ["FOO", "BAR"]}}, caseSensitive));
+        var arr = coll.findOne().a;
+        assert.eq(arr.length, 2);
+
+        // "foo" == "FOO", "bar" == "BAR" (case-insensitive), so both are removed.
+        assert.writeOK(coll.update({}, {$pullAll: {a: ["FOO", "BAR"]}}, caseInsensitive));
+        arr = coll.findOne().a;
+        assert.eq(arr.length, 0);
+    }
+
+    // $pullAll respects collection default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
+    assert.writeOK(coll.insert({a: ["foo", "bar"]}));
+    assert.writeOK(coll.update({}, {$pullAll: {a: ["FOO", "BAR"]}}));
+    var arr = coll.findOne().a;
+    assert.eq(arr.length, 0);
+
+    // $push with $sort respects query collation.
+    if (db.getMongo().writeMode() === "commands") {
+        coll.drop();
+
+        // "1230" < "1234" < "124" (case-sensitive)
+        assert.writeOK(coll.insert({a: ["1234", "124"]}));
+        assert.writeOK(coll.update({}, {$push: {a: {$each: ["1230"], $sort: 1}}}, caseSensitive));
+        var arr = coll.findOne().a;
+        assert.eq(arr.length, 3);
+        assert.eq(arr[0], "1230");
+        assert.eq(arr[1], "1234");
+        assert.eq(arr[2], "124");
+
+        // "124" < "1230" < "1234" (numeric ordering)
+        coll.drop();
+        assert.writeOK(coll.insert({a: ["1234", "124"]}));
+        assert.writeOK(coll.update({}, {$push: {a: {$each: ["1230"], $sort: 1}}}, numericOrdering));
+        arr = coll.findOne().a;
+        assert.eq(arr.length, 3);
+        assert.eq(arr[0], "124");
+        assert.eq(arr[1], "1230");
+        assert.eq(arr[2], "1234");
+    }
+
+    // $push with $sort respects collection default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), numericOrdering));
+    assert.writeOK(coll.insert({a: ["1234", "124"]}));
+    assert.writeOK(coll.update({}, {$push: {a: {$each: ["1230"], $sort: 1}}}));
+    var arr = coll.findOne().a;
+    assert.eq(arr.length, 3);
+    assert.eq(arr[0], "124");
+    assert.eq(arr[1], "1230");
+    assert.eq(arr[2], "1234");
+
+    // $ positional operator respects query collation on $set.
+    if (db.getMongo().writeMode() === "commands") {
+        coll.drop();
+
+        // "foo" != "FOO" (case-sensitive) so no update occurs.
+        assert.writeOK(coll.insert({a: ["foo", "FOO"]}));
+        assert.writeOK(coll.update({a: "FOO"}, {$set: {"a.$": "FOO"}}, caseSensitive));
+        var arr = coll.findOne().a;
+        assert.eq(arr.length, 2);
+        assert.eq(arr[0], "foo");
+        assert.eq(arr[1], "FOO");
+
+        // "foo" == "FOO" (case-insensitive) so no update occurs.
+        assert.writeOK(coll.insert({a: ["foo", "FOO"]}));
+        assert.writeOK(coll.update({a: "FOO"}, {$set: {"a.$": "FOO"}}, caseInsensitive));
+        var arr = coll.findOne().a;
+        assert.eq(arr.length, 2);
+        assert.eq(arr[0], "FOO");
+        assert.eq(arr[1], "FOO");
+    }
+
+    // $ positional operator respects collection default collation on $set.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
+    assert.writeOK(coll.insert({a: ["foo", "FOO"]}));
+    assert.writeOK(coll.update({a: "FOO"}, {$set: {"a.$": "FOO"}}));
+    var arr = coll.findOne().a;
+    assert.eq(arr.length, 2);
+    assert.eq(arr[0], "FOO");
+    assert.eq(arr[1], "FOO");
 })();

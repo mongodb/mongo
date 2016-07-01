@@ -197,16 +197,19 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
         valCursor = valCursor.rightSibling();
     }
 
-    _collator = opts.collator;
-
+    setCollator(opts.collator);
     return Status::OK();
+}
+
+void ModifierAddToSet::setCollator(const CollatorInterface* collator) {
+    invariant(!_collator);
+    _collator = collator;
+    // Deduplicate _val (must be performed after collator is set to final value.)
+    deduplicate(_val, mb::woLess(false, _collator), mb::woEqual(false, _collator));
 }
 
 Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, ExecInfo* execInfo) {
     _preparedState.reset(new PreparedState(root.getDocument()));
-
-    // Deduplicate _val (must be performed after collator is set to final value.)
-    deduplicate(_val, mb::woLess(false, _collator), mb::woEqual(false, _collator));
 
     // If we have a $-positional field, it is time to bind it to an actual field part.
     if (_posDollar) {

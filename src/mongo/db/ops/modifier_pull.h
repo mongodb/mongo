@@ -58,6 +58,8 @@ public:
     /** Converts the effects of this $pull into one or more equivalent $unset operations. */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    virtual void setCollator(const CollatorInterface* collator);
+
 private:
     bool isMatch(mutablebson::ConstElement element);
 

@@ -80,6 +80,8 @@ public:
      */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    virtual void setCollator(const CollatorInterface* collator){};
+
 private:
     // The source and destination fields
     FieldRef _fromFieldRef;

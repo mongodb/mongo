@@ -645,7 +645,7 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
     return true;
 }
 
-void InMatchExpression::setCollator(const CollatorInterface* collator) {
+void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     _collator = collator;
 
     // We need to re-compute '_equalitySet', since our set comparator has changed.

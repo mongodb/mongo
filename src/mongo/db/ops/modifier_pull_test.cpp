@@ -348,6 +348,22 @@ TEST(SimpleMod, PullingBasedOnNumberLiteralNotAffectedByCollation) {
     ASSERT_EQUALS(fromjson("{ $set : { a : ['a', 'b', 2, 'c', 'd'] } }"), logDoc);
 }
 
+TEST(SimpleMod, PullingBasedOnStringRespectsCollationProvidedBySetCollation) {
+    Document doc(fromjson("{ a : ['a', 'b', 'c', 'd'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    Mod mod(fromjson("{ $pull : { a : 'c' } }"), nullptr);
+    mod.mod().setCollator(&collator);
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(mod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{ a : [] }"), doc);
+}
+
 TEST(ComplexMod, ApplyAndLogComplexDocAndMatching1) {
     const char* const strings[] = {
         // Document:

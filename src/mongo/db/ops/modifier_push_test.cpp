@@ -43,6 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -51,6 +52,7 @@ namespace {
 using mongo::BSONObj;
 using mongo::BSONObjBuilder;
 using mongo::BSONArrayBuilder;
+using mongo::CollatorInterfaceMock;
 using mongo::fromjson;
 using mongo::LogBuilder;
 using mongo::ModifierInterface;
@@ -484,14 +486,14 @@ class Mod {
 public:
     Mod() : _mod() {}
 
-    explicit Mod(BSONObj modObj)
+    explicit Mod(BSONObj modObj,
+                 ModifierInterface::Options options = ModifierInterface::Options::normal())
         : _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$pushAll")
                    ? ModifierPush::PUSH_ALL
                    : ModifierPush::PUSH_NORMAL) {
         _modObj = modObj;
         StringData modName = modObj.firstElement().fieldName();
-        ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
-                            ModifierInterface::Options::normal()));
+        ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(), options));
     }
 
     Status prepare(Element root, StringData matchedField, ModifierInterface::ExecInfo* execInfo) {
@@ -1012,6 +1014,36 @@ TEST(SortPushEach, MixedSortEmbeddedField) {
     ASSERT_OK(pushMod.log(&logBuilder));
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
     ASSERT_EQUALS(BSON("$set" << expectedObj), logDoc);
+}
+
+TEST(SortPushEach, SortRespectsCollationFromOptions) {
+    Document doc(fromjson("{a: ['dd', 'fc', 'gb'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Mod pushMod(fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}"),
+                ModifierInterface::Options::normal(&collator));
+    const BSONObj expectedObj = fromjson("{a: ['ha', 'gb', 'fc', 'dd']}");
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQUALS(expectedObj, doc);
+}
+
+TEST(SortPushEach, SortRespectsCollationFromSetCollator) {
+    Document doc(fromjson("{a: ['dd', 'fc', 'gb'] }"));
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    Mod pushMod(fromjson("{$push: {a: {$each: ['ha'], $sort: 1}}}"));
+    pushMod.mod().setCollator(&collator);
+    const BSONObj expectedObj = fromjson("{a: ['ha', 'gb', 'fc', 'dd']}");
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQUALS(expectedObj, doc);
 }
 
 /**

@@ -34,6 +34,7 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -69,11 +70,14 @@ struct ModifierPullAll::PreparedState {
 namespace {
 
 struct mutableElementEqualsBSONElement : std::unary_function<BSONElement, bool> {
-    mutableElementEqualsBSONElement(const mutablebson::Element& elem) : _what(elem) {}
+    mutableElementEqualsBSONElement(const mutablebson::Element& elem,
+                                    const CollatorInterface* collator)
+        : _what(elem), _collator(collator) {}
     bool operator()(const BSONElement& elem) const {
-        return _what.compareWithBSONElement(elem, false) == 0;
+        return _what.compareWithBSONElement(elem, false, _collator) == 0;
     }
     const mutablebson::Element& _what;
+    const CollatorInterface* _collator = nullptr;
 };
 }  // namespace
 
@@ -121,6 +125,7 @@ Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts, bo
 
     // store the stuff to remove later
     _elementsToFind = modExpr.Array();
+    setCollator(opts.collator);
 
     return Status::OK();
 }
@@ -173,7 +178,7 @@ Status ModifierPullAll::prepare(mutablebson::Element root,
                 while (elem.ok()) {
                     if (std::find_if(_elementsToFind.begin(),
                                      _elementsToFind.end(),
-                                     mutableElementEqualsBSONElement(elem)) !=
+                                     mutableElementEqualsBSONElement(elem, _collator)) !=
                         _elementsToFind.end()) {
                         _preparedState->elementsToRemove.push_back(elem);
                     }

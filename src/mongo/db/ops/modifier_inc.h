@@ -74,6 +74,8 @@ public:
     /** Converts the result of the $inc into an equivalent $set under logRoot */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    virtual void setCollator(const CollatorInterface* collator){};
+
 private:
     const ModifierIncMode _mode;
 

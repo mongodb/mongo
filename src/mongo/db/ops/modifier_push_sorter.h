@@ -32,24 +32,22 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
 // Extracts the value for 'pattern' for both 'lhs' and 'rhs' and return true if 'lhs' <
 // 'rhs'. We expect that both 'lhs' and 'rhs' be key patterns.
 struct PatternElementCmp {
-    BSONObj sortPattern;
-    bool useWholeValue;
+    PatternElementCmp() = default;
 
-    PatternElementCmp() : sortPattern(BSONObj()), useWholeValue(true) {}
-
-    PatternElementCmp(const BSONObj& pattern)
-        : sortPattern(pattern), useWholeValue(pattern.hasField("")) {}
+    PatternElementCmp(const BSONObj& pattern, const CollatorInterface* collator)
+        : sortPattern(pattern), useWholeValue(pattern.hasField("")), collator(collator) {}
 
     bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
         namespace dps = ::mongo::dotted_path_support;
         if (useWholeValue) {
-            const int comparedValue = lhs.compareWithElement(rhs, false);
+            const int comparedValue = lhs.compareWithElement(rhs, false, collator);
 
             const bool reversed = (sortPattern.firstElement().number() < 0);
 
@@ -64,9 +62,13 @@ struct PatternElementCmp {
             BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
             BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
 
-            return lhsKey.woCompare(rhsKey, sortPattern) < 0;
+            return lhsKey.woCompare(rhsKey, sortPattern, false, collator) < 0;
         }
     }
+
+    BSONObj sortPattern;
+    bool useWholeValue = true;
+    const CollatorInterface* collator = nullptr;
 };
 
 }  // namespace mongo
