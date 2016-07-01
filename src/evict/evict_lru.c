@@ -1577,8 +1577,7 @@ __evict_get_ref(
 		}
 		if (!is_server)
 			__wt_spin_lock(session, &queue->evict_lock);
-		else if (__wt_spin_trylock(
-		    session, &queue->evict_lock) != 0)
+		else if (__wt_spin_trylock(session, &queue->evict_lock) != 0)
 			continue;
 		break;
 	}
@@ -1810,6 +1809,9 @@ __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_EVICT_QUEUE *urgent_queue;
 	WT_PAGE *page;
 	bool queued;
+
+	/* Root pages should never be evicted via LRU. */
+	WT_ASSERT(session, !__wt_ref_is_root(ref));
 
 	page = ref->page;
 	page->read_gen = WT_READGEN_OLDEST;

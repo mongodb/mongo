@@ -794,7 +794,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	if (result_entries == 0) {
 		empty_parent = true;
-		__wt_page_evict_soon(session, parent->pg_intl_parent_ref);
+		if (!__wt_ref_is_root(parent->pg_intl_parent_ref))
+			ret = __wt_page_evict_soon(
+			    session, parent->pg_intl_parent_ref);
 		goto err;
 	}
 
