@@ -184,6 +184,7 @@ private:
                                          "add computed fields during an exclusion projection: "
                                       << _rawObj.toString(),
                         !_parsedType || _parsedType == ProjectionType::kInclusion);
+                _parsedType = ProjectionType::kInclusion;
                 ensurePathDoesNotConflictOrThrow(prefix.fullPath());
                 continue;
             }
