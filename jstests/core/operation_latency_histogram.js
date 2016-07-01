@@ -6,13 +6,8 @@
 
     var testDB = db.getSiblingDB(name);
     var testColl = testDB[name + "coll"];
-    var inShardedCollection = (db.runCommand({isMaster: 1}).msg == "isdbgrid");
 
     testColl.drop();
-
-    // Insert a document initially so sharding passthrough gets a non-empty response
-    // from latencyStats.
-    testColl.insert({x: -1});
 
     // Test aggregation command output format.
     var commandResult = testDB.runCommand(
@@ -80,14 +75,12 @@
     }
     lastHistogram = checkHistogramDiff(numRecords, 0, 0);
 
-    if (!inShardedCollection) {
-        // KillCursors
-        // The last cursor has no additional results, hence does not need to be closed.
-        for (var i = 0; i < numRecords - 1; i++) {
-            cursors[i].close();
-        }
-        lastHistogram = checkHistogramDiff(0, 0, numRecords - 1);
+    // KillCursors
+    // The last cursor has no additional results, hence does not need to be closed.
+    for (var i = 0; i < numRecords - 1; i++) {
+        cursors[i].close();
     }
+    lastHistogram = checkHistogramDiff(0, 0, numRecords - 1);
 
     // Remove
     for (var i = 0; i < numRecords; i++) {
@@ -119,11 +112,9 @@
     testColl.group({initial: {}, reduce: function() {}, key: {a: 1}});
     lastHistogram = checkHistogramDiff(1, 0, 0);
 
-    if (!inShardedCollection) {
-        // ParallelCollectionScan
-        testDB.runCommand({parallelCollectionScan: testColl.getName(), numCursors: 5});
-        lastHistogram = checkHistogramDiff(0, 0, 1);
-    }
+    // ParallelCollectionScan
+    testDB.runCommand({parallelCollectionScan: testColl.getName(), numCursors: 5});
+    lastHistogram = checkHistogramDiff(0, 0, 1);
 
     // FindAndModify
     testColl.findAndModify({query: {}, update: {pt: {type: "Point", coordinates: [0, 0]}}});
@@ -168,16 +159,14 @@
         testDB.runCommand({collStats: testColl.getName(), validationLevel: "off"}));
     lastHistogram = checkHistogramDiff(0, 0, 1);
 
-    if (!inShardedCollection) {
-        // Compact
-        // Use force:true in case we're in replset.
-        var commandResult = testDB.runCommand({compact: testColl.getName(), force: true});
-        // If storage engine supports compact, it should count as a command.
-        if (!commandResult.ok) {
-            assert.commandFailedWithCode(commandResult, ErrorCodes.CommandNotSupported);
-        }
-        lastHistogram = checkHistogramDiff(0, 0, 1);
+    // Compact
+    // Use force:true in case we're in replset.
+    var commandResult = testDB.runCommand({compact: testColl.getName(), force: true});
+    // If storage engine supports compact, it should count as a command.
+    if (!commandResult.ok) {
+        assert.commandFailedWithCode(commandResult, ErrorCodes.CommandNotSupported);
     }
+    lastHistogram = checkHistogramDiff(0, 0, 1);
 
     // DataSize
     testColl.dataSize();
