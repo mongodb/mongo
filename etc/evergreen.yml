@@ -114,6 +114,7 @@ variables:
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1604-64
+  - enterprise-ubuntu1604-aarch64
   - enterprise-debian71-64
   - enterprise-debian81-64
   - linux-64
@@ -125,6 +126,7 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - ubuntu1604
+  - ubuntu1604-aarch64
   - ubuntu1404-jepsen
   - ubuntu1404-rocksdb
   - ubuntu1410-fast-clang
@@ -146,6 +148,7 @@ variables:
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1604-64
+  - enterprise-ubuntu1604-aarch64
   - enterprise-debian71-64
   - enterprise-debian81-64
   - rhel62
@@ -155,6 +158,7 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - ubuntu1604
+  - ubuntu1604-aarch64
   - amazon
   - debian71
   - debian81
@@ -3450,6 +3454,150 @@ buildvariants:
   - name: views_WT
   - name: push
 
+- name: enterprise-ubuntu1604-aarch64
+  display_name: Enterprise Ubuntu 16.04 aarch64
+  modules:
+  - enterprise
+  - mongo-tools
+  run_on:
+  - ubuntu1604-arm64-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-enterprise-ubuntu1604
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: arm64
+    packager_distro: ubuntu1604
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-arm64-large
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth_WT
+  - name: dbtest_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jsCore_WT
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
+  - name: jsCore_small_oplog_WT
+  - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: mongosTest
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: parallel_WT
+  - name: parallel_compatibility_WT
+  - name: concurrency_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous_WT
+  - name: replicasets_WT
+  - name: replicasets_auth
+  - name: replication_WT
+  - name: replication_auth
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+  - name: unittests
+  - name: push
+    distros:
+    - ubuntu1604
+
+- name: ubuntu1604-aarch64
+  display_name: SSL Ubuntu 16.04 aarch64
+  modules:
+  - mongo-tools
+  run_on:
+  - ubuntu1604-arm64-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto)" -tags 'ssl'
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-ubuntu1604
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: arm64
+    packager_distro: ubuntu1604
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-arm64-large
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth_WT
+  - name: dbtest_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jsCore_WT
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
+  - name: jsCore_small_oplog_WT
+  - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: mongosTest
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: parallel_WT
+  - name: parallel_compatibility_WT
+  - name: concurrency_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous_WT
+  - name: replicasets_WT
+  - name: replicasets_auth
+  - name: replication_WT
+  - name: replication_auth
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+  - name: unittests
+  - name: push
+    distros:
+    - ubuntu1604
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "* Enterprise Amazon Linux"

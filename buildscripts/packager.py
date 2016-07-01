@@ -42,7 +42,7 @@ import time
 import urlparse
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES=["x86_64"]
+ARCH_CHOICES=["x86_64", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS=["suse", "debian","redhat","ubuntu", "amazon"]
@@ -141,6 +141,8 @@ class Distro(object):
                 return "ppc64el"
             elif arch == "s390x":
                 return "s390x"
+            elif arch == "arm64":
+                return "arm64"
             elif arch.endswith("86"):
               return "i386"
             else:
@@ -249,7 +251,7 @@ class Distro(object):
         """Return the build os label in the binary package to download (e.g. "rhel55" for redhat,
         "ubuntu1204" for ubuntu, "debian71" for debian, "suse11" for suse, etc.)"""
         # Community builds only support amd64
-        if arch not in ['x86_64', 'ppc64le', 's390x']:
+        if arch not in ['x86_64', 'ppc64le', 's390x', 'arm64']:
             raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.n):
@@ -538,7 +540,7 @@ def make_deb_repo(repo, distro, build_os, spec):
 Label: mongodb
 Suite: %s
 Codename: %s/mongodb-org
-Architectures: amd64
+Architectures: amd64 arm64
 Components: %s
 Description: MongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
