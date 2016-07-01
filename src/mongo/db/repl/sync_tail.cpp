@@ -1085,13 +1085,15 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                 } catch (const DBException& e) {
                     // The group insert failed, log an error and fall through to the
                     // application of an individual op.
+                    if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
+                        // Swallow this error to prevent fassert and nonzero exit code.
+                        return Status::OK();
+                    }
+
                     str::stream msg;
                     msg << "Error applying inserts in bulk " << causedBy(e)
                         << " trying first insert as a lone insert";
                     error() << std::string(msg);
-                    if (inShutdown()) {
-                        return {ErrorCodes::InterruptedAtShutdown, msg};
-                    }
 
                     // Avoid quadratic run time from failed insert by not retrying until we
                     // are beyond this group of ops.
@@ -1115,8 +1117,9 @@ Status multiSyncApply_noAbort(OperationContext* txn,
             severe() << "writer worker caught exception: " << causedBy(e)
                      << " on: " << entry->raw.toString();
 
-            if (inShutdown()) {
-                return {ErrorCodes::InterruptedAtShutdown, e.toString()};
+            if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
+                // Swallow this error to prevent fassert and nonzero exit code.
+                return Status::OK();
             }
 
             return e.toStatus();
@@ -1164,8 +1167,9 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
         } catch (const DBException& e) {
             severe() << "writer worker caught exception: " << causedBy(e) << " on: " << entry.raw;
 
-            if (inShutdown()) {
-                return {ErrorCodes::InterruptedAtShutdown, e.toString()};
+            if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
+                // Swallow this error to prevent fassert and nonzero exit code.
+                return Status::OK();
             }
 
             return e.toStatus();
