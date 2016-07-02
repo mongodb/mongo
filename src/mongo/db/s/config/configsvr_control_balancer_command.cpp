@@ -26,10 +26,9 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -37,16 +36,14 @@
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/control_balancer_request_type.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
 
-class ConfigSvrControlBalancerCommand : public Command {
+class ConfigSvrBalancerControlCommand : public Command {
 public:
-    ConfigSvrControlBalancerCommand() : Command("_configsvrControlBalancer") {}
+    ConfigSvrBalancerControlCommand(StringData name) : Command(name) {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "
@@ -80,47 +77,68 @@ public:
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
-             BSONObjBuilder& result) override {
+             BSONObjBuilder& result) final {
+        if (cmdObj.firstElementFieldName() != getName()) {
+            uasserted(ErrorCodes::InternalError,
+                      str::stream() << "Expected to find a " << getName() << " command, but found "
+                                    << cmdObj);
+        }
+
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrControlBalancer can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream() << getName() << " can only be run on config servers");
         }
 
-        const auto request =
-            uassertStatusOK(ControlBalancerRequest::parseFromConfigCommand(cmdObj));
-        auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
-
-        Status writeBalancerConfigStatus{ErrorCodes::InternalError, "Not initialized"};
-
-        switch (request.getAction()) {
-            case ControlBalancerRequest::kStart:
-                writeBalancerConfigStatus = balancerConfig->setBalancerActive(txn, true);
-                uassertStatusOK(Balancer::get(txn)->startThread(txn));
-                break;
-            case ControlBalancerRequest::kStop:
-                writeBalancerConfigStatus = balancerConfig->setBalancerActive(txn, false);
-                Balancer::get(txn)->stopThread();
-                Balancer::get(txn)->joinThread();
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
-
-        if (!writeBalancerConfigStatus.isOK()) {
-            uasserted(writeBalancerConfigStatus.code(),
-                      str::stream()
-                          << "Balancer thread state was changed successfully, but the balancer "
-                             "configuration setting could not be persisted due to error '"
-                          << writeBalancerConfigStatus.reason()
-                          << "'");
-        }
+        _run(txn, &result);
 
         return true;
     }
 
-} configSvrControlBalancerCmd;
+private:
+    virtual void _run(OperationContext* txn, BSONObjBuilder* result) = 0;
+};
+
+class ConfigSvrBalancerStartCommand : public ConfigSvrBalancerControlCommand {
+public:
+    ConfigSvrBalancerStartCommand() : ConfigSvrBalancerControlCommand("_configsvrBalancerStart") {}
+
+private:
+    void _run(OperationContext* txn, BSONObjBuilder* result) override {
+        uassertStatusOK(Grid::get(txn)->getBalancerConfiguration()->setBalancerMode(
+            txn, BalancerSettingsType::kFull));
+    }
+};
+
+class ConfigSvrBalancerStopCommand : public ConfigSvrBalancerControlCommand {
+public:
+    ConfigSvrBalancerStopCommand() : ConfigSvrBalancerControlCommand("_configsvrBalancerStop") {}
+
+private:
+    void _run(OperationContext* txn, BSONObjBuilder* result) override {
+        uassertStatusOK(Grid::get(txn)->getBalancerConfiguration()->setBalancerMode(
+            txn, BalancerSettingsType::kOff));
+        Balancer::get(txn)->joinCurrentRound(txn);
+    }
+};
+
+class ConfigSvrBalancerStatusCommand : public ConfigSvrBalancerControlCommand {
+public:
+    ConfigSvrBalancerStatusCommand()
+        : ConfigSvrBalancerControlCommand("_configsvrBalancerStatus") {}
+
+private:
+    void _run(OperationContext* txn, BSONObjBuilder* result) override {
+        Balancer::get(txn)->report(txn, result);
+    }
+};
+
+MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
+    new ConfigSvrBalancerStartCommand();
+    new ConfigSvrBalancerStopCommand();
+    new ConfigSvrBalancerStatusCommand();
+
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo

@@ -297,9 +297,14 @@ public:
                                    const DocWriter* const* docs,
                                    size_t nDocs);
 
+    /**
+     * Inserts a document into the record store and adds it to the MultiIndexBlocks passed in.
+     *
+     * NOTE: It is up to caller to commit the indexes.
+     */
     Status insertDocument(OperationContext* txn,
                           const BSONObj& doc,
-                          MultiIndexBlock* indexBlock,
+                          const std::vector<MultiIndexBlock*>& indexBlocks,
                           bool enforceQuota);
 
     /**

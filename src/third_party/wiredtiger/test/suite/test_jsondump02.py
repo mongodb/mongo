@@ -208,12 +208,16 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # this one should work
         self.load_json(self.table_uri2,
-              (('"key0" : "KEY002"', '"value0" : 345,\n"value1" : "str2"'),))
+              (('"key0" : "KEY002"', '"value0" : 34,\n"value1" : "str2"'),))
 
         # extraneous/missing space is okay
         self.load_json(self.table_uri2,
               (('  "key0"\n:\t"KEY003"    ',
-                '"value0":456,"value1"\n\n\r\n:\t\n"str3"'),))
+                '"value0":45,"value1"\n\n\r\n:\t\n"str3"'),))
+
+        table2_json =  (
+            ('"key0" : "KEY002"', '"value0" : 34,\n"value1" : "str2"'),
+            ('"key0" : "KEY003"', '"value0" : 45,\n"value1" : "str3"'))
 
         table3_json =  (
             ('"key0" : 1', '"value0" : "\\u0001\\u0002\\u0003"'),
@@ -284,12 +288,11 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['load', '-jf', 'jsondump4.out'])
         self.session.drop(self.table_uri4)
 
-        # Note: only the first table is loaded.
         self.runWt(['load', '-jf', 'jsondump-all.out'])
         self.check_json(self.table_uri1, table1_json)
-        #self.check_json(self.table_uri2, table2_json)
-        #self.check_json(self.table_uri3, table3_json)
-        #self.check_json(self.table_uri4, table4_json)
+        self.check_json(self.table_uri2, table2_json)
+        self.check_json(self.table_uri3, table3_json)
+        self.check_json(self.table_uri4, table4_json)
 
     # Generate two byte keys that cover some range of byte values.
     # For simplicity, the keys are monotonically increasing.

@@ -119,7 +119,7 @@ Document DocumentSourceSort::serializeSortKey(bool explain) const {
             const FieldPath& withVariable = efp->getFieldPath();
             verify(withVariable.getPathLength() > 1);
             verify(withVariable.getFieldName(0) == "ROOT");
-            const string fieldPath = withVariable.tail().getPath(false);
+            const string fieldPath = withVariable.tail().fullPath();
 
             // append a named integer based on the sort order
             keyObj.setField(fieldPath, Value(vAscending[i] ? 1 : -1));

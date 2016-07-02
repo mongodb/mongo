@@ -1494,7 +1494,7 @@ if env.TargetOSIs('posix'):
         if not has_option("disable-warnings-as-errors"):
             env.Append( CCFLAGS=["-Werror"] )
 
-    env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
+    env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
     env.Append( LINKFLAGS=["-pthread"] )
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
@@ -1835,6 +1835,40 @@ def doConfigure(myenv):
         # TODO: re-evaluate when we move to GCC 5.3
         # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
         AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
+
+        # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
+        # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
+        # it shouldn't.
+        def CheckNonVirtualDtor(context):
+
+            test_body = """
+            class Base {
+            public:
+                virtual void foo() const = 0;
+            protected:
+                ~Base() {};
+            };
+
+            class Derived : public Base {
+            public:
+                virtual void foo() const {}
+            };
+            """
+
+            context.Message('Checking -Wnon-virtual-dtor for false positives... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+
+        myenvClone = myenv.Clone()
+        myenvClone.Append( CCFLAGS=['-Werror'] )
+        myenvClone.Append( CXXFLAGS=["-Wnon-virtual-dtor"] )
+        conf = Configure(myenvClone, help=False, custom_tests = {
+            'CheckNonVirtualDtor' : CheckNonVirtualDtor,
+        })
+        if conf.CheckNonVirtualDtor():
+            myenv.Append( CXXFLAGS=["-Wnon-virtual-dtor"] )
+        conf.Finish()
 
     if get_option('runtime-hardening') == "on":
         # Clang honors these flags, but doesn't actually do anything with them for compatibility, so we

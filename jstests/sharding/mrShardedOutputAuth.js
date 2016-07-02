@@ -36,12 +36,8 @@
         assert.eq(outputDb.numbers_out.count(), 0, "map/reduce should not have succeeded");
     }
 
-    var st = new ShardingTest({
-        name: "mrShardedOutputAuth",
-        shards: 1,
-        mongos: 1,
-        other: {extraOptions: {"keyFile": "jstests/libs/key1"}}
-    });
+    var st = new ShardingTest(
+        {name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
 
     // Setup the users to the input, output and admin databases
     var mongos = st.s;

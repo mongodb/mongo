@@ -52,10 +52,16 @@ class ReplSettings;
  */
 void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp);
 
+/**
+ * Create a new capped collection for the oplog if it doesn't yet exist.
+ * If the collection already exists (and isReplSet is false),
+ * set the 'last' Timestamp from the last entry of the oplog collection (side effect!)
+ */
+void createOplog(OperationContext* txn, const std::string& oplogCollectionName, bool isReplSet);
+
 /*
- * Create a new capped collection for the oplog using createOplog() if it doesn't yet exist.
- * Collection name will be "_oplogCollectionName" initialized in setOplogCollectionName().
- * This will be either local.oplog.rs (replica sets) or local.oplog.$main (master/slave)
+ * Shortcut for above function using oplogCollectionName = _oplogCollectionName,
+ * and replEnabled = replCoord::isReplSet();
  */
 void createOplog(OperationContext* txn);
 

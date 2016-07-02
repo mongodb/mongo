@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
@@ -37,6 +39,7 @@
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -58,12 +61,20 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
+void ReplicationCoordinatorExternalStateMock::runOnInitialSyncThread(
+    stdx::function<void(OperationContext* txn)> run) {
+    log() << "not running initial sync during test.";
+}
+
 void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& settings) {
     _threadsStarted = true;
 }
 
+bool ReplicationCoordinatorExternalStateMock::isInitialSyncFlagSet(OperationContext* txn) {
+    return false;
+}
 void ReplicationCoordinatorExternalStateMock::startInitialSync(OnInitialSyncFinishedFn finished) {}
-void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication() {}
+void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication(OperationContext* txn) {}
 
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
 Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* txn,
@@ -72,6 +83,11 @@ Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(Operati
 }
 
 void ReplicationCoordinatorExternalStateMock::shutdown(OperationContext*) {}
+
+executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor() const {
+    return nullptr;
+}
+
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
 OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
@@ -236,22 +252,22 @@ bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageE
 }
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
-    OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn) {
+    OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-void ReplicationCoordinatorExternalStateMock::multiSyncApply(const MultiApplier::Operations& ops) {}
+void ReplicationCoordinatorExternalStateMock::multiSyncApply(MultiApplier::OperationPtrs* ops) {}
 
 void ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
-    const MultiApplier::Operations& ops, const HostAndPort& source) {}
+    MultiApplier::OperationPtrs* ops, const HostAndPort& source) {}
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteadyStateOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteadyStateOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 

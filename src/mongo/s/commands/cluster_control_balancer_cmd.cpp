@@ -28,22 +28,27 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/control_balancer_request_type.h"
 
 namespace mongo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
-class ControlBalancerCommand : public Command {
+class BalancerControlCommand : public Command {
 public:
-    ControlBalancerCommand() : Command("controlBalancer") {}
+    BalancerControlCommand(StringData name,
+                           StringData configsvrCommandName,
+                           ActionType authorizationAction)
+        : Command(name),
+          _configsvrCommandName(configsvrCommandName),
+          _authorizationAction(authorizationAction) {}
 
     bool slaveOk() const override {
         return false;
@@ -66,7 +71,7 @@ public:
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString("config", "settings")),
-                ActionType::update)) {
+                _authorizationAction)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
@@ -78,22 +83,51 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        const auto request =
-            uassertStatusOK(ControlBalancerRequest::parseFromMongosCommand(cmdObj));
-
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus =
+        auto cmdResponse =
             uassertStatusOK(configShard->runCommand(txn,
                                                     kPrimaryOnlyReadPreference,
                                                     "admin",
-                                                    request.toCommandForConfig(),
+                                                    BSON(_configsvrCommandName << 1),
                                                     Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(cmdResponseStatus.commandStatus);
+        uassertStatusOK(cmdResponse.commandStatus);
+
+        // Append any return value from the response, which the config server returned
+        result.appendElements(cmdResponse.response);
 
         return true;
     }
 
-} clusterControlBalancerCmd;
+private:
+    const StringData _configsvrCommandName;
+    const ActionType _authorizationAction;
+};
+
+class BalancerStartCommand : public BalancerControlCommand {
+public:
+    BalancerStartCommand()
+        : BalancerControlCommand("balancerStart", "_configsvrBalancerStart", ActionType::update) {}
+};
+
+class BalancerStopCommand : public BalancerControlCommand {
+public:
+    BalancerStopCommand()
+        : BalancerControlCommand("balancerStop", "_configsvrBalancerStop", ActionType::update) {}
+};
+
+class BalancerStatusCommand : public BalancerControlCommand {
+public:
+    BalancerStatusCommand()
+        : BalancerControlCommand("balancerStatus", "_configsvrBalancerStatus", ActionType::find) {}
+};
+
+MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
+    new BalancerStartCommand();
+    new BalancerStopCommand();
+    new BalancerStatusCommand();
+
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo

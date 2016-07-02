@@ -30,14 +30,17 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/queue.h"
 
 namespace mongo {
 namespace repl {
 
+class StorageInterface;
+
 /**
  * Oplog buffer backed by a temporary collection. This collection is created in startup() and
- * removed in shutdown().
+ * removed in shutdown(). The documents will be popped and peeked in timestamp order.
  */
 class OplogBufferCollection : public OplogBuffer {
 public:
@@ -46,8 +49,20 @@ public:
      */
     static NamespaceString getDefaultNamespace();
 
-    OplogBufferCollection();
-    OplogBufferCollection(const NamespaceString& nss);
+    /**
+     * Returns the embedded document in the 'entry' field.
+     */
+    static BSONObj extractEmbeddedOplogDocument(const BSONObj& orig);
+
+    /**
+     * Returns a pair of a BSONObj with an '_id' field equal to the 'ts' field of the provided
+     * document and an 'entry' field equal to the provided document, and the timestamp of the
+     * BSONObj. Assumes there is a 'ts' field in the original document.
+     */
+    static std::pair<BSONObj, Timestamp> addIdToDocument(const BSONObj& orig);
+
+    explicit OplogBufferCollection(StorageInterface* storageInterface);
+    OplogBufferCollection(StorageInterface* storageInterface, const NamespaceString& nss);
 
     /**
      * Returns the namespace string of the collection used by this oplog buffer.
@@ -58,6 +73,10 @@ public:
     void shutdown(OperationContext* txn) override;
     void pushEvenIfFull(OperationContext* txn, const Value& value) override;
     void push(OperationContext* txn, const Value& value) override;
+    /**
+     * Pushing documents with 'pushAllNonBlocking' will not handle sentinel documents properly. If
+     * pushing sentinel documents is required, use 'push' or 'pushEvenIfFull'.
+     */
     bool pushAllNonBlocking(OperationContext* txn,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
@@ -73,8 +92,57 @@ public:
     bool peek(OperationContext* txn, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
 
+    // ---- Testing API ----
+    std::queue<Timestamp> getSentinels_forTest() const;
+
+
 private:
+    /*
+     * Creates a temporary collection with the _nss namespace.
+     */
+    void _createCollection(OperationContext* txn);
+
+    /*
+     * Drops the collection with the _nss namespace.
+     */
+    void _dropCollection(OperationContext* txn);
+
+    /**
+     * Returns the last oplog entry on the given side of the buffer. If front is true it will
+     * return the oldest entry, otherwise it will return the newest one. If the buffer is empty
+     * or peeking fails this returns false.
+     */
+    bool _peekOneSide_inlock(OperationContext* txn, Value* value, bool front) const;
+
+    // Storage interface used to perform storage engine level functions on the collection.
+    StorageInterface* _storageInterface;
+
+    /**
+     * Pops an entry off the buffer in a lock.
+     */
+    bool _doPop_inlock(OperationContext* txn, Value* value);
+
+    // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
+
+    // Allows functions to wait until the queue has data. This condition variable is used with
+    // _mutex below.
+    stdx::condition_variable _cvNoLongerEmpty;
+
+    // Protects member data below and synchronizes it with the underlying collection.
+    mutable stdx::mutex _mutex;
+
+    // Number of documents in buffer.
+    std::size_t _count;
+
+    // Size of documents in buffer.
+    std::size_t _size;
+
+    std::queue<Timestamp> _sentinels;
+
+    Timestamp _lastPushedTimestamp;
+
+    Timestamp _lastPoppedTimestamp;
 };
 
 }  // namespace repl

@@ -92,7 +92,8 @@ void ShardingUptimeReporter::reportStatus(OperationContext* txn, bool isBalancer
             MongosType::ConfigNS,
             BSON(MongosType::name(getInstanceId())),
             BSON("$set" << mType.toBSON()),
-            true);
+            true,
+            ShardingCatalogClient::kMajorityWriteConcern);
     } catch (const std::exception& e) {
         log() << "Caught exception while reporting uptime: " << e.what();
     }

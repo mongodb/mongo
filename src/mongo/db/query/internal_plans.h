@@ -74,6 +74,17 @@ public:
                                                         const RecordId startLoc = RecordId());
 
     /**
+     * Returns a FETCH => DELETE plan.
+     */
+    static std::unique_ptr<PlanExecutor> deleteWithCollectionScan(
+        OperationContext* txn,
+        Collection* collection,
+        const DeleteStageParams& params,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        Direction direction = FORWARD,
+        const RecordId& startLoc = RecordId());
+
+    /**
      * Returns an index scan.  Caller owns returned pointer.
      */
     static std::unique_ptr<PlanExecutor> indexScan(OperationContext* txn,
@@ -100,6 +111,17 @@ public:
                                                              Direction direction = FORWARD);
 
 private:
+    /**
+     * Returns a plan stage that can be used for a collection scan.
+     *
+     * Used as a helper for collectionScan() and deleteWithCollectionScan().
+     */
+    static std::unique_ptr<PlanStage> _collectionScan(OperationContext* txn,
+                                                      WorkingSet* ws,
+                                                      const Collection* collection,
+                                                      Direction direction,
+                                                      const RecordId& startLoc);
+
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.
      *

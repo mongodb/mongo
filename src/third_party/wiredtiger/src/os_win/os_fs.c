@@ -39,17 +39,20 @@ static int
 __win_fs_remove(
     WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *name)
 {
-	WT_DECL_RET;
+	DWORD windows_error;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	if (DeleteFileA(name) == FALSE)
-		WT_RET_MSG(session, __wt_getlasterror(),
-		    "%s: file-remove: DeleteFileA", name);
-
+	if (DeleteFileA(name) == FALSE) {
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: file-remove: DeleteFileA: %s",
+		    name, __wt_formatmessage(session, windows_error));
+		return (__wt_map_windows_error(windows_error));
+	}
 	return (0);
 }
 
@@ -61,7 +64,7 @@ static int
 __win_fs_rename(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *from, const char *to)
 {
-	WT_DECL_RET;
+	DWORD windows_error;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
@@ -73,13 +76,21 @@ __win_fs_rename(WT_FILE_SYSTEM *file_system,
 	 * it exists.
 	 */
 	if (GetFileAttributesA(to) != INVALID_FILE_ATTRIBUTES)
-		if (DeleteFileA(to) == FALSE)
-			WT_RET_MSG(session, __wt_getlasterror(),
-			    "%s to %s: file-rename: rename", from, to);
+		if (DeleteFileA(to) == FALSE) {
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
+			    "%s: file-rename: DeleteFileA: %s",
+			    to, __wt_formatmessage(session, windows_error));
+			return (__wt_map_windows_error(windows_error));
+		}
 
-	if (MoveFileA(from, to) == FALSE)
-		WT_RET_MSG(session, __wt_getlasterror(),
-		    "%s to %s: file-rename: rename", from, to);
+	if (MoveFileA(from, to) == FALSE) {
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s to %s: file-rename: MoveFileA: %s",
+		    from, to, __wt_formatmessage(session, windows_error));
+		return (__wt_map_windows_error(windows_error));
+	}
 
 	return (0);
 }
@@ -92,6 +103,7 @@ int
 __wt_win_fs_size(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, wt_off_t *sizep)
 {
+	DWORD windows_error;
 	WIN32_FILE_ATTRIBUTE_DATA data;
 	WT_SESSION_IMPL *session;
 
@@ -105,8 +117,11 @@ __wt_win_fs_size(WT_FILE_SYSTEM *file_system,
 		return (0);
 	}
 
-	WT_RET_MSG(session, __wt_getlasterror(),
-	    "%s: file-size: GetFileAttributesEx", name);
+	windows_error = __wt_getlasterror();
+	__wt_errx(session,
+	    "%s: file-size: GetFileAttributesEx: %s",
+	    name, __wt_formatmessage(session, windows_error));
+	return (__wt_map_windows_error(windows_error));
 }
 
 /*
@@ -116,6 +131,7 @@ __wt_win_fs_size(WT_FILE_SYSTEM *file_system,
 static int
 __win_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 {
+	DWORD windows_error;
 	WT_DECL_RET;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
@@ -132,17 +148,22 @@ __win_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 	 */
 	if (win_fh->filehandle != INVALID_HANDLE_VALUE &&
 	    CloseHandle(win_fh->filehandle) == 0) {
-		ret = __wt_getlasterror();
-		__wt_err(session, ret,
-		    "%s: handle-close: CloseHandle", file_handle->name);
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: handle-close: CloseHandle: %s",
+		    file_handle->name,
+		    __wt_formatmessage(session, windows_error));
+		ret = __wt_map_windows_error(windows_error);
 	}
 
 	if (win_fh->filehandle_secondary != INVALID_HANDLE_VALUE &&
 	    CloseHandle(win_fh->filehandle_secondary) == 0) {
-		ret = __wt_getlasterror();
-		__wt_err(session, ret,
-		    "%s: handle-close: secondary: CloseHandle",
-		    file_handle->name);
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: handle-close: secondary: CloseHandle: %s",
+		    file_handle->name,
+		    __wt_formatmessage(session, windows_error));
+		ret = __wt_map_windows_error(windows_error);
 	}
 
 	__wt_free(session, file_handle->name);
@@ -158,7 +179,7 @@ static int
 __win_file_lock(
     WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, bool lock)
 {
-	WT_DECL_RET;
+	DWORD windows_error;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
 
@@ -177,17 +198,23 @@ __win_file_lock(
 	 */
 	if (lock) {
 		if (LockFile(win_fh->filehandle, 0, 0, 1, 0) == FALSE) {
-			ret = __wt_getlasterror();
-			__wt_err(session, ret,
-			    "%s: handle-lock: LockFile", file_handle->name);
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
+			    "%s: handle-lock: LockFile: %s",
+			    file_handle->name,
+			    __wt_formatmessage(session, windows_error));
+			return (__wt_map_windows_error(windows_error));
 		}
 	} else
 		if (UnlockFile(win_fh->filehandle, 0, 0, 1, 0) == FALSE) {
-			ret = __wt_getlasterror();
-			__wt_err(session, ret,
-			    "%s: handle-lock: UnlockFile", file_handle->name);
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
+			    "%s: handle-lock: UnlockFile: %s",
+			    file_handle->name,
+			    __wt_formatmessage(session, windows_error));
+			return (__wt_map_windows_error(windows_error));
 		}
-	return (ret);
+	return (0);
 }
 
 /*
@@ -198,7 +225,7 @@ static int
 __win_file_read(WT_FILE_HANDLE *file_handle,
     WT_SESSION *wt_session, wt_off_t offset, size_t len, void *buf)
 {
-	DWORD chunk, nr;
+	DWORD chunk, nr, windows_error;
 	uint8_t *addr;
 	OVERLAPPED overlapped = { 0 };
 	WT_FILE_HANDLE_WIN *win_fh;
@@ -225,12 +252,15 @@ __win_file_read(WT_FILE_HANDLE *file_handle,
 		overlapped.OffsetHigh = UINT32_MAX & (offset >> 32);
 
 		if (!ReadFile(
-		    win_fh->filehandle, addr, chunk, &nr, &overlapped))
-			WT_RET_MSG(session,
-			    __wt_getlasterror(),
+		    win_fh->filehandle, addr, chunk, &nr, &overlapped)) {
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
 			    "%s: handle-read: ReadFile: failed to read %lu "
-			    "bytes at offset %" PRIuMAX,
-			    file_handle->name, chunk, (uintmax_t)offset);
+			    "bytes at offset %" PRIuMAX ": %s",
+			    file_handle->name, chunk, (uintmax_t)offset,
+			    __wt_formatmessage(session, windows_error));
+			return (__wt_map_windows_error(windows_error));
+		}
 	}
 	return (0);
 }
@@ -243,6 +273,7 @@ static int
 __win_file_size(
     WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t *sizep)
 {
+	DWORD windows_error;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
 	LARGE_INTEGER size;
@@ -255,8 +286,11 @@ __win_file_size(
 		return (0);
 	}
 
-	WT_RET_MSG(session, __wt_getlasterror(),
-	    "%s: handle-size: GetFileSizeEx", file_handle->name);
+	windows_error = __wt_getlasterror();
+	__wt_errx(session,
+	    "%s: handle-size: GetFileSizeEx: %s",
+	    file_handle->name, __wt_formatmessage(session, windows_error));
+	return (__wt_map_windows_error(windows_error));
 }
 
 /*
@@ -266,7 +300,7 @@ __win_file_size(
 static int
 __win_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 {
-	WT_DECL_RET;
+	DWORD windows_error;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
 
@@ -283,10 +317,12 @@ __win_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 		return (0);
 
 	if (FlushFileBuffers(win_fh->filehandle) == FALSE) {
-		ret = __wt_getlasterror();
-		WT_RET_MSG(session, ret,
-		    "%s handle-sync: FlushFileBuffers error",
-		    file_handle->name);
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s handle-sync: FlushFileBuffers: %s",
+		    file_handle->name,
+		    __wt_formatmessage(session, windows_error));
+		return (__wt_map_windows_error(windows_error));
 	}
 	return (0);
 }
@@ -299,7 +335,7 @@ static int
 __win_file_truncate(
     WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t len)
 {
-	WT_DECL_RET;
+	DWORD windows_error;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
 	LARGE_INTEGER largeint;
@@ -313,18 +349,25 @@ __win_file_truncate(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: handle-truncate: read-only", file_handle->name);
 
-	if (SetFilePointerEx(
-	    win_fh->filehandle_secondary, largeint, NULL, FILE_BEGIN) == FALSE)
-		WT_RET_MSG(session, __wt_getlasterror(),
-		    "%s: handle-truncate: SetFilePointerEx",
-		    file_handle->name);
+	if (SetFilePointerEx(win_fh->filehandle_secondary,
+	    largeint, NULL, FILE_BEGIN) == FALSE) {
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: handle-truncate: SetFilePointerEx: %s",
+		    file_handle->name,
+		    __wt_formatmessage(session, windows_error));
+		return (__wt_map_windows_error(windows_error));
+	}
 
 	if (SetEndOfFile(win_fh->filehandle_secondary) == FALSE) {
 		if (GetLastError() == ERROR_USER_MAPPED_FILE)
 			return (EBUSY);
-		WT_RET_MSG(session, __wt_getlasterror(),
-		    "%s: handle-truncate: SetEndOfFile error",
-		    file_handle->name);
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: handle-truncate: SetEndOfFile: %s",
+		    file_handle->name,
+		    __wt_formatmessage(session, windows_error));
+		return (__wt_map_windows_error(windows_error));
 	}
 	return (0);
 }
@@ -337,8 +380,7 @@ static int
 __win_file_write(WT_FILE_HANDLE *file_handle,
     WT_SESSION *wt_session, wt_off_t offset, size_t len, const void *buf)
 {
-	DWORD chunk;
-	DWORD nw;
+	DWORD chunk, nw, windows_error;
 	const uint8_t *addr;
 	OVERLAPPED overlapped = { 0 };
 	WT_FILE_HANDLE_WIN *win_fh;
@@ -365,11 +407,15 @@ __win_file_write(WT_FILE_HANDLE *file_handle,
 		overlapped.OffsetHigh = UINT32_MAX & (offset >> 32);
 
 		if (!WriteFile(
-		    win_fh->filehandle, addr, chunk, &nw, &overlapped))
-			WT_RET_MSG(session, __wt_getlasterror(),
+		    win_fh->filehandle, addr, chunk, &nw, &overlapped)) {
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
 			    "%s: handle-write: WriteFile: failed to write %lu "
-			    "bytes at offset %" PRIuMAX,
-			    file_handle->name, chunk, (uintmax_t)offset);
+			    "bytes at offset %" PRIuMAX ": %s",
+			    file_handle->name, chunk, (uintmax_t)offset,
+			    __wt_formatmessage(session, windows_error));
+			return (__wt_map_windows_error(windows_error));
+		}
 	}
 	return (0);
 }
@@ -383,7 +429,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
     const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
     WT_FILE_HANDLE **file_handlep)
 {
-	DWORD dwCreationDisposition;
+	DWORD dwCreationDisposition, windows_error;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FILE_HANDLE *file_handle;
@@ -464,13 +510,17 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 			win_fh->filehandle = CreateFileA(name, desired_access,
 			    FILE_SHARE_READ | FILE_SHARE_WRITE,
 			    NULL, OPEN_EXISTING, f, NULL);
-		if (win_fh->filehandle == INVALID_HANDLE_VALUE)
-			WT_ERR_MSG(session, __wt_getlasterror(),
+		if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
 			    win_fh->direct_io ?
 			    "%s: handle-open: CreateFileA: failed with direct "
 			    "I/O configured, some filesystem types do not "
-			    "support direct I/O" :
-			    "%s: handle-open: CreateFileA", name);
+			    "support direct I/O: %s" :
+			    "%s: handle-open: CreateFileA: %s",
+			    name, __wt_formatmessage(session, windows_error));
+			WT_ERR(__wt_map_windows_error(windows_error));
+		}
 	}
 
 	/*
@@ -482,9 +532,13 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 		win_fh->filehandle_secondary = CreateFileA(name, desired_access,
 		    FILE_SHARE_READ | FILE_SHARE_WRITE,
 		    NULL, OPEN_EXISTING, f, NULL);
-		if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE)
-			WT_ERR_MSG(session, __wt_getlasterror(),
-			    "%s: handle-open: CreateFileA: secondary", name);
+		if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE) {
+			windows_error = __wt_getlasterror();
+			__wt_errx(session,
+			    "%s: handle-open: CreateFileA: secondary: %s",
+			    name, __wt_formatmessage(session, windows_error));
+			WT_ERR(__wt_map_windows_error(windows_error));
+		}
 	}
 
 directory_open:

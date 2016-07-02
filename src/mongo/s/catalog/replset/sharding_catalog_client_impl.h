@@ -157,21 +157,22 @@ public:
 
     Status insertConfigDocument(OperationContext* txn,
                                 const std::string& ns,
-                                const BSONObj& doc) override;
+                                const BSONObj& doc,
+                                const WriteConcernOptions& writeConcern) override;
 
     StatusWith<bool> updateConfigDocument(OperationContext* txn,
                                           const std::string& ns,
                                           const BSONObj& query,
                                           const BSONObj& update,
-                                          bool upsert) override;
+                                          bool upsert,
+                                          const WriteConcernOptions& writeConcern) override;
 
     Status removeConfigDocuments(OperationContext* txn,
                                  const std::string& ns,
-                                 const BSONObj& query) override;
+                                 const BSONObj& query,
+                                 const WriteConcernOptions& writeConcern) override;
 
     DistLockManager* getDistLockManager() override;
-
-    Status initConfigVersion(OperationContext* txn) override;
 
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
@@ -240,11 +241,6 @@ private:
      * Appends a read committed read concern to the request object.
      */
     void _appendReadConcern(BSONObjBuilder* builder);
-
-    /**
-     * Returns the current cluster schema/protocol version.
-     */
-    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
 
     /**
      * Queries the config servers for the database metadata for the given database, using the

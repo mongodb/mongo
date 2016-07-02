@@ -1135,22 +1135,22 @@ TEST(RegexMatchExpression, Equality1) {
 TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
     RegexMatchExpression regex;
     {
-        StringData embeddedNull("a\0b", StringData::LiteralTag());
+        const auto embeddedNull = "a\0b"_sd;
         ASSERT_NOT_OK(regex.init("path", embeddedNull, ""));
     }
 
     {
-        StringData singleNullByte("\0", StringData::LiteralTag());
+        const auto singleNullByte = "\0"_sd;
         ASSERT_NOT_OK(regex.init("path", singleNullByte, ""));
     }
 
     {
-        StringData leadingNullByte("\0bbbb", StringData::LiteralTag());
+        const auto leadingNullByte = "\0bbbb"_sd;
         ASSERT_NOT_OK(regex.init("path", leadingNullByte, ""));
     }
 
     {
-        StringData trailingNullByte("bbbb\0", StringData::LiteralTag());
+        const auto trailingNullByte = "bbbb\0"_sd;
         ASSERT_NOT_OK(regex.init("path", trailingNullByte, ""));
     }
 }
@@ -1158,22 +1158,22 @@ TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
 TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
     RegexMatchExpression regex;
     {
-        StringData embeddedNull("a\0b", StringData::LiteralTag());
+        const auto embeddedNull = "a\0b"_sd;
         ASSERT_NOT_OK(regex.init("path", "pattern", embeddedNull));
     }
 
     {
-        StringData singleNullByte("\0", StringData::LiteralTag());
+        const auto singleNullByte = "\0"_sd;
         ASSERT_NOT_OK(regex.init("path", "pattern", singleNullByte));
     }
 
     {
-        StringData leadingNullByte("\0bbbb", StringData::LiteralTag());
+        const auto leadingNullByte = "\0bbbb"_sd;
         ASSERT_NOT_OK(regex.init("path", "pattern", leadingNullByte));
     }
 
     {
-        StringData trailingNullByte("bbbb\0", StringData::LiteralTag());
+        const auto trailingNullByte = "bbbb\0"_sd;
         ASSERT_NOT_OK(regex.init("path", "pattern", trailingNullByte));
     }
 }

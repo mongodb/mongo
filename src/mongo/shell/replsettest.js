@@ -306,6 +306,13 @@ var ReplSetTest = function(opts) {
             {ts: Timestamp(0, 0), t: NumberLong(0)};
     }
 
+    function _isEarlierTimestamp(ts1, ts2) {
+        if (ts1.getTime() == ts2.getTime()) {
+            return ts1.getInc() < ts2.getInc();
+        }
+        return ts1.getTime() < ts2.getTime();
+    }
+
     function _isEarlierOpTime(ot1, ot2) {
         // Make sure both optimes have a timestamp and a term.
         ot1 = ot1.t ? ot1 : {ts: ot1, t: NumberLong(-1)};
@@ -319,7 +326,7 @@ var ReplSetTest = function(opts) {
         }
 
         // Otherwise, choose the optime with the lower timestamp.
-        return ot1.ts < ot2.ts;
+        return _isEarlierTimestamp(ot1.ts, ot2.ts);
     }
 
     /**
@@ -819,8 +826,12 @@ var ReplSetTest = function(opts) {
         this.getPrimary();
         var res = {};
         res.master = this.liveNodes.master.getDB(db).runCommand("dbhash");
-        res.slaves = this.liveNodes.slaves.map(function(z) {
-            return z.getDB(db).runCommand("dbhash");
+        res.slaves = [];
+        this.liveNodes.slaves.forEach(function(node) {
+            var isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
+            if (!isArbiter) {
+                res.slaves.push(node.getDB(db).runCommand("dbhash"));
+            }
         });
         return res;
     };
@@ -967,10 +978,10 @@ var ReplSetTest = function(opts) {
             if (started.length) {
                 // if n was an array of conns, start will return an array of connections
                 for (var i = 0; i < started.length; i++) {
-                    jsTest.authenticate(started[i]);
+                    assert(jsTest.authenticate(started[i]), "Failed authentication during restart");
                 }
             } else {
-                jsTest.authenticate(started);
+                assert(jsTest.authenticate(started), "Failed authentication during restart");
             }
         }
         return started;
@@ -1299,6 +1310,32 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
                 // Check that *all* host properties are set correctly
                 var propOk = true;
                 for (var prop in hostOk) {
+                    // Use special comparator for tags because isMaster can return the fields in
+                    // different order. The fields of the tags should be treated like a set of
+                    // strings and 2 tags should be considered the same if the set is equal.
+                    if (prop == 'tags') {
+                        if (!clientHost.tags) {
+                            propOk = false;
+                            break;
+                        }
+
+                        for (var hostTag in hostOk.tags) {
+                            if (clientHost.tags[hostTag] != hostOk.tags[hostTag]) {
+                                propOk = false;
+                                break;
+                            }
+                        }
+
+                        for (var clientTag in clientHost.tags) {
+                            if (clientHost.tags[clientTag] != hostOk.tags[clientTag]) {
+                                propOk = false;
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
+
                     if (isObject(hostOk[prop])) {
                         if (!friendlyEqual(hostOk[prop], clientHost[prop])) {
                             propOk = false;

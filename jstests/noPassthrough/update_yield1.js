@@ -21,12 +21,10 @@
     const worksPerYield = 50;
 
     // Start a mongod that will yield every 50 work cycles.
-    // clang-format off
     var mongod = MongoRunner.runMongod({
         setParameter: `internalQueryExecYieldIterations=${worksPerYield}`,
         profile: 2,
     });
-    // clang-format on
     assert.neq(null, mongod, 'mongod was unable to start up');
 
     var coll = mongod.getDB('test').update_yield1;

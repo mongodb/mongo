@@ -25,37 +25,122 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
+#include <list>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
 
-class CollectionMetadata;
+class ScopedCollectionMetadata;
 
 class MetadataManager {
     MONGO_DISALLOW_COPYING(MetadataManager);
 
 public:
-    /**
-     * Creates a MetadataManager, setting the active metadata to the provided metadata
-     */
-    MetadataManager(std::unique_ptr<CollectionMetadata> initialMetadata);
+    MetadataManager();
 
     /**
-     * Returns the current active Metadata.
+     * An ActiveMetadata must be set before this function can be called.
+     *
+     * Increments the usage counter of the active metadata and returns an RAII object, which
+     * contains the currently active metadata.  When the usageCounter goes to zero, the RAII
+     * object going out of scope will call _removeMetadata.
      */
-    std::shared_ptr<CollectionMetadata> getActiveMetadata();
+    ScopedCollectionMetadata getActiveMetadata();
 
     /**
-     * Changes the active Metadata.
+     * Changes the active metadata and if there are current users of the current metadata,
+     * puts it in the _metadataInUse set.
      */
-    void setActiveMetadata(std::shared_ptr<CollectionMetadata> newMetadata);
+    void setActiveMetadata(std::unique_ptr<CollectionMetadata> newMetadata);
+
+    /**
+    * Adds a new range to be cleaned up.
+    * The newly introduced range must not overlap with the existing ranges.
+    */
+    void addRangeToClean(const ChunkRange& range);
+
+    /**
+     * Removes the specified range from the ranges to be cleaned up.
+     */
+    void removeRangeToClean(const ChunkRange& range);
+
+    /**
+     * Gets copy of _rangesToClean map (see below).
+     */
+    std::map<BSONObj, ChunkRange> getCopyOfRanges();
+
+    /*
+     * Appends information on all the chunk ranges in rangesToClean to builder.
+     */
+    void append(BSONObjBuilder* builder);
 
 private:
-    std::shared_ptr<CollectionMetadata> _activeMetadata;
+    friend class ScopedCollectionMetadata;
+
+    struct CollectionMetadataTracker {
+    public:
+        /**
+         * Creates a new CollectionMetadataTracker, with the usageCounter initialized to zero.
+         */
+        CollectionMetadataTracker(std::unique_ptr<CollectionMetadata> m);
+
+        std::unique_ptr<CollectionMetadata> metadata;
+        uint32_t usageCounter{0};
+    };
+
+    /**
+     * Removes the CollectionMetadata stored in the tracker from the _metadataInUse
+     * list (if it's there).
+     */
+    void _removeMetadata(CollectionMetadataTracker* metadataTracker);
+
+    std::unique_ptr<CollectionMetadataTracker> _activeMetadataTracker;
+
+    std::list<std::unique_ptr<CollectionMetadataTracker>> _metadataInUse;
+
+    // Contains the information of which ranges of sharding keys need to
+    // be deleted from the shard. The map is from the minimum value of the
+    // range to be deleted (e.g. BSON("key" << 0)) to the entire chunk range.
+    std::map<BSONObj, ChunkRange> _rangesToClean;
+};
+
+class ScopedCollectionMetadata {
+    MONGO_DISALLOW_COPYING(ScopedCollectionMetadata);
+
+public:
+    /**
+     * Decrements the usageCounter and conditionally makes a call to _removeMetadata on
+     * the tracker if the count has reached zero.
+     */
+    ~ScopedCollectionMetadata();
+
+    ScopedCollectionMetadata(ScopedCollectionMetadata&& other);
+    ScopedCollectionMetadata& operator=(ScopedCollectionMetadata&& other);
+
+    /**
+     * Dereferencing the ScopedCollectionMetadata will dereference the internal CollectionMetadata.
+     */
+    CollectionMetadata* operator->();
+    CollectionMetadata* getMetadata();
+
+private:
+    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata();
+
+    /**
+     * Increments the counter in the CollectionMetadataTracker.
+     */
+    ScopedCollectionMetadata(MetadataManager* manager,
+                             MetadataManager::CollectionMetadataTracker* tracker);
+
+    MetadataManager* _manager;
+    MetadataManager::CollectionMetadataTracker* _tracker;
 };
 
 }  // namespace mongo

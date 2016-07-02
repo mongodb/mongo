@@ -50,6 +50,7 @@ DEFAULTS = {
     "mongos": None,
     "mongosSetParameters": None,
     "nojournal": False,
+    "numClientsPerFixture": 1,
     "repeat": 1,
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
@@ -128,6 +129,9 @@ NO_JOURNAL = None
 # If true, then all mongod's started by resmoke.py and by the mongo shell will not preallocate
 # journal files.
 NO_PREALLOC_JOURNAL = None
+
+# If set, then each fixture runs tests with the specified number of clients.
+NUM_CLIENTS_PER_FIXTURE = None
 
 # If set, then the RNG is seeded with the specified value. Otherwise uses a seed based on the time
 # this module was loaded.

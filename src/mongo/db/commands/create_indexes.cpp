@@ -46,7 +46,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/scopeguard.h"
@@ -338,21 +338,17 @@ private:
                                               const BSONObj& newIdxKey) {
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
 
-        ShardingState* const shardingState = ShardingState::get(txn);
-
-        if (shardingState->enabled()) {
-            std::shared_ptr<CollectionMetadata> metadata(
-                shardingState->getCollectionMetadata(ns.toString()));
-            if (metadata) {
-                ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
-                if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {
-                    return Status(ErrorCodes::CannotCreateIndex,
-                                  str::stream() << "cannot create unique index over " << newIdxKey
-                                                << " with shard key pattern "
-                                                << shardKeyPattern.toBSON());
-                }
+        auto metadata(CollectionShardingState::get(txn, ns.toString())->getMetadata());
+        if (metadata) {
+            ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+            if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {
+                return Status(ErrorCodes::CannotCreateIndex,
+                              str::stream() << "cannot create unique index over " << newIdxKey
+                                            << " with shard key pattern "
+                                            << shardKeyPattern.toBSON());
             }
         }
+
 
         return Status::OK();
     }

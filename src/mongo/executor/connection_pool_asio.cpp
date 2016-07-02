@@ -190,8 +190,21 @@ void ASIOConnection::setup(Milliseconds timeout, SetupCallback cb) {
             cb(ptr, status);
         };
 
+        std::size_t generation;
+        {
+            stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
+            generation = _impl->_access->id;
+        }
+
         // Actually timeout setup
-        setTimeout(timeout, [this] { _impl->connection().stream().cancel(); });
+        setTimeout(timeout, [this, generation] {
+            stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
+            if (generation != _impl->_access->id) {
+                // The operation has been cleaned up, do not access.
+                return;
+            }
+            _impl->timeOut_inlock();
+        });
 
         _global->_impl->_connect(_impl.get());
     });

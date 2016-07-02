@@ -26,7 +26,7 @@ var collNested = mongos.getCollection("foo.barNested");
 var collHashed = mongos.getCollection("foo.barHashed");
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
-admin.runCommand({movePrimary: coll.getDB().toString(), to: shards[0]._id});
+st.ensurePrimaryShard(coll.getDB().toString(), shards[0]._id);
 
 //
 // Split the collection so that "abcde-0" and "abcde-1" go on different shards when possible

@@ -32,7 +32,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace executor {
@@ -41,39 +43,60 @@ Status TaskExecutorTest::getDetectableErrorStatus() {
     return Status(ErrorCodes::InternalError, "Not mutated");
 }
 
+void TaskExecutorTest::assertRemoteCommandNameEquals(StringData cmdName,
+                                                     const RemoteCommandRequest& request) {
+    auto&& cmdObj = request.cmdObj;
+    ASSERT_FALSE(cmdObj.isEmpty());
+    if (cmdName != cmdObj.firstElementFieldName()) {
+        std::string msg = str::stream()
+            << "Expected command name \"" << cmdName << "\" in remote command request but found \""
+            << cmdObj.firstElementFieldName() << "\" instead: " << request.toString();
+        FAIL(msg);
+    }
+}
+
 TaskExecutorTest::~TaskExecutorTest() = default;
 
 void TaskExecutorTest::setUp() {
     auto net = stdx::make_unique<NetworkInterfaceMock>();
     _net = net.get();
     _executor = makeTaskExecutor(std::move(net));
+    _executorState = LifecycleState::kPreStart;
 }
 
 void TaskExecutorTest::tearDown() {
-    if (_executorStarted) {
-        _executor->shutdown();
-        if (!_executorJoined) {
-            joinExecutorThread();
-        }
+    if (_executorState == LifecycleState::kRunning) {
+        shutdownExecutorThread();
     }
-    _executorStarted = false;
-    _executorJoined = false;
+    if (_executorState == LifecycleState::kJoinRequired) {
+        joinExecutorThread();
+    }
+    invariant(_executorState == LifecycleState::kPreStart ||
+              _executorState == LifecycleState::kShutdownComplete);
     _executor.reset();
 }
 
 void TaskExecutorTest::launchExecutorThread() {
-    invariant(!_executorStarted);
-    _executorStarted = true;
+    invariant(_executorState == LifecycleState::kPreStart);
     _executor->startup();
+    _executorState = LifecycleState::kRunning;
     postExecutorThreadLaunch();
 }
 
+void TaskExecutorTest::shutdownExecutorThread() {
+    invariant(_executorState == LifecycleState::kRunning);
+    _executor->shutdown();
+    _executorState = LifecycleState::kJoinRequired;
+}
+
 void TaskExecutorTest::joinExecutorThread() {
-    invariant(_executorStarted);
-    invariant(!_executorJoined);
+    // Tests may call shutdown() directly, bypassing the state change in shutdownExecutorThread().
+    invariant(_executorState == LifecycleState::kRunning ||
+              _executorState == LifecycleState::kJoinRequired);
     _net->exitNetwork();
-    _executorJoined = true;
+    _executorState = LifecycleState::kJoining;
     _executor->join();
+    _executorState = LifecycleState::kShutdownComplete;
 }
 
 void TaskExecutorTest::postExecutorThreadLaunch() {}

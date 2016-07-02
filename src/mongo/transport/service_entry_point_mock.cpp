@@ -65,8 +65,7 @@ void setOkResponse(Message* m) {
 
     // Set the message, transfer buffer ownership to Message
     m->reset();
-    m->setData(msg.view2ptr(), true);
-    b.decouple();
+    m->setData(b.release());
 }
 
 }  // namespace

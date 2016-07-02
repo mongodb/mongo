@@ -1,3 +1,5 @@
+load("jstests/replsets/rslib.js");
+
 /**
  * Test for making sure that the replica seed list in the config server does not
  * become invalid when a replica set reconfig happens.
@@ -35,11 +37,7 @@
 
     jsTest.log('Changing conf to ' + tojson(confDoc));
 
-    try {
-        priConn.getDB('admin').adminCommand({replSetReconfig: confDoc});
-    } catch (x) {
-        print('Expected exception because of reconfig' + x);
-    }
+    reconfig(replTest, confDoc);
 
     ReplSetTest.awaitRSClientHosts(mongos, {host: targetHostName}, {ok: true, ismaster: true});
 
@@ -47,26 +45,32 @@
     confDoc.members.shift();
     confDoc.version++;
 
-    try {
-        replTest.getPrimary().getDB('admin').adminCommand({replSetReconfig: confDoc});
-    } catch (x) {
-        print('Expected exception because of reconfig: ' + x);
-    }
+    reconfig(replTest, confDoc);
 
-    assert.soon(function() {
-        var connPoolStats = mongos.getDB('admin').runCommand('connPoolStats');
-        var replView = connPoolStats.replicaSets[replTest.name].hosts;
-        jsTest.log('current replView: ' + tojson(replView));
+    jsTest.log("Waiting for mongos to reflect change in shard replica set membership.");
+    var replView;
+    assert.soon(
+        function() {
+            var connPoolStats = mongos.getDB('admin').runCommand('connPoolStats');
+            replView = connPoolStats.replicaSets[replTest.name].hosts;
+            return replView.length == confDoc.members.length;
+        },
+        function() {
+            return ("Expected to find " + confDoc.members.length + " nodes but found " +
+                    replView.length + " in " + tojson(replView));
+        });
 
-        return replView.length == NODE_COUNT - 1;
-    });
-
-    assert.soon(function() {
-        shardDoc = mongos.getDB('config').shards.findOne();
-        jsTest.log('shardDoc: ' + tojson(shardDoc));
-        // seed list should contain one less node
-        return shardDoc.host.split(',').length == NODE_COUNT - 1;
-    });
+    jsTest.log("Waiting for config.shards to reflect change in shard replica set membership.");
+    assert.soon(
+        function() {
+            shardDoc = mongos.getDB('config').shards.findOne();
+            // seed list should contain one less node
+            return shardDoc.host.split(',').length == confDoc.members.length;
+        },
+        function() {
+            return ("Expected to find " + confDoc.members.length + " nodes but found " +
+                    shardDoc.host.split(',').length + " in " + shardDoc.host);
+        });
 
     st.stop();
 

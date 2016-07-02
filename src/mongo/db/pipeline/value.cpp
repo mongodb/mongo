@@ -241,6 +241,15 @@ Value::Value(const BSONArray& arr) : _storage(Array) {
     _storage.putVector(vec.get());
 }
 
+Value::Value(const vector<BSONObj>& arr) : _storage(Array) {
+    intrusive_ptr<RCVector> vec(new RCVector);
+    vec->vec.reserve(arr.size());
+    for (auto&& obj : arr) {
+        vec->vec.push_back(Value(obj));
+    }
+    _storage.putVector(vec.get());
+}
+
 Value Value::createIntOrLong(long long longValue) {
     int intValue = longValue;
     if (intValue != longValue) {

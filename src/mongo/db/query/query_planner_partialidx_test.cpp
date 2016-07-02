@@ -464,21 +464,6 @@ TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
     assertNumSolutions(0U);
 }
 
-TEST_F(QueryPlannerTest, PartialIndexFilterStringComparisonNonMatchingCollators) {
-    params.options = QueryPlannerParams::NO_TABLE_SCAN;
-    BSONObj filterObj(fromjson("{a: {$lt: {b: 'abc'}}}"));
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    std::unique_ptr<MatchExpression> filterExpr = parseMatchExpression(filterObj, &collator);
-    addIndex(fromjson("{a: 1}"), filterExpr.get(), &collator);
-
-    runQuery(fromjson("{a: {b: 1}}"));
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{filter: null, pattern: {a: 1}, "
-        "bounds: {a: [[{b: 1}, {b: 1}, true, true]]}}}}}");
-}
-
 TEST_F(QueryPlannerTest, PartialIndexNoStringComparisonNonMatchingCollators) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     BSONObj filterObj(fromjson("{a: {$gt: 0}}"));

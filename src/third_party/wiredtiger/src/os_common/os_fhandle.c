@@ -27,14 +27,15 @@ __fhandle_method_finalize(
 	/* not required: fadvise */
 	/* not required: fallocate */
 	/* not required: fallocate_nolock */
-	/* not required: lock */
+	WT_HANDLE_METHOD_REQ(fh_lock);
 	/* not required: map */
 	/* not required: map_discard */
 	/* not required: map_preload */
 	/* not required: map_unmap */
 	WT_HANDLE_METHOD_REQ(fh_read);
 	WT_HANDLE_METHOD_REQ(fh_size);
-	/* not required: sync */
+	if (!readonly)
+		WT_HANDLE_METHOD_REQ(fh_sync);
 	/* not required: sync_nowait */
 	if (!readonly) {
 		WT_HANDLE_METHOD_REQ(fh_truncate);

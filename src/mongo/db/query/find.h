@@ -109,13 +109,14 @@ StatusWith<std::unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* tx
 
 /**
  * Called from the getMore entry point in ops/query.cpp.
+ * Returned buffer is the message to return to the client.
  */
-QueryResult::View getMore(OperationContext* txn,
-                          const char* ns,
-                          int ntoreturn,
-                          long long cursorid,
-                          bool* exhaust,
-                          bool* isCursorAuthorized);
+Message getMore(OperationContext* txn,
+                const char* ns,
+                int ntoreturn,
+                long long cursorid,
+                bool* exhaust,
+                bool* isCursorAuthorized);
 
 /**
  * Run the query 'q' and place the result in 'result'.

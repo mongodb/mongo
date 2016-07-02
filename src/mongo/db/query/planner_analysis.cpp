@@ -200,7 +200,7 @@ void makeCartesianProduct(const IndexBounds& bounds,
  * a:[[1,1]], b:[MinKey, MaxKey]
  * a:[[2,2]], b:[MinKey, MaxKey]
  */
-void explodeScan(IndexScanNode* isn,
+void explodeScan(const IndexScanNode* isn,
                  const BSONObj& sort,
                  size_t fieldsToExplode,
                  vector<QuerySolutionNode*>* explosionResult) {
@@ -219,6 +219,8 @@ void explodeScan(IndexScanNode* isn,
         child->maxScan = isn->maxScan;
         child->addKeyMetadata = isn->addKeyMetadata;
         child->indexIsMultiKey = isn->indexIsMultiKey;
+        child->indexCollator = isn->indexCollator;
+        child->queryCollator = isn->queryCollator;
 
         // Copy the filter, if there is one.
         if (isn->filter.get()) {

@@ -38,6 +38,7 @@ using std::string;
 using mongoutils::str::stream;
 const BSONField<BSONObj> BatchedDeleteDocument::query("q");
 const BSONField<int> BatchedDeleteDocument::limit("limit");
+const BSONField<BSONObj> BatchedDeleteDocument::collation("collation");
 
 BatchedDeleteDocument::BatchedDeleteDocument() {
     clear();
@@ -80,6 +81,9 @@ BSONObj BatchedDeleteDocument::toBSON() const {
     if (_isLimitSet)
         builder.append(limit(), _limit);
 
+    if (_isCollationSet)
+        builder.append(collation(), _collation);
+
     return builder.obj();
 }
 
@@ -109,6 +113,11 @@ bool BatchedDeleteDocument::parseBSON(const BSONObj& source, string* errMsg) {
                 return false;
             }
             _isLimitSet = fieldState == FieldParser::FIELD_SET;
+        } else if (fieldName == collation.name()) {
+            fieldState = FieldParser::extract(field, collation, &_collation, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID)
+                return false;
+            _isCollationSet = fieldState == FieldParser::FIELD_SET;
         } else {
             *errMsg = str::stream() << "Unknown option in delete document: " << fieldName;
             return false;
@@ -123,6 +132,9 @@ void BatchedDeleteDocument::clear() {
 
     _limit = 0;
     _isLimitSet = false;
+
+    _collation = BSONObj();
+    _isCollationSet = false;
 }
 
 void BatchedDeleteDocument::cloneTo(BatchedDeleteDocument* other) const {
@@ -133,6 +145,9 @@ void BatchedDeleteDocument::cloneTo(BatchedDeleteDocument* other) const {
 
     other->_limit = _limit;
     other->_isLimitSet = _isLimitSet;
+
+    other->_collation = _collation;
+    other->_isCollationSet = _isCollationSet;
 }
 
 std::string BatchedDeleteDocument::toString() const {
@@ -173,6 +188,24 @@ bool BatchedDeleteDocument::isLimitSet() const {
 int BatchedDeleteDocument::getLimit() const {
     dassert(_isLimitSet);
     return _limit;
+}
+
+void BatchedDeleteDocument::setCollation(const BSONObj& collation) {
+    _collation = collation.getOwned();
+    _isCollationSet = true;
+}
+
+void BatchedDeleteDocument::unsetCollation() {
+    _isCollationSet = false;
+}
+
+bool BatchedDeleteDocument::isCollationSet() const {
+    return _isCollationSet;
+}
+
+const BSONObj& BatchedDeleteDocument::getCollation() const {
+    dassert(_isCollationSet);
+    return _collation;
 }
 
 }  // namespace mongo

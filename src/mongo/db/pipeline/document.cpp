@@ -256,8 +256,8 @@ BSONObj Document::toBson() const {
     return bb.obj();
 }
 
-const StringData Document::metaFieldTextScore("$textScore", StringData::LiteralTag());
-const StringData Document::metaFieldRandVal("$randVal", StringData::LiteralTag());
+const StringData Document::metaFieldTextScore("$textScore"_sd);
+const StringData Document::metaFieldRandVal("$randVal"_sd);
 
 BSONObj Document::toBsonWithMetaData() const {
     BSONObjBuilder bb;

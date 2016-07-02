@@ -71,6 +71,9 @@ TEST(UnitTestSelfTest, TestAssertThrowsSuccess) {
 
 class MyException {
 public:
+    std::string toString() const {
+        return what();
+    }
     std::string what() const {
         return "whatever";
     }

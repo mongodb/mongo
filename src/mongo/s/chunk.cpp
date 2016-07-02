@@ -347,7 +347,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             return false;
         }
 
-        bool shouldBalance = balancerConfig->isBalancerActive();
+        bool shouldBalance = balancerConfig->shouldBalanceForAutoSplit();
         if (shouldBalance) {
             auto collStatus = grid.catalogClient(txn)->getCollection(txn, _manager->getns());
             if (!collStatus.isOK()) {
@@ -443,7 +443,8 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
                                                       ChunkType::ConfigNS,
                                                       BSON(ChunkType::name(chunkName)),
                                                       BSON("$set" << BSON(ChunkType::jumbo(true))),
-                                                      false);
+                                                      false,
+                                                      ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
         warning() << "couldn't set jumbo for chunk: " << chunkName << causedBy(status.getStatus());
     }

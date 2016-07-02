@@ -114,7 +114,7 @@ public:
         init(bsonData);
     }
 
-    explicit BSONObj(SharedBuffer ownedBuffer)
+    explicit BSONObj(ConstSharedBuffer ownedBuffer)
         : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata()),
           _ownedBuffer(std::move(ownedBuffer)) {}
 
@@ -175,7 +175,27 @@ public:
        @return true if this is in owned mode
     */
     bool isOwned() const {
-        return _ownedBuffer.get() != 0;
+        return bool(_ownedBuffer);
+    }
+
+    /**
+     * Share ownership with another object.
+     *
+     * It is the callers responsibility to ensure that the other object is owned and contains the
+     * data this BSONObj is viewing. This can happen if this is a subobject or sibling object
+     * contained in a larger buffer.
+     */
+    void shareOwnershipWith(ConstSharedBuffer buffer) {
+        invariant(buffer);
+        _ownedBuffer = buffer;
+    }
+    void shareOwnershipWith(const BSONObj& other) {
+        shareOwnershipWith(other.sharedBuffer());
+    }
+
+    ConstSharedBuffer sharedBuffer() const {
+        invariant(isOwned());
+        return _ownedBuffer;
     }
 
     /** If the data buffer is under the control of this BSONObj, return it.
@@ -540,19 +560,6 @@ public:
     template <typename T>
     bool coerceVector(std::vector<T>* out) const;
 
-    typedef SharedBuffer::Holder Holder;
-
-    /** Given a pointer to a region of un-owned memory containing BSON data, prefixed by
-     *  sufficient space for a BSONObj::Holder object, return a BSONObj that owns the
-     *  memory.
-     *
-     * This class will call free(holderPrefixedData), so it must have been allocated in a way
-     * that makes that valid.
-     */
-    static BSONObj takeOwnership(char* holderPrefixedData) {
-        return BSONObj(SharedBuffer::takeOwnership(holderPrefixedData));
-    }
-
     /// members for Sorter
     struct SorterDeserializeSettings {};  // unused
     void serializeForSorter(BufBuilder& buf) const {
@@ -586,7 +593,7 @@ private:
     Status _okForStorage(bool root, bool deep) const;
 
     const char* _objdata;
-    SharedBuffer _ownedBuffer;
+    ConstSharedBuffer _ownedBuffer;
 };
 
 std::ostream& operator<<(std::ostream& s, const BSONObj& o);

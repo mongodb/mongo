@@ -112,8 +112,14 @@ Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId
                     return parseStatus.getStatus();
                 }
 
+                // Use the last committed optime to advance config optime.
+                // For successful majority writes, we could use the optime of the last op
+                // from us and lastOpCommitted is always greater than or equal to it.
+                // On majority write failures, the last visible optime would be incorrect
+                // due to rollback as explained in SERVER-24630 and the last committed optime
+                // is safe to use.
                 const auto& replMetadata = parseStatus.getValue();
-                auto opTime = replMetadata.getLastOpVisible();
+                auto opTime = replMetadata.getLastOpCommitted();
                 grid.advanceConfigOpTime(opTime);
             }
         } else {

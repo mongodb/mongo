@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
+#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -98,7 +99,6 @@ class RecordCursor;
         DocumentSource::registerParser("$" #key, (parser));                      \
         return Status::OK();                                                     \
     }
-
 
 class DocumentSource : public IntrusiveCounterUnsigned {
 public:
@@ -225,6 +225,10 @@ public:
      */
     virtual void addInvolvedCollections(std::vector<NamespaceString>* collections) const {}
 
+    virtual void detachFromOperationContext() {}
+
+    virtual void reattachToOperationContext(OperationContext* opCtx) {}
+
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
@@ -308,7 +312,7 @@ protected:
  *  It causes a MongodInterface to be injected when in a mongod and prevents mongos from
  *  merging pipelines containing this stage.
  */
-class DocumentSourceNeedsMongod {
+class DocumentSourceNeedsMongod : public DocumentSource {
 public:
     // Wraps mongod-specific functions to allow linking into mongos.
     class MongodInterface {
@@ -345,17 +349,49 @@ public:
 
         virtual bool hasUniqueIdIndex(const NamespaceString& ns) const = 0;
 
+        /**
+         * Appends operation latency statistics for collection "nss" to "builder"
+         */
+        virtual void appendLatencyStats(const NamespaceString& nss,
+                                        BSONObjBuilder* builder) const = 0;
+
         // Add new methods as needed.
     };
 
+    DocumentSourceNeedsMongod(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(expCtx) {}
+
     void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
         _mongod = mongod;
+        doInjectMongodInterface(mongod);
     }
 
-    void setOperationContext(OperationContext* opCtx) {
+    /**
+     * Derived classes may override this method to register custom inject functionality.
+     */
+    virtual void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) {}
+
+    void detachFromOperationContext() override {
+        invariant(_mongod);
+        _mongod->setOperationContext(nullptr);
+        doDetachFromOperationContext();
+    }
+
+    /**
+     * Derived classes may override this method to register custom detach functionality.
+     */
+    virtual void doDetachFromOperationContext() {}
+
+    void reattachToOperationContext(OperationContext* opCtx) final {
         invariant(_mongod);
         _mongod->setOperationContext(opCtx);
+        doReattachToOperationContext(opCtx);
     }
+
+    /**
+     * Derived classes may override this method to register custom reattach functionality.
+     */
+    virtual void doReattachToOperationContext(OperationContext* opCtx) {}
 
 protected:
     // It is invalid to delete through a DocumentSourceNeedsMongod-typed pointer.
@@ -631,7 +667,7 @@ private:
  * Provides a document source interface to retrieve index statistics for a given namespace.
  * Each document returned represents a single index and mongod instance.
  */
-class DocumentSourceIndexStats final : public DocumentSource, public DocumentSourceNeedsMongod {
+class DocumentSourceIndexStats final : public DocumentSourceNeedsMongod {
 public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
@@ -842,6 +878,8 @@ private:
 class DocumentSourceMock : public DocumentSource {
 public:
     DocumentSourceMock(std::deque<Document> docs);
+    DocumentSourceMock(std::deque<Document> docs,
+                       const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     boost::optional<Document> getNext() override;
     const char* getSourceName() const override;
@@ -863,16 +901,29 @@ public:
     static boost::intrusive_ptr<DocumentSourceMock> create(
         const std::initializer_list<const char*>& jsons);
 
+    void reattachToOperationContext(OperationContext* opCtx) {
+        isDetachedFromOpCtx = false;
+    }
+
+    void detachFromOperationContext() {
+        isDetachedFromOpCtx = true;
+    }
+
+    boost::intrusive_ptr<DocumentSource> optimize() override {
+        isOptimized = true;
+        return this;
+    }
+
     // Return documents from front of queue.
     std::deque<Document> queue;
-    bool disposed = false;
+    bool isDisposed = false;
+    bool isDetachedFromOpCtx = false;
+    bool isOptimized = false;
 
     BSONObjSet sorts;
 };
 
-class DocumentSourceOut final : public DocumentSource,
-                                public SplittableDocumentSource,
-                                public DocumentSourceNeedsMongod {
+class DocumentSourceOut final : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
     ~DocumentSourceOut() final;
@@ -927,46 +978,41 @@ private:
 
 class DocumentSourceProject final : public DocumentSource {
 public:
-    // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+    void dispose() final;
+
+    /**
+     * Adds any paths that are included via this projection, or that are referenced by any
+     * expressions.
+     */
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
     /**
      * Attempt to move a subsequent $skip or $limit stage before the $project, thus reducing the
      * number of documents that pass through this stage.
      */
     Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
                                                    Pipeline::SourceContainer* container) final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
-    Value serialize(bool explain = false) const final;
-
-    virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
 
     /**
-      Create a new projection DocumentSource from BSON.
+     * Optimize any expressions being used in this stage.
+     */
+    boost::intrusive_ptr<DocumentSource> optimize() final;
 
-      This is a convenience for directly handling BSON, and relies on the
-      above methods.
-
-      @param pBsonElement the BSONElement with an object named $project
-      @param pExpCtx the expression context for the pipeline
-      @returns the created projection
+    /**
+     * Parse the projection from the user-supplied BSON.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    /** projection as specified by the user */
-    BSONObj getRaw() const {
-        return _raw;
-    }
-
 private:
-    DocumentSourceProject(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                          const boost::intrusive_ptr<ExpressionObject>& exprObj);
+    DocumentSourceProject(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> parsedProject);
 
-    // configuration state
-    std::unique_ptr<Variables> _variables;
-    boost::intrusive_ptr<ExpressionObject> pEO;
-    BSONObj _raw;
+    std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> _parsedProject;
 };
 
 class DocumentSourceRedact final : public DocumentSource {
@@ -1396,7 +1442,7 @@ public:
         const boost::optional<std::string>& includeArrayIndex);
 
     std::string getUnwindPath() const {
-        return _unwindPath.getPath(false);
+        return _unwindPath.fullPath();
     }
 
     bool preserveNullAndEmptyArrays() const {
@@ -1427,9 +1473,7 @@ private:
     std::unique_ptr<Unwinder> _unwinder;
 };
 
-class DocumentSourceGeoNear : public DocumentSource,
-                              public SplittableDocumentSource,
-                              public DocumentSourceNeedsMongod {
+class DocumentSourceGeoNear : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     static const long long kDefaultLimit;
 
@@ -1447,7 +1491,7 @@ public:
     }
     Value serialize(bool explain = false) const final;
     BSONObjSet getOutputSorts() final {
-        return {BSON(distanceField->getPath(false) << -1)};
+        return {BSON(distanceField->fullPath() << -1)};
     }
 
     // Virtuals for SplittableDocumentSource
@@ -1500,9 +1544,8 @@ private:
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSource,
-                                   public SplittableDocumentSource,
-                                   public DocumentSourceNeedsMongod {
+class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
+                                   public SplittableDocumentSource {
 public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
@@ -1517,7 +1560,7 @@ public:
     void dispose() final;
 
     BSONObjSet getOutputSorts() final {
-        return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.getPath(false)});
+        return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.fullPath()});
     }
 
     bool needsPrimaryShard() const final {
@@ -1577,7 +1620,7 @@ private:
     boost::optional<Document> _input;
 };
 
-class DocumentSourceGraphLookUp final : public DocumentSource, public DocumentSourceNeedsMongod {
+class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod {
 public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
@@ -1592,7 +1635,7 @@ public:
                                                    Pipeline::SourceContainer* container) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        _startWith->addDependencies(deps, nullptr);
+        _startWith->addDependencies(deps);
         return SEE_NEXT;
     };
 
@@ -1719,4 +1762,38 @@ public:
 private:
     DocumentSourceSortByCount() = default;
 };
-}
+
+class DocumentSourceCount final {
+public:
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceCount() = default;
+};
+
+/**
+ * Provides a document source interface to retrieve collection-level statistics for a given
+ * collection.
+ */
+class DocumentSourceCollStats : public DocumentSourceNeedsMongod {
+public:
+    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+        : DocumentSourceNeedsMongod(pExpCtx) {}
+
+    boost::optional<Document> getNext() final;
+
+    const char* getSourceName() const final;
+
+    bool isValidInitialSource() const final;
+
+    Value serialize(bool explain = false) const;
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    bool _latencySpecified = false;
+    bool _finished = false;
+};
+}  // namespace mongo

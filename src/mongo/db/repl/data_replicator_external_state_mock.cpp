@@ -41,6 +41,10 @@ DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
                       const MultiApplier::Operations& ops,
                       MultiApplier::ApplyOperationFn) { return ops.back().getOpTime(); }) {}
 
+executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const {
+    return taskExecutor;
+}
+
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
     return {currentTerm, lastCommittedOpTime};
 }
@@ -57,24 +61,30 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& sour
     return shouldStopFetchingResult;
 }
 
-std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer() const {
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeSteadyStateOplogBuffer() const {
+std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeSteadyStateOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
+}
+
+StatusWith<ReplicaSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
+    return replSetConfig;
 }
 
 StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
     OperationContext* txn,
-    const MultiApplier::Operations& ops,
+    MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return multiApplyFn(txn, ops, applyOperation);
+    return multiApplyFn(txn, std::move(ops), applyOperation);
 }
 
-void DataReplicatorExternalStateMock::_multiSyncApply(const MultiApplier::Operations& ops) {}
+void DataReplicatorExternalStateMock::_multiSyncApply(MultiApplier::OperationPtrs* ops) {}
 
-void DataReplicatorExternalStateMock::_multiInitialSyncApply(const MultiApplier::Operations& ops,
+void DataReplicatorExternalStateMock::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                                              const HostAndPort& source) {}
 
 }  // namespace repl

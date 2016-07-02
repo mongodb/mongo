@@ -97,6 +97,11 @@ public:
 
     /** throws AssertionException if get back { $err : ... } */
     BSONObj nextSafe();
+    BSONObj nextSafeOwned() {
+        BSONObj out = nextSafe();
+        out.shareOwnershipWith(batch.m.sharedBuffer());
+        return out;
+    }
 
     /** peek ahead at items buffered for future next() calls.
         never requests new data from the server.  so peek only effective

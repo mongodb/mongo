@@ -88,11 +88,18 @@ public:
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) = 0;
 
     /**
+     * Returns true if an incomplete initial sync is detected.
+     */
+    virtual bool isInitialSyncFlagSet(OperationContext* txn) = 0;
+
+    /**
      * Starts steady state sync for replica set member -- legacy impl not in DataReplicator.
      *
      * NOTE: Use either this or the Master/Slave version, but not both.
      */
-    virtual void startSteadyStateReplication() = 0;
+    virtual void startSteadyStateReplication(OperationContext* txn) = 0;
+
+    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) = 0;
 
     /**
      * Starts the Master/Slave threads and sets up logOp
@@ -104,6 +111,11 @@ public:
      * the threads it started.
      */
     virtual void shutdown(OperationContext* txn) = 0;
+
+    /**
+     * Returns task executor for scheduling tasks to be run asynchronously.
+     */
+    virtual executor::TaskExecutor* getTaskExecutor() const = 0;
 
     /**
      * Creates the oplog, writes the first entry and stores the replica set config document.
@@ -268,30 +280,32 @@ public:
      * "applyOperation" function.
      */
     virtual StatusWith<OpTime> multiApply(OperationContext* txn,
-                                          const MultiApplier::Operations& ops,
+                                          MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
      * Used by multiApply() to writes operations to database during steady state replication.
      */
-    virtual void multiSyncApply(const MultiApplier::Operations& ops) = 0;
+    virtual void multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
     /**
      * Used by multiApply() to writes operations to database during initial sync.
      * Fetches missing documents from "source".
      */
-    virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
+    virtual void multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                        const HostAndPort& source) = 0;
 
     /**
      * This function creates an oplog buffer of the type specified at server startup.
      */
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
+        OperationContext* txn) const = 0;
 
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const = 0;
 
     /**
      * Returns true if the user specified to use the data replicator for initial sync.

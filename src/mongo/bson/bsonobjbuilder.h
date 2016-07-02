@@ -65,15 +65,8 @@ class BSONObjBuilder {
 public:
     /** @param initsize this is just a hint as to the final size of the object */
     BSONObjBuilder(int initsize = 512)
-        : _b(_buf),
-          _buf(sizeof(BSONObj::Holder) + initsize),
-          _offset(sizeof(BSONObj::Holder)),
-          _s(this),
-          _tracker(0),
-          _doneCalled(false) {
-        // Skip over space for a holder object at the beginning of the buffer, followed by
-        // space for the object length. The length is filled in by _done.
-        _b.skip(sizeof(BSONObj::Holder));
+        : _b(_buf), _buf(initsize), _offset(0), _s(this), _tracker(0), _doneCalled(false) {
+        // Skip over space for the object length. The length is filled in by _done.
         _b.skip(sizeof(int));
 
         // Reserve space for the EOO byte. This means _done() can't fail.
@@ -119,13 +112,12 @@ public:
 
     BSONObjBuilder(const BSONSizeTracker& tracker)
         : _b(_buf),
-          _buf(sizeof(BSONObj::Holder) + tracker.getSize()),
-          _offset(sizeof(BSONObj::Holder)),
+          _buf(tracker.getSize()),
+          _offset(0),
           _s(this),
           _tracker(const_cast<BSONSizeTracker*>(&tracker)),
           _doneCalled(false) {
         // See the comments in the first constructor for details.
-        _b.skip(sizeof(BSONObj::Holder));
         _b.skip(sizeof(int));
 
         // Reserve space for the EOO byte. This means _done() can't fail.
@@ -639,9 +631,7 @@ public:
     BSONObj obj() {
         massert(10335, "builder does not own memory", owned());
         doneFast();
-        char* buf = _b.buf();
-        decouple();
-        return BSONObj::takeOwnership(buf);
+        return BSONObj(_b.release());
     }
 
     /** Fetch the object we have built.
@@ -679,10 +669,6 @@ public:
      */
     void abandon() {
         _doneCalled = true;
-    }
-
-    void decouple() {
-        _b.decouple();  // post done() call version.  be sure jsobj frees...
     }
 
     void appendKeys(const BSONObj& keyPattern, const BSONObj& values);

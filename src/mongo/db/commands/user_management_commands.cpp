@@ -63,7 +63,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_request.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
@@ -1194,8 +1193,6 @@ public:
                     return appendCommandStatus(result, status);
                 }
 
-                userDetails = _redactPrivilegesForBackwardsCompabilityIfNeeded(txn, userDetails);
-
                 if (!args.showCredentials) {
                     // getUserDescription always includes credentials, need to strip it out
                     BSONObjBuilder userWithoutCredentials(usersArrayBuilder.subobjStart());
@@ -1241,48 +1238,6 @@ public:
         return true;
     }
 
-private:
-    /**
-     * Gets the Protocol from 'txn' of the operation being run to determine if it was from
-     * OP_COMMAND or OP_QUERY.  If OP_COMMAND, returns the input user document unmodified.
-     * If OP_QUERY, assumes that means it is a 3.0 mongos talking to us, and returns a modified
-     * version of the input user doc, with all privileges containing the 'bypassDocumentValidation'
-     * modified to remove that action.  This is because when a 3.0 mongos parses the privileges from
-     * a user document at authentication time, it skips any privileges containing any actions it
-     * doesn't know about, and 'bypassDocumentValidation' was added for 3.2 so a 3.0 mongos will not
-     * recognize it.
-     * NOTE: This means that if a user connects directly to mongod with a driver that doesn't use
-     * OP_COMMAND and runs usersInfo with 'showPrivileges':true, they won't see any privileges
-     * containing 'bypassDocumentValidation', even if the user in question actually does possess
-     * that action.
-     * See SERVER-21486 and SERVER-21659 for more details.
-     * TODO(SERVER-21561): Remove this after 3.2
-     */
-    BSONObj _redactPrivilegesForBackwardsCompabilityIfNeeded(OperationContext* txn,
-                                                             BSONObj userDoc) {
-        if (rpc::getOperationProtocol(txn) != rpc::Protocol::kOpQuery) {
-            return userDoc;
-        }
-
-        namespace mmb = mutablebson;
-        bool changed = false;
-        mmb::Document redacted(userDoc, mmb::Document::kInPlaceDisabled);
-        mmb::Element privilegesArray =
-            mmb::findFirstChildNamed(redacted.root(), "inheritedPrivileges");
-        for (auto privilegeElement = privilegesArray.leftChild(); privilegeElement.ok();
-             privilegeElement = privilegeElement.rightSibling()) {
-            auto actionsArray = mmb::findFirstChildNamed(privilegeElement, "actions");
-            for (auto actionElement = actionsArray.leftChild(); actionElement.ok();) {
-                auto nextActionElement = actionElement.rightSibling();
-                if (actionElement.getValueString() == "bypassDocumentValidation") {
-                    invariantOK(actionElement.remove());
-                    changed = true;
-                }
-                actionElement = nextActionElement;
-            }
-        }
-        return changed ? redacted.getObject().getOwned() : userDoc;
-    }
 } cmdUsersInfo;
 
 class CmdCreateRole : public Command {

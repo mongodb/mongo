@@ -65,6 +65,7 @@
 
     assert.lt(
         oldVersion.t, newVersion.t, "The major value in the shard version should have increased");
+    assert.eq(1, newVersion.i, "The minor value in the shard version should be 1");
 
     // Run a migration to move off the shard's last chunk in the collection. The collection's
     // shardVersion will be reset.

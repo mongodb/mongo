@@ -33,10 +33,12 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
 
+class BatchedCommandResponse;
 class OperationContext;
 class RemoteCommandTargeter;
 
@@ -55,6 +57,14 @@ public:
               metadata(std::move(_metadata)),
               commandStatus(std::move(_commandStatus)),
               writeConcernStatus(std::move(_writeConcernStatus)) {}
+
+        /**
+         * Takes the response from running a batch write command and writes the appropriate response
+         * into batchResponse, while also returning the Status of the operation.
+         */
+        static Status processBatchWriteResponse(StatusWith<CommandResponse> response,
+                                                BatchedCommandResponse* batchResponse);
+
         BSONObj response;
         BSONObj metadata;
         Status commandStatus;
@@ -138,13 +148,28 @@ public:
     * Warning: This method exhausts the cursor and pulls all data into memory.
     * Do not use other than for very small (i.e., admin or metadata) collections.
     * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
+    *
+    * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
+    * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
     */
     StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
                                                      const ReadPreferenceSetting& readPref,
+                                                     const repl::ReadConcernLevel& readConcernLevel,
                                                      const NamespaceString& nss,
                                                      const BSONObj& query,
                                                      const BSONObj& sort,
                                                      const boost::optional<long long> limit);
+    /**
+     * Builds an index on a config server collection.
+     * Creates the collection if it doesn't yet exist.  Does not error if the index already exists,
+     * so long as the options are the same.
+     * NOTE: Currently only supported for LocalShard.
+     */
+    virtual Status createIndexOnConfig(OperationContext* txn,
+                                       const NamespaceString& ns,
+                                       const BSONObj& keys,
+                                       bool unique) = 0;
+
 
 protected:
     Shard(const ShardId& id);
@@ -155,12 +180,14 @@ private:
                                                     const std::string& dbname,
                                                     const BSONObj& cmdObj) = 0;
 
-    virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
-                                                              const ReadPreferenceSetting& readPref,
-                                                              const NamespaceString& nss,
-                                                              const BSONObj& query,
-                                                              const BSONObj& sort,
-                                                              boost::optional<long long> limit) = 0;
+    virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
+        OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcernLevel,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit) = 0;
 
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).

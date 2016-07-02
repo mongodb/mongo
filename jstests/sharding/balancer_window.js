@@ -43,45 +43,6 @@
         };
     };
 
-    /**
-     * Waits until at least one balancing round has passed.
-     *
-     * Note: This relies on the fact that the balancer pings the config.mongos document every round.
-     */
-    var waitForAtLeastOneBalanceRound = function(mongosHost, timeoutMS) {
-        var mongos = new Mongo(mongosHost);
-        var configDB = mongos.getDB('config');
-
-        // Wait for ts to change twice because:
-        // 1st: for start of the balancing round.
-        // 2nd: for the start of the next round, which implies that the previous one has ended.
-        var waitForTSChangeNTimes = 2;
-        var lastPing = new Date(0);
-
-        assert.soon(
-            function() {
-                // Note: The balancer pings twice, once with { waiting: false } at the beginning
-                // and another { waiting: true } at the end. Poll for the negative edge since
-                // the smallest granurality should be a second, if for some reason the interval
-                // became less than a second, it can cause this to miss the negative edge and
-                // wake it wait longer than it should.
-                var currentPing = configDB.mongos.findOne({_id: mongosHost, waiting: true});
-                if (currentPing == null) {
-                    return false;
-                }
-
-                if (currentPing.ping.valueOf() != lastPing.valueOf()) {
-                    waitForTSChangeNTimes--;
-                    lastPing = currentPing.ping;
-                }
-
-                return waitForTSChangeNTimes <= 0;
-            },
-            'Timed out waiting for mongos ping to change ' + waitForTSChangeNTimes + ' more times',
-            timeoutMS,
-            500);
-    };
-
     var st = new ShardingTest({shards: 2});
     var configDB = st.s.getDB('config');
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
@@ -102,12 +63,12 @@
                                                       start: hourMinStart.addHour(-2).toString(),
                                                       stop: hourMinStart.addHour(-1).toString()
                                                   },
-                                                  stopped: false,
                                               }
                                             },
                                             true));
+    st.startBalancer();
 
-    waitForAtLeastOneBalanceRound(st.s.host, 60 * 1000);
+    st.awaitBalancerRound();
 
     var shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: 'shard0000'}).count();
     assert.eq(shard0Chunks, shard0ChunksAfter);
@@ -122,7 +83,7 @@
         },
         true));
 
-    waitForAtLeastOneBalanceRound(st.s.host, 60 * 1000);
+    st.awaitBalancerRound();
 
     shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: 'shard0000'}).count();
     assert.neq(shard0Chunks, shard0ChunksAfter);

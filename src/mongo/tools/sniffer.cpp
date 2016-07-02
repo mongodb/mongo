@@ -82,6 +82,7 @@ using mongo::BufBuilder;
 using mongo::DBClientConnection;
 using mongo::MemoryMappedFile;
 using std::string;
+namespace MsgData = mongo::MsgData;
 
 #define SNAP_LEN 65535
 
@@ -176,6 +177,13 @@ map<Connection, map<long long, long long>> mapCursor;
 
 void processMessage(Connection& c, Message& d);
 
+Message copyToMessage(const char* source) {
+    auto msgLen = MsgData::ConstView(source).getLen();
+    auto msgData = mongo::SharedBuffer::allocate(msgLen);
+    memcpy(msgData.get(), source, msgLen);
+    return Message(std::move(msgData));
+}
+
 void got_packet(u_char* args, const struct pcap_pkthdr* header, const u_char* packet) {
     const struct sniff_ip* ip = (struct sniff_ip*)(packet + captureHeaderSize);
     int size_ip = IP_HL(ip) * 4;
@@ -225,7 +233,7 @@ void got_packet(u_char* args, const struct pcap_pkthdr* header, const u_char* pa
     Message m;
 
     if (bytesRemainingInMessage[c] == 0) {
-        m.setData(const_cast<char*>(reinterpret_cast<const char*>(payload)), false);
+        m = copyToMessage(reinterpret_cast<const char*>(payload));
         if (!m.header().valid()) {
             cerr << "Invalid message start, skipping packet." << endl;
             return;
@@ -251,8 +259,7 @@ void got_packet(u_char* args, const struct pcap_pkthdr* header, const u_char* pa
         }
         if (bytesRemainingInMessage[c] > 0)
             return;
-        m.setData(messageBuilder[c]->buf(), true);
-        messageBuilder[c]->decouple();
+        m.setData(messageBuilder[c]->release());
         messageBuilder[c].reset();
     }
 
@@ -454,7 +461,7 @@ void processDiagLog(const char* file) {
 
     long read = 0;
     while (read < length) {
-        Message m(pos, false);
+        Message m = copyToMessage(pos);
         int len = m.header().getLen();
         DbMessage d(m);
         cout << len << " " << d.getns() << endl;

@@ -26,29 +26,24 @@
         }
     });
 
-    var db = s.getDB("test");
-    var bulk = db.foo.initializeUnorderedBulkOp();
+    var coll = s.s0.getCollection("test.foo");
+    var bulk = coll.initializeUnorderedBulkOp();
     for (var i = 0; i < 2100; i++) {
         bulk.insert({_id: i, x: i});
     }
     assert.writeOK(bulk.execute());
 
-    assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'test-rs0');
-    assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
+    assert.commandWorked(s.s0.adminCommand({enablesharding: coll.getDB() + ""}));
+    s.ensurePrimaryShard(coll.getDB() + "", s.shard0.shardName);
+    assert.commandWorked(s.s0.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
 
     for (i = 0; i < 20; i++) {
-        assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {_id: i * 100}}));
+        assert.commandWorked(s.s0.adminCommand({split: coll + "", middle: {_id: i * 100}}));
     }
 
-    assert.eq(2100, db.foo.find().itcount());
-
-    var coll = db.foo;
+    assert.eq(2100, coll.find().itcount());
     coll.setSlaveOk();
     assert.eq(2100, coll.find().itcount());
-
-    var dbPrimaryShardId = s.getPrimaryShardIdForDatabase("test");
-    var other = s.config.shards.findOne({_id: {$ne: dbPrimaryShardId}});
 
     for (i = 0; i < 20; i++) {
         // Needs to waitForDelete because we'll be performing a slaveOk query, and secondaries don't
@@ -56,7 +51,7 @@
         assert.commandWorked(s.s0.adminCommand({
             moveChunk: "test.foo",
             find: {_id: i * 100},
-            to: other._id,
+            to: s.shard1.shardName,
             _secondaryThrottle: true,
             writeConcern: {w: 2},
             _waitForDelete: true

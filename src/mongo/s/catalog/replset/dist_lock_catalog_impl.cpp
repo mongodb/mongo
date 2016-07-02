@@ -209,12 +209,12 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus =
-        _client->getConfigShard()->runCommand(txn,
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              _locksNS.db().toString(),
-                                              request.toBSON(),
-                                              Shard::RetryPolicy::kNotIdempotent);
+    auto resultStatus = _client->getConfigShard()->runCommand(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        _locksNS.db().toString(),
+        request.toBSON(),
+        Shard::RetryPolicy::kNoRetry);  // Dist lock manager is handling own retries
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     if (!findAndModifyStatus.isOK()) {
@@ -464,8 +464,8 @@ StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto result =
-        _client->getConfigShard()->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+    auto result = _client->getConfigShard()->exhaustiveFindOnConfig(
+        txn, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
     if (!result.isOK()) {
         return result.getStatus();
     }

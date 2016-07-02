@@ -33,6 +33,7 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -149,8 +150,6 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
                 return status;
 
             _val = _valDoc.root().leftChild();
-
-            deduplicate(_val, mb::woLess(false), mb::woEqual(false));
         }
     }
 
@@ -198,11 +197,16 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
         valCursor = valCursor.rightSibling();
     }
 
+    _collator = opts.collator;
+
     return Status::OK();
 }
 
 Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, ExecInfo* execInfo) {
     _preparedState.reset(new PreparedState(root.getDocument()));
+
+    // Deduplicate _val (must be performed after collator is set to final value.)
+    deduplicate(_val, mb::woLess(false, _collator), mb::woEqual(false, _collator));
 
     // If we have a $-positional field, it is time to bind it to an actual field part.
     if (_posDollar) {
@@ -267,8 +271,8 @@ Status ModifierAddToSet::prepare(mb::Element root, StringData matchedField, Exec
     // the element is not present, record it as one to add.
     mb::Element eachIter = _val.leftChild();
     while (eachIter.ok()) {
-        mb::Element where =
-            mb::findElement(_preparedState->elemFound.leftChild(), mb::woEqualTo(eachIter, false));
+        mb::Element where = mb::findElement(_preparedState->elemFound.leftChild(),
+                                            mb::woEqualTo(eachIter, false, _collator));
         if (!where.ok()) {
             // The element was not found. Record the element from $each as one to be added.
             _preparedState->elementsToAdd.push_back(eachIter);

@@ -79,6 +79,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/shard_id',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
     ]
 )
 

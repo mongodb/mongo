@@ -33,27 +33,17 @@
 #include "mongo/db/repl/sync_source_feedback.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/reporter.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/exit.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-using std::endl;
-using std::string;
-
 namespace repl {
 
 namespace {
@@ -162,18 +152,8 @@ void SyncSourceFeedback::shutdown() {
     _cond.notify_all();
 }
 
-void SyncSourceFeedback::run(BackgroundSync* bgsync) {
+void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* bgsync) {
     Client::initThread("SyncSourceFeedback");
-
-    // Task executor used to run replSetUpdatePosition command on sync source.
-    auto net = executor::makeNetworkInterface("NetworkInterfaceASIO-SyncSourceFeedback");
-    auto pool = stdx::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
-    executor::ThreadPoolTaskExecutor executor(std::move(pool), std::move(net));
-    executor.startup();
-    ON_BLOCK_EXIT([&executor]() {
-        executor.shutdown();
-        executor.join();
-    });
 
     HostAndPort syncTarget;
 
@@ -241,7 +221,7 @@ void SyncSourceFeedback::run(BackgroundSync* bgsync) {
         }
 
         Reporter reporter(
-            &executor,
+            executor,
             makePrepareReplSetUpdatePositionCommandFn(txn.get(), _mtx, syncTarget, bgsync),
             syncTarget,
             keepAliveInterval);

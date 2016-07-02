@@ -143,6 +143,11 @@ void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
     }
 }
 
+Status MultiIndexBlock::init(const BSONObj& spec) {
+    const auto indexes = std::vector<BSONObj>(1, spec);
+    return init(indexes);
+}
+
 Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
     WriteUnitOfWork wunit(_txn);
 
@@ -151,7 +156,10 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
 
     const string& ns = _collection->ns().ns();
 
-    Status status = _collection->getIndexCatalog()->checkUnfinished();
+    const auto idxCat = _collection->getIndexCatalog();
+    invariant(idxCat);
+    invariant(idxCat->ok());
+    Status status = idxCat->checkUnfinished();
     if (!status.isOK())
         return status;
 

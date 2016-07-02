@@ -28,16 +28,25 @@
 
 #pragma once
 
-namespace mongo {
-namespace repl {
+#include "mongo/base/status.h"
 
-class BackgroundSync;
+namespace mongo {
+class OperationContext;
+class Database;
+
+namespace repl {
+class ReplicationCoordinatorExternalState;
 
 /**
  * Begins an initial sync of a node.  This drops all data, chooses a sync source,
  * and runs the cloner from that sync source.  The node's state is not changed.
  */
-void syncDoInitialSync(BackgroundSync* bgsync);
+void syncDoInitialSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
+
+/**
+ * Checks that the "admin" database contains a supported version of the auth data schema.
+ */
+Status checkAdminDatabase(OperationContext* txn, Database* adminDb);
 
 }  // namespace repl
 }  // namespace mongo

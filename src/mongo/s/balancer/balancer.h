@@ -30,7 +30,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy.h"
-#include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -97,6 +96,12 @@ public:
     void joinThread();
 
     /**
+     * Potentially blocking method, which will return immediately if the balancer is not running a
+     * balancer round and will block until the current round completes otherwise.
+     */
+    void joinCurrentRound(OperationContext* txn);
+
+    /**
      * Blocking call, which requests the balancer to move a single chunk to a more appropriate
      * shard, in accordance with the active balancer policy. It is not guaranteed that the chunk
      * will actually move because it may already be at the best shard. An error will be returned if
@@ -119,6 +124,11 @@ public:
                            const MigrationSecondaryThrottleOptions& secondaryThrottle,
                            bool waitForDelete);
 
+    /**
+     * Appends the runtime state of the balancer instance to the specified builder.
+     */
+    void report(OperationContext* txn, BSONObjBuilder* builder);
+
 private:
     /**
      * Possible runtime states of the balancer. The comments indicate the allowed next state.
@@ -140,20 +150,16 @@ private:
     bool _stopRequested();
 
     /**
-     * Signals the beginning of a balancing round.
+     * Signals the beginning and end of a balancing round.
      */
     void _beginRound(OperationContext* txn);
+    void _endRound(OperationContext* txn, Seconds waitTimeout);
 
     /**
      * Blocks the caller for the specified timeout or until the balancer condition variable is
      * signaled, whichever comes first.
      */
-    void _endRound(OperationContext* txn, Seconds waitTimeout);
-
-    /**
-     * Ensures that the balancer can connect to all shards and that they are consistent.
-     */
-    bool _init(OperationContext* txn);
+    void _sleepFor(OperationContext* txn, Seconds waitTimeout);
 
     /**
      * Returns true if all the servers listed in configdb as being shards are reachable and are
@@ -180,16 +186,24 @@ private:
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
-    // The uptime reporter associated with this instance
-    const ShardingUptimeReporter _shardingUptimeReporter;
-
     // The main balancer thread
     stdx::thread _thread;
 
-    // Utilities to stop the balancer
+    // Protects the state below
     stdx::mutex _mutex;
-    stdx::condition_variable _condVar;
+
+    // Indicates the current state of the balancer
     State _state{kStopped};
+
+    // Indicates whether the balancer is currently executing a balancer round
+    bool _inBalancerRound{false};
+
+    // Counts the number of balancing rounds performed since the balancer thread was first activated
+    int64_t _numBalancerRounds{0};
+
+    // Condition variable, which is signalled every time the above runtime state of the balancer
+    // changes (in particular, state/balancer round and number of balancer rounds).
+    stdx::condition_variable _condVar;
 
     // Number of moved chunks in last round
     int _balancedLastTime;

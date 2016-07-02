@@ -51,6 +51,7 @@ public:
 
     static const BSONField<BSONObj> query;
     static const BSONField<int> limit;
+    static const BSONField<BSONObj> collation;
 
     //
     // construction / destruction
@@ -86,6 +87,11 @@ public:
     bool isLimitSet() const;
     int getLimit() const;
 
+    void setCollation(const BSONObj& collation);
+    void unsetCollation();
+    bool isCollationSet() const;
+    const BSONObj& getCollation() const;
+
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -96,6 +102,10 @@ private:
     // (M)  the maximum number of documents to be deleted
     int _limit;
     bool _isLimitSet;
+
+    // (O)  the collation which this delete should respect.
+    BSONObj _collation;
+    bool _isCollationSet;
 };
 
 }  // namespace mongo

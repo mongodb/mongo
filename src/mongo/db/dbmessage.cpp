@@ -198,8 +198,7 @@ void OpQueryReplyBuilder::putInMessage(
     qr.setCursorId(cursorId);
     qr.setStartingFrom(startingFrom);
     qr.setNReturned(nReturned);
-    _buffer.decouple();
-    out->setData(qr.view2ptr(), true);  // transport will free
+    out->setData(_buffer.release());  // transport will free
 }
 
 void replyToQuery(int queryResultFlags,

@@ -56,7 +56,6 @@ env.Library(
         'storage_interface.cpp',
     ],
     LIBDEPS=[
-        'oplog_entry',
         'optime',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/decorable',
@@ -67,9 +66,12 @@ env.Library(
     target='storage_interface_impl',
     source=[
         'storage_interface_impl.cpp',
+        'collection_bulk_loader_impl.cpp',
     ],
     LIBDEPS=[
         'storage_interface',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
     ],
 )
@@ -148,11 +150,8 @@ env.Library(
     ],
     LIBDEPS=[
         'storage_interface',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/service_context',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on files like db_raii.cpp from serverOnlyFiles
-        'incomplete',
     ],
 )
 
@@ -167,6 +166,7 @@ env.CppUnitTest(
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ],
     NO_CRUTCH = True,
 )
@@ -879,7 +879,8 @@ env.Library(
     ],
     LIBDEPS=[
         'oplog_entry',
-        'replication_executor',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
 
@@ -925,6 +926,7 @@ env.Library(
         'oplog_buffer_blocking_queue',
         'oplog_entry',
         'optime',
+        'replica_set_messages',
         '$BUILD_DIR/mongo/util/net/hostandport',
     ],
 )
@@ -959,6 +961,7 @@ env.CppUnitTest(
         'data_replicator',
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )

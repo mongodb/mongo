@@ -33,26 +33,91 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-// TODO SERVER-23172: Update this to consider strings inside nested objects or arrays.
-bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt,
-                                                   const CollatorInterface* collator) {
-    return collator && elt.type() == BSONType::String;
+void CollationIndexKey::translate(StringData fieldName,
+                                  BSONElement element,
+                                  const CollatorInterface* collator,
+                                  BSONObjBuilder* out) {
+    invariant(collator);
+
+    switch (element.type()) {
+        case BSONType::String: {
+            out->append(fieldName,
+                        collator->getComparisonKey(element.valueStringData()).getKeyData());
+            return;
+        }
+        case BSONType::Object: {
+            BSONObjBuilder bob(out->subobjStart(fieldName));
+            for (const BSONElement& elt : element.embeddedObject()) {
+                translate(elt.fieldNameStringData(), elt, collator, &bob);
+            }
+            bob.doneFast();
+            return;
+        }
+        case BSONType::Array: {
+            BSONArrayBuilder bab(out->subarrayStart(fieldName));
+            for (const BSONElement& elt : element.Array()) {
+                translate(elt, collator, &bab);
+            }
+            bab.doneFast();
+            return;
+        }
+        default:
+            out->appendAs(element, fieldName);
+    }
 }
 
-// TODO SERVER-23172: Update this to convert strings inside nested objects or arrays to their
-// corresponding comparison keys.
+void CollationIndexKey::translate(BSONElement element,
+                                  const CollatorInterface* collator,
+                                  BSONArrayBuilder* out) {
+    invariant(collator);
+
+    switch (element.type()) {
+        case BSONType::String: {
+            out->append(collator->getComparisonKey(element.valueStringData()).getKeyData());
+            return;
+        }
+        case BSONType::Object: {
+            BSONObjBuilder bob(out->subobjStart());
+            for (const BSONElement& elt : element.embeddedObject()) {
+                translate(elt.fieldNameStringData(), elt, collator, &bob);
+            }
+            bob.doneFast();
+            return;
+        }
+        case BSONType::Array: {
+            BSONArrayBuilder bab(out->subarrayStart());
+            for (const BSONElement& elt : element.Array()) {
+                translate(elt, collator, &bab);
+            }
+            bab.doneFast();
+            return;
+        }
+        default:
+            out->append(element);
+    }
+}
+
+// TODO SERVER-24674: We may want to check that objects and arrays actually do contain strings
+// before returning true.
+bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt,
+                                                   const CollatorInterface* collator) {
+    return collator && isCollatableType(elt.type());
+}
+
 void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
                                                      const CollatorInterface* collator,
                                                      BSONObjBuilder* out) {
-    if (shouldUseCollationIndexKey(elt, collator)) {
-        auto comparisonKey = collator->getComparisonKey(elt.valueStringData());
-        out->append("", comparisonKey.getKeyData());
-    } else {
+    invariant(out);
+    if (!collator) {
         out->appendAs(elt, "");
+        return;
     }
+
+    translate("", elt, collator, out);
 }
 
 }  // namespace mongo

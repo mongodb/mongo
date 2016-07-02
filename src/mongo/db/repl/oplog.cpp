@@ -483,15 +483,14 @@ long long getNewOplogSizeBytes(OperationContext* txn, const ReplSettings& replSe
 }
 }  // namespace
 
-void createOplog(OperationContext* txn) {
+void createOplog(OperationContext* txn, const std::string& oplogCollectionName, bool isReplSet) {
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
 
     const ReplSettings& replSettings = ReplicationCoordinator::get(txn)->getSettings();
-    bool replEnabled = replSettings.usingReplSets();
 
-    OldClientContext ctx(txn, _oplogCollectionName);
-    Collection* collection = ctx.db()->getCollection(_oplogCollectionName);
+    OldClientContext ctx(txn, oplogCollectionName);
+    Collection* collection = ctx.db()->getCollection(oplogCollectionName);
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
@@ -509,8 +508,8 @@ void createOplog(OperationContext* txn) {
             }
         }
 
-        if (!replEnabled)
-            initTimestampFromOplog(txn, _oplogCollectionName);
+        if (!isReplSet)
+            initTimestampFromOplog(txn, oplogCollectionName);
         return;
     }
 
@@ -527,17 +526,23 @@ void createOplog(OperationContext* txn) {
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         WriteUnitOfWork uow(txn);
-        invariant(ctx.db()->createCollection(txn, _oplogCollectionName, options));
-        if (!replEnabled)
+        invariant(ctx.db()->createCollection(txn, oplogCollectionName, options));
+        if (!isReplSet)
             getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSONObj());
         uow.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", _oplogCollectionName);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", oplogCollectionName);
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
     storageEngine->flushAllFiles(true);
     log() << "******" << endl;
+}
+
+void createOplog(OperationContext* txn) {
+    const auto isReplSet = ReplicationCoordinator::get(txn)->getReplicationMode() ==
+        ReplicationCoordinator::modeReplSet;
+    createOplog(txn, _oplogCollectionName, isReplSet);
 }
 
 // -------------------------------------
@@ -750,16 +755,14 @@ Status applyOperation_inlock(OperationContext* txn,
 
         if (fieldO.type() == Array) {
             // Batched inserts.
-            Status status{ErrorCodes::NotYetInitialized, ""};
-
             std::vector<BSONObj> insertObjs;
-            for (auto elem : fieldO.Array()) {
+            for (auto elem : fieldO.Obj()) {
                 insertObjs.push_back(elem.Obj());
             }
 
             WriteUnitOfWork wuow(txn);
             OpDebug* const nullOpDebug = nullptr;
-            status = collection->insertDocuments(
+            Status status = collection->insertDocuments(
                 txn, insertObjs.begin(), insertObjs.end(), nullOpDebug, true);
             if (!status.isOK()) {
                 return status;

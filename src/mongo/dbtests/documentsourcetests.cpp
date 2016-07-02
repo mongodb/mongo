@@ -84,7 +84,7 @@ using mongo::DocumentSourceCursor;
 
 class Base : public CollectionBase {
 public:
-    Base() : _ctx(new ExpressionContext(&_opCtx, nss)) {
+    Base() : _ctx(new ExpressionContext(&_opCtx, AggregationRequest(nss, {}))) {
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 
@@ -278,7 +278,7 @@ public:
 class IndexScanProvidesSortOnKeys : public Base {
 public:
     void run() {
-        client.ensureIndex(nss.ns(), BSON("a" << 1));
+        client.createIndex(nss.ns(), BSON("a" << 1));
         createSource(BSON("a" << 1));
 
         ASSERT_EQ(source()->getOutputSorts().size(), 1U);
@@ -289,7 +289,7 @@ public:
 class ReverseIndexScanProvidesSort : public Base {
 public:
     void run() {
-        client.ensureIndex(nss.ns(), BSON("a" << -1));
+        client.createIndex(nss.ns(), BSON("a" << -1));
         createSource(BSON("a" << -1));
 
         ASSERT_EQ(source()->getOutputSorts().size(), 1U);
@@ -300,7 +300,7 @@ public:
 class CompoundIndexScanProvidesMultipleSorts : public Base {
 public:
     void run() {
-        client.ensureIndex(nss.ns(), BSON("a" << 1 << "b" << -1));
+        client.createIndex(nss.ns(), BSON("a" << 1 << "b" << -1));
         createSource(BSON("a" << 1 << "b" << -1));
 
         ASSERT_EQ(source()->getOutputSorts().size(), 2U);

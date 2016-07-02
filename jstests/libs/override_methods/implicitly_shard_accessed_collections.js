@@ -17,6 +17,7 @@
     var blacklistedNamespaces = [
         /\$cmd/,
         /^admin\./,
+        /^config\./,
         /\.system\./,
     ];
 

@@ -35,6 +35,7 @@
 
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/asio_ssl_context.h"
 #include "mongo/util/net/message.h"
@@ -123,12 +124,14 @@ private:
     void _setTimerCallback();
     asio::error_code _read(char* buf, std::size_t size);
     asio::error_code _write(const char* buf, std::size_t size);
+    asio::error_code _handshake(bool isServer, const char* buf = nullptr, std::size_t size = 0);
     const asio::generic::stream_protocol::socket& _getSocket() const;
     asio::generic::stream_protocol::socket& _getSocket();
 
     asio::io_service _service;
 
     AtomicBool _inShutdown;
+    stdx::mutex _opInProgress;
 
     asio::system_timer _timer;
     uint64_t _creationTime;

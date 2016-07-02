@@ -72,7 +72,8 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
 
     PlanExecutor::ExecState state;
     if (PlanExecutor::ADVANCED != (state = _exec->getNext(&obj, &recordId))) {
-        return StatusWith<Value>(ErrorCodes::NoSuchKey, "no more operations in local oplog");
+        return StatusWith<Value>(ErrorCodes::CollectionIsEmpty,
+                                 "no more operations in local oplog");
     }
 
     // Non-yielding collection scans from InternalPlanner will never error.

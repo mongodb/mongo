@@ -156,6 +156,7 @@ err:		__wt_logrec_free(session, &logrec);
 int
 __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
 	WT_ITEM *logrec;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
@@ -179,24 +180,25 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	switch (op->type) {
 	case WT_TXN_OP_BASIC:
-		return (__txn_op_log(session, logrec, op, cbt));
+		ret = __txn_op_log(session, logrec, op, cbt);
+		break;
 	case WT_TXN_OP_INMEM:
 	case WT_TXN_OP_REF:
 		/* Nothing to log, we're done. */
-		return (0);
+		break;
 	case WT_TXN_OP_TRUNCATE_COL:
-		return (__wt_logop_col_truncate_pack(session, logrec,
+		ret = __wt_logop_col_truncate_pack(session, logrec,
 		    op->fileid,
-		    op->u.truncate_col.start, op->u.truncate_col.stop));
+		    op->u.truncate_col.start, op->u.truncate_col.stop);
+		break;
 	case WT_TXN_OP_TRUNCATE_ROW:
-		return (__wt_logop_row_truncate_pack(session, txn->logrec,
+		ret = __wt_logop_row_truncate_pack(session, txn->logrec,
 		    op->fileid,
 		    &op->u.truncate_row.start, &op->u.truncate_row.stop,
-		    (uint32_t)op->u.truncate_row.mode));
-	WT_ILLEGAL_VALUE(session);
+		    (uint32_t)op->u.truncate_row.mode);
+		break;
 	}
-
-	/* NOTREACHED */
+	return (ret);
 }
 
 /*

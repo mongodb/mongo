@@ -32,6 +32,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -77,6 +78,12 @@ void ServiceContextMongoDTest::_dropAllDBs(OperationContext* txn) {
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "_dropAllDBs", "local");
     }
+
+    // dropAllDatabasesExceptLocal() does not close empty databases. However the holder still
+    // allocates resources to track these empty databases. These resources not released by
+    // dropAllDatabasesExceptLocal() will be leaked at exit unless we call DatabaseHolder::closeAll.
+    BSONObjBuilder unused;
+    invariant(dbHolder().closeAll(txn, unused, false));
 }
 
 }  // namespace mongo

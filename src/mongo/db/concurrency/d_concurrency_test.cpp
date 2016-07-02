@@ -26,17 +26,158 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <string>
+#include <vector>
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
+
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::string;
+
+namespace {
+const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
+const int kMinPerfMillis = 30;   // min duration for reliable timing
+
+/**
+ * Calls fn the given number of iterations, spread out over up to maxThreads threads.
+ * The threadNr passed is an integer between 0 and maxThreads exclusive. Logs timing
+ * statistics for for all power-of-two thread counts from 1 up to maxThreds.
+ */
+void perfTest(stdx::function<void(int threadNr)> fn, int maxThreads) {
+    for (int numThreads = 1; numThreads <= maxThreads; numThreads *= 2) {
+        std::vector<stdx::thread> threads;
+
+        AtomicInt32 ready{0};
+        AtomicInt64 elapsedNanos{0};
+        AtomicInt64 timedIters{0};
+
+        for (int threadId = 0; threadId < numThreads; threadId++)
+            threads.emplace_back([&, threadId]() {
+                // Busy-wait until everybody is ready
+                ready.fetchAndAdd(1);
+                while (ready.load() < numThreads) {
+                }
+
+                uint64_t micros = 0;
+                int iters;
+                // Ensure at least 16 iterations are done and at least 25 milliseconds is timed
+                for (iters = 16; iters < (1 << 30) && micros < kMinPerfMillis * 1000; iters *= 2) {
+                    // Measure the number of loops
+                    Timer t;
+
+                    for (int i = 0; i < iters; i++)
+                        fn(threadId);
+
+                    micros = t.micros();
+                }
+
+                elapsedNanos.fetchAndAdd(micros * 1000);
+                timedIters.fetchAndAdd(iters);
+            });
+
+        for (auto& thread : threads)
+            thread.join();
+
+        log() << numThreads
+              << " threads took: " << elapsedNanos.load() / static_cast<double>(timedIters.load())
+              << " ns per call" << (kDebugBuild ? " (DEBUG BUILD!)" : "");
+    }
+}
+}  // namespace
+
+TEST(DConcurrency, ResourceMutex) {
+    Lock::ResourceMutex mtx;
+    DefaultLockerImpl locker1;
+    DefaultLockerImpl locker2;
+    DefaultLockerImpl locker3;
+
+    struct State {
+        void check(int n) {
+            ASSERT_EQ(step.load(), n);
+        }
+        void finish(int n) {
+            auto actual = step.fetchAndAdd(1);
+            ASSERT_EQ(actual, n);
+        }
+        void waitFor(stdx::function<bool()> cond) {
+            while (!cond())
+                sleepmillis(0);
+        }
+        void waitFor(int n) {
+            waitFor([this, n]() { return this->step.load() == n; });
+        }
+        AtomicInt32 step{0};
+    } state;
+
+    stdx::thread t1([&]() {
+        // Step 0: Single thread acquires shared lock
+        state.waitFor(0);
+        Lock::SharedLock lk(&locker1, mtx);
+        ASSERT(lk.isLocked());
+        state.finish(0);
+
+        // Step 4: Wait for t2 to regain its shared lock
+        {
+            // Check that TempRelease does not actually unlock anything
+            Lock::TempRelease yield(&locker1);
+
+            state.waitFor(4);
+            state.waitFor([&locker2]() { return locker2.getWaitingResource().isValid(); });
+            state.finish(4);
+        }
+
+        // Step 5: After t2 becomes blocked, unlock, yielding the mutex to t3
+        lk.unlock();
+        ASSERT(!lk.isLocked());
+    });
+    stdx::thread t2([&]() {
+        // Step 1: Two threads acquire shared lock
+        state.waitFor(1);
+        Lock::SharedLock lk(&locker2, mtx);
+        ASSERT(lk.isLocked());
+        state.finish(1);
+
+        // Step 2: Wait for t3 to attempt the exclusive lock
+        state.waitFor([&locker3]() { return locker3.getWaitingResource().isValid(); });
+        state.finish(2);
+
+        // Step 3: Yield shared lock
+        lk.unlock();
+        ASSERT(!lk.isLocked());
+        state.finish(3);
+
+        // Step 4: Try to regain the shared lock // transfers control to t1
+        lk.lock(MODE_IS);
+
+        // Step 6: CHeck we actually got back the shared lock
+        ASSERT(lk.isLocked());
+        state.check(6);
+    });
+    stdx::thread t3([&]() {
+        // Step 2: Third thread attempts to acquire exclusive lock
+        state.waitFor(2);
+        Lock::ExclusiveLock lk(&locker3, mtx);  // transfers control to t2
+
+        // Step 5: Actually get the exclusive lock
+        ASSERT(lk.isLocked());
+        state.finish(5);
+    });
+    t1.join();
+    t2.join();
+    t3.join();
+}
 
 TEST(DConcurrency, GlobalRead) {
     MMAPV1LockerImpl ls;
@@ -306,4 +447,88 @@ TEST(DConcurrency, IsCollectionLocked_DB_Locked_IX) {
     }
 }
 
+// These tests exercise single- and multi-threaded performance of uncontended lock acquisition. It
+// is meither practical nor useful to run them on debug builds.
+
+extern bool _supportsDocLocking;
+namespace {
+/**
+ * Temporarily forces setting of the docLockingSupported global for testing purposes.
+ */
+class ForceSupportsDocLocking {
+public:
+    explicit ForceSupportsDocLocking(bool supported) : _oldSupportsDocLocking(_supportsDocLocking) {
+        _supportsDocLocking = supported;
+    }
+
+    ~ForceSupportsDocLocking() {
+        _supportsDocLocking = _oldSupportsDocLocking;
+    }
+
+private:
+    bool _oldSupportsDocLocking;
+};
+}  // namespace
+
+TEST(Locker, PerformanceStdMutex) {
+    stdx::mutex mtx;
+    perfTest([&](int threadId) { stdx::unique_lock<stdx::mutex> lk(mtx); }, kMaxPerfThreads);
+}
+
+TEST(Locker, PerformanceResourceMutexShared) {
+    Lock::ResourceMutex mtx;
+    std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
+    perfTest([&](int threadId) { Lock::SharedLock lk(&locker[threadId], mtx); }, kMaxPerfThreads);
+}
+
+TEST(Locker, PerformanceResourceMutexExclusive) {
+    Lock::ResourceMutex mtx;
+    std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
+    perfTest([&](int threadId) { Lock::ExclusiveLock lk(&locker[threadId], mtx); },
+             kMaxPerfThreads);
+}
+
+TEST(Locker, PerformanceCollectionIntentSharedLock) {
+    std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
+    ForceSupportsDocLocking supported(true);
+    perfTest(
+        [&](int threadId) {
+            Lock::DBLock dlk(&locker[threadId], "test", MODE_IS);
+            Lock::CollectionLock clk(&locker[threadId], "test.coll", MODE_IS);
+        },
+        kMaxPerfThreads);
+}
+
+TEST(Locker, PerformanceCollectionIntentExclusiveLock) {
+    std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
+    ForceSupportsDocLocking supported(true);
+    perfTest(
+        [&](int threadId) {
+            Lock::DBLock dlk(&locker[threadId], "test", MODE_IX);
+            Lock::CollectionLock clk(&locker[threadId], "test.coll", MODE_IX);
+        },
+        kMaxPerfThreads);
+}
+
+TEST(Locker, PerformanceMMAPv1CollectionSharedLock) {
+    std::array<MMAPV1LockerImpl, kMaxPerfThreads> locker;
+    ForceSupportsDocLocking supported(false);
+    perfTest(
+        [&](int threadId) {
+            Lock::DBLock dlk(&locker[threadId], "test", MODE_IS);
+            Lock::CollectionLock clk(&locker[threadId], "test.coll", MODE_S);
+        },
+        kMaxPerfThreads);
+}
+
+TEST(Locker, PerformanceMMAPv1CollectionExclusive) {
+    std::array<MMAPV1LockerImpl, kMaxPerfThreads> locker;
+    ForceSupportsDocLocking supported(false);
+    perfTest(
+        [&](int threadId) {
+            Lock::DBLock dlk(&locker[threadId], "test", MODE_IX);
+            Lock::CollectionLock clk(&locker[threadId], "test.coll", MODE_X);
+        },
+        kMaxPerfThreads);
+}
 }  // namespace mongo

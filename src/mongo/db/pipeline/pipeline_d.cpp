@@ -55,6 +55,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/s/chunk_version.h"
@@ -127,6 +128,10 @@ public:
         }
 
         return collection->getIndexCatalog()->findIdIndex(_ctx->opCtx);
+    }
+
+    void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const {
+        Top::get(_ctx->opCtx->getServiceContext()).appendLatencyStats(nss.ns(), builder);
     }
 
 private:
@@ -249,7 +254,7 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     const intrusive_ptr<Pipeline>& pPipeline,
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
     // We will be modifying the source vector as we go.
-    Pipeline::SourceContainer& sources = pPipeline->sources;
+    Pipeline::SourceContainer& sources = pPipeline->_sources;
 
     // Inject a MongodImplementation to sources that need them.
     for (auto&& source : sources) {
@@ -417,11 +422,11 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
             }
 
             // We know the sort is being handled by the query system, so remove the $sort stage.
-            pipeline->sources.pop_front();
+            pipeline->_sources.pop_front();
 
             if (sortStage->getLimitSrc()) {
                 // We need to reinsert the coalesced $limit after removing the $sort.
-                pipeline->sources.push_front(sortStage->getLimitSrc());
+                pipeline->_sources.push_front(sortStage->getLimitSrc());
             }
             return exec;
         }
@@ -496,7 +501,7 @@ shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline
 
 std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline) {
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pPipeline->sources.front().get())) {
+            dynamic_cast<DocumentSourceCursor*>(pPipeline->_sources.front().get())) {
         return docSourceCursor->getPlanSummaryStr();
     }
 
@@ -508,12 +513,12 @@ void PipelineD::getPlanSummaryStats(const boost::intrusive_ptr<Pipeline>& pPipel
     invariant(statsOut);
 
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pPipeline->sources.front().get())) {
+            dynamic_cast<DocumentSourceCursor*>(pPipeline->_sources.front().get())) {
         *statsOut = docSourceCursor->getPlanSummaryStats();
     }
 
     bool hasSortStage{false};
-    for (auto&& source : pPipeline->sources) {
+    for (auto&& source : pPipeline->_sources) {
         if (dynamic_cast<DocumentSourceSort*>(source.get())) {
             hasSortStage = true;
             break;

@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/catalog/collection_options.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -70,6 +72,9 @@ protected:
     SyncTail::ApplyCommandInLockFn _applyCmd;
     SyncTail::IncrementOpsAppliedStatsFn _incOps;
     StorageInterfaceMock* _storageInterface = nullptr;
+
+    // Implements the MultiApplier::ApplyOperationFn interface and does nothing.
+    static void noopApplyOperationFn(MultiApplier::OperationPtrs*) {}
 
 private:
     void setUp() override;
@@ -107,6 +112,9 @@ void SyncTailTest::setUp() {
                                 stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
     auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
     _storageInterface = storageInterface.get();
+    storageInterface->insertDocumentsFn = [](OperationContext*,
+                                             const NamespaceString&,
+                                             const std::vector<BSONObj>&) { return Status::OK(); };
     StorageInterface::set(serviceContext, std::move(storageInterface));
 
     Client::initThreadIfNotAlready();
@@ -465,25 +473,22 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
 
 TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullOperationContext) {
     auto writerPool = SyncTail::makeWriterPool();
-    auto applyOperationFn = [](const MultiApplier::Operations&) {};
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status = multiApply(nullptr, writerPool.get(), {op}, applyOperationFn).getStatus();
+    auto status = multiApply(nullptr, writerPool.get(), {op}, noopApplyOperationFn).getStatus();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "invalid operation context");
 }
 
 TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullWriterPool) {
-    auto applyOperationFn = [](const MultiApplier::Operations&) {};
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status = multiApply(_txn.get(), nullptr, {op}, applyOperationFn).getStatus();
+    auto status = multiApply(_txn.get(), nullptr, {op}, noopApplyOperationFn).getStatus();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "invalid worker pool");
 }
 
 TEST_F(SyncTailTest, MultiApplyReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
     auto writerPool = SyncTail::makeWriterPool();
-    auto applyOperationFn = [](const MultiApplier::Operations&) {};
-    auto status = multiApply(_txn.get(), writerPool.get(), {}, applyOperationFn).getStatus();
+    auto status = multiApply(_txn.get(), writerPool.get(), {}, noopApplyOperationFn).getStatus();
     ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation, status);
     ASSERT_STRING_CONTAINS(status.reason(), "no operations provided to multiApply");
 }
@@ -502,10 +507,11 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* txn,
                                           const CollectionOptions& options) {
     auto writerPool = SyncTail::makeWriterPool();
     MultiApplier::Operations operationsApplied;
-    auto applyOperationFn =
-        [&operationsApplied](const MultiApplier::Operations& operationsToApply) {
-            operationsApplied = operationsToApply;
-        };
+    auto applyOperationFn = [&operationsApplied](MultiApplier::OperationPtrs* operationsToApply) {
+        for (auto&& opPtr : *operationsToApply) {
+            operationsApplied.push_back(*opPtr);
+        }
+    };
     createCollection(txn, nss, options);
 
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("a" << 1));
@@ -548,13 +554,26 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     stdx::mutex mutex;
     std::vector<MultiApplier::Operations> operationsApplied;
     auto applyOperationFn = [&mutex, &operationsApplied](
-        const MultiApplier::Operations& operationsForWriterThreadToApply) {
+        MultiApplier::OperationPtrs* operationsForWriterThreadToApply) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        operationsApplied.push_back(operationsForWriterThreadToApply);
+        operationsApplied.emplace_back();
+        for (auto&& opPtr : *operationsForWriterThreadToApply) {
+            operationsApplied.back().push_back(*opPtr);
+        }
     };
 
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss1, BSON("x" << 1));
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss2, BSON("x" << 2));
+
+    NamespaceString nssForInsert;
+    std::vector<BSONObj> operationsWrittenToOplog;
+    _storageInterface->insertDocumentsFn = [&mutex, &nssForInsert, &operationsWrittenToOplog](
+        OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        nssForInsert = nss;
+        operationsWrittenToOplog = docs;
+        return Status::OK();
+    };
 
     auto lastOpTime =
         unittest::assertGet(multiApply(_txn.get(), &writerPool, {op1, op2}, applyOperationFn));
@@ -576,10 +595,11 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     }
 
     // Check ops in oplog.
-    auto operationsWritternToOplog = _storageInterface->getOperationsWrittenToOplog();
-    ASSERT_EQUALS(2U, operationsWritternToOplog.size());
-    ASSERT_EQUALS(op1, operationsWritternToOplog[0]);
-    ASSERT_EQUALS(op2, operationsWritternToOplog[1]);
+    stdx::lock_guard<stdx::mutex> lock(mutex);
+    ASSERT_EQUALS(2U, operationsWrittenToOplog.size());
+    ASSERT_EQUALS(NamespaceString(rsOplogName), nssForInsert);
+    ASSERT_EQUALS(op1.raw, operationsWrittenToOplog[0]);
+    ASSERT_EQUALS(op2.raw, operationsWrittenToOplog[1]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
@@ -589,7 +609,9 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
     ASSERT_FALSE(_txn->lockState()->isBatchWriter());
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
     _txn.reset();
-    multiSyncApply({op}, nullptr);
+
+    MultiApplier::OperationPtrs ops = {&op};
+    multiSyncApply(&ops, nullptr);
     // Collection should be created after SyncTail::syncApply() processes operation.
     _txn = cc().makeOperationContext();
     ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
@@ -609,7 +631,8 @@ TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperat
     };
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), {op}, syncApply));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToApplyOperation) {
@@ -621,7 +644,8 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToAppl
     auto syncApply = [](OperationContext*, const BSONObj&, bool) -> Status {
         return {ErrorCodes::OperationFailed, ""};
     };
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, multiSyncApply_noAbort(_txn.get(), {op}, syncApply));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
@@ -634,7 +658,8 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
         uasserted(ErrorCodes::OperationFailed, "");
         MONGO_UNREACHABLE;
     };
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, multiSyncApply_noAbort(_txn.get(), {op}, syncApply));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplying) {
@@ -656,7 +681,8 @@ TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplyin
         operationsApplied.push_back(OplogEntry(op));
         return Status::OK();
     };
-    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), {op4, op1, op3, op2}, syncApply));
+    MultiApplier::OperationPtrs ops = {&op4, &op1, &op3, &op2};
+    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
     ASSERT_EQUALS(4U, operationsApplied.size());
     ASSERT_EQUALS(op1, operationsApplied[0]);
     ASSERT_EQUALS(op2, operationsApplied[1]);
@@ -684,10 +710,9 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
         return Status::OK();
     };
 
-    ASSERT_OK(multiSyncApply_noAbort(
-        _txn.get(),
-        {createOp1, createOp2, insertOp1a, insertOp2a, insertOp1b, insertOp2b},
-        syncApply));
+    MultiApplier::OperationPtrs ops = {
+        &createOp1, &createOp2, &insertOp1a, &insertOp2a, &insertOp1b, &insertOp2b};
+    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
 
     ASSERT_EQUALS(4U, operationsApplied.size());
     ASSERT_EQUALS(createOp1, operationsApplied[0]);
@@ -737,7 +762,11 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
         return Status::OK();
     };
 
-    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), operationsToApply, syncApply));
+    MultiApplier::OperationPtrs ops;
+    for (auto&& op : operationsToApply) {
+        ops.push_back(&op);
+    }
+    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
 
     // multiSyncApply should combine operations as follows:
     // {create}, {grouped_insert}, {insert_(limit+1)}
@@ -792,7 +821,11 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
         return Status::OK();
     };
 
-    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), operationsToApply, syncApply));
+    MultiApplier::OperationPtrs ops;
+    for (auto&& op : operationsToApply) {
+        ops.push_back(&op);
+    }
+    ASSERT_OK(multiSyncApply_noAbort(_txn.get(), &ops, syncApply));
 
     // On failing to apply the grouped insert operation, multiSyncApply should apply the operations
     // as given in "operationsToApply":
@@ -818,7 +851,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
     ASSERT_FALSE(_txn->lockState()->isBatchWriter());
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
 }
 
 TEST_F(SyncTailTest,
@@ -828,7 +862,8 @@ TEST_F(SyncTailTest,
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
@@ -841,7 +876,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
     auto updatedDocument = BSON("_id" << 0 << "x" << 2);
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold
     // the missing document fetched from the sync source. We verify the contents of the collection
@@ -849,7 +885,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
     OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
     ASSERT_EQUALS(updatedDocument, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailingToRetryBadOp) {
@@ -859,7 +895,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailin
                        << "x"
                        << "ns"
                        << nss.ns()));
-    ASSERT_EQUALS(ErrorCodes::BadValue, multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+    MultiApplier::OperationPtrs ops = {&op};
+    ASSERT_EQUALS(ErrorCodes::BadValue, multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughShouldSyncTailRetryError) {
@@ -869,8 +906,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughShouldSyncTailRetryError)
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     ASSERT_THROWS_CODE(
         syncTail.shouldRetry(_txn.get(), op.raw), mongo::UserException, ErrorCodes::FailedToParse);
+    MultiApplier::OperationPtrs ops = {&op};
     ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                  multiInitialSyncApply_noAbort(_txn.get(), {op}, &syncTail));
+                  multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
 }
 
 }  // namespace

@@ -548,7 +548,10 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
     grid.catalogCache()->invalidate(_name);
 
     Status result = grid.catalogClient(txn)->removeConfigDocuments(
-        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)));
+        txn,
+        DatabaseType::ConfigNS,
+        BSON(DatabaseType::name(_name)),
+        ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         errmsg = result.reason();
         log() << "could not drop '" << _name << "': " << errmsg;
@@ -726,7 +729,8 @@ void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
             ShardType::ConfigNS,
             BSON(ShardType::name(s->getId().toString())),
             BSON("$set" << BSON(ShardType::host(newConnectionString))),
-            false);
+            false,
+            ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             error() << "RSChangeWatcher: could not update config db for set: " << setName
                     << " to: " << newConnectionString << causedBy(status.getStatus());

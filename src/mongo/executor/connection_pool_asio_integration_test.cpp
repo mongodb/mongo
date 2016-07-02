@@ -149,6 +149,31 @@ TEST(ConnectionPoolASIO, TestHostTimeoutRace) {
     }
 }
 
+
+/**
+ * Verify that a connections that timeout immediately don't invariant.
+ */
+TEST(ConnectionPoolASIO, ConnSetupTimeout) {
+    auto fixture = unittest::getFixtureConnectionString();
+
+    NetworkInterfaceASIO::Options options;
+    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    options.connectionPoolOptions.refreshTimeout = Milliseconds(-2);
+    NetworkInterfaceASIO net{std::move(options)};
+
+    net.startup();
+    auto guard = MakeGuard([&] { net.shutdown(); });
+
+    Deferred<StatusWith<RemoteCommandResponse>> deferred;
+    net.startCommand(
+        makeCallbackHandle(),
+        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
+        [&](StatusWith<RemoteCommandResponse> resp) { deferred.emplace(std::move(resp)); });
+
+    ASSERT_EQ(deferred.get().getStatus().code(), ErrorCodes::ExceededTimeLimit);
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

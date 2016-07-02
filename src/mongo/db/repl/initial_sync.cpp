@@ -91,9 +91,9 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
             }
 
             // apply replication batch limits
-            if (ops.getSize() > replBatchLimitBytes)
+            if (ops.getBytes() > replBatchLimitBytes)
                 break;
-            if (ops.getDeque().size() > replBatchLimitOperations)
+            if (ops.getCount() > replBatchLimitOperations)
                 break;
         };
 
@@ -104,11 +104,10 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
 
         const BSONObj lastOp = ops.back().raw.getOwned();
 
-        // Tally operation information
-        bytesApplied += ops.getSize();
-        entriesApplied += ops.getDeque().size();
-
-        const OpTime lastOpTime = multiApply(txn, ops);
+        // Tally operation information and apply batch. Don't use ops again after these lines.
+        bytesApplied += ops.getBytes();
+        entriesApplied += ops.getCount();
+        const OpTime lastOpTime = multiApply(txn, ops.releaseBatch());
 
         replCoord->setMyLastAppliedOpTime(lastOpTime);
         setNewTimestamp(lastOpTime.getTimestamp());

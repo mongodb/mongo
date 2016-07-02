@@ -147,6 +147,14 @@ public:
      *     array before operating on it.
      */
     virtual Status log(LogBuilder* logBuilder) const = 0;
+
+    /**
+     * Set the collation on the modifier.  This is a no-op on modifiers that are not
+     * collation-aware.
+     *
+     * The collator must outlive the modifier interface.
+     */
+    virtual void setCollator(const CollatorInterface* collator){};
 };
 
 /**

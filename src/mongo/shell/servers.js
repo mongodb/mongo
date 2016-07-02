@@ -720,6 +720,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
 
     // Constants for exit codes of MongoDB processes
+    MongoRunner.EXIT_ABORT = -6;
     MongoRunner.EXIT_CLEAN = 0;
     MongoRunner.EXIT_BADOPTIONS = 2;
     MongoRunner.EXIT_REPLICATION_ERROR = 3;
@@ -792,10 +793,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         if (!Array.contains(allowedExitCodes, returnCode)) {
             throw new MongoRunner.StopError(
-                // clang-format off
-            `MongoDB process on port ${port} exited with error code ${returnCode}`,
-                // clang-format on
-                returnCode);
+                `MongoDB process on port ${port} exited with error code ${returnCode}`, returnCode);
         }
 
         return returnCode;

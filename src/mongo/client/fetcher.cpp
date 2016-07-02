@@ -62,6 +62,7 @@ const char* kNextBatchFieldName = "nextBatch";
 Status parseCursorResponse(const BSONObj& obj,
                            const std::string& batchFieldName,
                            Fetcher::QueryResponse* batchData) {
+    invariant(obj.isOwned());
     invariant(batchFieldName == kFirstBatchFieldName || batchFieldName == kNextBatchFieldName);
     invariant(batchData);
 
@@ -149,7 +150,11 @@ Status parseCursorResponse(const BSONObj& obj,
                                         << "' field: "
                                         << obj);
         }
-        batchData->documents.push_back(itemElement.Obj().getOwned());
+        batchData->documents.push_back(itemElement.Obj());
+    }
+
+    for (auto& doc : batchData->documents) {
+        doc.shareOwnershipWith(obj);
     }
 
     return Status::OK();

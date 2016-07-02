@@ -145,16 +145,16 @@ class JsCustomBehavior(CustomBehavior):
         self.hook_test_case.configure(self.fixture)
 
     def after_test(self, test, test_report):
+        description = "{0} after running '{1}'".format(self.description, test.short_name())
         try:
             # Change test_name and description to be more descriptive.
-            self.hook_test_case.test_name =  test.short_name() + ":" + self.logger_name
-            self.description = "Collection validation after running {0}".format(test.short_name())
+            self.hook_test_case.test_name = test.short_name() + ":" + self.logger_name
             CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
             self.hook_test_case.run_test()
             self.hook_test_case.return_code = 0
             test_report.addSuccess(self.hook_test_case)
         except self.hook_test_case.failureException as err:
-            self.hook_test_case.logger.exception("{0} failed".format(self.description))
+            self.hook_test_case.logger.exception("{0} failed".format(description))
             test_report.addFailure(self.hook_test_case, sys.exc_info())
             raise errors.TestFailure(err.args[0])
         finally:
@@ -172,7 +172,19 @@ class ValidateCollections(JsCustomBehavior):
         JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
 
 
-class CheckReplDBHash(CustomBehavior):
+class CheckReplDBHash(JsCustomBehavior):
+    """
+    Checks that the dbhashes of all non-local databases and non-replicated system collections
+    match on the primary and secondaries.
+    """
+    def __init__(self, logger, fixture):
+        description = "Check dbhashes of all replica set or master/slave members"
+        js_filename = os.path.join("jstests", "hooks", "run_check_repl_dbhash.js")
+        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
+
+
+# Old version of CheckReplDBHash used to ensure feature parity of new version.
+class CheckReplDBHashDeprecated(CustomBehavior):
     """
     Waits for replication after each test, then checks that the dbhahses
     of all databases other than "local" match on the primary and all of
@@ -222,9 +234,9 @@ class CheckReplDBHash(CustomBehavior):
                 if secondary_conn.admin.command("isMaster").get("arbiterOnly", False):
                     continue
 
-                all_matched = CheckReplDBHash._check_all_db_hashes(primary_conn,
-                                                                   secondary_conn,
-                                                                   sb)
+                all_matched = CheckReplDBHashDeprecated._check_all_db_hashes(primary_conn,
+                                                                             secondary_conn,
+                                                                             sb)
                 if not all_matched:
                     sb.insert(0,
                               "One or more databases were different between the primary on port %d"
@@ -234,7 +246,7 @@ class CheckReplDBHash(CustomBehavior):
                 success = all_matched and success
 
             if not success:
-                CheckReplDBHash._dump_oplog(primary_conn, secondary_conn, sb)
+                CheckReplDBHashDeprecated._dump_oplog(primary_conn, secondary_conn, sb)
 
                 # Adding failures to a TestReport requires traceback information, so we raise
                 # a 'self.hook_test_case.failureException' that we will catch ourselves.
@@ -309,14 +321,15 @@ class CheckReplDBHash(CustomBehavior):
 
         success = True
 
-        if not CheckReplDBHash._check_dbs_present(primary_conn, secondary_conn, sb):
+        if not CheckReplDBHashDeprecated._check_dbs_present(primary_conn, secondary_conn, sb):
             return False
 
         for db_name in primary_conn.database_names():
             if db_name == "local":
                 continue  # We don't expect this to match across different nodes.
 
-            matched = CheckReplDBHash._check_db_hash(primary_conn, secondary_conn, db_name, sb)
+            matched = CheckReplDBHashDeprecated._check_db_hash(
+                primary_conn, secondary_conn, db_name, sb)
             success = matched and success
 
         return success
@@ -340,7 +353,7 @@ class CheckReplDBHash(CustomBehavior):
         # There may be a difference in databases which is not considered an error, when
         # the database only contains system collections. This difference is only logged
         # when others are encountered, i.e., success = False.
-        missing_on_primary, missing_on_secondary = CheckReplDBHash._check_difference(
+        missing_on_primary, missing_on_secondary = CheckReplDBHashDeprecated._check_difference(
             set(primary_dbs), set(secondary_dbs), "database")
 
         for missing_db in missing_on_secondary:
@@ -352,7 +365,7 @@ class CheckReplDBHash(CustomBehavior):
             # otherwise it's not well defined whether they should exist or not.
             if non_system_colls:
                 sb.append("Database %s present on primary but not on secondary." % (missing_db))
-                CheckReplDBHash._dump_all_collections(db, non_system_colls, sb)
+                CheckReplDBHashDeprecated._dump_all_collections(db, non_system_colls, sb)
                 success = False
 
         for missing_db in missing_on_primary:
@@ -369,7 +382,7 @@ class CheckReplDBHash(CustomBehavior):
             # otherwise it's not well defined if it should exist or not.
             if non_system_colls:
                 sb.append("Database %s present on secondary but not on primary." % (missing_db))
-                CheckReplDBHash._dump_all_collections(db, non_system_colls, sb)
+                CheckReplDBHashDeprecated._dump_all_collections(db, non_system_colls, sb)
                 success = False
 
         return success
@@ -390,7 +403,7 @@ class CheckReplDBHash(CustomBehavior):
         if primary_hash["md5"] == secondary_hash["md5"]:
             return True
 
-        success = CheckReplDBHash._check_dbs_eq(
+        success = CheckReplDBHashDeprecated._check_dbs_eq(
             primary_conn, secondary_conn, primary_hash, secondary_hash, db_name, sb)
 
         if not success:
@@ -422,16 +435,16 @@ class CheckReplDBHash(CustomBehavior):
         primary_coll_names = set(primary_coll_hashes.keys())
         secondary_coll_names = set(secondary_coll_hashes.keys())
 
-        missing_on_primary, missing_on_secondary = CheckReplDBHash._check_difference(
+        missing_on_primary, missing_on_secondary = CheckReplDBHashDeprecated._check_difference(
             primary_coll_names, secondary_coll_names, "collection", sb=sb)
 
         if missing_on_primary or missing_on_secondary:
 
             # 'sb' already describes which collections are missing where.
             for coll_name in missing_on_primary:
-                CheckReplDBHash._dump_all_documents(secondary_db, coll_name, sb)
+                CheckReplDBHashDeprecated._dump_all_documents(secondary_db, coll_name, sb)
             for coll_name in missing_on_secondary:
-                CheckReplDBHash._dump_all_documents(primary_db, coll_name, sb)
+                CheckReplDBHashDeprecated._dump_all_documents(primary_db, coll_name, sb)
             return
 
         for coll_name in primary_coll_names & secondary_coll_names:
@@ -461,7 +474,7 @@ class CheckReplDBHash(CustomBehavior):
             sb.append("Collection %s.%s has a different hash on the primary and the secondary"
                       " ([ %s ] != [ %s ]):"
                       % (db_name, coll_name, primary_coll_hash, secondary_coll_hash))
-            CheckReplDBHash._check_colls_eq(primary_db, secondary_db, coll_name, sb)
+            CheckReplDBHashDeprecated._check_colls_eq(primary_db, secondary_db, coll_name, sb)
 
         if success:
             sb.append("All collections that were expected to match did.")
@@ -480,10 +493,10 @@ class CheckReplDBHash(CustomBehavior):
         primary_coll = primary_db.get_collection(coll_name, codec_options=codec_options)
         secondary_coll = secondary_db.get_collection(coll_name, codec_options=codec_options)
 
-        primary_docs = CheckReplDBHash._extract_documents(primary_coll)
-        secondary_docs = CheckReplDBHash._extract_documents(secondary_coll)
+        primary_docs = CheckReplDBHashDeprecated._extract_documents(primary_coll)
+        secondary_docs = CheckReplDBHashDeprecated._extract_documents(secondary_coll)
 
-        CheckReplDBHash._get_collection_diff(primary_docs, secondary_docs, sb)
+        CheckReplDBHashDeprecated._get_collection_diff(primary_docs, secondary_docs, sb)
 
     @staticmethod
     def _extract_documents(collection):
@@ -556,7 +569,7 @@ class CheckReplDBHash(CustomBehavior):
             s_idx += 1
 
         if not matched:
-            CheckReplDBHash._append_differences(
+            CheckReplDBHashDeprecated._append_differences(
                 missing_on_primary, missing_on_secondary, "document", sb)
         else:
             sb.append("All documents matched.")
@@ -582,7 +595,7 @@ class CheckReplDBHash(CustomBehavior):
             missing_on_primary.add(item)
 
         if sb is not None:
-            CheckReplDBHash._append_differences(
+            CheckReplDBHashDeprecated._append_differences(
                 missing_on_primary, missing_on_secondary, item_type_name, sb)
 
         return (missing_on_primary, missing_on_secondary)
@@ -618,7 +631,7 @@ class CheckReplDBHash(CustomBehavior):
             sb.append("Database %s contains the following collections: %s"
                       % (database.name, coll_names))
             for coll_name in coll_names:
-                CheckReplDBHash._dump_all_documents(database, coll_name, sb)
+                CheckReplDBHashDeprecated._dump_all_documents(database, coll_name, sb)
         else:
             sb.append("No collections in database %s." % (database.name))
 
@@ -628,7 +641,7 @@ class CheckReplDBHash(CustomBehavior):
         Appends the contents of 'coll_name' to 'sb'.
         """
 
-        docs = CheckReplDBHash._extract_documents(database[coll_name])
+        docs = CheckReplDBHashDeprecated._extract_documents(database[coll_name])
         if docs:
             sb.append("Documents in %s.%s:" % (database.name, coll_name))
             for doc in docs:
@@ -667,5 +680,6 @@ class TypeSensitiveSON(bson.SON):
 _CUSTOM_BEHAVIORS = {
     "CleanEveryN": CleanEveryN,
     "CheckReplDBHash": CheckReplDBHash,
+    "CheckReplDBHashDeprecated": CheckReplDBHashDeprecated,
     "ValidateCollections": ValidateCollections,
 }

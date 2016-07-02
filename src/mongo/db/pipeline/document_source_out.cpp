@@ -171,7 +171,7 @@ boost::optional<Document> DocumentSourceOut::getNext() {
 
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                      const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+    : DocumentSourceNeedsMongod(pExpCtx),
       _done(false),
       _tempNs("")  // filled in by prepTempCollection
       ,
@@ -182,6 +182,10 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     uassert(16990,
             str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
             elem.type() == String);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "$out can only be used with the 'local' read concern level",
+            !pExpCtx->opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
 
     NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
     uassert(17385, "Can't $out to special collection: " + elem.str(), !outputNs.isSpecial());

@@ -313,8 +313,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
                 intrusive_ptr<Expression> pGroupExpr;
                 BSONType elementType = subElement.type();
                 if (elementType == Object) {
-                    Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                    pGroupExpr = Expression::parseObject(subElement.Obj(), &oCtx, vps);
+                    pGroupExpr = Expression::parseObject(subElement.Obj(), vps);
                 } else if (elementType == Array) {
                     uasserted(15953,
                               str::stream() << "aggregating group operators are unary (" << name
@@ -396,7 +395,7 @@ void getFieldPathMap(ExpressionObject* expressionObj,
         if (expObj) {
             getFieldPathMap(expObj, newPrefix, fields);
         } else if (expPath) {
-            (*fields)[expPath->getFieldPath().tail().getPath(false)] = newPrefix;
+            (*fields)[expPath->getFieldPath().tail().fullPath()] = newPrefix;
         }
     }
 }
@@ -742,8 +741,7 @@ void DocumentSourceGroup::parseIdExpression(BSONElement groupField,
         const BSONObj idKeyObj = groupField.Obj();
         if (idKeyObj.firstElementFieldName()[0] == '$') {
             // grouping on a $op expression
-            Expression::ObjectCtx oCtx(0);
-            _idExpressions.push_back(Expression::parseObject(idKeyObj, &oCtx, vps));
+            _idExpressions.push_back(Expression::parseObject(idKeyObj, vps));
         } else {
             // grouping on an "artificial" object. Rather than create the object for each input
             // in initialize(), instead group on the output of the raw expressions. The artificial

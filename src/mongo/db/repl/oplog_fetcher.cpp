@@ -34,6 +34,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -103,8 +104,12 @@ BSONObj makeGetMoreCommandObject(DataReplicatorExternalState* dataReplicatorExte
  * Returns command metadata object suitable for tailing remote oplog.
  */
 StatusWith<BSONObj> makeMetadataObject(bool isV1ElectionProtocol) {
-    return isV1ElectionProtocol ? BSON(rpc::kReplSetMetadataFieldName << 1)
-                                : rpc::makeEmptyMetadata();
+    return isV1ElectionProtocol
+        ? BSON(rpc::kReplSetMetadataFieldName
+               << 1
+               << rpc::ServerSelectionMetadata::fieldName()
+               << BSON(rpc::ServerSelectionMetadata::kSecondaryOkFieldName << true))
+        : rpc::ServerSelectionMetadata(true, boost::none).toBSON();
 }
 
 /**
@@ -191,8 +196,12 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
                                         << lastTS.toString()
                                         << " outOfOrderTS:"
                                         << docTS.toString()
-                                        << " at count:"
-                                        << info.networkDocumentCount);
+                                        << " in batch with "
+                                        << info.networkDocumentCount
+                                        << "docs; first-batch:"
+                                        << first
+                                        << ", doc:"
+                                        << doc);
         }
         lastTS = docTS;
     }

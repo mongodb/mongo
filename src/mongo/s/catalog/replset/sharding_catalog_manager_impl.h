@@ -38,6 +38,7 @@ namespace mongo {
 
 class DatabaseType;
 class ShardingCatalogClient;
+class VersionType;
 
 namespace executor {
 class TaskExecutor;
@@ -65,7 +66,17 @@ public:
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize) override;
 
+    Status addShardToZone(OperationContext* txn,
+                          const std::string& shardName,
+                          const std::string& zoneName) override;
+
+    Status removeShardFromZone(OperationContext* txn,
+                               const std::string& shardName,
+                               const std::string& zoneName) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
+
+    Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
 
 private:
     /**
@@ -110,7 +121,21 @@ private:
                                                               const std::string& dbName,
                                                               const BSONObj& cmdObj);
 
+    /**
+     * Returns the current cluster schema/protocol version.
+     */
+    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
 
+    /**
+     * Performs the necessary checks for version compatibility and creates a new config.version
+     * document if the current cluster config is empty.
+     */
+    Status _initConfigVersion(OperationContext* txn);
+
+    /**
+     * Builds all the expected indexes on the config server.
+     */
+    Status _initConfigIndexes(OperationContext* txn);
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -137,6 +162,9 @@ private:
 
     // True if startup() has been called.
     bool _started = false;  // (M)
+
+    // True if initializeConfigDatabaseIfNeeded() has been called and returned successfully.
+    bool _configInitialized = false;  // (M)
 };
 
 }  // namespace mongo

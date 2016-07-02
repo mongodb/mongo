@@ -84,8 +84,11 @@ TEST_F(InsertRetryTest, RetryOnInterruptedAndNetworkErrorSuccess) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogClient()->insertConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToInsert);
+        Status status =
+            catalogClient()->insertConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToInsert,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 
@@ -113,8 +116,11 @@ TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogClient()->insertConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToInsert);
+        Status status =
+            catalogClient()->insertConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToInsert,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_EQ(ErrorCodes::NetworkTimeout, status.code());
     });
 
@@ -145,8 +151,11 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogClient()->insertConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToInsert);
+        Status status =
+            catalogClient()->insertConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToInsert,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 
@@ -180,8 +189,11 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogClient()->insertConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToInsert);
+        Status status =
+            catalogClient()->insertConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToInsert,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
     });
 
@@ -215,8 +227,11 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogClient()->insertConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToInsert);
+        Status status =
+            catalogClient()->insertConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToInsert,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
     });
 
@@ -251,8 +266,11 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
                                      << "TestValue");
 
     auto future = launchAsync([&] {
-        Status status = catalogClient()->insertConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToInsert);
+        Status status =
+            catalogClient()->insertConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToInsert,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 
@@ -308,8 +326,13 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
                                              << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status = catalogClient()->updateConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToUpdate, updateExpr, false);
+        auto status =
+            catalogClient()->updateConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToUpdate,
+                                                  updateExpr,
+                                                  false,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 
@@ -355,8 +378,13 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
                                              << "NewTestValue"));
 
     auto future = launchAsync([&] {
-        auto status = catalogClient()->updateConfigDocument(
-            operationContext(), kTestNamespace.ns(), objToUpdate, updateExpr, false);
+        auto status =
+            catalogClient()->updateConfigDocument(operationContext(),
+                                                  kTestNamespace.ns(),
+                                                  objToUpdate,
+                                                  updateExpr,
+                                                  false,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 

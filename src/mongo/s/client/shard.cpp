@@ -31,10 +31,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+using std::string;
 
 namespace {
 
@@ -61,6 +64,29 @@ Status _getEffectiveCommandStatus(StatusWith<Shard::CommandResponse> cmdResponse
 
 }  // namespace
 
+Status Shard::CommandResponse::processBatchWriteResponse(
+    StatusWith<Shard::CommandResponse> response, BatchedCommandResponse* batchResponse) {
+    auto status = _getEffectiveCommandStatus(response);
+    if (status.isOK()) {
+        string errmsg;
+        if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
+            status = Status(ErrorCodes::FailedToParse,
+                            str::stream() << "Failed to parse write response: " << errmsg);
+        } else {
+            status = batchResponse->toStatus();
+        }
+    }
+
+    if (!status.isOK()) {
+        batchResponse->clear();
+        batchResponse->setErrCode(status.code());
+        batchResponse->setErrMessage(status.reason());
+        batchResponse->setOk(false);
+    }
+
+    return status;
+}
+
 Shard::Shard(const ShardId& id) : _id(id) {}
 
 const ShardId Shard::getId() const {
@@ -81,7 +107,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
         if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
-            LOG(3) << "Command " << cmdObj << " failed with retriable error and will be retried"
+            LOG(2) << "Command " << cmdObj << " failed with retriable error and will be retried"
                    << causedBy(commandStatus);
             continue;
         }
@@ -94,12 +120,14 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
+    const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     const boost::optional<long long> limit) {
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+        auto result =
+            _exhaustiveFindOnConfig(txn, readPref, readConcernLevel, nss, query, sort, limit);
 
         if (retry < kOnErrorNumRetries &&
             isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {

@@ -203,6 +203,10 @@ public:
         return true;
     }
 
+    ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kWrite;
+    }
+
     bool run(OperationContext* txn,
              const std::string& dbname,
              BSONObj& cmdObj,

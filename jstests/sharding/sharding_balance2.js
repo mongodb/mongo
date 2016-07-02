@@ -1,24 +1,21 @@
 /**
  * Test the maxSize setting for the addShard command.
  */
-
 (function() {
-    "use strict";
+    'use strict';
 
     var MaxSizeMB = 1;
 
     var s = new ShardingTest({shards: 2, other: {chunkSize: 1, manualAddShard: true}});
     var db = s.getDB("test");
-    s.stopBalancer();
 
     var names = s.getConnNames();
     assert.eq(2, names.length);
-    s.adminCommand({addshard: names[0]});
-    s.adminCommand({addshard: names[1], maxSize: MaxSizeMB});
+    assert.commandWorked(s.s0.adminCommand({addshard: names[0]}));
+    assert.commandWorked(s.s0.adminCommand({addshard: names[1], maxSize: MaxSizeMB}));
 
-    s.adminCommand({enablesharding: "test"});
-    var res = db.adminCommand({movePrimary: 'test', to: names[0]});
-    assert(res.ok || res.errmsg == "it is already the primary");
+    assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
+    s.ensurePrimaryShard('test', names[0]);
 
     var bigString = "";
     while (bigString.length < 10000)
@@ -32,7 +29,8 @@
         inserted += bigString.length;
     }
     assert.writeOK(bulk.execute());
-    s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
+
+    assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
     assert.gt(s.config.chunks.count(), 10);
 
     var getShardSize = function(conn) {
@@ -63,13 +61,10 @@
     }
 
     s.startBalancer();
-
-    // Wait until balancer finishes at least one balancing round.
-    assert(s.waitForBalancerRound(), "Balancer is not running: it never pinged config.mongos");
+    s.awaitBalancerRound();
 
     var chunkCounts = s.chunkCounts('foo', 'test');
     assert.eq(0, chunkCounts.shard0001);
 
     s.stop();
-
 })();

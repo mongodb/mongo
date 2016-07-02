@@ -39,12 +39,14 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/inline_decls.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 
@@ -69,63 +71,80 @@ const int BufferMaxSize = 64 * 1024 * 1024;
 template <typename Allocator>
 class StringBuilderImpl;
 
-class TrivialAllocator {
-public:
-    void* Malloc(size_t sz) {
-        return mongoMalloc(sz);
-    }
-    void* Realloc(void* p, size_t sz) {
-        return mongoRealloc(p, sz);
-    }
-    void Free(void* p) {
-        free(p);
-    }
-};
+class SharedBufferAllocator {
+    MONGO_DISALLOW_COPYING(SharedBufferAllocator);
 
-class StackAllocator {
 public:
-    enum { SZ = 512 };
-    void* Malloc(size_t sz) {
-        if (sz <= SZ)
-            return buf;
-        return mongoMalloc(sz);
+    SharedBufferAllocator() = default;
+
+    void malloc(size_t sz) {
+        _buf = SharedBuffer::allocate(sz);
     }
-    void* Realloc(void* p, size_t sz) {
-        if (p == buf) {
-            if (sz <= SZ)
-                return buf;
-            void* d = mongoMalloc(sz);
-            if (d == 0)
-                msgasserted(15912, "out of memory StackAllocator::Realloc");
-            memcpy(d, p, SZ);
-            return d;
-        }
-        return mongoRealloc(p, sz);
+    void realloc(size_t sz) {
+        _buf.realloc(sz);
     }
-    void Free(void* p) {
-        if (p != buf)
-            free(p);
+    void free() {
+        _buf = {};
+    }
+    SharedBuffer release() {
+        return std::move(_buf);
+    }
+
+    char* get() const {
+        return _buf.get();
     }
 
 private:
-    char buf[SZ];
+    SharedBuffer _buf;
 };
 
-template <class Allocator>
+class StackAllocator {
+    MONGO_DISALLOW_COPYING(StackAllocator);
+
+public:
+    StackAllocator() = default;
+
+    enum { SZ = 512 };
+    void malloc(size_t sz) {
+        if (sz > SZ)
+            _ptr = mongoMalloc(sz);
+    }
+    void realloc(size_t sz) {
+        if (_ptr == _buf) {
+            if (sz > SZ) {
+                _ptr = mongoMalloc(sz);
+                memcpy(_ptr, _buf, SZ);
+            }
+        } else {
+            _ptr = mongoRealloc(_ptr, sz);
+        }
+    }
+    void free() {
+        if (_ptr != _buf)
+            ::free(_ptr);
+        _ptr = _buf;
+    }
+
+    // Not supported on this allocator.
+    void release() = delete;
+
+    char* get() const {
+        return static_cast<char*>(_ptr);
+    }
+
+private:
+    char _buf[SZ];
+    void* _ptr = _buf;
+};
+
+template <class BufferAllocator>
 class _BufBuilder {
-    // non-copyable, non-assignable
-    _BufBuilder(const _BufBuilder&);
-    _BufBuilder& operator=(const _BufBuilder&);
-    Allocator al;
+    MONGO_DISALLOW_COPYING(_BufBuilder);
 
 public:
     _BufBuilder(int initsize = 512) : size(initsize) {
         if (size > 0) {
-            data = (char*)al.Malloc(size);
-            if (data == 0)
-                msgasserted(10000, "out of memory BufBuilder");
-        } else {
-            data = 0;
+            _buf.malloc(size);
         }
         l = 0;
         reservedBytes = 0;
@@ -135,10 +154,7 @@ public:
     }
 
     void kill() {
-        if (data) {
-            al.Free(data);
-            data = 0;
-        }
+        _buf.free();
     }
 
     void reset() {
@@ -149,10 +165,8 @@ public:
         l = 0;
         reservedBytes = 0;
         if (maxSize && size > maxSize) {
-            al.Free(data);
-            data = (char*)al.Malloc(maxSize);
-            if (data == 0)
-                msgasserted(15913, "out of memory BufBuilder::reset");
+            _buf.free();
+            _buf.malloc(maxSize);
             size = maxSize;
         }
     }
@@ -167,15 +181,15 @@ public:
 
     /* note this may be deallocated (realloced) if you keep writing. */
     char* buf() {
-        return data;
+        return _buf.get();
     }
     const char* buf() const {
-        return data;
+        return _buf.get();
     }
 
-    /* assume ownership of the buffer - you must then free() it */
-    void decouple() {
-        data = 0;
+    /* assume ownership of the buffer */
+    SharedBuffer release() {
+        return _buf.release();
     }
 
     void appendUChar(unsigned char j) {
@@ -268,7 +282,7 @@ public:
             grow_reallocate(minSize);
         }
         l = newLen;
-        return data + oldlen;
+        return _buf.get() + oldlen;
     }
 
     /**
@@ -313,24 +327,22 @@ private:
             ss << "BufBuilder attempted to grow() to " << a << " bytes, past the 64MB limit.";
             msgasserted(13548, ss.str().c_str());
         }
-        data = (char*)al.Realloc(data, a);
-        if (data == NULL)
-            msgasserted(16070, "out of memory BufBuilder::grow_reallocate");
+        _buf.realloc(a);
         size = a;
     }
 
-    char* data;
+    BufferAllocator _buf;
     int l;
     int size;
     int reservedBytes;  // eagerly grow_reallocate to keep this many bytes of spare room.
 
-    friend class StringBuilderImpl<Allocator>;
+    friend class StringBuilderImpl<BufferAllocator>;
 };
 
-typedef _BufBuilder<TrivialAllocator> BufBuilder;
+typedef _BufBuilder<SharedBufferAllocator> BufBuilder;
 
 /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
-      this can be significantly faster for small bufs.  However, you can not decouple() the
+      this can be significantly faster for small bufs.  However, you can not release() the
       buffer with StackBufBuilder.
     While designed to be a variable on the stack, if you were to dynamically allocate one,
       nothing bad would happen.  In fact in some circumstances this might make sense, say,
@@ -339,7 +351,7 @@ typedef _BufBuilder<TrivialAllocator> BufBuilder;
 class StackBufBuilder : public _BufBuilder<StackAllocator> {
 public:
     StackBufBuilder() : _BufBuilder<StackAllocator>(StackAllocator::SZ) {}
-    void decouple();  // not allowed. not implemented.
+    void release() = delete;  // not allowed. not implemented.
 };
 
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
@@ -426,7 +438,7 @@ public:
     }
 
     std::string str() const {
-        return std::string(_buf.data, _buf.l);
+        return std::string(_buf.buf(), _buf.l);
     }
 
     /** size of current std::string */
@@ -452,6 +464,6 @@ private:
     }
 };
 
-typedef StringBuilderImpl<TrivialAllocator> StringBuilder;
+typedef StringBuilderImpl<SharedBufferAllocator> StringBuilder;
 typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
 }  // namespace mongo

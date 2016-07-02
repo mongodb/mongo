@@ -58,9 +58,13 @@ public:
     virtual ~ReplicationCoordinatorExternalStateMock();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
-    virtual void startSteadyStateReplication() override;
+    virtual void startSteadyStateReplication(OperationContext* txn) override;
+    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) override;
+    virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
+
     virtual void startMasterSlave(OperationContext*);
     virtual void shutdown(OperationContext* txn);
+    virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
@@ -89,13 +93,15 @@ public:
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
     virtual StatusWith<OpTime> multiApply(OperationContext* txn,
-                                          const MultiApplier::Operations& ops,
+                                          MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
-    virtual void multiSyncApply(const MultiApplier::Operations& ops) override;
-    virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
+    virtual void multiSyncApply(MultiApplier::OperationPtrs* ops) override;
+    virtual void multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                        const HostAndPort& source) override;
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
+        OperationContext* txn) const override;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const override;
     virtual bool shouldUseDataReplicatorInitialSync() const override;
 
     /**

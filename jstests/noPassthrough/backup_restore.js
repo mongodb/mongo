@@ -68,6 +68,7 @@
             "    'auth_create_role.js'," + "    'auth_create_user.js'," +
             "    'auth_drop_role.js'," + "    'auth_drop_user.js'," +
             "    'reindex_background.js'," + "    'yield_sort.js'," +
+            "    'create_index_background.js'," +
             "].map(function(file) { return dir + '/' + file; });" + "Random.setRandomSeed();" +
             // run indefinitely
             "while (true) {" + "   try {" +
@@ -271,6 +272,10 @@
 
         // Wait up to 60 seconds until the new hidden node is in state SECONDARY.
         rst.waitForState(rst.nodes[numNodes], ReplSetTest.State.SECONDARY, 60 * 1000);
+
+        // Wait for secondaries to finish catching up before shutting down.
+        assert.writeOK(primary.getDB("test").foo.insert(
+            {}, {writeConcern: {w: rst.nodes.length, wtimeout: 10 * 60 * 1000}}));
 
         // Stop set.
         rst.stopSet();

@@ -66,13 +66,17 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/balancer/balancer.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -122,42 +126,64 @@ MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
     return Status::OK();
 }
 
+/**
+ * Returns new thread pool for thread pool task executor.
+ */
+std::unique_ptr<ThreadPool> makeThreadPool() {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.poolName = "replication";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    return stdx::make_unique<ThreadPool>(threadPoolOptions);
+}
+
 }  // namespace
 
-ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl()
-    : _startedThreads(false), _nextThreadId(0) {}
+ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
+    StorageInterface* storageInterface)
+    : _storageInterface(storageInterface) {
+    uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
+}
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
+
+bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationContext* txn) {
+    return _storageInterface->getInitialSyncFlag(txn);
+}
 
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
     _initialSyncThread.reset(new stdx::thread{[finished, this]() {
         Client::initThreadIfNotAlready("initial sync");
-        log() << "Starting replication fetcher thread";
-
-        // Start bgsync.
-        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer()));
-        invariant(!_producerThread);  // The producer thread should not be init'd before this.
-        _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
         // Do initial sync.
-        syncDoInitialSync(_bgSync.get());
+        syncDoInitialSync(this);
         finished();
     }});
 }
 
-void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication() {
-    if (!_producerThread) {
-        log() << "Starting replication fetcher thread";
-        _bgSync.reset(new BackgroundSync(makeSteadyStateOplogBuffer()));
-        _producerThread.reset(
-            new stdx::thread(stdx::bind(&BackgroundSync::producerThread, _bgSync.get(), this)));
-    }
+void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
+    stdx::function<void(OperationContext* txn)> run) {
+    _initialSyncThread.reset(new stdx::thread{[run, this]() {
+        Client::initThreadIfNotAlready("initial sync");
+        auto txn = cc().makeOperationContext();
+        invariant(txn);
+        invariant(txn->getClient());
+        run(txn.get());
+    }});
+}
+
+void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(OperationContext* txn) {
+    invariant(!_bgSync);
+    log() << "Starting replication fetcher thread";
+    _bgSync = stdx::make_unique<BackgroundSync>(this, makeSteadyStateOplogBuffer(txn));
+    _bgSync->startup(txn);
+
     log() << "Starting replication applier threads";
     invariant(!_applierThread);
     _applierThread.reset(new stdx::thread(stdx::bind(&runSyncThread, _bgSync.get())));
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread.reset(new stdx::thread(
-        stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback, _bgSync.get())));
+    _syncSourceFeedbackThread.reset(new stdx::thread(stdx::bind(
+        &SyncSourceFeedback::run, &_syncSourceFeedback, _taskExecutor.get(), _bgSync.get())));
 }
 
 void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
@@ -171,7 +197,13 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     }
     getGlobalServiceContext()->getGlobalStorageEngine()->setJournalListener(this);
 
+    _taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        makeThreadPool(), executor::makeNetworkInterface("NetworkInterfaceASIO-RS"));
+    _taskExecutor->startup();
+
     _writerPool = SyncTail::makeWriterPool();
+
+    _storageInterface->startup();
 
     _startedThreads = true;
 }
@@ -192,13 +224,21 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
             _applierThread->join();
         }
 
-        if (_producerThread) {
+        if (_bgSync) {
             _bgSync->shutdown(txn);
-            _producerThread->join();
+            _bgSync->join(txn);
         }
         if (_snapshotThread)
             _snapshotThread->shutdown();
+
+        _taskExecutor->shutdown();
+        _taskExecutor->join();
+        _storageInterface->shutdown();
     }
+}
+
+executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor() const {
+    return _taskExecutor.get();
 }
 
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* txn,
@@ -350,7 +390,10 @@ void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp
 }
 
 void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationContext* txn) {
-    auto mv = StorageInterface::get(txn)->getMinValid(txn);
+    if (_storageInterface->getInitialSyncFlag(txn)) {
+        return;  // Initial Sync will take over so no cleanup is needed.
+    }
+    auto mv = _storageInterface->getMinValid(txn);
 
     if (!mv.start.isNull()) {
         // If we are in the middle of a batch, and recoveringm then we need to truncate the oplog.
@@ -362,6 +405,11 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(OperationContext* txn) {
     // TODO: handle WriteConflictExceptions below
     try {
+        // If we are doing an initial sync do not read from the oplog.
+        if (_storageInterface->getInitialSyncFlag(txn)) {
+            return {ErrorCodes::InitialSyncFailure, "In the middle of an initial sync."};
+        }
+
         BSONObj oplogEntry;
         if (!Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry)) {
             return StatusWith<OpTime>(ErrorCodes::NoMatchingDocument,
@@ -430,6 +478,21 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        status = Grid::get(txn)->catalogManager()->initializeConfigDatabaseIfNeeded(txn);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::ShutdownInProgress ||
+                status == ErrorCodes::InterruptedAtShutdown) {
+                // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
+                return;
+            }
+            fassertFailedWithStatus(40184,
+                                    Status(status.code(),
+                                           str::stream()
+                                               << "Failed to initialize config database on config "
+                                                  "server's first transition to primary"
+                                               << causedBy(status)));
+        }
+
         // If this is a config server node becoming a primary, start the balancer
         auto balancer = Balancer::get(txn);
 
@@ -522,18 +585,18 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     OperationContext* txn,
-    const MultiApplier::Operations& ops,
+    MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return repl::multiApply(txn, _writerPool.get(), ops, applyOperation);
+    return repl::multiApply(txn, _writerPool.get(), std::move(ops), applyOperation);
 }
 
-void ReplicationCoordinatorExternalStateImpl::multiSyncApply(const MultiApplier::Operations& ops) {
+void ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::OperationPtrs* ops) {
     // SyncTail* argument is not used by repl::multiSyncApply().
     repl::multiSyncApply(ops, nullptr);
 }
 
 void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    const MultiApplier::Operations& ops, const HostAndPort& source) {
+    MultiApplier::OperationPtrs* ops, const HostAndPort& source) {
 
     // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
     // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
@@ -544,17 +607,17 @@ void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     repl::multiInitialSyncApply(ops, &syncTail);
 }
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
+    OperationContext* txn) const {
     if (initialSyncOplogBuffer == kCollectionOplogBufferName) {
-        return stdx::make_unique<OplogBufferCollection>();
+        return stdx::make_unique<OplogBufferCollection>(StorageInterface::get(txn));
     } else {
         return stdx::make_unique<OplogBufferBlockingQueue>();
     }
 }
 
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer()
-    const {
+std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer(
+    OperationContext* txn) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 

@@ -357,8 +357,7 @@ TEST(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
                              actualMultikeyPaths);
 }
 
-// TODO SERVER-23172: remove test.
-TEST(S2KeyGeneratorTest, CollationDoesNotAffectStringsInEmbeddedDocuments) {
+TEST(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
     BSONObj obj = fromjson("{a: {type: 'Point', coordinates: [0, 0]}, b: {c: 'string'}}");
     BSONObj keyPattern = fromjson("{a: '2dsphere', b: 1}");
     BSONObj infoObj = fromjson("{key: {a: '2dsphere', b: 1}, '2dsphereIndexVersion': 3}");
@@ -372,7 +371,7 @@ TEST(S2KeyGeneratorTest, CollationDoesNotAffectStringsInEmbeddedDocuments) {
 
     BSONObjSet expectedKeys;
     expectedKeys.insert(BSON("" << getCellID(0, 0) << "" << BSON("c"
-                                                                 << "string")));
+                                                                 << "gnirts")));
 
     assertKeysetsEqual(expectedKeys, actualKeys);
     assertMultikeyPathsEqual(MultikeyPaths{std::set<size_t>{}, std::set<size_t>{}},

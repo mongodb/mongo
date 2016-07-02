@@ -353,7 +353,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 
 				/* Make sure the types are compatible. */
 				WT_ASSERT(session,
-				    tolower(pv.type) == tolower(vpv.type));
+				    __wt_tolower((u_char)pv.type) ==
+				    __wt_tolower((u_char)vpv.type));
 				pv.u = vpv.u;
 
 				len = __pack_size(session, &pv);
@@ -459,7 +460,8 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				WT_RET(__pack_next(&vpack, &vpv));
 				/* Make sure the types are compatible. */
 				WT_ASSERT(session,
-				    tolower(pv.type) == tolower(vpv.type));
+				    __wt_tolower((u_char)pv.type) ==
+				    __wt_tolower((u_char)vpv.type));
 				vpv.u = pv.u;
 				len = __pack_size(session, &vpv);
 				WT_RET(__wt_buf_grow(session,

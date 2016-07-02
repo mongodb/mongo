@@ -259,7 +259,7 @@ Socket::Socket(int fd, const SockAddr& remote)
 }
 
 Socket::Socket(double timeout, logger::LogSeverity ll) : _logLevel(ll) {
-    _fd = -1;
+    _fd = INVALID_SOCKET;
     _timeout = timeout;
     _lastValidityCheckAtSecs = time(0);
     _init();
@@ -279,7 +279,7 @@ void Socket::_init() {
 }
 
 void Socket::close() {
-    if (_fd >= 0) {
+    if (_fd != INVALID_SOCKET) {
 // Stop any blocking reads/writes, and prevent new reads/writes
 #if defined(_WIN32)
         shutdown(_fd, SD_BOTH);
@@ -287,14 +287,14 @@ void Socket::close() {
         shutdown(_fd, SHUT_RDWR);
 #endif
         closesocket(_fd);
-        _fd = -1;
+        _fd = INVALID_SOCKET;
     }
 }
 
 #ifdef MONGO_CONFIG_SSL
 bool Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
     fassert(16503, mgr);
-    if (_fd < 0) {
+    if (_fd == INVALID_SOCKET) {
         return false;
     }
     _sslManager = mgr;
@@ -310,7 +310,7 @@ void Socket::secureAccepted(SSLManagerInterface* ssl) {
 std::string Socket::doSSLHandshake(const char* firstBytes, int len) {
     if (!_sslManager)
         return "";
-    fassert(16506, _fd);
+    fassert(16506, _fd != INVALID_SOCKET);
     if (_sslConnection.get()) {
         throw SocketException(SocketException::RECV_ERROR,
                               "Attempt to call SSL_accept on already secure Socket from " +
@@ -640,7 +640,7 @@ const int Socket::errorPollIntervalSecs(5);
 // isStillConnected() polls the socket at max every Socket::errorPollIntervalSecs to determine
 // if any disconnection-type events have happened on the socket.
 bool Socket::isStillConnected() {
-    if (_fd == -1) {
+    if (_fd == INVALID_SOCKET) {
         // According to the man page, poll will respond with POLLVNAL for invalid or
         // unopened descriptors, but it doesn't seem to be properly implemented in
         // some platforms - it can return 0 events and 0 for revent. Hence this workaround.

@@ -10,6 +10,8 @@ selector:
     - jstests/sharding/shard_aware_on_add_shard.js
     - jstests/sharding/shard_aware_primary_failover.js
     - jstests/sharding/shard_identity_config_update.js
+    - jstests/sharding/add_shard_to_zone.js
+    - jstests/sharding/remove_shard_from_zone.js
     # v3.4 changes $in shard key extraction.
     - jstests/sharding/upsert_sharded.js
     - jstests/sharding/update_sharded.js
@@ -22,11 +24,14 @@ selector:
     # NumInitialChunks verification changed. See SERVER-23327.
     - jstests/sharding/shard_collection_verify_initial_chunks.js
     # TODO: Enable when SERVER-22672 is complete
-    - jstests/sharding/balancer_window.js
     - jstests/sharding/printShardingStatus.js
-    # TODO: Enable whan SERVER-XXXXX is complete
-    - jstests/sharding/*auth*
-    - jstests/sharding/*Auth*
+    # TODO: Change in error reporting, enable when 3.4 becomes 'last-stable'.
+    - jstests/sharding/map_reduce_validation.js
+    # TODO Assumes mapReduce can handle the collation option; enable when 3.4 becomes 'last-stable'.
+    - jstests/sharding/mapReduce_inSharded.js
+    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
+    # 'last-stable'.
+    - jstests/sharding/shard_collection_basic.js
 
 executor:
   js_test:

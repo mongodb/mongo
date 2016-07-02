@@ -1,23 +1,24 @@
-var st = new ShardingTest({
-    keyFile: 'jstests/libs/key1',
-    shards: 2,
-    chunkSize: 1,
-    verbose: 2,
-    other: {nopreallocj: 1, verbose: 2, useHostname: true, configOptions: {verbose: 2}}
-});
+(function() {
+    'use strict';
 
-var mongos = st.s;
-var adminDB = mongos.getDB('admin');
-var db = mongos.getDB('test');
+    var st = new ShardingTest({
+        shards: 2,
+        other: {chunkSize: 1, useHostname: true, keyFile: 'jstests/libs/key1'},
+    });
 
-adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
+    var mongos = st.s;
+    var adminDB = mongos.getDB('admin');
+    var db = mongos.getDB('test');
 
-jsTestLog("Add user was successful");
+    adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
 
-// Test for SERVER-6549, make sure that repeatedly logging in always passes.
-for (var i = 0; i < 100; i++) {
-    adminDB = new Mongo(mongos.host).getDB('admin');
-    assert(adminDB.auth('admin', 'password'), "Auth failed on attempt #: " + i);
-}
+    jsTestLog("Add user was successful");
 
-st.stop();
+    // Test for SERVER-6549, make sure that repeatedly logging in always passes.
+    for (var i = 0; i < 100; i++) {
+        adminDB = new Mongo(mongos.host).getDB('admin');
+        assert(adminDB.auth('admin', 'password'), "Auth failed on attempt #: " + i);
+    }
+
+    st.stop();
+})();

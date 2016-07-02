@@ -466,11 +466,13 @@ public:
     virtual Status set(const BSONElement& newValueElement) {
         try {
             return setFromString(newValueElement.String());
-        } catch (MsgAssertionException msg) {
+        } catch (const MsgAssertionException& msg) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream()
                               << "Invalid value for sslMode via setParameter command: "
-                              << newValueElement);
+                              << newValueElement
+                              << ", exception: "
+                              << msg.what());
         }
     }
 
@@ -535,11 +537,13 @@ public:
     virtual Status set(const BSONElement& newValueElement) {
         try {
             return setFromString(newValueElement.String());
-        } catch (MsgAssertionException msg) {
+        } catch (const MsgAssertionException& msg) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream()
                               << "Invalid value for clusterAuthMode via setParameter command: "
-                              << newValueElement);
+                              << newValueElement
+                              << ", exception: "
+                              << msg.what());
         }
     }
 

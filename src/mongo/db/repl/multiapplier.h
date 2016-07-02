@@ -38,8 +38,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -58,6 +58,8 @@ public:
      */
     using Operations = std::vector<OplogEntry>;
 
+    using OperationPtrs = std::vector<const OplogEntry*>;
+
     /**
      * Callback function to report final status of applying operations along with
      * list of operations (if applicable) that were not successfully applied.
@@ -71,10 +73,10 @@ public:
      * would have the same outcome as calling SyncTail::syncApply() ('convertUpdatesToUpserts'
      * value will be embedded in the function implementation).
      */
-    using ApplyOperationFn = stdx::function<void(const Operations&)>;
+    using ApplyOperationFn = stdx::function<void(OperationPtrs*)>;
 
     using MultiApplyFn = stdx::function<StatusWith<OpTime>(
-        OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn)>;
+        OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn)>;
 
     /**
      * Creates MultiApplier in inactive state.
@@ -89,7 +91,7 @@ public:
      * It is an error for 'operations' to be empty but individual oplog entries
      * contained in 'operations' are not validated.
      */
-    MultiApplier(ReplicationExecutor* executor,
+    MultiApplier(executor::TaskExecutor* executor,
                  const Operations& operations,
                  const ApplyOperationFn& applyOperation,
                  const MultiApplyFn& multiApply,
@@ -133,11 +135,11 @@ private:
     /**
      * DB worker callback function - applies all operations.
      */
-    void _callback(const ReplicationExecutor::CallbackArgs& cbd);
+    void _callback(const executor::TaskExecutor::CallbackArgs& cbd);
     void _finishCallback(const StatusWith<Timestamp>& result, const Operations& operations);
 
     // Not owned by us.
-    ReplicationExecutor* _executor;
+    executor::TaskExecutor* _executor;
 
     Operations _operations;
     ApplyOperationFn _applyOperation;
@@ -152,7 +154,7 @@ private:
     // _active is true when MultiApplier is scheduled to be run by the executor.
     bool _active;
 
-    ReplicationExecutor::CallbackHandle _dbWorkCallbackHandle;
+    executor::TaskExecutor::CallbackHandle _dbWorkCallbackHandle;
 };
 
 
@@ -170,7 +172,7 @@ private:
 using PauseDataReplicatorFn = stdx::function<void()>;
 
 StatusWith<std::pair<std::unique_ptr<MultiApplier>, MultiApplier::Operations>> applyUntilAndPause(
-    ReplicationExecutor* executor,
+    executor::TaskExecutor* executor,
     const MultiApplier::Operations& operations,
     const MultiApplier::ApplyOperationFn& applyOperation,
     const MultiApplier::ApplyOperationFn& multiApply,

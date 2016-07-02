@@ -71,9 +71,9 @@ StorageInterface* StorageInterface::get(OperationContext* txn) {
 }
 
 
-void StorageInterface::set(ServiceContext* service, std::unique_ptr<StorageInterface> replCoord) {
-    auto& coordinator = getStorageInterface(service);
-    coordinator = std::move(replCoord);
+void StorageInterface::set(ServiceContext* service, std::unique_ptr<StorageInterface> storage) {
+    auto& storageInterface = getStorageInterface(service);
+    storageInterface = std::move(storage);
 }
 
 }  // namespace repl

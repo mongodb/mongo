@@ -58,6 +58,17 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	(void)config;
 
 	{
+#if !defined(ERROR_BAD_COMMAND)
+#define	ERROR_BAD_COMMAND	37
+#endif
+	/*! [WT_EXTENSION_API map_windows_error] */
+	int posix_error =
+	    wt_api->map_windows_error(wt_api, session, ERROR_BAD_COMMAND);
+	/*! [WT_EXTENSION_API map_windows_error] */
+	(void)posix_error;
+	}
+
+	{
 	const char *msg = "string";
 	/*! [WT_EXTENSION_API err_printf] */
 	(void)wt_api->err_printf(

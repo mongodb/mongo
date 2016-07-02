@@ -70,6 +70,18 @@ public:
     static StatusWith<ChunkVersion> parseFromBSONForCommands(const BSONObj& obj);
 
     /**
+     * Parses the BSON formatted by ChunkVersion::appendWithFieldForCommands.
+     *
+     * Interprets the specified BSON content as the format for commands, which is in the form:
+     *  { ..., <field>: [ <combined major/minor>, <OID epoch> ], ... }.
+     */
+    static StatusWith<ChunkVersion> parseFromBSONWithFieldForCommands(const BSONObj& obj,
+                                                                      StringData field);
+
+    /**
+     * Note: if possible, use ChunkVersion::parseFromBSONForCommands or
+     * ChunkVersion::parseFromBSONWithFieldForCommands instead. Phasing out this function.
+     *
      * Interprets the specified BSON content as the format for the setShardVersion command, which
      * is in the form:
      *  { ..., version: [ <combined major/minor> ], versionEpoch: [ <OID epoch> ], ... }
@@ -77,6 +89,9 @@ public:
     static StatusWith<ChunkVersion> parseFromBSONForSetShardVersion(const BSONObj& obj);
 
     /**
+     * Note: if possible, use ChunkVersion::parseFromBSONForCommands or
+     * ChunkVersion::parseFromBSONWithFieldForCommands instead. Phasing out this function.
+     *
      * Interprets the specified BSON content as the format for chunk persistence, which is in the
      * form:
      *  { ..., lastmod: [ <combined major/minor> ], lastmodEpoch: [ <OID epoch> ], ... }
@@ -336,6 +351,10 @@ public:
         return b.obj();
     }
 
+    /**
+     * Note: if possible, use ChunkVersion::appendForCommands or
+     * ChunkVersion::appendWithFieldForCommands instead. Phasing out this function.
+     */
     void addToBSON(BSONObjBuilder& b, const std::string& prefix) const {
         b.appendElements(toBSONWithPrefix(prefix));
     }
@@ -350,6 +369,17 @@ public:
      * Appends the contents to the specified builder in the format expected by the sharded commands.
      */
     void appendForCommands(BSONObjBuilder* builder) const;
+
+    /**
+     * Appends the contents as an array to "builder" with the field name "field" in the format
+     * expected by the sharded commands.
+     *
+     * { ..., <field>: [ <combined major/minor>, <OID epoch> ], ... }
+     *
+     * Use ChunkVersion::parseFromBSONWithFieldForCommands to retrieve the ChunkVersion from the
+     * BSON created by this function.
+     */
+    void appendWithFieldForCommands(BSONObjBuilder* builder, StringData field) const;
 
     /**
      * Appends the contents to the specified builder in the format expected by the chunk

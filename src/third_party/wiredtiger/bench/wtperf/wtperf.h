@@ -320,6 +320,9 @@ extract_key(char *key_buf, uint64_t *keynop)
  *      Print message and exit on failure.
  */
 static inline void
+die(int, const char *)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static inline void
 die(int e, const char *str)
 {
 	fprintf(stderr, "Call to %s failed: %s", str, wiredtiger_strerror(e));

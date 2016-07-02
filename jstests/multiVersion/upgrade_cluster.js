@@ -15,17 +15,6 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
 
         jsTest.log("Starting" + (isRSCluster ? " (replica set)" : "") + " cluster" + "...");
 
-        var options = {
-            mongosOptions: {binVersion: "last-stable"},
-            configOptions: {binVersion: "last-stable"},
-            shardOptions: {binVersion: "last-stable"},
-
-            rsOptions: {binVersion: "last-stable"},
-            rs: isRSCluster,
-            // TODO: SERVER-24163 remove after v3.4
-            waitForCSRSSecondaries: false
-        };
-
         var testCRUD = function(mongos) {
             assert.commandWorked(mongos.getDB('test').runCommand({dropDatabase: 1}));
             assert.commandWorked(mongos.getDB('unsharded').runCommand({dropDatabase: 1}));
@@ -56,7 +45,20 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
             assert.eq(null, doc);
         };
 
-        var st = new ShardingTest({shards: 2, mongos: 1, other: options});
+        var st = new ShardingTest({
+            shards: 2,
+            mongos: 1,
+            other: {
+                mongosOptions: {binVersion: "last-stable"},
+                configOptions: {binVersion: "last-stable"},
+                shardOptions: {binVersion: "last-stable"},
+
+                rsOptions: {binVersion: "last-stable"},
+                rs: isRSCluster,
+                // TODO: SERVER-24163 remove after v3.4
+                waitForCSRSSecondaries: false
+            }
+        });
         st.configRS.awaitReplication();
 
         var version = st.s.getCollection('config.version').findOne();

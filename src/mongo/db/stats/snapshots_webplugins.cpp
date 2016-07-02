@@ -54,8 +54,13 @@ public:
         double per = 100 * ((double)usage.time) / elapsed;
         if (per == (int)per)
             ss << (int)per;
-        else
+        else {
+            const auto precision = ss.precision();
+            const auto flags = ss.flags();
             ss << setprecision(1) << fixed << per;
+            ss.flags(flags);
+            ss.precision(precision);
+        }
         ss << '%';
         ss << "</td>";
     }

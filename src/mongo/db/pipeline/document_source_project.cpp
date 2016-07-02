@@ -28,23 +28,27 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source.h"
+
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::string;
-using std::vector;
+using parsed_aggregation_projection::ParsedAggregationProjection;
+using parsed_aggregation_projection::ProjectionType;
 
-DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
-                                             const intrusive_ptr<ExpressionObject>& exprObj)
-    : DocumentSource(pExpCtx), pEO(exprObj) {}
+DocumentSourceProject::DocumentSourceProject(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<ParsedAggregationProjection> parsedProject)
+    : DocumentSource(expCtx), _parsedProject(std::move(parsedProject)) {}
 
 REGISTER_DOCUMENT_SOURCE(project, DocumentSourceProject::createFromBson);
 
@@ -55,31 +59,16 @@ const char* DocumentSourceProject::getSourceName() const {
 boost::optional<Document> DocumentSourceProject::getNext() {
     pExpCtx->checkForInterrupt();
 
-    boost::optional<Document> input = pSource->getNext();
-    if (!input)
+    auto input = pSource->getNext();
+    if (!input) {
         return boost::none;
+    }
 
-    /* create the result document */
-    const size_t sizeHint = pEO->getSizeHint();
-    MutableDocument out(sizeHint);
-    out.copyMetaDataFrom(*input);
-
-    /*
-      Use the ExpressionObject to create the base result.
-
-      If we're excluding fields at the top level, leave out the _id if
-      it is found, because we took care of it above.
-    */
-    _variables->setRoot(*input);
-    pEO->addToDocument(out, *input, _variables.get());
-    _variables->clearRoot();
-
-    return out.freeze();
+    return _parsedProject->applyProjection(*input);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::optimize() {
-    intrusive_ptr<Expression> pE(pEO->optimize());
-    pEO = boost::dynamic_pointer_cast<ExpressionObject>(pE);
+    _parsedProject->optimize();
     return this;
 }
 
@@ -99,38 +88,32 @@ Pipeline::SourceContainer::iterator DocumentSourceProject::optimizeAt(
     return std::next(itr);
 }
 
+void DocumentSourceProject::dispose() {
+    _parsedProject.reset();
+}
+
 Value DocumentSourceProject::serialize(bool explain) const {
-    return Value(DOC(getSourceName() << pEO->serialize(explain)));
+    return Value(Document{{getSourceName(), _parsedProject->serialize(explain)}});
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    /* validate */
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(15969, "$project specification must be an object", elem.type() == Object);
 
-    Expression::ObjectCtx objectCtx(Expression::ObjectCtx::DOCUMENT_OK |
-                                    Expression::ObjectCtx::TOP_LEVEL |
-                                    Expression::ObjectCtx::INCLUSION_OK);
-
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
-    intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx, vps);
-    ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
-    massert(16402, "parseObject() returned wrong type of Expression", exprObj);
-    uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
-
-    intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx, exprObj));
-    pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
-
-    BSONObj projectObj = elem.Obj();
-    pProject->_raw = projectObj.getOwned();
-
-    return pProject;
+    return new DocumentSourceProject(expCtx, ParsedAggregationProjection::create(elem.Obj()));
 }
 
 DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(DepsTracker* deps) const {
-    vector<string> path;  // empty == top-level
-    pEO->addDependencies(deps, &path);
-    return EXHAUSTIVE_FIELDS;
+    // Add any fields referenced by the projection.
+    _parsedProject->addDependencies(deps);
+
+    if (_parsedProject->getType() == ProjectionType::kInclusion) {
+        // Stop looking for further dependencies later in the pipeline, since anything that is not
+        // explicitly included or added in this projection will not exist after this stage, so would
+        // be pointless to include in our dependencies.
+        return EXHAUSTIVE_FIELDS;
+    } else {
+        return SEE_NEXT;
+    }
 }
 }

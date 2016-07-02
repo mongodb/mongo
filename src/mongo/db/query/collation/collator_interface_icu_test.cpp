@@ -255,7 +255,7 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectly) {
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    StringData nullByte("\0", StringData::LiteralTag());
+    const auto nullByte = "\0"_sd;
     ASSERT_EQ(nullByte.rawData()[0], '\0');
     ASSERT_EQ(nullByte.size(), 1u);
 
@@ -274,7 +274,7 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectlyUsing
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    StringData nullByte("\0", StringData::LiteralTag());
+    const auto nullByte = "\0"_sd;
     ASSERT_EQ(nullByte.rawData()[0], '\0');
     ASSERT_EQ(nullByte.size(), 1u);
 
@@ -295,9 +295,9 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectly) {
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    StringData string1("a\0b", StringData::LiteralTag());
+    const auto string1 = "a\0b"_sd;
     ASSERT_EQ(string1.size(), 3u);
-    StringData string2("a\0c", StringData::LiteralTag());
+    const auto string2 = "a\0c"_sd;
     ASSERT_EQ(string2.size(), 3u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
@@ -315,9 +315,9 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectlyUsingC
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
     ASSERT(U_SUCCESS(status));
 
-    StringData string1("a\0b", StringData::LiteralTag());
+    const auto string1 = "a\0b"_sd;
     ASSERT_EQ(string1.size(), 3u);
-    StringData string2("a\0c", StringData::LiteralTag());
+    const auto string2 = "a\0c"_sd;
     ASSERT_EQ(string2.size(), 3u);
 
     CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));

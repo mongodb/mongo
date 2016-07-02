@@ -76,7 +76,7 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     } else {
         os << msg;
     }
-    if (!msg.endsWith(StringData("\n", StringData::LiteralTag())))
+    if (!msg.endsWith(StringData("\n"_sd)))
         os << '\n';
     return os;
 }

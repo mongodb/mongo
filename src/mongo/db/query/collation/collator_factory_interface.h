@@ -65,7 +65,8 @@ public:
                     std::unique_ptr<CollatorFactoryInterface> collatorFactory);
 
     /**
-     * Parses 'spec' and, on success, returns the corresponding CollatorInterface.
+     * Parses 'spec' and, on success, returns the corresponding CollatorInterface. If 'spec'
+     * represents the simple collation, returns an OK status with a null pointer.
      *
      * Returns a non-OK status if 'spec' is invalid or otherwise cannot be converted into a
      * collator.

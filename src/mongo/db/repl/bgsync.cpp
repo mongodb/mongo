@@ -37,7 +37,6 @@
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
@@ -52,15 +51,11 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/executor/network_interface_factory.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -107,18 +102,6 @@ bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
     return DataReplicatorExternalStateImpl::shouldStopFetching(source, metadata);
 }
 
-/**
- * Returns new thread pool for thead pool task executor.
- */
-std::unique_ptr<ThreadPool> makeThreadPool() {
-    ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.poolName = "rsBackgroundSync";
-    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-    return stdx::make_unique<ThreadPool>(threadPoolOptions);
-}
-
 size_t getSize(const BSONObj& o) {
     // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
     return static_cast<size_t>(o.objsize());
@@ -153,11 +136,12 @@ static ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxS
                                                                &bufferMaxSizeGauge);
 
 
-BackgroundSync::BackgroundSync(std::unique_ptr<OplogBuffer> oplogBuffer)
+BackgroundSync::BackgroundSync(
+    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+    std::unique_ptr<OplogBuffer> oplogBuffer)
     : _oplogBuffer(std::move(oplogBuffer)),
-      _threadPoolTaskExecutor(makeThreadPool(),
-                              executor::makeNetworkInterface("NetworkInterfaceASIO-BGSync")),
       _replCoord(getGlobalReplicationCoordinator()),
+      _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
       _syncSourceResolver(_replCoord),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()) {
@@ -166,41 +150,48 @@ BackgroundSync::BackgroundSync(std::unique_ptr<OplogBuffer> oplogBuffer)
     bufferMaxSizeGauge.increment(_oplogBuffer->getMaxSize() - bufferMaxSizeGauge.get());
 }
 
+void BackgroundSync::startup(OperationContext* txn) {
+    _oplogBuffer->startup(txn);
+
+    invariant(!_producerThread);
+    _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::_run, this)));
+}
+
 void BackgroundSync::shutdown(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
-    invariant(inShutdown());
     clearBuffer(txn);
     _stopped = true;
 
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();
     }
+
+    _inShutdown = true;
 }
 
-void BackgroundSync::producerThread(
-    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void BackgroundSync::join(OperationContext* txn) {
+    _producerThread->join();
+    _oplogBuffer->shutdown(txn);
+}
+
+bool BackgroundSync::inShutdown() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _inShutdown_inlock();
+}
+
+bool BackgroundSync::_inShutdown_inlock() const {
+    return _inShutdown;
+}
+
+void BackgroundSync::_run() {
     Client::initThread("rsBackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
-    {
-        auto txn = cc().makeOperationContext();
-        _oplogBuffer->startup(txn.get());
-    }
-
-    _threadPoolTaskExecutor.startup();
-    ON_BLOCK_EXIT([this]() {
-        _threadPoolTaskExecutor.shutdown();
-        _threadPoolTaskExecutor.join();
-
-        auto txn = cc().makeOperationContext();
-        _oplogBuffer->shutdown(txn.get());
-    });
-
     while (!inShutdown()) {
         try {
-            _producerThread(replicationCoordinatorExternalState);
+            _runProducer();
         } catch (const DBException& e) {
             std::string msg(str::stream() << "sync producer problem: " << e.toString());
             error() << msg;
@@ -226,8 +217,7 @@ void BackgroundSync::_signalNoNewDataForApplier(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::_producerThread(
-    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void BackgroundSync::_runProducer() {
     const MemberState state = _replCoord->getMemberState();
     // Stop when the state changes to primary.
     if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
@@ -261,12 +251,10 @@ void BackgroundSync::_producerThread(
         start(txn.get());
     }
 
-    _produce(txn.get(), replicationCoordinatorExternalState);
+    _produce(txn.get());
 }
 
-void BackgroundSync::_produce(
-    OperationContext* txn,
-    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void BackgroundSync::_produce(OperationContext* txn) {
     // this oplog reader does not do a handshake because we don't want the server it's syncing
     // from to track how far it has synced
     {
@@ -280,7 +268,7 @@ void BackgroundSync::_produce(
         }
 
         if (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary() ||
-            inShutdownStrict()) {
+            _inShutdown_inlock()) {
             return;
         }
     }
@@ -347,9 +335,10 @@ void BackgroundSync::_produce(
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
-        _replCoord, replicationCoordinatorExternalState, this);
+        _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
+        auto executor = _replicationCoordinatorExternalState->getTaskExecutor();
         auto config = _replCoord->getConfig();
         auto onOplogFetcherShutdownCallbackFn =
             [&fetcherReturnStatus](const Status& status, const OpTimeWithHash& lastFetched) {
@@ -358,7 +347,7 @@ void BackgroundSync::_produce(
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _oplogFetcher =
-            stdx::make_unique<OplogFetcher>(&_threadPoolTaskExecutor,
+            stdx::make_unique<OplogFetcher>(executor,
                                             OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
                                             source,
                                             NamespaceString(rsOplogName),
@@ -592,8 +581,6 @@ void BackgroundSync::clearSyncTarget() {
 }
 
 void BackgroundSync::cancelFetcher() {
-    _threadPoolTaskExecutor.cancelAllCommands();
-
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();

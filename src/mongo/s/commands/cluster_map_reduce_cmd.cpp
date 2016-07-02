@@ -93,8 +93,9 @@ BSONObj fixForShards(const BSONObj& orig,
 
         if (fn == bypassDocumentValidationCommandOption() || fn == "map" || fn == "mapreduce" ||
             fn == "mapReduce" || fn == "mapparams" || fn == "reduce" || fn == "query" ||
-            fn == "sort" || fn == "scope" || fn == "verbose" || fn == "$queryOptions" ||
-            fn == "readConcern" || fn == QueryRequest::cmdOptionMaxTimeMS) {
+            fn == "sort" || fn == "collation" || fn == "scope" || fn == "verbose" ||
+            fn == "$queryOptions" || fn == "readConcern" ||
+            fn == QueryRequest::cmdOptionMaxTimeMS) {
             b.append(e);
         } else if (fn == "out" || fn == "finalize" || fn == "writeConcern") {
             // We don't want to copy these
@@ -195,6 +196,7 @@ public:
         bool shardedOutput = false;
         NamespaceString outputCollNss;
         bool customOutDB = false;
+        bool inlineOutput = false;
 
         string outDB = dbname;
 
@@ -205,6 +207,7 @@ public:
             shardedOutput = customOut.getBoolField("sharded");
 
             if (customOut.hasField("inline")) {
+                inlineOutput = true;
                 uassert(ErrorCodes::InvalidOptions,
                         "cannot specify inline and sharded output at the same time",
                         !shardedOutput);
@@ -241,6 +244,14 @@ public:
             confOut = scopedDb.getSharedDbReference();
         } else {
             confOut = confIn;
+        }
+
+        if (confOut->getPrimaryId() == "config" && !inlineOutput) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::CommandNotSupported,
+                       str::stream() << "Can not execute mapReduce with output database " << outDB
+                                     << " which lives on config servers"));
         }
 
         const bool shardedInput =

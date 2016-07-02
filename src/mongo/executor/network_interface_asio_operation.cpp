@@ -417,6 +417,9 @@ void NetworkInterfaceASIO::AsyncOp::_transitionToState_inlock(AsyncOp::State new
                                              "kInProgress must come directly after kUninitialized");
                     break;
                 case State::kTimedOut:
+                    // During connection setup, it is possible to timeout before the stream is
+                    // initialized, so we have to allow this transition.
+                    break;
                 case State::kCanceled:
                     MONGO_ASYNC_OP_INVARIANT(
                         i > 1, _stateToString(newState) + " must come after kInProgress");

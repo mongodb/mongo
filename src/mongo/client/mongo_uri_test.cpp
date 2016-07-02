@@ -308,4 +308,17 @@ TEST(MongoURI, InvalidURIs) {
     }
 }
 
+TEST(MongoURI, ValidButBadURIsFailToConnect) {
+    // "invalid" is a TLD that cannot exit on the public internet (see rfc2606). It should always
+    // parse as a valid URI, but connecting should always fail.
+    auto sw_uri = MongoURI::parse("mongodb://user:pass@hostname.invalid:12345");
+    ASSERT_OK(sw_uri.getStatus());
+    auto uri = sw_uri.getValue();
+    ASSERT_TRUE(uri.isValid());
+
+    std::string errmsg;
+    auto dbclient = uri.connect(errmsg);
+    ASSERT_EQ(dbclient, static_cast<decltype(dbclient)>(nullptr));
+}
+
 }  // namespace

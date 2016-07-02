@@ -121,6 +121,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/net/network',
     ]
 )
 
@@ -568,7 +569,6 @@ serverOnlyFiles = [
     "catalog/cursor_manager.cpp",
     "catalog/database.cpp",
     "catalog/database_holder.cpp",
-    "catalog/document_validation.cpp",
     "catalog/drop_collection.cpp",
     "catalog/drop_database.cpp",
     "catalog/drop_indexes.cpp",
@@ -710,6 +710,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/third_party/shim_snappy",
     "auth/authmongod",
     "catalog/collection_options",
+    "catalog/document_validation",
     "catalog/index_key_validate",
     "commands/killcursors_common",
     "collection_index_usage_tracker",
@@ -726,8 +727,7 @@ serveronlyLibdeps = [
     "matcher/expressions_mongod_only",
     "ops/update_driver",
     "ops/write_ops_parsers",
-    "pipeline/document_source",
-    "pipeline/pipeline",
+    "pipeline/aggregation",
     "query/query",
     "range_deleter",
     "repl/bgsync",

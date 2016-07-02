@@ -75,8 +75,7 @@ const char* strsignal(int signalNum) {
 }
 
 void endProcessWithSignal(int signalNum) {
-    doMinidump();
-    quickExit(EXIT_ABRUPT);
+    RaiseException(EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, NULL);
 }
 
 #else

@@ -28,12 +28,9 @@
 
 #pragma once
 
-#include <vector>
-
 namespace mongo {
 
 class Collection;
-class FieldRef;
 class OperationContext;
 class UpdateIndexData;
 
@@ -60,13 +57,6 @@ public:
      * Return a pointer to any indexes if there is a collection.
      */
     virtual const UpdateIndexData* getIndexKeys(OperationContext* opCtx) const = 0;
-
-    /**
-     * Returns the shard keys as immutable fields
-     * Immutable fields in this case mean that they are required to exist, cannot change values
-     * and must not be multi-valued (in an array, or an array)
-     */
-    virtual const std::vector<FieldRef*>* getImmutableFields() const = 0;
 };
 
 }  // namespace mongo

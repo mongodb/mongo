@@ -544,6 +544,7 @@ __wt_conn_dhandle_discard_single(
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	int tret;
+	bool set_pass_intr;
 
 	dhandle = session->dhandle;
 
@@ -562,12 +563,17 @@ __wt_conn_dhandle_discard_single(
 	 * Kludge: interrupt the eviction server in case it is holding the
 	 * handle list lock.
 	 */
-	if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST))
-		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
+	set_pass_intr = false;
+	if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
+		set_pass_intr = true;
+		(void)__wt_atomic_add32(&S2C(session)->cache->pass_intr, 1);
+	}
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    tret = __conn_dhandle_remove(session, final));
+	if (set_pass_intr)
+		(void)__wt_atomic_sub32(&S2C(session)->cache->pass_intr, 1);
 	WT_TRET(tret);
 
 	/*

@@ -111,11 +111,13 @@ void
 __wt_attach(WT_SESSION_IMPL *session)
 {
 #ifdef HAVE_ATTACH
+	u_int i;
+
 	__wt_errx(session, "process ID %" PRIdMAX
 	    ": waiting for debugger...", (intmax_t)getpid());
 
 	/* Sleep forever, the debugger will interrupt us when it attaches. */
-	for (;;)
+	for (i = 0; i < WT_MILLION; ++i)
 		__wt_sleep(10, 0);
 #else
 	WT_UNUSED(session);

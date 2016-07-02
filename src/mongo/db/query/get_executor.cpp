@@ -597,6 +597,14 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
     params.direction = CollectionScanParams::FORWARD;
     params.tailable = cq->getQueryRequest().isTailable();
 
+    // If the query is just tsExpr, we know that every document in the collection after the first
+    // matching one must also match. To avoid wasting time running the match expression on every
+    // document to be returned, we tell the CollectionScan stage to stop applying the filter once it
+    // finds the first match.
+    if (cq->root() == tsExpr) {
+        params.stopApplyingFilterAfterFirstMatch = true;
+    }
+
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     unique_ptr<CollectionScan> cs = make_unique<CollectionScan>(txn, params, ws.get(), cq->root());
     // Takes ownership of 'ws', 'cs', and 'cq'.
@@ -835,6 +843,13 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
     // collection or database creation.
     if (!collection && request->isUpsert()) {
         invariant(request->isExplain());
+    }
+
+    // If the parsed update does not have a user-specified collation, set it from the collection
+    // default.
+    if (collection && parsedUpdate->getRequest()->getCollation().isEmpty() &&
+        collection->getDefaultCollator()) {
+        parsedUpdate->setCollator(collection->getDefaultCollator()->clone());
     }
 
     // TODO: This seems a bit circuitious.

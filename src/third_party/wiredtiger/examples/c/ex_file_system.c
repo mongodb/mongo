@@ -28,35 +28,57 @@
  * ex_file_system.c
  * 	demonstrates how to use the custom file system interface
  */
-#include <errno.h>
-#include <inttypes.h>
-#include <stdlib.h>
-#include <string.h>
-#if (defined(_WIN32) && _MSC_VER < 1900)
-/* snprintf is not supported on <= VS2013 */
-#define	snprintf _snprintf
-#endif
-
-#include <wiredtiger.h>
-#include <wiredtiger_ext.h>
-
-#include "queue_example.h"
-
-static const char *home;
 
 /*
- * Example file system implementation. Using memory buffers to represent files.
+ * Include WiredTiger internal functions: we need architecture portable locking
+ * in this example, and we use the TAILQ_XXX functions to keep the code simple.
  *
- * WARNING: This implementation isn't thread safe: WiredTiger performs schema
- * and I/O operations in parallel, so all access to the handle must be thread-
- * safe.
+ * Application-writers SHOULD NOT INCLUDE "wt_internal.h", the public WiredTiger
+ * include files should be used instead:
+ *
+ *	#include <wiredtiger.h>
+ *	#include <wiredtiger_ext.h>
+ */
+#include "wt_internal.h"
+
+/*
+ * This example code uses internal WiredTiger functions for portable locking.
+ * We use #defines to clarify the meaning and ignore errors to simplify the
+ * code.
+ *
+ * Application writers SHOULD NOT COPY THIS LOCKING CODE, it's special-case code
+ * to make this example portable across platforms.
+ */
+#define	ALLOCATE_FILE_SYSTEM_LOCK(demo_fs)				\
+	(void)__wt_spin_init(NULL, &(demo_fs)->lock, "demo file handle lock")
+#define	DESTROY_FILE_SYSTEM_LOCK(wt_session, demo_fs)			\
+	__wt_spin_destroy((WT_SESSION_IMPL *)(wt_session), &(demo_fs)->lock)
+#define	LOCK_FILE_SYSTEM(wt_session, demo_fs)				\
+	__wt_spin_lock((WT_SESSION_IMPL *)(wt_session), &(demo_fs)->lock)
+#define	UNLOCK_FILE_SYSTEM(wt_session, demo_fs)				\
+	__wt_spin_unlock(						\
+	    (WT_SESSION_IMPL *)(wt_session), &(demo_fs)->lock)
+
+/*
+ * Example file system implementation, using memory buffers to represent files.
  */
 typedef struct {
 	WT_FILE_SYSTEM iface;
 
+	/*
+	 * WiredTiger performs schema and I/O operations in parallel, all file
+	 * system and file handle access must be thread-safe. This example uses
+	 * a single, global file system lock for simplicity; real applications
+	 * might require finer granularity, for example, a single lock for the
+	 * file system handle list and per-handle locks serializing I/O.
+	 */
+	WT_SPINLOCK lock;			/* Lock */
+
 	int opened_file_count;
 	int opened_unique_file_count;
 	int closed_file_count;
+	int read_ops;
+	int write_ops;
 
 	/* Queue of file handles */
 	TAILQ_HEAD(demo_file_handle_qh, demo_file_handle) fileq;
@@ -71,15 +93,14 @@ typedef struct demo_file_handle {
 	/*
 	 * Add custom file handle fields after the interface.
 	 */
-	DEMO_FILE_SYSTEM *demo_fs;
+	DEMO_FILE_SYSTEM *demo_fs;		/* Enclosing file system */
 
-	TAILQ_ENTRY(demo_file_handle) q;
+	TAILQ_ENTRY(demo_file_handle) q;	/* Queue of handles */
 	uint32_t ref;				/* Reference count */
 
 	char	*buf;				/* In-memory contents */
 	size_t	 bufsize;			/* In-memory buffer size */
 
-	size_t	 off;				/* Read/write offset */
 	size_t	 size;				/* Read/write data size */
 } DEMO_FILE_HANDLE;
 
@@ -122,7 +143,6 @@ static int demo_file_read(
     WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, void *);
 static int demo_file_size(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
 static int demo_file_sync(WT_FILE_HANDLE *, WT_SESSION *);
-static int demo_file_sync_nowait(WT_FILE_HANDLE *, WT_SESSION *);
 static int demo_file_truncate(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t);
 static int demo_file_write(
     WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, const void *);
@@ -170,7 +190,14 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 	demo_fs->wtext = wtext;
 	file_system = (WT_FILE_SYSTEM *)demo_fs;
 
-	/* Retrieve our configuration information, the "config" value. */
+	/*
+	 * Applications may have their own configuration information to pass to
+	 * the underlying filesystem implementation. See the main function for
+	 * the setup of those configuration strings; here we parse configuration
+	 * information as passed in by main, through WiredTiger.
+	 *
+	 * Retrieve our configuration information, the "config" value.
+	 */
 	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0) {
 		(void)wtext->err_printf(wtext, NULL,
 		    "WT_EXTENSION_API.config_get: config: %s",
@@ -223,6 +250,8 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 		goto err;
 	}
 
+	ALLOCATE_FILE_SYSTEM_LOCK(demo_fs);
+
 	/* Initialize the in-memory jump table. */
 	file_system->fs_directory_list = demo_fs_directory_list;
 	file_system->fs_directory_list_free = demo_fs_directory_list_free;
@@ -260,51 +289,63 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	DEMO_FILE_SYSTEM *demo_fs;
 	WT_EXTENSION_API *wtext;
 	WT_FILE_HANDLE *file_handle;
+	int ret = 0;
 
 	(void)file_type;					/* Unused */
 	(void)flags;						/* Unused */
+
+	*file_handlep = NULL;
 
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 	demo_fh = NULL;
 	wtext = demo_fs->wtext;
 
+	LOCK_FILE_SYSTEM(session, demo_fs);
 	++demo_fs->opened_file_count;
 
 	/*
 	 * First search the file queue, if we find it, assert there's only a
-	 * single reference, we only supports a single handle on any file.
+	 * single reference, we only support a single handle on any file.
 	 */
 	demo_fh = demo_handle_search(file_system, name);
 	if (demo_fh != NULL) {
 		if (demo_fh->ref != 0) {
 			(void)wtext->err_printf(wtext, session,
 			    "demo_fs_open: %s: file already open", name);
-			return (EBUSY);
+			ret = EBUSY;
+			goto err;
 		}
 
 		demo_fh->ref = 1;
-		demo_fh->off = 0;
 
 		*file_handlep = (WT_FILE_HANDLE *)demo_fh;
+
+		UNLOCK_FILE_SYSTEM(session, demo_fs);
 		return (0);
 	}
 
 	/* The file hasn't been opened before, create a new one. */
-	if ((demo_fh = calloc(1, sizeof(DEMO_FILE_HANDLE))) == NULL)
-		return (ENOMEM);
+	if ((demo_fh = calloc(1, sizeof(DEMO_FILE_HANDLE))) == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
 
 	/* Initialize private information. */
-	demo_fh->ref = 1;
-	demo_fh->off = demo_fh->size = 0;
 	demo_fh->demo_fs = demo_fs;
-	if ((demo_fh->buf = calloc(1, DEMO_FILE_SIZE_INCREMENT)) == NULL)
-		goto enomem;
+	demo_fh->ref = 1;
+	if ((demo_fh->buf = calloc(1, DEMO_FILE_SIZE_INCREMENT)) == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
 	demo_fh->bufsize = DEMO_FILE_SIZE_INCREMENT;
+	demo_fh->size = 0;
 
 	/* Initialize public information. */
 	file_handle = (WT_FILE_HANDLE *)demo_fh;
-	if ((file_handle->name = strdup(name)) == NULL)
-		goto enomem;
+	if ((file_handle->name = strdup(name)) == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
 
 	/*
 	 * Setup the function call table for our custom file system. Set the
@@ -323,7 +364,7 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	file_handle->fh_read = demo_file_read;
 	file_handle->fh_size = demo_file_size;
 	file_handle->fh_sync = demo_file_sync;
-	file_handle->fh_sync_nowait = demo_file_sync_nowait;
+	file_handle->fh_sync_nowait = NULL;
 	file_handle->fh_truncate = demo_file_truncate;
 	file_handle->fh_write = demo_file_write;
 
@@ -331,11 +372,14 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	++demo_fs->opened_unique_file_count;
 
 	*file_handlep = file_handle;
-	return (0);
 
-enomem:	free(demo_fh->buf);
-	free(demo_fh);
-	return (ENOMEM);
+	if (0) {
+err:		free(demo_fh->buf);
+		free(demo_fh);
+	}
+
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	return (ret);
 }
 
 /*
@@ -349,21 +393,25 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 {
 	DEMO_FILE_HANDLE *demo_fh;
 	DEMO_FILE_SYSTEM *demo_fs;
-	size_t dir_len, prefix_len;
-	char *name, **entries;
+	size_t len, prefix_len;
 	uint32_t allocated, count;
-
-	(void)session;						/* Unused */
+	int ret = 0;
+	char *name, **entries;
 
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
+
+	*dirlistp = NULL;
+	*countp = 0;
+
 	entries = NULL;
 	allocated = count = 0;
-	dir_len = strlen(directory);
+	len = strlen(directory);
 	prefix_len = prefix == NULL ? 0 : strlen(prefix);
 
+	LOCK_FILE_SYSTEM(session, demo_fs);
 	TAILQ_FOREACH(demo_fh, &demo_fs->fileq, q) {
 		name = demo_fh->iface.name;
-		if (strncmp(name, directory, dir_len) != 0 ||
+		if (strncmp(name, directory, len) != 0 ||
 		    (prefix != NULL && strncmp(name, prefix, prefix_len) != 0))
 			continue;
 
@@ -374,8 +422,10 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 		if (count >= allocated) {
 			entries = realloc(
 			    entries, (allocated + 10) * sizeof(char *));
-			if (entries == NULL)
-				return (ENOMEM);
+			if (entries == NULL) {
+				ret = ENOMEM;
+				goto err;
+			}
 			memset(entries + allocated * sizeof(char *),
 			    0, 10 * sizeof(char *));
 			allocated += 10;
@@ -386,7 +436,17 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 	*dirlistp = entries;
 	*countp = count;
 
-	return (0);
+err:	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	if (ret == 0)
+		return (0);
+
+	if (entries != NULL) {
+		while (count > 0)
+			free(entries[--count]);
+		free(entries);
+	}
+
+	return (ret);
 }
 
 /*
@@ -431,10 +491,13 @@ static int
 demo_fs_exist(WT_FILE_SYSTEM *file_system,
     WT_SESSION *session, const char *name, bool *existp)
 {
-	(void)session;						/* Unused */
+	DEMO_FILE_SYSTEM *demo_fs;
 
-	*existp =
-	    demo_handle_search(file_system, name) != NULL;
+	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
+
+	LOCK_FILE_SYSTEM(session, demo_fs);
+	*existp = demo_handle_search(file_system, name) != NULL;
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
 
 	return (0);
 }
@@ -447,12 +510,17 @@ static int
 demo_fs_remove(
     WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name)
 {
+	DEMO_FILE_SYSTEM *demo_fs;
 	DEMO_FILE_HANDLE *demo_fh;
-	int ret;
+	int ret = 0;
+
+	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
 	ret = ENOENT;
+	LOCK_FILE_SYSTEM(session, demo_fs);
 	if ((demo_fh = demo_handle_search(file_system, name)) != NULL)
 		ret = demo_handle_remove(session, demo_fh);
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
 
 	return (ret);
 }
@@ -466,19 +534,23 @@ demo_fs_rename(WT_FILE_SYSTEM *file_system,
     WT_SESSION *session, const char *from, const char *to)
 {
 	DEMO_FILE_HANDLE *demo_fh;
+	DEMO_FILE_SYSTEM *demo_fs;
 	char *copy;
+	int ret = 0;
 
-	(void)session;						/* Unused */
+	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
+	LOCK_FILE_SYSTEM(session, demo_fs);
 	if ((demo_fh = demo_handle_search(file_system, from)) == NULL)
-		return (ENOENT);
-
-	if ((copy = strdup(to)) == NULL)
-		return (ENOMEM);
-
-	free(demo_fh->iface.name);
-	demo_fh->iface.name = copy;
-	return (0);
+		ret = ENOENT;
+	else if ((copy = strdup(to)) == NULL)
+		ret = ENOMEM;
+	else {
+		free(demo_fh->iface.name);
+		demo_fh->iface.name = copy;
+	}
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	return (ret);
 }
 
 /*
@@ -489,13 +561,17 @@ static int
 demo_fs_size(WT_FILE_SYSTEM *file_system,
     WT_SESSION *session, const char *name, wt_off_t *sizep)
 {
+	DEMO_FILE_SYSTEM *demo_fs;
 	DEMO_FILE_HANDLE *demo_fh;
 	int ret = 0;
 
+	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
+
 	ret = ENOENT;
+	LOCK_FILE_SYSTEM(session, demo_fs);
 	if ((demo_fh = demo_handle_search(file_system, name)) != NULL)
-		ret = demo_file_size(
-		    (WT_FILE_HANDLE *)demo_fh, session, sizep);
+		ret = demo_file_size((WT_FILE_HANDLE *)demo_fh, session, sizep);
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
 
 	return (ret);
 }
@@ -511,8 +587,6 @@ demo_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
 	DEMO_FILE_SYSTEM *demo_fs;
 	int ret = 0, tret;
 
-	(void)session;						/* Unused */
-
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
 	while ((demo_fh = TAILQ_FIRST(&demo_fs->fileq)) != NULL)
@@ -522,8 +596,12 @@ demo_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
 
 	printf("Custom file system\n");
 	printf("\t%d unique file opens\n", demo_fs->opened_unique_file_count);
-	printf("\t%d opened\n", demo_fs->opened_file_count);
-	printf("\t%d closed\n", demo_fs->closed_file_count);
+	printf("\t%d files opened\n", demo_fs->opened_file_count);
+	printf("\t%d files closed\n", demo_fs->closed_file_count);
+	printf("\t%d reads, %d writes\n",
+	    demo_fs->read_ops, demo_fs->write_ops);
+
+	DESTROY_FILE_SYSTEM_LOCK(session, demo_fs);
 	free(demo_fs);
 
 	return (ret);
@@ -537,21 +615,15 @@ static int
 demo_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 {
 	DEMO_FILE_HANDLE *demo_fh;
-	WT_EXTENSION_API *wtext;
+	DEMO_FILE_SYSTEM *demo_fs;
 
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
-	wtext = demo_fh->demo_fs->wtext;
+	demo_fs = demo_fh->demo_fs;
 
-	if (demo_fh->ref < 1) {
-		(void)wtext->err_printf(wtext, session,
-		    "demo_file_close: %s: handle already closed",
-		    demo_fh->iface.name);
-		return (EINVAL);
-	}
-	--demo_fh->ref;
-
-	if (demo_fh->ref == 0)
-		++demo_fh->demo_fs->closed_file_count;
+	LOCK_FILE_SYSTEM(session, demo_fs);
+	if (--demo_fh->ref == 0)
+		++demo_fs->closed_file_count;
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
 
 	return (0);
 }
@@ -579,29 +651,28 @@ demo_file_read(WT_FILE_HANDLE *file_handle,
     WT_SESSION *session, wt_off_t offset, size_t len, void *buf)
 {
 	DEMO_FILE_HANDLE *demo_fh;
+	DEMO_FILE_SYSTEM *demo_fs;
 	WT_EXTENSION_API *wtext;
 	size_t off;
 	int ret = 0;
 
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
-	wtext = demo_fh->demo_fs->wtext;
-
+	demo_fs = demo_fh->demo_fs;
+	wtext = demo_fs->wtext;
 	off = (size_t)offset;
+
+	LOCK_FILE_SYSTEM(session, demo_fs);
+	++demo_fs->read_ops;
 	if (off < demo_fh->size) {
 		if (len > demo_fh->size - off)
 			len = demo_fh->size - off;
 		memcpy(buf, (uint8_t *)demo_fh->buf + off, len);
-		demo_fh->off = off + len;
 	} else
-		ret = EINVAL;		/* EOF */
-
+		ret = EIO;		/* EOF */
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
 	if (ret == 0)
 		return (0);
 
-	/*
-	 * WiredTiger should never request data past the end of a file, so
-	 * flag an error if it does.
-	 */
 	(void)wtext->err_printf(wtext, session,
 	    "%s: handle-read: failed to read %zu bytes at offset %zu: %s",
 	    demo_fh->iface.name, len, off, wtext->strerror(wtext, NULL, ret));
@@ -617,11 +688,14 @@ demo_file_size(
     WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t *sizep)
 {
 	DEMO_FILE_HANDLE *demo_fh;
+	DEMO_FILE_SYSTEM *demo_fs;
 
-	(void)session;						/* Unused */
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
+	demo_fs = demo_fh->demo_fs;
 
+	LOCK_FILE_SYSTEM(session, demo_fs);
 	*sizep = (wt_off_t)demo_fh->size;
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
 	return (0);
 }
 
@@ -640,15 +714,35 @@ demo_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 }
 
 /*
- * demo_file_sync_nowait --
- *	Ensure the content of the file is stable. This is a no-op in our
- *	memory backed file system.
+ * demo_buffer_resize --
+ *	Resize the write buffer.
  */
 static int
-demo_file_sync_nowait(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
+demo_buffer_resize(
+    WT_SESSION *session, DEMO_FILE_HANDLE *demo_fh, wt_off_t offset)
 {
-	(void)file_handle;					/* Unused */
-	(void)session;						/* Unused */
+	DEMO_FILE_SYSTEM *demo_fs;
+	WT_EXTENSION_API *wtext;
+	size_t off;
+	void *p;
+
+	demo_fs = demo_fh->demo_fs;
+	wtext = demo_fs->wtext;
+	off = (size_t)offset;
+
+	/* Grow the buffer as necessary and clear any new space in the file. */
+	if (demo_fh->bufsize >= off)
+		return (0);
+
+	if ((p = realloc(demo_fh->buf, off)) == NULL) {
+		(void)wtext->err_printf(wtext, session,
+		    "%s: failed to resize buffer",
+		    demo_fh->iface.name, wtext->strerror(wtext, NULL, ENOMEM));
+		return (ENOMEM);
+	}
+	memset((uint8_t *)p + demo_fh->bufsize, 0, off - demo_fh->bufsize);
+	demo_fh->buf = p;
+	demo_fh->bufsize = off;
 
 	return (0);
 }
@@ -662,33 +756,17 @@ demo_file_truncate(
     WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t offset)
 {
 	DEMO_FILE_HANDLE *demo_fh;
-	WT_EXTENSION_API *wtext;
-	size_t off;
+	DEMO_FILE_SYSTEM *demo_fs;
+	int ret = 0;
 
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
-	wtext = demo_fh->demo_fs->wtext;
+	demo_fs = demo_fh->demo_fs;
 
-	/*
-	 * Grow the buffer as necessary, clear any new space in the file,
-	 * and reset the file's data length.
-	 */
-	off = (size_t)offset;
-	if (demo_fh->bufsize < off ) {
-		if ((demo_fh->buf = realloc(demo_fh->buf, off)) == NULL) {
-			(void)wtext->err_printf(wtext, session,
-			    "demo_file_truncate: %s: failed to resize buffer",
-			    demo_fh->iface.name,
-			    wtext->strerror(wtext, NULL, ENOMEM));
-			return (ENOMEM);
-		}
-		demo_fh->bufsize = off;
-	}
-	if (demo_fh->size < off)
-		memset((uint8_t *)demo_fh->buf + demo_fh->size,
-		    0, off - demo_fh->size);
-	demo_fh->size = off;
-
-	return (0);
+	LOCK_FILE_SYSTEM(session, demo_fs);
+	if ((ret = demo_buffer_resize(session, demo_fh, offset)) == 0)
+		demo_fh->size = (size_t)offset;
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	return (ret);
 }
 
 /*
@@ -700,23 +778,32 @@ demo_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
     wt_off_t offset, size_t len, const void *buf)
 {
 	DEMO_FILE_HANDLE *demo_fh;
+	DEMO_FILE_SYSTEM *demo_fs;
+	WT_EXTENSION_API *wtext;
 	size_t off;
 	int ret = 0;
 
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
-
-	/* Make sure the buffer is large enough for the write */
-	if ((ret = demo_file_truncate(file_handle, session,
-	    offset + (wt_off_t)(len + DEMO_FILE_SIZE_INCREMENT))) != 0)
-		return (ret);
-
+	demo_fs = demo_fh->demo_fs;
+	wtext = demo_fs->wtext;
 	off = (size_t)offset;
-	memcpy((uint8_t *)demo_fh->buf + off, buf, len);
-	if (off + len > demo_fh->size)
-		demo_fh->size = off + len;
-	demo_fh->off = off + len;
 
-	return (0);
+	LOCK_FILE_SYSTEM(session, demo_fs);
+	++demo_fs->write_ops;
+	if ((ret = demo_buffer_resize(session, demo_fh,
+	    offset + (wt_off_t)(len + DEMO_FILE_SIZE_INCREMENT))) == 0) {
+		memcpy((uint8_t *)demo_fh->buf + off, buf, len);
+		if (off + len > demo_fh->size)
+			demo_fh->size = off + len;
+	}
+	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	if (ret == 0)
+		return (0);
+
+	(void)wtext->err_printf(wtext, session,
+	    "%s: handle-write: failed to write %zu bytes at offset %zu: %s",
+	    demo_fh->iface.name, len, off, wtext->strerror(wtext, NULL, ret));
+	return (ret);
 }
 
 /*
@@ -731,7 +818,7 @@ demo_handle_remove(WT_SESSION *session, DEMO_FILE_HANDLE *demo_fh)
 	WT_EXTENSION_API *wtext;
 
 	demo_fs = demo_fh->demo_fs;
-	wtext = demo_fh->demo_fs->wtext;
+	wtext = demo_fs->wtext;
 
 	if (demo_fh->ref != 0) {
 		(void)wtext->err_printf(wtext, session,
@@ -744,7 +831,6 @@ demo_handle_remove(WT_SESSION *session, DEMO_FILE_HANDLE *demo_fh)
 
 	/* Clean up private information. */
 	free(demo_fh->buf);
-	demo_fh->buf = NULL;
 
 	/* Clean up public information. */
 	free(demo_fh->iface.name);
@@ -771,6 +857,8 @@ demo_handle_search(WT_FILE_SYSTEM *file_system, const char *name)
 			break;
 	return (demo_fh);
 }
+
+static const char *home;
 
 int
 main(void)

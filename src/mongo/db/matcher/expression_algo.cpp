@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
@@ -95,12 +96,9 @@ bool _isSubsetOf(const ComparisonMatchExpression* lhs, const ComparisonMatchExpr
         return false;
     }
 
-    if (!CollatorInterface::collatorsMatch(lhs->getCollator(), rhs->getCollator())) {
-        // TODO SERVER-23172: Check that lhsData does not contain string comparison in nested
-        // objects or arrays.
-        if (lhsData.type() == BSONType::String) {
-            return false;
-        }
+    if (!CollatorInterface::collatorsMatch(lhs->getCollator(), rhs->getCollator()) &&
+        CollationIndexKey::isCollatableType(lhsData.type())) {
+        return false;
     }
 
     // Either collator may be used by compareElementValues() here, since either the collators are

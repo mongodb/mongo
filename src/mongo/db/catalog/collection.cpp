@@ -414,7 +414,7 @@ Status Collection::insertDocument(OperationContext* txn,
 
 Status Collection::insertDocument(OperationContext* txn,
                                   const BSONObj& doc,
-                                  MultiIndexBlock* indexBlock,
+                                  const std::vector<MultiIndexBlock*>& indexBlocks,
                                   bool enforceQuota) {
     {
         auto status = checkValidation(txn, doc);
@@ -433,9 +433,12 @@ Status Collection::insertDocument(OperationContext* txn,
     if (!loc.isOK())
         return loc.getStatus();
 
-    Status status = indexBlock->insert(doc, loc.getValue());
-    if (!status.isOK())
-        return status;
+    for (auto&& indexBlock : indexBlocks) {
+        Status status = indexBlock->insert(doc, loc.getValue());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
 
     vector<BSONObj> docs;
     docs.push_back(doc);

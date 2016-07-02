@@ -49,7 +49,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string localField,
                                            std::string foreignField,
                                            const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+    : DocumentSourceNeedsMongod(pExpCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
       _localField(std::move(localField)),
@@ -94,7 +94,7 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
         // We have internalized a $match, but have not yet computed the descended $match that should
         // be applied to our queries.
         _additionalFilter = DocumentSourceMatch::descendMatchOnPath(
-                                _matchSrc->getMatchExpression(), _as.getPath(false), pExpCtx)
+                                _matchSrc->getMatchExpression(), _as.fullPath(), pExpCtx)
                                 ->getQuery();
     }
 
@@ -139,7 +139,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::optimizeAt(
 
     // If we are not already handling an $unwind stage internally, we can combine with the
     // following $unwind stage.
-    if (nextUnwind && !_handlingUnwind && nextUnwind->getUnwindPath() == _as.getPath(false)) {
+    if (nextUnwind && !_handlingUnwind && nextUnwind->getUnwindPath() == _as.fullPath()) {
         _unwindSrc = std::move(nextUnwind);
         _handlingUnwind = true;
         container->erase(std::next(itr));
@@ -154,11 +154,11 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::optimizeAt(
 
     // Attempt to move part of the $match before ourselves, and internalize any predicates upon the
     // "_as" field.
-    std::string outputPath = _as.getPath(false);
+    std::string outputPath = _as.fullPath();
 
     std::set<std::string> fields = {outputPath};
     if (_handlingUnwind && _unwindSrc->indexPath()) {
-        fields.insert((*_unwindSrc->indexPath()).getPath(false));
+        fields.insert((*_unwindSrc->indexPath()).fullPath());
     }
 
     // Attempt to split the $match, putting the independent portion before ourselves.
@@ -374,12 +374,11 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
 }
 
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool explain) const {
-    MutableDocument output(
-        DOC(getSourceName() << DOC("from" << _fromNs.coll() << "as" << _as.getPath(false)
-                                          << "localField"
-                                          << _localField.getPath(false)
-                                          << "foreignField"
-                                          << _foreignField.getPath(false))));
+    MutableDocument output(DOC(
+        getSourceName() << DOC("from" << _fromNs.coll() << "as" << _as.fullPath() << "localField"
+                                      << _localField.fullPath()
+                                      << "foreignField"
+                                      << _foreignField.fullPath())));
     if (explain) {
         if (_handlingUnwind) {
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
@@ -387,7 +386,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
                 Value(DOC("preserveNullAndEmptyArrays"
                           << _unwindSrc->preserveNullAndEmptyArrays()
                           << "includeArrayIndex"
-                          << (indexPath ? Value(indexPath->getPath(false)) : Value())));
+                          << (indexPath ? Value(indexPath->fullPath()) : Value())));
         }
 
         if (_matchSrc) {
@@ -395,7 +394,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
             // descended match expression.
             output[getSourceName()]["matching"] =
                 Value(DocumentSourceMatch::descendMatchOnPath(
-                          _matchSrc->getMatchExpression(), _as.getPath(false), pExpCtx)
+                          _matchSrc->getMatchExpression(), _as.fullPath(), pExpCtx)
                           ->getQuery());
         }
 
@@ -417,7 +416,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
 }
 
 DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
-    deps->fields.insert(_localField.getPath(false));
+    deps->fields.insert(_localField.fullPath());
     return SEE_NEXT;
 }
 

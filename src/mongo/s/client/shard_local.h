@@ -56,6 +56,11 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
+    Status createIndexOnConfig(OperationContext* txn,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique) override;
+
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* txn,
                                                    const ReadPreferenceSetting& unused,
@@ -65,6 +70,7 @@ private:
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,
         const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,

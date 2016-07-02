@@ -34,12 +34,14 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
 
+class Collection;
+struct CollectionOptions;
 class OperationContext;
 
 namespace repl {
@@ -60,9 +62,19 @@ enum class DurableRequirement {
 };
 
 /**
- * Storage interface used by used by the ReplicationExecutor inside mongod for supporting
- * ReplicationExectutor's ability to take database locks.
+ * Storage interface used by the replication system to interact with storage.
+ * This interface provides seperation of concerns and a place for mocking out test
+ * interactions.
  *
+ * The grouping of functionality includes general collection helpers, and more specific replication
+ * concepts:
+ *      * Create Collection and Oplog
+ *      * Drop database and all user databases
+ *      * Drop a collection
+ *      * Insert documents into a collection
+ *      * Manage minvalid boundaries and initial sync state
+ *
+ * ***** MINVALID *****
  * This interface provides helper functions for maintaining a single document in the
  * local.replset.minvalid collection.
  *
@@ -83,20 +95,24 @@ enum class DurableRequirement {
  *      begin: {ts:..., t:...} // a batch is currently being applied, and not consistent
  * }
  */
-
 class StorageInterface {
     MONGO_DISALLOW_COPYING(StorageInterface);
 
 public:
+    // Operation Context binding.
     static StorageInterface* get(ServiceContext* service);
     static StorageInterface* get(ServiceContext& service);
     static StorageInterface* get(OperationContext* txn);
-
     static void set(ServiceContext* service, std::unique_ptr<StorageInterface> storageInterface);
 
+    // Constructor and Destructor.
     StorageInterface() = default;
     virtual ~StorageInterface() = default;
 
+    virtual void startup() = 0;
+    virtual void shutdown() = 0;
+
+    // MinValid and Initial Sync Flag.
     /**
      * Returns true if initial sync was started but has not not completed.
      */
@@ -143,15 +159,86 @@ public:
      */
     virtual void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) = 0;
 
+    // Collection creation and population for initial sync.
     /**
-     * Writes operations into the replica set oplog at "nss".
-     * Used internally by replication secondaries.
+     * Creates a collection with the provided indexes.
      *
-     * Returns the optime for the last operation inserted on success.
+     * Assumes that no database locks have been acquired prior to calling this function.
      */
-    virtual StatusWith<OpTime> writeOpsToOplog(OperationContext* txn,
-                                               const NamespaceString& nss,
-                                               const MultiApplier::Operations& operations) = 0;
+    virtual StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
+        const NamespaceString& nss,
+        const CollectionOptions& options,
+        const BSONObj idIndexSpec,
+        const std::vector<BSONObj>& secondaryIndexSpecs) = 0;
+
+    /**
+     * Inserts a document into a collection.
+     *
+     * NOTE: If the collection doesn't exist, it will not be created, and instead
+     * an error is returned.
+     */
+    virtual Status insertDocument(OperationContext* txn,
+                                  const NamespaceString& nss,
+                                  const BSONObj& doc) = 0;
+
+    /**
+     * Inserts the given documents into the collection.
+     * It is an error to call this function with an empty set of documents.
+     */
+    virtual Status insertDocuments(OperationContext* txn,
+                                   const NamespaceString& nss,
+                                   const std::vector<BSONObj>& docs) = 0;
+
+    /**
+     * Creates the initial oplog, errors if it exists.
+     */
+    virtual Status createOplog(OperationContext* txn, const NamespaceString& nss) = 0;
+
+    /**
+     * Creates a collection.
+     */
+    virtual Status createCollection(OperationContext* txn,
+                                    const NamespaceString& nss,
+                                    const CollectionOptions& options) = 0;
+
+    /**
+     * Drops a collection, like the oplog.
+     */
+    virtual Status dropCollection(OperationContext* txn, const NamespaceString& nss) = 0;
+
+    /**
+     * Drops all databases except "local".
+     */
+    virtual Status dropReplicatedDatabases(OperationContext* txn) = 0;
+
+    /**
+     * Validates that the admin database is valid during initial sync.
+     */
+    virtual Status isAdminDbValid(OperationContext* txn) = 0;
+
+    /**
+     * Finds the first document returned by a collection or index scan on the collection in the
+     * requested direction.
+     * If "indexKeyPattern" is empty, a collection scan is used to locate the document.
+     */
+    enum class ScanDirection {
+        kForward = 1,
+        kBackward = -1,
+    };
+    virtual StatusWith<BSONObj> findOne(OperationContext* txn,
+                                        const NamespaceString& nss,
+                                        const BSONObj& indexKeyPattern,
+                                        ScanDirection scanDirection) = 0;
+
+    /**
+     * Deletes the first document returned by a collection or index scan on the collection in the
+     * requested direction. Returns deleted document on success.
+     * If "indexKeyPattern" is empty, a collection scan is used to locate the document.
+     */
+    virtual StatusWith<BSONObj> deleteOne(OperationContext* txn,
+                                          const NamespaceString& nss,
+                                          const BSONObj& indexKeyPattern,
+                                          ScanDirection scanDirection) = 0;
 };
 
 }  // namespace repl

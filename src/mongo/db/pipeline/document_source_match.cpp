@@ -345,7 +345,7 @@ void DocumentSourceMatch::setSource(DocumentSource* source) {
 bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
     BSONForEach(e, query) {
         const StringData fieldName = e.fieldNameStringData();
-        if (fieldName == StringData("$text", StringData::LiteralTag()))
+        if (fieldName == "$text"_sd)
             return true;
 
         if (e.isABSONObj() && isTextQuery(e.Obj()))

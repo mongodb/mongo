@@ -76,6 +76,10 @@ Timestamp findCommonPoint(HostAndPort host, Timestamp start) {
     return Timestamp();
 }
 
+ServiceContext::UniqueOperationContext makeOpCtx() {
+    return cc().makeOperationContext();
+}
+
 }  // namespace
 
 std::string toString(DataReplicatorState s) {
@@ -439,7 +443,7 @@ DataReplicator::~DataReplicator() {
     });
 }
 
-Status DataReplicator::start() {
+Status DataReplicator::start(OperationContext* txn) {
     UniqueLock lk(_mutex);
     if (_state != DataReplicatorState::Uninitialized) {
         return Status(ErrorCodes::IllegalOperation,
@@ -450,14 +454,14 @@ Status DataReplicator::start() {
     _applierPaused = false;
     _fetcherPaused = false;
     _reporterPaused = false;
-    _oplogBuffer = _dataReplicatorExternalState->makeSteadyStateOplogBuffer();
-    _oplogBuffer->startup(nullptr);
+    _oplogBuffer = _dataReplicatorExternalState->makeSteadyStateOplogBuffer(txn);
+    _oplogBuffer->startup(txn);
     _doNextActions_Steady_inlock();
     return Status::OK();
 }
 
-Status DataReplicator::shutdown() {
-    return _shutdown();
+Status DataReplicator::shutdown(OperationContext* txn) {
+    return _shutdown(txn);
 }
 
 Status DataReplicator::pause() {
@@ -569,10 +573,10 @@ TimestampStatus DataReplicator::flushAndPause() {
     return TimestampStatus(_lastTimestampApplied);
 }
 
-void DataReplicator::_resetState_inlock(Timestamp lastAppliedOpTime) {
+void DataReplicator::_resetState_inlock(OperationContext* txn, Timestamp lastAppliedOpTime) {
     invariant(!_anyActiveHandles_inlock());
     _lastTimestampApplied = _lastTimestampFetched = lastAppliedOpTime;
-    _oplogBuffer->clear(nullptr);
+    _oplogBuffer->clear(txn);
 }
 
 void DataReplicator::slavesHaveProgressed() {
@@ -590,10 +594,10 @@ void DataReplicator::_setInitialSyncStorageInterface(CollectionCloner::StorageIn
 }
 
 TimestampStatus DataReplicator::resync(OperationContext* txn) {
-    _shutdown();
+    _shutdown(txn);
     // Drop databases and do initialSync();
-    CBHStatus cbh = _exec->scheduleDBWork(
-        [&](const CallbackArgs& cbData) { _storage->dropUserDatabases(cbData.txn); });
+    CBHStatus cbh = _exec->scheduleWork(
+        [&](const CallbackArgs& cbData) { _storage->dropUserDatabases(makeOpCtx().get()); });
 
     if (!cbh.isOK()) {
         return TimestampStatus(cbh.getStatus());
@@ -603,7 +607,7 @@ TimestampStatus DataReplicator::resync(OperationContext* txn) {
 
     TimestampStatus status = initialSync(txn);
     if (status.isOK()) {
-        _resetState_inlock(status.getValue());
+        _resetState_inlock(txn, status.getValue());
     }
     return status;
 }
@@ -631,10 +635,10 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
     _reporterPaused = true;
     _applierPaused = true;
 
-    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer();
-    _oplogBuffer->startup(nullptr);
-    ON_BLOCK_EXIT([this]() {
-        _oplogBuffer->shutdown(nullptr);
+    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
+    _oplogBuffer->startup(txn);
+    ON_BLOCK_EXIT([this, txn]() {
+        _oplogBuffer->shutdown(txn);
         _oplogBuffer.reset();
     });
 
@@ -695,7 +699,7 @@ TimestampStatus DataReplicator::initialSync(OperationContext* txn) {
                     OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
                     _syncSource,
                     _opts.remoteOplogNS,
-                    _opts.getReplSetConfig(),
+                    uassertStatusOK(_dataReplicatorExternalState->getCurrentConfig()),
                     _dataReplicatorExternalState.get(),
                     stdx::bind(&DataReplicator::_enqueueDocuments,
                                this,
@@ -975,9 +979,9 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     //      * only OplogEntries from before the slaveDelay point
     //      * a single command OplogEntry (including index builds, which appear to be inserts)
     //          * consequently, commands bound the previous batch to be in a batch of their own
-    OperationContext* txn = nullptr;
-    while (_oplogBuffer->peek(txn, &op)) {
-        auto entry = OplogEntry(op);
+    auto txn = makeOpCtx();
+    while (_oplogBuffer->peek(txn.get(), &op)) {
+        auto entry = OplogEntry(std::move(op));
 
         // Check for ops that must be processed one at a time.
         if (entry.isCommand() ||
@@ -987,12 +991,12 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
-                _oplogBuffer->tryPop(txn, &op);
-                invariant(entry == OplogEntry(op));
+                invariant(_oplogBuffer->tryPop(txn.get(), &op));
+                dassert(ops.back().raw == op);
             }
 
             // Otherwise, apply what we have so far and come back for the command.
-            return ops;
+            return std::move(ops);
         }
 
         // Check for oplog version change. If it is absent, its value is one.
@@ -1006,10 +1010,10 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
 
         // Apply replication batch limits.
         if (ops.size() >= _opts.replBatchLimitOperations) {
-            return ops;
+            return std::move(ops);
         }
-        if (totalBytes + entry.raw.objsize() > _opts.replBatchLimitBytes) {
-            return ops;
+        if (totalBytes + entry.raw.objsize() >= _opts.replBatchLimitBytes) {
+            return std::move(ops);
         }
 
         // Check slaveDelay boundary.
@@ -1021,17 +1025,17 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             // make this thread sleep longer when handleSlaveDelay is called
             // and apply ops much sooner than we like.
             if (opTimestampSecs > slaveDelayBoundary) {
-                return ops;
+                return std::move(ops);
             }
         }
 
         // Add op to buffer.
-        ops.push_back(entry);
-        totalBytes += entry.raw.objsize();
-        _oplogBuffer->tryPop(txn, &op);
-        invariant(entry == OplogEntry(op));
+        ops.push_back(std::move(entry));
+        totalBytes += ops.back().raw.objsize();
+        invariant(_oplogBuffer->tryPop(txn.get(), &op));
+        dassert(ops.back().raw == op);
     }
-    return ops;
+    return std::move(ops);
 }
 
 void DataReplicator::_onApplyBatchFinish(const CallbackArgs& cbData,
@@ -1154,7 +1158,7 @@ Status DataReplicator::_scheduleApplyBatch_inlock() {
         if (!batchStatus.isOK()) {
             return batchStatus.getStatus();
         }
-        const Operations ops = batchStatus.getValue();
+        const Operations& ops = batchStatus.getValue();
         if (ops.empty()) {
             _applierActive = false;
             auto status = _exec->scheduleWorkAt(_exec->now() + Seconds(1),
@@ -1192,6 +1196,9 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
                                    stdx::placeholders::_3);
 
     auto lambda = [this](const TimestampStatus& ts, const Operations& theOps) {
+        if (ErrorCodes::CallbackCanceled == ts) {
+            return;
+        }
         CBHStatus status = _exec->scheduleWork(stdx::bind(&DataReplicator::_onApplyBatchFinish,
                                                           this,
                                                           stdx::placeholders::_1,
@@ -1208,7 +1215,8 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
         _exec->wait(status.getValue());
     };
 
-    _applier.reset(new MultiApplier(_exec, ops, applierFn, multiApplyFn, lambda));
+    auto executor = _dataReplicatorExternalState->getTaskExecutor();
+    _applier = stdx::make_unique<MultiApplier>(executor, ops, applierFn, multiApplyFn, lambda);
     return _applier->start();
 }
 
@@ -1254,22 +1262,23 @@ Status DataReplicator::_scheduleFetch_inlock() {
         long long startHash = 0LL;
         const auto remoteOplogNS = _opts.remoteOplogNS;
 
-        _fetcher = stdx::make_unique<OplogFetcher>(_exec,
-                                                   OpTimeWithHash(startHash, startOptime),
-                                                   _syncSource,
-                                                   remoteOplogNS,
-                                                   _opts.getReplSetConfig(),
-                                                   _dataReplicatorExternalState.get(),
-                                                   stdx::bind(&DataReplicator::_enqueueDocuments,
-                                                              this,
-                                                              stdx::placeholders::_1,
-                                                              stdx::placeholders::_2,
-                                                              stdx::placeholders::_3,
-                                                              stdx::placeholders::_4),
-                                                   stdx::bind(&DataReplicator::_onOplogFetchFinish,
-                                                              this,
-                                                              stdx::placeholders::_1,
-                                                              stdx::placeholders::_2));
+        _fetcher = stdx::make_unique<OplogFetcher>(
+            _exec,
+            OpTimeWithHash(startHash, startOptime),
+            _syncSource,
+            remoteOplogNS,
+            uassertStatusOK(_dataReplicatorExternalState->getCurrentConfig()),
+            _dataReplicatorExternalState.get(),
+            stdx::bind(&DataReplicator::_enqueueDocuments,
+                       this,
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2,
+                       stdx::placeholders::_3,
+                       stdx::placeholders::_4),
+            stdx::bind(&DataReplicator::_onOplogFetchFinish,
+                       this,
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2));
     }
     if (!_fetcher->isActive()) {
         Status status = _fetcher->startup();
@@ -1289,7 +1298,7 @@ void DataReplicator::_changeStateIfNeeded() {
     // TODO
 }
 
-Status DataReplicator::scheduleShutdown() {
+Status DataReplicator::scheduleShutdown(OperationContext* txn) {
     auto eventStatus = _exec->makeEvent();
     if (!eventStatus.isOK()) {
         return eventStatus.getStatus();
@@ -1300,7 +1309,7 @@ Status DataReplicator::scheduleShutdown() {
         invariant(!_onShutdown.isValid());
         _onShutdown = eventStatus.getValue();
         _cancelAllHandles_inlock();
-        _oplogBuffer->shutdown(nullptr);
+        _oplogBuffer->shutdown(txn);
         _oplogBuffer.reset();
     }
 
@@ -1328,8 +1337,8 @@ void DataReplicator::waitForShutdown() {
     }
 }
 
-Status DataReplicator::_shutdown() {
-    auto status = scheduleShutdown();
+Status DataReplicator::_shutdown(OperationContext* txn) {
+    auto status = scheduleShutdown(txn);
     if (status.isOK()) {
         waitForShutdown();
     }
@@ -1346,14 +1355,14 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
 
     // Wait for enough space.
     // Gets unblocked on shutdown.
-    _oplogBuffer->waitForSpace(nullptr, info.toApplyDocumentBytes);
+    _oplogBuffer->waitForSpace(makeOpCtx().get(), info.toApplyDocumentBytes);
 
     OCCASIONALLY {
         LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
     }
 
     // Buffer docs for later application.
-    fassert(40143, _oplogBuffer->pushAllNonBlocking(nullptr, begin, end));
+    fassert(40143, _oplogBuffer->pushAllNonBlocking(makeOpCtx().get(), begin, end));
 
     _lastTimestampFetched = info.lastDocument.opTime.getTimestamp();
 
@@ -1377,7 +1386,7 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
             case ErrorCodes::RemoteOplogStale: {
                 _setState(DataReplicatorState::Rollback);
                 // possible rollback
-                auto scheduleResult = _exec->scheduleDBWork(
+                auto scheduleResult = _exec->scheduleWork(
                     stdx::bind(&DataReplicator::_rollbackOperations, this, stdx::placeholders::_1));
                 if (!scheduleResult.isOK()) {
                     error() << "Failed to schedule rollback work: " << scheduleResult.getStatus();
@@ -1407,11 +1416,10 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
     if (cbData.status.code() == ErrorCodes::CallbackCanceled) {
         return;
     }
-    invariant(cbData.txn);
 
     OpTime lastOpTimeWritten(getLastTimestampApplied(), OpTime::kInitialTerm);
     HostAndPort syncSource = getSyncSource();
-    auto rollbackStatus = _opts.rollbackFn(cbData.txn, lastOpTimeWritten, syncSource);
+    auto rollbackStatus = _opts.rollbackFn(makeOpCtx().get(), lastOpTimeWritten, syncSource);
     if (!rollbackStatus.isOK()) {
         error() << "Failed rollback: " << rollbackStatus;
         Date_t until{_exec->now() + _opts.blacklistSyncSourcePenaltyForOplogStartMissing};

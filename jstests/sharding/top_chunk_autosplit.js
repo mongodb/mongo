@@ -2,10 +2,9 @@ function shardSetup(shardConfig, dbName, collName) {
     var st = new ShardingTest(shardConfig);
     var db = st.getDB(dbName);
 
-    // Disable the balancer to not interfere with the test, but keep the balancer settings on
-    // (with default empty document) so the auto split logic will be able to move chunks around.
-    assert.writeOK(st.s.getDB('config').settings.remove({_id: 'balancer'}));
-    db.adminCommand({configureFailPoint: 'skipBalanceRound', mode: 'alwaysOn'});
+    // Set the balancer mode to only balance on autoSplit
+    assert.writeOK(st.s.getDB('config').settings.update(
+        {_id: 'balancer'}, {'$unset': {stopped: ''}, '$set': {mode: 'autoSplitOnly'}}));
     return st;
 }
 

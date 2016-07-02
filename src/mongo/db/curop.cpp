@@ -280,6 +280,23 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
     _dbprofile = std::max(dbProfileLevel, _dbprofile);
 }
 
+Command::ReadWriteType CurOp::getReadWriteType() const {
+    if (_command) {
+        return _command->getReadWriteType();
+    }
+    switch (_logicalOp) {
+        case LogicalOp::opGetMore:
+        case LogicalOp::opQuery:
+            return Command::ReadWriteType::kRead;
+        case LogicalOp::opUpdate:
+        case LogicalOp::opInsert:
+        case LogicalOp::opDelete:
+            return Command::ReadWriteType::kWrite;
+        default:
+            return Command::ReadWriteType::kCommand;
+    }
+}
+
 namespace {
 /**
  * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a

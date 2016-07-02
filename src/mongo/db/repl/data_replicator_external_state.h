@@ -29,15 +29,22 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+namespace executor {
+class TaskExecutor;
+}  // namespace executor
+
 namespace repl {
 
 class DataReplicator;
@@ -62,6 +69,11 @@ public:
     virtual ~DataReplicatorExternalState() = default;
 
     /**
+     * Returns task executor for scheduling tasks to be run asynchronously.
+     */
+    virtual executor::TaskExecutor* getTaskExecutor() const = 0;
+
+    /**
      * Returns the current term and last committed optime.
      * Returns (OpTime::kUninitializedTerm, OpTime()) if not available.
      */
@@ -83,12 +95,19 @@ public:
     /**
      * This function creates an oplog buffer of the type specified at server startup.
      */
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
+        OperationContext* txn) const = 0;
 
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const = 0;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const = 0;
+
+    /**
+     * Returns the current replica set config if there is one, or an error why there isn't.
+     */
+    virtual StatusWith<ReplicaSetConfig> getCurrentConfig() const = 0;
 
 private:
     /**
@@ -98,7 +117,7 @@ private:
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
     virtual StatusWith<OpTime> _multiApply(OperationContext* txn,
-                                           const MultiApplier::Operations& ops,
+                                           MultiApplier::Operations ops,
                                            MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
@@ -106,7 +125,7 @@ private:
      *
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
-    virtual void _multiSyncApply(const MultiApplier::Operations& ops) = 0;
+    virtual void _multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
     /**
      * Used by _multiApply() to write operations to database during initial sync.
@@ -114,7 +133,7 @@ private:
      *
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
-    virtual void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+    virtual void _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                         const HostAndPort& source) = 0;
 
     // Provides DataReplicator with access to _multiApply, _multiSyncApply and

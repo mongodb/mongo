@@ -60,11 +60,13 @@ else
 		echo "$f: use TAILQ for all lists"
 	fi
 
-	if ! expr "$f" : 'src/os_common/.*' > /dev/null &&
+	if ! expr "$f" : 'src/include/extern.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern_posix.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern_win.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	   ! expr "$f" : 'src/os_common/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
-	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&
-	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
 	    grep '__wt_errno' $f > $t; then
 		echo "$f: upper-level code should not call __wt_errno"
 		cat $t
@@ -73,7 +75,7 @@ else
 	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
 	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
-	    grep "%zu" $f | grep -v 'SIZET_FMT' > $t; then
+	    egrep "%[0-9]*zu" $f | grep -v 'SIZET_FMT' > $t; then
 		echo "$f: %zu needs to be fixed for Windows"
 		cat $t
 	fi
@@ -136,6 +138,20 @@ else
 			echo "$f: explicit declaration of \"ret\""
 			cat $t
 		}
+	fi
+
+	# Use of ctype functions that sign extend their arguments.
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'test/csuite/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/.*' > /dev/null &&
+	   ! expr "$f" : 'src/include/ctype.i' > /dev/null; then
+		if egrep '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
+			test -s $t && {
+				echo "$f: direct use of ctype.h functions, instead of ctype.i equivalents"
+				cat $t
+			}
+		fi
 	fi
 
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |

@@ -30,19 +30,144 @@
 
 #include "mongo/db/s/metadata_manager.h"
 
-#include "mongo/db/s/collection_metadata.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-MetadataManager::MetadataManager(std::unique_ptr<CollectionMetadata> initialMetadata)
-    : _activeMetadata(std::move(initialMetadata)) {}
+MetadataManager::MetadataManager() = default;
 
-std::shared_ptr<CollectionMetadata> MetadataManager::getActiveMetadata() {
-    return _activeMetadata;
+ScopedCollectionMetadata MetadataManager::getActiveMetadata() {
+    invariant(_activeMetadataTracker);
+    return ScopedCollectionMetadata(this, _activeMetadataTracker.get());
 }
 
-void MetadataManager::setActiveMetadata(std::shared_ptr<CollectionMetadata> newMetadata) {
-    _activeMetadata = std::move(newMetadata);
+void MetadataManager::setActiveMetadata(std::unique_ptr<CollectionMetadata> newMetadata) {
+    if (_activeMetadataTracker && _activeMetadataTracker->usageCounter > 0) {
+        _metadataInUse.push_front(std::move(_activeMetadataTracker));
+    }
+    _activeMetadataTracker = stdx::make_unique<CollectionMetadataTracker>(std::move(newMetadata));
+}
+
+void MetadataManager::_removeMetadata(CollectionMetadataTracker* metadataTracker) {
+    invariant(metadataTracker->usageCounter == 0);
+    auto i = _metadataInUse.begin();
+    auto e = _metadataInUse.end();
+    while (i != e) {
+        if (metadataTracker == i->get()) {
+            _metadataInUse.erase(i);
+            return;
+        }
+        i++;
+    }
+}
+
+MetadataManager::CollectionMetadataTracker::CollectionMetadataTracker(
+    std::unique_ptr<CollectionMetadata> m)
+    : metadata(std::move(m)), usageCounter(0){};
+
+ScopedCollectionMetadata::ScopedCollectionMetadata(
+    MetadataManager* manager, MetadataManager::CollectionMetadataTracker* tracker)
+    : _manager(manager), _tracker(tracker) {
+    _tracker->usageCounter++;
+}
+
+ScopedCollectionMetadata::~ScopedCollectionMetadata() {
+    invariant(_tracker->usageCounter > 0);
+    if (--_tracker->usageCounter == 0) {
+        _manager->_removeMetadata(_tracker);
+    }
+}
+
+CollectionMetadata* ScopedCollectionMetadata::operator->() {
+    return _tracker->metadata.get();
+}
+
+CollectionMetadata* ScopedCollectionMetadata::getMetadata() {
+    return _tracker->metadata.get();
+}
+
+ScopedCollectionMetadata::ScopedCollectionMetadata(ScopedCollectionMetadata&& other) {
+    *this = std::move(other);
+}
+
+ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMetadata&& other) {
+    if (this != &other) {
+        _manager = other._manager;
+        _tracker = other._tracker;
+        other._manager = nullptr;
+        other._tracker = nullptr;
+    }
+
+    return *this;
+}
+
+std::map<BSONObj, ChunkRange> MetadataManager::getCopyOfRanges() {
+    return _rangesToClean;
+}
+
+void MetadataManager::addRangeToClean(const ChunkRange& range) {
+    auto itLow = _rangesToClean.upper_bound(range.getMin());
+    if (itLow != _rangesToClean.begin()) {
+        --itLow;
+    }
+
+    if (itLow != _rangesToClean.end()) {
+        const ChunkRange& cr = itLow->second;
+        if (cr.getMin() < range.getMin()) {
+            // Checks that there is no overlap between range and any other ChunkRange
+            // Specifically, checks that the greatest chunk less than or equal to range, if such a
+            // chunk exists, does not overlap with the min of range.
+            invariant(cr.getMax() <= range.getMin());
+        }
+    }
+
+    auto itHigh = _rangesToClean.lower_bound(range.getMin());
+    if (itHigh != _rangesToClean.end()) {
+        const ChunkRange& cr = itHigh->second;
+        // Checks that there is no overlap between range and any other ChunkRange
+        // Specifically, checks that the least chunk greater than or equal to range
+        // does not overlap with the max of range.
+        invariant(cr.getMin() >= range.getMax());
+    }
+
+    _rangesToClean.insert(std::make_pair(range.getMin(), range));
+}
+
+void MetadataManager::removeRangeToClean(const ChunkRange& range) {
+    auto it = _rangesToClean.upper_bound(range.getMin());
+    // We want our iterator to point at the greatest value
+    // that is still less than or equal to range.
+    if (it != _rangesToClean.begin()) {
+        --it;
+    }
+
+    for (; it != _rangesToClean.end() && it->second.getMin() < range.getMax();) {
+        if (it->second.getMax() <= range.getMin()) {
+            ++it;
+            continue;
+        }
+        // There's overlap between *it and range so we remove *it
+        // and then replace with new ranges.
+        ChunkRange oldChunk = it->second;
+        _rangesToClean.erase(it++);
+        if (oldChunk.getMin() < range.getMin()) {
+            ChunkRange newChunk = ChunkRange(oldChunk.getMin(), range.getMin());
+            addRangeToClean(newChunk);
+        }
+        if (oldChunk.getMax() > range.getMax()) {
+            ChunkRange newChunk = ChunkRange(range.getMax(), oldChunk.getMax());
+            addRangeToClean(newChunk);
+        }
+    }
+}
+
+void MetadataManager::append(BSONObjBuilder* builder) {
+    BSONArrayBuilder arr(builder->subarrayStart("rangesToClean"));
+    for (const auto& entry : _rangesToClean) {
+        BSONObjBuilder obj;
+        entry.second.append(&obj);
+        arr.append(obj.done());
+    }
 }
 
 }  // namespace mongo

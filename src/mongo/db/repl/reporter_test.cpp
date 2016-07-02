@@ -115,13 +115,6 @@ public:
     ReporterTest();
 
     /**
-     * Schedules response to the current network request.
-     * Returns command object in the network request.
-     */
-    BSONObj scheduleNetworkResponse(const BSONObj& obj);
-    BSONObj scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason);
-
-    /**
      * Schedules network response and instructs network interface to process response.
      * Returns command object in the network request.
      */
@@ -206,31 +199,11 @@ bool ReporterTestNoTriggerAtSetUp::triggerAtSetUp() const {
     return false;
 }
 
-BSONObj ReporterTest::scheduleNetworkResponse(const BSONObj& obj) {
-    auto net = getNet();
-    ASSERT_TRUE(net->hasReadyRequests());
-    Milliseconds millis(0);
-    RemoteCommandResponse response(obj, BSONObj(), millis);
-    executor::TaskExecutor::ResponseStatus responseStatus(response);
-    auto noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), responseStatus);
-    return noi->getRequest().cmdObj;
-}
-
-BSONObj ReporterTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason) {
-    auto net = getNet();
-    ASSERT_TRUE(net->hasReadyRequests());
-    executor::TaskExecutor::ResponseStatus responseStatus(code, reason);
-    auto noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), responseStatus);
-    return noi->getRequest().cmdObj;
-}
-
 BSONObj ReporterTest::processNetworkResponse(const BSONObj& obj,
                                              bool expectReadyRequestsAfterProcessing) {
     auto net = getNet();
     net->enterNetwork();
-    auto cmdObj = scheduleNetworkResponse(obj);
+    auto cmdObj = net->scheduleSuccessfulResponse(obj).cmdObj;
     net->runReadyNetworkOperations();
     ASSERT_EQUALS(expectReadyRequestsAfterProcessing, net->hasReadyRequests());
     net->exitNetwork();
@@ -242,7 +215,7 @@ BSONObj ReporterTest::processNetworkResponse(ErrorCodes::Error code,
                                              bool expectReadyRequestsAfterProcessing) {
     auto net = getNet();
     net->enterNetwork();
-    auto cmdObj = scheduleNetworkResponse(code, reason);
+    auto cmdObj = net->scheduleErrorResponse({code, reason}).cmdObj;
     net->runReadyNetworkOperations();
     ASSERT_EQUALS(expectReadyRequestsAfterProcessing, net->hasReadyRequests());
     net->exitNetwork();

@@ -36,57 +36,72 @@
 
 namespace mongo {
 
+class StringData;
+
+/**
+ * Utility class which represents a field path with nested paths separated by dots.
+ */
 class FieldPath {
 public:
     /**
-     * Constructor.
+     * Throws a UserException if a field name does not pass validation.
+     */
+    static void uassertValidFieldName(StringData fieldName);
+
+    /**
+     * Concatenates 'prefix' and 'suffix' using dotted path notation. 'prefix' is allowed to be
+     * empty.
+     */
+    static std::string getFullyQualifiedPath(StringData prefix, StringData suffix);
+
+    /**
+     * Throws a UserException if the string is empty or if any of the field names fail validation.
      *
-     * @param fieldPath the dotted field path std::string or non empty pre-split vector.
-     * The constructed object will have getPathLength() > 0.
-     * Uassert if any component field names do not pass validation.
+     * Field names are validated using uassertValidFieldName().
      */
     FieldPath(const std::string& fieldPath);
-    FieldPath(const std::vector<std::string>& fieldPath);
 
     /**
-      Get the number of path elements in the field path.
-
-      @returns the number of path elements
+     * Throws a UserException if 'fieldNames' is empty or if any of the field names fail validation.
+     *
+     * Field names are validated using uassertValidFieldName().
      */
-    size_t getPathLength() const;
+    FieldPath(const std::vector<std::string>& fieldNames);
 
     /**
-      Get a particular path element from the path.
-
-      @param i the zero based index of the path element.
-      @returns the path element
+     * Returns the number of path elements in the field path.
      */
-    const std::string& getFieldName(size_t i) const;
+    size_t getPathLength() const {
+        return _fieldNames.size();
+    }
 
     /**
-      Get the full path.
-
-      @param fieldPrefix whether or not to include the field prefix
-      @returns the complete field path
+     * Return the ith field name from this path using zero-based indexes.
      */
-    std::string getPath(bool fieldPrefix) const;
+    const std::string& getFieldName(size_t i) const {
+        dassert(i < getPathLength());
+        return _fieldNames[i];
+    }
 
     /**
-      Write the full path.
-
-      @param outStream where to write the path to
-      @param fieldPrefix whether or not to include the field prefix
-    */
-    void writePath(std::ostream& outStream, bool fieldPrefix) const;
-
-    /**
-       Get the prefix string.
-
-       @returns the prefix string
+     * Returns the full path, not including the prefix 'FieldPath::prefix'.
      */
-    static const char* getPrefix();
+    std::string fullPath() const;
 
-    static const char prefix[];
+    /**
+     * Returns the full path, including the prefix 'FieldPath::prefix'.
+     */
+    std::string fullPathWithPrefix() const;
+
+    /**
+     * Write the full path to 'outStream', including the prefix 'FieldPath::prefix' if
+     * 'includePrefix' is specified.
+     */
+    void writePath(std::ostream& outStream, bool includePrefix) const;
+
+    static const char* getPrefix() {
+        return prefix;
+    }
 
     /**
      * A FieldPath like this but missing the first element (useful for recursion).
@@ -95,34 +110,16 @@ public:
     FieldPath tail() const;
 
 private:
-    /** Uassert if a field name does not pass validation. */
-    static void uassertValidFieldName(const std::string& fieldName);
-
     /**
      * Push a new field name to the back of the vector of names comprising the field path.
-     * Uassert if 'fieldName' does not pass validation.
+     *
+     * Throws a UserException if 'fieldName' does not pass validation done by
+     * uassertValidFieldName().
      */
     void pushFieldName(const std::string& fieldName);
 
-    std::vector<std::string> vFieldName;
+    static const char prefix[];
+
+    std::vector<std::string> _fieldNames;
 };
-}
-
-
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
-
-namespace mongo {
-
-inline size_t FieldPath::getPathLength() const {
-    return vFieldName.size();
-}
-
-inline const std::string& FieldPath::getFieldName(size_t i) const {
-    dassert(i < getPathLength());
-    return vFieldName[i];
-}
-
-inline const char* FieldPath::getPrefix() {
-    return prefix;
-}
 }

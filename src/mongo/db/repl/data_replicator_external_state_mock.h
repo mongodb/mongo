@@ -43,6 +43,8 @@ class DataReplicatorExternalStateMock : public DataReplicatorExternalState {
 public:
     DataReplicatorExternalStateMock();
 
+    executor::TaskExecutor* getTaskExecutor() const override;
+
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
     void processMetadata(const rpc::ReplSetMetadata& metadata) override;
@@ -50,9 +52,14 @@ public:
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& metadata) override;
 
-    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
+    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* txn) const override;
 
-    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
+    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* txn) const override;
+
+    StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
+
+    // Task executor. Not owned by us.
+    executor::TaskExecutor* taskExecutor = nullptr;
 
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;
@@ -72,14 +79,16 @@ public:
     // Override to change multiApply behavior.
     MultiApplier::MultiApplyFn multiApplyFn;
 
+    ReplicaSetConfig replSetConfig;
+
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,
-                                   const MultiApplier::Operations& ops,
+                                   MultiApplier::Operations ops,
                                    MultiApplier::ApplyOperationFn applyOperation) override;
 
-    void _multiSyncApply(const MultiApplier::Operations& ops) override;
+    void _multiSyncApply(MultiApplier::OperationPtrs* ops) override;
 
-    void _multiInitialSyncApply(const MultiApplier::Operations& ops,
+    void _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                 const HostAndPort& source) override;
 };
 

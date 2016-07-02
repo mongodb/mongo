@@ -350,13 +350,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         }
     }
 
-    unique_ptr<MigrateInfo> migrateInfo(
-        BalancerPolicy::balance(nss.ns(), distStatus, aggressiveBalanceHint));
-    if (migrateInfo) {
-        return MigrateInfoVector{*migrateInfo};
-    }
-
-    return MigrateInfoVector{};
+    return BalancerPolicy::balance(nss.ns(), distStatus, aggressiveBalanceHint);
 }
 
 }  // namespace mongo

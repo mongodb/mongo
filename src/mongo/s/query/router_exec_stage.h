@@ -58,6 +58,10 @@ public:
      * Returns the next query result, or an error.
      *
      * If there are no more results, returns boost::none.
+     *
+     * All returned BSONObjs are owned. They may own a buffer larger than the object. If you are
+     * holding on to a subset of the returned results and need to minimize memory usage, call copy()
+     * on the BSONObjs.
      */
     virtual StatusWith<boost::optional<BSONObj>> next() = 0;
 

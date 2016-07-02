@@ -44,6 +44,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class BSONObj;
+
 namespace executor {
 
 class NetworkConnectionHook;
@@ -72,13 +75,18 @@ class NetworkConnectionHook;
 class NetworkInterfaceMock : public NetworkInterface {
 public:
     class NetworkOperation;
-    typedef stdx::list<NetworkOperation> NetworkOperationList;
-    typedef NetworkOperationList::iterator NetworkOperationIterator;
+    using NetworkOperationList = stdx::list<NetworkOperation>;
+    using NetworkOperationIterator = NetworkOperationList::iterator;
 
     NetworkInterfaceMock();
     virtual ~NetworkInterfaceMock();
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const;
     virtual std::string getDiagnosticString();
+
+    /**
+     * Logs the contents of the queues for diagnostics.
+     */
+    virtual void logQueues();
 
     ////////////////////////////////////////////////////////////////////////////////
     //
@@ -168,6 +176,33 @@ public:
                           const TaskExecutor::ResponseStatus& response);
 
     /**
+     * Schedules a successful "response" to "noi" at virtual time "when".
+     * "noi" defaults to next ready request.
+     * "when" defaults to now().
+     * Returns the "request" that the response was scheduled for.
+     */
+    RemoteCommandRequest scheduleSuccessfulResponse(const BSONObj& response);
+    RemoteCommandRequest scheduleSuccessfulResponse(const RemoteCommandResponse& response);
+    RemoteCommandRequest scheduleSuccessfulResponse(NetworkOperationIterator noi,
+                                                    const RemoteCommandResponse& response);
+    RemoteCommandRequest scheduleSuccessfulResponse(NetworkOperationIterator noi,
+                                                    Date_t when,
+                                                    const RemoteCommandResponse& response);
+
+    /**
+     * Schedules an error "response" to "noi" at virtual time "when".
+     * "noi" defaults to next ready request.
+     * "when" defaults to now().
+     */
+    RemoteCommandRequest scheduleErrorResponse(const Status& response);
+    RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
+                                               const Status& response);
+    RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
+                                               Date_t when,
+                                               const Status& response);
+
+
+    /**
      * Swallows "noi", causing the network interface to not respond to it until
      * shutdown() is called.
      */
@@ -237,6 +272,15 @@ private:
      */
     enum ThreadType { kNoThread = 0, kExecutorThread = 1, kNetworkThread = 2 };
 
+    /**
+     * Returns information about the state of this mock for diagnostic purposes.
+     */
+    std::string _getDiagnosticString_inlock() const;
+
+    /**
+     * Logs the contents of the queues for diagnostics.
+     */
+    void _logQueues_inlock() const;
     /**
      * Returns the current virtualized time.
      */
@@ -417,6 +461,11 @@ public:
      */
     void finishResponse();
 
+    /**
+     * Returns a printable diagnostic string.
+     */
+    std::string getDiagnosticString() const;
+
 private:
     Date_t _requestDate;
     Date_t _nextConsiderationDate;
@@ -427,15 +476,34 @@ private:
     RemoteCommandCompletionFn _onFinish;
 };
 
+/**
+ * RAII type to enter and exit network on construction/destruction.
+ *
+ * Calls enterNetwork on construction, and exitNetwork during destruction,
+ * unless dismissed.
+ *
+ * Not thread-safe.
+ */
 class NetworkInterfaceMock::InNetworkGuard {
     MONGO_DISALLOW_COPYING(InNetworkGuard);
 
 public:
+    /**
+     * Calls enterNetwork.
+     */
     explicit InNetworkGuard(NetworkInterfaceMock* net);
+    /**
+     * Calls exitNetwork, and disables the destructor from calling.
+     */
+    void dismiss();
+    /**
+     * Calls exitNetwork, unless dismiss has been called.
+     */
     ~InNetworkGuard();
 
 private:
     NetworkInterfaceMock* _net;
+    bool _callExitNetwork = true;
 };
 
 }  // namespace executor

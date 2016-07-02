@@ -78,6 +78,11 @@ particular database.
 */
 
 // constants
+
+// All roles that are specific to one database will be given only for 'firstDbName'. For example,
+// when using the roles in 'roles_read', the 'read' role will only be granted on 'firstDbName'. In
+// particular, this means that when 'runOnDb' is 'secondDbName', the test user with the 'read' role
+// should not be able to perform read operations.
 var firstDbName = "roles_commands_1";
 var secondDbName = "roles_commands_2";
 var adminDbName = "admin";
@@ -275,6 +280,128 @@ var authCommandsLib = {
               roles: {clusterMonitor: 1, clusterAdmin: 1, root: 1, __system: 1},
               privileges: [{resource: {anyResource: true}, actions: ["indexStats"]}]
           }]
+        },
+        {
+          testname: "aggregate_lookup",
+          command: {
+              aggregate: "foo",
+              pipeline: [
+                  {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "results"}}
+              ]
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("bar");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.bar.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_graphLookup",
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $graphLookup: {
+                      from: "bar",
+                      startWith: [1],
+                      connectFromField: "_id",
+                      connectToField: "barId",
+                      as: "results"
+                  }
+              }]
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("bar");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.bar.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_collStats",
+          command: {aggregate: "foo", pipeline: [{$collStats: {latencyStats: {}}}]},
+          setup: function(db) {
+              db.createCollection("foo");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {
+                    read: 1,
+                    readAnyDatabase: 1,
+                    readWrite: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdmin: 1,
+                    dbAdminAnyDatabase: 1,
+                    dbOwner: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    backup: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["collStats"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {
+                    readAnyDatabase: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdminAnyDatabase: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    backup: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["collStats"]}]
+              }
+          ]
         },
         {
           testname: "appendOplogNote",
@@ -595,16 +722,64 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "controlBalancer",
-          command: {controlBalancer: "x"},
+          testname: "balancerStart",
+          command: {balancerStart: 1},
           skipStandalone: true,
           testcases: [
               {
                 runOnDb: adminDbName,
                 privileges:
                     [{resource: {db: 'config', collection: 'settings'}, actions: ['update']}],
-                expectFail: true  // 'x' is not a vaild parameter
+                expectFail: true  // Command cannot be run on non-config server
               },
+          ]
+        },
+        {
+          testname: "_configsvrBalancerStart",
+          command: {_configsvrBalancerStart: 1},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
+        {
+          testname: "balancerStop",
+          command: {balancerStop: 1},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges:
+                    [{resource: {db: 'config', collection: 'settings'}, actions: ['update']}],
+                expectFail: true  // Command cannot be run on non-config server
+              },
+          ]
+        },
+        {
+          testname: "_configsvrBalancerStop",
+          command: {_configsvrBalancerStop: 1},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
+        {
+          testname: "balancerStatus",
+          command: {balancerStatus: 1},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {db: 'config', collection: 'settings'}, actions: ['find']}],
+              },
+          ]
+        },
+        {
+          testname: "_configsvrBalancerStatus",
+          command: {_configsvrBalancerStatus: 1},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
           ]
         },
         {
@@ -2509,8 +2684,47 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrControlBalancer",
-          command: {_configsvrControlBalancer: "x"},
+          testname: "addShardToZone",
+          command: {addShardToZone: shard0name, zone: 'z'},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                // addShardToZone only checks that you can write to config.shards,
+                // that's why readWriteAnyDatabase passes.
+                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
+                privileges: [{resource: {db: 'config', collection: 'shards'}, actions: ['update']}],
+              },
+          ]
+        },
+        {
+          testname: "_configsvrAddShardToZone",
+          command: {_configsvrAddShardToZone: shard0name, zone: 'z'},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
+        {
+          testname: "removeShardFromZone",
+          command: {removeShardFromZone: shard0name, zone: 'z'},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                // removeShardZone only checks that you can write to config.shards,
+                // that's why readWriteAnyDatabase passes.
+                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
+                privileges: [
+                    {resource: {db: 'config', collection: 'shards'}, actions: ['update']},
+                    {resource: {db: 'config', collection: 'tags'}, actions: ['find']}
+                ],
+              },
+          ]
+        },
+        {
+          testname: "_configsvrRemoveShardFromZone",
+          command: {_configsvrRemoveShardFromZone: shard0name, zone: 'z'},
           skipSharded: true,
           testcases: [
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},

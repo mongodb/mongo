@@ -66,5 +66,98 @@ TEST(BatchedUpdateRequest, Basic) {
     ASSERT_EQUALS(origUpdateRequestObj, request.toBSON());
 }
 
+TEST(BatchedUpdateRequest, CloneBatchedUpdateDocCopiesAllFields) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+    updateDoc.setMulti(true);
+    updateDoc.setUpsert(true);
+    updateDoc.setCollation(BSON("locale"
+                                << "en_US"));
+
+    BatchedUpdateDocument cloneToDoc;
+    updateDoc.cloneTo(&cloneToDoc);
+    ASSERT_TRUE(cloneToDoc.isQuerySet());
+    ASSERT_EQ(BSON("a" << 1), cloneToDoc.getQuery());
+    ASSERT_TRUE(cloneToDoc.isUpdateExprSet());
+    ASSERT_EQ(BSON("$set" << BSON("a" << 2)), cloneToDoc.getUpdateExpr());
+    ASSERT_TRUE(cloneToDoc.isMultiSet());
+    ASSERT_TRUE(cloneToDoc.getMulti());
+    ASSERT_TRUE(cloneToDoc.isUpsertSet());
+    ASSERT_TRUE(cloneToDoc.getUpsert());
+    ASSERT_TRUE(cloneToDoc.isCollationSet());
+    ASSERT_EQ(BSON("locale"
+                   << "en_US"),
+              cloneToDoc.getCollation());
+}
+
+TEST(BatchedUpdateRequest, CanSetAndRetrieveCollationField) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+
+    ASSERT_FALSE(updateDoc.isCollationSet());
+    updateDoc.setCollation(BSON("locale"
+                                << "en_US"));
+    ASSERT_TRUE(updateDoc.isCollationSet());
+    ASSERT_EQ(BSON("locale"
+                   << "en_US"),
+              updateDoc.getCollation());
+    updateDoc.unsetCollation();
+    ASSERT_FALSE(updateDoc.isCollationSet());
+}
+
+TEST(BatchedUpdateRequest, ClearBatchedUpdateDocUnsetsCollation) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+    updateDoc.setCollation(BSON("locale"
+                                << "en_US"));
+
+    ASSERT_TRUE(updateDoc.isCollationSet());
+    updateDoc.clear();
+    ASSERT_FALSE(updateDoc.isCollationSet());
+}
+
+TEST(BatchedUpdateRequest, CollationFieldSerializesToBSONCorrectly) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+    updateDoc.setCollation(BSON("locale"
+                                << "en_US"));
+
+    BSONObj expectedUpdateObj =
+        BSON(BatchedUpdateDocument::query(BSON("a" << 1))
+             << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 2)))
+             << BatchedUpdateDocument::collation(BSON("locale"
+                                                      << "en_US")));
+
+    ASSERT_EQUALS(expectedUpdateObj, updateDoc.toBSON());
+}
+
+TEST(BatchedUpdateRequest, CollationFieldParsesFromBSONCorrectly) {
+    BSONArray updateArray =
+        BSON_ARRAY(BSON(BatchedUpdateDocument::query(BSON("a" << 1))
+                        << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 2)))
+                        << BatchedUpdateDocument::collation(BSON("locale"
+                                                                 << "en_US"))));
+
+    BSONObj origUpdateRequestObj = BSON(
+        BatchedUpdateRequest::collName("test") << BatchedUpdateRequest::updates() << updateArray);
+
+    std::string errMsg;
+    BatchedUpdateRequest request;
+    ASSERT_TRUE(request.parseBSON("foo", origUpdateRequestObj, &errMsg));
+
+    ASSERT_EQ(1U, request.sizeUpdates());
+    ASSERT_TRUE(request.getUpdatesAt(0)->isCollationSet());
+    ASSERT_EQ(BSON("locale"
+                   << "en_US"),
+              request.getUpdatesAt(0)->getCollation());
+
+    // Ensure we re-serialize to the original BSON request.
+    ASSERT_EQUALS(origUpdateRequestObj, request.toBSON());
+}
+
 }  // namespace
 }  // namespace mongo

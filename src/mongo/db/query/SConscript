@@ -387,6 +387,7 @@ env.CppUnitTest(
         "query_solution_test.cpp",
     ],
     LIBDEPS=[
+        "collation/collator_factory_mock",
         "query_planner",
     ],
 )

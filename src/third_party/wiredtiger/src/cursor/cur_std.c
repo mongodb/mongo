@@ -435,7 +435,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 	} else if (WT_STREQ(fmt, "S"))
 		*va_arg(ap, const char **) = cursor->value.data;
 	else if (WT_STREQ(fmt, "t") ||
-	    (isdigit(fmt[0]) && WT_STREQ(fmt + 1, "t")))
+	    (__wt_isdigit((u_char)fmt[0]) && WT_STREQ(fmt + 1, "t")))
 		*va_arg(ap, uint8_t *) = *(uint8_t *)cursor->value.data;
 	else
 		ret = __wt_struct_unpackv(session,
@@ -496,7 +496,7 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 		sz = strlen(str) + 1;
 		buf->data = str;
 	} else if (WT_STREQ(fmt, "t") ||
-	    (isdigit(fmt[0]) && WT_STREQ(fmt + 1, "t"))) {
+	    (__wt_isdigit((u_char)fmt[0]) && WT_STREQ(fmt + 1, "t"))) {
 		sz = 1;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
 		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);

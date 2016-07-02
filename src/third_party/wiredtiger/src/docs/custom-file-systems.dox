@@ -17,6 +17,12 @@ allocation is attempted. See the WiredTiger POSIX file system
 implementation for an example of how the fallocate method might be
 changed after initialization.
 
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods are expected to return POSIX
+1003.1 or ANSI C standard error codes on failure.  Custom file systems
+on Windows systems can use the WT_EXTENSION_API::map_windows_error
+method to translate Windows system errors into POSIX system errors for
+return to WiredTiger.
+
 WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail but not fatally
 (for example, a WT_FILE_HANDLE::truncate method call which fails because
 the file is currently mapped into memory), should return EBUSY.
@@ -24,6 +30,9 @@ the file is currently mapped into memory), should return EBUSY.
 WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail fatally, but not
 in all cases (for example, a WT_FILE_HANDLE::fadvise method call which
 only supports ::WT_FILE_HANDLE_WILLNEED), should return ENOTSUP.
+
+Additionally, custom file system functions  may return ::WT_PANIC to
+shut down the system.
 
 Unless explicitly stated otherwise, WiredTiger may invoke methods on the
 WT_FILE_SYSTEM and WT_FILE_HANDLE interfaces from multiple threads

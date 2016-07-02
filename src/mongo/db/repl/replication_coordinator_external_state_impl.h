@@ -47,20 +47,25 @@ class ServiceContext;
 namespace repl {
 
 class SnapshotThread;
+class StorageInterface;
 
-class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState,
-                                                public JournalListener {
+class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordinatorExternalState,
+                                                      public JournalListener {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
 
 public:
-    ReplicationCoordinatorExternalStateImpl();
+    ReplicationCoordinatorExternalStateImpl(StorageInterface* storageInterface);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
-    virtual void startSteadyStateReplication() override;
+    virtual void startSteadyStateReplication(OperationContext* txn) override;
+    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) override;
+
+    virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
 
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown(OperationContext* txn);
+    virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
@@ -89,13 +94,15 @@ public:
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
     virtual StatusWith<OpTime> multiApply(OperationContext* txn,
-                                          const MultiApplier::Operations& ops,
+                                          MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
-    virtual void multiSyncApply(const MultiApplier::Operations& ops) override;
-    virtual void multiInitialSyncApply(const MultiApplier::Operations& ops,
+    virtual void multiSyncApply(MultiApplier::OperationPtrs* ops) override;
+    virtual void multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                        const HostAndPort& source) override;
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer() const override;
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer() const override;
+    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
+        OperationContext* txn) const override;
+    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
+        OperationContext* txn) const override;
     virtual bool shouldUseDataReplicatorInitialSync() const override;
 
     std::string getNextOpContextThreadName();
@@ -108,8 +115,9 @@ private:
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;
 
+    StorageInterface* _storageInterface;
     // True when the threads have been started
-    bool _startedThreads;
+    bool _startedThreads = false;
 
     // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
     // for forwarding replication progress information upstream when there is chained
@@ -129,13 +137,10 @@ private:
     // Thread running runSyncThread().
     std::unique_ptr<stdx::thread> _applierThread;
 
-    // Thread running BackgroundSync::producerThread().
-    std::unique_ptr<stdx::thread> _producerThread;
-
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
     stdx::mutex _nextThreadIdMutex;
     // Number used to uniquely name threads.
-    long long _nextThreadId;
+    long long _nextThreadId = 0;
 
     std::unique_ptr<SnapshotThread> _snapshotThread;
 
@@ -143,6 +148,9 @@ private:
     StartInitialSyncFn _startInitialSyncIfNeededFn;
     StartSteadyReplicationFn _startSteadReplicationFn;
     std::unique_ptr<stdx::thread> _initialSyncThread;
+
+    // Task executor used to run replication tasks.
+    std::unique_ptr<executor::TaskExecutor> _taskExecutor;
 
     // Used by repl::multiApply() to apply the sync source's operations in parallel.
     std::unique_ptr<OldThreadPool> _writerPool;

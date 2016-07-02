@@ -81,7 +81,6 @@ const char* DocumentSource::getSourceName() const {
 
 void DocumentSource::setSource(DocumentSource* pTheSource) {
     verify(!isValidInitialSource());
-    verify(!pSource);
     pSource = pTheSource;
 }
 

@@ -1841,8 +1841,11 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == moved_ins; ++i)
 		;
-	WT_MEM_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
-	    (size_t)i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
+	WT_MEM_TRANSFER(page_decr, right_incr,
+	    sizeof(WT_INSERT) + (size_t)i * sizeof(WT_INSERT *));
+	if (type == WT_PAGE_ROW_LEAF)
+		WT_MEM_TRANSFER(
+		    page_decr, right_incr, WT_INSERT_KEY_SIZE(moved_ins));
 	WT_MEM_TRANSFER(
 	    page_decr, right_incr, __wt_update_list_memsize(moved_ins->upd));
 
@@ -1951,9 +1954,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	/*
 	 * Update the page accounting.
-	 *
-	 * XXX
-	 * If we fail to split the parent, the page's accounting will be wrong.
 	 */
 	__wt_cache_page_inmem_decr(session, page, page_decr);
 	__wt_cache_page_inmem_incr(session, right, right_incr);
@@ -1998,6 +1998,9 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	ins_head->tail[0]->next[0] = moved_ins;
 	ins_head->tail[0] = moved_ins;
+
+	/* Fix up accounting for the page size. */
+	__wt_cache_page_inmem_incr(session, page, page_decr);
 
 err:	if (split_ref[0] != NULL) {
 		/*

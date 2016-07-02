@@ -55,6 +55,7 @@ variables:
 
 - &jepsen_config_vars
   hang_analyzer_processes: "java"
+  jepsen_key_time_limit: --key-time-limit 15
   jepsen_protocol_version: --protocol-version 1
   jepsen_read_concern: ""
   jepsen_read_with_find_and_modify: ""
@@ -74,6 +75,11 @@ variables:
     vars:
       <<: *jepsen_config_vars
 
+- &jstestfuzz_config_vars
+  resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
+  should_shuffle: false
+  continue_on_failure: false
+
 - &run_jstestfuzz_tests
   func: "run tests"
   # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
@@ -82,9 +88,7 @@ variables:
   # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
   timeout_secs: 1800
   vars:
-    resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
-    should_shuffle: false
-    continue_on_failure: false
+    <<: *jstestfuzz_config_vars
 
 # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
 - &jstestfuzz_template
@@ -101,7 +105,6 @@ variables:
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
   - enterprise-osx-107
-  - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
@@ -115,7 +118,6 @@ variables:
   - enterprise-debian81-64
   - linux-64
   - amazon
-  - rhel55
   - rhel62
   - rhel70
   - suse11
@@ -135,7 +137,6 @@ variables:
 
 - &packaging_variants
   - enterprise-linux-64-amazon-ami
-  - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
@@ -147,7 +148,6 @@ variables:
   - enterprise-ubuntu1604-64
   - enterprise-debian71-64
   - enterprise-debian81-64
-  - rhel55
   - rhel62
   - rhel70
   - suse11
@@ -216,6 +216,27 @@ functions:
     params:
       key: "${build_variant}_master"
       destination: "builder_num"
+
+  "run diskstats": &run_diskstats
+    command: shell.exec
+    params:
+      background: true
+      system_log: true
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # On Windows we can use typeperf.exe to dump performance counters.
+        if [ "Windows_NT" = "$OS" ]; then
+            typeperf -qx PhysicalDisk | grep Disk | grep -v _Total > disk_counters.txt
+            typeperf -cf disk_counters.txt -si 5 -o mongo-diskstats
+        # See if iostat is available.
+        elif which iostat 2>&1 /dev/null; then
+            iostat -d 5 > mongo-diskstats
+        # Fall back to vmstat if iostat is not available.
+        else
+            vmstat -d 5 > mongo-diskstats
+        fi
 
   "setup credentials" : &setup_credentials
     command: shell.exec
@@ -295,6 +316,7 @@ functions:
   - *check_binary_version
   - *get_buildnumber
   - *setup_credentials
+  - *run_diskstats
 
   "set up virtualenv" :
     command: shell.exec
@@ -367,15 +389,40 @@ functions:
       params:
         working_dir: src
         script: |
-          set -o errexit
           # On each LXC host do the following:
-          #   Copy the mongodb tarball to /root
+          #   Check to see if it's running, if not try to restart it.
+          #   Copy the mongodb tarball to /root.
           numVms=5
+          exit_failure_code=0
+          ${set_sudo}
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
-            scp mongo-binaries.tgz root@$hostn:
+            $sudo lxc-wait -n $hostn -s 'RUNNING' -t 0
+            lxc_code=$?
+            lxc_restarts=0
+            # If the LXC host is not running, try 5 times to start it.
+            while [ $lxc_code -ne 0 ]
+            do
+              lxc_restarts=$((lxc_restarts+1))
+              echo "Restarting host $hostn"
+              $sudo lxc-start -n $hostn -d
+              $sudo lxc-wait -n $hostn -s 'RUNNING' -t 5
+              lxc_code=$?
+              if [ $lxc_restarts -eq 5 ]; then
+                break
+              fi
+            done
+            scp -o ConnectTimeout=5 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
+            exit_code=$?
+            # If the copy fails, then tail the LXC host log.
+            if [ $exit_code -ne 0 ]; then
+              echo "Copy to host $hostn failed!"
+              $sudo tail -n 100 /var/log/lxc/$hostn.log
+              exit_failure_code=$exit_code
+            fi
           done
+          exit $exit_failure_code
 
   "run jepsen test" :
     - command: shell.exec
@@ -384,9 +431,9 @@ functions:
         script: |
           set -o verbose
           set -o errexit
-          # Increase JVM heap space to 75% of total free memory
-          heap_space=$(awk '/MemFree:/{printf "%0dm\n",$2*0.75/1024}' /proc/meminfo)
-          sed -i -e "s/\"-Xmx.*\"/\"-Xmx$heap_space\"/" project.clj
+          # Set/modify JVM heap space settings.
+          jvm_settings="\"-Xmx16g\"\n             \"-Xms16g\"\n             \"-Xmn4g\""
+          sed -i -e "s/\"-Xmx.*\"/$jvm_settings/" project.clj
     - command: shell.exec
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
@@ -395,7 +442,7 @@ functions:
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
+          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
           exit_code=$?
           # Create exit_code file, so we can signal an error, after the archive/put steps have run.
           echo $exit_code > ../../jepsen-exit_code-${task_id}-${execution}.txt
@@ -494,7 +541,7 @@ functions:
             export PATH="$PATH:/opt/node/bin"
           fi
 
-          npm start -- --jsTestsDir ../jstests
+          npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -643,6 +690,26 @@ post:
       source_dir: "./"
       include:
         - "./**.mdmp"
+  # Using shell and tar to recurse properly to all possible diagnostic.data subdirectories.  The
+  # archive.targz_pack command is not being used here because the command's glob support did not
+  # allow us to gather all directories.
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ -d /data/db ]; then
+            file_list=$(cd /data/db && find . -type d -name diagnostic.data)
+            if [ -n "$file_list" ]; then
+                ${tar|tar} cvzf diagnostic-data.tgz -C /data/db $file_list
+            fi
+        fi
+  - command: archive.targz_pack
+    params:
+      target: "diskstats.tgz"
+      source_dir: "./"
+      include:
+        - "./mongo-diskstats*"
+        - "./mongo-diskstats*.csv"
   - command: s3.put
     params:
       aws_key: ${aws_key}
@@ -653,6 +720,27 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: Core Dumps - Execution ${execution}
+      optional: true
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/diagnostic-data.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/ftdc/mongo-diagnostic-data-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: FTDC Diagnostic Data - Execution ${execution}
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: diskstats.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Disk Stats - Execution ${execution}
       optional: true
   - command: shell.exec
     params:
@@ -940,9 +1028,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=mmapv1
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz WT ##
 - <<: *jstestfuzz_template
@@ -952,9 +1039,21 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger
-      should_shuffle: false
-      continue_on_failure: false
+
+## jstestfuzz concurrent WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger --numClientsPerFixture=10
 
 ## jstestfuzz replica set mmapv1 ##
 - <<: *jstestfuzz_template
@@ -964,9 +1063,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=mmapv1
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz replica set WT ##
 - <<: *jstestfuzz_template
@@ -976,9 +1074,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
@@ -988,9 +1085,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=mmapv1
-      should_shuffle: false
-      continue_on_failure: false
 
 ## jstestfuzz sharded cluster WT ##
 - <<: *jstestfuzz_template
@@ -1000,9 +1096,8 @@ tasks:
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
+      <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
-      should_shuffle: false
-      continue_on_failure: false
 
 ## unit tests ##
 - <<: *task_template
@@ -2626,8 +2721,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2640,7 +2734,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2682,25 +2776,12 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
-    distros:
-    - rhel55-test
   - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2760,7 +2841,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2770,7 +2851,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: dbtest
   - name: dbtest_WT
   - name: integration_tests_standalone
@@ -2791,8 +2872,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2805,7 +2885,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2845,28 +2925,28 @@ buildvariants:
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_replication
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_replication_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_sharded
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_sharded_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_simultaneous
     distros:
-    - rhel55
+    - rhel62-large
   - name: concurrency_simultaneous_WT
     distros:
-    - rhel55
+    - rhel62-large
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
@@ -2896,8 +2976,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2911,7 +2990,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2927,25 +3006,12 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz
-    distros:
-    - rhel55-test
   - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -2976,8 +3042,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -2987,7 +3052,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation_WT
   - name: auth_WT
   - name: dbtest_WT
@@ -3001,16 +3066,9 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
   - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough_WT
@@ -3911,6 +3969,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: external_auth_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_WT_ese
@@ -3918,6 +3977,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
@@ -4366,57 +4426,6 @@ buildvariants:
 #          Redhat buildvariants           #
 ###########################################
 
-- name: enterprise-rhel-57-64-bit
-  display_name: Enterprise RHEL 5.7
-  modules:
-  - enterprise
-  - mongo-tools
-  run_on:
-  - rhel55-test
-  batchtime: 1440 # 1 day
-  expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl) -L/usr/lib64/sasl2" -tags 'sasl ssl'
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: x86_64-enterprise-rhel57
-    compile_flags: --ssl MONGO_DISTMOD=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: true
-    packager_script: packager-enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel57
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: audit
-  - name: audit_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: ese_WT
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: replicasets_auth
-  - name: sasl
-  - name: sharding_auth
-  - name: snmp
-  - name: snmp_WT
-  - name: ssl
-  - name: sslSpecial
-  - name: unittests
-  - name: push
-    distros:
-    - rhel55-test
-
 - name: enterprise-rhel-62-64-bit
   display_name: "* Enterprise RHEL 6.2"
   modules:
@@ -4440,6 +4449,8 @@ buildvariants:
     packager_distro: rhel62
   tasks:
   - name: compile
+    requires:
+    - name: burn_in_tests_WT
     distros:
     - rhel62-large
   - name: lint
@@ -4641,131 +4652,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
-  - name: push
-    distros:
-    - rhel55-test
-
-- name: rhel55
-  display_name: SSL RHEL 5.5
-  modules:
-  - mongo-tools
-  run_on:
-  - rhel55
-  - rhel55-test
-  batchtime: 1440 # 1 day
-  expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-rhel55
-    compile_flags: --ssl MONGO_DISTMOD=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: rhel55
-  tasks:
-  - name: compile
-    distros:
-    - rhel55
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_auth
-  - name: auth
-  - name: auth_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: durability
-  - name: dur_jscore_passthrough
-  - name: failpoints
-  - name: failpoints_auth
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_auth
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_decimal
-  - name: jsCore_decimal_WT
-  - name: jsCore_small_oplog
-  - name: jsCore_small_oplog_WT
-  - name: jsCore_small_oplog_rs
-  - name: jsCore_small_oplog_rs_WT
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
-  - name: jstestfuzz
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_WT
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_replication
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_replication_WT
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_sharded
-    distros:
-    - rhel55-test
-  - name: jstestfuzz_sharded_WT
-    distros:
-    - rhel55-test
-  - name: mmap
-  - name: mongosTest
-  - name: multiversion
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: replicasets
-  - name: replicasets_WT
-  - name: replicasets_auth
-  - name: replication
-  - name: replication_WT
-  - name: replication_auth
-  - name: sharding
-  - name: sharding_WT
-  - name: sharding_auth
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_last_stable_mongos
-  - name: ssl
-  - name: sslSpecial
-  - name: tool
-  - name: tool_WT
   - name: unittests
   - name: push
     distros:
@@ -5420,7 +5306,22 @@ buildvariants:
     distros:
     - rhel55-test
 
-
+- name: enterprise-ubuntu1404-clang-3.4-libc
+  display_name: "~Enterprise Ubuntu 14.04 (Clang 3.4/libc++)"
+  modules:
+  - enterprise
+  - mongo-tools
+  run_on:
+  - ubuntu1404-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    compile_flags: --ssl CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ -j$(grep -c ^processor /proc/cpuinfo)
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1404-build
 
 ###########################################
 #          SUSE buildvariants             #
@@ -6254,8 +6155,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel55
-  - rhel55-test
+  - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -6265,7 +6165,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -6296,16 +6196,9 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   # Disabled due to SERVER-21965
-  # Use rhel55-test hosts because the rhel55 hosts don't have Node.js installed, which is a requirement for the fuzzer suites.
   # - name: jstestfuzz_WT
-  #   distros:
-  #   - rhel55-test
   # - name: jstestfuzz_replication_WT
-  #   distros:
-  #   - rhel55-test
   # - name: jstestfuzz_sharded_WT
-  #   distros:
-  #   - rhel55-test
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -6540,6 +6433,9 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
+    # We use machines with more RAM to avoid OOM issues when validating collections.
+    distros:
+    - ubuntu1404-build
   - name: concurrency_simultaneous
   - name: replicasets
   - name: replicasets_auth
@@ -6557,22 +6453,22 @@ buildvariants:
 #     Experimental buildvariants          #
 ###########################################
 
-- name: ubuntu1410-debug-asan
-  display_name: ~ ASAN Enterprise SSL Ubuntu 14.10 DEBUG
+- name: ubuntu1604-debug-asan
+  display_name: ~ ASAN Enterprise SSL Ubuntu 16.04 DEBUG
   modules:
   - enterprise
   - mongo-tools
   run_on:
-  - ubuntu1410-build
+  - ubuntu1604-build
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
-    san_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.5
+    # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
+    path_prefix: PATH=$PATH:/usr/lib/llvm-3.8/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
-    compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --dbg=on --opt=on --allocator=system --sanitize=address --ssl --libc++ -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: -j1 # Avoid starting too many mongod's under ASAN build.
+    compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
+    num_jobs_available: $(echo "$(grep -c ^processor /proc/cpuinfo)/3" | bc) # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
   - name: aggregation
@@ -6682,21 +6578,21 @@ buildvariants:
   - name: tool_WT
   - name: unittests
 
-- name: ubuntu1410-asan
-  display_name: ~ ASAN SSL Ubuntu 14.10
+- name: ubuntu1604-asan
+  display_name: ~ ASAN SSL Ubuntu 16.04
   modules:
   - mongo-tools
   run_on:
-  - ubuntu1410-build
+  - ubuntu1604-build
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
-    san_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.5
+    # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
+    path_prefix: PATH=$PATH:/usr/lib/llvm-3.8/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
-    compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --opt=on --allocator=system --sanitize=address --ssl --libc++ -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: -j1 # Avoid starting too many mongod's under ASAN build.
+    compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
+    num_jobs_available: $(echo "$(grep -c ^processor /proc/cpuinfo)/3" | bc) # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
   - name: jstestfuzz

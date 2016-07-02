@@ -3,7 +3,7 @@
 //
 
 (function() {
-    "use strict";
+    'use strict';
 
     function assertUnauthorized(res, msg) {
         if (assert._debug && msg)
@@ -20,7 +20,7 @@
     }
 
     var st =
-        new ShardingTest({auth: true, keyFile: 'jstests/libs/key1', other: {useHostname: false}});
+        new ShardingTest({auth: true, other: {keyFile: 'jstests/libs/key1', useHostname: false}});
 
     var shardAdmin = st.shard0.getDB('admin');
     shardAdmin.createUser(
@@ -52,5 +52,4 @@
     assertUnauthorized(shardAdmin.runCommand({cleanupOrphaned: 'foo.bar'}));
 
     st.stop();
-
 })();

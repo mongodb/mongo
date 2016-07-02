@@ -70,6 +70,11 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
+    Status createIndexOnConfig(OperationContext* txn,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique) override;
+
 private:
     /**
      * Returns the metadata that should be used when running commands against this shard with
@@ -85,12 +90,14 @@ private:
                                             const std::string& dbname,
                                             const BSONObj& cmdObj) final;
 
-    StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
-                                                      const ReadPreferenceSetting& readPref,
-                                                      const NamespaceString& nss,
-                                                      const BSONObj& query,
-                                                      const BSONObj& sort,
-                                                      boost::optional<long long> limit) final;
+    StatusWith<QueryResponse> _exhaustiveFindOnConfig(
+        OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcernLevel,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit) final;
 
     /**
      * Connection string for the shard at the creation time.

@@ -35,9 +35,10 @@ __COMPILATION_DB_ENTRIES=[]
 class __CompilationDbNode(SCons.Node.Node):
     def __init__(self):
         SCons.Node.Node.__init__(self)
+        self.Decider(changed_since_last_build_node)
 
-    def changed_since_last_build(self, target, prev_ni):
-        return True
+def changed_since_last_build_node(node, target, prev_ni):
+    return True
 
 def makeEmitCompilationDbEntry(comstr):
     user_action = SCons.Action.Action(comstr)

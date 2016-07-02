@@ -44,7 +44,7 @@ __wt_logop_read(WT_SESSION_IMPL *session,
 }
 
 static size_t
-__logrec_json_unpack_str(char *dest, size_t destlen, const char *src,
+__logrec_json_unpack_str(char *dest, size_t destlen, const u_char *src,
     size_t srclen)
 {
 	size_t total;

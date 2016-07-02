@@ -427,8 +427,8 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
 
-        Status status =
-            grid.catalogClient(txn)->insertConfigDocument(txn, ChunkType::ConfigNS, chunk.toBSON());
+        Status status = grid.catalogClient(txn)->insertConfigDocument(
+            txn, ChunkType::ConfigNS, chunk.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             const string errMsg = str::stream() << "Creating first chunks failed: "
                                                 << status.reason();

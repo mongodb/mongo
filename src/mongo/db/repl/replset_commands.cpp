@@ -54,6 +54,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -366,7 +367,7 @@ public:
             result.append("info2", noConfigMessage);
             log() << "initiate : " << noConfigMessage;
 
-            ReplicationCoordinatorExternalStateImpl externalState;
+            ReplicationCoordinatorExternalStateImpl externalState(StorageInterface::get(txn));
             std::string name;
             std::vector<HostAndPort> seeds;
             parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...

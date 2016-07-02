@@ -1,7 +1,10 @@
+/**
+ * This test confirms that chunks get split as they grow due to data insertion.
+ */
 (function() {
     'use strict';
 
-    var s = new ShardingTest({name: "auto1", shards: 2, mongos: 1, other: {enableBalancer: 1}});
+    var s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');

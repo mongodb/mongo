@@ -60,8 +60,7 @@ static void assertExpectedResults(string expression,
             VariablesIdGenerator idGenerator;
             VariablesParseState vps(&idGenerator);
             const BSONObj obj = BSON(expression << Value(op.first));
-            Value result =
-                Expression::parseExpression(obj.firstElement(), vps)->evaluate(Document());
+            Value result = Expression::parseExpression(obj, vps)->evaluate(Document());
             ASSERT_EQUALS(op.second, result);
             ASSERT_EQUALS(op.second.getType(), result.getType());
         } catch (...) {
@@ -126,6 +125,10 @@ Value valueFromBson(BSONObj obj) {
     return Value(element);
 }
 
+template <typename T>
+intrusive_ptr<ExpressionConstant> makeConstant(T&& val) {
+    return ExpressionConstant::create(Value(std::forward<T>(val)));
+}
 
 class ExpressionBaseTest : public unittest::Test {
 public:
@@ -257,11 +260,9 @@ TEST_F(ExpressionNaryTest, ValidateObjectExpressionDependency) {
                                    << "q"
                                    << "$r"));
     BSONElement specElement = spec.firstElement();
-    Expression::ObjectCtx ctx(Expression::ObjectCtx::DOCUMENT_OK);
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
-    _notAssociativeNorCommutative->addOperand(
-        Expression::parseObject(specElement.Obj(), &ctx, vps));
+    _notAssociativeNorCommutative->addOperand(Expression::parseObject(specElement.Obj(), vps));
     assertDependencies(_notAssociativeNorCommutative,
                        BSON_ARRAY("r"
                                   << "x"));
@@ -2326,872 +2327,222 @@ public:
 }  // namespace FieldPath
 
 namespace Object {
+using mongo::ExpressionObject;
 
-class Base {
-protected:
-    void assertDependencies(const BSONArray& expectedDependencies,
-                            const intrusive_ptr<ExpressionObject>& expression,
-                            bool includePath = true) const {
-        vector<string> path;
-        DepsTracker dependencies;
-        expression->addDependencies(&dependencies, includePath ? &path : 0);
-        BSONArrayBuilder bab;
-        for (set<string>::const_iterator i = dependencies.fields.begin();
-             i != dependencies.fields.end();
-             ++i) {
-            bab << *i;
-        }
-        ASSERT_EQUALS(expectedDependencies, bab.arr());
-        ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
-    }
+template <typename T>
+Document literal(T&& value) {
+    return Document{{"$const", Value(std::forward<T>(value))}};
+}
+
+//
+// Parsing.
+//
+
+TEST(ExpressionObjectParse, ShouldAcceptEmptyObject) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(BSONObj(), vps);
+    ASSERT_EQUALS(Value(Document{}), object->serialize(false));
+}
+
+TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(BSON("a" << 5 << "b"
+                                                   << "string"
+                                                   << "c"
+                                                   << BSONNULL),
+                                          vps);
+    auto expectedResult =
+        Value(Document{{"a", literal(5)}, {"b", literal("string")}, {"c", literal(BSONNULL)}});
+    ASSERT_EQUALS(expectedResult, object->serialize(false));
+}
+
+TEST(ExpressionObjectParse, ShouldAccept_idAsFieldName) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(BSON("_id" << 5), vps);
+    auto expectedResult = Value(Document{{"_id", literal(5)}});
+    ASSERT_EQUALS(expectedResult, object->serialize(false));
+}
+
+TEST(ExpressionObjectParse, ShouldAcceptFieldNameContainingDollar) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(BSON("a$b" << 5), vps);
+    auto expectedResult = Value(Document{{"a$b", literal(5)}});
+    ASSERT_EQUALS(expectedResult, object->serialize(false));
+}
+
+TEST(ExpressionObjectParse, ShouldAcceptNestedObjects) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(fromjson("{a: {b: 1}, c: {d: {e: 1, f: 1}}}"), vps);
+    auto expectedResult =
+        Value(Document{{"a", Document{{"b", literal(1)}}},
+                       {"c", Document{{"d", Document{{"e", literal(1)}, {"f", literal(1)}}}}}});
+    ASSERT_EQUALS(expectedResult, object->serialize(false));
+}
+
+TEST(ExpressionObjectParse, ShouldAcceptArrays) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(fromjson("{a: [1, 2]}"), vps);
+    auto expectedResult =
+        Value(Document{{"a", vector<Value>{Value(literal(1)), Value(literal(2))}}});
+    ASSERT_EQUALS(expectedResult, object->serialize(false));
+}
+
+TEST(ObjectParsing, ShouldAcceptExpressionAsValue) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto object = ExpressionObject::parse(BSON("a" << BSON("$and" << BSONArray())), vps);
+    ASSERT_EQ(object->serialize(false), Value(Document{{"a", Document{{"$and", BSONArray()}}}}));
+}
+
+//
+// Error cases.
+//
+
+TEST(ExpressionObjectParse, ShouldRejectDottedFieldNames) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a.b" << 1), vps), UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("c" << 3 << "a.b" << 1), vps), UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a.b" << 1 << "c" << 3), vps), UserException);
+}
+
+TEST(ExpressionObjectParse, ShouldRejectDuplicateFieldNames) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a" << 1 << "a" << 1), vps), UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a" << 1 << "b" << 2 << "a" << 1), vps),
+                  UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a" << BSON("c" << 1) << "b" << 2 << "a" << 1), vps),
+                  UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a" << 1 << "b" << 2 << "a" << BSON("c" << 1)), vps),
+                  UserException);
+}
+
+TEST(ExpressionObjectParse, ShouldRejectInvalidFieldName) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("$a" << 1), vps), UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("" << 1), vps), UserException);
+    ASSERT_THROWS(ExpressionObject::parse(BSON(std::string("a\0b", 3) << 1), vps), UserException);
+}
+
+TEST(ExpressionObjectParse, ShouldRejectInvalidFieldPathAsValue) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    ASSERT_THROWS(ExpressionObject::parse(BSON("a"
+                                               << "$field."),
+                                          vps),
+                  UserException);
+}
+
+TEST(ParseObject, ShouldRejectExpressionAsTheSecondField) {
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    ASSERT_THROWS(ExpressionObject::parse(
+                      BSON("a" << BSON("$and" << BSONArray()) << "$or" << BSONArray()), vps),
+                  UserException);
+}
+
+//
+// Evaluation.
+//
+
+TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
+    auto object = ExpressionObject::create({});
+    ASSERT_EQUALS(Value(Document()), object->evaluate(Document()));
+    ASSERT_EQUALS(Value(Document()), object->evaluate(Document{{"a", 1}}));
+    ASSERT_EQUALS(Value(Document()), object->evaluate(Document{{"_id", "ID"}}));
+}
+
+TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
+    auto object = ExpressionObject::create({{"a", makeConstant(1)}, {"b", makeConstant(5)}});
+    ASSERT_EQUALS(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document()));
+    ASSERT_EQUALS(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document{{"a", 1}}));
+    ASSERT_EQUALS(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document{{"_id", "ID"}}));
+}
+
+TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
+    auto object = ExpressionObject::create({{"a", ExpressionFieldPath::create("a")},
+                                            {"b", ExpressionFieldPath::create("b")},
+                                            {"c", ExpressionFieldPath::create("c")}});
+    ASSERT_EQUALS(Value(Document{{"a", "A"}, {"b", "B"}, {"c", "C"}}),
+                  object->evaluate(Document{{"c", "C"}, {"a", "A"}, {"b", "B"}, {"_id", "ID"}}));
+}
+
+TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
+    auto object = ExpressionObject::create(
+        {{"a", ExpressionFieldPath::create("a.b")}, {"b", ExpressionFieldPath::create("missing")}});
+    ASSERT_EQUALS(Value(Document{}), object->evaluate(Document()));
+    ASSERT_EQUALS(Value(Document{}), object->evaluate(Document{{"a", 1}}));
+}
+
+TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
+    auto object = ExpressionObject::create(
+        {{"a",
+          ExpressionObject::create(
+              {{"b", makeConstant(1)}, {"c", ExpressionFieldPath::create("_id")}})}});
+    ASSERT_EQUALS(Value(Document{{"a", Document{{"b", 1}}}}), object->evaluate(Document()));
+    ASSERT_EQUALS(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"}}}}),
+                  object->evaluate(Document{{"_id", "ID"}}));
+}
+
+TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
+    auto object = ExpressionObject::create({{"a", ExpressionFieldPath::create("missing")}});
+    ASSERT_EQUALS(Value(Document{}), object->evaluate(Document()));
+
+    auto objectWithNestedObject = ExpressionObject::create({{"nested", object}});
+    ASSERT_EQUALS(Value(Document{{"nested", Document{}}}),
+                  objectWithNestedObject->evaluate(Document()));
+}
+
+//
+// Dependencies.
+//
+
+TEST(ExpressionObjectDependencies, ConstantValuesShouldNotBeAddedToDependencies) {
+    auto object = ExpressionObject::create({{"a", makeConstant(5)}});
+    DepsTracker deps;
+    object->addDependencies(&deps);
+    ASSERT_EQ(deps.fields.size(), 0UL);
+}
+
+TEST(ExpressionObjectDependencies, FieldPathsShouldBeAddedToDependencies) {
+    auto object = ExpressionObject::create({{"x", ExpressionFieldPath::create("c.d")}});
+    DepsTracker deps;
+    object->addDependencies(&deps);
+    ASSERT_EQ(deps.fields.size(), 1UL);
+    ASSERT_EQ(deps.fields.count("c.d"), 1UL);
 };
 
-class ExpectedResultBase : public Base {
-public:
-    virtual ~ExpectedResultBase() {}
-    void run() {
-        _expression = ExpressionObject::createRoot();
-        prepareExpression();
-        Document document = fromBson(source());
-        MutableDocument result;
-        Variables vars(0, document);
-        expression()->addToDocument(result, document, &vars);
-        assertBinaryEqual(expected(), toBson(result.freeze()));
-        assertDependencies(expectedDependencies(), _expression);
-        ASSERT_EQUALS(expectedBsonRepresentation(), expressionToBson(_expression));
-        ASSERT_EQUALS(expectedIsSimple(), _expression->isSimple());
-    }
+//
+// Optimizations.
+//
 
-protected:
-    intrusive_ptr<ExpressionObject> expression() {
-        return _expression;
-    }
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "a" << 1 << "b" << 2);
-    }
-    virtual void prepareExpression() = 0;
-    virtual BSONObj expected() = 0;
-    virtual BSONArray expectedDependencies() = 0;
-    virtual BSONObj expectedBsonRepresentation() = 0;
-    virtual bool expectedIsSimple() {
-        return true;
-    }
+TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressions) {
+    // Build up the object {a: {$add: [1, 2]}}.
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    auto addExpression =
+        ExpressionAdd::parse(BSON("$add" << BSON_ARRAY(1 << 2)).firstElement(), vps);
+    auto object = ExpressionObject::create({{"a", addExpression}});
+    ASSERT_EQ(object->getChildExpressions().size(), 1UL);
 
-private:
-    intrusive_ptr<ExpressionObject> _expression;
-};
+    auto optimized = object->optimize();
+    auto optimizedObject = dynamic_cast<ExpressionObject*>(optimized.get());
+    ASSERT_TRUE(optimizedObject);
+    ASSERT_EQ(optimizedObject->getChildExpressions().size(), 1UL);
 
-/** Empty object spec. */
-class Empty : public ExpectedResultBase {
-public:
-    void prepareExpression() {}
-    BSONObj expected() {
-        return BSON("_id" << 0);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSONObj();
-    }
-};
-
-/** Include 'a' field only. */
-class Include : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << 1);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << true);
-    }
-};
-
-/** Cannot include missing 'a' field. */
-class MissingInclude : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "b" << 2);
-    }
-    void prepareExpression() {
-        expression()->includePath("a");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << true);
-    }
-};
-
-/** Include '_id' field only. */
-class IncludeId : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("_id");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("_id" << true);
-    }
-};
-
-/** Exclude '_id' field. */
-class ExcludeId : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("b");
-        expression()->excludeId(true);
-    }
-    BSONObj expected() {
-        return BSON("b" << 2);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("_id" << false << "b" << true);
-    }
-};
-
-/** Result order based on source document field order, not inclusion spec field
- * order. */
-class SourceOrder : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("b");
-        expression()->includePath("a");
-    }
-    BSONObj expected() {
-        return source();
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a"
-                          << "b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("b" << true << "a" << true);
-    }
-};
-
-/** Include a nested field. */
-class IncludeNested : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a.b");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5));
-    }
-    BSONObj source() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5 << "c" << 6) << "z" << 2);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true));
-    }
-};
-
-/** Include two nested fields. */
-class IncludeTwoNested : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a.b");
-        expression()->includePath("a.c");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5 << "c" << 6));
-    }
-    BSONObj source() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5 << "c" << 6) << "z" << 2);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b"
-                          << "a.c");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true << "c" << true));
-    }
-};
-
-/** Include two fields nested within different parents. */
-class IncludeTwoParentNested : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a.b");
-        expression()->includePath("c.d");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5) << "c" << BSON("d" << 6));
-    }
-    BSONObj source() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5) << "c" << BSON("d" << 6) << "z" << 2);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b"
-                          << "c.d");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true) << "c" << BSON("d" << true));
-    }
-};
-
-/** Attempt to include a missing nested field. */
-class IncludeMissingNested : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a.b");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSONObj());
-    }
-    BSONObj source() {
-        return BSON("_id" << 0 << "a" << BSON("c" << 6) << "z" << 2);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true));
-    }
-};
-
-/** Attempt to include a nested field within a non object. */
-class IncludeNestedWithinNonObject : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a.b");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0);
-    }
-    BSONObj source() {
-        return BSON("_id" << 0 << "a" << 2 << "z" << 2);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true));
-    }
-};
-
-/** Include a nested field within an array. */
-class IncludeArrayNested : public ExpectedResultBase {
-public:
-    void prepareExpression() {
-        expression()->includePath("a.b");
-    }
-    BSONObj expected() {
-        return fromjson("{_id:0,a:[{b:5},{b:2},{}]}");
-    }
-    BSONObj source() {
-        return fromjson("{_id:0,a:[{b:5,c:6},{b:2,c:9},{c:7},[],2],z:1}");
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true));
-    }
-};
-
-/** Don't include not root '_id' field implicitly. */
-class ExcludeNonRootId : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "a" << BSON("_id" << 1 << "b" << 1));
-    }
-    void prepareExpression() {
-        expression()->includePath("a.b");
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 1));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << true));
-    }
-};
-
-/** Project a computed expression. */
-class Computed : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << 5);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("$const" << 5));
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** Project a computed expression replacing an existing field. */
-class ComputedReplacement : public Computed {
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "a" << 99);
-    }
-};
-
-/** An undefined value is passed through */
-class ComputedUndefined : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a"),
-                               ExpressionConstant::create(Value(BSONUndefined)));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSONUndefined);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return fromjson("{a:{$const:undefined}}");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** Project a computed expression replacing an existing field with Undefined. */
-class ComputedUndefinedReplacement : public ComputedUndefined {
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "a" << 99);
-    }
-};
-
-/** A null value is projected. */
-class ComputedNull : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(BSONNULL)));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSONNULL);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("$const" << BSONNULL));
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** A nested value is projected. */
-class ComputedNested : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(5)));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 5));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b" << BSON("$const" << 5)));
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** A field path is projected. */
-class ComputedFieldPath : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "x" << 4);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a"), ExpressionFieldPath::create("x"));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << 4);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "x");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a"
-                    << "$x");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** A nested field path is projected. */
-class ComputedNestedFieldPath : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0 << "x" << BSON("y" << 4));
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a.b"), ExpressionFieldPath::create("x.y"));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 4));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "x.y");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return BSON("a" << BSON("b"
-                                << "$x.y"));
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** An empty subobject expression for a missing field is not projected. */
-class EmptyNewSubobject : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        // Create a sub expression returning an empty object.
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->addField(mongo::FieldPath("b"), ExpressionFieldPath::create("a.b"));
-        expression()->addField(mongo::FieldPath("a"), subExpression);
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0);
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id"
-                          << "a.b");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return fromjson("{a:{b:'$a.b'}}");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** A non empty subobject expression for a missing field is projected. */
-class NonEmptyNewSubobject : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        // Create a sub expression returning an empty object.
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->addField(mongo::FieldPath("b"), ExpressionConstant::create(Value(6)));
-        expression()->addField(mongo::FieldPath("a"), subExpression);
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 6));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return fromjson("{a:{b:{$const:6}}}");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** Two computed fields within a common parent. */
-class AdjacentDottedComputedFields : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(6)));
-        expression()->addField(mongo::FieldPath("a.c"), ExpressionConstant::create(Value(7)));
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 6 << "c" << 7));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return fromjson("{a:{b:{$const:6},c:{$const:7}}}");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** Two computed fields within a common parent, in one case dotted. */
-class AdjacentDottedAndNestedComputedFields : public AdjacentDottedComputedFields {
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(6)));
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->addField(mongo::FieldPath("c"), ExpressionConstant::create(Value(7)));
-        expression()->addField(mongo::FieldPath("a"), subExpression);
-    }
-};
-
-/** Two computed fields within a common parent, in another case dotted. */
-class AdjacentNestedAndDottedComputedFields : public AdjacentDottedComputedFields {
-    void prepareExpression() {
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->addField(mongo::FieldPath("b"), ExpressionConstant::create(Value(6)));
-        expression()->addField(mongo::FieldPath("a"), subExpression);
-        expression()->addField(mongo::FieldPath("a.c"), ExpressionConstant::create(Value(7)));
-    }
-};
-
-/** Two computed fields within a common parent, nested rather than dotted. */
-class AdjacentNestedComputedFields : public AdjacentDottedComputedFields {
-    void prepareExpression() {
-        intrusive_ptr<ExpressionObject> firstSubExpression = ExpressionObject::create();
-        firstSubExpression->addField(mongo::FieldPath("b"), ExpressionConstant::create(Value(6)));
-        expression()->addField(mongo::FieldPath("a"), firstSubExpression);
-        intrusive_ptr<ExpressionObject> secondSubExpression = ExpressionObject::create();
-        secondSubExpression->addField(mongo::FieldPath("c"), ExpressionConstant::create(Value(7)));
-        expression()->addField(mongo::FieldPath("a"), secondSubExpression);
-    }
-};
-
-/** Field ordering is preserved when nested fields are merged. */
-class AdjacentNestedOrdering : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(6)));
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        // Add field 'd' then 'c'.  Expect the same field ordering in the result
-        // doc.
-        subExpression->addField(mongo::FieldPath("d"), ExpressionConstant::create(Value(7)));
-        subExpression->addField(mongo::FieldPath("c"), ExpressionConstant::create(Value(8)));
-        expression()->addField(mongo::FieldPath("a"), subExpression);
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << 6 << "d" << 7 << "c" << 8));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return fromjson("{a:{b:{$const:6},d:{$const:7},c:{$const:8}}}");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** Adjacent fields two levels deep. */
-class MultipleNestedFields : public ExpectedResultBase {
-public:
-    virtual BSONObj source() {
-        return BSON("_id" << 0);
-    }
-    void prepareExpression() {
-        expression()->addField(mongo::FieldPath("a.b.c"), ExpressionConstant::create(Value(6)));
-        intrusive_ptr<ExpressionObject> bSubExpression = ExpressionObject::create();
-        bSubExpression->addField(mongo::FieldPath("d"), ExpressionConstant::create(Value(7)));
-        intrusive_ptr<ExpressionObject> aSubExpression = ExpressionObject::create();
-        aSubExpression->addField(mongo::FieldPath("b"), bSubExpression);
-        expression()->addField(mongo::FieldPath("a"), aSubExpression);
-    }
-    BSONObj expected() {
-        return BSON("_id" << 0 << "a" << BSON("b" << BSON("c" << 6 << "d" << 7)));
-    }
-    BSONArray expectedDependencies() {
-        return BSON_ARRAY("_id");
-    }
-    BSONObj expectedBsonRepresentation() {
-        return fromjson("{a:{b:{c:{$const:6},d:{$const:7}}}}");
-    }
-    bool expectedIsSimple() {
-        return false;
-    }
-};
-
-/** Two expressions cannot generate the same field. */
-class ConflictingExpressionFields : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        ASSERT_THROWS(expression->addField(mongo::FieldPath("a"),  // Duplicate field.
-                                           ExpressionConstant::create(Value(6))),
-                      UserException);
-    }
-};
-
-/** An expression field conflicts with an inclusion field. */
-class ConflictingInclusionExpressionFields : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->includePath("a");
-        ASSERT_THROWS(
-            expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(6))),
-            UserException);
-    }
-};
-
-/** An inclusion field conflicts with an expression field. */
-class ConflictingExpressionInclusionFields : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        ASSERT_THROWS(expression->includePath("a"), UserException);
-    }
-};
-
-/** An object expression conflicts with a constant expression. */
-class ConflictingObjectConstantExpressionFields : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->includePath("b");
-        expression->addField(mongo::FieldPath("a"), subExpression);
-        ASSERT_THROWS(
-            expression->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(6))),
-            UserException);
-    }
-};
-
-/** A constant expression conflicts with an object expression. */
-class ConflictingConstantObjectExpressionFields : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(6)));
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->includePath("b");
-        ASSERT_THROWS(expression->addField(mongo::FieldPath("a"), subExpression), UserException);
-    }
-};
-
-/** Two nested expressions cannot generate the same field. */
-class ConflictingNestedFields : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(5)));
-        ASSERT_THROWS(expression->addField(mongo::FieldPath("a.b"),  // Duplicate field.
-                                           ExpressionConstant::create(Value(6))),
-                      UserException);
-    }
-};
-
-/** An expression cannot be created for a subfield of another expression. */
-class ConflictingFieldAndSubfield : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        ASSERT_THROWS(
-            expression->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(5))),
-            UserException);
-    }
-};
-
-/** An expression cannot be created for a nested field of another expression. */
-class ConflictingFieldAndNestedField : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->addField(mongo::FieldPath("b"), ExpressionConstant::create(Value(5)));
-        ASSERT_THROWS(expression->addField(mongo::FieldPath("a"), subExpression), UserException);
-    }
-};
-
-/** An expression cannot be created for a parent field of another expression. */
-class ConflictingSubfieldAndField : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a.b"), ExpressionConstant::create(Value(5)));
-        ASSERT_THROWS(
-            expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5))),
-            UserException);
-    }
-};
-
-/** An expression cannot be created for a parent of a nested field. */
-class ConflictingNestedFieldAndField : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
-        subExpression->addField(mongo::FieldPath("b"), ExpressionConstant::create(Value(5)));
-        expression->addField(mongo::FieldPath("a"), subExpression);
-        ASSERT_THROWS(
-            expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5))),
-            UserException);
-    }
-};
-
-/** Dependencies for non inclusion expressions. */
-class NonInclusionDependencies : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        assertDependencies(BSON_ARRAY("_id"), expression, true);
-        assertDependencies(BSONArray(), expression, false);
-        expression->addField(mongo::FieldPath("b"), ExpressionFieldPath::create("c.d"));
-        assertDependencies(BSON_ARRAY("_id"
-                                      << "c.d"),
-                           expression,
-                           true);
-        assertDependencies(BSON_ARRAY("c.d"), expression, false);
-    }
-};
-
-/** Dependencies for inclusion expressions. */
-class InclusionDependencies : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->includePath("a");
-        assertDependencies(BSON_ARRAY("_id"
-                                      << "a"),
-                           expression,
-                           true);
-        DepsTracker unused;
-        // 'path' must be provided for inclusion expressions.
-        ASSERT_THROWS(expression->addDependencies(&unused), UserException);
-    }
-};
-
-/** Optimizing an object expression optimizes its sub expressions. */
-class Optimize : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        // Add inclusion.
-        expression->includePath("a");
-        // Add non inclusion.
-        intrusive_ptr<Expression> andExpr = new ExpressionAnd();
-        expression->addField(mongo::FieldPath("b"), andExpr);
-        expression->optimize();
-        // Optimizing 'expression' optimizes its non inclusion sub expressions,
-        // while
-        // inclusion sub expressions are passed through.
-        ASSERT_EQUALS(BSON("a" << true << "b" << BSON("$const" << true)),
-                      expressionToBson(expression));
-    }
-};
-
-/** Serialize to a BSONObj. */
-class AddToBsonObj : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        ASSERT_EQUALS(constify(BSON("foo" << BSON("a" << 5))),
-                      BSON("foo" << expression->serialize(false)));
-    }
-};
-
-/** Serialize to a BSONObj, with constants represented by expressions. */
-class AddToBsonObjRequireExpression : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        ASSERT_EQUALS(BSON("foo" << BSON("a" << BSON("$const" << 5))),
-                      BSON("foo" << expression->serialize(false)));
-    }
-};
-
-/** Serialize to a BSONArray. */
-class AddToBsonArray : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->addField(mongo::FieldPath("a"), ExpressionConstant::create(Value(5)));
-        BSONArrayBuilder bab;
-        bab << expression->serialize(false);
-        ASSERT_EQUALS(constify(BSON_ARRAY(BSON("a" << 5))), bab.arr());
-    }
-};
-
-/**
- * evaluate() does not supply an inclusion document.  Inclusion spec'd fields
- * are not
- * included.  (Inclusion specs are not generally expected/allowed in cases where
- * evaluate
- * is called instead of addToDocument.)
- */
-class Evaluate : public Base {
-public:
-    void run() {
-        intrusive_ptr<ExpressionObject> expression = ExpressionObject::createRoot();
-        expression->includePath("a");
-        expression->addField(mongo::FieldPath("b"), ExpressionConstant::create(Value(5)));
-        expression->addField(mongo::FieldPath("c"), ExpressionFieldPath::create("a"));
-        ASSERT_EQUALS(
-            BSON("b" << 5 << "c" << 1),
-            toBson(expression->evaluate(fromBson(BSON("_id" << 0 << "a" << 1))).getDocument()));
-    }
+    // We should have optimized {$add: [1, 2]} to just the constant 3.
+    auto expConstant =
+        dynamic_cast<ExpressionConstant*>(optimizedObject->getChildExpressions()[0].second.get());
+    ASSERT_TRUE(expConstant);
+    ASSERT_EQ(expConstant->evaluate(Document()), Value(3));
 };
 
 }  // namespace Object
@@ -3499,263 +2850,33 @@ namespace Parse {
 
 namespace Object {
 
-class Base {
-public:
-    virtual ~Base() {}
-    void run() {
-        BSONObj specObject = BSON("" << spec());
-        BSONElement specElement = specObject.firstElement();
-        Expression::ObjectCtx context = objectCtx();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        intrusive_ptr<Expression> expression =
-            Expression::parseObject(specElement.Obj(), &context, vps);
-        ASSERT_EQUALS(expectedBson(), expressionToBson(expression));
-    }
+/**
+ * Parses the object given by 'specification', with the options given by 'parseContextOptions'.
+ */
+boost::intrusive_ptr<Expression> parseObject(BSONObj specification) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
 
-protected:
-    virtual BSONObj spec() = 0;
-    virtual Expression::ObjectCtx objectCtx() {
-        return Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK);
-    }
-    virtual BSONObj expectedBson() {
-        return constify(spec());
-    }
+    return Expression::parseObject(specification, vps);
 };
 
-class ParseError {
-public:
-    virtual ~ParseError() {}
-    void run() {
-        BSONObj specObject = BSON("" << spec());
-        BSONElement specElement = specObject.firstElement();
-        Expression::ObjectCtx context = objectCtx();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        ASSERT_THROWS(Expression::parseObject(specElement.Obj(), &context, vps), UserException);
-    }
+TEST(ParseObject, ShouldAcceptEmptyObject) {
+    auto resultExpression = parseObject(BSONObj());
 
-protected:
-    virtual BSONObj spec() = 0;
-    virtual Expression::ObjectCtx objectCtx() {
-        return Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK);
-    }
-};
+    // Should return an empty ExpressionObject.
+    auto resultObject = dynamic_cast<ExpressionObject*>(resultExpression.get());
+    ASSERT_TRUE(resultObject);
 
-/** The spec must be an object. */
-class NonObject {
-public:
-    void run() {
-        BSONObj specObject = BSON("" << 1);
-        BSONElement specElement = specObject.firstElement();
-        Expression::ObjectCtx context = Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK);
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        ASSERT_THROWS(Expression::parseObject(specElement.Obj(), &context, vps), UserException);
-    }
-};
+    ASSERT_EQ(resultObject->getChildExpressions().size(), 0UL);
+}
 
-/** Empty object. */
-class Empty : public Base {
-    BSONObj spec() {
-        return BSONObj();
-    }
-};
+TEST(ParseObject, ShouldRecognizeKnownExpression) {
+    auto resultExpression = parseObject(BSON("$and" << BSONArray()));
 
-/** Operator spec object. */
-class Operator : public Base {
-    BSONObj spec() {
-        return BSON("$and" << BSONArray());
-    }
-};
-
-/** Invalid operator not allowed. */
-class InvalidOperator : public ParseError {
-    BSONObj spec() {
-        return BSON("$invalid" << 1);
-    }
-};
-
-/** Two operators not allowed. */
-class TwoOperators : public ParseError {
-    BSONObj spec() {
-        return BSON("$and" << BSONArray() << "$or" << BSONArray());
-    }
-};
-
-/** An operator must be the first and only field. */
-class OperatorLaterField : public ParseError {
-    BSONObj spec() {
-        return BSON("a" << BSON("$and" << BSONArray()) << "$or" << BSONArray());
-    }
-};
-
-/** An operator must be the first and only field. */
-class OperatorAndOtherField : public ParseError {
-    BSONObj spec() {
-        return BSON("$and" << BSONArray() << "a" << BSON("$or" << BSONArray()));
-    }
-};
-
-/** Operators not allowed at the top level of a projection. */
-class OperatorTopLevel : public ParseError {
-    BSONObj spec() {
-        return BSON("$and" << BSONArray());
-    }
-    Expression::ObjectCtx objectCtx() {
-        return Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK |
-                                     Expression::ObjectCtx::TOP_LEVEL);
-    }
-};
-
-/** Dotted fields are not generally allowed. */
-class Dotted : public ParseError {
-    BSONObj spec() {
-        return BSON("a.b" << BSON("$and" << BSONArray()));
-    }
-};
-
-/** Dotted fields are allowed at the top level. */
-class DottedTopLevel : public Base {
-    BSONObj spec() {
-        return BSON("a.b" << BSON("$and" << BSONArray()));
-    }
-    Expression::ObjectCtx objectCtx() {
-        return Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK |
-                                     Expression::ObjectCtx::TOP_LEVEL);
-    }
-    BSONObj expectedBson() {
-        return BSON("a" << BSON("b" << BSON("$and" << BSONArray())));
-    }
-};
-
-/** Nested spec. */
-class Nested : public Base {
-    BSONObj spec() {
-        return BSON("a" << BSON("$and" << BSONArray()));
-    }
-};
-
-/** Parse error in nested document. */
-class NestedParseError : public ParseError {
-    BSONObj spec() {
-        return BSON("a" << BSON("$and" << BSONArray() << "$or" << BSONArray()));
-    }
-};
-
-/** FieldPath expression. */
-class FieldPath : public Base {
-    BSONObj spec() {
-        return BSON("a"
-                    << "$field");
-    }
-};
-
-/** Invalid FieldPath expression. */
-class InvalidFieldPath : public ParseError {
-    BSONObj spec() {
-        return BSON("a"
-                    << "$field.");
-    }
-};
-
-/** Non FieldPath string. */
-class NonFieldPathString : public ParseError {
-    BSONObj spec() {
-        return BSON("a"
-                    << "foo");
-    }
-};
-
-/** Inclusion spec not allowed. */
-class DisallowedInclusion : public ParseError {
-    BSONObj spec() {
-        return BSON("a" << 1);
-    }
-};
-
-class InclusionBase : public Base {
-    Expression::ObjectCtx objectCtx() {
-        return Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK |
-                                     Expression::ObjectCtx::INCLUSION_OK);
-    }
-    BSONObj expectedBson() {
-        return BSON("a" << true);
-    }
-};
-
-/** Inclusion with bool type. */
-class InclusionBool : public InclusionBase {
-    BSONObj spec() {
-        return BSON("a" << true);
-    }
-};
-
-/** Inclusion with double type. */
-class InclusionDouble : public InclusionBase {
-    BSONObj spec() {
-        return BSON("a" << 1.0);
-    }
-};
-
-/** Inclusion with int type. */
-class InclusionInt : public InclusionBase {
-    BSONObj spec() {
-        return BSON("a" << 1);
-    }
-};
-
-/** Inclusion with long type. */
-class InclusionLong : public InclusionBase {
-    BSONObj spec() {
-        return BSON("a" << 1LL);
-    }
-};
-
-/** Inclusion of a nested field. */
-class NestedInclusion : public InclusionBase {
-    BSONObj spec() {
-        return BSON("a" << BSON("b" << true));
-    }
-    BSONObj expectedBson() {
-        return spec();
-    }
-};
-
-/** Exclude _id. */
-class ExcludeId : public Base {
-    BSONObj spec() {
-        return BSON("_id" << 0);
-    }
-    Expression::ObjectCtx objectCtx() {
-        return Expression::ObjectCtx(Expression::ObjectCtx::DOCUMENT_OK |
-                                     Expression::ObjectCtx::TOP_LEVEL);
-    }
-    BSONObj expectedBson() {
-        return BSON("_id" << false);
-    }
-};
-
-/** Excluding non _id field not allowed. */
-class ExcludeNonId : public ParseError {
-    BSONObj spec() {
-        return BSON("a" << 0);
-    }
-};
-
-/** Excluding _id not top level. */
-class ExcludeIdNotTopLevel : public ParseError {
-    BSONObj spec() {
-        return BSON("_id" << 0);
-    }
-};
-
-/** Invalid value type. */
-class InvalidType : public ParseError {
-    BSONObj spec() {
-        return BSON("a" << BSONNULL);
-    }
-};
+    // Should return an ExpressionAnd.
+    auto resultAnd = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(resultAnd);
+}
 
 }  // namespace Object
 
@@ -3763,230 +2884,160 @@ namespace Expression {
 
 using mongo::Expression;
 
-class Base {
-public:
-    virtual ~Base() {}
-    void run() {
-        BSONObj specObject = spec();
-        BSONElement specElement = specObject.firstElement();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        intrusive_ptr<Expression> expression = Expression::parseExpression(specElement, vps);
-        ASSERT_EQUALS(constify(expectedBson()), expressionToBson(expression));
-    }
+/**
+ * Parses an expression from the given BSON specification.
+ */
+boost::intrusive_ptr<Expression> parseExpression(BSONObj specification) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+    return Expression::parseExpression(specification, vps);
+}
 
-protected:
-    virtual BSONObj spec() = 0;
-    virtual BSONObj expectedBson() {
-        return constify(spec());
-    }
-};
+TEST(ParseExpression, ShouldRecognizeConstExpression) {
+    auto resultExpression = parseExpression(BSON("$const" << 5));
+    auto constExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
+    ASSERT_TRUE(constExpression);
+    ASSERT_EQUALS(constExpression->serialize(false), Value(Document{{"$const", 5}}));
+}
 
-class ParseError {
-public:
-    virtual ~ParseError() {}
-    void run() {
-        BSONObj specObject = spec();
-        BSONElement specElement = specObject.firstElement();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        ASSERT_THROWS(Expression::parseExpression(specElement, vps), UserException);
-    }
+TEST(ParseExpression, ShouldRejectUnknownExpression) {
+    ASSERT_THROWS(parseExpression(BSON("$invalid" << 1)), UserException);
+}
 
-protected:
-    virtual BSONObj spec() = 0;
-};
+TEST(ParseExpression, ShouldRejectExpressionArgumentsWhichAreNotInArray) {
+    ASSERT_THROWS(parseExpression(BSON("$strcasecmp"
+                                       << "foo")),
+                  UserException);
+}
 
-/** A constant expression. */
-class Const : public Base {
-    BSONObj spec() {
-        return BSON("$const" << 5);
-    }
-};
+TEST(ParseExpression, ShouldRejectExpressionWithWrongNumberOfArguments) {
+    ASSERT_THROWS(parseExpression(BSON("$strcasecmp" << BSON_ARRAY("foo"))), UserException);
+}
 
-/** An expression with an invalid name. */
-class InvalidName : public ParseError {
-    BSONObj spec() {
-        return BSON("$invalid" << 1);
-    }
-};
+TEST(ParseExpression, ShouldRejectObjectWithTwoTopLevelExpressions) {
+    ASSERT_THROWS(parseExpression(BSON("$and" << BSONArray() << "$or" << BSONArray())),
+                  UserException);
+}
 
-/** An expression requiring an array that is not provided with an array. */
-class RequiredArrayMissing : public ParseError {
-    BSONObj spec() {
-        return BSON("$strcasecmp"
-                    << "foo");
-    }
-};
+TEST(ParseExpression, ShouldRejectExpressionIfItsNotTheOnlyField) {
+    ASSERT_THROWS(parseExpression(BSON("$and" << BSONArray() << "a" << BSON("$or" << BSONArray()))),
+                  UserException);
+}
 
-/** An expression with the wrong number of operands. */
-class IncorrectOperandCount : public ParseError {
-    BSONObj spec() {
-        return BSON("$strcasecmp" << BSON_ARRAY("foo"));
-    }
-};
+TEST(ParseExpression, ShouldParseExpressionWithMultipleArguments) {
+    auto resultExpression = parseExpression(BSON("$strcasecmp" << BSON_ARRAY("foo"
+                                                                             << "FOO")));
+    auto strCaseCmpExpression = dynamic_cast<ExpressionStrcasecmp*>(resultExpression.get());
+    ASSERT_TRUE(strCaseCmpExpression);
+    vector<Value> arguments = {Value(Document{{"$const", "foo"}}),
+                               Value(Document{{"$const", "FOO"}})};
+    ASSERT_EQUALS(strCaseCmpExpression->serialize(false),
+                  Value(Document{{"$strcasecmp", arguments}}));
+}
 
-/** An expression with the correct number of operands. */
-class CorrectOperandCount : public Base {
-    BSONObj spec() {
-        return BSON("$strcasecmp" << BSON_ARRAY("foo"
-                                                << "FOO"));
-    }
-};
+TEST(ParseExpression, ShouldParseExpressionWithNoArguments) {
+    auto resultExpression = parseExpression(BSON("$and" << BSONArray()));
+    auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(andExpression);
+    ASSERT_EQUALS(andExpression->serialize(false), Value(Document{{"$and", vector<Value>{}}}));
+}
 
-/** An variable argument expression with zero operands. */
-class ZeroOperands : public Base {
-    BSONObj spec() {
-        return BSON("$and" << BSONArray());
-    }
-};
+TEST(ParseExpression, ShouldParseExpressionWithOneArgument) {
+    auto resultExpression = parseExpression(BSON("$and" << BSON_ARRAY(1)));
+    auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(andExpression);
+    vector<Value> arguments = {Value(Document{{"$const", 1}})};
+    ASSERT_EQUALS(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+}
 
-/** An variable argument expression with one operand. */
-class OneOperand : public Base {
-    BSONObj spec() {
-        return BSON("$and" << BSON_ARRAY(1));
-    }
-};
+TEST(ParseExpression, ShouldAcceptArgumentWithoutArrayForVariadicExpressions) {
+    auto resultExpression = parseExpression(BSON("$and" << 1));
+    auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(andExpression);
+    vector<Value> arguments = {Value(Document{{"$const", 1}})};
+    ASSERT_EQUALS(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+}
 
-/** An variable argument expression with two operands. */
-class TwoOperands : public Base {
-    BSONObj spec() {
-        return BSON("$and" << BSON_ARRAY(1 << 2));
-    }
-};
+TEST(ParseExpression, ShouldAcceptArgumentWithoutArrayAsSingleArgument) {
+    auto resultExpression = parseExpression(BSON("$not" << 1));
+    auto notExpression = dynamic_cast<ExpressionNot*>(resultExpression.get());
+    ASSERT_TRUE(notExpression);
+    vector<Value> arguments = {Value(Document{{"$const", 1}})};
+    ASSERT_EQUALS(notExpression->serialize(false), Value(Document{{"$not", arguments}}));
+}
 
-/** An variable argument expression with a singleton operand. */
-class SingletonOperandVariable : public Base {
-    BSONObj spec() {
-        return BSON("$and" << 1);
-    }
-    BSONObj expectedBson() {
-        return BSON("$and" << BSON_ARRAY(1));
-    }
-};
+TEST(ParseExpression, ShouldAcceptObjectAsSingleArgument) {
+    auto resultExpression = parseExpression(BSON("$and" << BSON("$const" << 1)));
+    auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(andExpression);
+    vector<Value> arguments = {Value(Document{{"$const", 1}})};
+    ASSERT_EQUALS(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+}
 
-/** An fixed argument expression with a singleton operand. */
-class SingletonOperandFixed : public Base {
-    BSONObj spec() {
-        return BSON("$not" << 1);
-    }
-    BSONObj expectedBson() {
-        return BSON("$not" << BSON_ARRAY(1));
-    }
-};
-
-/** An object can be provided as a singleton argument. */
-class ObjectSingleton : public Base {
-    BSONObj spec() {
-        return BSON("$and" << BSON("$const" << 1));
-    }
-    BSONObj expectedBson() {
-        return BSON("$and" << BSON_ARRAY(BSON("$const" << 1)));
-    }
-};
-
-/** An object can be provided as an array agrument. */
-class ObjectOperand : public Base {
-    BSONObj spec() {
-        return BSON("$and" << BSON_ARRAY(BSON("$const" << 1)));
-    }
-    BSONObj expectedBson() {
-        return BSON("$and" << BSON_ARRAY(1));
-    }
-};
+TEST(ParseExpression, ShouldAcceptObjectInsideArrayAsSingleArgument) {
+    auto resultExpression = parseExpression(BSON("$and" << BSON_ARRAY(BSON("$const" << 1))));
+    auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(andExpression);
+    vector<Value> arguments = {Value(Document{{"$const", 1}})};
+    ASSERT_EQUALS(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+}
 
 }  // namespace Expression
 
 namespace Operand {
 
-class Base {
-public:
-    virtual ~Base() {}
-    void run() {
-        BSONObj specObject = spec();
-        BSONElement specElement = specObject.firstElement();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        intrusive_ptr<mongo::Expression> expression =
-            mongo::Expression::parseOperand(specElement, vps);
-        ASSERT_EQUALS(expectedBson(), expressionToBson(expression));
-    }
+using mongo::Expression;
 
-protected:
-    virtual BSONObj spec() = 0;
-    virtual BSONObj expectedBson() {
-        return constify(spec());
-    }
-};
+/**
+ * Parses an operand from the given BSON specification. The field name is ignored, since it is
+ * assumed to have come from an array, or to have been the only argument to an expression, in which
+ * case the field name would be the name of the expression.
+ */
+intrusive_ptr<Expression> parseOperand(BSONObj specification) {
+    BSONElement specElement = specification.firstElement();
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+    return Expression::parseOperand(specElement, vps);
+}
 
-class ParseError {
-public:
-    virtual ~ParseError() {}
-    void run() {
-        BSONObj specObject = spec();
-        BSONElement specElement = specObject.firstElement();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        ASSERT_THROWS(mongo::Expression::parseOperand(specElement, vps), UserException);
-    }
+TEST(ParseOperand, ShouldRecognizeFieldPath) {
+    auto resultExpression = parseOperand(BSON(""
+                                              << "$field"));
+    auto fieldPathExpression = dynamic_cast<ExpressionFieldPath*>(resultExpression.get());
+    ASSERT_TRUE(fieldPathExpression);
+    ASSERT_EQ(fieldPathExpression->serialize(false), Value("$field"));
+}
 
-protected:
-    virtual BSONObj spec() = 0;
-};
+TEST(ParseOperand, ShouldRecognizeStringLiteral) {
+    auto resultExpression = parseOperand(BSON(""
+                                              << "foo"));
+    auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
+    ASSERT_TRUE(constantExpression);
+    ASSERT_EQ(constantExpression->serialize(false), Value(Document{{"$const", "foo"}}));
+}
 
-/** A field path operand. */
-class FieldPath {
-public:
-    void run() {
-        BSONObj specObject = BSON(""
-                                  << "$field");
-        BSONElement specElement = specObject.firstElement();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        intrusive_ptr<mongo::Expression> expression =
-            mongo::Expression::parseOperand(specElement, vps);
-        ASSERT_EQUALS(specObject, BSON("" << expression->serialize(false)));
-    }
-};
+TEST(ParseOperand, ShouldRecognizeNestedArray) {
+    auto resultExpression = parseOperand(BSON("" << BSON_ARRAY("foo"
+                                                               << "$field")));
+    auto arrayExpression = dynamic_cast<ExpressionArray*>(resultExpression.get());
+    ASSERT_TRUE(arrayExpression);
+    vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"}}), Value("$field")};
+    ASSERT_EQ(arrayExpression->serialize(false), Value(expectedSerializedArray));
+}
 
-/** A string constant (not field path) operand. */
-class NonFieldPathString : public Base {
-    BSONObj spec() {
-        return BSON(""
-                    << "foo");
-    }
-    BSONObj expectedBson() {
-        return BSON("$const"
-                    << "foo");
-    }
-};
+TEST(ParseOperand, ShouldRecognizeNumberLiteral) {
+    auto resultExpression = parseOperand(BSON("" << 5));
+    auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
+    ASSERT_TRUE(constantExpression);
+    ASSERT_EQ(constantExpression->serialize(false), Value(Document{{"$const", 5}}));
+}
 
-/** An object operand. */
-class Object : public Base {
-    BSONObj spec() {
-        return BSON("" << BSON("$and" << BSONArray()));
-    }
-    BSONObj expectedBson() {
-        return BSON("$and" << BSONArray());
-    }
-};
-
-/** An inclusion operand. */
-class InclusionObject : public ParseError {
-    BSONObj spec() {
-        return BSON("" << BSON("a" << 1));
-    }
-};
-
-/** A constant operand. */
-class Constant : public Base {
-    BSONObj spec() {
-        return BSON("" << 5);
-    }
-    BSONObj expectedBson() {
-        return BSON("$const" << 5);
-    }
-};
+TEST(ParseOperand, ShouldRecognizeNestedExpression) {
+    auto resultExpression = parseOperand(BSON("" << BSON("$and" << BSONArray())));
+    auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
+    ASSERT_TRUE(andExpression);
+    ASSERT_EQ(andExpression->serialize(false), Value(Document{{"$and", vector<Value>{}}}));
+}
 
 }  // namespace Operand
 
@@ -4016,8 +3067,7 @@ public:
                 const BSONObj obj = BSON(field.first << args);
                 VariablesIdGenerator idGenerator;
                 VariablesParseState vps(&idGenerator);
-                const intrusive_ptr<Expression> expr =
-                    Expression::parseExpression(obj.firstElement(), vps);
+                const intrusive_ptr<Expression> expr = Expression::parseExpression(obj, vps);
                 Value result = expr->evaluate(Document());
                 if (result.getType() == Array) {
                     result = sortSet(result);
@@ -4045,7 +3095,7 @@ public:
                         // NOTE: parse and evaluatation failures are treated the
                         // same
                         const intrusive_ptr<Expression> expr =
-                            Expression::parseExpression(obj.firstElement(), vps);
+                            Expression::parseExpression(obj, vps);
                         expr->evaluate(Document());
                     },
                     UserException);
@@ -4405,13 +3455,11 @@ TEST(ExpressionStrLenBytes, ComputesLengthOfEmptyString) {
 }
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfStringWithNull) {
-    assertExpectedResults("$strLenBytes",
-                          {{{Value(StringData("ab\0c", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenBytes", {{{Value("ab\0c"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
-    assertExpectedResults("$strLenBytes",
-                          {{{Value(StringData("abc\0", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenBytes", {{{Value("abc\0"_sd)}, Value(4)}});
 }
 
 }  // namespace StrLenBytes
@@ -4427,18 +3475,15 @@ TEST(ExpressionStrLenCP, ComputesLengthOfEmptyString) {
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNull) {
-    assertExpectedResults("$strLenCP",
-                          {{{Value(StringData("ab\0c", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("ab\0c"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
-    assertExpectedResults("$strLenCP",
-                          {{{Value(StringData("abc\0", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("abc\0"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithAccent) {
-    assertExpectedResults("$strLenCP",
-                          {{{Value(StringData("a\0bâ", StringData::LiteralTag()))}, Value(4)}});
+    assertExpectedResults("$strLenCP", {{{Value("a\0bâ"_sd)}, Value(4)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
@@ -4562,9 +3607,9 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
 
-    StringData continuationByte("\x80\x00", StringData::LiteralTag());
+    const auto continuationByte = "\x80\x00"_sd;
     const auto expr = Expression::parseExpression(
-        BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)).firstElement(), vps);
+        BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)), vps);
     ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
 }
 
@@ -4572,9 +3617,9 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
 
-    StringData leadingByte("\xFF\x00", StringData::LiteralTag());
-    const auto expr = Expression::parseExpression(
-        BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)).firstElement(), vps);
+    const auto leadingByte = "\xFF\x00"_sd;
+    const auto expr =
+        Expression::parseExpression(BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)), vps);
     ASSERT_THROWS({ expr->evaluate(Document()); }, UserException);
 }
 
@@ -4831,8 +3876,7 @@ public:
                 const BSONObj obj = BSON(field.first << args);
                 VariablesIdGenerator idGenerator;
                 VariablesParseState vps(&idGenerator);
-                const intrusive_ptr<Expression> expr =
-                    Expression::parseExpression(obj.firstElement(), vps);
+                const intrusive_ptr<Expression> expr = Expression::parseExpression(obj, vps);
                 const Value result = expr->evaluate(Document());
                 if (result != expected) {
                     string errMsg = str::stream()
@@ -4857,7 +3901,7 @@ public:
                         // NOTE: parse and evaluatation failures are treated the
                         // same
                         const intrusive_ptr<Expression> expr =
-                            Expression::parseExpression(obj.firstElement(), vps);
+                            Expression::parseExpression(obj, vps);
                         expr->evaluate(Document());
                     },
                     UserException);
@@ -5049,52 +4093,6 @@ public:
         add<FieldPath::AddToBsonObj>();
         add<FieldPath::AddToBsonArray>();
 
-        add<Object::Empty>();
-        add<Object::Include>();
-        add<Object::MissingInclude>();
-        add<Object::IncludeId>();
-        add<Object::ExcludeId>();
-        add<Object::SourceOrder>();
-        add<Object::IncludeNested>();
-        add<Object::IncludeTwoNested>();
-        add<Object::IncludeTwoParentNested>();
-        add<Object::IncludeMissingNested>();
-        add<Object::IncludeNestedWithinNonObject>();
-        add<Object::IncludeArrayNested>();
-        add<Object::ExcludeNonRootId>();
-        add<Object::Computed>();
-        add<Object::ComputedReplacement>();
-        add<Object::ComputedUndefined>();
-        add<Object::ComputedUndefinedReplacement>();
-        add<Object::ComputedNull>();
-        add<Object::ComputedNested>();
-        add<Object::ComputedFieldPath>();
-        add<Object::ComputedNestedFieldPath>();
-        add<Object::EmptyNewSubobject>();
-        add<Object::NonEmptyNewSubobject>();
-        add<Object::AdjacentNestedComputedFields>();
-        add<Object::AdjacentDottedAndNestedComputedFields>();
-        add<Object::AdjacentNestedAndDottedComputedFields>();
-        add<Object::AdjacentDottedComputedFields>();
-        add<Object::AdjacentNestedOrdering>();
-        add<Object::MultipleNestedFields>();
-        add<Object::ConflictingExpressionFields>();
-        add<Object::ConflictingInclusionExpressionFields>();
-        add<Object::ConflictingExpressionInclusionFields>();
-        add<Object::ConflictingObjectConstantExpressionFields>();
-        add<Object::ConflictingConstantObjectExpressionFields>();
-        add<Object::ConflictingNestedFields>();
-        add<Object::ConflictingFieldAndSubfield>();
-        add<Object::ConflictingFieldAndNestedField>();
-        add<Object::ConflictingSubfieldAndField>();
-        add<Object::ConflictingNestedFieldAndField>();
-        add<Object::NonInclusionDependencies>();
-        add<Object::InclusionDependencies>();
-        add<Object::Optimize>();
-        add<Object::AddToBsonObj>();
-        add<Object::AddToBsonObjRequireExpression>();
-        add<Object::AddToBsonArray>();
-        add<Object::Evaluate>();
 
         add<Or::NoOperands>();
         add<Or::True>();
@@ -5120,49 +4118,6 @@ public:
         add<Or::ZeroZeroNonConstant>();
         add<Or::Nested>();
         add<Or::NestedOne>();
-
-        add<Parse::Object::NonObject>();
-        add<Parse::Object::Empty>();
-        add<Parse::Object::Operator>();
-        add<Parse::Object::InvalidOperator>();
-        add<Parse::Object::TwoOperators>();
-        add<Parse::Object::OperatorLaterField>();
-        add<Parse::Object::OperatorAndOtherField>();
-        add<Parse::Object::OperatorTopLevel>();
-        add<Parse::Object::Dotted>();
-        add<Parse::Object::DottedTopLevel>();
-        add<Parse::Object::Nested>();
-        add<Parse::Object::NestedParseError>();
-        add<Parse::Object::FieldPath>();
-        add<Parse::Object::InvalidFieldPath>();
-        add<Parse::Object::NonFieldPathString>();
-        add<Parse::Object::DisallowedInclusion>();
-        add<Parse::Object::InclusionBool>();
-        add<Parse::Object::InclusionDouble>();
-        add<Parse::Object::InclusionInt>();
-        add<Parse::Object::InclusionLong>();
-        add<Parse::Object::NestedInclusion>();
-        add<Parse::Object::ExcludeId>();
-        add<Parse::Object::ExcludeNonId>();
-        add<Parse::Object::ExcludeIdNotTopLevel>();
-        add<Parse::Object::InvalidType>();
-        add<Parse::Expression::Const>();
-        add<Parse::Expression::InvalidName>();
-        add<Parse::Expression::RequiredArrayMissing>();
-        add<Parse::Expression::IncorrectOperandCount>();
-        add<Parse::Expression::CorrectOperandCount>();
-        add<Parse::Expression::ZeroOperands>();
-        add<Parse::Expression::OneOperand>();
-        add<Parse::Expression::TwoOperands>();
-        add<Parse::Expression::SingletonOperandVariable>();
-        add<Parse::Expression::SingletonOperandFixed>();
-        add<Parse::Expression::ObjectSingleton>();
-        add<Parse::Expression::ObjectOperand>();
-        add<Parse::Operand::FieldPath>();
-        add<Parse::Operand::NonFieldPathString>();
-        add<Parse::Operand::Object>();
-        add<Parse::Operand::InclusionObject>();
-        add<Parse::Operand::Constant>();
 
         add<Strcasecmp::NullBegin>();
         add<Strcasecmp::NullEnd>();

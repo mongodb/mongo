@@ -250,20 +250,16 @@ public:
     FTDCSimpleInternalCommandCollector(StringData command,
                                        StringData name,
                                        StringData ns,
-                                       BSONObj param)
-        : _commandString(command.toString()),
-          _name(name.toString()),
-          _ns(ns.toString()),
-          _param(std::move(param)) {
-        _command = Command::findCommand(_commandString);
+                                       BSONObj cmdObj)
+        : _name(name.toString()), _ns(ns.toString()), _cmdObj(std::move(cmdObj)) {
+        _command = Command::findCommand(command);
         invariant(_command);
     }
 
     void collect(OperationContext* txn, BSONObjBuilder& builder) override {
-        BSONObj cmdObj;
         std::string errmsg;
 
-        bool ret = _command->run(txn, _ns, cmdObj, 0, errmsg, builder);
+        bool ret = _command->run(txn, _ns, _cmdObj, 0, errmsg, builder);
 
         // Some commands return errmsgs when they return false (collstats)
         // Some commands return bson objs when they return false (replGetStatus)
@@ -277,10 +273,9 @@ public:
     }
 
 private:
-    std::string _commandString;
     std::string _name;
     std::string _ns;
-    BSONObj _param;
+    BSONObj _cmdObj;
 
     // Not owned
     Command* _command;
@@ -313,18 +308,22 @@ void startFTDC() {
 
     // CmdServerStatus
     controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-        "serverStatus", "serverStatus", "", BSON("tcMalloc" << true)));
+        "serverStatus", "serverStatus", "", BSON("serverStatus" << 1 << "tcMalloc" << true)));
 
     // These metrics are only collected if replication is enabled
     if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
         repl::ReplicationCoordinator::modeNone) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-            "replSetGetStatus", "replSetGetStatus", "", BSONObj()));
+            "replSetGetStatus", "replSetGetStatus", "", BSON("replSetGetStatus" << 1)));
 
         // CollectionStats
-        controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-            "collStats", "local.oplog.rs.stats", "local.oplog.rs", BSONObj()));
+        controller->addPeriodicCollector(
+            stdx::make_unique<FTDCSimpleInternalCommandCollector>("collStats",
+                                                                  "local.oplog.rs.stats",
+                                                                  "local",
+                                                                  BSON("collStats"
+                                                                       << "oplog.rs")));
     }
 
     // Install file rotation collectors
@@ -332,15 +331,15 @@ void startFTDC() {
 
     // CmdBuildInfo
     controller->addOnRotateCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-        "buildInfo", "buildInfo", "", BSONObj()));
+        "buildInfo", "buildInfo", "", BSON("buildInfo" << 1)));
 
     // CmdGetCmdLineOpts
     controller->addOnRotateCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-        "getCmdLineOpts", "getCmdLineOpts", "", BSONObj()));
+        "getCmdLineOpts", "getCmdLineOpts", "", BSON("getCmdLineOpts" << 1)));
 
     // HostInfoCmd
     controller->addOnRotateCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-        "hostInfo", "hostInfo", "", BSONObj()));
+        "hostInfo", "hostInfo", "", BSON("hostInfo" << 1)));
 
     // Install the new controller
     auto& staticFTDC = getFTDCController(getGlobalServiceContext());

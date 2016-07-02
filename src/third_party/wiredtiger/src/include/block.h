@@ -261,6 +261,7 @@ struct __wt_block {
 
 				/* Verification support */
 	bool	   verify;		/* If performing verification */
+	bool	   verify_layout;	/* Print out file layout information */
 	bool	   verify_strict;	/* Fail hard on any error */
 	wt_off_t   verify_size;		/* Checkpoint's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */

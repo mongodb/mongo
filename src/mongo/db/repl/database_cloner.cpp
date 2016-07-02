@@ -37,6 +37,8 @@
 #include <set>
 
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
@@ -97,7 +99,8 @@ DatabaseCloner::DatabaseCloner(ReplicationExecutor* executor,
                                          this,
                                          stdx::placeholders::_1,
                                          stdx::placeholders::_2,
-                                         stdx::placeholders::_3)),
+                                         stdx::placeholders::_3),
+                              rpc::ServerSelectionMetadata(true, boost::none).toBSON()),
       _scheduleDbWorkFn([this](const ReplicationExecutor::CallbackFn& work) {
           return _executor->scheduleDBWork(work);
       }),

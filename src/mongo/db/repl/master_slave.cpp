@@ -937,7 +937,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
 
     Timestamp nextOpTime;
     {
-        BSONObj op = oplogReader.next();
+        BSONObj op = oplogReader.nextSafe();
         BSONElement ts = op.getField("ts");
         if (ts.type() != Date && ts.type() != bsonTimestamp) {
             string err = op.getStringField("$err");
@@ -1022,7 +1022,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                 n = 0;
             }
 
-            BSONObj op = oplogReader.next();
+            BSONObj op = oplogReader.nextSafe();
 
             int b = replApplyBatchSize;
             bool justOne = b == 1;
@@ -1080,7 +1080,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                     // break if no more in batch so we release lock while reading from the master
                     break;
                 }
-                op = oplogReader.next();
+                op = oplogReader.nextSafe();
             }
         }
     }

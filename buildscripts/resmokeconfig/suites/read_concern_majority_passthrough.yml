@@ -75,6 +75,7 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+    - class: CheckReplDBHashDeprecated
     - class: CheckReplDBHash
     - class: CleanEveryN
       n: 20

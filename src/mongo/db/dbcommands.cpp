@@ -95,7 +95,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/s/chunk_version.h"
@@ -1275,8 +1274,6 @@ void Command::execCommand(OperationContext* txn,
             CurOp::get(txn)->setCommand_inlock(command);
         }
 
-        rpc::setOperationProtocol(txn, request.getProtocol());  // SERVER-21485.  Remove after 3.2
-
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
         uassertStatusOK(rpc::readRequestMetadata(txn, request.getMetadata()));
@@ -1330,11 +1327,16 @@ void Command::execCommand(OperationContext* txn,
                 !replCoord->canAcceptWritesForDatabase(dbname) &&
                 !replCoord->getMemberState().secondary()) {
 
-                if (replCoord->getMemberState().recovering()) {
-                    uasserted(ErrorCodes::NotMasterOrSecondary, "node is recovering");
-                }
-                invariant(replCoord->getMemberState().primary());
-                uasserted(ErrorCodes::NotMasterOrSecondary, "node is in drain mode");
+                uassert(ErrorCodes::NotMasterOrSecondary,
+                        "node is recovering",
+                        !replCoord->getMemberState().recovering());
+                uassert(ErrorCodes::NotMasterOrSecondary,
+                        "node is not in primary or recovering state",
+                        replCoord->getMemberState().primary());
+                // Check ticket SERVER-21432, slaveOk commands are allowed in drain mode
+                uassert(ErrorCodes::NotMasterOrSecondary,
+                        "node is in drain mode",
+                        commandIsOverriddenToRunOnSecondary || commandCanRunOnSecondary);
             }
         }
 

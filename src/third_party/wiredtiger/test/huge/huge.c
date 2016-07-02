@@ -65,13 +65,13 @@ static size_t lengths[] = {
     0
 };
 
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-s]\n", progname);
-	fprintf(stderr, "%s",
-	    "\t-s small run, only test up to 1GB\n");
-
+	fprintf(stderr, "%s", "\t-s small run, only test up to 1GB\n");
 	exit(EXIT_FAILURE);
 }
 

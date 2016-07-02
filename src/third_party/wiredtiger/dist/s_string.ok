@@ -87,6 +87,7 @@ Decrement
 Decrypt
 DeleteFileA
 EAGAIN
+EB
 EBUSY
 EEXIST
 EINTR
@@ -117,6 +118,7 @@ FNV
 FORALL
 FOREACH
 FULLFSYNC
+FindClose
 FindFirstFile
 Fixup
 Fk
@@ -131,6 +133,7 @@ GIDs
 Gcc
 Geoff
 GetEnvironmentVariableA
+GetFileAttributesA
 GetFileAttributesEx
 GetFileSizeEx
 GetLastError
@@ -213,6 +216,7 @@ Mewhort
 Mitzenmacher
 MongoDB
 MoveFile
+MoveFileA
 Multi
 Multithreaded
 Mutex
@@ -471,6 +475,7 @@ ckptfrag
 ckptlist
 cksum
 cloexec
+closedir
 clsm
 cmd
 cmp
@@ -644,6 +649,7 @@ fmterr
 fnv
 foc
 fopen
+formatmessage
 fp
 fprintf
 free'd
@@ -695,6 +701,7 @@ ibackup
 icount
 idx
 ifdef's
+iiu
 ikey
 im
 impl
@@ -728,9 +735,20 @@ intrin
 inuse
 io
 ip
+isalnum
+isalpha
+iscntrl
+isdigit
+isgraph
 islocked
+islower
 ispo
+isprint
+ispunct
 isrc
+isspace
+isupper
+isxdigit
 iter
 iteratively
 jnr
@@ -1057,7 +1075,9 @@ toklen
 tokname
 tokstart
 toktype
+tolower
 totalsec
+toupper
 transactional
 transactionally
 trecno
@@ -1088,6 +1108,7 @@ unescaped
 unicode
 uninstantiated
 unistd
+unlink
 unlinked
 unmap
 unmarshall

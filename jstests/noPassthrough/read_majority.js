@@ -41,8 +41,8 @@ load("jstests/libs/analyze_plan.js");
     }
 
     function getReadMajorityAggCursor() {
-        var res =
-            t.runCommand('aggregate', {cursor: {batchSize: 2}, readConcern: {level: "majority"}});
+        var res = t.runCommand(
+            'aggregate', {pipeline: [], cursor: {batchSize: 2}, readConcern: {level: "majority"}});
         assert.commandWorked(res);
         return new DBCommandCursor(db.getMongo(), res, 2);
     }

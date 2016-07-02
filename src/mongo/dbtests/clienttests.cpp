@@ -233,6 +233,153 @@ public:
     }
 };
 
+class CreateSimpleV1Index : public Base {
+public:
+    CreateSimpleV1Index() : Base("CreateSimpleV1Index") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField").version(1));
+    }
+};
+
+class CreateSimpleNamedV1Index : public Base {
+public:
+    CreateSimpleNamedV1Index() : Base("CreateSimpleNamedV1Index") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField").version(1).name("aFieldV1Index"));
+    }
+};
+
+class CreateCompoundNamedV1Index : public Base {
+public:
+    CreateCompoundNamedV1Index() : Base("CreateCompoundNamedV1Index") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField")
+                           .addKey("bField", IndexSpec::kIndexTypeDescending)
+                           .version(1)
+                           .name("aFieldbFieldV1Index"));
+    }
+};
+
+class CreateUniqueSparseDropDupsIndexInBackground : public Base {
+public:
+    CreateUniqueSparseDropDupsIndexInBackground()
+        : Base("CreateUniqueSparseDropDupsIndexInBackground") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(
+            ns(), IndexSpec().addKey("aField").background().unique().sparse().dropDuplicates());
+    }
+};
+
+class CreateComplexTextIndex : public Base {
+public:
+    CreateComplexTextIndex() : Base("CreateComplexTextIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeText)
+                           .addKey("bField", IndexSpec::kIndexTypeText)
+                           .textWeights(BSON("aField" << 100))
+                           .textDefaultLanguage("spanish")
+                           .textLanguageOverride("lang")
+                           .textIndexVersion(2));
+    }
+};
+
+class Create2DIndex : public Base {
+public:
+    Create2DIndex() : Base("Create2DIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeGeo2D)
+                           .geo2DBits(20)
+                           .geo2DMin(-120.0)
+                           .geo2DMax(120.0));
+    }
+};
+
+class CreateHaystackIndex : public Base {
+public:
+    CreateHaystackIndex() : Base("CreateHaystackIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeGeoHaystack)
+                           .addKey("otherField", IndexSpec::kIndexTypeDescending)
+                           .geoHaystackBucketSize(1.0));
+    }
+};
+
+class Create2DSphereIndex : public Base {
+public:
+    Create2DSphereIndex() : Base("Create2DSphereIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(),
+                       IndexSpec()
+                           .addKey("aField", IndexSpec::kIndexTypeGeo2DSphere)
+                           .geo2DSphereIndexVersion(2));
+    }
+};
+
+class CreateHashedIndex : public Base {
+public:
+    CreateHashedIndex() : Base("CreateHashedIndex") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField", IndexSpec::kIndexTypeHashed));
+    }
+};
+
+class CreateIndexFailure : public Base {
+public:
+    CreateIndexFailure() : Base("CreateIndexFailure") {}
+    void run() {
+        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+        OperationContext& txn = *txnPtr;
+        DBDirectClient db(&txn);
+
+        db.createIndex(ns(), IndexSpec().addKey("aField"));
+        ASSERT_THROWS(db.createIndex(ns(), IndexSpec().addKey("aField").unique()), UserException);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("client") {}
@@ -244,6 +391,16 @@ public:
         add<PushBack>();
         add<Create>();
         add<ConnectionStringTests>();
+        add<CreateSimpleV1Index>();
+        add<CreateSimpleNamedV1Index>();
+        add<CreateCompoundNamedV1Index>();
+        add<CreateUniqueSparseDropDupsIndexInBackground>();
+        add<CreateComplexTextIndex>();
+        add<Create2DIndex>();
+        add<CreateHaystackIndex>();
+        add<Create2DSphereIndex>();
+        add<CreateHashedIndex>();
+        add<CreateIndexFailure>();
     }
 };
 

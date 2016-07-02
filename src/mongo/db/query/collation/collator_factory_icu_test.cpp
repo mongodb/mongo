@@ -387,8 +387,8 @@ TEST(CollatorFactoryICUTest, ChineseTraditionalLocaleWithCollationPinyinAllowed)
 
 TEST(CollatorFactoryICUTest, LocaleStringCannotContainNullByte) {
     CollatorFactoryICU factory;
-    auto collator =
-        factory.makeFromBSON(BSON("locale" << StringData("en_US\0", StringData::LiteralTag())));
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US\0"_sd));
     ASSERT_NOT_OK(collator.getStatus());
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }

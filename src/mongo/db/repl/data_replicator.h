@@ -115,9 +115,6 @@ struct DataReplicatorOptions {
     /** Function to get this node's slaveDelay. */
     using GetSlaveDelayFn = stdx::function<Seconds()>;
 
-    /** Function to get current replica set configuration */
-    using GetReplSetConfigFn = stdx::function<ReplicaSetConfig()>;
-
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
@@ -143,7 +140,6 @@ struct DataReplicatorOptions {
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;
     GetSlaveDelayFn getSlaveDelay;
-    GetReplSetConfigFn getReplSetConfig;
 
     SyncSourceSelector* syncSourceSelector = nullptr;
 
@@ -169,13 +165,13 @@ public:
 
     virtual ~DataReplicator();
 
-    Status start();
-    Status shutdown();
+    Status start(OperationContext* txn);
+    Status shutdown(OperationContext* txn);
 
     /**
      * Cancels outstanding work and begins shutting down.
      */
-    Status scheduleShutdown();
+    Status scheduleShutdown(OperationContext* txn);
 
     /**
      * Waits for data replicator to finish shutting down.
@@ -221,7 +217,7 @@ public:
 
     // For testing only
 
-    void _resetState_inlock(Timestamp lastAppliedOpTime);
+    void _resetState_inlock(OperationContext* txn, Timestamp lastAppliedOpTime);
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
 
 private:
@@ -281,7 +277,7 @@ private:
     void _waitOnAll_inlock();
     bool _anyActiveHandles_inlock() const;
 
-    Status _shutdown();
+    Status _shutdown(OperationContext* txn);
     void _changeStateIfNeeded();
 
     // Set during construction

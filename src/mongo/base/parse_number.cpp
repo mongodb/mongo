@@ -95,8 +95,8 @@ static inline StringData _extractSign(StringData stringValue, bool* isNegative) 
  * "0x" or "0X" prefix, if present.
  */
 static inline StringData _extractBase(StringData stringValue, int inputBase, int* outputBase) {
-    const StringData hexPrefixLower("0x", StringData::LiteralTag());
-    const StringData hexPrefixUpper("0X", StringData::LiteralTag());
+    const auto hexPrefixLower = "0x"_sd;
+    const auto hexPrefixUpper = "0X"_sd;
     if (inputBase == 0) {
         if (stringValue.size() > 2 &&
             (stringValue.startsWith(hexPrefixLower) || stringValue.startsWith(hexPrefixUpper))) {
@@ -239,14 +239,13 @@ Status parseNumberFromStringWithBase<double>(StringData stringValue, int base, d
         // The Windows libc implementation of strtod cannot parse +/-infinity or nan,
         // so handle that here.
         std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
-        if (str == StringData("nan", StringData::LiteralTag())) {
+        if (str == "nan"_sd) {
             *result = std::numeric_limits<double>::quiet_NaN();
             return Status::OK();
-        } else if (str == StringData("+infinity", StringData::LiteralTag()) ||
-                   str == StringData("infinity", StringData::LiteralTag())) {
+        } else if (str == "+infinity"_sd || str == "infinity"_sd) {
             *result = std::numeric_limits<double>::infinity();
             return Status::OK();
-        } else if (str == StringData("-infinity", StringData::LiteralTag())) {
+        } else if (str == "-infinity"_sd) {
             *result = -std::numeric_limits<double>::infinity();
             return Status::OK();
         }

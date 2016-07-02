@@ -407,6 +407,60 @@ TEST(QueryPlannerIXSelectTest, StringGTEqualCollators) {
 }
 
 /**
+ * $gt array comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, ArrayGTUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$gt: ['string']}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt array comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, ArrayGTEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$gt: ['string']}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt object comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, NestedObjectGTUnequalCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices;
+    testRateIndices("{a: {$gt: {b: 'string'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
+ * $gt object comparison requires matching collator.
+ */
+TEST(QueryPlannerIXSelectTest, NestedObjectGTEqualCollators) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    IndexEntry index(BSON("a" << 1));
+    index.collator = &collator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$gt: {b : 'string'}}}", "", &collator, indices, "a", expectedIndices);
+}
+
+/**
  * $gte string comparison requires matching collator.
  */
 TEST(QueryPlannerIXSelectTest, StringGTEUnequalCollators) {
@@ -843,105 +897,11 @@ TEST(QueryPlannerIXSelectTest, NoStringComparisonType) {
     std::vector<IndexEntry> indices;
     indices.push_back(index);
     std::set<size_t> expectedIndices = {0};
-    testRateIndices("{a: {$type: 'string'}}", "", &collator, indices, "a", expectedIndices);
-}
-
-/**
- * If nested object comparison is done, the query collator must be null.
- * TODO SERVER-23172: remove this test.
- */
-TEST(QueryPlannerIXSelectTest, NestedObjectNonNullCollators) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    IndexEntry index(BSON("a" << 1));
-    index.collator = &collator;
-    std::vector<IndexEntry> indices;
-    indices.push_back(index);
-    std::set<size_t> expectedIndices;
-    testRateIndices("{a: {b: 1}}", "", &collator, indices, "a", expectedIndices);
-}
-
-/**
- * If nested object comparison is done, the query collator must be null.
- * TODO SERVER-23172: remove this test.
- */
-TEST(QueryPlannerIXSelectTest, NestedObjectNullQueryCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    IndexEntry index(BSON("a" << 1));
-    index.collator = &collator;
-    std::vector<IndexEntry> indices;
-    indices.push_back(index);
-    std::set<size_t> expectedIndices = {0};
-    testRateIndices("{a: {b: 1}}", "", nullptr, indices, "a", expectedIndices);
-}
-
-/**
- * If nested object comparison is done, the query collator must be null.
- */
-TEST(QueryPlannerIXSelectTest, NestedObjectNonNullQueryCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    std::vector<IndexEntry> indices;
-    indices.push_back(IndexEntry(BSON("a" << 1)));
-    std::set<size_t> expectedIndices;
-    testRateIndices("{a: {b: 1}}", "", &collator, indices, "a", expectedIndices);
-}
-
-/**
- * If nested object comparison is done, the query collator must be null.
- */
-TEST(QueryPlannerIXSelectTest, NestedObjectNullCollators) {
-    std::vector<IndexEntry> indices;
-    indices.push_back(IndexEntry(BSON("a" << 1)));
-    std::set<size_t> expectedIndices = {0};
-    testRateIndices("{a: {b: 1}}", "", nullptr, indices, "a", expectedIndices);
-}
-
-/**
- * If nested array comparison is done, the query collator must be null.
- * TODO SERVER-23172: remove this test.
- */
-TEST(QueryPlannerIXSelectTest, NestedArrayNonNullCollators) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    IndexEntry index(BSON("a" << 1));
-    index.collator = &collator;
-    std::vector<IndexEntry> indices;
-    indices.push_back(index);
-    std::set<size_t> expectedIndices;
-    testRateIndices("{a: [1]}", "", &collator, indices, "a", expectedIndices);
-}
-
-/**
- * If nested array comparison is done, the query collator must be null.
- * TODO SERVER-23172: remove this test.
- */
-TEST(QueryPlannerIXSelectTest, NestedArrayNullQueryCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    IndexEntry index(BSON("a" << 1));
-    index.collator = &collator;
-    std::vector<IndexEntry> indices;
-    indices.push_back(index);
-    std::set<size_t> expectedIndices = {0};
-    testRateIndices("{a: [1]}", "", nullptr, indices, "a", expectedIndices);
-}
-
-/**
- * If nested array comparison is done, the query collator must be null.
- */
-TEST(QueryPlannerIXSelectTest, NestedArrayNonNullQueryCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    std::vector<IndexEntry> indices;
-    indices.push_back(IndexEntry(BSON("a" << 1)));
-    std::set<size_t> expectedIndices;
-    testRateIndices("{a: [1]}", "", &collator, indices, "a", expectedIndices);
-}
-
-/**
- * If nested array comparison is done, the query collator must be null.
- */
-TEST(QueryPlannerIXSelectTest, NestedArrayNullCollators) {
-    std::vector<IndexEntry> indices;
-    indices.push_back(IndexEntry(BSON("a" << 1)));
-    std::set<size_t> expectedIndices = {0};
-    testRateIndices("{a: [1]}", "", nullptr, indices, "a", expectedIndices);
+    std::set<std::string> testPatterns = {
+        "{a: {$type: 'string'}}", "{a: {$type: 'object'}}", "{a: {$type: 'array'}}"};
+    for (const auto& pattern : testPatterns) {
+        testRateIndices(pattern.c_str(), "", &collator, indices, "a", expectedIndices);
+    }
 }
 
 }  // namespace

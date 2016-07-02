@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -37,12 +38,20 @@ namespace mongo {
 struct HostAndPort;
 class OperationContext;
 
+namespace executor {
+class TaskExecutor;
+}  // namespace executor
+
 namespace repl {
 class BackgroundSync;
 class Reporter;
 
 class SyncSourceFeedback {
+    MONGO_DISALLOW_COPYING(SyncSourceFeedback);
+
 public:
+    SyncSourceFeedback() = default;
+
     /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
     /// replication progress.
     void forwardSlaveProgress();
@@ -51,8 +60,10 @@ public:
      * Loops continuously until shutdown() is called, passing updates when they are present. If no
      * update occurs within the _keepAliveInterval, progress is forwarded to let the upstream node
      * know that this node, along with the alive nodes chaining through it, are still alive.
+     *
+     * Task executor is used to run replSetUpdatePosition command on sync source.
      */
-    void run(BackgroundSync* bgsync);
+    void run(executor::TaskExecutor* executor, BackgroundSync* bgsync);
 
     /// Signals the run() method to terminate.
     void shutdown();

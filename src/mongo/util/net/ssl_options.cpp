@@ -330,11 +330,9 @@ Status storeSSLServerOptions(const moe::Environment& params) {
             " no CA file has been provided; please specify an"
             " sslCAFile parameter");
 
-        if (sslGlobalParams.sslCAFile.empty()) {
-            if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
-                return Status(ErrorCodes::BadValue, sslCANotFoundError);
-            }
-            warning() << sslCANotFoundError;
+        if (sslGlobalParams.sslCAFile.empty() &&
+            clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+            return Status(ErrorCodes::BadValue, sslCANotFoundError);
         }
     } else if (sslGlobalParams.sslPEMKeyFile.size() || sslGlobalParams.sslPEMKeyPassword.size() ||
                sslGlobalParams.sslClusterFile.size() || sslGlobalParams.sslClusterPassword.size() ||

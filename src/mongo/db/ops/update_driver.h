@@ -43,6 +43,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 class OperationContext;
 
 class UpdateDriver {
@@ -134,6 +135,13 @@ public:
     bool needMatchDetails() const {
         return _positional;
     }
+
+    /**
+     * Set the collator which will be used by all of the UpdateDriver's underlying modifiers.
+     *
+     * 'collator' must outlive the UpdateDriver.
+     */
+    void setCollator(const CollatorInterface* collator);
 
 private:
     /** Resets the state of the class associated with mods (not the error state) */

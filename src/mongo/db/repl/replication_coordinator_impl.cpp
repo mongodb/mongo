@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
@@ -236,6 +237,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
     ReplicationCoordinatorExternalState* externalState,
     TopologyCoordinator* topCoord,
+    StorageInterface* storage,
     int64_t prngSeed,
     NetworkInterface* network,
     ReplicationExecutor* replExec,
@@ -282,20 +284,23 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     ReplicationCoordinatorExternalState* externalState,
     NetworkInterface* network,
     TopologyCoordinator* topCoord,
+    StorageInterface* storage,
     int64_t prngSeed)
     : ReplicationCoordinatorImpl(
-          settings, externalState, topCoord, prngSeed, network, nullptr, nullptr) {}
+          settings, externalState, topCoord, storage, prngSeed, network, nullptr, nullptr) {}
 
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
     ReplicationCoordinatorExternalState* externalState,
     TopologyCoordinator* topCoord,
+    StorageInterface* storage,
     ReplicationExecutor* replExec,
     int64_t prngSeed,
     stdx::function<bool()>* isDurableStorageEngineFn)
     : ReplicationCoordinatorImpl(settings,
                                  externalState,
                                  topCoord,
+                                 storage,
                                  prngSeed,
                                  nullptr,
                                  replExec,
@@ -480,29 +485,42 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
 }
 
-void ReplicationCoordinatorImpl::_stopDataReplication() {}
+void ReplicationCoordinatorImpl::_stopDataReplication() {
+    // TODO: Stop replication threads (bgsync, synctail, reporter)
+}
+
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
-    // When initial sync is done, callback.
-    OnInitialSyncFinishedFn callback{[this]() {
+    // Check to see if we need to do an initial sync.
+    const auto lastOpTime = getMyLastAppliedOpTime();
+    const auto needsInitialSync = lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(txn);
+    if (!needsInitialSync) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_inShutdown) {
-            log() << "Initial sync done, starting steady state replication.";
-            _externalState->startSteadyStateReplication();
+            // Start steady replication, since we already have data.
+            _externalState->startSteadyStateReplication(txn);
         }
-    }};
-
-    const auto lastApplied = getMyLastAppliedOpTime();
-    if (!lastApplied.isNull()) {
-        callback();
         return;
     }
 
     // Do initial sync.
-    if (false) {
-        // TODO: make this async with callback.
-        _dr.initialSync(txn);
+    if (_externalState->shouldUseDataReplicatorInitialSync()) {
+        _externalState->runOnInitialSyncThread([this](OperationContext* txn) {
+            const auto status = _dr.initialSync(txn);
+            fassertStatusOK(40088, status);
+            _setMyLastAppliedOpTime_inlock({status.getValue(), -1}, false);
+            _externalState->startSteadyStateReplication(txn);
+
+        });
     } else {
-        _externalState->startInitialSync(callback);
+        _externalState->startInitialSync([this]() {
+            auto txn = cc().makeOperationContext();
+            invariant(txn);
+            invariant(txn->getClient());
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            if (!_inShutdown) {
+                _externalState->startSteadyStateReplication(txn.get());
+            }
+        });
     }
 }
 

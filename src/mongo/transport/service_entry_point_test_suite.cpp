@@ -86,8 +86,7 @@ void setPingCommand(Message* m) {
     m->reset();
 
     // Transfer buffer ownership to the Message.
-    m->setData(msg.view2ptr(), true);
-    b.decouple();
+    m->setData(b.release());
 }
 
 // Some default method implementations

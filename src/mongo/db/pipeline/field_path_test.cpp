@@ -61,8 +61,8 @@ public:
         FieldPath path("foo");
         ASSERT_EQUALS(1U, path.getPathLength());
         ASSERT_EQUALS("foo", path.getFieldName(0));
-        ASSERT_EQUALS("foo", path.getPath(false));
-        ASSERT_EQUALS("$foo", path.getPath(true));
+        ASSERT_EQUALS("foo", path.fullPath());
+        ASSERT_EQUALS("$foo", path.fullPathWithPrefix());
     }
 };
 
@@ -74,7 +74,7 @@ public:
         FieldPath path(vec);
         ASSERT_EQUALS(1U, path.getPathLength());
         ASSERT_EQUALS("foo", path.getFieldName(0));
-        ASSERT_EQUALS("foo", path.getPath(false));
+        ASSERT_EQUALS("foo", path.fullPath());
     }
 };
 
@@ -102,8 +102,8 @@ public:
         ASSERT_EQUALS(2U, path.getPathLength());
         ASSERT_EQUALS("foo", path.getFieldName(0));
         ASSERT_EQUALS("bar", path.getFieldName(1));
-        ASSERT_EQUALS("foo.bar", path.getPath(false));
-        ASSERT_EQUALS("$foo.bar", path.getPath(true));
+        ASSERT_EQUALS("foo.bar", path.fullPath());
+        ASSERT_EQUALS("$foo.bar", path.fullPathWithPrefix());
     }
 };
 
@@ -125,7 +125,7 @@ public:
         vec.push_back("bar");
         FieldPath path(vec);
         ASSERT_EQUALS(2U, path.getPathLength());
-        ASSERT_EQUALS("foo.bar", path.getPath(false));
+        ASSERT_EQUALS("foo.bar", path.fullPath());
     }
 };
 
@@ -146,7 +146,7 @@ public:
         ASSERT_EQUALS("foo", path.getFieldName(0));
         ASSERT_EQUALS("bar", path.getFieldName(1));
         ASSERT_EQUALS("baz", path.getFieldName(2));
-        ASSERT_EQUALS("foo.bar.baz", path.getPath(false));
+        ASSERT_EQUALS("foo.bar.baz", path.fullPath());
     }
 };
 
@@ -180,7 +180,7 @@ public:
     void run() {
         FieldPath path("foo.a.bar");
         ASSERT_EQUALS(3U, path.getPathLength());
-        ASSERT_EQUALS("foo.a.bar", path.getPath(false));
+        ASSERT_EQUALS("foo.a.bar", path.fullPath());
     }
 };
 
@@ -209,7 +209,7 @@ public:
     void run() {
         FieldPath path = FieldPath("foo.bar").tail();
         ASSERT_EQUALS(1U, path.getPathLength());
-        ASSERT_EQUALS("bar", path.getPath(false));
+        ASSERT_EQUALS("bar", path.fullPath());
     }
 };
 
@@ -219,7 +219,7 @@ public:
     void run() {
         FieldPath path = FieldPath("foo.bar.baz").tail();
         ASSERT_EQUALS(2U, path.getPathLength());
-        ASSERT_EQUALS("bar.baz", path.getPath(false));
+        ASSERT_EQUALS("bar.baz", path.fullPath());
     }
 };
 

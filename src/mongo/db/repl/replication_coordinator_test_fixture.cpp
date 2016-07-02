@@ -109,6 +109,10 @@ void ReplCoordTest::init() {
     invariant(!_repl);
     invariant(!_callShutdown);
 
+    auto serviceContext = getGlobalServiceContext();
+    StorageInterface* storageInterface = new StorageInterfaceMock();
+    StorageInterface::set(serviceContext, std::unique_ptr<StorageInterface>(storageInterface));
+    ASSERT_TRUE(storageInterface == StorageInterface::get(serviceContext));
     // PRNG seed for tests.
     const int64_t seed = 0;
 
@@ -118,8 +122,13 @@ void ReplCoordTest::init() {
     _net = new NetworkInterfaceMock;
     _replExec = stdx::make_unique<ReplicationExecutor>(_net, seed);
     _externalState = new ReplicationCoordinatorExternalStateMock;
-    _repl.reset(new ReplicationCoordinatorImpl(
-        _settings, _externalState, _topo, _replExec.get(), seed, &_durablityLambda));
+    _repl.reset(new ReplicationCoordinatorImpl(_settings,
+                                               _externalState,
+                                               _topo,
+                                               storageInterface,
+                                               _replExec.get(),
+                                               seed,
+                                               &_durablityLambda));
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

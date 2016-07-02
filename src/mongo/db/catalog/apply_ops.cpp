@@ -32,6 +32,9 @@
 
 #include "mongo/db/catalog/apply_ops.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -239,30 +242,52 @@ Status _applyOps(OperationContext* txn,
     return Status::OK();
 }
 
-bool preconditionOK(OperationContext* txn, const BSONObj& applyOpCmd, BSONObjBuilder* result) {
+Status preconditionOK(OperationContext* txn, const BSONObj& applyOpCmd, BSONObjBuilder* result) {
     dassert(txn->lockState()->isLockHeldForMode(
         ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_X));
 
     if (applyOpCmd["preCondition"].type() == Array) {
         BSONObjIterator i(applyOpCmd["preCondition"].Obj());
         while (i.more()) {
-            BSONObj f = i.next().Obj();
+            BSONObj preCondition = i.next().Obj();
+            if (preCondition["ns"].type() != BSONType::String) {
+                return {ErrorCodes::InvalidNamespace,
+                        str::stream() << "ns in preCondition must be a string, but found type: "
+                                      << typeName(preCondition["ns"].type())};
+            }
+            const NamespaceString nss(preCondition["ns"].valueStringData());
+            if (!nss.isValid()) {
+                return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
+            }
 
             DBDirectClient db(txn);
-            BSONObj realres = db.findOne(f["ns"].String(), f["q"].Obj());
+            BSONObj realres = db.findOne(nss.ns(), preCondition["q"].Obj());
+
+            // Get collection default collation.
+            Database* database = dbHolder().get(txn, nss.db());
+            if (!database) {
+                return {ErrorCodes::NamespaceNotFound,
+                        "database in ns does not exist: " + nss.ns()};
+            }
+            Collection* collection = database->getCollection(nss.ns());
+            if (!collection) {
+                return {ErrorCodes::NamespaceNotFound,
+                        "collection in ns does not exist: " + nss.ns()};
+            }
+            const CollatorInterface* collator = collection->getDefaultCollator();
 
             // Apply-ops would never have a $where/$text matcher. Using the "DisallowExtensions"
             // callback ensures that parsing will throw an error if $where or $text are found.
-            // TODO SERVER-23690: Pass the appropriate CollatorInterface* instead of nullptr.
-            Matcher m(f["res"].Obj(), ExtensionsCallbackDisallowExtensions(), nullptr);
-            if (!m.matches(realres)) {
+            Matcher matcher(
+                preCondition["res"].Obj(), ExtensionsCallbackDisallowExtensions(), collator);
+            if (!matcher.matches(realres)) {
                 result->append("got", realres);
-                result->append("whatFailed", f);
-                return false;
+                result->append("whatFailed", preCondition);
+                return {ErrorCodes::BadValue, "preCondition failed"};
             }
         }
     }
-    return true;
+    return Status::OK();
 }
 }  // namespace
 
@@ -282,8 +307,10 @@ Status applyOps(OperationContext* txn,
         return Status(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while applying ops to database " << dbName);
 
-    if (!preconditionOK(txn, applyOpCmd, result))
-        return Status(ErrorCodes::BadValue, "pre-condition failed");
+    Status preconditionStatus = preconditionOK(txn, applyOpCmd, result);
+    if (!preconditionStatus.isOK()) {
+        return preconditionStatus;
+    }
 
     int numApplied = 0;
     if (!canBeAtomic(applyOpCmd))

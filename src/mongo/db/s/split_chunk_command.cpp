@@ -282,9 +282,14 @@ public:
             }
         }
 
-        // Get collection metadata
-        const std::shared_ptr<CollectionMetadata> collMetadata(
-            shardingState->getCollectionMetadata(nss.ns()));
+        std::shared_ptr<CollectionMetadata> collMetadata;
+        {
+            AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+            // Get collection metadata
+            collMetadata = CollectionShardingState::get(txn, nss.ns())->getMetadata();
+        }
+
         // With nonzero shard version, we must have metadata
         invariant(NULL != collMetadata);
 

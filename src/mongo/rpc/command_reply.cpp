@@ -53,7 +53,9 @@ CommandReply::CommandReply(const Message* message) : _message(message) {
     ConstDataRangeCursor cur(begin, messageEnd);
 
     _commandReply = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    _commandReply.shareOwnershipWith(message->sharedBuffer());
     _metadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    _metadata.shareOwnershipWith(message->sharedBuffer());
     _outputDocs = DocumentRange(cur.data(), messageEnd);
 }
 

@@ -61,11 +61,19 @@
 
     // Ping shard[1] so it will be aware that it is sharded. Otherwise cleanupOrphaned
     // may fail.
-    assert.commandWorked(mongosAdmin.runCommand(
-        {moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
+    assert.commandWorked(mongosAdmin.runCommand({
+        moveChunk: coll.getFullName(),
+        find: {_id: 1},
+        to: st.shard1.shardName,
+        _waitForDelete: true
+    }));
 
-    assert.commandWorked(mongosAdmin.runCommand(
-        {moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard0.shardName}));
+    assert.commandWorked(mongosAdmin.runCommand({
+        moveChunk: coll.getFullName(),
+        find: {_id: 1},
+        to: st.shard0.shardName,
+        _waitForDelete: true
+    }));
 
     // Collection's home is shard0, there are no chunks assigned to shard1.
     st.shard1.getCollection(ns).insert({});

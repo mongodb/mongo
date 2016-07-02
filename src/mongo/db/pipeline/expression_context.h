@@ -28,10 +28,13 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
+#include <memory>
 #include <string>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -39,23 +42,19 @@ namespace mongo {
 
 struct ExpressionContext : public IntrusiveCounterUnsigned {
 public:
-    ExpressionContext(OperationContext* opCtx, const NamespaceString& ns) : ns(ns), opCtx(opCtx) {}
+    ExpressionContext(OperationContext* opCtx, const AggregationRequest& request);
 
-    /** Used by a pipeline to check for interrupts so that killOp() works.
-     *  @throws if the operation has been interrupted
+    /**
+     * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
+     * this aggregation pipeline has been interrupted.
      */
-    void checkForInterrupt() {
-        if (opCtx && --interruptCounter == 0) {  // XXX SERVER-13931 for opCtx check
-            // The checkForInterrupt could be expensive, at least in relative terms.
-            opCtx->checkForInterrupt();
-            interruptCounter = kInterruptCheckPeriod;
-        }
-    }
+    void checkForInterrupt();
 
-    bool inShard = false;
+    bool isExplain;
+    bool inShard;
     bool inRouter = false;
-    bool extSortAllowed = false;
-    bool bypassDocumentValidation = false;
+    bool extSortAllowed;
+    bool bypassDocumentValidation;
 
     NamespaceString ns;
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.
@@ -64,7 +63,7 @@ public:
 
     // Collation requested by the user for this pipeline. Empty if the user did not request a
     // collation.
-    BSONObj collation;
+    const BSONObj collation;
 
     // Collator used to compare elements. 'collator' is initialized from 'collation', except in the
     // case where 'collation' is empty and there is a collection default collation.

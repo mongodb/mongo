@@ -1070,22 +1070,22 @@ TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringKeys) {
         testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
 }
 
-TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNestedObjectKeys) {
+TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromNestedObject) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: {c: 'foo'}}");
     BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': {c: 'foo'}}"));
+    expectedKeys.insert(fromjson("{'': {c: 'oof'}}"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
     ASSERT(
         testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, false, &collator));
 }
 
-TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNestedArrayKeys) {
+TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromNestedArray) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: {c: ['foo', 'bar', 'baz']}}");
     BSONObjSet expectedKeys;
-    expectedKeys.insert(fromjson("{'': {c: ['foo', 'bar', 'baz']}}"));
+    expectedKeys.insert(fromjson("{'': {c: ['oof', 'rab', 'zab']}}"));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{std::set<size_t>{}};
     ASSERT(

@@ -657,7 +657,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel62-large
   - name: query
   - name: where
   - name: update

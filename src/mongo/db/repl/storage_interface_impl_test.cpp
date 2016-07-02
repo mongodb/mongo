@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -40,7 +41,9 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -48,11 +51,20 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
+
+/**
+ * Generates a unique namespace from the test registration agent.
+ */
+template <typename T>
+NamespaceString makeNamespace(const T& t, const char* suffix = "") {
+    return NamespaceString("local." + t.getSuiteName() + "_" + t.getTestName() + suffix);
+}
 
 /**
  * Returns min valid document.
@@ -88,7 +100,7 @@ CollectionOptions createOplogCollectionOptions() {
  */
 void createCollection(OperationContext* txn,
                       const NamespaceString& nss,
-                      const CollectionOptions& options) {
+                      const CollectionOptions& options = CollectionOptions()) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dblk(txn->lockState(), nss.db(), MODE_X);
@@ -106,21 +118,89 @@ void createCollection(OperationContext* txn,
 /**
  * Creates an oplog entry with given optime.
  */
-OplogEntry makeOplogEntry(OpTime opTime) {
+BSONObj makeOplogEntry(OpTime opTime) {
     BSONObjBuilder bob;
     bob.appendElements(opTime.toBSON());
     bob.append("h", 1LL);
     bob.append("op", "c");
     bob.append("ns", "test.t");
-    return OplogEntry(bob.obj());
+    return bob.obj();
 }
+
+/**
+ * Helper to create default ReplSettings for tests.
+ */
+ReplSettings createReplSettings() {
+    ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setReplSetString("mySet/node1:12345");
+    return settings;
+}
+
+/**
+ * Counts the number of keys in an index using an IndexAccessMethod::validate call.
+ */
+int64_t getIndexKeyCount(OperationContext* txn, IndexCatalog* cat, IndexDescriptor* desc) {
+    auto idx = cat->getIndex(desc);
+    int64_t numKeys;
+    ValidateResults fullRes;
+    idx->validate(txn, &numKeys, &fullRes);
+    return numKeys;
+}
+
 
 class StorageInterfaceImplTest : public ServiceContextMongoDTest {
 protected:
-    Client* getClient() const;
+    Client* getClient() const {
+        return &cc();
+    }
 
 private:
-    void setUp() override;
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        // Initializes cc() used in ServiceContextMongoD::_newOpCtx().
+        Client::initThreadIfNotAlready("StorageInterfaceImplTest");
+
+        ReplSettings settings;
+        settings.setOplogSizeBytes(5 * 1024 * 1024);
+        settings.setReplSetString("mySet/node1:12345");
+        ReplicationCoordinator::set(getGlobalServiceContext(),
+                                    stdx::make_unique<ReplicationCoordinatorMock>(settings));
+    }
+};
+
+class StorageInterfaceImplWithReplCoordTest : public ServiceContextMongoDTest {
+protected:
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        Client::initThreadIfNotAlready();
+        createOptCtx();
+        _coordinator = new ReplicationCoordinatorMock(createReplSettings());
+        setGlobalReplicationCoordinator(_coordinator);
+    }
+    void tearDown() override {
+        _txn.reset(nullptr);
+        ServiceContextMongoDTest::tearDown();
+    }
+
+
+    void createOptCtx() {
+        Client::initThreadIfNotAlready();
+        _txn = cc().makeOperationContext();
+        // We are not replicating nor validating these writes.
+        _txn->setReplicatedWrites(false);
+        DisableDocumentValidation validationDisabler(_txn.get());
+    }
+
+    OperationContext* getOperationContext() {
+        return _txn.get();
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _txn;
+
+    // Owned by service context
+    ReplicationCoordinator* _coordinator;
 };
 
 /**
@@ -131,22 +211,6 @@ public:
     bool waitUntilDurable() override;
     bool waitUntilDurableCalled = false;
 };
-
-void StorageInterfaceImplTest::setUp() {
-    ServiceContextMongoDTest::setUp();
-    // Initializes cc() used in ServiceContextMongoD::_newOpCtx().
-    Client::initThreadIfNotAlready("StorageInterfaceImplTest");
-
-    ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setReplSetString("mySet/node1:12345");
-    ReplicationCoordinator::set(getGlobalServiceContext(),
-                                stdx::make_unique<ReplicationCoordinatorMock>(settings));
-}
-
-Client* StorageInterfaceImplTest::getClient() const {
-    return &cc();
-}
 
 bool RecoveryUnitWithDurabilityTracking::waitUntilDurable() {
     waitUntilDurableCalled = true;
@@ -187,6 +251,25 @@ TEST_F(StorageInterfaceImplTest, InitialSyncFlag) {
     // Clearing initial sync flag should affect getInitialSyncFlag() result.
     storageInterface.clearInitialSyncFlag(txn.get());
     ASSERT_FALSE(storageInterface.getInitialSyncFlag(txn.get()));
+}
+
+TEST_F(StorageInterfaceImplTest, GetMinValidAfterSettingInitialSyncFlagWorks) {
+    NamespaceString nss(
+        "local.StorageInterfaceImplTest_GetMinValidAfterSettingInitialSyncFlagWorks");
+
+    StorageInterfaceImpl storageInterface(nss);
+    auto txn = getClient()->makeOperationContext();
+
+    // Initial sync flag should be unset after initializing a new storage engine.
+    ASSERT_FALSE(storageInterface.getInitialSyncFlag(txn.get()));
+
+    // Setting initial sync flag should affect getInitialSyncFlag() result.
+    storageInterface.setInitialSyncFlag(txn.get());
+    ASSERT_TRUE(storageInterface.getInitialSyncFlag(txn.get()));
+
+    auto minValid = storageInterface.getMinValid(txn.get());
+    ASSERT_TRUE(minValid.start.isNull());
+    ASSERT_TRUE(minValid.end.isNull());
 }
 
 TEST_F(StorageInterfaceImplTest, MinValid) {
@@ -245,31 +328,31 @@ TEST_F(StorageInterfaceImplTest, SnapshotNotSupported) {
 }
 
 TEST_F(StorageInterfaceImplTest,
-       WriteOpsToOplogReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
+       InsertDocumentsReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
     NamespaceString nss("local." + _agent.getTestName());
     StorageInterfaceImpl storageInterface(nss);
     auto txn = getClient()->makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation,
-                  storageInterface.writeOpsToOplog(txn.get(), nss, {}));
+                  storageInterface.insertDocuments(txn.get(), nss, {}));
 }
 
 TEST_F(StorageInterfaceImplTest,
-       WriteOpsToOplogReturnsInternalErrorWhenSavingOperationToNonOplogCollection) {
+       InsertDocumentsReturnsInternalErrorWhenSavingOperationToNonOplogCollection) {
     // Create fake non-oplog collection to ensure saving oplog entries (without _id field) will
     // fail.
     auto txn = getClient()->makeOperationContext();
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    createCollection(txn.get(), nss, CollectionOptions());
+    createCollection(txn.get(), nss);
 
     // Non-oplog collection will enforce mandatory _id field requirement on insertion.
     StorageInterfaceImpl storageInterface(nss);
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status = storageInterface.writeOpsToOplog(txn.get(), nss, {op}).getStatus();
+    auto status = storageInterface.insertDocuments(txn.get(), nss, {op});
     ASSERT_EQUALS(ErrorCodes::InternalError, status);
     ASSERT_STRING_CONTAINS(status.reason(), "Collection::insertDocument got document without _id");
 }
 
-TEST_F(StorageInterfaceImplTest, WriteOpsToOplogSavesOperationsReturnsOpTimeOfLastOperation) {
+TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
     // Create fake oplog collection to hold operations.
     auto txn = getClient()->makeOperationContext();
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
@@ -280,27 +363,424 @@ TEST_F(StorageInterfaceImplTest, WriteOpsToOplogSavesOperationsReturnsOpTimeOfLa
     StorageInterfaceImpl storageInterface(nss);
     auto op1 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     auto op2 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    ASSERT_EQUALS(
-        op2.getOpTime(),
-        unittest::assertGet(storageInterface.writeOpsToOplog(txn.get(), nss, {op1, op2})));
+    ASSERT_OK(storageInterface.insertDocuments(txn.get(), nss, {op1, op2}));
 
     // Check contents of oplog. OplogInterface iterates over oplog collection in reverse.
     repl::OplogInterfaceLocal oplog(txn.get(), nss.ns());
     auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(op2.raw, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(op1.raw, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
+    ASSERT_EQUALS(op2, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(op1, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest,
-       WriteOpsToOplogReturnsNamespaceNotFoundIfOplogCollectionDoesNotExist) {
+       InsertDocumentsReturnsNamespaceNotFoundIfOplogCollectionDoesNotExist) {
     auto op = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     NamespaceString nss("local.nosuchcollection");
     StorageInterfaceImpl storageInterface(nss);
     auto txn = getClient()->makeOperationContext();
-    auto status = storageInterface.writeOpsToOplog(txn.get(), nss, {op}).getStatus();
+    auto status = storageInterface.insertDocuments(txn.get(), nss, {op});
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "collection not found");
+    ASSERT_STRING_CONTAINS(status.reason(), "The collection must exist before inserting documents");
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocWorksOnExistingCappedCollection) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("foo.bar");
+    CollectionOptions opts;
+    opts.capped = true;
+    opts.cappedSize = 1024 * 1024;
+    createCollection(txn, nss, opts);
+    ASSERT_OK(storage.insertDocument(txn, nss, BSON("_id" << 1)));
+    AutoGetCollectionForRead autoColl(txn, nss);
+    ASSERT_TRUE(autoColl.getCollection());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocWorksOnExistingCollection) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("foo.bar");
+    createCollection(txn, nss);
+    ASSERT_OK(storage.insertDocument(txn, nss, BSON("_id" << 1)));
+    AutoGetCollectionForRead autoColl(txn, nss);
+    ASSERT_TRUE(autoColl.getCollection());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocFailesIfCollectionIsMissing) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("foo.bar");
+    const auto status = storage.insertDocument(txn, nss, BSON("_id" << 1));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionWithIDIndexCommits) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    storage.startup();
+    NamespaceString nss("foo.bar");
+    CollectionOptions opts;
+    std::vector<BSONObj> indexes;
+    auto loaderStatus = storage.createCollectionForBulkLoading(nss, opts, {}, indexes);
+    ASSERT_OK(loaderStatus.getStatus());
+    auto loader = std::move(loaderStatus.getValue());
+    std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
+    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
+    ASSERT_OK(loader->commit());
+
+    AutoGetCollectionForRead autoColl(txn, nss);
+    auto coll = autoColl.getCollection();
+    ASSERT(coll);
+    ASSERT_EQ(coll->getRecordStore()->numRecords(txn), 2LL);
+    auto collIdxCat = coll->getIndexCatalog();
+    auto idIdxDesc = collIdxCat->findIdIndex(txn);
+    auto count = getIndexKeyCount(txn, collIdxCat, idIdxDesc);
+    ASSERT_EQ(count, 2LL);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionThatAlreadyExistsFails) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    storage.startup();
+    NamespaceString nss("test.system.indexes");
+    createCollection(txn, nss);
+
+    const CollectionOptions opts;
+    const std::vector<BSONObj> indexes;
+    const auto status = storage.createCollectionForBulkLoading(nss, opts, {}, indexes);
+    ASSERT_NOT_OK(status.getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, CreateOplogCreateCappedCollection) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("local.oplog.X");
+    {
+        AutoGetCollectionForRead autoColl(txn, nss);
+        ASSERT_FALSE(autoColl.getCollection());
+    }
+    ASSERT_OK(storage.createOplog(txn, nss));
+    {
+        AutoGetCollectionForRead autoColl(txn, nss);
+        ASSERT_TRUE(autoColl.getCollection());
+        ASSERT_EQ(nss.toString(), autoColl.getCollection()->ns().toString());
+        ASSERT_TRUE(autoColl.getCollection()->isCapped());
+    }
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       CreateCollectionReturnsUserExceptionAsStatusIfCollectionCreationThrows) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("local.oplog.Y");
+    {
+        AutoGetCollectionForRead autoColl(txn, nss);
+        ASSERT_FALSE(autoColl.getCollection());
+    }
+
+    auto status = storage.createCollection(txn, nss, CollectionOptions());
+    ASSERT_EQUALS(ErrorCodes::fromInt(28838), status);
+    ASSERT_STRING_CONTAINS(status.reason(), "cannot create a non-capped oplog collection");
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionFailsIfCollectionExists) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    {
+        AutoGetCollectionForRead autoColl(txn, nss);
+        ASSERT_FALSE(autoColl.getCollection());
+    }
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    {
+        AutoGetCollectionForRead autoColl(txn, nss);
+        ASSERT_TRUE(autoColl.getCollection());
+        ASSERT_EQ(nss.toString(), autoColl.getCollection()->ns().toString());
+    }
+    auto status = storage.createCollection(txn, nss, CollectionOptions());
+    ASSERT_EQUALS(ErrorCodes::NamespaceExists, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           str::stream() << "Collection " << nss.ns() << " already exists");
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithExistingWithDataCollection) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("foo.bar");
+    createCollection(txn, nss);
+    ASSERT_OK(storage.insertDocument(txn, nss, BSON("_id" << 1)));
+    ASSERT_OK(storage.dropCollection(txn, nss));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithExistingEmptyCollection) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("foo.bar");
+    createCollection(txn, nss);
+    ASSERT_OK(storage.dropCollection(txn, nss));
+    AutoGetCollectionForRead autoColl(txn, nss);
+    ASSERT_FALSE(autoColl.getCollection());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithMissingCollection) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("foo.bar");
+    ASSERT_OK(storage.dropCollection(txn, nss));
+    AutoGetCollectionForRead autoColl(txn, nss);
+    ASSERT_FALSE(autoColl.getCollection());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsInvalidNamespaceIfCollectionIsMissing) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsIndexNotFoundIfIndexIsMissing) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("x" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound,
+                  storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneReturnsIndexOptionsConflictIfIndexIsAPartialIndex) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    storage.startup();
+    auto nss = makeNamespace(_agent);
+    std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
+                                             << "x_1"
+                                             << "ns"
+                                             << nss.ns()
+                                             << "partialFilterExpression"
+                                             << BSON("y" << 1))};
+    auto loader = unittest::assertGet(
+        storage.createCollectionForBulkLoading(nss, CollectionOptions(), {}, indexes));
+    std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
+    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
+    ASSERT_OK(loader->commit());
+    auto keyPattern = BSON("x" << 1);
+    ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
+                  storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsCollectionIsEmptyIfCollectionIsEmpty) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty,
+                  storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneReturnsDocumentWithLowestKeyValueIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
+    ASSERT_EQUALS(BSON("_id" << 0),
+                  storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneReturnsDocumentWithHighestKeyValueIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 2),
+        storage.findOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kBackward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneCollectionScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(BSON("_id" << 1),
+                  storage.findOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kForward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindOneCollectionScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(BSON("_id" << 0),
+                  storage.findOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kBackward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneReturnsInvalidNamespaceIfCollectionIsMissing) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_EQUALS(
+        ErrorCodes::NamespaceNotFound,
+        storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, DeleteOneReturnsIndexNotFoundIfIndexIsMissing) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("x" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_EQUALS(
+        ErrorCodes::IndexNotFound,
+        storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneReturnsCollectionIsEmptyIfCollectionIsEmpty) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_EQUALS(
+        ErrorCodes::CollectionIsEmpty,
+        storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneReturnsDocumentWithLowestKeyValueIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 0),
+        storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kForward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneReturnsDocumentWithHighestKeyValueIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto keyPattern = BSON("_id" << 1);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 2),
+        storage.deleteOne(txn, nss, keyPattern, StorageInterface::ScanDirection::kBackward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneCollectionScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 1),
+        storage.deleteOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kForward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteOneCollectionScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(
+        BSON("_id" << 0),
+        storage.deleteOne(txn, nss, BSONObj(), StorageInterface::ScanDirection::kBackward));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 }  // namespace

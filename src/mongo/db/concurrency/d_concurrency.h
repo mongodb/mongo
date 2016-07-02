@@ -100,6 +100,52 @@ public:
         LockResult _result;
     };
 
+    class SharedLock;
+    class ExclusiveLock;
+
+    /**
+     * For use as general mutex or readers/writers lock, outside the general multi-granularity
+     * model. A ResourceMutex is not affected by yielding/temprelease and two phase locking
+     * semantics inside WUOWs. Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same
+     * fairness as other LockManager locks.
+     */
+    class ResourceMutex {
+    public:
+        ResourceMutex();
+
+    private:
+        friend class Lock::SharedLock;
+        friend class Lock::ExclusiveLock;
+
+        /**
+         * Each instantiation of this class allocates a new ResourceId.
+         */
+        ResourceId rid() const {
+            return _rid;
+        }
+
+        const ResourceId _rid;
+    };
+
+    /**
+     * Obtains a ResourceMutex for exclusive use.
+     */
+    class ExclusiveLock : public ResourceLock {
+    public:
+        ExclusiveLock(Locker* locker, ResourceMutex mutex)
+            : ResourceLock(locker, mutex.rid(), MODE_X) {}
+    };
+
+    /**
+     * Obtains a ResourceMutex for shared/non-exclusive use. This uses MODE_IS rather than MODE_S
+     * to take advantage of optimizations in the lock manager for intent modes. This is OK as
+     * this just has to conflict with exclusive locks.
+     */
+    class SharedLock : public ResourceLock {
+    public:
+        SharedLock(Locker* locker, ResourceMutex mutex)
+            : ResourceLock(locker, mutex.rid(), MODE_IS) {}
+    };
 
     /**
      * Global lock.

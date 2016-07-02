@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
@@ -226,9 +227,18 @@ public:
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.
         */
-        if (cmdObj["forShell"].trueValue())
+        if (cmdObj["forShell"].trueValue()) {
             LastError::get(txn->getClient()).disable();
+        }
 
+        // Tag connections to avoid closing them on stepdown.
+        auto hangUpElement = cmdObj["hangUpOnStepDown"];
+        if (!hangUpElement.eoo() && !hangUpElement.trueValue()) {
+            AbstractMessagingPort* mp = txn->getClient()->port();
+            if (mp) {
+                mp->setTag(mp->getTag() | executor::NetworkInterface::kMessagingPortKeepOpen);
+            }
+        }
         appendReplicationInfo(txn, result, 0);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

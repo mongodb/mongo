@@ -50,6 +50,9 @@ namespace mongo {
 namespace repl {
 
 namespace {
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+
 
 /**
  * Runs a single task runner task.
@@ -80,8 +83,7 @@ TaskRunner::TaskRunner(OldThreadPool* threadPool)
 }
 
 TaskRunner::~TaskRunner() {
-    DESTRUCTOR_GUARD(stdx::unique_lock<stdx::mutex> lk(_mutex);
-                     if (!_active) { return; } _cancelRequested = true;
+    DESTRUCTOR_GUARD(UniqueLock lk(_mutex); if (!_active) { return; } _cancelRequested = true;
                      _condition.notify_all();
                      while (_active) { _condition.wait(lk); });
 }
@@ -165,21 +167,26 @@ void TaskRunner::_runTasks() {
     txn.reset();
 
     std::list<Task> tasks;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+    UniqueLock lk{_mutex};
+
+    auto cancelTasks = [&]() {
         tasks.swap(_tasks);
-    }
+        lk.unlock();
+        // Cancel remaining tasks with a CallbackCanceled status.
+        for (auto task : tasks) {
+            runSingleTask(task,
+                          nullptr,
+                          Status(ErrorCodes::CallbackCanceled,
+                                 "this task has been canceled by a previously invoked task"));
+        }
+        tasks.clear();
 
-    // Cancel remaining tasks with a CallbackCanceled status.
-    for (auto task : tasks) {
-        runSingleTask(task,
-                      nullptr,
-                      Status(ErrorCodes::CallbackCanceled,
-                             "this task has been canceled by a previously invoked task"));
-    }
+    };
+    cancelTasks();
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    lk.lock();
     _finishRunTasks_inlock();
+    cancelTasks();
 }
 
 void TaskRunner::_finishRunTasks_inlock() {
@@ -189,7 +196,7 @@ void TaskRunner::_finishRunTasks_inlock() {
 }
 
 TaskRunner::Task TaskRunner::_waitForNextTask() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    UniqueLock lk(_mutex);
 
     while (_tasks.empty() && !_cancelRequested) {
         _condition.wait(lk);
@@ -204,5 +211,43 @@ TaskRunner::Task TaskRunner::_waitForNextTask() {
     return task;
 }
 
+Status TaskRunner::runSynchronousTask(SynchronousTask func, TaskRunner::NextAction nextAction) {
+    // Setup cond_var for signaling when done.
+    bool done = false;
+    stdx::mutex mutex;
+    stdx::condition_variable waitTillDoneCond;
+
+    Status returnStatus{Status::OK()};
+    this->schedule([&](OperationContext* txn, const Status taskStatus) {
+        if (!taskStatus.isOK()) {
+            returnStatus = taskStatus;
+        } else {
+            // Run supplied function.
+            try {
+                log() << "starting to run synchronous task on runner.";
+                returnStatus = func(txn);
+                log() << "done running the synchronous task.";
+            } catch (...) {
+                returnStatus = exceptionToStatus();
+                error() << "Exception thrown in runSynchronousTask: " << returnStatus;
+            }
+        }
+
+        // Signal done.
+        LockGuard lk2{mutex};
+        done = true;
+        waitTillDoneCond.notify_all();
+
+        // return nextAction based on status from supplied function.
+        if (returnStatus.isOK()) {
+            return nextAction;
+        }
+        return TaskRunner::NextAction::kCancel;
+    });
+
+    UniqueLock lk{mutex};
+    waitTillDoneCond.wait(lk, [&done] { return done; });
+    return returnStatus;
+}
 }  // namespace repl
 }  // namespace mongo

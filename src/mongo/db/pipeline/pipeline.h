@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include <deque>
+#include <list>
+#include <vector>
 
 #include <boost/intrusive_ptr.hpp>
 
@@ -42,34 +43,40 @@ class BSONObj;
 class BSONObjBuilder;
 class ClientBasic;
 class CollatorInterface;
-class Command;
 struct DepsTracker;
 class DocumentSource;
-class DocumentSourceNeedsMongod;
 struct ExpressionContext;
 class OperationContext;
-class Privilege;
 
-/** mongodb "commands" (sent via db.$cmd.findOne(...))
-    subclass to make a command.  define a singleton object for it.
-    */
+/**
+ * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
+ * pipeline.
+ */
 class Pipeline : public IntrusiveCounterUnsigned {
 public:
     typedef std::list<boost::intrusive_ptr<DocumentSource>> SourceContainer;
 
     /**
-     * Create a pipeline from the command.
-     *
-     * @param errmsg where to write errors, if there are any
-     * @param cmdObj the command object sent from the client
-     * @returns the pipeline, if created, otherwise a NULL reference
+     * Parses a Pipeline from a BSONElement representing a list of DocumentSources. Returns a non-OK
+     * status if it failed to parse. The returned pipeline is not optimized, but the caller may
+     * convert it to an optimized pipeline by calling optimizePipeline().
      */
-    static boost::intrusive_ptr<Pipeline> parseCommand(
-        std::string& errmsg,
-        const BSONObj& cmdObj,
-        const boost::intrusive_ptr<ExpressionContext>& pCtx);
+    static StatusWith<boost::intrusive_ptr<Pipeline>> parse(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    // Helper to implement Command::checkAuthForCommand
+    /**
+     * Creates a Pipeline from an existing SourceContainer.
+     *
+     * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
+     * is present but is not the last stage.
+     */
+    static StatusWith<boost::intrusive_ptr<Pipeline>> create(
+        SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Helper to implement Command::checkAuthForCommand.
+     */
     static Status checkAuthForCommand(ClientBasic* client,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj);
@@ -87,7 +94,7 @@ public:
      * Sets the OperationContext of 'pCtx' to nullptr.
      *
      * The PipelineProxyStage is responsible for detaching the OperationContext and releasing any
-     * storage-engine state of the DocumentSourceCursor that may be present in 'sources'.
+     * storage-engine state of the DocumentSourceCursor that may be present in '_sources'.
      */
     void detachFromOperationContext();
 
@@ -95,7 +102,7 @@ public:
      * Sets the OperationContext of 'pCtx' to 'opCtx'.
      *
      * The PipelineProxyStage is responsible for reattaching the OperationContext and reacquiring
-     * any storage-engine state of the DocumentSourceCursor that may be present in 'sources'.
+     * any storage-engine state of the DocumentSourceCursor that may be present in '_sources'.
      */
     void reattachToOperationContext(OperationContext* opCtx);
 
@@ -141,22 +148,9 @@ public:
     std::vector<NamespaceString> getInvolvedCollections() const;
 
     /**
-      Write the Pipeline as a BSONObj command.  This should be the
-      inverse of parseCommand().
-
-      This is only intended to be used by the shard command obtained
-      from splitForSharded().  Some pipeline operations in the merge
-      process do not have equivalent command forms, and using this on
-      the mongos Pipeline will cause assertions.
-
-      @param the builder to write the command to
-    */
-    Document serialize() const;
-
-    /** Stitch together the source pointers (by calling setSource) for each source in sources.
-     *  Must be called after optimize and addInitialSource but before trying to get results.
+     * Serializes the pipeline into a form that can be parsed into an equivalent pipeline.
      */
-    void stitch();
+    std::vector<Value> serialize() const;
 
     /**
       Run the Pipeline on the given source.
@@ -165,17 +159,13 @@ public:
     */
     void run(BSONObjBuilder& result);
 
-    bool isExplain() const {
-        return explain;
-    }
-
     /// The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 
     /// The source that represents the output. Returns a non-owning pointer.
     DocumentSource* output() {
-        invariant(!sources.empty());
-        return sources.back().get();
+        invariant(!_sources.empty());
+        return _sources.back().get();
     }
 
     /**
@@ -192,10 +182,9 @@ public:
      */
     DepsTracker getDependencies(const BSONObj& initialQuery) const;
 
-    /**
-      The aggregation command name.
-     */
-    static const char commandName[];
+    const SourceContainer& getSources() {
+        return _sources;
+    }
 
     /*
       PipelineD is a "sister" class that has additional functionality
@@ -221,21 +210,23 @@ private:
     friend class Optimizations::Local;
     friend class Optimizations::Sharded;
 
-    static const char pipelineName[];
-    static const char collationName[];
-    static const char explainName[];
-    static const char fromRouterName[];
-    static const char serverPipelineName[];
-    static const char mongosPipelineName[];
-
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
+    Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    SourceContainer sources;
-    bool explain;
+    /**
+     * Stitch together the source pointers by calling setSource() for each source in '_sources'.
+     * This function must be called any time the order of stages within the pipeline changes, e.g.
+     * in optimizePipeline().
+     */
+    void stitch();
 
-    // Cache of the document sources for which dynamic_cast<DocumentSourceNeedsMongod*>() returns a
-    // non-null pointer.
-    std::vector<DocumentSourceNeedsMongod*> sourcesNeedingMongod;
+    /**
+     * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
+     * is present but is not the last stage in the pipeline.
+     */
+    Status ensureAllStagesAreInLegalPositions() const;
+
+    SourceContainer _sources;
 
     boost::intrusive_ptr<ExpressionContext> pCtx;
 };
