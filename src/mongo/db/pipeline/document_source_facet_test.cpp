@@ -161,8 +161,8 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
  */
 class DocumentSourcePassthrough : public DocumentSourceMock {
 public:
-    DocumentSourcePassthrough(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMock({}, expCtx) {}
+    DocumentSourcePassthrough(const boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx)
+        : DocumentSourceMock({}, aggrExcCtx) {}
 
     // We need this to be false so that it can be used in a $facet stage.
     bool isValidInitialSource() const final {
@@ -174,8 +174,8 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourcePassthrough> create(
-        boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourcePassthrough(expCtx);
+        boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx) {
+        return new DocumentSourcePassthrough(aggrExcCtx);
     }
 };
 

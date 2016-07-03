@@ -35,7 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/stdx/memory.h"
 
@@ -53,7 +53,7 @@ const char* DocumentSourceGraphLookUp::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     uassert(
         40106, "from collection must have a unique _id index", _mongod->hasUniqueIdIndex(_from));
@@ -402,7 +402,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::intrusive_ptr<Expression> startWith,
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    const boost::intrusive_ptr<AggregationExecContext>& expCtx)
     : DocumentSourceNeedsMongod(expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
@@ -413,7 +413,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _maxDepth(maxDepth) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& expCtx) {
     NamespaceString from;
     std::string as;
     boost::intrusive_ptr<Expression> startWith;

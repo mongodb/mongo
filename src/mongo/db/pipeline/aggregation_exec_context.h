@@ -40,9 +40,9 @@
 
 namespace mongo {
 
-struct ExpressionContext : public IntrusiveCounterUnsigned {
+struct AggregationExecContext : public IntrusiveCounterUnsigned {
 public:
-    ExpressionContext(OperationContext* opCtx, const AggregationRequest& request);
+    AggregationExecContext(OperationContext* opCtx, const AggregationRequest& request);
 
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if

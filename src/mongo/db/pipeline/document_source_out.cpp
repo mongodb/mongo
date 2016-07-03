@@ -120,7 +120,7 @@ void DocumentSourceOut::spill(const vector<BSONObj>& toInsert) {
 }
 
 boost::optional<Document> DocumentSourceOut::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     // make sure we only write out once
     if (_done)
@@ -170,31 +170,31 @@ boost::optional<Document> DocumentSourceOut::getNext() {
 }
 
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
-                                     const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
+                                     const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSourceNeedsMongod(pAggrExcCtx),
       _done(false),
       _tempNs("")  // filled in by prepTempCollection
       ,
       _outputNs(outputNs) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(16990,
             str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
             elem.type() == String);
 
     uassert(ErrorCodes::InvalidOptions,
             "$out can only be used with the 'local' read concern level",
-            !pExpCtx->opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
+            !pAggrExcCtx->opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
 
-    NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
+    NamespaceString outputNs(pAggrExcCtx->ns.db().toString() + '.' + elem.str());
     uassert(17385, "Can't $out to special collection: " + elem.str(), !outputNs.isSpecial());
-    return new DocumentSourceOut(outputNs, pExpCtx);
+    return new DocumentSourceOut(outputNs, pAggrExcCtx);
 }
 
 Value DocumentSourceOut::serialize(bool explain) const {
     massert(
-        17000, "$out shouldn't have different db than input", _outputNs.db() == pExpCtx->ns.db());
+        17000, "$out shouldn't have different db than input", _outputNs.db() == pAggrExcCtx->ns.db());
 
     return Value(DOC(getSourceName() << _outputNs.coll()));
 }

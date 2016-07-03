@@ -30,7 +30,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 
 namespace mongo {
 
@@ -40,7 +40,7 @@ using std::vector;
 REGISTER_DOCUMENT_SOURCE_ALIAS(sortByCount, DocumentSourceSortByCount::createFromBson);
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     if (elem.type() == Object) {
         // Make sure that the sortByCount field is an expression inside an object
         BSONObj innerObj = elem.embeddedObject();
@@ -67,8 +67,8 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONObj groupObj = BSON("$group" << groupExprBuilder.obj());
     BSONObj sortObj = BSON("$sort" << BSON("count" << -1));
 
-    auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
-    auto sortSource = DocumentSourceSort::createFromBson(sortObj.firstElement(), pExpCtx);
+    auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pAggrExcCtx);
+    auto sortSource = DocumentSourceSort::createFromBson(sortObj.firstElement(), pAggrExcCtx);
 
     return {groupSource, sortSource};
 }

@@ -35,24 +35,24 @@
 #include <vector>
 
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
+DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<AggregationExecContext>& expCtx,
                                                      const intrusive_ptr<TeeBuffer>& bufferSource)
     : DocumentSource(expCtx), _bufferSource(bufferSource), _iterator() {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<AggregationExecContext>& expCtx,
     const boost::intrusive_ptr<TeeBuffer>& bufferSource) {
     return new DocumentSourceTeeConsumer(expCtx, bufferSource);
 }
 
 boost::optional<Document> DocumentSourceTeeConsumer::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (!_initialized) {
         _bufferSource->populate();

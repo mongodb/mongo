@@ -35,7 +35,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/stdx/memory.h"
 
@@ -48,8 +48,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string as,
                                            std::string localField,
                                            std::string foreignField,
-                                           const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
+                                           const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSourceNeedsMongod(pAggrExcCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
       _localField(std::move(localField)),
@@ -86,7 +86,7 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const vector<Value>& 
 }  // namespace
 
 boost::optional<Document> DocumentSourceLookUp::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     uassert(4567, "from collection cannot be sharded", !_mongod->isSharded(_fromNs));
 
@@ -94,7 +94,7 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
         // We have internalized a $match, but have not yet computed the descended $match that should
         // be applied to our queries.
         _additionalFilter = DocumentSourceMatch::descendMatchOnPath(
-                                _matchSrc->getMatchExpression(), _as.fullPath(), pExpCtx)
+                                _matchSrc->getMatchExpression(), _as.fullPath(), pAggrExcCtx)
                                 ->getQuery();
     }
 
@@ -394,7 +394,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
             // descended match expression.
             output[getSourceName()]["matching"] =
                 Value(DocumentSourceMatch::descendMatchOnPath(
-                          _matchSrc->getMatchExpression(), _as.fullPath(), pExpCtx)
+                          _matchSrc->getMatchExpression(), _as.fullPath(), pAggrExcCtx)
                           ->getQuery());
         }
 
@@ -421,7 +421,7 @@ DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker*
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(4569, "the $lookup specification must be an Object", elem.type() == Object);
 
     NamespaceString fromNs;
@@ -437,7 +437,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         const auto argName = argument.fieldNameStringData();
 
         if (argName == "from") {
-            fromNs = NamespaceString(pExpCtx->ns.db().toString() + '.' + argument.String());
+            fromNs = NamespaceString(pAggrExcCtx->ns.db().toString() + '.' + argument.String());
         } else if (argName == "as") {
             as = argument.String();
         } else if (argName == "localField") {
@@ -455,6 +455,6 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
             !fromNs.ns().empty() && !as.empty() && !localField.empty() && !foreignField.empty());
 
     return new DocumentSourceLookUp(
-        std::move(fromNs), std::move(as), std::move(localField), std::move(foreignField), pExpCtx);
+        std::move(fromNs), std::move(as), std::move(localField), std::move(foreignField), pAggrExcCtx);
 }
 }

@@ -32,7 +32,7 @@
 #include <memory>
 
 #include "mongo/db/client.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
@@ -41,23 +41,23 @@
 namespace mongo {
 
 /**
- * Test fixture which provides an ExpressionContext for use in testing.
+ * Test fixture which provides an AggregationExecContext for use in testing.
  */
 class AggregationContextFixture : public unittest::Test {
 public:
     AggregationContextFixture()
         : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
-          _expCtx(new ExpressionContext(
+          _expCtx(new AggregationExecContext(
               _opCtx.get(), AggregationRequest(NamespaceString("unittests.pipeline_test"), {}))) {}
 
-    boost::intrusive_ptr<ExpressionContext> getExpCtx() {
+    boost::intrusive_ptr<AggregationExecContext> getExpCtx() {
         return _expCtx.get();
     }
 
 private:
     std::unique_ptr<QueryTestServiceContext> _queryServiceContext;
     ServiceContext::UniqueOperationContext _opCtx;
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
+    boost::intrusive_ptr<AggregationExecContext> _expCtx;
 };
 }  // namespace mongo

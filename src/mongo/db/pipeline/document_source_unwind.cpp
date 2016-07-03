@@ -153,11 +153,11 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
     return _haveNext ? _output.peek() : _output.freeze();
 }
 
-DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx,
+DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx,
                                            const FieldPath& fieldPath,
                                            bool preserveNullAndEmptyArrays,
                                            const boost::optional<FieldPath>& indexPath)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(pAggrExcCtx),
       _unwindPath(fieldPath),
       _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
       _indexPath(indexPath),
@@ -170,7 +170,7 @@ const char* DocumentSourceUnwind::getSourceName() const {
 }
 
 intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
-    const intrusive_ptr<ExpressionContext>& expCtx,
+    const intrusive_ptr<AggregationExecContext>& expCtx,
     const string& unwindPath,
     bool preserveNullAndEmptyArrays,
     const boost::optional<string>& indexPath) {
@@ -182,7 +182,7 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
 }
 
 boost::optional<Document> DocumentSourceUnwind::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     boost::optional<Document> out = _unwinder->getNext();
     while (!out) {
@@ -278,7 +278,7 @@ DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker*
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     // $unwind accepts either the legacy "{$unwind: '$path'}" syntax, or a nested document with
     // extra options.
     string prefixedPathString;
@@ -333,6 +333,6 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
                           << prefixedPathString,
             prefixedPathString[0] == '$');
     string pathString(Expression::removeFieldPrefix(prefixedPathString));
-    return DocumentSourceUnwind::create(pExpCtx, pathString, preserveNullAndEmptyArrays, indexPath);
+    return DocumentSourceUnwind::create(pAggrExcCtx, pathString, preserveNullAndEmptyArrays, indexPath);
 }
 }

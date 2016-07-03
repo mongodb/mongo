@@ -34,7 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -45,8 +45,8 @@ using std::make_pair;
 using std::string;
 using std::vector;
 
-DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), populated(false), _mergingPresorted(false) {}
+DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSource(pAggrExcCtx), populated(false), _mergingPresorted(false) {}
 
 REGISTER_DOCUMENT_SOURCE(sort, DocumentSourceSort::createFromBson);
 
@@ -55,7 +55,7 @@ const char* DocumentSourceSort::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceSort::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (!populated)
         populate();
@@ -162,14 +162,14 @@ DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* d
 
 
 intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(15973, "the $sort key specification must be an object", elem.type() == Object);
-    return create(pExpCtx, elem.embeddedObject());
+    return create(pAggrExcCtx, elem.embeddedObject());
 }
 
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx, BSONObj sortOrder, long long limit) {
-    intrusive_ptr<DocumentSourceSort> pSort = new DocumentSourceSort(pExpCtx);
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx, BSONObj sortOrder, long long limit) {
+    intrusive_ptr<DocumentSourceSort> pSort = new DocumentSourceSort(pAggrExcCtx);
     pSort->_sort = sortOrder.getOwned();
 
     /* check for then iterate over the sort object */
@@ -215,7 +215,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     uassert(15976, "$sort stage must have at least one sort key", !pSort->vSortKey.empty());
 
     if (limit > 0) {
-        pSort->setLimitSrc(DocumentSourceLimit::create(pExpCtx, limit));
+        pSort->setLimitSrc(DocumentSourceLimit::create(pAggrExcCtx, limit));
     }
 
     return pSort;
@@ -230,9 +230,9 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
         opts.limit = limitSrc->getLimit();
 
     opts.maxMemoryUsageBytes = 100 * 1024 * 1024;
-    if (pExpCtx->extSortAllowed && !pExpCtx->inRouter) {
+    if (pAggrExcCtx->extSortAllowed && !pAggrExcCtx->inRouter) {
         opts.extSortAllowed = true;
-        opts.tempDir = pExpCtx->tempDir;
+        opts.tempDir = pAggrExcCtx->tempDir;
     }
 
     return opts;
@@ -355,7 +355,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::getShardSource() {
 
 intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
     verify(!_mergingPresorted);
-    intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pExpCtx);
+    intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pAggrExcCtx);
     other->vAscending = vAscending;
     other->vSortKey = vSortKey;
     other->limitSrc = limitSrc;

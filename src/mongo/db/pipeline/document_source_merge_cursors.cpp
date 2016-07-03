@@ -40,8 +40,8 @@ using std::vector;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     std::vector<CursorDescriptor> cursorDescriptors,
-    const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _cursorDescriptors(std::move(cursorDescriptors)), _unstarted(true) {}
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSource(pAggrExcCtx), _cursorDescriptors(std::move(cursorDescriptors)), _unstarted(true) {}
 
 REGISTER_DOCUMENT_SOURCE(mergeCursors, DocumentSourceMergeCursors::createFromBson);
 
@@ -51,12 +51,12 @@ const char* DocumentSourceMergeCursors::getSourceName() const {
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
     std::vector<CursorDescriptor> cursorDescriptors,
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
+    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pAggrExcCtx);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     massert(17026,
             string("Expected an Array, but got a ") + typeName(elem.type()),
             elem.type() == Array);
@@ -71,14 +71,14 @@ intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
         // The cursor descriptors for the merge cursors stage used to lack an "ns" field; "ns" was
         // understood to be the expression context namespace in that case. For mixed-version
         // compatibility, we accept both the old and new formats here.
-        std::string cursorNs = cursor["ns"] ? cursor["ns"].String() : pExpCtx->ns.ns();
+        std::string cursorNs = cursor["ns"] ? cursor["ns"].String() : pAggrExcCtx->ns.ns();
 
         cursorDescriptors.emplace_back(ConnectionString(HostAndPort(cursor["host"].String())),
                                        std::move(cursorNs),
                                        cursor["id"].Long());
     }
 
-    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
+    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pAggrExcCtx);
 }
 
 Value DocumentSourceMergeCursors::serialize(bool explain) const {

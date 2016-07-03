@@ -55,7 +55,7 @@ const char* DocumentSourceCursor::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceCursor::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (_currentBatch.empty()) {
         loadBatch();
@@ -85,7 +85,7 @@ void DocumentSourceCursor::loadBatch() {
     // We have already validated the sharding version when we constructed the PlanExecutor
     // so we shouldn't check it again.
     const NamespaceString nss(_ns);
-    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
+    AutoGetCollectionForRead autoColl(pAggrExcCtx->opCtx, nss);
 
     _exec->restoreState();
 
@@ -190,7 +190,7 @@ Value DocumentSourceCursor::serialize(bool explain) const {
     BSONObjBuilder explainBuilder;
     {
         const NamespaceString nss(_ns);
-        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
+        AutoGetCollectionForRead autoColl(pAggrExcCtx->opCtx, nss);
 
         massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
@@ -223,7 +223,7 @@ Value DocumentSourceCursor::serialize(bool explain) const {
 
 DocumentSourceCursor::DocumentSourceCursor(const string& ns,
                                            const std::shared_ptr<PlanExecutor>& exec,
-                                           const intrusive_ptr<ExpressionContext>& pCtx)
+                                           const intrusive_ptr<AggregationExecContext>& pCtx)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
       _ns(ns),
@@ -238,8 +238,8 @@ DocumentSourceCursor::DocumentSourceCursor(const string& ns,
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const string& ns,
     const std::shared_ptr<PlanExecutor>& exec,
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceCursor(ns, exec, pExpCtx);
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
+    return new DocumentSourceCursor(ns, exec, pAggrExcCtx);
 }
 
 void DocumentSourceCursor::setProjection(const BSONObj& projection,

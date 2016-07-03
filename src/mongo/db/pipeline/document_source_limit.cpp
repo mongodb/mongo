@@ -32,16 +32,16 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>& pExpCtx,
+DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx,
                                          long long limit)
-    : DocumentSource(pExpCtx), limit(limit), count(0) {}
+    : DocumentSource(pAggrExcCtx), limit(limit), count(0) {}
 
 REGISTER_DOCUMENT_SOURCE(limit, DocumentSourceLimit::createFromBson);
 
@@ -64,7 +64,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLimit::optimizeAt(
 }
 
 boost::optional<Document> DocumentSourceLimit::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (++count > limit) {
         pSource->dispose();
@@ -79,16 +79,16 @@ Value DocumentSourceLimit::serialize(bool explain) const {
 }
 
 intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx, long long limit) {
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx, long long limit) {
     uassert(15958, "the limit must be positive", limit > 0);
-    return new DocumentSourceLimit(pExpCtx, limit);
+    return new DocumentSourceLimit(pAggrExcCtx, limit);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceLimit::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(15957, "the limit must be specified as a number", elem.isNumber());
 
     long long limit = elem.numberLong();
-    return DocumentSourceLimit::create(pExpCtx, limit);
+    return DocumentSourceLimit::create(pAggrExcCtx, limit);
 }
 }

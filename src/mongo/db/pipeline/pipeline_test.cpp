@@ -34,7 +34,7 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -87,7 +87,7 @@ public:
             rawPipeline.push_back(stageElem.embeddedObject());
         }
         AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
-        intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(&_opCtx, request);
+        intrusive_ptr<AggregationExecContext> ctx = new AggregationExecContext(&_opCtx, request);
         auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         outputPipe->optimizePipeline();
 
@@ -734,7 +734,7 @@ public:
             rawPipeline.push_back(stageElem.embeddedObject());
         }
         AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
-        intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(&_opCtx, request);
+        intrusive_ptr<AggregationExecContext> ctx = new AggregationExecContext(&_opCtx, request);
         mergePipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         mergePipe->optimizePipeline();
 
@@ -1078,7 +1078,7 @@ TEST(PipelineInitialSource, GeoNearInitialQuery) {
     OperationContextNoop _opCtx;
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}")};
-    intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(
+    intrusive_ptr<AggregationExecContext> ctx = new AggregationExecContext(
         &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
     auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
     ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 1));
@@ -1087,7 +1087,7 @@ TEST(PipelineInitialSource, GeoNearInitialQuery) {
 TEST(PipelineInitialSource, MatchInitialQuery) {
     OperationContextNoop _opCtx;
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {'a': 4}}")};
-    intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(
+    intrusive_ptr<AggregationExecContext> ctx = new AggregationExecContext(
         &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
 
     auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
@@ -1103,7 +1103,7 @@ TEST(PipelineInitialSource, ParseCollation) {
     auto request = AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson);
     ASSERT_OK(request.getStatus());
 
-    intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(opCtx.get(), request.getValue());
+    intrusive_ptr<AggregationExecContext> ctx = new AggregationExecContext(opCtx.get(), request.getValue());
     ASSERT(ctx->collator.get());
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_TRUE(CollatorInterface::collatorsMatch(ctx->collator.get(), &collator));

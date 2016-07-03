@@ -33,14 +33,14 @@
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 using boost::intrusive_ptr;
 
-DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _size(0) {}
+DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSource(pAggrExcCtx), _size(0) {}
 
 REGISTER_DOCUMENT_SOURCE(sample, DocumentSourceSample::createFromBson);
 
@@ -52,11 +52,11 @@ boost::optional<Document> DocumentSourceSample::getNext() {
     if (_size == 0)
         return {};
 
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (!_sortStage->isPopulated()) {
         // Exhaust source stage, add random metadata, and push all into sorter.
-        PseudoRandom& prng = pExpCtx->opCtx->getClient()->getPrng();
+        PseudoRandom& prng = pAggrExcCtx->opCtx->getClient()->getPrng();
         while (boost::optional<Document> next = pSource->getNext()) {
             MutableDocument doc(std::move(*next));
             doc.setRandMetaField(prng.nextCanonicalDouble());
@@ -79,7 +79,7 @@ const BSONObj randSortSpec = BSON("$rand" << BSON("$meta"
 }  // namespace
 
 intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
-    BSONElement specElem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONElement specElem, const intrusive_ptr<AggregationExecContext>& expCtx) {
     uassert(28745, "the $sample stage specification must be an object", specElem.type() == Object);
     intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
 
@@ -109,6 +109,6 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::getShardSource() {
 
 intrusive_ptr<DocumentSource> DocumentSourceSample::getMergeSource() {
     // Just need to merge the pre-sorted documents by their random values.
-    return DocumentSourceSort::create(pExpCtx, randSortSpec, _size);
+    return DocumentSourceSort::create(pAggrExcCtx, randSortSpec, _size);
 }
 }  // mongo

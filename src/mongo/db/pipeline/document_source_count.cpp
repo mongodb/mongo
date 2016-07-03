@@ -30,7 +30,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 
 namespace mongo {
 
@@ -41,7 +41,7 @@ using std::string;
 REGISTER_DOCUMENT_SOURCE_ALIAS(count, DocumentSourceCount::createFromBson);
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(40156,
             str::stream() << "the count field must be a non-empty string",
             elem.type() == String);
@@ -65,8 +65,8 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONObj groupObj = BSON("$group" << BSON("_id" << BSONNULL << elemString << BSON("$sum" << 1)));
     BSONObj projectObj = BSON("$project" << BSON("_id" << 0 << elemString << 1));
 
-    auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
-    auto projectSource = DocumentSourceProject::createFromBson(projectObj.firstElement(), pExpCtx);
+    auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pAggrExcCtx);
+    auto projectSource = DocumentSourceProject::createFromBson(projectObj.firstElement(), pAggrExcCtx);
 
     return {groupSource, projectSource};
 }

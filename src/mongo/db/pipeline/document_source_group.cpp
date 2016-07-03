@@ -33,7 +33,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -50,7 +50,7 @@ const char* DocumentSourceGroup::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceGroup::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (!_initialized)
         initialize();
@@ -99,7 +99,7 @@ boost::optional<Document> DocumentSourceGroup::getNextSpilled() {
         _firstPartOfNextGroup = _sorterIterator->next();
     }
 
-    return makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
+    return makeDocument(_currentId, _currentAccumulators, pAggrExcCtx->inShard);
 }
 
 boost::optional<Document> DocumentSourceGroup::getNextStandard() {
@@ -107,7 +107,7 @@ boost::optional<Document> DocumentSourceGroup::getNextStandard() {
     if (groups.empty())
         return boost::none;
 
-    Document out = makeDocument(groupsIterator->first, groupsIterator->second, pExpCtx->inShard);
+    Document out = makeDocument(groupsIterator->first, groupsIterator->second, pAggrExcCtx->inShard);
 
     if (++groupsIterator == groups.end())
         dispose();
@@ -148,7 +148,7 @@ boost::optional<Document> DocumentSourceGroup::getNextStreaming() {
         id = computeId(_variables.get());
     } while (_currentId == id);
 
-    Document out = makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
+    Document out = makeDocument(_currentId, _currentAccumulators, pAggrExcCtx->inShard);
     _currentId = std::move(id);
 
     return out;
@@ -236,19 +236,19 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
 }
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceGroup(pExpCtx);
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
+    return new DocumentSourceGroup(pAggrExcCtx);
 }
 
-DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSource(pAggrExcCtx),
       _doingMerge(false),
       _maxMemoryUsageBytes(100 * 1024 * 1024),
       _inputSort(BSONObj()),
       _streaming(false),
       _initialized(false),
       _spilled(false),
-      _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {}
+      _extSortAllowed(pAggrExcCtx->extSortAllowed && !pAggrExcCtx->inRouter) {}
 
 void DocumentSourceGroup::addAccumulator(const std::string& fieldName,
                                          Accumulator::Factory accumulatorFactory,
@@ -259,10 +259,10 @@ void DocumentSourceGroup::addAccumulator(const std::string& fieldName,
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(15947, "a group's fields must be specified in an object", elem.type() == Object);
 
-    intrusive_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create(pExpCtx));
+    intrusive_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create(pAggrExcCtx));
 
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
@@ -510,7 +510,7 @@ void DocumentSourceGroup::initialize() {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
             if (!inserted  // is a dup
                 &&
-                !pExpCtx->inRouter  // can't spill to disk in router
+                !pAggrExcCtx->inRouter  // can't spill to disk in router
                 &&
                 !_extSortAllowed  // don't change behavior when testing external sort
                 &&
@@ -557,7 +557,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator());
 
-    SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir));
+    SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pAggrExcCtx->tempDir));
     switch (vpAccumulatorFactory.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                             // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
@@ -827,7 +827,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
-    intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pExpCtx));
+    intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pAggrExcCtx));
     pMerger->setDoingMerge(true);
 
     VariablesIdGenerator idGenerator;

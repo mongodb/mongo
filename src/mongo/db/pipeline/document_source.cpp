@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 
@@ -40,8 +40,8 @@ using boost::intrusive_ptr;
 using std::string;
 using std::vector;
 
-DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(NULL), pExpCtx(pCtx) {}
+DocumentSource::DocumentSource(const intrusive_ptr<AggregationExecContext>& pCtx)
+    : pSource(NULL), pAggrExcCtx(pCtx) {}
 
 namespace {
 // Used to keep track of which DocumentSources are registered under which name.
@@ -57,7 +57,7 @@ void DocumentSource::registerParser(string name, Parser parser) {
 }
 
 vector<intrusive_ptr<DocumentSource>> DocumentSource::parse(
-    const intrusive_ptr<ExpressionContext> expCtx, BSONObj stageObj) {
+    const intrusive_ptr<AggregationExecContext> aggrExcCtx, BSONObj stageObj) {
     uassert(16435,
             "A pipeline stage specification object must contain exactly one field.",
             stageObj.nFields() == 1);
@@ -71,7 +71,7 @@ vector<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second(stageSpec, expCtx);
+    return it->second(stageSpec, aggrExcCtx);
 }
 
 const char* DocumentSource::getSourceName() const {

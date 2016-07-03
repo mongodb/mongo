@@ -39,7 +39,7 @@
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -84,7 +84,7 @@ using mongo::DocumentSourceCursor;
 
 class Base : public CollectionBase {
 public:
-    Base() : _ctx(new ExpressionContext(&_opCtx, AggregationRequest(nss, {}))) {
+    Base() : _ctx(new AggregationExecContext(&_opCtx, AggregationRequest(nss, {}))) {
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 
@@ -112,7 +112,7 @@ protected:
         _source = DocumentSourceCursor::create(nss.ns(), _exec, _ctx);
     }
 
-    intrusive_ptr<ExpressionContext> ctx() {
+    intrusive_ptr<AggregationExecContext> ctx() {
         return _ctx;
     }
 
@@ -123,7 +123,7 @@ protected:
 private:
     // It is important that these are ordered to ensure correct destruction order.
     std::shared_ptr<PlanExecutor> _exec;
-    intrusive_ptr<ExpressionContext> _ctx;
+    intrusive_ptr<AggregationExecContext> _ctx;
     intrusive_ptr<DocumentSourceCursor> _source;
 };
 
