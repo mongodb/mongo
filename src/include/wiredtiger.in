@@ -3800,6 +3800,11 @@ struct __wt_file_system {
 	/*!
 	 * Open a handle for a named file system object
 	 *
+	 * The method should return ENOENT if the file does not exist.
+	 * The method should return EACCES if the file cannot be opened in the
+	 * requested mode (for example, a file opened for writing in a readonly
+	 * file system).
+	 *
 	 * @errors
 	 *
 	 * @param file_system the WT_FILE_SYSTEM
@@ -3981,7 +3986,7 @@ struct __wt_file_handle {
 
 	/*!
 	 * Lock/unlock a file from the perspective of other processes running
-	 * in the system.
+	 * in the system, where necessary.
 	 *
 	 * @errors
 	 *
