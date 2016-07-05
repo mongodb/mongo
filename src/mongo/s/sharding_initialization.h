@@ -78,8 +78,8 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder);
 
 /**
- * Tries to contact the config server and reload the shard registry until it succeeds or
- * is interrupted.
+ * Tries to contact the config server and reload the shard registry and the cluster ID until it
+ * succeeds or is interrupted.
  */
 Status reloadShardRegistryUntilSuccess(OperationContext* txn);
 

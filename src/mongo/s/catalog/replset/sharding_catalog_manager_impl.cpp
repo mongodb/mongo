@@ -61,6 +61,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -498,11 +499,17 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
         shardType.setMaxSizeMB(maxSize);
     }
 
+    auto clusterIdentity = ClusterIdentityLoader::get(txn);
+    auto clusterId = clusterIdentity->getClusterId(txn);
+    if (!clusterId.isOK()) {
+        return clusterId.getStatus();
+    }
+
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         Grid::get(txn)->shardRegistry()->getConfigServerConnectionString());
     shardIdentity.setShardName(shardType.getName());
-    shardIdentity.setClusterId(Grid::get(txn)->shardRegistry()->getClusterId());
+    shardIdentity.setClusterId(clusterId.getValue());
     auto validateStatus = shardIdentity.validate();
     if (!validateStatus.isOK()) {
         return validateStatus;
@@ -749,47 +756,9 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
     return Status::OK();
 }
 
-StatusWith<VersionType> ShardingCatalogManagerImpl::_getConfigVersion(OperationContext* txn) {
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        txn,
-        kConfigReadSelector,
-        // Use local read concern as we're likely to follow this up with a write.
-        repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString(VersionType::ConfigNS),
-        BSONObj(),
-        BSONObj(),
-        boost::none /* no limit */);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-
-    auto queryResults = findStatus.getValue().docs;
-
-    if (queryResults.size() > 1) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                str::stream() << "should only have 1 document in " << VersionType::ConfigNS};
-    }
-
-    if (queryResults.empty()) {
-        VersionType versionInfo;
-        versionInfo.setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
-        versionInfo.setCurrentVersion(UpgradeHistory_EmptyVersion);
-        return versionInfo;
-    }
-
-    BSONObj versionDoc = queryResults.front();
-    auto versionTypeResult = VersionType::fromBSON(versionDoc);
-    if (!versionTypeResult.isOK()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "invalid config version document: " << versionDoc
-                                    << versionTypeResult.getStatus().toString());
-    }
-
-    return versionTypeResult.getValue();
-}
-
 Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* txn) {
-    auto versionStatus = _getConfigVersion(txn);
+    auto versionStatus =
+        _catalogClient->getConfigVersion(txn, repl::ReadConcernLevel::kLocalReadConcern);
     if (!versionStatus.isOK()) {
         return versionStatus.getStatus();
     }

@@ -54,10 +54,12 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -907,6 +909,53 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 
     invariant(docs.size() == 1);
     return docs.front();
+}
+
+StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
+    OperationContext* txn, repl::ReadConcernLevel readConcern) {
+    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        txn,
+        kConfigReadSelector,
+        readConcern,
+        NamespaceString(VersionType::ConfigNS),
+        BSONObj(),
+        BSONObj(),
+        boost::none /* no limit */);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    auto queryResults = findStatus.getValue().docs;
+
+    if (queryResults.size() > 1) {
+        return {ErrorCodes::TooManyMatchingDocuments,
+                str::stream() << "should only have 1 document in " << VersionType::ConfigNS};
+    }
+
+    if (queryResults.empty()) {
+        VersionType versionInfo;
+        versionInfo.setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
+        versionInfo.setCurrentVersion(UpgradeHistory_EmptyVersion);
+        versionInfo.setClusterId(OID{});
+        return versionInfo;
+    }
+
+    BSONObj versionDoc = queryResults.front();
+    auto versionTypeResult = VersionType::fromBSON(versionDoc);
+    if (!versionTypeResult.isOK()) {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "invalid config.version document: " << versionDoc
+                                    << causedBy(versionTypeResult.getStatus()));
+    }
+
+    auto validationStatus = versionTypeResult.getValue().validate();
+    if (!validationStatus.isOK()) {
+        return Status(validationStatus.code(),
+                      str::stream() << "invalid config.version document: " << versionDoc
+                                    << causedBy(validationStatus.reason()));
+    }
+
+    return versionTypeResult.getValue();
 }
 
 Status ShardingCatalogClientImpl::getDatabasesForShard(OperationContext* txn,

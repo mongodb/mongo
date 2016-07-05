@@ -164,6 +164,7 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
         if (auto idElem = insertedDoc["_id"]) {
             if (idElem.str() == ShardIdentityType::IdName) {
                 auto shardIdentityDoc = uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
+                uassertStatusOK(shardIdentityDoc.validate());
                 txn->recoveryUnit()->registerChange(
                     new ShardIdentityLopOpHandler(txn, std::move(shardIdentityDoc)));
             }

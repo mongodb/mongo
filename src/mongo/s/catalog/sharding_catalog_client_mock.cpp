@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/stdx/memory.h"
@@ -181,6 +182,11 @@ Status ShardingCatalogClientMock::logChange(OperationContext* txn,
 
 StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* txn,
                                                                  StringData key) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+StatusWith<VersionType> ShardingCatalogClientMock::getConfigVersion(
+    OperationContext* txn, repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

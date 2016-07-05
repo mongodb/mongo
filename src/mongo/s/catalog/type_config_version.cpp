@@ -84,6 +84,10 @@ Status VersionType::validate() const {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << clusterId.name() << " field"};
     }
 
+    if (!_clusterId->isSet()) {
+        return {ErrorCodes::NotYetInitialized, "Cluster ID cannot be empty"};
+    }
+
     return Status::OK();
 }
 
@@ -210,7 +214,6 @@ void VersionType::setCurrentVersion(const int currentVersion) {
 }
 
 void VersionType::setClusterId(const OID& clusterId) {
-    invariant(clusterId.isSet());
     _clusterId = clusterId;
 }
 

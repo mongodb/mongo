@@ -122,11 +122,6 @@ private:
                                                               const BSONObj& cmdObj);
 
     /**
-     * Returns the current cluster schema/protocol version.
-     */
-    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
-
-    /**
      * Performs the necessary checks for version compatibility and creates a new config.version
      * document if the current cluster config is empty.
      */

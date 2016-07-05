@@ -329,33 +329,6 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(txn()).toString());
 }
 
-TEST_F(ShardingStateTest, InitializeAgainWithPreviouslyUnsetClusterIdSucceeds) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
-    shardIdentity.setClusterId(OID());
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
-
-    ShardIdentityType shardIdentity2;
-    shardIdentity2.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity2.setShardName("a");
-    shardIdentity2.setClusterId(OID::gen());
-
-    shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
-            return Status{ErrorCodes::InternalError, "should not reach here"};
-        });
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max()));
-
-    ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
-    ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(txn()).toString());
-}
-
 TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(

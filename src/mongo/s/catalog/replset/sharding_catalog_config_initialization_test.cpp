@@ -126,7 +126,7 @@ TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
                                        BSON("_id"
                                             << "a second document")));
 
-    ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
+    ASSERT_EQ(ErrorCodes::TooManyMatchingDocuments,
               catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 

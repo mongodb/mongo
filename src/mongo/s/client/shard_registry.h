@@ -158,11 +158,6 @@ public:
     ConnectionString getConfigServerConnectionString() const;
 
     /**
-     * Returns the cluster id from the config shard.
-     */
-    const OID& getClusterId() const;
-
-    /**
      * Reloads the ShardRegistry based on the contents of the config server's config.shards
      * collection. Returns true if this call performed a reload and false if this call only waited
      * for another thread to perform the reload and did not actually reload. Because of this, it is
@@ -245,12 +240,6 @@ private:
      * shard
      */
     ConnectionString _initConfigServerCS;
-
-    /**
-     * The id for the cluster, obtained from the config servers on sharding initialization. The
-     * config servers are the authority on the clusterId.
-     */
-    const OID _clusterId;
 
     ShardRegistryData _data;
 

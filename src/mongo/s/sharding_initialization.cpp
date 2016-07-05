@@ -55,6 +55,7 @@
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
+#include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_egress_metadata_hook.h"
@@ -200,6 +201,16 @@ Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
         }
 
         try {
+            auto clusterIdentity = ClusterIdentityLoader::get(txn);
+            auto clusterId = clusterIdentity->getClusterId(txn);
+            if (!clusterId.isOK()) {
+                warning()
+                    << "Error initializing sharding state, sleeping for 2 seconds and trying again"
+                    << causedBy(clusterId.getStatus());
+                sleepmillis(2000);
+                continue;
+            }
+
             grid.shardRegistry()->reload(txn);
             return Status::OK();
         } catch (const DBException& ex) {
@@ -211,8 +222,9 @@ Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
                 // servers.
                 grid.shardRegistry()->rebuildConfigShard();
             }
-            log() << "Error initializing sharding state, sleeping for 2 seconds and trying again"
-                  << causedBy(status);
+            warning()
+                << "Error initializing sharding state, sleeping for 2 seconds and trying again"
+                << causedBy(status);
             sleepmillis(2000);
             continue;
         }

@@ -62,6 +62,7 @@ class Status;
 template <typename T>
 class StatusWith;
 class TagsType;
+class VersionType;
 
 namespace executor {
 struct ConnectionPoolStats;
@@ -343,6 +344,13 @@ public:
      * setting otherwise.
      */
     virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) = 0;
+
+    /**
+     * Returns the contents of the config.version document - containing the current cluster schema
+     * version as well as the clusterID.
+     */
+    virtual StatusWith<VersionType> getConfigVersion(OperationContext* txn,
+                                                     repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Directly sends the specified command to the config server and returns the response.

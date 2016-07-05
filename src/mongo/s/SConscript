@@ -258,6 +258,7 @@ env.Library(
         'catalog/catalog_cache.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
+        'cluster_identity_loader.cpp',
         'config.cpp',
         'config_server_client.cpp',
         'grid.cpp',
@@ -328,6 +329,17 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'coreshard',
+        'sharding_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
+    target='cluster_identity_loader_test',
+    source=[
+        'cluster_identity_loader_test.cpp',
+    ],
+    LIBDEPS=[
         'coreshard',
         'sharding_test_fixture',
     ]

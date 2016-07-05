@@ -59,21 +59,14 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-// TODO SERVER-23096: Initializing an empty _clusterId is a temporary hack. The _clusterId should
-// be queried from the config servers on sharding initialization and passed to the ShardRegistry
-// constructor.
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              const ConnectionString& configServerCS)
-    : _shardFactory(std::move(shardFactory)), _clusterId(), _data() {
+    : _shardFactory(std::move(shardFactory)), _data() {
     _initConfigServerCS = configServerCS;
 }
 
 ConnectionString ShardRegistry::getConfigServerConnectionString() const {
     return getConfigShard()->getConnString();
-}
-
-const OID& ShardRegistry::getClusterId() const {
-    return _clusterId;
 }
 
 void ShardRegistry::rebuildConfigShard() {

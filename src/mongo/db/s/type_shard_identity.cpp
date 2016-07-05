@@ -136,10 +136,7 @@ Status ShardIdentityType::validate() const {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << shardName() << " field"};
     }
 
-    // TODO SERVER-23096: Once ShardRegistry::_clusterId is loaded from the config servers rather
-    // than initialized in the ShardRegistry constructor in each process, the isSet() check can
-    // be re-added.
-    if (!_clusterId /*|| !_clusterId->isSet()*/) {
+    if (!_clusterId || !_clusterId->isSet()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << clusterId() << " field"};
     }
 

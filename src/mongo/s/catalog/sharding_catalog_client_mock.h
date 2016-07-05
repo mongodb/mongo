@@ -129,6 +129,9 @@ public:
 
     StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) override;
 
+    StatusWith<VersionType> getConfigVersion(OperationContext* txn,
+                                             repl::ReadConcernLevel readConcern) override;
+
     void writeConfigServerDirect(OperationContext* txn,
                                  const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;

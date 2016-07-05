@@ -433,6 +433,15 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
         return Status::OK();
     }
 
+    Status validationStatus = shardIdentity.validate();
+    if (!validationStatus.isOK()) {
+        return Status(
+            validationStatus.code(),
+            str::stream()
+                << "Invalid shard identity document found when initializing sharding state: "
+                << validationStatus.reason());
+    }
+
     log() << "initializing sharding state with: " << shardIdentity;
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);

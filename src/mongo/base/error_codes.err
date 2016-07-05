@@ -168,6 +168,7 @@ error_code("CommandNotSupportedOnView", 166)
 error_code("OptionNotSupportedOnView", 167)
 error_code("OperatorNotSupportedOnView", 168)
 error_code("CommandOnShardedViewNotSupportedOnMongos", 169)
+error_code("TooManyMatchingDocuments", 170)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)
