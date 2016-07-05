@@ -141,16 +141,14 @@ function checkDBHashes(rst, dbBlacklist, phase) {
 
             // Check that collection information is consistent on the primary and secondaries.
             var secondaryCollInfo = secondary.getDB(dbName).getCollectionInfos();
-            // capped, autoIndexId, size, max, validator, validationLevel, validationAction,
-            // indexOptionDefaults
             secondaryCollInfo.forEach(secondaryInfo => {
                 primaryCollInfo.forEach(primaryInfo => {
                     if (secondaryInfo.name === primaryInfo.name) {
-                        if (secondaryInfo.options.temp !== primaryInfo.options.temp) {
+                        if (bsonWoCompare(secondaryInfo, primaryInfo) !== 0) {
                             print(
                                 phase +
                                 ', the primary and secondary have different attributes for the collection ' +
-                                dbName + '.' + collName);
+                                dbName + '.' + secondaryInfo.name);
                             print('Collection info on the primary: ' + tojson(primaryInfo));
                             print('Collection info on the secondary: ' + tojson(secondaryInfo));
                             success = false;
@@ -159,24 +157,24 @@ function checkDBHashes(rst, dbBlacklist, phase) {
                 });
             });
 
-            // Check that collection attributes are the same across replica set members.
+            // Check that the following collection stats are the same across replica set members:
+            //  capped
+            //  nindexes
+            //  ns
             primaryCollections.forEach(collName => {
-                var cappedOnPrimary = nonCappedCollNames.indexOf(collName) === -1;
-                var res = secondary.getDB(dbName).runCommand({collStats: collName});
-                assert.commandWorked(res);
-                var cappedOnSecondary = res.capped;
+                var primaryCollStats = primary.getDB(dbName).runCommand({collStats: collName});
+                assert.commandWorked(primaryCollStats);
+                var secondaryCollStats = secondary.getDB(dbName).runCommand({collStats: collName});
+                assert.commandWorked(secondaryCollStats);
 
-                // Cast cappedOnSecondary to a boolean to prevent unexpected behavior from values
-                // that evaluate to true or false. E.g. "undefined".
-                cappedOnSecondary = !!cappedOnSecondary;
-                if (cappedOnPrimary !== cappedOnSecondary) {
-                    var status;
-                    if (cappedOnPrimary) {
-                        status = 'capped on the primary but not on the secondary';
-                    } else {
-                        status = 'capped on the secondary but not on the primary';
-                    }
-                    print(phase + ' the collection ' + dbName + '.' + collname + ' is ' + status);
+                if (primaryCollStats.capped !== secondaryCollStats.capped ||
+                    primaryCollStats.nindexes !== secondaryCollStats.nindexes ||
+                    primaryCollStats.ns !== secondaryCollStats.ns) {
+                    print(phase +
+                          ', the primary and secondary have different stats for the collection ' +
+                          dbName + '.' + collName);
+                    print('Collection stats on the primary: ' + tojson(primaryCollStats));
+                    print('Collection stats on the secondary: ' + tojson(secondaryCollStats));
                     success = false;
                 }
             });
