@@ -83,6 +83,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/fail_point",
         "collation/collator_icu",
+        "query_planner",
         "query_request",
     ],
 )
