@@ -60,7 +60,6 @@ functions:
       # bring up the cluster
       params:
         working_dir: src/dsi/dsi
-        silent: true
         script: |
           # to create a mongod EC2 cluster
           set -e
@@ -471,6 +470,47 @@ tasks:
         variant2: "linux-1-node-replSet"
     - func: "analyze"
 
+- name: initialsync_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+    - func: "bring up cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "initialSync"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "initialsync_WT"
+    - func: "analyze"
+
+- name: initialsync_MMAPv1
+  depends_on:
+    - name: initialsync_WT
+      status: "*"
+  commands:
+    - func: "prepare environment"
+    - func: "restore cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "initialSync"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "initialsync_MMAPv1"
+    - func: "destroy cluster"
+    - func: "analyze"
+
 
 #######################################
 #               Modules               #
@@ -607,6 +647,21 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+
+- name: linux-3-node-replSet-initialsync
+  display_name: Linux 3-Node ReplSet Initial Sync
+  batchtime: 1440 # 24 hours
+  modules: *modules
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
+    setup: replica
+    cluster: replica
+    platform: linux
+  run_on:
+      - "rhel70-perf-standalone"
+  tasks:
+    - name: initialsync_WT
+    - name: initialsync_MMAPv1
 
 - name: linux-oplog-compare
   display_name: Linux Oplog Compare
