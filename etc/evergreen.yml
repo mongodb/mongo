@@ -1077,6 +1077,19 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
 
+## jstestfuzz concurrent replica set WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger --numClientsPerFixture=10
+
 ## jstestfuzz sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded
@@ -3978,6 +3991,7 @@ buildvariants:
   - name: jstestfuzz
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
