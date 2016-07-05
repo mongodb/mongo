@@ -315,7 +315,7 @@ class JSTestCase(TestCase):
 
         self.js_filename = js_filename
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
-        self.num_clients = self.DEFAULT_CLIENT_NUM
+        self.num_clients = JSTestCase.DEFAULT_CLIENT_NUM
 
     def configure(self, fixture, num_clients=DEFAULT_CLIENT_NUM):
         TestCase.configure(self, fixture)

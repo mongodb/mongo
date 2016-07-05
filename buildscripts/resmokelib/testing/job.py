@@ -79,7 +79,7 @@ class Job(object):
         Calls the before/after test hooks and executes 'test'.
         """
 
-        test.configure(self.fixture,config.NUM_CLIENTS_PER_FIXTURE)
+        test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE)
         self._run_hooks_before_tests(test)
 
         test(self.report)
