@@ -413,7 +413,7 @@ functions:
                 break
               fi
             done
-            scp -o ConnectTimeout=5 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
+            scp -o ConnectTimeout=30 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
             exit_code=$?
             # If the copy fails, then tail the LXC host log.
             if [ $exit_code -ne 0 ]; then
