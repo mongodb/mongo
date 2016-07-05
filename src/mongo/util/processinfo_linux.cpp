@@ -141,8 +141,8 @@ public:
         return _vsize;
     }
 
-    unsigned long getResidentSize() {
-        return (unsigned long)_rss * 4 * 1024;
+    unsigned long getResidentSizeInPages() {
+        return (unsigned long)_rss;
     }
 
     int _pid;
@@ -443,7 +443,7 @@ int ProcessInfo::getVirtualMemorySize() {
 
 int ProcessInfo::getResidentSize() {
     LinuxProc p(_pid);
-    return (int)(p.getResidentSize() / (1024.0 * 1024));
+    return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
 double ProcessInfo::getSystemMemoryPressurePercentage() {
