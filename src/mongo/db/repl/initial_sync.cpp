@@ -72,6 +72,10 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
 
         auto replCoord = repl::ReplicationCoordinator::get(txn);
         while (!tryPopAndWaitForMore(txn, &ops)) {
+            if (inShutdown()) {
+                return;
+            }
+
             // nothing came back last time, so go again
             if (ops.empty())
                 continue;
