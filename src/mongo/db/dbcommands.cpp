@@ -1458,7 +1458,6 @@ bool Command::run(OperationContext* txn,
             replyBuilder->setMetadata(rpc::makeEmptyMetadata());
             return result;
         }
-
         if (!supportsReadConcern()) {
             // Only return an error if a non-nullish readConcern was parsed, but do not process
             // readConcern regardless.
@@ -1495,11 +1494,11 @@ bool Command::run(OperationContext* txn,
                     return result;
                 }
             }
-
             if ((replCoord->getReplicationMode() ==
                      repl::ReplicationCoordinator::Mode::modeReplSet ||
                  testingSnapshotBehaviorInIsolation) &&
-                readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+                (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+                 readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern)) {
                 // ReadConcern Majority is not supported in ProtocolVersion 0.
                 if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
                     auto result = appendCommandStatus(
@@ -1536,6 +1535,15 @@ bool Command::run(OperationContext* txn,
                 }
             }
         }
+
+        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
+            uassert(ErrorCodes::FailedToParse,
+                    "afterOpTime not compatible with read concern level linearizable",
+                    readConcernArgs.getOpTime().isNull());
+            uassert(ErrorCodes::NotMaster,
+                    "cannot satisfy linearizable read concern on non-primary node",
+                    replCoord->getMemberState().primary());
+        }
     }
 
     // run expects non-const bsonobj
@@ -1548,6 +1556,7 @@ bool Command::run(OperationContext* txn,
 
     StatusWith<WriteConcernOptions> wcResult =
         extractWriteConcern(txn, cmd, db, this->supportsWriteConcern(cmd));
+
     if (!wcResult.isOK()) {
         auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
         inPlaceReplyBob.doneFast();
