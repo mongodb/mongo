@@ -1656,6 +1656,7 @@ private:
                               std::string connectFromField,
                               std::string connectToField,
                               boost::intrusive_ptr<Expression> startWith,
+                              boost::optional<BSONObj> additionalFilter,
                               boost::optional<FieldPath> depthField,
                               boost::optional<long long> maxDepth,
                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -1719,6 +1720,7 @@ private:
     FieldPath _connectFromField;
     FieldPath _connectToField;
     boost::intrusive_ptr<Expression> _startWith;
+    boost::optional<BSONObj> _additionalFilter;
     boost::optional<FieldPath> _depthField;
     boost::optional<long long> _maxDepth;
 
