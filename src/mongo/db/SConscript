@@ -652,6 +652,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/util/net/network",
     "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
     "$BUILD_DIR/third_party/shim_snappy",
+    '$BUILD_DIR/mongo/db/ttl_collection_cache',
     "auth/authmongod",
     "catalog/catalog",
     "catalog/collection_options",
@@ -758,5 +759,16 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+    ],
+)
+
+env.Library(
+    target='ttl_collection_cache',
+    source=[
+        'ttl_collection_cache.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )

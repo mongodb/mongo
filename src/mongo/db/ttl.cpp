@@ -54,6 +54,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -129,73 +130,40 @@ private:
             !repl::getGlobalReplicationCoordinator()->getMemberState().readable())
             return;
 
-        set<string> dbs;
-        dbHolder().getAllShortNames(dbs);
+        TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
+        std::vector<std::string> ttlCollections = ttlCollectionCache.getCollections();
+        std::vector<BSONObj> ttlIndexes;
 
         ttlPasses.increment();
 
-        for (set<string>::const_iterator i = dbs.begin(); i != dbs.end(); ++i) {
-            string db = *i;
-
-            vector<BSONObj> indexes;
-            getTTLIndexesForDB(&txn, db, &indexes);
-
-            for (vector<BSONObj>::const_iterator it = indexes.begin(); it != indexes.end(); ++it) {
-                BSONObj idx = *it;
-                try {
-                    if (!doTTLForIndex(&txn, db, idx)) {
-                        break;  // stop processing TTL indexes on this database
-                    }
-                } catch (const DBException& dbex) {
-                    error() << "Error processing ttl index: " << idx << " -- " << dbex.toString();
-                    // continue on to the next index
-                    continue;
-                }
-            }
-        }
-    }
-
-    /**
-     * Acquire an IS-mode lock on the specified database and for each
-     * collection in the database, append the specification of all
-     * TTL indexes on those collections to the supplied vector.
-     *
-     * The index specifications are grouped by the collection to which
-     * they belong.
-     */
-    void getTTLIndexesForDB(OperationContext* txn, const string& dbName, vector<BSONObj>* indexes) {
-        invariant(indexes && indexes->empty());
-        ScopedTransaction transaction(txn, MODE_IS);
-        Lock::DBLock dbLock(txn->lockState(), dbName, MODE_IS);
-
-        Database* db = dbHolder().get(txn, dbName);
-        if (!db) {
-            return;  // skip since database no longer exists
-        }
-
-        const DatabaseCatalogEntry* dbEntry = db->getDatabaseCatalogEntry();
-
-        list<string> namespaces;
-        dbEntry->getCollectionNamespaces(&namespaces);
-
-        for (list<string>::const_iterator it = namespaces.begin(); it != namespaces.end(); ++it) {
-            string ns = *it;
-            Lock::CollectionLock collLock(txn->lockState(), ns, MODE_IS);
-            CollectionCatalogEntry* coll = dbEntry->getCollectionCatalogEntry(ns);
-
+        // Get all TTL indexes from every collection.
+        for (const std::string& collectionNS : ttlCollections) {
+            NamespaceString collectionNSS(collectionNS);
+            AutoGetCollection autoGetCollection(&txn, collectionNSS, MODE_IS);
+            Collection* coll = autoGetCollection.getCollection();
             if (!coll) {
-                continue;  // skip since collection not found in catalog
+                // Skip since collection has been dropped.
+                continue;
             }
 
-            vector<string> indexNames;
-            coll->getAllIndexes(txn, &indexNames);
-            for (size_t i = 0; i < indexNames.size(); i++) {
-                const string& name = indexNames[i];
-                BSONObj spec = coll->getIndexSpec(txn, name);
-
+            CollectionCatalogEntry* collEntry = coll->getCatalogEntry();
+            std::vector<std::string> indexNames;
+            collEntry->getAllIndexes(&txn, &indexNames);
+            for (const std::string& name : indexNames) {
+                BSONObj spec = collEntry->getIndexSpec(&txn, name);
                 if (spec.hasField(secondsExpireField)) {
-                    indexes->push_back(spec.getOwned());
+                    ttlIndexes.push_back(spec.getOwned());
                 }
+            }
+        }
+
+        for (const BSONObj& idx : ttlIndexes) {
+            try {
+                doTTLForIndex(&txn, idx);
+            } catch (const DBException& dbex) {
+                error() << "Error processing ttl index: " << idx << " -- " << dbex.toString();
+                // Continue on to the next index.
+                continue;
             }
         }
     }
@@ -204,53 +172,41 @@ private:
      * Remove documents from the collection using the specified TTL index
      * after a sufficient amount of time has passed according to its expiry
      * specification.
-     *
-     * @return true if caller should continue processing TTL indexes of collections
-     *         on the specified database, and false otherwise
      */
-    bool doTTLForIndex(OperationContext* txn, const string& dbName, BSONObj idx) {
-        const string ns = idx["ns"].String();
-        NamespaceString nss(ns);
-        if (!userAllowedWriteNS(nss).isOK()) {
-            error() << "namespace '" << ns
+    void doTTLForIndex(OperationContext* txn, BSONObj idx) {
+        const NamespaceString collectionNSS(idx["ns"].String());
+        if (!userAllowedWriteNS(collectionNSS).isOK()) {
+            error() << "namespace '" << collectionNSS
                     << "' doesn't allow deletes, skipping ttl job for: " << idx;
-            return true;
+            return;
         }
 
-        BSONObj key = idx["key"].Obj();
+        const BSONObj key = idx["key"].Obj();
         if (key.nFields() != 1) {
             error() << "key for ttl index can only have 1 field, skipping ttl job for: " << idx;
-            return true;
+            return;
         }
 
-        LOG(1) << "TTL -- ns: " << ns << " key: " << key;
+        LOG(1) << "TTL -- ns: " << collectionNSS << " key: " << key;
 
-        ScopedTransaction scopedXact(txn, MODE_IX);
-        AutoGetDb autoDb(txn, dbName, MODE_IX);
-        Database* db = autoDb.getDb();
-        if (!db) {
-            return false;
-        }
-
-        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_IX);
-
-        Collection* collection = db->getCollection(ns);
+        AutoGetCollection autoGetCollection(txn, collectionNSS, MODE_IX);
+        Collection* collection = autoGetCollection.getCollection();
         if (!collection) {
             // Collection was dropped.
-            return true;
+            return;
         }
 
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionNSS)) {
             // We've stepped down since we started this function, so we should stop working
             // as we only do deletes on the primary.
-            return false;
+            return;
         }
 
         IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByKeyPattern(txn, key);
         if (!desc) {
             LOG(1) << "index not found (index build in progress? index dropped?), skipping "
                    << "ttl job for: " << idx;
-            return true;
+            return;
         }
 
         // Re-read 'idx' from the descriptor, in case the collection or index definition
@@ -259,7 +215,7 @@ private:
 
         if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
             error() << "special index can't be used as a ttl index, skipping ttl job for: " << idx;
-            return true;
+            return;
         }
 
         BSONElement secondsExpireElt = idx[secondsExpireField];
@@ -267,7 +223,7 @@ private:
             error() << "ttl indexes require the " << secondsExpireField << " field to be "
                     << "numeric but received a type of " << typeName(secondsExpireElt.type())
                     << ", skipping ttl job for: " << idx;
-            return true;
+            return;
         }
 
         const Date_t kDawnOfTime =
@@ -288,7 +244,7 @@ private:
         const char* keyFieldName = key.firstElement().fieldName();
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
         qr->setFilter(query);
         auto canonicalQuery = CanonicalQuery::canonicalize(
             txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
@@ -312,14 +268,12 @@ private:
         Status result = exec->executePlan();
         if (!result.isOK()) {
             error() << "ttl query execution for index " << idx << " failed with status: " << result;
-            return true;
+            return;
         }
 
         const long long numDeleted = DeleteStage::getNumDeleted(*exec);
         ttlDeletedDocuments.increment(numDeleted);
         LOG(1) << "\tTTL deleted: " << numDeleted << endl;
-
-        return true;
     }
 };
 
