@@ -33,10 +33,12 @@
 #include "mongo/base/init.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -286,17 +288,27 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* c
         }
     }
 
-    // Create a query of the form {_connectToField: {$in: [...]}}.
+    // Create a query of the form {$and: [_additionalFilter, {_connectToField: {$in: [...]}}]}.
     BSONObjBuilder query;
-    BSONObjBuilder subobj(query.subobjStart(_connectToField.fullPath()));
-    BSONArrayBuilder in(subobj.subarrayStart("$in"));
+    {
+        BSONArrayBuilder andObj(query.subarrayStart("$and"));
+        if (_additionalFilter) {
+            andObj << *_additionalFilter;
+        }
 
-    for (auto&& value : _frontier) {
-        in << value;
+        {
+            BSONObjBuilder connectToObj(andObj.subobjStart());
+            {
+                BSONObjBuilder subObj(connectToObj.subobjStart(_connectToField.fullPath()));
+                {
+                    BSONArrayBuilder in(subObj.subarrayStart("$in"));
+                    for (auto&& value : _frontier) {
+                        in << value;
+                    }
+                }
+            }
+        }
     }
-
-    in.doneFast();
-    subobj.doneFast();
 
     return _frontier.empty() ? boost::none : boost::optional<BSONObj>(query.obj());
 }
@@ -376,6 +388,10 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
         spec["maxDepth"] = Value(*_maxDepth);
     }
 
+    if (_additionalFilter) {
+        spec["restrictSearchWithMatch"] = Value(*_additionalFilter);
+    }
+
     // If we are explaining, include an absorbed $unwind inside the $graphLookup specification.
     if (_unwind && explain) {
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
@@ -400,6 +416,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     std::string connectFromField,
     std::string connectToField,
     boost::intrusive_ptr<Expression> startWith,
+    boost::optional<BSONObj> additionalFilter,
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
@@ -409,6 +426,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _connectFromField(std::move(connectFromField)),
       _connectToField(std::move(connectToField)),
       _startWith(std::move(startWith)),
+      _additionalFilter(additionalFilter),
       _depthField(depthField),
       _maxDepth(maxDepth) {}
 
@@ -421,6 +439,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
     std::string connectToField;
     boost::optional<FieldPath> depthField;
     boost::optional<long long> maxDepth;
+    boost::optional<BSONObj> additionalFilter;
 
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
@@ -445,6 +464,32 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                     str::stream() << "maxDepth could not be represented as a long long: "
                                   << *maxDepth,
                     *maxDepth == argument.number());
+            continue;
+        } else if (argName == "restrictSearchWithMatch") {
+            uassert(40185,
+                    str::stream() << "restrictSearchWithMatch must be an object, found "
+                                  << typeName(argument.type()),
+                    argument.type() == Object);
+
+            // We don't need to keep ahold of the MatchExpression, but we do need to ensure that
+            // the specified object is parseable.
+            auto parsedMatchExpression = MatchExpressionParser::parse(
+                argument.embeddedObject(), ExtensionsCallbackDisallowExtensions(), nullptr);
+
+            uassert(40186,
+                    str::stream()
+                        << "Failed to parse 'restrictSearchWithMatch' option to $graphLookup: "
+                        << parsedMatchExpression.getStatus().reason(),
+                    parsedMatchExpression.isOK());
+
+            uassert(40187,
+                    str::stream()
+                        << "Failed to parse 'restrictSearchWithMatch' option to $graphLookup: "
+                        << "$near not supported.",
+                    !QueryPlannerCommon::hasNode(parsedMatchExpression.getValue().get(),
+                                                 MatchExpression::GEO_NEAR));
+
+            additionalFilter = argument.embeddedObject().getOwned();
             continue;
         }
 
@@ -488,6 +533,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                                       std::move(connectFromField),
                                       std::move(connectToField),
                                       std::move(startWith),
+                                      additionalFilter,
                                       depthField,
                                       maxDepth,
                                       expCtx));
