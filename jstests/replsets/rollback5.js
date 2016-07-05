@@ -79,11 +79,11 @@ replTest.awaitSecondaryNodes();
 print("AFTER------------------");
 printjson(A.foo.find().toArray());
 
-assert.eq(2, A.foo.count());
+assert.eq(2, A.foo.find().itcount());
 assert.eq('req', A.foo.findOne({key: 'value1'}).req);
 assert.eq(null, A.foo.findOne({key: 'value1'}).res);
 reconnect(B);
-assert.eq(2, B.foo.count());
+assert.eq(2, B.foo.find().itcount());
 assert.eq('req', B.foo.findOne({key: 'value1'}).req);
 assert.eq(null, B.foo.findOne({key: 'value1'}).res);
 
