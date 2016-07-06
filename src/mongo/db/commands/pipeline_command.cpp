@@ -79,7 +79,7 @@ bool handleCursorCommand(OperationContext* txn,
                          const string& ns,
                          ClientCursorPin* pin,
                          PlanExecutor* exec,
-                         const BSONObj& cmdObj,
+                         const AggregationRequest& request,
                          BSONObjBuilder& result) {
     ClientCursor* cursor = pin ? pin->c() : NULL;
     if (pin) {
@@ -88,9 +88,8 @@ bool handleCursorCommand(OperationContext* txn,
         invariant(cursor->isAggCursor());
     }
 
-    const long long defaultBatchSize = 101;  // Same as query.
-    long long batchSize;
-    uassertStatusOK(Command::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
+    invariant(request.getBatchSize());
+    long long batchSize = request.getBatchSize().get();
 
     // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
     BSONArrayBuilder resultsArray;
@@ -350,15 +349,13 @@ public:
             // Unless set to true, the ClientCursor created above will be deleted on block exit.
             bool keepCursor = false;
 
-            const bool isCursorCommand = !cmdObj["cursor"].eoo();
-
             // Use of the aggregate command without specifying to use a cursor is deprecated.
             // Applications should migrate to using cursors. Cursors are strictly more useful than
             // outputting the results as a single document, since results that fit inside a single
             // BSONObj will also fit inside a single batch.
             //
             // We occasionally log a deprecation warning.
-            if (!isCursorCommand) {
+            if (!request.getValue().isCursorCommand()) {
                 RARELY {
                     warning()
                         << "Use of the aggregate command without the 'cursor' "
@@ -370,12 +367,12 @@ public:
             // If both explain and cursor are specified, explain wins.
             if (expCtx->isExplain) {
                 result << "stages" << Value(pipeline->writeExplainOps());
-            } else if (isCursorCommand) {
+            } else if (request.getValue().isCursorCommand()) {
                 keepCursor = handleCursorCommand(txn,
                                                  nss.ns(),
                                                  pin.get(),
                                                  pin ? pin->c()->getExecutor() : exec.get(),
-                                                 cmdObj,
+                                                 request.getValue(),
                                                  result);
             } else {
                 pipeline->run(result);

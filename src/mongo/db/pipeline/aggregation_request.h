@@ -47,11 +47,15 @@ class Document;
 class AggregationRequest {
 public:
     static const StringData kCommandName;
+    static const StringData kCursorName;
+    static const StringData kBatchSizeName;
     static const StringData kFromRouterName;
     static const StringData kPipelineName;
     static const StringData kCollationName;
     static const StringData kExplainName;
     static const StringData kAllowDiskUseName;
+
+    static const long long kDefaultBatchSize;
 
     /**
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a
@@ -77,6 +81,10 @@ public:
     // Getters.
     //
 
+    boost::optional<long long> getBatchSize() const {
+        return _batchSize;
+    }
+
     const NamespaceString& getNamespaceString() const {
         return _nss;
     }
@@ -86,6 +94,10 @@ public:
      */
     const std::vector<BSONObj>& getPipeline() const {
         return _pipeline;
+    }
+
+    bool isCursorCommand() const {
+        return _cursorCommand;
     }
 
     bool isExplain() const {
@@ -115,8 +127,21 @@ public:
     // Setters for optional fields.
     //
 
+    /**
+     * Must be either unset or non-negative. Negative batchSize is illegal but batchSize of 0 is
+     * allowed.
+     */
+    void setBatchSize(long long batchSize) {
+        uassert(40203, "batchSize must be non-negative", batchSize >= 0);
+        _batchSize = batchSize;
+    }
+
     void setCollation(BSONObj collation) {
         _collation = collation.getOwned();
+    }
+
+    void setCursorCommand(bool isCursorCommand) {
+        _cursorCommand = isCursorCommand;
     }
 
     void setExplain(bool isExplain) {
@@ -145,6 +170,8 @@ private:
 
     // Optional fields.
 
+    boost::optional<long long> _batchSize;
+
     // An owned copy of the user-specified collation object, or an empty object if no collation was
     // specified.
     BSONObj _collation;
@@ -153,5 +180,6 @@ private:
     bool _allowDiskUse = false;
     bool _fromRouter = false;
     bool _bypassDocumentValidation = false;
+    bool _cursorCommand = false;
 };
 }  // namespace mongo

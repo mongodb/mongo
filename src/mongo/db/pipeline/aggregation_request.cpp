@@ -36,8 +36,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/storage_options.h"
@@ -45,11 +47,15 @@
 namespace mongo {
 
 const StringData AggregationRequest::kCommandName = "aggregate"_sd;
+const StringData AggregationRequest::kCursorName = "cursor"_sd;
+const StringData AggregationRequest::kBatchSizeName = "batchSize"_sd;
 const StringData AggregationRequest::kFromRouterName = "fromRouter"_sd;
 const StringData AggregationRequest::kPipelineName = "pipeline"_sd;
 const StringData AggregationRequest::kCollationName = "collation"_sd;
 const StringData AggregationRequest::kExplainName = "explain"_sd;
 const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
+
+const long long AggregationRequest::kDefaultBatchSize = 101;
 
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
     : _nss(std::move(nss)), _pipeline(std::move(pipeline)) {}
@@ -74,7 +80,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
 
     const std::initializer_list<StringData> optionsParsedElseWhere = {
         QueryRequest::cmdOptionMaxTimeMS,
-        "cursor"_sd,
         "writeConcern"_sd,
         kPipelineName,
         kCommandName,
@@ -95,7 +100,17 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
             continue;
         }
 
-        if (kCollationName == fieldName) {
+        if (kCursorName == fieldName) {
+            long long batchSize;
+            auto status =
+                CursorRequest::parseCommandCursorOptions(cmdObj, kDefaultBatchSize, &batchSize);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            request.setCursorCommand(true);
+            request.setBatchSize(batchSize);
+        } else if (kCollationName == fieldName) {
             if (elem.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << kCollationName << " must be an object, not a "
@@ -139,16 +154,18 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
 
 Document AggregationRequest::serializeToCommandObj() const {
     MutableDocument serialized;
-    return Document{{kCommandName, _nss.coll()},
-                    {kPipelineName, _pipeline},
-                    // Only serialize booleans if different than their default.
-                    {kExplainName, _explain ? Value(true) : Value()},
-                    {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
-                    {kFromRouterName, _fromRouter ? Value(true) : Value()},
-                    {bypassDocumentValidationCommandOption(),
-                     _bypassDocumentValidation ? Value(true) : Value()},
-                    // Only serialize a collation if one was specified.
-                    {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)}};
+    return Document{
+        {kCommandName, _nss.coll()},
+        {kPipelineName, _pipeline},
+        // Only serialize booleans if different than their default.
+        {kExplainName, _explain ? Value(true) : Value()},
+        {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
+        {kFromRouterName, _fromRouter ? Value(true) : Value()},
+        {bypassDocumentValidationCommandOption(),
+         _bypassDocumentValidation ? Value(true) : Value()},
+        // Only serialize a collation if one was specified.
+        {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
+        {kCursorName, _batchSize ? Value(Document{{kBatchSizeName, _batchSize.get()}}) : Value()}};
 }
 
 }  // namespace mongo

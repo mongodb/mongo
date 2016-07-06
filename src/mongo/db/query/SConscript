@@ -125,6 +125,7 @@ env.Library(
     target='command_request_response',
     source=[
         'count_request.cpp',
+        'cursor_request.cpp',
         'cursor_response.cpp',
         'find_and_modify_request.cpp',
         'getmore_request.cpp',

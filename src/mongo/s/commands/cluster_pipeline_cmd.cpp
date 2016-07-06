@@ -166,9 +166,8 @@ public:
         commandBuilder[AggregationRequest::kPipelineName] = Value(shardPipeline->serialize());
         if (needSplit) {
             commandBuilder[AggregationRequest::kFromRouterName] = Value(true);
-            commandBuilder["cursor"] = Value(DOC("batchSize" << 0));
-        } else {
-            commandBuilder["cursor"] = Value(cmdObj["cursor"]);
+            commandBuilder[AggregationRequest::kCursorName] =
+                Value(DOC(AggregationRequest::kBatchSizeName << 0));
         }
 
         // These fields are not part of the AggregationRequest since they are not handled by the

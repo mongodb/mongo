@@ -40,6 +40,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
@@ -123,7 +124,8 @@ public:
 
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
-        Status parseCursorStatus = parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize);
+        Status parseCursorStatus =
+            CursorRequest::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize);
         if (!parseCursorStatus.isOK()) {
             return appendCommandStatus(result, parseCursorStatus);
         }

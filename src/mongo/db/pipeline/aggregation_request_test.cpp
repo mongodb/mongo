@@ -51,12 +51,14 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], explain: true, allowDiskUse: true, fromRouter: true, "
-        "bypassDocumentValidation: true, collation: {locale: 'en_US'}}");
+        "bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: {batchSize: 10}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_TRUE(request.isExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
     ASSERT_TRUE(request.isFromRouter());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
+    ASSERT_TRUE(request.isCursorCommand());
+    ASSERT_EQ(request.getBatchSize().get(), 10);
     ASSERT_EQ(request.getCollation(),
               BSON("locale"
                    << "en_US"));
@@ -113,6 +115,25 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     ASSERT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
+TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}}");
+    auto request = AggregationRequest::parseFromBSON(nss, inputBson);
+    ASSERT_OK(request.getStatus());
+    ASSERT_TRUE(request.getValue().isCursorCommand());
+    ASSERT_TRUE(request.getValue().getBatchSize());
+    ASSERT_EQ(request.getValue().getBatchSize().get(), AggregationRequest::kDefaultBatchSize);
+}
+
+TEST(AggregationRequestTest, NoBatchSizeWhenCursorObjectNotSet) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}]}");
+    auto request = AggregationRequest::parseFromBSON(nss, inputBson);
+    ASSERT_OK(request.getStatus());
+    ASSERT_FALSE(request.getValue().isCursorCommand());
+    ASSERT_FALSE(request.getValue().getBatchSize());
+}
+
 //
 // Error cases.
 //
@@ -164,12 +185,6 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
 TEST(AggregationRequestTest, ShouldIgnoreFieldsPrefixedWithDollar) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], $unknown: 1}");
-    ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
-}
-
-TEST(AggregationRequestTest, ShouldIgnoreCursorOption) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: 1}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
