@@ -759,7 +759,10 @@ Status applyOperation_inlock(OperationContext* txn,
             for (auto elem : fieldO.Obj()) {
                 insertObjs.push_back(elem.Obj());
             }
-
+            uassert(ErrorCodes::OperationFailed,
+                    str::stream() << "Failed to apply insert due to empty array element: "
+                                  << op.toString(),
+                    !insertObjs.empty());
             WriteUnitOfWork wuow(txn);
             OpDebug* const nullOpDebug = nullptr;
             Status status = collection->insertDocuments(

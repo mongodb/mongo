@@ -162,6 +162,10 @@
     var o = {_id: 5, x: 17};
     assert.eq(o, t.findOne(), "Mismatching document inserted.");
 
+    // 'o' field is an empty array.
+    assert.commandFailed(db.adminCommand({applyOps: [{op: 'i', ns: t.getFullName(), o: []}]}),
+                         'applyOps should fail on insert of object with empty array element');
+
     var res = db.runCommand({
         applyOps: [
             {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
