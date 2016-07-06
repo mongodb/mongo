@@ -467,6 +467,10 @@ __evict_review(
 		 */
 		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 			return (__wt_split_insert(session, ref));
+
+		/* We are done if reconciliation is disabled. */
+		if (F_ISSET(S2BT(session), WT_BTREE_NO_RECONCILE))
+			return (EBUSY);
 	}
 
 	/* If the page is clean, we're done and we can evict. */

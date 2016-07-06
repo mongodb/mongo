@@ -548,10 +548,14 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * if the page qualifies for forced eviction and update
 			 * the page's generation number. If eviction isn't being
 			 * done on this file, we're done.
+			 * In-memory split of large pages is allowed while
+			 * no_eviction is set on btree, whereas reconciliation
+			 * is not allowed.
 			 */
 			if (LF_ISSET(WT_READ_NO_EVICT) ||
 			    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
-			    F_ISSET(btree, WT_BTREE_NO_EVICTION))
+			    (F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+			     !F_ISSET(btree, WT_BTREE_NO_RECONCILE)))
 				goto skip_evict;
 
 			/*
