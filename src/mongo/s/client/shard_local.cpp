@@ -37,12 +37,14 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -94,10 +96,39 @@ bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
     }
 }
 
+void ShardLocal::_updateLastOpTimeFromClient(OperationContext* txn,
+                                             const repl::OpTime& previousOpTimeOnClient) {
+    repl::OpTime lastOpTimeFromClient =
+        repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+    invariant(lastOpTimeFromClient >= previousOpTimeOnClient);
+    if (lastOpTimeFromClient.isNull() || lastOpTimeFromClient == previousOpTimeOnClient) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (lastOpTimeFromClient >= _lastOpTime) {
+        // It's always possible for lastOpTimeFromClient to be less than _lastOpTime if another
+        // thread started and completed a write through this ShardLocal (updating _lastOpTime)
+        // after this operation had completed its write but before it got here.
+        _lastOpTime = lastOpTimeFromClient;
+    }
+}
+
+repl::OpTime ShardLocal::_getLastOpTime() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _lastOpTime;
+}
+
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn,
                                                            const ReadPreferenceSetting& unused,
                                                            const std::string& dbName,
                                                            const BSONObj& cmdObj) {
+    repl::OpTime currentOpTimeFromClient =
+        repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+    ON_BLOCK_EXIT([this, &txn, &currentOpTimeFromClient] {
+        _updateLastOpTimeFromClient(txn, currentOpTimeFromClient);
+    });
+
     try {
         DBDirectClient client(txn);
         rpc::UniqueReply commandResponse = client.runCommandWithMetadata(
@@ -134,16 +165,21 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
         // Set up operation context with majority read snapshot so correct optime can be retrieved.
         Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
-        // Wait until a snapshot is available.
-        while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-            LOG(1) << "Waiting for ReadFromMajorityCommittedSnapshot to become available";
-            replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
-            status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        // Wait for any writes performed by this ShardLocal instance to be committed and visible.
+        auto readConcernResponse = replCoord->waitUntilOpTime(
+            txn, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
+        if (!readConcernResponse.getStatus().isOK()) {
+            if (readConcernResponse.getStatus() == ErrorCodes::ShutdownInProgress ||
+                ErrorCodes::isInterruption(readConcernResponse.getStatus().code())) {
+                return readConcernResponse.getStatus();
+            }
+            fassertStatusOK(40188, readConcernResponse.getStatus());
         }
 
-        if (!status.isOK()) {
-            return status;
-        }
+        // Inform the storage engine to read from the committed snapshot for the rest of this
+        // operation.
+        status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        fassertStatusOK(40189, status);
     } else {
         invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
     }
