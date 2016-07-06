@@ -111,7 +111,7 @@ class EnterpriseDistro(packager.Distro):
         """
         if arch == "ppc64le":
             if self.n == 'ubuntu':
-                return [ "ubuntu1504" ]
+                return [ "ubuntu1604" ]
             if self.n == 'redhat':
                 return [ "rhel71" ]
             else:
