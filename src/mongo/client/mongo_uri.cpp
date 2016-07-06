@@ -56,14 +56,21 @@ const char kMongoDBURL[] =
     "(?:([^:]+)(?::([^@]+))?@)?"
 
     // servers: grabs all host:port or UNIX socket names
-    "((?:(?:[^\\/]+|/.+.sock?),?)+)"
+    "((?:[^\\/]+|/.+\\.sock)(?:(?:[^\\/]+|/.+\\.sock),)*)"
 
-    // database: matches anything but the chars that cannot
-    // be part of a MongoDB database name.
-    "(?:/([^/\\.\\ \"*<>:\\|\\?]*))?"
+    // database and options are grouped together
+    "(?:/"
+
+    // database: matches anything but the chars that cannot be part of a MongoDB database name which
+    // are (in order) - forward slash, back slash, dot, space, double-quote, dollar sign, asterisk,
+    // less than, greater than, colon, pipe, question mark.
+    "([^/\\\\\\.\\ \"\\$*<>:\\|\\?]*)?"
 
     // options
-    "(?:\\?(?:(.+=.+)&?)+)*";
+    "(?:\\?([^&=?]+=[^&=?]+(?:&[^&=?]+=[^&=?]+)*))?"
+
+    // close db/options group
+    ")?";
 
 }  // namespace
 
@@ -86,7 +93,7 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
                       str::stream() << "Failed to parse mongodb:// URL: " << url);
     }
 
-    // We have 5 top level captures, plus the whole input.
+    // We have the whole input plus 5 top level captures (user, password, host, db, options).
     invariant(matches.size() == 6);
 
     if (!matches[3].matched) {

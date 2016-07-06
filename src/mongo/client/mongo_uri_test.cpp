@@ -61,6 +61,8 @@ const URITestCase validCases[] = {
 
     {"mongodb://127.0.0.1/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
 
+    {"mongodb://localhost/?foo=bar", "", "", kMaster, "", 1, 1, ""},
+
     {"mongodb://user:pwd@127.0.0.1:1234", "user", "pwd", kMaster, "", 1, 0, ""},
 
     {"mongodb://user@127.0.0.1:1234", "user", "", kMaster, "", 1, 0, ""},
@@ -269,9 +271,20 @@ const URITestCase validCases[] = {
 
 const InvalidURITestCase invalidCases[] = {
 
+    // No host.
     {"mongodb://"},
 
+    // Needs a "/" after the hosts and before the options.
     {"mongodb://localhost:27017,localhost:27018?replicaSet=missingSlash"},
+
+    // Host list must actually be comma separated.
+    {"mongodb://localhost:27017localhost:27018"},
+
+    // Domain sockets have to end in ".sock".
+    {"mongodb:///notareal/domainsock"},
+
+    // Options can't have multiple question marks. Only one.
+    {"mongodb://localhost:27017/?foo=a?c=b&d=e?asdf=foo"},
 };
 
 TEST(MongoURI, GoodTrickyURIs) {
