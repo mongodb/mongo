@@ -45,6 +45,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/commit_chunk_migration_request_type.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
@@ -284,37 +285,31 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                 str::stream() << "commit clone failed due to " << commitCloneStatus.toString()};
     }
 
-    BSONObjBuilder builder;
-    builder.append("_configsvrCommitChunkMigration", _args.getNss().ns());
-    builder.append("fromShard", _args.getFromShardId().toString());
-    builder.append("toShard", _args.getToShardId().toString());
 
-    {
-        ChunkType migratedChunkType;
-        migratedChunkType.setMin(_args.getMinKey());
-        migratedChunkType.setMax(_args.getMaxKey());
-        builder.append("migratedChunk", migratedChunkType.toBSON());
-    }
+    ChunkType migratedChunkType;
+    migratedChunkType.setMin(_args.getMinKey());
+    migratedChunkType.setMax(_args.getMaxKey());
 
     // If we have chunks left on the FROM shard, bump the version of one of them as well. This will
     // change the local collection major version, which indicates to other processes that the chunk
     // metadata has changed and they should refresh.
-    bool hasControlChunk = false;
+    boost::optional<ChunkType> controlChunkType = boost::none;
     if (_committedMetadata->getNumChunks() > 1) {
-        hasControlChunk = true;
         ChunkType differentChunk;
         invariant(_committedMetadata->getDifferentChunk(_args.getMinKey(), &differentChunk));
         invariant(differentChunk.getMin().woCompare(_args.getMinKey()) != 0);
-
-        {
-            ChunkType controlChunkType;
-            controlChunkType.setMin(differentChunk.getMin());
-            controlChunkType.setMax(differentChunk.getMax());
-            builder.append("controlChunk", controlChunkType.toBSON());
-        }
+        controlChunkType = std::move(differentChunk);
     } else {
         log() << "moveChunk moved last chunk out for collection '" << _args.getNss().ns() << "'";
     }
+
+    BSONObjBuilder builder;
+    CommitChunkMigrationRequest::appendAsCommand(&builder,
+                                                 _args.getNss(),
+                                                 _args.getFromShardId(),
+                                                 _args.getToShardId(),
+                                                 migratedChunkType,
+                                                 controlChunkType);
 
     builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
 
@@ -339,7 +334,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         // response and forget the migrated chunk.
 
         ChunkVersion uncommittedCollVersion;
-        if (hasControlChunk) {
+        if (controlChunkType) {
             uncommittedCollVersion = fassertStatusOK(
                 40084,
                 ChunkVersion::parseFromBSONWithFieldForCommands(
@@ -430,7 +425,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                         << causedBy(commitChunkMigrationResponse.getStatus())};
             }
 
-            if (hasControlChunk) {
+            if (controlChunkType) {
                 ChunkVersion refreshedCollVersion = refreshedMetadata->getCollVersion();
                 if (refreshedCollVersion.majorVersion() <=
                         previousMetadataCollVersion.majorVersion() ||
