@@ -656,6 +656,7 @@ serverOnlyFiles = [
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
     "range_deleter_service.cpp",
+    "read_concern.cpp",
     "repair_database.cpp",
     "repl/initial_sync.cpp",
     "repl/master_slave.cpp",

@@ -79,6 +79,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -87,7 +88,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
@@ -114,15 +114,6 @@ using std::ostringstream;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
-
-// This is a special flag that allows for testing of snapshot behavior by skipping the replication
-// related checks and isolating the storage/query side of snapshotting.
-bool testingSnapshotBehaviorInIsolation = false;
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshotBehaviorInIsolation(
-    ServerParameterSet::getGlobal(),
-    "testingSnapshotBehaviorInIsolation",
-    &testingSnapshotBehaviorInIsolation);
-
 
 class CmdShutdownMongoD : public CmdShutdown {
 public:
@@ -1443,119 +1434,41 @@ bool Command::run(OperationContext* txn,
         bytesToReserve = 0;
 #endif
 
-    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
-
-    repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-
-    repl::ReadConcernArgs readConcernArgs;
-    {
-        // parse and validate ReadConcernArgs
-        auto readConcernParseStatus = readConcernArgs.initialize(request.getCommandArgs());
-        if (!readConcernParseStatus.isOK()) {
-            auto result = appendCommandStatus(inPlaceReplyBob, readConcernParseStatus);
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-        if (!supportsReadConcern()) {
-            // Only return an error if a non-nullish readConcern was parsed, but do not process
-            // readConcern regardless.
-            if (!readConcernArgs.getOpTime().isNull() ||
-                readConcernArgs.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
-                auto result = appendCommandStatus(
-                    inPlaceReplyBob,
-                    {ErrorCodes::InvalidOptions,
-                     str::stream() << "Command " << getName() << " does not support "
-                                   << repl::ReadConcernArgs::kReadConcernFieldName});
-                inPlaceReplyBob.doneFast();
-                replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-                return result;
-            }
-        } else {
-            // Skip waiting for the OpTime when testing snapshot behavior.
-            if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
-                // Wait for readConcern to be satisfied.
-                auto readConcernStatus = replCoord->waitUntilOpTimeForRead(txn, readConcernArgs);
-                if (!readConcernStatus.isOK()) {
-                    if (ErrorCodes::ExceededTimeLimit == readConcernStatus) {
-                        const int debugLevel =
-                            serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
-                        LOG(debugLevel)
-                            << "Command on database " << request.getDatabase()
-                            << " timed out waiting for read concern to be satisfied. Command: "
-                            << getRedactedCopyForLogging(request.getCommandArgs());
-                    }
-
-                    auto result = appendCommandStatus(inPlaceReplyBob, readConcernStatus);
-                    inPlaceReplyBob.doneFast();
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-                    return result;
-                }
-            }
-
-            if ((replCoord->getReplicationMode() ==
-                     repl::ReplicationCoordinator::Mode::modeReplSet ||
-                 testingSnapshotBehaviorInIsolation) &&
-                (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-                 readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern)) {
-                // ReadConcern Majority is not supported in ProtocolVersion 0.
-                if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
-                    auto result = appendCommandStatus(
-                        inPlaceReplyBob,
-                        {ErrorCodes::ReadConcernMajorityNotEnabled,
-                         str::stream() << "Replica sets running protocol version 0 do not support "
-                                          "readConcern: majority"});
-                    inPlaceReplyBob.doneFast();
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-                    return result;
-                }
-
-                const int debugLevel =
-                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;
-                LOG(debugLevel) << "Waiting for 'committed' snapshot to be available for reading: "
-                                << readConcernArgs;
-                Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-
-                // Wait until a snapshot is available.
-                while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-                    LOG(debugLevel) << "Snapshot not available for readConcern: "
-                                    << readConcernArgs;
-                    replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
-                    status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-                }
-
-                LOG(debugLevel) << "Using 'committed' snapshot. " << CurOp::get(txn)->query();
-
-                if (!status.isOK()) {
-                    auto result = appendCommandStatus(inPlaceReplyBob, status);
-                    inPlaceReplyBob.doneFast();
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-                    return result;
-                }
-            }
-        }
-
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
-            uassert(ErrorCodes::FailedToParse,
-                    "afterOpTime not compatible with read concern level linearizable",
-                    readConcernArgs.getOpTime().isNull());
-            uassert(ErrorCodes::NotMaster,
-                    "cannot satisfy linearizable read concern on non-primary node",
-                    replCoord->getMemberState().primary());
-        }
-    }
-
     // run expects non-const bsonobj
     BSONObj cmd = request.getCommandArgs();
-    // Implementation just forwards to the old method signature for now.
-    std::string errmsg;
 
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
-    StatusWith<WriteConcernOptions> wcResult =
-        extractWriteConcern(txn, cmd, db, this->supportsWriteConcern(cmd));
+    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
 
+    {
+        auto readConcernArgsStatus = extractReadConcern(txn, cmd, supportsReadConcern());
+        if (!readConcernArgsStatus.isOK()) {
+            auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
+        Status rcStatus = waitForReadConcern(txn, readConcernArgsStatus.getValue());
+        if (!rcStatus.isOK()) {
+            if (rcStatus == ErrorCodes::ExceededTimeLimit) {
+                const int debugLevel =
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
+                LOG(debugLevel) << "Command on database " << db
+                                << " timed out waiting for read concern to be satisfied. Command: "
+                                << getRedactedCopyForLogging(request.getCommandArgs());
+            }
+
+            auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+    }
+
+    auto wcResult = extractWriteConcern(txn, cmd, db, supportsWriteConcern(cmd));
     if (!wcResult.isOK()) {
         auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
         inPlaceReplyBob.doneFast();
@@ -1563,17 +1476,18 @@ bool Command::run(OperationContext* txn,
         return result;
     }
 
+    std::string errmsg;
     bool result;
-    if (!this->supportsWriteConcern(cmd)) {
+    if (!supportsWriteConcern(cmd)) {
         // TODO: remove queryOptions parameter from command's run method.
-        result = this->run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+        result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
     } else {
         // Change the write concern while running the command.
         const auto oldWC = txn->getWriteConcern();
         ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
         txn->setWriteConcern(wcResult.getValue());
 
-        result = this->run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+        result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
         dassert(txn->getWriteConcern().toBSON() == wcResult.getValue().toBSON());
@@ -1588,7 +1502,7 @@ bool Command::run(OperationContext* txn,
 
         // SERVER-22421: This code is to ensure error response backwards compatibility with the
         // user management commands. This can be removed in 3.6.
-        if (!waitForWCStatus.isOK() && isUserManagementCommand(this->getName())) {
+        if (!waitForWCStatus.isOK() && isUserManagementCommand(getName())) {
             BSONObj temp = inPlaceReplyBob.asTempObj().copy();
             inPlaceReplyBob.resetToEmpty();
             appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
