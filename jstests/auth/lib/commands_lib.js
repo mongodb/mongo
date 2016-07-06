@@ -3586,6 +3586,26 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "profileSetSampleRate",
+          command: {profile: -1, sampleRate: 0.5},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_dbAdmin,
+                privileges:
+                    [{resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_dbAdminAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: ""}, actions: ["enableProfiler"]}
+                ]
+              }
+          ]
+        },
+        {
           testname: "renameCollection_sameDb",
           command: {renameCollection: firstDbName + ".x", to: firstDbName + ".y", dropTarget: true},
           setup: function(db) {
