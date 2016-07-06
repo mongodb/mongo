@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -349,7 +350,8 @@ public:
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        if (cmdObj.firstElement().numberInt() == -1 && !cmdObj.hasField("slowms")) {
+        if (cmdObj.firstElement().numberInt() == -1 && !cmdObj.hasField("slowms") &&
+            !cmdObj.hasField("sampleRate")) {
             // If you just want to get the current profiling level you can do so with just
             // read access to system.profile, even if you can't change the profiling level.
             if (authzSession->isAuthorizedForActionsOnResource(
@@ -393,6 +395,7 @@ public:
 
         result.append("was", db ? db->getProfilingLevel() : serverGlobalParams.defaultProfile);
         result.append("slowms", serverGlobalParams.slowMS);
+        result.append("sampleRate", serverGlobalParams.sampleRate);
 
         if (!readOnly) {
             if (!db) {
@@ -407,6 +410,14 @@ public:
         if (slow.isNumber()) {
             serverGlobalParams.slowMS = slow.numberInt();
         }
+
+        double newSampleRate;
+        uassertStatusOK(bsonExtractDoubleFieldWithDefault(
+            cmdObj, "sampleRate"_sd, serverGlobalParams.sampleRate, &newSampleRate));
+        uassert(ErrorCodes::BadValue,
+                "sampleRate must be between 0.0 and 1.0 inclusive",
+                newSampleRate >= 0.0 && newSampleRate <= 1.0);
+        serverGlobalParams.sampleRate = newSampleRate;
 
         if (!status.isOK()) {
             errmsg = status.reason();

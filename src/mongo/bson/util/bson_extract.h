@@ -158,6 +158,21 @@ Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
                                           long long* out);
 
 /**
+ * Finds a double-precision floating point element named "fieldName" in "object".
+ *
+ * If a field named "fieldName" is present, and is a double, stores the value of the field into
+ * "*out". If no field named fieldName is present, sets "*out" to "defaultValue". In these cases,
+ * returns Status::OK().
+ *
+ * If "fieldName" is present more than once, behavior is undefined. If the found field is not a
+ * double, returns ErrorCodes::TypeMismatch.
+ */
+Status bsonExtractDoubleFieldWithDefault(const BSONObj& object,
+                                         StringData fieldName,
+                                         double defaultValue,
+                                         double* out);
+
+/**
  * Finds a std::string element named "fieldName" in "object".
  *
  * If a field named "fieldName" is present, and is a string, stores the value of the field into

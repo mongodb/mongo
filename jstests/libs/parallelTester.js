@@ -247,6 +247,7 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_insert.js",
             parallelFilesDir + "/profile_mapreduce.js",
             parallelFilesDir + "/profile_no_such_db.js",
+            parallelFilesDir + "/profile_sampling.js",
             parallelFilesDir + "/profile_update.js"
         ];
         var serialTests = makeKeys(serialTestsArr);

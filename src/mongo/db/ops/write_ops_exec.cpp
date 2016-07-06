@@ -109,13 +109,17 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
         const bool logSlow = executionTimeMicros >
             (serverGlobalParams.slowMS + curOp->getExpectedLatencyMs()) * 1000LL;
 
-        if (logAll || logSlow) {
+        const bool shouldSample = serverGlobalParams.sampleRate == 1.0
+            ? true
+            : txn->getClient()->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
+
+        if (logAll || (shouldSample && logSlow)) {
             Locker::LockerInfo lockerInfo;
             txn->lockState()->getLockerInfo(&lockerInfo);
             log() << curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats);
         }
 
-        if (curOp->shouldDBProfile()) {
+        if (shouldSample && curOp->shouldDBProfile()) {
             profile(txn, CurOp::get(txn)->getNetworkOp());
         }
     } catch (const DBException& ex) {

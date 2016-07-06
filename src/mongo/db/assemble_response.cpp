@@ -628,13 +628,17 @@ void assembleResponse(OperationContext* txn,
         .incrementGlobalLatencyStats(
             txn, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
 
-    if (shouldLogOpDebug || debug.executionTimeMicros > logThresholdMs * 1000LL) {
+    const bool shouldSample = serverGlobalParams.sampleRate == 1.0
+        ? true
+        : c.getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
+
+    if (shouldLogOpDebug || (shouldSample && debug.executionTimeMicros > logThresholdMs * 1000LL)) {
         Locker::LockerInfo lockerInfo;
         txn->lockState()->getLockerInfo(&lockerInfo);
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
-    if (currentOp.shouldDBProfile()) {
+    if (shouldSample && currentOp.shouldDBProfile()) {
         // Performance profiling is on
         if (txn->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";

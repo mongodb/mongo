@@ -509,7 +509,7 @@ var DB;
             "\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
         print("\tdb.serverStatus()");
         print("\tdb.setLogLevel(level,<component>)");
-        print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
+        print("\tdb.setProfilingLevel(level,slowms) 0=off 1=slow 2=all");
         print(
             "\tdb.setWriteConcern( <write concern doc> ) - sets the write concern for writes to the db");
         print(
@@ -546,22 +546,25 @@ var DB;
     };
 
     /**
-     * <p> Set profiling level for your db.  Profiling gathers stats on query performance. </p>
+     * Configures settings for capturing operations inside the system.profile collection and in the
+     * slow query log.
      *
-     * <p>Default is off, and resets to off on a database restart -- so if you want it on,
-     *    turn it on periodically. </p>
+     * The 'level' can be 0, 1, or 2:
+     *  - 0 means that profiling is off and nothing will be written to system.profile.
+     *  - 1 means that profiling is on for operations slower than the currently configured 'slowms'
+     *    threshold (more on 'slowms' below).
+     *  - 2 means that profiling is on for all operations, regardless of whether or not they are
+     *    slower than 'slowms'.
      *
-     *  <p>Levels :</p>
-     *   <ul>
-     *    <li>0=off</li>
-     *    <li>1=log very slow operations; optional argument slowms specifies slowness threshold</li>
-     *    <li>2=log all</li>
-     *  @param {String} level Desired level of profiling
-     *  @param {String} slowms For slow logging, query duration that counts as slow (default 100ms)
-     *  @return SOMETHING_FIXME or null on error
+     * The 'options' parameter, if a number, is interpreted as the 'slowms' value to send to the
+     * server. 'slowms' determines the threshold, in milliseconds, above which slow operations get
+     * profiled at profiling level 1 or logged at logLevel 0.
+     *
+     * If 'options' is not a number, it is expected to be an object containing additional parameters
+     * to get passed to the server. For example, db.setProfilingLevel(2, {foo: "bar"}) will issue
+     * the command {profile: 2, foo: "bar"} to the server.
      */
-    DB.prototype.setProfilingLevel = function(level, slowms) {
-
+    DB.prototype.setProfilingLevel = function(level, options) {
         if (level < 0 || level > 2) {
             var errorText = "input level " + level + " is out of range [0..2]";
             var errorObject = new Error(errorText);
@@ -570,8 +573,11 @@ var DB;
         }
 
         var cmd = {profile: level};
-        if (isNumber(slowms))
-            cmd["slowms"] = slowms;
+        if (isNumber(options)) {
+            cmd.slowms = options;
+        } else {
+            cmd = Object.extend(cmd, options);
+        }
         return assert.commandWorked(this._dbCommand(cmd));
     };
 
