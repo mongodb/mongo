@@ -422,7 +422,6 @@ StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn) {
 
     auto status = doInitialSync(txn);
     if (status.isOK()) {
-        _resetState_inlock(txn, status.getValue());
         return status.getValue().opTime.getTimestamp();
     } else {
         return status.getStatus();
@@ -722,22 +721,20 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
     }
 
     // Success, cleanup
-    // TODO: re-enable, find blocking call from tests
-    /*
-            _cancelAllHandles_inlock();
-            _waitOnAll_inlock();
+    _cancelAllHandles_inlock();
+    _waitOnAll_inlock();
+    invariant(!_anyActiveHandles_inlock());
 
-            _reporterPaused = false;
-            _fetcherPaused = false;
-            _fetcher.reset(nullptr);
-            _tmpFetcher.reset(nullptr);
-            _applierPaused = false;
-            _applier.reset(nullptr);
-            _applierActive = false;
-            _initialSyncState.reset(nullptr);
-            _oplogBuffer.clear();
-            _resetState_inlock(_lastTimestampApplied);
-    */
+    _reporterPaused = false;
+    _fetcherPaused = false;
+    _applierPaused = false;
+    _applierActive = false;
+    _initialSyncState.reset();
+    _oplogFetcher.reset();
+    _lastOplogEntryFetcher.reset();
+    _applier.reset();
+
+    _lastFetched = _lastApplied;
 
     auto si = StorageInterface::get(txn);
     si->clearInitialSyncFlag(txn);
