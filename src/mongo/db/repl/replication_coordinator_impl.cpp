@@ -3536,27 +3536,6 @@ CallbackFn ReplicationCoordinatorImpl::_wrapAsCallbackFn(const stdx::function<vo
     };
 }
 
-Status ReplicationCoordinatorImpl::stepUpIfEligible() {
-    if (!isV1ElectionProtocol()) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "Step-up command is only supported by Protocol Version 1");
-    }
-
-    _startElectSelfIfEligibleV1(false);
-    EventHandle finishEvent;
-    {
-        LockGuard lk(_mutex);
-        finishEvent = _electionFinishedEvent;
-    }
-    if (finishEvent.isValid()) {
-        _replExecutor.waitForEvent(finishEvent);
-    }
-    auto state = getMemberState();
-    if (state.primary()) {
-        return Status::OK();
-    }
-    return Status(ErrorCodes::CommandFailed, "Election failed.");
-}
 
 bool ReplicationCoordinatorImpl::getInitialSyncRequestedFlag() const {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);

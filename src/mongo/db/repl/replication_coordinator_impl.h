@@ -334,7 +334,6 @@ public:
     virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
     virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) override;
 
-    virtual Status stepUpIfEligible() override;
 
     // ================== Test support API ===================
 

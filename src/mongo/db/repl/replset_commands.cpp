@@ -893,38 +893,5 @@ private:
     }
 } cmdReplSetElect;
 
-class CmdReplSetStepUp : public ReplSetCommand {
-public:
-    virtual Status checkAuthForCommand(ClientBasic* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
-        ActionSet actions;
-        actions.addAction(ActionType::replSetStateChange);
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), actions)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    CmdReplSetStepUp() : ReplSetCommand("replSetStepUp") {}
-
-private:
-    virtual bool run(OperationContext* txn,
-                     const string&,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return appendCommandStatus(result, status);
-
-        status = getGlobalReplicationCoordinator()->stepUpIfEligible();
-
-        return appendCommandStatus(result, status);
-    }
-} cmdReplSetStepUp;
-
 }  // namespace repl
 }  // namespace mongo
