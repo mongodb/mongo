@@ -618,7 +618,15 @@ Status Cloner::copyDb(OperationContext* txn,
             uassert(18645, str::stream() << "database " << toDBName << " dropped during clone", db);
 
             Collection* c = db->getCollection(to_name);
-            if (c && !c->getIndexCatalog()->haveIdIndex(txn)) {
+            bool autoIndexId = true;
+            auto status =
+                bsonExtractBooleanFieldWithDefault(options, "autoIndexId", true, &autoIndexId);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (c && !c->getIndexCatalog()->haveIdIndex(txn) && autoIndexId) {
+
                 // We need to drop objects with duplicate _ids because we didn't do a true
                 // snapshot and this is before applying oplog operations that occur during the
                 // initial sync.
