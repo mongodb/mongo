@@ -12,6 +12,7 @@ create=false
 run_time=600
 threads=((count=20,reads=1))
 
-# Error if a latency over 1 seconds is seen
-max_latency=1000000
-sample_interval=1
+# Warn if a latency over 1 second is seen
+max_latency=1000
+sample_interval=5
+sample_rate=1

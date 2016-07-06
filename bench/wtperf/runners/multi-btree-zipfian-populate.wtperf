@@ -12,3 +12,8 @@ run_ops=10000000
 populate_threads=0
 icount=0
 threads=((count=20,inserts=1))
+
+# Warn if a latency over 1 second is seen
+max_latency=1000
+sample_interval=5
+sample_rate=1
