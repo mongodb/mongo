@@ -19,8 +19,8 @@ load("jstests/replsets/rslib.js");
     var checkFinalResults = function(db) {
         assert.eq(2, db.b.getIndexes().length);
         assert.eq(2, db.oldname.getIndexes().length);
-        assert.eq(2, db.oldname.count());
-        assert.eq(1, db.kap.count());
+        assert.eq(2, db.oldname.find().itcount());
+        assert.eq(1, db.kap.find().itcount());
         assert(db.kap.isCapped());
         assert.eq(0, db.bar.count({q: 70}));
         assert.eq(33, db.bar.findOne({q: 0})["y"]);
@@ -28,8 +28,8 @@ load("jstests/replsets/rslib.js");
         assert.eq(1, db.bar.count({txt: "foo"}));
         assert.eq(200, db.bar.count({i: {$gt: -1}}));
         assert.eq(6, db.bar.count({q: {$gt: -1}}));
-        assert.eq(0, db.getSiblingDB("abc").foo.count());
-        assert.eq(0, db.getSiblingDB("abc").bar.count());
+        assert.eq(0, db.getSiblingDB("abc").foo.find().itcount());
+        assert.eq(0, db.getSiblingDB("abc").bar.find().itcount());
     };
 
     var name = "rollback2js";
@@ -114,7 +114,7 @@ load("jstests/replsets/rslib.js");
     // two to see if we transitively rollback?
     b.oldname.renameCollection("newname");
     b.newname.renameCollection("fooname");
-    assert(b.fooname.count() > 0, "count rename");
+    assert(b.fooname.find().itcount() > 0, "count rename");
     // test roll back (drop) a whole database
     var abc = b.getSisterDB("abc");
     assert.writeOK(abc.foo.insert({x: 1}));
@@ -139,7 +139,7 @@ load("jstests/replsets/rslib.js");
             return false;
         }
     });
-    assert(a.bar.count() >= 1, "count check");
+    assert(a.bar.find().itcount() >= 1, "count check");
     assert.writeOK(a.bar.insert({txt: 'foo'}));
     assert.writeOK(a.bar.remove({q: 70}));
     assert.writeOK(a.bar.update({q: 0}, {$inc: {y: 33}}));

@@ -23,8 +23,8 @@ load("jstests/replsets/rslib.js");
         assert.eq(6, db.bar.count({q: {$gt: -1}}));
         assert.eq(1, db.bar.count({txt: "foo"}));
         assert.eq(33, db.bar.findOne({q: 0})["y"]);
-        assert.eq(1, db.kap.count());
-        assert.eq(0, db.kap2.count());
+        assert.eq(1, db.kap.find().itcount());
+        assert.eq(0, db.kap2.find().itcount());
     };
 
     var name = "rollback2js";
@@ -122,7 +122,7 @@ load("jstests/replsets/rslib.js");
             return false;
         }
     });
-    assert(a.bar.count() >= 1, "count check");
+    assert.gte(a.bar.find().itcount(), 1, "count check");
     assert.writeOK(a.bar.insert({txt: 'foo'}));
     assert.writeOK(a.bar.remove({q: 70}));
     assert.writeOK(a.bar.update({q: 0}, {$inc: {y: 33}}));

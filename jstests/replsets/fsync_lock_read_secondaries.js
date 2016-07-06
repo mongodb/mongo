@@ -61,14 +61,14 @@
     // Issue a read query on the secondary while holding the fsync lock.
     // This is what we are testing. Previously this would block. After the fix
     // this should work just fine.
-    var slave0count = slaves[0].getDB("foo").bar.count();
+    var slave0count = slaves[0].getDB("foo").bar.find().itcount();
     assert.eq(
         slave0count, 100, "Doc count in fsync lock wrong. Expected (=100), found " + slave0count);
     assert(slaves[0].getDB("admin").fsyncUnlock().ok);
 
     // The secondary should have equal or more documents than what it had before.
     assert.soon(function() {
-        return slaves[0].getDB("foo").bar.count() > 100;
+        return slaves[0].getDB("foo").bar.find().itcount() > 100;
     }, "count of documents stored on the secondary did not increase");
     replTest.stopSet();
 }());

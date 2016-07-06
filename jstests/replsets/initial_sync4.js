@@ -60,7 +60,7 @@ for (i = N; i < N * 2; i++) {
     mc.insert({_id: i, x: i});
 }
 
-assert.eq(N * 2, mc.count());
+assert.eq(N * 2, mc.find().itcount());
 
 print("7. Wait for new node to become SECONDARY");
 wait(function() {
@@ -71,7 +71,7 @@ wait(function() {
 
 print("8. Wait for new node to have all the data");
 wait(function() {
-    return sc.count() == mc.count();
+    return sc.find().itcount() == mc.find().itcount();
 });
 
 assert.eq(mc.getIndexKeys().length, sc.getIndexKeys().length);

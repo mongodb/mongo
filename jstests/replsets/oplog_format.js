@@ -104,7 +104,7 @@ var otherTS = assertLastOplog({$set: {"a.0": 3}}, {_id: 1}, msg);    // Nothing 
 assert.eq(lastTS, otherTS, "new oplog was not expected -- " + msg);  // No new oplog entry
 
 coll.remove({});
-assert.eq(coll.count(), 0, "collection not empty");
+assert.eq(coll.find().itcount(), 0, "collection not empty");
 
 var msg = "bad $setOnInsert w/upsert";
 res = assert.writeOK(coll.update({}, {$setOnInsert: {a: 200}}, {upsert: true}));  // upsert
@@ -114,7 +114,7 @@ assert.docEq({_id: id, a: 200}, coll.findOne({}), msg);  // No-op
 assertLastOplog({_id: id, a: 200}, null, msg);           // No new oplog entry
 
 coll.remove({});
-assert.eq(coll.count(), 0, "collection not empty-2");
+assert.eq(coll.find().itcount(), 0, "collection not empty-2");
 
 /* inconsistent oplog format with old code -- new is okay but less efficient
  * enable once we switch the default

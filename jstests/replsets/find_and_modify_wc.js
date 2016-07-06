@@ -21,7 +21,7 @@
     var res =
         coll.runCommand({insert: coll.getName(), documents: docs, writeConcern: {w: nodeCount}});
     assert(res.ok);
-    assert.eq(5, coll.count());
+    assert.eq(5, coll.find().itcount());
 
     // use for updates in subsequent runCommand calls
     var reqUpdate = {
@@ -52,7 +52,7 @@
     res = coll.runCommand(
         {findAndModify: coll.getName(), sort: {i: 1}, remove: true, writeConcern: {w: nodeCount}});
     assert.eq(res.value.i, 1);
-    assert.eq(coll.count(), 4);
+    assert.eq(coll.find().itcount(), 4);
     assert(!res.writeConcernError);
 
     // Verify findAndModify returns writeConcernError

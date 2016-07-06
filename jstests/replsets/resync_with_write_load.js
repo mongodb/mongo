@@ -66,7 +66,7 @@ var loadGen = startParallelShell(work, replTest.ports[0]);
 // wait for document to appear to continue
 assert.soon(function() {
     try {
-        return 1 == master.getDB("test")["timeToStartTrigger"].count();
+        return 1 == master.getDB("test")["timeToStartTrigger"].find().itcount();
     } catch (e) {
         print(e);
         return false;

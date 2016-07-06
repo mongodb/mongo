@@ -13,7 +13,7 @@ db = primary.getDB('test');
 db.test.save({a: 0});
 replTest.awaitReplication();
 assert.soon(function() {
-    return secondary.getDB('test').test.count() == 1;
+    return secondary.getDB('test').test.find().itcount() == 1;
 });
 
 // Start a parallel shell to insert new documents on the primary.
@@ -39,12 +39,12 @@ for (i = 0; i < 1e3; ++i) {
 // Wait for the inserter to finish.
 inserter();
 
-assert.eq(numDocs, db.test.count());
+assert.eq(numDocs, db.test.find().itcount());
 
 // Return true when the correct number of documents are present on the secondary.  Otherwise print
 // which documents are missing and return false.
 function allReplicated() {
-    count = secondary.getDB('test').test.count();
+    count = secondary.getDB('test').test.find().itcount();
     if (count == numDocs) {
         // Return true if the count is as expected.
         return true;

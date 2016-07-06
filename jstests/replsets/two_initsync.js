@@ -88,7 +88,7 @@ doTest = function(signal) {
     printjson(b.isMaster());
 
     wait(function() {
-        var c = b.getSisterDB("two").coll.count();
+        var c = b.getSisterDB("two").coll.find().itcount();
         print(c);
         return c == 20000;
     });

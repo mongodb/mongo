@@ -43,7 +43,7 @@
     }
     assert.writeOK(bulk.execute());
     jsTestLog('Number of documents inserted into collection on primary: ' + numDocuments);
-    assert.eq(numDocuments, primary.getDB("foo").foo.count());
+    assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());
 
     assert.soon(function() {
         var serverStatus = secondary.getDB('foo').serverStatus();
@@ -110,5 +110,5 @@
     // Check for at least two entries. There was one prior to freezing op application on the
     // secondary and we cannot guarantee all writes reached the secondary's op queue prior to
     // shutting down the original primary.
-    assert.gte(primary.getDB("foo").foo.count(), 2);
+    assert.gte(primary.getDB("foo").foo.find().itcount(), 2);
 })();

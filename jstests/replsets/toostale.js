@@ -78,7 +78,7 @@ print("okay");
 
 print("4: overflow oplog");
 reconnect(master.getDB("local"));
-var count = master.getDB("local").oplog.rs.count();
+var count = master.getDB("local").oplog.rs.find().itcount();
 var prevCount = -1;
 while (count > prevCount) {
     print("inserting 1000");
@@ -90,7 +90,7 @@ while (count > prevCount) {
 
     prevCount = count;
     replTest.awaitReplication();
-    count = master.getDB("local").oplog.rs.count();
+    count = master.getDB("local").oplog.rs.find().itcount();
     print("count: " + count + " prev: " + prevCount);
 }
 

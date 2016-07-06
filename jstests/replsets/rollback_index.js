@@ -78,7 +78,7 @@ options = {
     writeConcern: {w: 1, wtimeout: 60000}
 };
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
-assert.eq(2, a_conn.getDB(name).foo.count(), 'invalid number of documents on A');
+assert.eq(2, a_conn.getDB(name).foo.find().itcount(), 'invalid number of documents on A');
 
 // restart B, which should rollback.
 replTest.restart(BID);
@@ -95,7 +95,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 
 // Check collections and indexes.
 assert.eq(3,
-          b_conn.getDB(name).foo.count(),
+          b_conn.getDB(name).foo.find().itcount(),
           'Collection on B does not have the same number of documents as A');
 assert.eq(a_conn.getDB(name).foo.getIndexes().length,
           b_conn.getDB(name).foo.getIndexes().length,

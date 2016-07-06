@@ -61,4 +61,4 @@ for (i = doccount * 2; i > doccount; --i) {
 print("finished");
 // Wait for replication to catch up.
 rt.awaitSecondaryNodes();
-assert.eq(doccount + 1, slave.getDB('d')['c'].count());
+assert.eq(doccount + 1, slave.getDB('d')['c'].find().itcount());
