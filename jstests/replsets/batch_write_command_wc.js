@@ -29,7 +29,7 @@ printjson(request = {
 printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Basic insert, majority WC
@@ -42,7 +42,7 @@ printjson(request = {
 printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Basic insert,  w:2 WC
@@ -55,7 +55,7 @@ printjson(request = {
 printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Basic insert, immediate nojournal error
@@ -67,7 +67,7 @@ printjson(request = {
 });
 printjson(result = coll.runCommand(request));
 assert(!result.ok);
-assert.eq(0, coll.count());
+assert.eq(0, coll.find().itcount());
 
 //
 // Basic insert, timeout wc error
@@ -82,7 +82,7 @@ assert(result.ok);
 assert.eq(1, result.n);
 assert(result.writeConcernError);
 assert.eq(100, result.writeConcernError.code);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Basic insert, wmode wc error
@@ -96,7 +96,7 @@ printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert(result.writeConcernError);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Two ordered inserts, write error and wc error both reported
@@ -112,7 +112,7 @@ assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);
 assert(result.writeConcernError);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Two unordered inserts, write error and wc error reported
@@ -129,7 +129,7 @@ assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);
 assert(result.writeConcernError);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Write error with empty writeConcern object.
@@ -146,7 +146,7 @@ assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);
 assert.eq(null, result.writeConcernError);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 //
 // Write error with unspecified w.
@@ -163,7 +163,7 @@ assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);
 assert.eq(null, result.writeConcernError);
-assert.eq(1, coll.count());
+assert.eq(1, coll.find().itcount());
 
 jsTest.log("DONE no journal/repl tests");
 rst.stopSet();

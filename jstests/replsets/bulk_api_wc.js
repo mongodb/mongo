@@ -47,7 +47,7 @@ var executeTests = function() {
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
     assert(!result.getWriteConcernError());
-    assert.eq(coll.count(), 2);
+    assert.eq(coll.find().itcount(), 2);
 
     //
     // Unordered
@@ -66,7 +66,7 @@ var executeTests = function() {
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
     assert(result.getWriteConcernError());
-    assert.eq(coll.count(), 2);
+    assert.eq(coll.find().itcount(), 2);
 
     //
     // Fail with write error, write concern timeout reported when unordered
@@ -83,7 +83,7 @@ var executeTests = function() {
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
     assert.eq(100, result.getWriteConcernError().code);
-    assert.eq(coll.count(), 2);
+    assert.eq(coll.find().itcount(), 2);
 
     //
     // Fail with write error and upserted, write concern error reported when unordered
@@ -101,7 +101,7 @@ var executeTests = function() {
     assert.eq(result.getUpsertedIds()[0].index, 2);
     assert.eq(result.getWriteErrors()[0].index, 3);
     assert(result.getWriteConcernError());
-    assert.eq(coll.count(), 3);
+    assert.eq(coll.find().itcount(), 3);
 };
 
 // Use write commands

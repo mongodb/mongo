@@ -108,18 +108,18 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             adminDB.system.users.remove({});
             adminDB.system.roles.remove({});
 
-            assert.eq(0, adminDB.system.users.count());
-            assert.eq(0, adminDB.system.roles.count());
+            assert.eq(0, adminDB.system.users.find().itcount());
+            assert.eq(0, adminDB.system.roles.find().itcount());
 
             db.createUser({user: 'lorax2', pwd: 'pwd', roles: ['readWrite']});
             db.createRole({role: 'role2', roles: ['readWrite'], privileges: []});
 
-            assert.eq(1, adminDB.system.users.count());
-            assert.eq(1, adminDB.system.roles.count());
+            assert.eq(1, adminDB.system.users.find().itcount());
+            assert.eq(1, adminDB.system.roles.find().itcount());
         },
         confirmFunc: function() {
-            assert.eq(2, adminDB.system.users.count());
-            assert.eq(2, adminDB.system.roles.count());
+            assert.eq(2, adminDB.system.users.find().itcount());
+            assert.eq(2, adminDB.system.roles.find().itcount());
         },
         admin: true
     });

@@ -40,7 +40,7 @@ for (var i = 0; i < 100; i++) {
     bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
 }
 assert.writeOK(bulk.execute());
-print("total in foo: " + foo.bar.count());
+print("total in foo: " + foo.bar.find().itcount());
 
 print("4. Make sure synced");
 replTest.awaitReplication();

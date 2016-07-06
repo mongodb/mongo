@@ -32,7 +32,7 @@
     replTest.awaitReplication();
 
     function checkCollection(coll) {
-        assert.eq(coll.count(), nDocuments);
+        assert.eq(coll.find().itcount(), nDocuments);
 
         var i = 0;
         coll.find().forEach(function(doc) {

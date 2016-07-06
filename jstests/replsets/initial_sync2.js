@@ -39,7 +39,7 @@ var doTest = function() {
     for (var i = 0; i < 10000; i++) {
         foo.bar.insert({date: new Date(), x: i, str: "all the talk on the market"});
     }
-    jsTest.log("total in foo: " + foo.bar.count());
+    jsTest.log("total in foo: " + foo.bar.find().itcount());
 
     jsTest.log("4. Make sure synced");
     replTest.awaitReplication();

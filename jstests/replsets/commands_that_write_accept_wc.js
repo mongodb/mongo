@@ -22,7 +22,7 @@ load('jstests/libs/write_concern_util.js');
 
     function dropTestCollection() {
         coll.drop();
-        assert.eq(0, coll.find().count(), "test collection not empty");
+        assert.eq(0, coll.find().itcount(), "test collection not empty");
     }
 
     dropTestCollection();

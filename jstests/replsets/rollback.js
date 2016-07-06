@@ -93,8 +93,8 @@ load("jstests/replsets/rslib.js");
     assert.writeOK(a.bar.insert({q: 2, a: "foo", x: 1}));
     assert.writeOK(a.bar.insert({q: 3, bb: 9, a: "foo"}, {writeConcern: {w: 2}}));
 
-    assert.eq(a.bar.count(), 3, "a.count");
-    assert.eq(b.bar.count(), 3, "b.count");
+    assert.eq(a.bar.find().itcount(), 3, "a.count");
+    assert.eq(b.bar.find().itcount(), 3, "b.count");
 
     conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
@@ -112,7 +112,7 @@ load("jstests/replsets/rslib.js");
     for (var i = 4; i <= 100; i++) {
         assert.writeOK(b.bar.insert({q: i}));
     }
-    assert.eq(100, b.bar.count(), "u.count");
+    assert.eq(100, b.bar.find().itcount(), "u.count");
 
     // a should not have the new data as it was partitioned.
     conns[1].disconnect(conns[2]);
@@ -136,7 +136,7 @@ load("jstests/replsets/rslib.js");
         }
     });
 
-    assert(a.bar.count() == 3, "t is 3");
+    assert.eq(3, a.bar.find().itcount(), "t is 3");
     assert.writeOK(a.bar.insert({q: 7}));
     assert.writeOK(a.bar.insert({q: 8}));
 

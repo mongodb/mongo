@@ -38,7 +38,7 @@ doTest = function(signal) {
     slaves.forEach(function(slave) {
         // try to read from slave
         slave.slaveOk = true;
-        var count = slave.getDB("foo").foo.count();
+        var count = slave.getDB("foo").foo.find().itcount();
         printjson(count);
         assert.eq(len, count, "slave count wrong: " + slave);
 
