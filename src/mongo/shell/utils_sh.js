@@ -81,7 +81,7 @@ sh.help = function() {
         "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
     print("\tsh.disableAutoSplit()                   disable autoSplit on one collection");
     print("\tsh.enableAutoSplit()                    re-eable autoSplit on one colleciton");
-    print("\tsh.getShouldAutoSplit                   returns whether autosplit is enabled");
+    print("\tsh.getShouldAutoSplit()                 returns whether autosplit is enabled");
 };
 
 sh.status = function(verbose, configDB) {
@@ -194,17 +194,19 @@ sh.startBalancer = function(timeoutMs, interval) {
 sh.enableAutoSplit = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    return assert.writeOK(configDB.settings.update({_id: 'autosplit'},
-                                                   {$set: {enabled: true}},
-                                                   {upsert: true, writeConcern: {w: 'majority'}}));
+    return assert.writeOK(
+        configDB.settings.update({_id: 'autosplit'},
+                                 {$set: {enabled: true}},
+                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
 };
 
 sh.disableAutoSplit = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    return assert.writeOK(configDB.settings.update({_id: 'autosplit'},
-                                                   {$set: {enabled: false}},
-                                                   {upsert: true, writeConcern: {w: 'majority'}}));
+    return assert.writeOK(
+        configDB.settings.update({_id: 'autosplit'},
+                                 {$set: {enabled: false}},
+                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
 };
 
 sh.getShouldAutoSplit = function(configDB) {
@@ -212,7 +214,8 @@ sh.getShouldAutoSplit = function(configDB) {
         configDB = sh._getConfigDB();
     var autosplit = configDB.settings.findOne({_id: 'autosplit'});
     if (autosplit == null) {
-        print("config.settings collection empty or missing. be sure you are connected to a mongos");
+        print(
+            "No autosplit document found in config.settings collection. Be sure you are connected to a mongos");
         return true;
     }
     return autosplit.enabled;

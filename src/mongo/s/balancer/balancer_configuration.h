@@ -177,7 +177,7 @@ public:
     static AutoSplitSettingsType createDefault();
 
     /**
-     * Interprets the BSON content as chunk size settings and extracts the respective values
+     * Interprets the BSON content as autosplit settings and extracts the respective values
      */
     static StatusWith<AutoSplitSettingsType> fromBSON(const BSONObj& obj);
 
