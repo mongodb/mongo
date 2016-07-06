@@ -1055,6 +1055,19 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger --numClientsPerFixture=10
 
+## jstestfuzz concurrent replica set WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger --numClientsPerFixture=10
+
 ## jstestfuzz replica set mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication
@@ -1076,19 +1089,6 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
-
-## jstestfuzz concurrent replica set WT ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_replication_WT
-  commands:
-  - func: "do setup"
-  - func: "run jstestfuzz"
-    vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
-  - <<: *run_jstestfuzz_tests
-    vars:
-      <<: *jstestfuzz_config_vars
-      resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger --numClientsPerFixture=10
 
 ## jstestfuzz sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
@@ -3688,6 +3688,8 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
@@ -3792,6 +3794,8 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
@@ -4053,6 +4057,8 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
@@ -4110,6 +4116,8 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
