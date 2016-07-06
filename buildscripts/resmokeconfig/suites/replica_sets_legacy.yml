@@ -16,6 +16,7 @@ selector:
     - jstests/replsets/read_majority_two_arbs.js
     # The combination of new bridges and PV0 can lead to an improper spanning tree in sync2.js.
     - jstests/replsets/sync2.js
+    - jstests/replsets/stepup.js
 
 executor:
   js_test:
