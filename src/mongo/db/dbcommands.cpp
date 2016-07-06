@@ -82,7 +82,6 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -1476,10 +1475,9 @@ bool Command::run(OperationContext* txn,
             // Skip waiting for the OpTime when testing snapshot behavior.
             if (!testingSnapshotBehaviorInIsolation) {
                 // Wait for readConcern to be satisfied.
-                auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcernArgs);
-                readConcernResult.appendInfo(&inPlaceReplyBob);
-                if (!readConcernResult.getStatus().isOK()) {
-                    if (ErrorCodes::ExceededTimeLimit == readConcernResult.getStatus()) {
+                auto readConcernStatus = replCoord->waitUntilOpTimeForRead(txn, readConcernArgs);
+                if (!readConcernStatus.isOK()) {
+                    if (ErrorCodes::ExceededTimeLimit == readConcernStatus) {
                         const int debugLevel =
                             serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
                         LOG(debugLevel)
@@ -1487,13 +1485,14 @@ bool Command::run(OperationContext* txn,
                             << " timed out waiting for read concern to be satisfied. Command: "
                             << getRedactedCopyForLogging(request.getCommandArgs());
                     }
-                    auto result =
-                        appendCommandStatus(inPlaceReplyBob, readConcernResult.getStatus());
+
+                    auto result = appendCommandStatus(inPlaceReplyBob, readConcernStatus);
                     inPlaceReplyBob.doneFast();
                     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
                     return result;
                 }
             }
+
             if ((replCoord->getReplicationMode() ==
                      repl::ReplicationCoordinator::Mode::modeReplSet ||
                  testingSnapshotBehaviorInIsolation) &&

@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/storage/snapshot_name.h"
@@ -47,6 +46,7 @@ using std::vector;
 
 ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& settings)
     : _settings(settings) {}
+
 ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
 void ReplicationCoordinatorMock::startup(OperationContext* txn) {
@@ -181,9 +181,9 @@ OpTime ReplicationCoordinatorMock::getMyLastDurableOpTime() const {
     return _myLastDurableOpTime;
 }
 
-ReadConcernResponse ReplicationCoordinatorMock::waitUntilOpTime(OperationContext* txn,
-                                                                const ReadConcernArgs& settings) {
-    return ReadConcernResponse();
+Status ReplicationCoordinatorMock::waitUntilOpTimeForRead(OperationContext* txn,
+                                                          const ReadConcernArgs& settings) {
+    return Status::OK();
 }
 
 

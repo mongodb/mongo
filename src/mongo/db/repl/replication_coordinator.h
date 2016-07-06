@@ -72,7 +72,6 @@ class OldUpdatePositionArgs;
 class OplogReader;
 class OpTime;
 class ReadConcernArgs;
-class ReadConcernResponse;
 class ReplicaSetConfig;
 class ReplicationExecutor;
 class ReplSetHeartbeatArgs;
@@ -108,7 +107,6 @@ public:
 
     static void set(ServiceContext* service,
                     std::unique_ptr<ReplicationCoordinator> replCoordinator);
-
 
     struct StatusAndDuration {
     public:
@@ -351,16 +349,12 @@ public:
     virtual OpTime getMyLastDurableOpTime() const = 0;
 
     /**
-     * Waits until the optime of the current node is at least the opTime specified in
-     * 'settings'.
+     * Waits until the optime of the current node is at least the opTime specified in 'settings'.
      *
-     * The returned ReadConcernResponse object's didWait() method returns true if
-     * an attempt was made to wait for the specified opTime. This will return false when
-     * attempting to do read after opTime when node is not a replica set member.
-     *
+     * Returns whether the wait was successful.
      */
-    virtual ReadConcernResponse waitUntilOpTime(OperationContext* txn,
-                                                const ReadConcernArgs& settings) = 0;
+    virtual Status waitUntilOpTimeForRead(OperationContext* txn,
+                                          const ReadConcernArgs& settings) = 0;
 
     /**
      * Retrieves and returns the current election id, which is a unique id that is local to

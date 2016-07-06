@@ -37,7 +37,6 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -166,14 +165,15 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
         Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
         // Wait for any writes performed by this ShardLocal instance to be committed and visible.
-        auto readConcernResponse = replCoord->waitUntilOpTime(
+        Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
             txn, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
-        if (!readConcernResponse.getStatus().isOK()) {
-            if (readConcernResponse.getStatus() == ErrorCodes::ShutdownInProgress ||
-                ErrorCodes::isInterruption(readConcernResponse.getStatus().code())) {
-                return readConcernResponse.getStatus();
+        if (!readConcernStatus.isOK()) {
+            if (readConcernStatus == ErrorCodes::ShutdownInProgress ||
+                ErrorCodes::isInterruption(readConcernStatus.code())) {
+                return readConcernStatus;
             }
-            fassertStatusOK(40188, readConcernResponse.getStatus());
+
+            fassertStatusOK(40188, readConcernStatus);
         }
 
         // Inform the storage engine to read from the committed snapshot for the rest of this

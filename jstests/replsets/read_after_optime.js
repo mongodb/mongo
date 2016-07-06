@@ -23,14 +23,13 @@
 
         // Test timeout with maxTimeMS
         var runTimeoutTest = function() {
-            var timeoutResult = assert.commandFailedWithCode(testDB.runCommand({
+            assert.commandFailedWithCode(testDB.runCommand({
                 find: 'user',
                 filter: {x: 1},
                 readConcern: {afterOpTime: {ts: twoSecTS, t: term}},
                 maxTimeMS: 5000,
             }),
-                                                             ErrorCodes.ExceededTimeLimit);
-            assert.gt(timeoutResult.waitedMS, 500);
+                                         ErrorCodes.ExceededTimeLimit);
         };
 
         var countLogMessages = function(msg) {

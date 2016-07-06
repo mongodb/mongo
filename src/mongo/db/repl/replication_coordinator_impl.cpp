@@ -50,7 +50,6 @@
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -1059,39 +1058,35 @@ OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
     return _getMyLastDurableOpTime_inlock();
 }
 
-ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
-                                                                const ReadConcernArgs& settings) {
+Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
+                                                          const ReadConcernArgs& settings) {
     const bool isMajorityReadConcern =
         settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
 
     if (isMajorityReadConcern && !getSettings().isMajorityReadConcernEnabled()) {
         // This is an opt-in feature. Fail if the user didn't opt-in.
-        return ReadConcernResponse(
-            Status(ErrorCodes::ReadConcernMajorityNotEnabled,
-                   "Majority read concern requested, but server was not started with "
-                   "--enableMajorityReadConcern."));
+        return {ErrorCodes::ReadConcernMajorityNotEnabled,
+                "Majority read concern requested, but server was not started with "
+                "--enableMajorityReadConcern."};
     }
 
     const auto targetOpTime = settings.getOpTime();
     if (targetOpTime.isNull()) {
-        return ReadConcernResponse(Status::OK(), Milliseconds(0));
+        return Status::OK();
     }
 
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
         // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
         // an error. However, we consider all writes "committed" and can treat MajorityReadConcern
         // as LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
-        return ReadConcernResponse(
-            Status(ErrorCodes::NotAReplicaSet,
-                   "node needs to be a replica set member to use read concern"));
+        return {ErrorCodes::NotAReplicaSet,
+                "node needs to be a replica set member to use read concern"};
     }
 
-    Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {
-        return ReadConcernResponse(
-            Status(ErrorCodes::CommandNotSupported,
-                   "Current storage engine does not support majority readConcerns"));
+        return {ErrorCodes::CommandNotSupported,
+                "Current storage engine does not support majority readConcerns"};
     }
 
     auto getCurrentOpTime = [this, isMajorityReadConcern, targetOpTime] {
@@ -1108,12 +1103,11 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
     while (targetOpTime > getCurrentOpTime()) {
         Status interruptedStatus = txn->checkForInterruptNoAssert();
         if (!interruptedStatus.isOK()) {
-            return ReadConcernResponse(interruptedStatus, Milliseconds(timer.millis()));
+            return interruptedStatus;
         }
 
         if (_inShutdown) {
-            return ReadConcernResponse(Status(ErrorCodes::ShutdownInProgress, "shutting down"),
-                                       Milliseconds(timer.millis()));
+            return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
         }
 
         // Now we have to wait to be notified when
@@ -1148,7 +1142,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
         }
     }
 
-    return ReadConcernResponse(Status::OK(), Milliseconds(timer.millis()));
+    return Status::OK();
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTime_inlock() const {

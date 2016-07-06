@@ -34,10 +34,9 @@
     assert.commandWorked(runFindCommand(lastOp.ts));
 
     var pingIntervalSeconds = 10;
-    var timeoutResult = assert.commandFailedWithCode(
+    assert.commandFailedWithCode(
         runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
         ErrorCodes.ExceededTimeLimit);
-    assert.gt(timeoutResult.waitedMS, 500);
 
     var msg = 'Command on database local timed out waiting for read concern to be satisfied.';
     assert.soon(function() {

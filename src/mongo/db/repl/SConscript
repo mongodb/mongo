@@ -608,7 +608,6 @@ env.Library('replica_set_messages',
                 'is_master_response.cpp',
                 'member_config.cpp',
                 'old_update_position_args.cpp',
-                'read_concern_response.cpp',
                 'repl_set_heartbeat_args.cpp',
                 'repl_set_heartbeat_args_v1.cpp',
                 'repl_set_heartbeat_response.cpp',
@@ -861,14 +860,6 @@ env.CppUnitTest(
     target='read_concern_args_test',
     source=[
         'read_concern_args_test.cpp',
-    ],
-    LIBDEPS=['replica_set_messages']
-)
-
-env.CppUnitTest(
-    target='read_concern_response_test',
-    source=[
-        'read_concern_response_test.cpp',
     ],
     LIBDEPS=['replica_set_messages']
 )
