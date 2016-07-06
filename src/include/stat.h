@@ -145,14 +145,14 @@ __wt_stats_clear(void *stats_arg, int slot)
 #define	WT_STAT_DECRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
 #define	WT_STAT_DECRV_ATOMIC(session, stats, fld, value)		\
-	__wt_atomic_addi64(						\
+	__wt_atomic_subi64(						\
 	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_DECR(session, stats, fld)				\
 	WT_STAT_DECRV(session, stats, fld, 1)
 #define	WT_STAT_INCRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value)
 #define	WT_STAT_INCRV_ATOMIC(session, stats, fld, value)		\
-	__wt_atomic_subi64(						\
+	__wt_atomic_addi64(						\
 	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_INCR(session, stats, fld)				\
 	WT_STAT_INCRV(session, stats, fld, 1)
@@ -410,9 +410,9 @@ struct __wt_connection_stats {
 	int64_t rec_split_stashed_objects;
 	int64_t session_cursor_open;
 	int64_t session_open;
-	int64_t fsync_active;
-	int64_t read_active;
-	int64_t write_active;
+	int64_t thread_fsync_active;
+	int64_t thread_read_active;
+	int64_t thread_write_active;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
 	int64_t page_locked_blocked;

@@ -907,9 +907,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing rec_split_stashed_objects */
 		/* not clearing session_cursor_open */
 		/* not clearing session_open */
-		/* not clearing fsync_active */
-		/* not clearing read_active */
-		/* not clearing write_active */
+		/* not clearing thread_fsync_active */
+		/* not clearing thread_read_active */
+		/* not clearing thread_write_active */
 	stats->page_busy_blocked = 0;
 	stats->page_forcible_evict_blocked = 0;
 	stats->page_locked_blocked = 0;
@@ -1161,9 +1161,9 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, rec_split_stashed_objects);
 	to->session_cursor_open += WT_STAT_READ(from, session_cursor_open);
 	to->session_open += WT_STAT_READ(from, session_open);
-	to->fsync_active += WT_STAT_READ(from, fsync_active);
-	to->read_active += WT_STAT_READ(from, read_active);
-	to->write_active += WT_STAT_READ(from, write_active);
+	to->thread_fsync_active += WT_STAT_READ(from, thread_fsync_active);
+	to->thread_read_active += WT_STAT_READ(from, thread_read_active);
+	to->thread_write_active += WT_STAT_READ(from, thread_write_active);
 	to->page_busy_blocked += WT_STAT_READ(from, page_busy_blocked);
 	to->page_forcible_evict_blocked +=
 	    WT_STAT_READ(from, page_forcible_evict_blocked);

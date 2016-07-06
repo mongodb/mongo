@@ -81,10 +81,10 @@ class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionStat.prefix, desc, flags)
-class ThreadState(Stat):
+class ThreadStat(Stat):
     prefix = 'thread-state'
     def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, ThreadState.prefix, desc, flags)
+        Stat.__init__(self, name, ThreadStat.prefix, desc, flags)
 class TxnStat(Stat):
     prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
@@ -105,7 +105,7 @@ groups['evict'] = [
     BlockStat.prefix,
     CacheStat.prefix,
     ConnStat.prefix,
-    ThreadState.prefix
+    ThreadStat.prefix
 ]
 groups['lsm'] = [LSMStat.prefix, TxnStat.prefix]
 groups['memory'] = [CacheStat.prefix, ConnStat.prefix, RecStat.prefix]
@@ -113,7 +113,7 @@ groups['system'] = [
     ConnStat.prefix,
     DhandleStat.prefix,
     SessionStat.prefix,
-    ThreadState.prefix
+    ThreadStat.prefix
 ]
 
 ##########################################
@@ -351,11 +351,11 @@ connection_stats = [
     CursorStat('cursor_update', 'cursor update calls'),
 
     ##########################################
-    # Thread State statistics
+    # Thread Count statistics
     ##########################################
-    ThreadState('fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
-    ThreadState('read_active', 'active filesystem read calls','no_clear,no_scale'),
-    ThreadState('write_active', 'active filesystem write calls','no_clear,no_scale'),
+    ThreadStat('thread_fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
+    ThreadStat('thread_read_active', 'active filesystem read calls','no_clear,no_scale'),
+    ThreadStat('thread_write_active', 'active filesystem write calls','no_clear,no_scale'),
 
     ##########################################
     # Yield statistics
