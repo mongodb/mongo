@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
@@ -38,6 +40,7 @@
 
 namespace mongo {
 
+class BatchedCommandRequest;
 class BatchedCommandResponse;
 class OperationContext;
 class RemoteCommandTargeter;
@@ -145,6 +148,14 @@ public:
                                            RetryPolicy retryPolicy);
 
     /**
+     * Executes the specified batch write command on this shard's primary and retries on the
+     * specified set of errors using the specified retry policy.
+     */
+    BatchedCommandResponse runBatchWriteCommand(OperationContext* txn,
+                                                const BatchedCommandRequest& batchRequest,
+                                                RetryPolicy retryPolicy);
+
+    /**
     * Warning: This method exhausts the cursor and pulls all data into memory.
     * Do not use other than for very small (i.e., admin or metadata) collections.
     * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
@@ -172,13 +183,26 @@ public:
 
 
 protected:
+    struct HostWithResponse {
+        HostWithResponse(boost::optional<HostAndPort> _host,
+                         StatusWith<CommandResponse> _commandResponse)
+            : host(std::move(_host)), commandResponse(std::move(_commandResponse)) {}
+
+        boost::optional<HostAndPort> host;
+        StatusWith<CommandResponse> commandResponse;
+    };
+
     Shard(const ShardId& id);
 
 private:
-    virtual StatusWith<CommandResponse> _runCommand(OperationContext* txn,
-                                                    const ReadPreferenceSetting& readPref,
-                                                    const std::string& dbname,
-                                                    const BSONObj& cmdObj) = 0;
+    /**
+     * Paired HostWithResponse output exposes RemoteShard's host for updateReplSetMonitor.
+     * LocalShard will not return a host.
+     */
+    virtual HostWithResponse _runCommand(OperationContext* txn,
+                                         const ReadPreferenceSetting& readPref,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,

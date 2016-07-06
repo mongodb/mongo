@@ -216,15 +216,6 @@ private:
                                          int cappedSize);
 
     /**
-     * Executes the specified batch write command on the current config server's primary and retries
-     * on the specified set of errors using the default retry policy.
-     */
-    void _runBatchWriteCommand(OperationContext* txn,
-                               const BatchedCommandRequest& request,
-                               BatchedCommandResponse* response,
-                               Shard::RetryPolicy retryPolicy);
-
-    /**
      * Helper method for running a count command against the config server with appropriate
      * error handling.
      */

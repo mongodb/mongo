@@ -64,10 +64,10 @@ public:
                                bool unique) override;
 
 private:
-    StatusWith<Shard::CommandResponse> _runCommand(OperationContext* txn,
-                                                   const ReadPreferenceSetting& unused,
-                                                   const std::string& dbName,
-                                                   const BSONObj& cmdObj) final;
+    Shard::HostWithResponse _runCommand(OperationContext* txn,
+                                        const ReadPreferenceSetting& unused,
+                                        const std::string& dbName,
+                                        const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,

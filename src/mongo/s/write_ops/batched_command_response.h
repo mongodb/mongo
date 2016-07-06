@@ -46,7 +46,6 @@ namespace mongo {
  * the response side.
  */
 class BatchedCommandResponse : public BSONSerializable {
-    MONGO_DISALLOW_COPYING(BatchedCommandResponse);
 
 public:
     //
@@ -69,6 +68,13 @@ public:
 
     BatchedCommandResponse();
     virtual ~BatchedCommandResponse();
+
+    //
+    // BatchedCommandResponse should have a move constructor but not a copy constructor
+    //
+
+    BatchedCommandResponse(BatchedCommandResponse&&) = default;
+    BatchedCommandResponse& operator=(BatchedCommandResponse&&) = default;
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedCommandResponse* other) const;

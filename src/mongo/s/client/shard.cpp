@@ -31,6 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
 #include "mongo/util/log.h"
@@ -103,7 +105,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj);
+        auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj).commandResponse;
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
         if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
@@ -113,6 +115,37 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
         }
 
         return swCmdResponse;
+    }
+    MONGO_UNREACHABLE;
+}
+
+BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* txn,
+                                                   const BatchedCommandRequest& batchRequest,
+                                                   RetryPolicy retryPolicy) {
+    const std::string dbname = batchRequest.getNS().db().toString();
+    invariant(batchRequest.sizeWriteOps() == 1);
+
+    const BSONObj cmdObj = batchRequest.toBSON();
+
+    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
+        auto response =
+            _runCommand(txn, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, dbname, cmdObj);
+
+        BatchedCommandResponse batchResponse;
+        Status writeStatus =
+            CommandResponse::processBatchWriteResponse(response.commandResponse, &batchResponse);
+
+        if (!writeStatus.isOK() && response.host) {
+            updateReplSetMonitor(response.host.get(), writeStatus);
+        }
+
+        if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
+            LOG(2) << "Batch write command failed with retriable error and will be retried"
+                   << causedBy(writeStatus);
+            continue;
+        }
+
+        return batchResponse;
     }
     MONGO_UNREACHABLE;
 }

@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include <boost/none_t.hpp>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard_local.h"
@@ -118,10 +120,10 @@ repl::OpTime ShardLocal::_getLastOpTime() {
     return _lastOpTime;
 }
 
-StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn,
-                                                           const ReadPreferenceSetting& unused,
-                                                           const std::string& dbName,
-                                                           const BSONObj& cmdObj) {
+Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* txn,
+                                                const ReadPreferenceSetting& unused,
+                                                const std::string& dbName,
+                                                const BSONObj& cmdObj) {
     repl::OpTime currentOpTimeFromClient =
         repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
     ON_BLOCK_EXIT([this, &txn, &currentOpTimeFromClient] {
@@ -141,12 +143,13 @@ StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* txn
             writeConcernStatus = getWriteConcernStatusFromCommandResult(responseReply);
         }
 
-        return Shard::CommandResponse{std::move(responseReply),
-                                      std::move(responseMetadata),
-                                      std::move(commandStatus),
-                                      std::move(writeConcernStatus)};
+        return Shard::HostWithResponse(boost::none,
+                                       Shard::CommandResponse{std::move(responseReply),
+                                                              std::move(responseMetadata),
+                                                              std::move(commandStatus),
+                                                              std::move(writeConcernStatus)});
     } catch (const DBException& ex) {
-        return ex.toStatus();
+        return Shard::HostWithResponse(boost::none, ex.toStatus());
     }
 }
 

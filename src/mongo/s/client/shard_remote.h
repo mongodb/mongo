@@ -85,10 +85,10 @@ private:
      */
     const BSONObj& _getMetadataForCommand(const ReadPreferenceSetting& readPref);
 
-    StatusWith<CommandResponse> _runCommand(OperationContext* txn,
-                                            const ReadPreferenceSetting& readPref,
-                                            const std::string& dbname,
-                                            const BSONObj& cmdObj) final;
+    Shard::HostWithResponse _runCommand(OperationContext* txn,
+                                        const ReadPreferenceSetting& readPref,
+                                        const std::string& dbname,
+                                        const BSONObj& cmdObj) final;
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* txn,

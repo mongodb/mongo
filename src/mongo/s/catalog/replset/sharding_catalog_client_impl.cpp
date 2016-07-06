@@ -1318,41 +1318,9 @@ void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* txn,
         return;
     }
 
-    _runBatchWriteCommand(txn, batchRequest, batchResponse, Shard::RetryPolicy::kNotIdempotent);
-}
-
-void ShardingCatalogClientImpl::_runBatchWriteCommand(OperationContext* txn,
-                                                      const BatchedCommandRequest& batchRequest,
-                                                      BatchedCommandResponse* batchResponse,
-                                                      Shard::RetryPolicy retryPolicy) {
-    const std::string dbname = batchRequest.getNS().db().toString();
-    invariant(dbname == "config" || dbname == "admin");
-
-    invariant(batchRequest.sizeWriteOps() == 1);
-
-    const BSONObj cmdObj = batchRequest.toBSON();
-
-    for (int retry = 1; retry <= kMaxWriteRetry; ++retry) {
-        auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto response = configShard->runCommand(
-            txn,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            dbname,
-            cmdObj,
-            Shard::RetryPolicy::kNoRetry);  // We're handling our own retries here.
-
-        Status status = Shard::CommandResponse::processBatchWriteResponse(response, batchResponse);
-        if (retry < kMaxWriteRetry && configShard->isRetriableError(status.code(), retryPolicy)) {
-            batchResponse->clear();
-            LOG(2) << "Batch write command failed with retriable error and will be retried"
-                   << causedBy(status);
-            continue;
-        }
-
-        return;
-    }
-
-    MONGO_UNREACHABLE;
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    *batchResponse =
+        configShard->runBatchWriteCommand(txn, batchRequest, Shard::RetryPolicy::kNotIdempotent);
 }
 
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
@@ -1374,8 +1342,8 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        BatchedCommandResponse response;
-        _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kNoRetry);
+        auto response =
+            configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1455,8 +1423,9 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     request.setNS(nss);
     request.setWriteConcern(writeConcern.toBSON());
 
-    BatchedCommandResponse response;
-    _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kIdempotent);
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto response =
+        configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1486,8 +1455,9 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* txn,
     request.setNS(nss);
     request.setWriteConcern(writeConcern.toBSON());
 
-    BatchedCommandResponse response;
-    _runBatchWriteCommand(txn, request, &response, Shard::RetryPolicy::kIdempotent);
+    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto response =
+        configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kIdempotent);
 
     return response.toStatus();
 }
