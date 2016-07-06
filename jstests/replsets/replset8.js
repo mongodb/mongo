@@ -47,18 +47,15 @@ assert.writeOK(bulk.execute());
 var slave = rt.add();
 rt.reInitiate();
 print("initiation complete!");
-var sc = slave.getDB('d')['c'];
-slave.setSlaveOk();
-sleep(25000);
+rt.awaitSecondaryNodes();
 print("updating documents backwards");
 // Move all documents to the beginning by growing them to sizes that should
 // fit the holes we made in phase 1
 bulk = mdc.initializeUnorderedBulkOp();
 for (i = doccount * 2; i > doccount; --i) {
-    mdc.update({_id: i, x: i}, {_id: i, x: bigstring});
+    bulk.find({_id: i, x: i}).update({$set: {x: bigstring}});
     bigstring = bigstring.slice(0, -1);  // remove last char
 }
+assert.writeOK(bulk.execute({writeConcern: {w: rt.nodes.length}}));
 print("finished");
-// Wait for replication to catch up.
-rt.awaitSecondaryNodes();
 assert.eq(doccount + 1, slave.getDB('d')['c'].find().itcount());
