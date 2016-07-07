@@ -179,17 +179,47 @@ MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr,
                                                const char* file,
                                                unsigned line) noexcept;
 void wasserted(const char* expr, const char* file, unsigned line);
-MONGO_COMPILER_NORETURN void fassertFailed(int msgid) noexcept;
-MONGO_COMPILER_NORETURN void fassertFailedNoTrace(int msgid) noexcept;
-MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status) noexcept;
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTrace(int msgid,
-                                                            const Status& status) noexcept;
+
+#define fassertFailed MONGO_fassertFailed
+#define MONGO_fassertFailed(...) ::mongo::fassertFailedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+MONGO_COMPILER_NORETURN void fassertFailedWithLocation(int msgid,
+                                                       const char* file,
+                                                       unsigned line) noexcept;
+
+#define fassertFailedNoTrace MONGO_fassertFailedNoTrace
+#define MONGO_fassertFailedNoTrace(...) \
+    ::mongo::fassertFailedNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+MONGO_COMPILER_NORETURN void fassertFailedNoTraceWithLocation(int msgid,
+                                                              const char* file,
+                                                              unsigned line) noexcept;
+
+#define fassertFailedWithStatus MONGO_fassertFailedWithStatus
+#define MONGO_fassertFailedWithStatus(...) \
+    ::mongo::fassertFailedWithStatusWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
+                                                                 const Status& status,
+                                                                 const char* file,
+                                                                 unsigned line) noexcept;
+
+#define fassertFailedWithStatusNoTrace MONGO_fassertFailedWithStatusNoTrace
+#define MONGO_fassertFailedWithStatusNoTrace(...) \
+    ::mongo::fassertFailedWithStatusNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
+                                                                        const Status& status,
+                                                                        const char* file,
+                                                                        unsigned line) noexcept;
 
 /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
     could cause, such as duplicate key, disk full, etc.
 */
-MONGO_COMPILER_NORETURN void uasserted(int msgid, const char* msg);
-MONGO_COMPILER_NORETURN void uasserted(int msgid, const std::string& msg);
+MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
+                                                   const char* msg,
+                                                   const char* file,
+                                                   unsigned line);
+MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
+                                                   const std::string& msg,
+                                                   const char* file,
+                                                   unsigned line);
 
 /** msgassert and massert are for errors that are internal but have a well defined error text
     std::string.  a stack trace is logged.
@@ -197,8 +227,14 @@ MONGO_COMPILER_NORETURN void uasserted(int msgid, const std::string& msg);
 MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char* msg);
 MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const std::string& msg);
 MONGO_COMPILER_NORETURN void msgassertedNoTraceWithStatus(int msgid, const Status& status);
-MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char* msg);
-MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string& msg);
+MONGO_COMPILER_NORETURN void msgassertedWithLocation(int msgid,
+                                                     const char* msg,
+                                                     const char* file,
+                                                     unsigned line);
+MONGO_COMPILER_NORETURN void msgassertedWithLocation(int msgid,
+                                                     const std::string& msg,
+                                                     const char* file,
+                                                     unsigned line);
 
 /* convert various types of exceptions to strings */
 std::string causedBy(const char* e);
@@ -208,21 +244,31 @@ std::string causedBy(const std::string& e);
 std::string causedBy(const std::string* e);
 std::string causedBy(const Status& e);
 
-/** aborts on condition failure */
-inline void fassert(int msgid, bool testOK) {
-    if (MONGO_unlikely(!testOK))
-        fassertFailed(msgid);
-}
+#define fassert MONGO_fassert
+#define MONGO_fassert(...) ::mongo::fassertWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 
-inline void fassert(int msgid, const Status& status) {
-    if (MONGO_unlikely(!status.isOK())) {
-        fassertFailedWithStatus(msgid, status);
+/** aborts on condition failure */
+inline void fassertWithLocation(int msgid, bool testOK, const char* file, unsigned line) {
+    if (MONGO_unlikely(!testOK)) {
+        fassertFailedWithLocation(msgid, file, line);
     }
 }
 
-inline void fassertNoTrace(int msgid, const Status& status) {
+inline void fassertWithLocation(int msgid, const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
-        fassertFailedWithStatusNoTrace(msgid, status);
+        fassertFailedWithStatusWithLocation(msgid, status, file, line);
+    }
+}
+
+#define fassertNoTrace MONGO_fassertNoTrace
+#define MONGO_fassertNoTrace(...) \
+    ::mongo::fassertNoTraceWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+inline void fassertNoTraceWithLocation(int msgid,
+                                       const Status& status,
+                                       const char* file,
+                                       unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        fassertNoTraceWithLocation(msgid, status, file, line);
     }
 }
 
@@ -235,23 +281,32 @@ inline void fassertNoTrace(int msgid, const Status& status) {
  * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
  */
 #define uassert MONGO_uassert
-#define MONGO_uassert(msgid, msg, expr)                                               \
-    do {                                                                              \
-        if (MONGO_unlikely(!(expr))) {                                                \
-            [&]() MONGO_COMPILER_COLD_FUNCTION { ::mongo::uasserted(msgid, msg); }(); \
-            MONGO_COMPILER_UNREACHABLE;                                               \
-        }                                                                             \
+#define MONGO_uassert(msgid, msg, expr)                                         \
+    do {                                                                        \
+        if (MONGO_unlikely(!(expr))) {                                          \
+            [&]() MONGO_COMPILER_COLD_FUNCTION {                                \
+                ::mongo::uassertedWithLocation(msgid, msg, __FILE__, __LINE__); \
+            }();                                                                \
+            MONGO_COMPILER_UNREACHABLE;                                         \
+        }                                                                       \
     } while (false)
 
-inline void uassertStatusOK(const Status& status) {
-    uassert((status.location() != 0 ? status.location() : status.code()),
-            status.reason(),
-            status.isOK());
+#define uasserted MONGO_uasserted
+#define MONGO_uasserted(...) ::mongo::uassertedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+
+#define uassertStatusOK MONGO_uassertStatusOK
+#define MONGO_uassertStatusOK(...) \
+    ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+
+inline void uassertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        uasserted((status.location() != 0 ? status.location() : status.code()), status.reason());
+    }
 }
 
 template <typename T>
-inline T uassertStatusOK(StatusWith<T> sw) {
-    uassertStatusOK(sw.getStatus());
+inline T uassertStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigned line) {
+    uassertStatusOKWithLocation(sw.getStatus(), file, line);
     return std::move(sw.getValue());
 }
 
@@ -284,18 +339,23 @@ inline void fassertStatusOK(int msgid, const Status& s) {
    display happening.
 */
 #define massert MONGO_massert
-#define MONGO_massert(msgid, msg, expr)                                                 \
-    do {                                                                                \
-        if (MONGO_unlikely(!(expr))) {                                                  \
-            [&]() MONGO_COMPILER_COLD_FUNCTION { ::mongo::msgasserted(msgid, msg); }(); \
-            MONGO_COMPILER_UNREACHABLE;                                                 \
-        }                                                                               \
+#define MONGO_massert(msgid, msg, expr)                                           \
+    do {                                                                          \
+        if (MONGO_unlikely(!(expr))) {                                            \
+            [&]() MONGO_COMPILER_COLD_FUNCTION {                                  \
+                ::mongo::msgassertedWithLocation(msgid, msg, __FILE__, __LINE__); \
+            }();                                                                  \
+            MONGO_COMPILER_UNREACHABLE;                                           \
+        }                                                                         \
     } while (false)
 
+#define msgasserted MONGO_msgasserted
+#define MONGO_msgasserted(...) ::mongo::msgassertedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+
 inline void massertStatusOK(const Status& status) {
-    massert((status.location() != 0 ? status.location() : status.code()),
-            status.reason(),
-            status.isOK());
+    if (MONGO_unlikely(!status.isOK())) {
+        msgasserted((status.location() != 0 ? status.location() : status.code()), status.reason());
+    }
 }
 
 inline void massertNoTraceStatusOK(const Status& status) {
