@@ -560,6 +560,12 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
         // this was implicit before since we did a splitVector on the same socket
         ShardConnection::sync();
 
+        if (!grid.catalogManager(txn)->isMetadataConsistentFromLastCheck(txn)) {
+            RARELY warning() << "will not perform auto-split because "
+                             << "config servers are inconsistent";
+            return false;
+        }
+
         LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten
                << " splitThreshold: " << splitThreshold;
 

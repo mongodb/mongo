@@ -615,6 +615,13 @@ void Balancer::run() {
                     continue;
                 }
 
+                if (!grid.catalogManager(txn.get())->isMetadataConsistentFromLastCheck(txn.get())) {
+                    warning() << "Skipping balancing round because data inconsistency"
+                              << " was detected amongst the config servers";
+                    sleepFor(balanceRoundInterval);
+                    continue;
+                }
+
                 const bool waitForDelete =
                     (balancerConfig.isWaitForDeleteSet() ? balancerConfig.getWaitForDelete()
                                                          : false);

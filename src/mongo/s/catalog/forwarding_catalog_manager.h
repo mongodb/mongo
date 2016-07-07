@@ -236,6 +236,8 @@ private:
 
     Status initConfigVersion(OperationContext* txn) override;
 
+    bool isMetadataConsistentFromLastCheck(OperationContext* txn) override;
+
     template <typename Callable>
     auto retry(OperationContext* txn, Callable&& c) -> decltype(std::forward<Callable>(c)());
 

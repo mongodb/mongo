@@ -615,4 +615,8 @@ Status ForwardingCatalogManager::appendInfoForConfigServerDatabases(OperationCon
     return retry(txn, [&] { return _actual->appendInfoForConfigServerDatabases(txn, builder); });
 }
 
+bool ForwardingCatalogManager::isMetadataConsistentFromLastCheck(OperationContext* txn) {
+    return retry(txn, [&] { return _actual->isMetadataConsistentFromLastCheck(txn); });
+}
+
 }  // namespace mongo

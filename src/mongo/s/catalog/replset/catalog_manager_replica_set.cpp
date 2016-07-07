@@ -1440,4 +1440,8 @@ Status CatalogManagerReplicaSet::appendInfoForConfigServerDatabases(OperationCon
     return Status::OK();
 }
 
+bool CatalogManagerReplicaSet::isMetadataConsistentFromLastCheck(OperationContext* txn) {
+    return true;
+}
+
 }  // namespace mongo

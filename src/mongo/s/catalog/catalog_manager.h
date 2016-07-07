@@ -445,6 +445,12 @@ public:
     virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                                       BSONArrayBuilder* builder) = 0;
 
+    /**
+     * Returns true if all config servers are consistent. Should always return true except for
+     * implementation for SCCC.
+     */
+    virtual bool isMetadataConsistentFromLastCheck(OperationContext* txn) = 0;
+
 protected:
     CatalogManager() = default;
 

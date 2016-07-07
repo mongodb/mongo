@@ -1044,14 +1044,6 @@ Status CatalogManagerLegacy::applyChunkOpsDeprecated(OperationContext* txn,
 void CatalogManagerLegacy::writeConfigServerDirect(OperationContext* txn,
                                                    const BatchedCommandRequest& request,
                                                    BatchedCommandResponse* response) {
-    // check if config servers are consistent
-    if (!_isConsistentFromLastCheck()) {
-        toBatchError(Status(ErrorCodes::ConfigServersInconsistent,
-                            "Data inconsistency detected amongst config servers"),
-                     response);
-        return;
-    }
-
     // We only support batch sizes of one for config writes
     if (request.sizeWriteOps() != 1) {
         toBatchError(Status(ErrorCodes::InvalidOptions,
@@ -1402,7 +1394,7 @@ void CatalogManagerLegacy::_consistencyChecker() {
     LOG(1) << "Consistency checker thread shutting down";
 }
 
-bool CatalogManagerLegacy::_isConsistentFromLastCheck() {
+bool CatalogManagerLegacy::isMetadataConsistentFromLastCheck(OperationContext* txn) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _consistentFromLastCheck;
 }

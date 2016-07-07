@@ -228,4 +228,8 @@ Status CatalogManagerMock::appendInfoForConfigServerDatabases(OperationContext* 
     return Status::OK();
 }
 
+bool CatalogManagerMock::isMetadataConsistentFromLastCheck(OperationContext* txn) {
+    return true;
+}
+
 }  // namespace mongo

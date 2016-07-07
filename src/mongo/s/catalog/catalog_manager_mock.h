@@ -165,6 +165,8 @@ public:
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 
+    bool isMetadataConsistentFromLastCheck(OperationContext* txn) override;
+
 private:
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };

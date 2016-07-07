@@ -156,6 +156,8 @@ public:
                                const BSONObj& cmdObj,
                                BSONObjBuilder* result);
 
+    bool isMetadataConsistentFromLastCheck(OperationContext* txn) override;
+
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,
                                 const std::string& dbName,

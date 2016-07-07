@@ -155,6 +155,8 @@ public:
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 
+    bool isMetadataConsistentFromLastCheck(OperationContext* txn) override;
+
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,
                                 const std::string& dbName,
@@ -189,12 +191,6 @@ private:
      * Checks data consistency amongst config servers every 60 seconds.
      */
     void _consistencyChecker();
-
-    /**
-     * Returns true if the config servers have the same contents since the last
-     * check was performed.
-     */
-    bool _isConsistentFromLastCheck();
 
     /**
      * Sends a read only command to the config server.
