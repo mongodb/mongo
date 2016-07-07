@@ -62,9 +62,9 @@ class QueryFetcher;
 namespace repl {
 
 namespace {
-using CallbackArgs = ReplicationExecutor::CallbackArgs;
-using Event = ReplicationExecutor::EventHandle;
-using Handle = ReplicationExecutor::CallbackHandle;
+using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+using Event = executor::TaskExecutor::EventHandle;
+using Handle = executor::TaskExecutor::CallbackHandle;
 using Operations = MultiApplier::Operations;
 using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
@@ -184,7 +184,7 @@ class DataReplicator {
 public:
     DataReplicator(DataReplicatorOptions opts,
                    std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-                   ReplicationExecutor* exec,
+                   executor::TaskExecutor* exec,
                    StorageInterface* storage);
 
     virtual ~DataReplicator();
@@ -326,7 +326,7 @@ private:
     mutable stdx::mutex _mutex;                                                 // (S)
     const DataReplicatorOptions _opts;                                          // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
-    ReplicationExecutor* _exec;                                                 // (R)
+    executor::TaskExecutor* _exec;                                              // (R)
     stdx::condition_variable _stateCondition;                                   // (R)
     DataReplicatorState _state;                                                 // (MX)
     std::unique_ptr<InitialSyncState> _initialSyncState;                        // (M)

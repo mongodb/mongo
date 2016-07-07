@@ -41,8 +41,6 @@
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -52,6 +50,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -105,11 +104,11 @@ public:
     HostAndPort _blacklistedSource;
 };
 
-class DataReplicatorTest : public ReplicationExecutorTest, public SyncSourceSelector {
+class DataReplicatorTest : public executor::ThreadPoolExecutorTest, public SyncSourceSelector {
 public:
     DataReplicatorTest() {}
 
-    void postExecutorThreadLaunch() override{};
+    executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
 
     /**
      * clear/reset state
@@ -157,7 +156,7 @@ public:
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
         RemoteCommandResponse response(obj, BSONObj(), millis);
-        ReplicationExecutor::ResponseStatus responseStatus(response);
+        executor::TaskExecutor::ResponseStatus responseStatus(response);
         log() << "Sending response for network request:";
         log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
         log() << "     resp:" << response;
@@ -219,7 +218,7 @@ protected:
     StorageInterfaceResults _storageInterfaceWorkDone;
 
     void setUp() override {
-        ReplicationExecutorTest::setUp();
+        executor::ThreadPoolExecutorTest::setUp();
         _storageInterface = new StorageInterfaceMock;
         _storageInterface->createOplogFn = [this](OperationContext* txn,
                                                   const NamespaceString& nss) {
@@ -331,7 +330,7 @@ protected:
         try {
             _dr.reset(new DataReplicator(options,
                                          std::move(dataReplicatorExternalState),
-                                         &(getReplExecutor()),
+                                         &(getExecutor()),
                                          _storageInterface));
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
@@ -340,13 +339,13 @@ protected:
 
     void tearDown() override {
         _applierTaskExecutor->shutdown();
-        ReplicationExecutorTest::shutdownExecutorThread();
-        ReplicationExecutorTest::joinExecutorThread();
+        executor::ThreadPoolExecutorTest::shutdownExecutorThread();
+        executor::ThreadPoolExecutorTest::joinExecutorThread();
         _applierTaskExecutor->join();
 
         _dr.reset();
         // tearDown() destroys the task executor which was referenced by the data replicator.
-        ReplicationExecutorTest::tearDown();
+        executor::ThreadPoolExecutorTest::tearDown();
     }
 
     /**
@@ -381,6 +380,12 @@ private:
     DataReplicatorExternalStateMock* _externalState;
     std::unique_ptr<DataReplicator> _dr;
 };
+
+executor::ThreadPoolMock::Options DataReplicatorTest::makeThreadPoolMockOptions() const {
+    executor::ThreadPoolMock::Options options;
+    options.onCreateThread = []() { Client::initThread("DataReplicatorTest"); };
+    return options;
+}
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
@@ -976,7 +981,7 @@ TEST_F(SteadyStateTest, ShutdownAfterStart) {
     auto txn = makeOpCtx();
     ASSERT_OK(dr.start(txn.get()));
     ASSERT_TRUE(net->hasReadyRequests());
-    getReplExecutor().shutdown();
+    getExecutor().shutdown();
     ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start(txn.get()));
 }
@@ -1004,7 +1009,7 @@ TEST_F(SteadyStateTest, RequestShutdownAfterStart) {
 
 class ShutdownExecutorSyncSourceSelector : public SyncSourceSelector {
 public:
-    ShutdownExecutorSyncSourceSelector(ReplicationExecutor* exec) : _exec(exec) {}
+    ShutdownExecutorSyncSourceSelector(executor::TaskExecutor* exec) : _exec(exec) {}
     void clearSyncSourceBlacklist() override {}
     HostAndPort chooseNewSyncSource(const Timestamp& ts) override {
         _exec->shutdown();
@@ -1019,11 +1024,11 @@ public:
                                                 const OpTime& lastOpTimeFetched) override {
         return SyncSourceResolverResponse();
     }
-    ReplicationExecutor* _exec;
+    executor::TaskExecutor* _exec;
 };
 
 TEST_F(SteadyStateTest, ScheduleNextActionFailsAfterChoosingEmptySyncSource) {
-    _syncSourceSelector.reset(new ShutdownExecutorSyncSourceSelector(&getReplExecutor()));
+    _syncSourceSelector.reset(new ShutdownExecutorSyncSourceSelector(&getExecutor()));
 
     DataReplicator& dr = getDR();
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
@@ -1241,7 +1246,7 @@ TEST_F(SteadyStateTest, RollbackTwoSyncSourcesSecondRollbackSucceeds) {
 //
 //    // Schedule a bogus work item to ensure that the operation applier function
 //    // is not scheduled.
-//    auto& exec = getReplExecutor();
+//    auto& exec = getExecutor();
 //    exec.scheduleWork(
 //        [&barrier](const executor::TaskExecutor::CallbackArgs&) { barrier.countDownAndWait(); });
 //

@@ -88,9 +88,9 @@ MONGO_FP_DECLARE(rsSyncApplyStop);
 
 namespace {
 using namespace executor;
-using CallbackArgs = ReplicationExecutor::CallbackArgs;
-using Event = ReplicationExecutor::EventHandle;
-using Handle = ReplicationExecutor::CallbackHandle;
+using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+using Event = executor::TaskExecutor::EventHandle;
+using Handle = executor::TaskExecutor::CallbackHandle;
 using Operations = MultiApplier::Operations;
 using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
@@ -117,25 +117,6 @@ StatusWith<TaskExecutor::CallbackHandle> scheduleWork(
     });
 }
 
-// TODO: Replace with TaskExecutor and take lock with WCE retry loop.
-StatusWith<ReplicationExecutor::CallbackHandle> scheduleCollectionWork(
-    ReplicationExecutor* exec,
-    stdx::function<void(OperationContext* txn, const CallbackArgs& cbData)> func,
-    const NamespaceString& nss,
-    LockMode mode) {
-
-    return exec->scheduleDBWork(
-        [func](const CallbackArgs& cbData) {
-            if (cbData.status == ErrorCodes::CallbackCanceled) {
-                return;
-            }
-            auto txn = cbData.txn;
-            func(txn, cbData);
-        },
-        nss,
-        mode);
-}
-
 StatusWith<Timestamp> parseTimestampStatus(const QueryResponseStatus& fetchResult) {
     if (!fetchResult.isOK()) {
         return fetchResult.getStatus();
@@ -150,7 +131,7 @@ StatusWith<Timestamp> parseTimestampStatus(const QueryResponseStatus& fetchResul
     }
 }
 
-StatusWith<BSONObj> getLatestOplogEntry(ReplicationExecutor* exec,
+StatusWith<BSONObj> getLatestOplogEntry(executor::TaskExecutor* exec,
                                         HostAndPort source,
                                         const NamespaceString& oplogNS) {
     BSONObj query =
@@ -239,7 +220,7 @@ std::string toString(DataReplicatorState s) {
 DataReplicator::DataReplicator(
     DataReplicatorOptions opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-    ReplicationExecutor* exec,
+    executor::TaskExecutor* exec,
     StorageInterface* storage)
     : _opts(opts),
       _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
