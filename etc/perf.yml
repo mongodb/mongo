@@ -103,7 +103,6 @@ functions:
           set -o verbose
           virtualenv ./venv
           source ./venv/bin/activate
-          pip install -r ../dsi/requirements/analysis.txt
           python -u ../dsi/analysis/compare.py -b stand.json -c node.json
     - command: "json.send"
       params:
@@ -118,7 +117,7 @@ functions:
           set -v
           virtualenv ./venv
           source ./venv/bin/activate
-          pip install -r ../dsi/requirements/analysis.txt
+          pip install argparse python-dateutil
     - command: json.get_history
       params:
         task: ${task_name}
