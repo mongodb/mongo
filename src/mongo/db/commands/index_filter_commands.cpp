@@ -224,6 +224,9 @@ Status ListFilters::list(const QuerySettings& querySettings, BSONObjBuilder* bob
         hintBob.append("query", entry->query);
         hintBob.append("sort", entry->sort);
         hintBob.append("projection", entry->projection);
+        if (!entry->collation.isEmpty()) {
+            hintBob.append("collation", entry->collation);
+        }
         BSONArrayBuilder indexesBuilder(hintBob.subarrayStart("indexes"));
         for (vector<BSONObj>::const_iterator j = entry->indexKeyPatterns.begin();
              j != entry->indexKeyPatterns.end();
@@ -289,11 +292,12 @@ Status ClearFilters::clear(OperationContext* txn,
         return Status::OK();
     }
 
-    // If query is not provided, make sure sort and projection are not in arguments.
+    // If query is not provided, make sure sort, projection, and collation are not in arguments.
     // We do not want to clear the entire cache inadvertently when the user
     // forgot to provide a value for "query".
-    if (cmdObj.hasField("sort") || cmdObj.hasField("projection")) {
-        return Status(ErrorCodes::BadValue, "sort or projection provided without query");
+    if (cmdObj.hasField("sort") || cmdObj.hasField("projection") || cmdObj.hasField("collation")) {
+        return Status(ErrorCodes::BadValue,
+                      "sort, projection, or collation provided without query");
     }
 
     // Get entries from query settings. We need to remove corresponding entries from the plan
@@ -326,6 +330,7 @@ Status ClearFilters::clear(OperationContext* txn,
         qr->setFilter(entry->query);
         qr->setSort(entry->sort);
         qr->setProj(entry->projection);
+        qr->setCollation(entry->collation);
         auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
         invariantOK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());

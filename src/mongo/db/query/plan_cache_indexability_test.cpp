@@ -28,8 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/unittest/unittest.h"
@@ -37,8 +39,8 @@
 namespace mongo {
 namespace {
 
-std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    const CollatorInterface* collator = nullptr;
+std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj,
+                                                      const CollatorInterface* collator = nullptr) {
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions(), collator);
     if (!status.isOK()) {
@@ -55,48 +57,61 @@ TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
                                            false,    // multikey
                                            true,     // sparse
                                            false,    // unique
-                                           "",       // name
+                                           "a_1",    // name
                                            nullptr,  // filterExpr
                                            BSONObj())});
 
-    const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
+    auto discriminators = state.getDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
+    ASSERT(discriminators.find("a_1") != discriminators.end());
 
-    const IndexabilityDiscriminator& disc = discriminators[0];
-    ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
-    ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
-    ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(1)))).get()));
+    auto disc = discriminators["a_1"];
+    ASSERT_EQ(true, disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 1)).get()));
     ASSERT_EQ(false,
-              disc(parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(BSONNULL)))).get()));
+              disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << BSONNULL)).get()));
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(1)))).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(BSONNULL)))).get()));
 }
 
 // Test sparse index discriminators for a compound sparse index.
 TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
     PlanCacheIndexabilityState state;
     state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
-                                           false,    // multikey
-                                           true,     // sparse
-                                           false,    // unique
-                                           "",       // name
-                                           nullptr,  // filterExpr
+                                           false,      // multikey
+                                           true,       // sparse
+                                           false,      // unique
+                                           "a_1_b_1",  // name
+                                           nullptr,    // filterExpr
                                            BSONObj())});
 
     {
-        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
+        auto discriminators = state.getDiscriminators("a");
         ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1_b_1") != discriminators.end());
 
-        const IndexabilityDiscriminator& disc = discriminators[0];
-        ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
-        ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
+        auto disc = discriminators["a_1_b_1"];
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 1)).get()));
+        ASSERT_EQ(
+            false,
+            disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << BSONNULL)).get()));
     }
 
     {
-        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("b");
+        auto discriminators = state.getDiscriminators("b");
         ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1_b_1") != discriminators.end());
 
-        const IndexabilityDiscriminator& disc = discriminators[0];
-        ASSERT_EQ(true, disc(parseMatchExpression(BSON("b" << 1)).get()));
-        ASSERT_EQ(false, disc(parseMatchExpression(BSON("b" << BSONNULL)).get()));
+        auto disc = discriminators["a_1_b_1"];
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("b" << 1)).get()));
+        ASSERT_EQ(
+            false,
+            disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("b" << BSONNULL)).get()));
     }
 }
 
@@ -109,18 +124,37 @@ TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
                                            false,  // multikey
                                            false,  // sparse
                                            false,  // unique
-                                           "",     // name
+                                           "a_1",  // name
                                            filterExpr.get(),
                                            BSONObj())});
 
-    const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
-    ASSERT_EQ(1U, discriminators.size());
+    {
+        auto discriminators = state.getDiscriminators("f");
+        ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
 
-    const IndexabilityDiscriminator& disc = discriminators[0];
-    ASSERT_EQ(false, disc(parseMatchExpression(BSON("f" << BSON("$gt" << -5))).get()));
-    ASSERT_EQ(true, disc(parseMatchExpression(BSON("f" << BSON("$gt" << 5))).get()));
+        auto disc = discriminators["a_1"];
+        ASSERT_EQ(false,
+                  disc.isMatchCompatibleWithIndex(
+                      parseMatchExpression(BSON("f" << BSON("$gt" << -5))).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(
+                      parseMatchExpression(BSON("f" << BSON("$gt" << 5))).get()));
+    }
 
-    ASSERT(state.getDiscriminators("a").empty());
+    {
+        auto discriminators = state.getDiscriminators("a");
+        ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
+
+        auto disc = discriminators["a_1"];
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(
+                      parseMatchExpression(BSON("a" << BSON("$gt" << -5))).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(
+                      parseMatchExpression(BSON("a" << BSON("$gt" << -5))).get()));
+    }
 }
 
 // Test partial index discriminators for an index where the filter expression is an AND.
@@ -132,29 +166,45 @@ TEST(PlanCacheIndexabilityTest, PartialIndexAnd) {
                                            false,  // multikey
                                            false,  // sparse
                                            false,  // unique
-                                           "",     // name
+                                           "a_1",  // name
                                            filterExpr.get(),
                                            BSONObj())});
 
     {
-        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
+        auto discriminators = state.getDiscriminators("f");
         ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
 
-        const IndexabilityDiscriminator& disc = discriminators[0];
-        ASSERT_EQ(false, disc(parseMatchExpression(BSON("f" << 0)).get()));
-        ASSERT_EQ(true, disc(parseMatchExpression(BSON("f" << 1)).get()));
+        auto disc = discriminators["a_1"];
+        ASSERT_EQ(false,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
     }
 
     {
-        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("g");
+        auto discriminators = state.getDiscriminators("g");
         ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
 
-        const IndexabilityDiscriminator& disc = discriminators[0];
-        ASSERT_EQ(false, disc(parseMatchExpression(BSON("g" << 0)).get()));
-        ASSERT_EQ(true, disc(parseMatchExpression(BSON("g" << 1)).get()));
+        auto disc = discriminators["a_1"];
+        ASSERT_EQ(false,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("g" << 0)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("g" << 1)).get()));
     }
 
-    ASSERT(state.getDiscriminators("a").empty());
+    {
+        auto discriminators = state.getDiscriminators("a");
+        ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
+
+        auto disc = discriminators["a_1"];
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 0)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 1)).get()));
+    }
 }
 
 // Test partial index discriminators where there are multiple partial indexes.
@@ -170,47 +220,169 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
                                            false,  // multikey
                                            false,  // sparse
                                            false,  // unique
-                                           "",     // name
+                                           "a_1",  // name
                                            filterExpr1.get(),
                                            BSONObj()),
                                 IndexEntry(BSON("b" << 1),
                                            false,  // multikey
                                            false,  // sparse
                                            false,  // unique
-                                           "",     // name
+                                           "b_1",  // name
                                            filterExpr2.get(),
                                            BSONObj())});
 
-    const IndexabilityDiscriminators& discriminators = state.getDiscriminators("f");
-    ASSERT_EQ(2U, discriminators.size());
+    {
+        auto discriminators = state.getDiscriminators("f");
+        ASSERT_EQ(2U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
+        ASSERT(discriminators.find("b_1") != discriminators.end());
 
-    const IndexabilityDiscriminator& disc1 = discriminators[0];
-    const IndexabilityDiscriminator& disc2 = discriminators[1];
+        auto discA = discriminators["a_1"];
+        auto discB = discriminators["b_1"];
 
-    ASSERT_EQ(false, disc1(parseMatchExpression(BSON("f" << 0)).get()));
-    ASSERT_EQ(false, disc1(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(false,
+                  discA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
+        ASSERT_EQ(false,
+                  discB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 0)).get()));
 
-    ASSERT_NOT_EQUALS(disc1(parseMatchExpression(BSON("f" << 1)).get()),
-                      disc2(parseMatchExpression(BSON("f" << 1)).get()));
+        ASSERT_EQ(true,
+                  discA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
+        ASSERT_EQ(false,
+                  discB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 1)).get()));
 
-    ASSERT_NOT_EQUALS(disc1(parseMatchExpression(BSON("f" << 2)).get()),
-                      disc2(parseMatchExpression(BSON("f" << 2)).get()));
+        ASSERT_EQ(false,
+                  discA.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 2)).get()));
+        ASSERT_EQ(true,
+                  discB.isMatchCompatibleWithIndex(parseMatchExpression(BSON("f" << 2)).get()));
+    }
 
-    ASSERT(state.getDiscriminators("a").empty());
-    ASSERT(state.getDiscriminators("b").empty());
+    {
+        auto discriminators = state.getDiscriminators("a");
+        ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("a_1") != discriminators.end());
+
+        auto disc = discriminators["a_1"];
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 0)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 1)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << 2)).get()));
+    }
+
+    {
+        auto discriminators = state.getDiscriminators("b");
+        ASSERT_EQ(1U, discriminators.size());
+        ASSERT(discriminators.find("b_1") != discriminators.end());
+
+        auto disc = discriminators["b_1"];
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("b" << 0)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("b" << 1)).get()));
+        ASSERT_EQ(true,
+                  disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("b" << 2)).get()));
+    }
 }
 
-// Test that no discriminators are generated for a regular index.
+// Test that a discriminator is generated for a regular index (this discriminator will only encode
+// collation indexability).
 TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
     PlanCacheIndexabilityState state;
     state.updateDiscriminators({IndexEntry(BSON("a" << 1),
                                            false,  // multikey
                                            false,  // sparse
                                            false,  // unique
-                                           "",     // name
+                                           "a_1",  // name
                                            nullptr,
                                            BSONObj())});
-    ASSERT(state.getDiscriminators("a").empty());
+    auto discriminators = state.getDiscriminators("a");
+    ASSERT_EQ(1U, discriminators.size());
+    ASSERT(discriminators.find("a_1") != discriminators.end());
+}
+
+// Test discriminator for a simple index with a collation.
+TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollationsAreCompatible) {
+    PlanCacheIndexabilityState state;
+    IndexEntry entry(BSON("a" << 1),
+                     false,    // multikey
+                     false,    // sparse
+                     false,    // unique
+                     "a_1",    // name
+                     nullptr,  // filterExpr
+                     BSONObj());
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    entry.collator = &collator;
+    state.updateDiscriminators({entry});
+
+    auto discriminators = state.getDiscriminators("a");
+    ASSERT_EQ(1U, discriminators.size());
+    ASSERT(discriminators.find("a_1") != discriminators.end());
+
+    auto disc = discriminators["a_1"];
+
+    // Index collator matches query collator.
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: 'abc'}"), &collator).get()));
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$in: ['abc', 'xyz']}}"), &collator).get()));
+
+    // Expression is not a ComparisonMatchExpression or InMatchExpression.
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$exists: true}}"), nullptr).get()));
+
+    // Expression is a ComparisonMatchExpression with non-matching collator.
+    ASSERT_EQ(
+        true,
+        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 5}"), nullptr).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: 'abc'}"), nullptr).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {b: 'abc'}}"), nullptr).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: ['abc', 'xyz']}"), nullptr).get()));
+
+    // Expression is an InMatchExpression with non-matching collator.
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$in: [1, 2]}}"), nullptr).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$in: [1, 'abc', 2]}}"), nullptr).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$in: [1, {b: 'abc'}, 2]}}"), nullptr).get()));
+    ASSERT_EQ(
+        false,
+        disc.isMatchCompatibleWithIndex(
+            parseMatchExpression(fromjson("{a: {$in: [1, ['abc', 'xyz'], 2]}}"), nullptr).get()));
+}
+
+// Test that a discriminator is produced for each field in a compound index (this discriminator will
+// only encode collation indexability).
+TEST(PlanCacheIndexabilityTest, CompoundIndexCollationDiscriminator) {
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
+                                           false,      // multikey
+                                           false,      // sparse
+                                           false,      // unique
+                                           "a_1_b_1",  // name
+                                           nullptr,
+                                           BSONObj())});
+
+    auto discriminatorsA = state.getDiscriminators("a");
+    ASSERT_EQ(1U, discriminatorsA.size());
+    ASSERT(discriminatorsA.find("a_1_b_1") != discriminatorsA.end());
+
+    auto discriminatorsB = state.getDiscriminators("b");
+    ASSERT_EQ(1U, discriminatorsB.size());
+    ASSERT(discriminatorsB.find("a_1_b_1") != discriminatorsB.end());
 }
 
 }  // namespace
