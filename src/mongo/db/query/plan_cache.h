@@ -201,7 +201,6 @@ public:
     BSONObj query;
     BSONObj sort;
     BSONObj projection;
-    BSONObj collation;
 
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached.
@@ -251,7 +250,6 @@ public:
     BSONObj query;
     BSONObj sort;
     BSONObj projection;
-    BSONObj collation;
 
     //
     // Performance stats

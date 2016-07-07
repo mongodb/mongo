@@ -1797,11 +1797,9 @@ PlanCache.prototype.help = function() {
           "displays all query shapes in a collection");
     print("\tdb." + shortName + ".getPlanCache().clear() - " +
           "drops all cached queries in a collection");
-    print("\tdb." + shortName +
-          ".getPlanCache().clearPlansByQuery(query[, projection, sort, collation]) - " +
+    print("\tdb." + shortName + ".getPlanCache().clearPlansByQuery(query[, projection, sort]) - " +
           "drops query shape from plan cache");
-    print("\tdb." + shortName +
-          ".getPlanCache().getPlansByQuery(query[, projection, sort, collation]) - " +
+    print("\tdb." + shortName + ".getPlanCache().getPlansByQuery(query[, projection, sort]) - " +
           "displays the cached plans for a query shape");
     return __magicNoPrint;
 };
@@ -1809,30 +1807,23 @@ PlanCache.prototype.help = function() {
 /**
  * Internal function to parse query shape.
  */
-PlanCache.prototype._parseQueryShape = function(query, projection, sort, collation) {
+PlanCache.prototype._parseQueryShape = function(query, projection, sort) {
     if (query == undefined) {
         throw new Error("required parameter query missing");
     }
 
     // Accept query shape object as only argument.
-    // Query shape must contain 'query', 'projection', and 'sort', and may optionally contain
-    // 'collation'. 'collation' must be non-empty if present.
-    if (typeof(query) == 'object' && projection == undefined && sort == undefined &&
-        collation == undefined) {
+    // Query shape contains exactly 3 fields (query, projection and sort)
+    // as generated in the listQueryShapes() result.
+    if (typeof(query) == 'object' && projection == undefined && sort == undefined) {
         var keysSorted = Object.keys(query).sort();
         // Expected keys must be sorted for the comparison to work.
         if (bsonWoCompare(keysSorted, ['projection', 'query', 'sort']) == 0) {
             return query;
         }
-        if (bsonWoCompare(keysSorted, ['collation', 'projection', 'query', 'sort']) == 0) {
-            if (Object.keys(query.collation).length === 0) {
-                throw new Error("collation object must not be empty");
-            }
-            return query;
-        }
     }
 
-    // Extract query shape, projection, sort and collation from DBQuery if it is the first
+    // Extract query shape, projection and sort from DBQuery if it is the first
     // argument. If a sort or projection is provided in addition to DBQuery, do not
     // overwrite with the DBQuery value.
     if (query instanceof DBQuery) {
@@ -1842,14 +1833,10 @@ PlanCache.prototype._parseQueryShape = function(query, projection, sort, collati
         if (sort != undefined) {
             throw new Error("cannot pass DBQuery with sort");
         }
-        if (collation != undefined) {
-            throw new Error("cannot pass DBQuery with collation");
-        }
 
         var queryObj = query._query["query"] || {};
         projection = query._fields || {};
         sort = query._query["orderby"] || {};
-        collation = query._query["collation"] || undefined;
         // Overwrite DBQuery with the BSON query.
         query = queryObj;
     }
@@ -1859,11 +1846,6 @@ PlanCache.prototype._parseQueryShape = function(query, projection, sort, collati
         projection: projection == undefined ? {} : projection,
         sort: sort == undefined ? {} : sort,
     };
-
-    if (collation !== undefined) {
-        shape.collation = collation;
-    }
-
     return shape;
 };
 
@@ -1896,18 +1878,17 @@ PlanCache.prototype.clear = function() {
 /**
  * List plans for a query shape.
  */
-PlanCache.prototype.getPlansByQuery = function(query, projection, sort, collation) {
+PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
     return this
         ._runCommandThrowOnError("planCacheListPlans",
-                                 this._parseQueryShape(query, projection, sort, collation))
+                                 this._parseQueryShape(query, projection, sort))
         .plans;
 };
 
 /**
  * Drop query shape from the plan cache.
  */
-PlanCache.prototype.clearPlansByQuery = function(query, projection, sort, collation) {
-    this._runCommandThrowOnError("planCacheClear",
-                                 this._parseQueryShape(query, projection, sort, collation));
+PlanCache.prototype.clearPlansByQuery = function(query, projection, sort) {
+    this._runCommandThrowOnError("planCacheClear", this._parseQueryShape(query, projection, sort));
     return;
 };

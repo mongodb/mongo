@@ -46,6 +46,19 @@ using std::unique_ptr;
 
 namespace {
 
+bool isComparisonMatchExpression(const MatchExpression* expr) {
+    switch (expr->matchType()) {
+        case MatchExpression::LT:
+        case MatchExpression::LTE:
+        case MatchExpression::EQ:
+        case MatchExpression::GTE:
+        case MatchExpression::GT:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool supportsEquality(const ComparisonMatchExpression* expr) {
     switch (expr->matchType()) {
         case MatchExpression::LTE:
@@ -140,7 +153,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rh
         return false;
     }
 
-    if (ComparisonMatchExpression::isComparisonMatchExpression(lhs)) {
+    if (isComparisonMatchExpression(lhs)) {
         return _isSubsetOf(static_cast<const ComparisonMatchExpression*>(lhs), rhs);
     }
 
@@ -175,7 +188,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
         return false;
     }
 
-    if (ComparisonMatchExpression::isComparisonMatchExpression(lhs)) {
+    if (isComparisonMatchExpression(lhs)) {
         const ComparisonMatchExpression* cme = static_cast<const ComparisonMatchExpression*>(lhs);
         // CompareMatchExpression::init() prohibits creating a match expression with EOO or
         // Undefined types, so only need to ensure that the value is not of type jstNULL.
@@ -325,7 +338,7 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         return true;
     }
 
-    if (ComparisonMatchExpression::isComparisonMatchExpression(rhs)) {
+    if (isComparisonMatchExpression(rhs)) {
         return _isSubsetOf(lhs, static_cast<const ComparisonMatchExpression*>(rhs));
     }
 

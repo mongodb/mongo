@@ -516,9 +516,6 @@ std::string CanonicalQuery::toString() const {
     ss << "Tree: " << _root->toString();
     ss << "Sort: " << _qr->getSort().toString() << '\n';
     ss << "Proj: " << _qr->getProj().toString() << '\n';
-    if (!_qr->getCollation().isEmpty()) {
-        ss << "Collation: " << _qr->getCollation().toString() << '\n';
-    }
     return ss;
 }
 
@@ -526,10 +523,6 @@ std::string CanonicalQuery::toStringShort() const {
     str::stream ss;
     ss << "query: " << _qr->getFilter().toString() << " sort: " << _qr->getSort().toString()
        << " projection: " << _qr->getProj().toString();
-
-    if (!_qr->getCollation().isEmpty()) {
-        ss << " collation: " << _qr->getCollation().toString();
-    }
 
     if (_qr->getBatchSize()) {
         ss << " batchSize: " << *_qr->getBatchSize();

@@ -56,12 +56,8 @@ AllowedIndices::~AllowedIndices() {}
 AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
                                      const BSONObj& sort,
                                      const BSONObj& projection,
-                                     const BSONObj& collation,
                                      const std::vector<BSONObj>& indexKeyPatterns)
-    : query(query.getOwned()),
-      sort(sort.getOwned()),
-      projection(projection.getOwned()),
-      collation(collation.getOwned()) {
+    : query(query.getOwned()), sort(sort.getOwned()), projection(projection.getOwned()) {
     for (std::vector<BSONObj>::const_iterator i = indexKeyPatterns.begin();
          i != indexKeyPatterns.end();
          ++i) {
@@ -73,8 +69,7 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
 AllowedIndexEntry::~AllowedIndexEntry() {}
 
 AllowedIndexEntry* AllowedIndexEntry::clone() const {
-    AllowedIndexEntry* entry =
-        new AllowedIndexEntry(query, sort, projection, collation, indexKeyPatterns);
+    AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, indexKeyPatterns);
     return entry;
 }
 
@@ -128,9 +123,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
     const BSONObj& query = qr.getFilter();
     const BSONObj& sort = qr.getSort();
     const BSONObj& projection = qr.getProj();
-    const BSONObj collation =
-        canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();
-    AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, collation, indexes);
+    AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, indexes);
 
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
     AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
