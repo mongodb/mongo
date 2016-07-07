@@ -38,8 +38,8 @@
 namespace mongo {
 namespace executor {
 
-ThreadPoolMock::ThreadPoolMock(NetworkInterfaceMock* net, int32_t prngSeed)
-    : _prng(prngSeed), _net(net) {}
+ThreadPoolMock::ThreadPoolMock(NetworkInterfaceMock* net, int32_t prngSeed, Options options)
+    : _options(std::move(options)), _prng(prngSeed), _net(net) {}
 
 ThreadPoolMock::~ThreadPoolMock() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -64,6 +64,7 @@ void ThreadPoolMock::startup() {
     invariant(!_worker.joinable());
     _started = true;
     _worker = stdx::thread([this] {
+        _options.onCreateThread();
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         consumeTasks(&lk);
     });

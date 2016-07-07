@@ -47,7 +47,8 @@ namespace {
 
 class NetworkInterfaceMockTest : public mongo::unittest::Test {
 public:
-    NetworkInterfaceMockTest() : _net{}, _executor(&_net, 1), _tearDownCalled(false) {}
+    NetworkInterfaceMockTest()
+        : _net{}, _executor(&_net, 1, ThreadPoolMock::Options()), _tearDownCalled(false) {}
 
     NetworkInterfaceMock& net() {
         return _net;

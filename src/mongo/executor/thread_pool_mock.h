@@ -50,10 +50,19 @@ class NetworkInterfaceMock;
 class ThreadPoolMock final : public ThreadPoolInterface {
 public:
     /**
+     * Structure used to configure an instance of ThreadPoolMock.
+     */
+    struct Options {
+        // This function is run before the worker thread begins consuming tasks.
+        using OnCreateThreadFn = stdx::function<void()>;
+        OnCreateThreadFn onCreateThread = []() {};
+    };
+
+    /**
      * Create an instance that interlocks with "net". "prngSeed" seeds the pseudorandom number
      * generator that is used to determine which schedulable task runs next.
      */
-    ThreadPoolMock(NetworkInterfaceMock* net, int32_t prngSeed);
+    ThreadPoolMock(NetworkInterfaceMock* net, int32_t prngSeed, Options options);
     ~ThreadPoolMock();
 
     void startup() override;
@@ -63,6 +72,9 @@ public:
 
 private:
     void consumeTasks(stdx::unique_lock<stdx::mutex>* lk);
+
+    // These are the options with which the pool was configured at construction time.
+    const Options _options;
 
     stdx::mutex _mutex;
     stdx::thread _worker;
