@@ -211,7 +211,7 @@ shardedAggTest.startBalancer();  // TODO: remove after fixing SERVER-9622
 // Make sure we error out if $out collection is sharded
 assertErrorCode(outCollection, [{$out: db.ts1.getName()}], 17017);
 
-db.literal.save({dollar: false});
+assert.writeOK(db.literal.save({dollar: false}));
 
 result = aggregateOrdered(
     db.literal,

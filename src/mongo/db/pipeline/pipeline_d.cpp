@@ -290,9 +290,11 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
                 sources.emplace_front(DocumentSourceSampleFromRandomCursor::create(
                     pExpCtx, sampleSize, idString, numRecords));
 
-                const BSONObj initialQuery;
                 return addCursorSource(
-                    pPipeline, pExpCtx, exec, pPipeline->getDependencies(initialQuery));
+                    pPipeline,
+                    pExpCtx,
+                    exec,
+                    pPipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata));
             }
         }
     }
@@ -313,7 +315,9 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     }
 
     // Find the set of fields in the source documents depended on by this pipeline.
-    DepsTracker deps = pPipeline->getDependencies(queryObj);
+    DepsTracker deps = pPipeline->getDependencies(
+        DocumentSourceMatch::isTextQuery(queryObj) ? DepsTracker::MetadataAvailable::kTextScore
+                                                   : DepsTracker::MetadataAvailable::kNoMetadata);
 
     BSONObj projForQuery = deps.toProjection();
 
@@ -395,7 +399,7 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
     // The only way to get a text score is to let the query system handle the projection. In all
     // other cases, unless the query system can do an index-covered projection and avoid going to
     // the raw record at all, it is faster to have ParsedDeps filter the fields we need.
-    if (!deps.needTextScore) {
+    if (!deps.getNeedTextScore()) {
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
@@ -480,7 +484,9 @@ shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline
     } else {
         // There may be fewer dependencies now if the sort was covered.
         if (!sortObj.isEmpty()) {
-            deps = pipeline->getDependencies(queryObj);
+            deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
+                                                 ? DepsTracker::MetadataAvailable::kTextScore
+                                                 : DepsTracker::MetadataAvailable::kNoMetadata);
         }
 
         pSource->setProjection(deps.toProjection(), deps.toParsedDeps());

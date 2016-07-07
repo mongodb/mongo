@@ -41,7 +41,13 @@ class ParsedDeps;
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
 struct DepsTracker {
-    DepsTracker() : needWholeDocument(false), needTextScore(false) {}
+    /**
+     * Represents what metadata is available on documents that are input to the pipeline.
+     */
+    enum MetadataAvailable { kNoMetadata = 0, kTextScore = 1 };
+
+    DepsTracker(MetadataAvailable metadataAvailable = kNoMetadata)
+        : needWholeDocument(false), _metadataAvailable(metadataAvailable), _needTextScore(false) {}
 
     /**
      * Returns a projection object covering the dependencies tracked by this class.
@@ -52,11 +58,31 @@ struct DepsTracker {
 
     std::set<std::string> fields;  // names of needed fields in dotted notation
     bool needWholeDocument;        // if true, ignore fields and assume the whole document is needed
-    bool needTextScore;
+
 
     bool hasNoRequirements() const {
-        return fields.empty() && !needWholeDocument && !needTextScore;
+        return fields.empty() && !needWholeDocument && !_needTextScore;
     }
+
+    MetadataAvailable getMetadataAvailable() const {
+        return _metadataAvailable;
+    }
+
+    bool isTextScoreAvailable() const {
+        return _metadataAvailable & MetadataAvailable::kTextScore;
+    }
+
+    bool getNeedTextScore() const {
+        return _needTextScore;
+    }
+
+    void setNeedTextScore(bool needTextScore) {
+        _needTextScore = needTextScore;
+    }
+
+private:
+    MetadataAvailable _metadataAvailable;
+    bool _needTextScore;
 };
 
 /**

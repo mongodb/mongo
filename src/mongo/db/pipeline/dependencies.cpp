@@ -44,7 +44,7 @@ namespace str = mongoutils::str;
 BSONObj DepsTracker::toProjection() const {
     BSONObjBuilder bb;
 
-    if (needTextScore)
+    if (_needTextScore)
         bb.append(Document::metaFieldTextScore,
                   BSON("$meta"
                        << "textScore"));
@@ -93,7 +93,7 @@ BSONObj DepsTracker::toProjection() const {
 boost::optional<ParsedDeps> DepsTracker::toParsedDeps() const {
     MutableDocument md;
 
-    if (needWholeDocument || needTextScore) {
+    if (needWholeDocument || _needTextScore) {
         // can't use ParsedDeps in this case
         return boost::none;
     }

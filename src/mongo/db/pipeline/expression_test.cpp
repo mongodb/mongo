@@ -208,7 +208,7 @@ protected:
         }
         ASSERT_EQUALS(expectedDependencies, dependenciesBson.arr());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 
     void assertContents(const intrusive_ptr<Testable>& expr, const BSONArray& expectedContents) {
@@ -1510,7 +1510,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -2011,7 +2011,7 @@ public:
         expression->addDependencies(&dependencies);
         ASSERT_EQUALS(0U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -2145,7 +2145,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 

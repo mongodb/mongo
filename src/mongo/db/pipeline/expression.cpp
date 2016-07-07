@@ -1712,7 +1712,7 @@ Value ExpressionMeta::evaluateInternal(Variables* vars) const {
 
 void ExpressionMeta::addDependencies(DepsTracker* deps) const {
     if (_metaType == MetaType::TEXT_SCORE) {
-        deps->needTextScore = true;
+        deps->setNeedTextScore(true);
     }
 }
 

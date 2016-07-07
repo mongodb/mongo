@@ -161,8 +161,7 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
  */
 class DocumentSourcePassthrough : public DocumentSourceMock {
 public:
-    DocumentSourcePassthrough(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMock({}, expCtx) {}
+    DocumentSourcePassthrough() : DocumentSourceMock({}) {}
 
     // We need this to be false so that it can be used in a $facet stage.
     bool isValidInitialSource() const final {
@@ -173,16 +172,15 @@ public:
         return pSource->getNext();
     }
 
-    static boost::intrusive_ptr<DocumentSourcePassthrough> create(
-        boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourcePassthrough(expCtx);
+    static boost::intrusive_ptr<DocumentSourcePassthrough> create() {
+        return new DocumentSourcePassthrough();
     }
 };
 
 TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
     auto ctx = getExpCtx();
 
-    auto dummy = DocumentSourcePassthrough::create(ctx);
+    auto dummy = DocumentSourcePassthrough::create();
 
     auto statusWithPipeline = Pipeline::create({dummy}, ctx);
     ASSERT_OK(statusWithPipeline.getStatus());
@@ -207,10 +205,10 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
     auto ctx = getExpCtx();
 
-    auto firstDummy = DocumentSourcePassthrough::create(ctx);
+    auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = uassertStatusOK(Pipeline::create({firstDummy}, ctx));
 
-    auto secondDummy = DocumentSourcePassthrough::create(ctx);
+    auto secondDummy = DocumentSourcePassthrough::create();
     auto secondPipeline = uassertStatusOK(Pipeline::create({secondDummy}, ctx));
 
     auto facetStage =
@@ -238,8 +236,8 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
 TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSubPipeline) {
     auto ctx = getExpCtx();
 
-    auto firstDummy = DocumentSourcePassthrough::create(ctx);
-    auto secondDummy = DocumentSourcePassthrough::create(ctx);
+    auto firstDummy = DocumentSourcePassthrough::create();
+    auto secondDummy = DocumentSourcePassthrough::create();
     auto pipeline = uassertStatusOK(Pipeline::create({firstDummy, secondDummy}, ctx));
 
     auto facetStage = DocumentSourceFacet::create({{"subPipe", pipeline}}, ctx);
@@ -308,8 +306,8 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
 TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
     auto ctx = getExpCtx();
 
-    auto dummy = DocumentSourcePassthrough::create(ctx);
-    auto pipeline = uassertStatusOK(Pipeline::create({dummy}, ctx));
+    auto dummy = DocumentSourcePassthrough::create();
+    auto pipeline = unittest::assertGet(Pipeline::create({dummy}, ctx));
 
     auto facetStage = DocumentSourceFacet::create({{"subPipe", pipeline}}, ctx);
 
@@ -321,11 +319,11 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
 TEST_F(DocumentSourceFacetTest, ShouldPropogateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
 
-    auto firstDummy = DocumentSourcePassthrough::create(ctx);
-    auto firstPipeline = uassertStatusOK(Pipeline::create({firstDummy}, ctx));
+    auto firstDummy = DocumentSourcePassthrough::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({firstDummy}, ctx));
 
-    auto secondDummy = DocumentSourcePassthrough::create(ctx);
-    auto secondPipeline = uassertStatusOK(Pipeline::create({secondDummy}, ctx));
+    auto secondDummy = DocumentSourcePassthrough::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({secondDummy}, ctx));
 
     auto facetStage =
         DocumentSourceFacet::create({{"one", firstPipeline}, {"two", secondPipeline}}, ctx);
@@ -342,5 +340,138 @@ TEST_F(DocumentSourceFacetTest, ShouldPropogateDetachingAndReattachingOfOpCtx) {
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
 }
+
+/**
+ * A dummy DocumentSource which has one dependency: the field "a".
+ */
+class DocumentSourceNeedsA : public DocumentSourcePassthrough {
+public:
+    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+        deps->fields.insert("a");
+        return GetDepsReturn::EXHAUSTIVE_ALL;
+    }
+
+    static boost::intrusive_ptr<DocumentSource> create() {
+        return new DocumentSourceNeedsA();
+    }
+};
+
+/**
+ * A dummy DocumentSource which has one dependency: the field "b".
+ */
+class DocumentSourceNeedsB : public DocumentSourcePassthrough {
+public:
+    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+        deps->fields.insert("b");
+        return GetDepsReturn::EXHAUSTIVE_ALL;
+    }
+
+    static boost::intrusive_ptr<DocumentSource> create() {
+        return new DocumentSourceNeedsB();
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
+    auto ctx = getExpCtx();
+
+    auto needsA = DocumentSourceNeedsA::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({needsA}, ctx));
+
+    auto firstPipelineDeps =
+        firstPipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    ASSERT_FALSE(firstPipelineDeps.needWholeDocument);
+    ASSERT_EQ(firstPipelineDeps.fields.size(), 1UL);
+    ASSERT_EQ(firstPipelineDeps.fields.count("a"), 1UL);
+
+    auto needsB = DocumentSourceNeedsB::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({needsB}, ctx));
+
+    auto secondPipelineDeps =
+        secondPipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+    ASSERT_FALSE(secondPipelineDeps.needWholeDocument);
+    ASSERT_EQ(secondPipelineDeps.fields.size(), 1UL);
+    ASSERT_EQ(secondPipelineDeps.fields.count("b"), 1UL);
+
+    auto facetStage =
+        DocumentSourceFacet::create({{"needsA", firstPipeline}, {"needsB", secondPipeline}}, ctx);
+
+    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
+    ASSERT_EQ(facetStage->getDependencies(&deps), DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL);
+    ASSERT_FALSE(deps.needWholeDocument);
+    ASSERT_FALSE(deps.getNeedTextScore());
+    ASSERT_EQ(deps.fields.size(), 2UL);
+    ASSERT_EQ(deps.fields.count("a"), 1UL);
+    ASSERT_EQ(deps.fields.count("b"), 1UL);
+}
+
+/**
+ * A dummy DocumentSource which has a dependency on the entire document.
+ */
+class DocumentSourceNeedsWholeDocument : public DocumentSourcePassthrough {
+public:
+    GetDepsReturn getDependencies(DepsTracker* deps) const override {
+        deps->needWholeDocument = true;
+        return GetDepsReturn::EXHAUSTIVE_ALL;
+    }
+    static boost::intrusive_ptr<DocumentSourceNeedsWholeDocument> create() {
+        return new DocumentSourceNeedsWholeDocument();
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresWholeDocument) {
+    auto ctx = getExpCtx();
+
+    auto needsA = DocumentSourceNeedsA::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({needsA}, ctx));
+
+    auto needsWholeDocument = DocumentSourceNeedsWholeDocument::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({needsWholeDocument}, ctx));
+
+    auto facetStage = DocumentSourceFacet::create(
+        {{"needsA", firstPipeline}, {"needsWholeDocument", secondPipeline}}, ctx);
+
+    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
+    ASSERT_EQ(facetStage->getDependencies(&deps), DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL);
+    ASSERT_TRUE(deps.needWholeDocument);
+    ASSERT_FALSE(deps.getNeedTextScore());
+}
+
+/**
+ * A dummy DocumentSource which depends on only the text score.
+ */
+class DocumentSourceNeedsOnlyTextScore : public DocumentSourcePassthrough {
+public:
+    GetDepsReturn getDependencies(DepsTracker* deps) const override {
+        deps->setNeedTextScore(true);
+        return GetDepsReturn::EXHAUSTIVE_ALL;
+    }
+    static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create() {
+        return new DocumentSourceNeedsOnlyTextScore();
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextScore) {
+    auto ctx = getExpCtx();
+
+    auto needsA = DocumentSourceNeedsA::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({needsA}, ctx));
+
+    auto needsWholeDocument = DocumentSourceNeedsWholeDocument::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({needsWholeDocument}, ctx));
+
+    auto needsTextScore = DocumentSourceNeedsOnlyTextScore::create();
+    auto thirdPipeline = unittest::assertGet(Pipeline::create({needsTextScore}, ctx));
+
+    auto facetStage = DocumentSourceFacet::create({{"needsA", firstPipeline},
+                                                   {"needsWholeDocument", secondPipeline},
+                                                   {"needsTextScore", thirdPipeline}},
+                                                  ctx);
+
+    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    ASSERT_EQ(facetStage->getDependencies(&deps), DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL);
+    ASSERT_TRUE(deps.needWholeDocument);
+    ASSERT_TRUE(deps.getNeedTextScore());
+}
+
 }  // namespace
 }  // namespace mongo

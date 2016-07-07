@@ -144,6 +144,25 @@ void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) 
     }
 }
 
+DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
+    for (auto&& facet : _facetPipelines) {
+        auto subDepsTracker = facet.second->getDependencies(deps->getMetadataAvailable());
+
+        deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
+
+        deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
+        deps->setNeedTextScore(deps->getNeedTextScore() || subDepsTracker.getNeedTextScore());
+
+        if (deps->needWholeDocument && deps->getNeedTextScore()) {
+            break;
+        }
+    }
+
+    // We will combine multiple documents into one, and the output document will have new fields, so
+    // we will stop looking for dependencies at this point.
+    return GetDepsReturn::EXHAUSTIVE_ALL;
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(40169,

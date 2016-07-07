@@ -179,17 +179,17 @@ public:
         }
         {
             const char* array[] = {"a"};  // needTextScore with needWholeDocument
-            DepsTracker deps;
+            DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
             deps.fields = arrayToSet(array);
             deps.needWholeDocument = true;
-            deps.needTextScore = true;
+            deps.setNeedTextScore(true);
             ASSERT_EQUALS(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
         }
         {
             const char* array[] = {"a"};  // needTextScore without needWholeDocument
-            DepsTracker deps;
+            DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
             deps.fields = arrayToSet(array);
-            deps.needTextScore = true;
+            deps.setNeedTextScore(true);
             ASSERT_EQUALS(
                 deps.toProjection(),
                 BSON(Document::metaFieldTextScore << metaTextScore << "a" << 1 << "_id" << 0));
@@ -388,7 +388,7 @@ public:
         ASSERT_EQUALS(DocumentSource::SEE_NEXT, limit()->getDependencies(&dependencies));
         ASSERT_EQUALS(0U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -998,7 +998,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("u"));
         ASSERT_EQUALS(1U, dependencies.fields.count("v"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -1470,7 +1470,7 @@ TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
 
 TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFields) {
     createProject(fromjson("{a: true, x: '$b', y: {$and: ['$c','$d']}, z: {$meta: 'textScore'}}"));
-    DepsTracker dependencies;
+    DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
     ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_FIELDS, project()->getDependencies(&dependencies));
     ASSERT_EQUALS(5U, dependencies.fields.size());
 
@@ -1487,7 +1487,7 @@ TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFiel
     ASSERT_EQUALS(1U, dependencies.fields.count("c"));
     ASSERT_EQUALS(1U, dependencies.fields.count("d"));
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(true, dependencies.needTextScore);
+    ASSERT_EQUALS(true, dependencies.getNeedTextScore());
 };
 
 TEST_F(ProjectStageTest, ExclusionShouldNotAddDependencies) {
@@ -1498,7 +1498,7 @@ TEST_F(ProjectStageTest, ExclusionShouldNotAddDependencies) {
 
     ASSERT_EQUALS(0U, dependencies.fields.size());
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(false, dependencies.needTextScore);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 };
 
 }  // namespace DocumentSourceProject
@@ -2252,7 +2252,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("a"));
         ASSERT_EQUALS(1U, dependencies.fields.count("b.c"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -2867,7 +2867,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(1U, dependencies.fields.count("x.y.z"));
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3194,7 +3194,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("x.y"));
         ASSERT_EQUALS(2U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3205,7 +3205,7 @@ public:
         DepsTracker dependencies;
         ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, match->getDependencies(&dependencies));
         ASSERT_EQUALS(true, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3219,7 +3219,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("a"));
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3233,7 +3233,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("a"));
         ASSERT_EQUALS(2U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3246,7 +3246,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("a"));
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 class DependenciesNotExpression {
@@ -3258,7 +3258,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("b"));
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3273,7 +3273,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("b.c"));
         ASSERT_EQUALS(2U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3285,7 +3285,7 @@ public:
         ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
         ASSERT_EQUALS(0U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 
@@ -3298,7 +3298,7 @@ public:
         ASSERT_EQUALS(1U, dependencies.fields.count("a"));
         ASSERT_EQUALS(1U, dependencies.fields.size());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
-        ASSERT_EQUALS(false, dependencies.needTextScore);
+        ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 };
 

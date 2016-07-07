@@ -609,7 +609,8 @@ boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
     // We will only attempt to take advantage of a sorted input stream if the _id given to the
     // $group contained only FieldPaths or constants. Determine if this is the case, and extract
     // those FieldPaths if it is.
-    DepsTracker deps;
+    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);  // We don't support streaming
+                                                                    // based off a text score.
     for (auto&& exp : _idExpressions) {
         if (dynamic_cast<ExpressionConstant*>(exp.get())) {
             continue;

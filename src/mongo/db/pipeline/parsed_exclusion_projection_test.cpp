@@ -113,7 +113,7 @@ TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
 
     ASSERT_EQ(deps.fields.size(), 0UL);
     ASSERT_FALSE(deps.needWholeDocument);
-    ASSERT_FALSE(deps.needTextScore);
+    ASSERT_FALSE(deps.getNeedTextScore());
 }
 
 //

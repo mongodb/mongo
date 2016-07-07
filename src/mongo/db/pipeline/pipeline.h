@@ -34,6 +34,7 @@
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
@@ -43,7 +44,6 @@ class BSONObj;
 class BSONObjBuilder;
 class ClientBasic;
 class CollatorInterface;
-struct DepsTracker;
 class DocumentSource;
 struct ExpressionContext;
 class OperationContext;
@@ -175,12 +175,10 @@ public:
     std::vector<Value> writeExplainOps() const;
 
     /**
-     * Returns the dependencies needed by this pipeline.
-     *
-     * initialQuery is used as a fallback for metadata dependency detection. The assumption is
-     * that any metadata produced by the query is needed unless we can prove it isn't.
+     * Returns the dependencies needed by this pipeline. 'metadataAvailable' should reflect what
+     * metadata is present on documents that are input to the front of the pipeline.
      */
-    DepsTracker getDependencies(const BSONObj& initialQuery) const;
+    DepsTracker getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const;
 
     const SourceContainer& getSources() {
         return _sources;

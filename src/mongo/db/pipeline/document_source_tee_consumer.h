@@ -55,6 +55,13 @@ public:
     void dispose() final;
     boost::optional<Document> getNext() final;
 
+    /**
+     * Returns SEE_NEXT, since it requires no fields, and changes nothing about the documents.
+     */
+    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+        return GetDepsReturn::SEE_NEXT;
+    }
+
     Value serialize(bool explain = false) const final;
 
 private:
