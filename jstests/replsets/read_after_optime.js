@@ -89,7 +89,6 @@
         }));
 
         assert.eq(null, res.code);
-        assert.gt(res.waitedMS, 0);
 
         insertFunc();
     };
