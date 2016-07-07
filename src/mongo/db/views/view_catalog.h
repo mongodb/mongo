@@ -28,15 +28,32 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+class AggregationRequest;
 class Database;
 class NamespaceString;
 class OperationContext;
 class Status;
 class StringData;
+
+/**
+ * Represents a fully-resolved view: a non-view namespace with a corresponding aggregation pipeline.
+ */
+struct ResolvedViewDefinition {
+    /**
+     * Creates a new aggregation command object for a view operation. The new command is an
+     * aggregation on 'collectionNss', and its pipeline is the concatenation of 'pipeline' with the
+     * pipeline of 'request'.
+     */
+    BSONObj asExpandedViewAggregation(const AggregationRequest& request);
+
+    NamespaceString collectionNss;
+    std::vector<BSONObj> pipeline;
+};
 
 /**
  * In-memory data structure for view definitions. Note that this structure is not thread-safe; you
@@ -81,6 +98,16 @@ public:
      * @return A bare pointer to a view definition if ns is a valid view with a backing namespace.
      */
     ViewDefinition* lookup(StringData ns);
+
+    /**
+     * Resolve the views on 'ns', transforming the pipeline appropriately. This function returns a
+     * pair containing the fully-qualified namespace of the backing collection and the raw pipeline
+     * for an aggregation.
+     *
+     * It is illegal to call this function on a namespace that is not a view.
+     */
+    StatusWith<ResolvedViewDefinition> resolveView(OperationContext* txn,
+                                                   const NamespaceString& nss);
 
 private:
     ViewMap _viewMap;

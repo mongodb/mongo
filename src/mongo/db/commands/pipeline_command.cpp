@@ -57,6 +57,8 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/views/view.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -274,15 +276,36 @@ public:
         unique_ptr<PlanExecutor> exec;
         auto curOp = CurOp::get(txn);
         {
-            // This will throw if the sharding version for this connection is out of date. The
-            // lock must be held continuously from now until we have we created both the output
-            // ClientCursor and the input executor. This ensures that both are using the same
-            // sharding version that we synchronize on here. This is also why we always need to
-            // create a ClientCursor even when we aren't outputting to a cursor. See the comment
-            // on ShardFilterStage for more details.
-            AutoGetCollectionForRead ctx(txn, nss.ns());
-
+            // This will throw if the sharding version for this connection is out of date. If the
+            // namespace is a view, the lock will be released before re-running the aggregation.
+            // Otherwise, the lock must be held continuously from now until we have we created both
+            // the output ClientCursor and the input executor. This ensures that both are using the
+            // same sharding version that we synchronize on here. This is also why we always need to
+            // create a ClientCursor even when we aren't outputting to a cursor. See the comment on
+            // ShardFilterStage for more details.
+            AutoGetCollectionOrViewForRead ctx(txn, nss);
             Collection* collection = ctx.getCollection();
+
+            // If this is a view, resolve it by finding the underlying collection and stitching view
+            // pipelines and this request's pipeline together. We then release our locks before
+            // recursively calling run, which will re-acquire locks on the underlying collection.
+            // (The lock must be released because recursively acquiring locks on the database will
+            // prohibit yielding.)
+            if (ctx.getView()) {
+                auto resolvedView = ctx.getDb()->getViewCatalog()->resolveView(txn, nss);
+                if (!resolvedView.isOK()) {
+                    return appendCommandStatus(result, resolvedView.getStatus());
+                }
+
+                // With the view resolved, we can relinquish locks.
+                ctx.releaseLocksForView();
+
+                // Parse the resolved view into a new aggregation request.
+                BSONObj viewCmd =
+                    resolvedView.getValue().asExpandedViewAggregation(request.getValue());
+
+                return this->run(txn, db, viewCmd, options, errmsg, result);
+            }
 
             // If the pipeline does not have a user-specified collation, set it from the
             // collection default.

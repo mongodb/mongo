@@ -73,7 +73,7 @@
         _recvChunkStart: {skip: isAnInternalCommand},
         _recvChunkStatus: {skip: isAnInternalCommand},
         _transferMods: {skip: isAnInternalCommand},
-        aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}]}, expectFailure: true},
+        aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}]}},
         appendOplogNote: {skip: isUnrelated},
         applyOps: {
             command: {applyOps: [{op: "i", o: {_id: 1}, ns: "test.view"}]},

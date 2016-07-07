@@ -71,6 +71,14 @@ public:
         return _viewOnNss;
     }
 
+    /**
+     * Returns a vector of BSONObjs that represent the stages of the aggregation pipeline that
+     * defines this view.
+     */
+    const std::vector<BSONObj>& pipeline() const {
+        return _pipeline;
+    }
+
 private:
     NamespaceString _viewNss;
     NamespaceString _viewOnNss;
