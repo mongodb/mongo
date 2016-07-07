@@ -76,10 +76,20 @@ class DistributionStatus {
     MONGO_DISALLOW_COPYING(DistributionStatus);
 
 public:
-    DistributionStatus(ShardStatisticsVector shardInfo, const ShardToChunksMap& shardToChunksMap);
+    DistributionStatus(NamespaceString nss,
+                       ShardStatisticsVector shardInfo,
+                       const ShardToChunksMap& shardToChunksMap);
 
     /**
-     * @return if range is valid
+     * Returns the namespace for which this balance status applies.
+     */
+    const NamespaceString& nss() const {
+        return _nss;
+    }
+
+    /**
+     * Appends the specified range to the set of ranges tracked for this collection and checks its
+     * valididty. Returns true if the range is valid or false otherwise.
      */
     bool addTagRange(const TagRange& range);
 
@@ -103,24 +113,37 @@ public:
      */
     ShardId getMostOverloadedShard(const std::string& forTag) const;
 
-    /** @return total number of chunks  */
-    unsigned totalChunks() const;
+    /**
+     * Returns total number of chunks across all shards.
+     */
+    size_t totalChunks() const;
 
-    /** @return number of chunks in this shard */
-    unsigned numberOfChunksInShard(const ShardId& shardId) const;
+    /**
+     * Returns number of chunks in the specified shard.
+     */
+    size_t numberOfChunksInShard(const ShardId& shardId) const;
 
-    /** @return number of chunks in this shard with the given tag */
-    unsigned numberOfChunksInShardWithTag(const ShardId& shardId, const std::string& tag) const;
+    /**
+     * Returns number of chunks in the specified shard, which have the given tag.
+     */
+    size_t numberOfChunksInShardWithTag(const ShardId& shardId, const std::string& tag) const;
 
-    /** @return chunks for the shard */
+    /**
+     * Returns all chunks for the specified shard.
+     */
     const std::vector<ChunkType>& getChunks(const ShardId& shardId) const;
 
-    /** @return all tags we know about, not include "" */
+    /**
+     * Returns all tags defined for the collection.
+     */
     const std::set<std::string>& tags() const {
         return _allTags;
     }
 
-    /** @return the right tag for chunk, possibly "" */
+    /**
+     * Using the set of tags defined for the collection, returns what tag corresponds to the
+     * specified chunk. If the chunk doesn't fall into any tag returns the empty string.
+     */
     std::string getTagForChunk(const ChunkType& chunk) const;
 
     const ShardStatisticsVector& getStats() const {
@@ -128,6 +151,9 @@ public:
     }
 
 private:
+    // Namespace for which this distribution applies
+    const NamespaceString _nss;
+
     const ShardStatisticsVector _shardInfo;
     const ShardToChunksMap& _shardChunks;
     std::map<BSONObj, TagRange> _tagRanges;
@@ -150,8 +176,7 @@ public:
      * collection. The entries in the vector do not need to be done serially and can be scheduled in
      * parallel.
      */
-    static std::vector<MigrateInfo> balance(const std::string& ns,
-                                            const DistributionStatus& distribution,
+    static std::vector<MigrateInfo> balance(const DistributionStatus& distribution,
                                             bool shouldAggressivelyBalance);
 };
 

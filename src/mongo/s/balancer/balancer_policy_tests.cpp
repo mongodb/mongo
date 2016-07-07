@@ -86,11 +86,12 @@ TEST(BalancerPolicyTests, BalanceNormal) {
     chunkMap[kShardId1] = vector<ChunkType>();
 
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion)},
         chunkMap);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQ(kShardId0, migrations[0].from);
     ASSERT_EQ(kShardId1, migrations[0].to);
@@ -147,11 +148,12 @@ TEST(BalancerPolicyTests, BalanceJumbo) {
     chunkMap[kShardId1] = vector<ChunkType>();
 
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion)},
         chunkMap);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQ(30, migrations[0].maxKey["x"].numberInt());
 }
@@ -181,11 +183,12 @@ TEST(BalanceNormalTests, BalanceDraining) {
 
     // shard0 is draining
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion)},
         chunkMap);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQ(kShardId0, migrations[0].from);
     ASSERT_EQ(kShardId1, migrations[0].to);
@@ -217,11 +220,12 @@ TEST(BalancerPolicyTests, BalanceCannotMoveDueToDraining) {
 
     // shard1 is draining
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 0, true, emptyTagSet, emptyShardVersion)},
         chunkMap);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT(migrations.empty());
 }
 
@@ -251,12 +255,13 @@ TEST(BalancerPolicyTests, BalanceImpasse) {
 
     // shard0 and shard2 are draining, shard1 is maxed out
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, kNoMaxSize, 2, true, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, 1, 1, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId2, kNoMaxSize, 1, true, emptyTagSet, emptyShardVersion)},
         chunkMap);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT(migrations.empty());
 }
 
@@ -314,12 +319,13 @@ TEST(BalancerPolicyTests, MultipleDraining) {
     addShard(chunks, 5, true);
 
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, kNoMaxSize, 5, true, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 5, true, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion)},
         chunks);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQ(kShardId0, migrations[0].from);
     ASSERT_EQ(kShardId2, migrations[0].to);
@@ -333,6 +339,7 @@ TEST(BalancerPolicyTests, TagsDraining) {
 
     while (true) {
         DistributionStatus distributionStatus(
+            NamespaceString("TestDB", "TestColl"),
             {ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
              ShardStatistics(kShardId1, kNoMaxSize, 5, true, {"a", "b"}, emptyShardVersion),
              ShardStatistics(kShardId2, kNoMaxSize, 5, false, {"b"}, emptyShardVersion)},
@@ -341,7 +348,7 @@ TEST(BalancerPolicyTests, TagsDraining) {
         distributionStatus.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 7), "a"));
         distributionStatus.addTagRange(TagRange(BSON("x" << 7), BSON("x" << 1000), "b"));
 
-        const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+        const auto migrations(BalancerPolicy::balance(distributionStatus, false));
         if (migrations.empty()) {
             break;
         }
@@ -368,6 +375,7 @@ TEST(BalancerPolicyTests, TagsPolicyChange) {
 
     while (true) {
         DistributionStatus distributionStatus(
+            NamespaceString("TestDB", "TestColl"),
             {ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
              ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
              ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion)},
@@ -375,7 +383,7 @@ TEST(BalancerPolicyTests, TagsPolicyChange) {
 
         distributionStatus.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 1000), "a"));
 
-        const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+        const auto migrations(BalancerPolicy::balance(distributionStatus, false));
         if (migrations.empty()) {
             break;
         }
@@ -393,7 +401,7 @@ TEST(BalancerPolicyTests, TagsPolicyChange) {
 
 TEST(BalancerPolicyTests, TagsSelector) {
     ShardToChunksMap chunks;
-    DistributionStatus d({}, chunks);
+    DistributionStatus d(NamespaceString("TestDB", "TestColl"), {}, chunks);
 
     ASSERT(d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "a")));
     ASSERT(d.addTagRange(TagRange(BSON("x" << 10), BSON("x" << 20), "b")));
@@ -460,12 +468,13 @@ TEST(BalancerPolicyTests, MaxSizeRespect) {
     // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3. Other
     // shards have maxSize = 0 = unset.
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, 1, 3, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId2, kNoMaxSize, 6, false, emptyTagSet, emptyShardVersion)},
         chunks);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT_EQ(1U, migrations.size());
     ASSERT_EQUALS(kShardId2, migrations[0].from);
     ASSERT_EQUALS(kShardId1, migrations[0].to);
@@ -486,12 +495,13 @@ TEST(BalancerPolicyTests, MaxSizeNoDrain) {
     // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4. Other
     // shards have maxSize = 0 = unset.
     DistributionStatus distributionStatus(
+        NamespaceString("TestDB", "TestColl"),
         {ShardStatistics(kShardId0, 1, 4, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion),
          ShardStatistics(kShardId2, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion)},
         chunks);
 
-    const auto migrations(BalancerPolicy::balance("ns", distributionStatus, false));
+    const auto migrations(BalancerPolicy::balance(distributionStatus, false));
     ASSERT(migrations.empty());
 }
 
@@ -555,8 +565,8 @@ TEST(BalancerPolicyTests, Simulation) {
 
         // Perform migrations and increment data size as chunks move
         for (int i = 0; i < numChunks; i++) {
-            const auto migrations(
-                BalancerPolicy::balance("ns", DistributionStatus(shards, chunks), i != 0));
+            const auto migrations(BalancerPolicy::balance(
+                DistributionStatus(NamespaceString("TestDB", "TestColl"), shards, chunks), i != 0));
             if (migrations.empty()) {
                 log() << "Finished with test moves.";
                 break;

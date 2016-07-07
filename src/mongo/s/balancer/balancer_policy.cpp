@@ -55,21 +55,22 @@ using std::set;
 using std::string;
 using std::vector;
 
-DistributionStatus::DistributionStatus(ShardStatisticsVector shardInfo,
+DistributionStatus::DistributionStatus(NamespaceString nss,
+                                       ShardStatisticsVector shardInfo,
                                        const ShardToChunksMap& shardToChunksMap)
-    : _shardInfo(std::move(shardInfo)), _shardChunks(shardToChunksMap) {}
+    : _nss(std::move(nss)), _shardInfo(std::move(shardInfo)), _shardChunks(shardToChunksMap) {}
 
-unsigned DistributionStatus::totalChunks() const {
-    unsigned total = 0;
+size_t DistributionStatus::totalChunks() const {
+    size_t total = 0;
 
-    for (ShardToChunksMap::const_iterator i = _shardChunks.begin(); i != _shardChunks.end(); ++i) {
-        total += i->second.size();
+    for (const auto& shardChunk : _shardChunks) {
+        total += shardChunk.second.size();
     }
 
     return total;
 }
 
-unsigned DistributionStatus::numberOfChunksInShard(const ShardId& shardId) const {
+size_t DistributionStatus::numberOfChunksInShard(const ShardId& shardId) const {
     ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
     if (i == _shardChunks.end()) {
         return 0;
@@ -78,18 +79,17 @@ unsigned DistributionStatus::numberOfChunksInShard(const ShardId& shardId) const
     return i->second.size();
 }
 
-unsigned DistributionStatus::numberOfChunksInShardWithTag(const ShardId& shardId,
-                                                          const string& tag) const {
+size_t DistributionStatus::numberOfChunksInShardWithTag(const ShardId& shardId,
+                                                        const string& tag) const {
     ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
     if (i == _shardChunks.end()) {
         return 0;
     }
 
-    unsigned total = 0;
+    size_t total = 0;
 
-    const vector<ChunkType>& chunkList = i->second;
-    for (unsigned j = 0; j < i->second.size(); j++) {
-        if (tag == getTagForChunk(chunkList[j])) {
+    for (const auto& chunk : i->second) {
+        if (tag == getTagForChunk(chunk)) {
             total++;
         }
     }
@@ -167,10 +167,9 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
 }
 
 bool DistributionStatus::addTagRange(const TagRange& range) {
-    // first check for overlaps
-    for (map<BSONObj, TagRange>::const_iterator i = _tagRanges.begin(); i != _tagRanges.end();
-         ++i) {
-        const TagRange& tocheck = i->second;
+    // Check for overlaps
+    for (const auto& tagRangesEntry : _tagRanges) {
+        const TagRange& tocheck = tagRangesEntry.second;
 
         if (range.min == tocheck.min) {
             LOG(1) << "have 2 ranges with the same min " << range << " " << tocheck;
@@ -214,8 +213,7 @@ string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
     return range.tag;
 }
 
-std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
-                                                 const DistributionStatus& distribution,
+std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distribution,
                                                  bool shouldAggressivelyBalance) {
     // 1) check for shards that policy require to us to move off of:
     //    draining only
@@ -239,26 +237,25 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
             unsigned numJumboChunks = 0;
 
             // Since we have to move all chunks, lets just do in order
-            for (unsigned i = 0; i < chunks.size(); i++) {
-                const ChunkType& chunkToMove = chunks[i];
-                if (chunkToMove.getJumbo()) {
+            for (const auto& chunk : chunks) {
+                if (chunk.getJumbo()) {
                     numJumboChunks++;
                     continue;
                 }
 
-                const string tag = distribution.getTagForChunk(chunkToMove);
+                const string tag = distribution.getTagForChunk(chunk);
 
                 const ShardId to = distribution.getBestReceieverShard(tag);
                 if (!to.isValid()) {
-                    warning() << "want to move chunk: " << chunkToMove << " (" << tag << ") from "
-                              << stat.shardId << " but can't find anywhere to put it";
+                    warning() << "chunk " << chunk
+                              << " is on a draining shard, but no appropriate recipient found";
                     continue;
                 }
 
-                log() << "going to move " << chunkToMove << " from " << stat.shardId << " (" << tag
+                log() << "going to move " << chunk << " from " << stat.shardId << " (" << tag
                       << ") to " << to;
 
-                return {MigrateInfo(ns, to, chunkToMove)};
+                return {MigrateInfo(distribution.nss().ns(), to, chunk)};
             }
 
             warning() << "can't find any chunk to move from: " << stat.shardId
@@ -271,30 +268,30 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
     if (!distribution.tags().empty()) {
         for (const auto& stat : distribution.getStats()) {
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
-            for (unsigned j = 0; j < chunks.size(); j++) {
-                const ChunkType& chunk = chunks[j];
-                string tag = distribution.getTagForChunk(chunk);
-
+            for (const auto& chunk : chunks) {
+                const string tag = distribution.getTagForChunk(chunk);
                 if (tag.empty() || stat.shardTags.count(tag))
                     continue;
 
-                // uh oh, this chunk is in the wrong place
-                log() << "chunk " << chunk << " is not on a shard with the right tag: " << tag;
-
                 if (chunk.getJumbo()) {
-                    warning() << "chunk " << chunk << " is jumbo, so cannot be moved";
+                    warning() << "chunk " << chunk << " violates tag " << tag
+                              << ", but it is jumbo and cannot be moved";
                     continue;
                 }
 
                 const ShardId to = distribution.getBestReceieverShard(tag);
                 if (!to.isValid()) {
-                    log() << "no where to put it :(";
+                    warning() << "chunk " << chunk << " violates tag " << tag
+                              << ", but no appropriate recipient found";
                     continue;
                 }
 
                 invariant(to != stat.shardId);
-                log() << " going to move to: " << to;
-                return {MigrateInfo(ns, to, chunk)};
+
+                log() << "going to move " << chunk << " from " << stat.shardId << " (" << tag
+                      << ") to " << to;
+
+                return {MigrateInfo(distribution.nss().ns(), to, chunk)};
             }
         }
     }
@@ -310,37 +307,36 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
 
     // Randomize the order in which we balance the tags so that one bad tag doesn't prevent others
     // from getting balanced
-    vector<string> tags;
+    vector<string> tagsPlusEmpty;
     {
         for (const auto& tag : distribution.tags()) {
-            tags.push_back(tag);
+            tagsPlusEmpty.push_back(tag);
         }
-        tags.push_back("");
+        tagsPlusEmpty.push_back("");
 
-        std::random_shuffle(tags.begin(), tags.end());
+        std::random_shuffle(tagsPlusEmpty.begin(), tagsPlusEmpty.end());
     }
 
-    for (const auto& tag : tags) {
+    for (const auto& tag : tagsPlusEmpty) {
         const ShardId from = distribution.getMostOverloadedShard(tag);
-        if (!from.isValid()) {
+        if (!from.isValid())
             continue;
-        }
 
-        unsigned max = distribution.numberOfChunksInShardWithTag(from, tag);
+        const unsigned max = distribution.numberOfChunksInShardWithTag(from, tag);
         if (max == 0)
             continue;
 
-        ShardId to = distribution.getBestReceieverShard(tag);
+        const ShardId to = distribution.getBestReceieverShard(tag);
         if (!to.isValid()) {
             log() << "no available shards to take chunks for tag [" << tag << "]";
             return vector<MigrateInfo>();
         }
 
-        unsigned min = distribution.numberOfChunksInShardWithTag(to, tag);
+        const unsigned min = distribution.numberOfChunksInShardWithTag(to, tag);
 
         const int imbalance = max - min;
 
-        LOG(1) << "collection : " << ns;
+        LOG(1) << "collection : " << distribution.nss().ns();
         LOG(1) << "donor      : " << from << " chunks on " << max;
         LOG(1) << "receiver   : " << to << " chunks on " << min;
         LOG(1) << "threshold  : " << threshold;
@@ -350,8 +346,8 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
 
         const vector<ChunkType>& chunks = distribution.getChunks(from);
         unsigned numJumboChunks = 0;
-        for (unsigned j = 0; j < chunks.size(); j++) {
-            const ChunkType& chunk = chunks[j];
+
+        for (const auto& chunk : chunks) {
             if (distribution.getTagForChunk(chunk) != tag)
                 continue;
 
@@ -360,14 +356,14 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const string& ns,
                 continue;
             }
 
-            log() << " ns: " << ns << " going to move " << chunk << " from: " << from
-                  << " to: " << to << " tag [" << tag << "]";
+            log() << " ns: " << distribution.nss().ns() << " going to move " << chunk
+                  << " from: " << from << " to: " << to << " tag [" << tag << "]";
 
-            return {MigrateInfo(ns, to, chunk)};
+            return {MigrateInfo(distribution.nss().ns(), to, chunk)};
         }
 
         if (numJumboChunks) {
-            error() << "shard: " << from << " ns: " << ns
+            error() << "shard: " << from << " ns: " << distribution.nss().ns()
                     << " has too many chunks, but they are all jumbo "
                     << " numJumboChunks: " << numJumboChunks;
             continue;

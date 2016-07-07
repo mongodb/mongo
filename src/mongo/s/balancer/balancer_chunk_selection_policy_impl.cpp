@@ -208,7 +208,7 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
     auto collInfo = createCollectionDistributionInfo(shardStatsStatus.getValue(), cm);
     ShardToChunksMap shardToChunksMap = std::move(std::get<0>(collInfo));
 
-    DistributionStatus distStatus(shardStatsStatus.getValue(), shardToChunksMap);
+    DistributionStatus distStatus(nss, shardStatsStatus.getValue(), shardToChunksMap);
     const ShardId newShardId(distStatus.getBestReceieverShard(tagForChunkStatus.getValue()));
     if (!newShardId.isValid() || newShardId == chunk.getShard()) {
         return boost::optional<MigrateInfo>();
@@ -308,7 +308,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     ShardToChunksMap shardToChunksMap = std::move(std::get<0>(collInfo));
     ChunkMinimumsSet allChunkMinimums = std::move(std::get<1>(collInfo));
 
-    DistributionStatus distStatus(shardStats, shardToChunksMap);
+    DistributionStatus distStatus(nss, shardStats, shardToChunksMap);
     {
         vector<TagsType> collectionTags;
         Status status = Grid::get(txn)->catalogClient(txn)->getTagsForCollection(
@@ -350,7 +350,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         }
     }
 
-    return BalancerPolicy::balance(nss.ns(), distStatus, aggressiveBalanceHint);
+    return BalancerPolicy::balance(distStatus, aggressiveBalanceHint);
 }
 
 }  // namespace mongo
