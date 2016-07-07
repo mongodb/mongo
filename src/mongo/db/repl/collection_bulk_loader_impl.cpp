@@ -89,7 +89,6 @@ Status CollectionBulkLoaderImpl::init(OperationContext* txn,
     invariant(txn);
     invariant(coll);
     invariant(txn->getClient() == &cc());
-    _callAbortOnDestructor = true;
     if (secondaryIndexSpecs.size()) {
         _hasSecondaryIndexes = true;
         _secondaryIndexesBlock.ignoreUniqueConstraint();
@@ -115,6 +114,9 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
 
         for (auto iter = begin; iter != end; ++iter) {
             std::vector<MultiIndexBlock*> indexers{&_idIndexBlock};
+            if (_hasSecondaryIndexes) {
+                indexers.push_back(&_secondaryIndexesBlock);
+            }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
                 const auto status = _coll->insertDocument(txn, *iter, indexers, false);
@@ -150,9 +152,13 @@ Status CollectionBulkLoaderImpl::commit() {
                     return Status{ErrorCodes::UserDataInconsistent,
                                   "Found duplicates when dups are disabled in MultiIndexBlock."};
                 }
-                WriteUnitOfWork wunit(txn);
-                _secondaryIndexesBlock.commit();
-                wunit.commit();
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wunit(txn);
+                    _secondaryIndexesBlock.commit();
+                    wunit.commit();
+                }
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                    _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
             }
 
             // Delete dups.
@@ -178,15 +184,18 @@ Status CollectionBulkLoaderImpl::commit() {
             }
 
             // Commit _id index, without dups.
-            WriteUnitOfWork wunit(txn);
-            _idIndexBlock.commit();
-            wunit.commit();
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(txn);
+                _idIndexBlock.commit();
+                wunit.commit();
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
 
             // release locks.
             _autoColl.reset(nullptr);
             _autoDB.reset(nullptr);
             _coll = nullptr;
-            _callAbortOnDestructor = false;
             return Status::OK();
         },
         TaskRunner::NextAction::kDisposeOperationContext);

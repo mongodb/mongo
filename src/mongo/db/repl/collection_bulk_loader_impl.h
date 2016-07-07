@@ -83,7 +83,6 @@ private:
     MultiIndexBlock _secondaryIndexesBlock;
     bool _hasSecondaryIndexes = false;
     BSONObj _idIndexSpec;
-    bool _callAbortOnDestructor = false;
 };
 
 }  // namespace repl
