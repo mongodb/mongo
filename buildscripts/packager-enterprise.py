@@ -119,6 +119,8 @@ class EnterpriseDistro(packager.Distro):
         if arch == "s390x":
             if self.n == 'redhat':
                 return [ "rhel72" ]
+            if self.n == 'suse':
+                return [ "suse12" ]
             else:
                 return []
         if arch == "arm64":
