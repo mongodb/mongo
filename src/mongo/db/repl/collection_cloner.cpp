@@ -58,7 +58,7 @@ const size_t numListIndexesRetries = 1;
 const size_t numFindRetries = 3;
 }  // namespace
 
-CollectionCloner::CollectionCloner(ReplicationExecutor* executor,
+CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                    const HostAndPort& source,
                                    const NamespaceString& sourceNss,
                                    const CollectionOptions& options,
@@ -108,22 +108,27 @@ CollectionCloner::CollectionCloner(ReplicationExecutor* executor,
 
       _indexSpecs(),
       _documents(),
-      _dbWorkCallbackHandle(),
-      _scheduleDbWorkFn([this](const ReplicationExecutor::CallbackFn& work) {
-          auto status = _executor->scheduleDBWork(work);
-          if (status.isOK()) {
-              LockGuard lk(_mutex);
-              _dbWorkCallbackHandle = status.getValue();
-          }
-          return status;
+      _dbWorkThreadPool(OldThreadPool::DoNotStartThreadsTag(),
+                        1,
+                        "CollectionCloner-" + _sourceNss.toString() + "-"),
+      _dbWorkTaskRunner(&_dbWorkThreadPool),
+      _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
+          auto task = [work](OperationContext* txn,
+                             const Status& status) -> TaskRunner::NextAction {
+              work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, txn));
+              return TaskRunner::NextAction::kDisposeOperationContext;
+          };
+          _dbWorkTaskRunner.schedule(task);
+          return executor::TaskExecutor::CallbackHandle();
       }) {
-    uassert(ErrorCodes::BadValue, "null replication executor", executor);
+    // Fetcher throws an exception on null executor.
+    invariant(executor);
     uassert(ErrorCodes::BadValue,
             "invalid collection namespace: " + sourceNss.ns(),
             sourceNss.isValid());
     uassertStatusOK(options.validate());
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
-    uassert(ErrorCodes::BadValue, "null storage interface", storageInterface);
+    uassert(ErrorCodes::BadValue, "storage interface cannot be null", storageInterface);
 }
 
 CollectionCloner::~CollectionCloner() {
@@ -146,8 +151,6 @@ std::string CollectionCloner::getDiagnosticString() const {
     output << " active: " << _active;
     output << " listIndexes fetcher: " << _listIndexesFetcher.getDiagnosticString();
     output << " find fetcher: " << _findFetcher.getDiagnosticString();
-    output << " database worked callback handle: "
-           << (_dbWorkCallbackHandle.isValid() ? "valid" : "invalid");
     return output;
 }
 
@@ -170,29 +173,21 @@ Status CollectionCloner::start() {
         return scheduleResult;
     }
 
+    _dbWorkThreadPool.startThreads();
+
     _active = true;
 
     return Status::OK();
 }
 
 void CollectionCloner::cancel() {
-    ReplicationExecutor::CallbackHandle dbWorkCallbackHandle;
-    {
-        LockGuard lk(_mutex);
-
-        if (!_active) {
-            return;
-        }
-
-        dbWorkCallbackHandle = _dbWorkCallbackHandle;
+    if (!isActive()) {
+        return;
     }
 
     _listIndexesFetcher.cancel();
     _findFetcher.cancel();
-
-    if (dbWorkCallbackHandle.isValid()) {
-        _executor->cancel(dbWorkCallbackHandle);
-    }
+    _dbWorkTaskRunner.cancel();
 }
 
 CollectionCloner::Stats CollectionCloner::getStats() const {
@@ -206,32 +201,15 @@ void CollectionCloner::wait() {
 }
 
 void CollectionCloner::waitForDbWorker() {
-    ReplicationExecutor::CallbackHandle dbWorkCallbackHandle;
-    {
-        LockGuard lk(_mutex);
-
-        if (!_active) {
-            return;
-        }
-
-        dbWorkCallbackHandle = _dbWorkCallbackHandle;
+    if (!isActive()) {
+        return;
     }
-
-    if (dbWorkCallbackHandle.isValid()) {
-        _executor->wait(dbWorkCallbackHandle);
-    }
+    _dbWorkTaskRunner.join();
 }
 
 void CollectionCloner::setScheduleDbWorkFn(const ScheduleDbWorkFn& scheduleDbWorkFn) {
     LockGuard lk(_mutex);
-
-    _scheduleDbWorkFn = [this, scheduleDbWorkFn](const ReplicationExecutor::CallbackFn& work) {
-        auto status = scheduleDbWorkFn(work);
-        if (status.isOK()) {
-            _dbWorkCallbackHandle = status.getValue();
-        }
-        return status;
-    };
+    _scheduleDbWorkFn = scheduleDbWorkFn;
 }
 
 void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& fetchResult,
@@ -329,7 +307,7 @@ void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& f
     }
 }
 
-void CollectionCloner::_beginCollectionCallback(const ReplicationExecutor::CallbackArgs& cbd) {
+void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::CallbackArgs& cbd) {
     if (!cbd.status.isOK()) {
         _finishCallback(cbd.status);
         return;
@@ -360,7 +338,7 @@ void CollectionCloner::_beginCollectionCallback(const ReplicationExecutor::Callb
     }
 }
 
-void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::CallbackArgs& cbd,
+void CollectionCloner::_insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd,
                                                 bool lastBatch) {
     if (!cbd.status.isOK()) {
         _finishCallback(cbd.status);

@@ -36,9 +36,9 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
@@ -52,7 +52,7 @@ namespace repl {
 
 class BaseCloner;
 
-class BaseClonerTest : public ReplicationExecutorTest {
+class BaseClonerTest : public executor::ThreadPoolExecutorTest {
 public:
     typedef executor::NetworkInterfaceMock::NetworkOperationIterator NetworkOperationIterator;
 

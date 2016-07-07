@@ -39,7 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
@@ -104,7 +104,7 @@ public:
      *
      * Takes ownership of the passed StorageInterface object.
      */
-    DatabaseCloner(ReplicationExecutor* executor,
+    DatabaseCloner(executor::TaskExecutor* executor,
                    const HostAndPort& source,
                    const std::string& dbname,
                    const BSONObj& listCollectionsFilter,
@@ -190,7 +190,7 @@ private:
     //
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;                 // (M)
-    ReplicationExecutor* _executor;                              // (R)
+    executor::TaskExecutor* _executor;                           // (R)
     const HostAndPort _source;                                   // (R)
     const std::string _dbname;                                   // (R)
     const BSONObj _listCollectionsFilter;                        // (R)

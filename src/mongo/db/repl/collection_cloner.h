@@ -39,11 +39,13 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/task_runner.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -66,14 +68,12 @@ public:
         BSONObj toBSON() const;
     };
     /**
-     * Type of function to schedule database work with the executor.
-     *
-     * Must be consistent with ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock().
+     * Type of function to schedule storage interface tasks with the executor.
      *
      * Used for testing only.
      */
-    using ScheduleDbWorkFn = stdx::function<StatusWith<ReplicationExecutor::CallbackHandle>(
-        const ReplicationExecutor::CallbackFn&)>;
+    using ScheduleDbWorkFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+        const executor::TaskExecutor::CallbackFn&)>;
 
     /**
      * Creates CollectionCloner task in inactive state. Use start() to activate cloner.
@@ -84,7 +84,7 @@ public:
      *
      * Takes ownership of the passed StorageInterface object.
      */
-    CollectionCloner(ReplicationExecutor* executor,
+    CollectionCloner(executor::TaskExecutor* executor,
                      const HostAndPort& source,
                      const NamespaceString& sourceNss,
                      const CollectionOptions& options,
@@ -150,7 +150,7 @@ private:
      * 'nextAction' is an in/out arg indicating the next action planned and to be taken
      *  by the fetcher.
      */
-    void _beginCollectionCallback(const ReplicationExecutor::CallbackArgs& callbackData);
+    void _beginCollectionCallback(const executor::TaskExecutor::CallbackArgs& callbackData);
 
     /**
      * Called multiple times if there are more than one batch of documents from the fetcher.
@@ -159,7 +159,7 @@ private:
      * Each document returned will be inserted via the storage interfaceRequest storage
      * interface.
      */
-    void _insertDocumentsCallback(const ReplicationExecutor::CallbackArgs& callbackData,
+    void _insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& callbackData,
                                   bool lastBatch);
 
     /**
@@ -180,7 +180,7 @@ private:
     //
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;        // (M)
-    ReplicationExecutor* _executor;                     // (R) Not owned by us.
+    executor::TaskExecutor* _executor;                  // (R) Not owned by us.
     HostAndPort _source;                                // (R)
     NamespaceString _sourceNss;                         // (R)
     NamespaceString _destNss;                           // (R)
@@ -194,8 +194,8 @@ private:
     std::vector<BSONObj> _indexSpecs;     // (M)
     BSONObj _idIndexSpec;                 // (M)
     std::vector<BSONObj> _documents;      // (M) Documents read from fetcher to insert.
-    ReplicationExecutor::CallbackHandle
-        _dbWorkCallbackHandle;  // (M) Callback handle for database worker.
+    OldThreadPool _dbWorkThreadPool;      // (R)
+    TaskRunner _dbWorkTaskRunner;         // (R)
     ScheduleDbWorkFn
         _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
     Stats _stats;           // (M) stats for this instance.

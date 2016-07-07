@@ -731,7 +731,11 @@ env.Library(
         'base_cloner_test_fixture.cpp',
     ],
     LIBDEPS=[
-        'replication_executor_test_fixture',
+        'replmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/commands_test_crutch',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )
 
@@ -741,11 +745,12 @@ env.Library(
         'collection_cloner.cpp',
     ],
     LIBDEPS=[
-        'replication_executor',
+        'task_runner',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/client/fetcher',
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
 
@@ -765,6 +770,7 @@ env.Library(
     ],
     LIBDEPS=[
         'collection_cloner',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
 
@@ -792,8 +798,8 @@ env.CppUnitTest(
     source='databases_cloner_test.cpp',
     LIBDEPS=[
         'databases_cloner',
-        'base_cloner_test_fixture',
         'oplog_entry',
+        'replication_executor_test_fixture',
     ],
 )
 
@@ -971,12 +977,11 @@ env.CppUnitTest(
         'data_replicator_test.cpp',
     ],
     LIBDEPS=[
-        'base_cloner_test_fixture',
         'data_replicator',
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
