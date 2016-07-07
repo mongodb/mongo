@@ -739,7 +739,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
     auto si = StorageInterface::get(txn);
     si->clearInitialSyncFlag(txn);
     si->setMinValid(txn, _lastApplied.opTime, DurableRequirement::Strong);
-    log() << "Initial sync took: " << t.millis() << " milliseconds.";
+    log() << "initial sync done; took " << t.millis() << " milliseconds.";
     return _lastApplied;
 }
 
