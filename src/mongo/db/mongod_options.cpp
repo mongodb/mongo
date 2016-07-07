@@ -447,8 +447,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "declare this is a config db of a cluster; default port 27019; "
                            "default dir /data/configdb")
         .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("shardsvr")
-        .incompatibleWith("nojournal");
+        .incompatibleWith("shardsvr");
 
     sharding_options
         .addOptionChaining("shardsvr",
@@ -1256,6 +1255,12 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
         if (clusterRoleParam == "configsvr") {
+            bool journal = true;
+            params.get("storage.journal.enabled", &journal);
+            if (!journal) {
+                return Status(ErrorCodes::BadValue,
+                              "journaling cannot be turned off when configsvr is specified");
+            }
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
             replSettings.setMajorityReadConcernEnabled(true);
 
