@@ -63,7 +63,7 @@ const size_t numListDatabasesRetries = 1;
 
 
 DatabasesCloner::DatabasesCloner(StorageInterface* si,
-                                 ReplicationExecutor* exec,
+                                 executor::TaskExecutor* exec,
                                  HostAndPort source,
                                  IncludeDbFilterFn includeDbPred,
                                  OnFinishFn finishFn)

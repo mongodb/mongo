@@ -40,7 +40,7 @@
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
@@ -49,8 +49,8 @@ namespace mongo {
 namespace repl {
 namespace {
 
-using CBHStatus = StatusWith<ReplicationExecutor::CallbackHandle>;
-using CommandCallbackArgs = ReplicationExecutor::RemoteCommandCallbackArgs;
+using CBHStatus = StatusWith<executor::TaskExecutor::CallbackHandle>;
+using CommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 }  // namespace.
@@ -63,7 +63,7 @@ public:
     using IncludeDbFilterFn = stdx::function<bool(const BSONObj& dbInfo)>;
     using OnFinishFn = stdx::function<void(const Status&)>;
     DatabasesCloner(StorageInterface* si,
-                    ReplicationExecutor* exec,
+                    executor::TaskExecutor* exec,
                     HostAndPort source,
                     IncludeDbFilterFn includeDbPred,
                     OnFinishFn finishFn);
@@ -111,7 +111,7 @@ private:
     //
     mutable stdx::mutex _mutex;                         // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
-    ReplicationExecutor* _exec;                         // (R) executor to schedule things with
+    executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
     HostAndPort _source;   // (R) The source to use, until we get an error
     bool _active = false;  // (M) false until we start
     std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;  // (M) database cloners by name

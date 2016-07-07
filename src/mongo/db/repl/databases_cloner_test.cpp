@@ -39,7 +39,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -47,6 +46,7 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
@@ -84,11 +84,9 @@ struct StorageInterfaceResults {
 };
 
 
-class DBsClonerTest : public ReplicationExecutorTest {
+class DBsClonerTest : public executor::ThreadPoolExecutorTest {
 public:
     DBsClonerTest() : _storageInterface{} {}
-
-    void postExecutorThreadLaunch() override{};
 
     StorageInterface& getStorage() {
         return _storageInterface;
@@ -108,7 +106,7 @@ public:
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
         RemoteCommandResponse response(obj, BSONObj(), millis);
-        ReplicationExecutor::ResponseStatus responseStatus(response);
+        executor::TaskExecutor::ResponseStatus responseStatus(response);
         net->scheduleResponse(noi, net->now(), responseStatus);
     }
 
@@ -143,7 +141,7 @@ public:
 
 protected:
     void setUp() override {
-        ReplicationExecutorTest::setUp();
+        executor::ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
 
         _storageInterface.createOplogFn = [this](OperationContext* txn,
@@ -189,7 +187,7 @@ protected:
     }
 
     void tearDown() override {
-        ReplicationExecutorTest::tearDown();
+        executor::ThreadPoolExecutorTest::tearDown();
     }
 
     /**
@@ -283,7 +281,7 @@ protected:
         stdx::mutex mutex;
         stdx::condition_variable cvDone;
         DatabasesCloner cloner{&getStorage(),
-                               &getReplExecutor(),
+                               &getExecutor(),
                                HostAndPort{"local:1234"},
                                [](const BSONObj&) { return true; },
                                [&](const Status& status) {
@@ -321,7 +319,7 @@ TEST_F(DBsClonerTest, FailsOnListDatabases) {
     Status result{Status::OK()};
     Status expectedResult{ErrorCodes::BadValue, "foo"};
     DatabasesCloner cloner{&getStorage(),
-                           &getReplExecutor(),
+                           &getExecutor(),
                            HostAndPort{"local:1234"},
                            [](const BSONObj&) { return true; },
                            [&result](const Status& status) {
@@ -341,7 +339,7 @@ TEST_F(DBsClonerTest, FailsOnListDatabases) {
 TEST_F(DBsClonerTest, FailsOnListCollectionsOnOnlyDatabase) {
     Status result{Status::OK()};
     DatabasesCloner cloner{&getStorage(),
-                           &getReplExecutor(),
+                           &getExecutor(),
                            HostAndPort{"local:1234"},
                            [](const BSONObj&) { return true; },
                            [&result](const Status& status) {
@@ -369,7 +367,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnFirstOfTwoDatabases) {
     Status result{Status::OK()};
     Status expectedStatus{ErrorCodes::NoSuchKey, "fake"};
     DatabasesCloner cloner{&getStorage(),
-                           &getReplExecutor(),
+                           &getExecutor(),
                            HostAndPort{"local:1234"},
                            [](const BSONObj&) { return true; },
                            [&result](const Status& status) {
