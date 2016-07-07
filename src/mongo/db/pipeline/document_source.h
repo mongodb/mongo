@@ -1756,6 +1756,7 @@ private:
     long long _outputIndex;
 };
 
+
 class DocumentSourceSortByCount final {
 public:
     static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
@@ -1772,6 +1773,15 @@ public:
 
 private:
     DocumentSourceCount() = default;
+};
+
+class DocumentSourceBucket final {
+public:
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceBucket() = default;
 };
 
 /**
