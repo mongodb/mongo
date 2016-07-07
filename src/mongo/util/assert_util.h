@@ -220,6 +220,12 @@ inline void fassert(int msgid, const Status& status) {
     }
 }
 
+inline void fassertNoTrace(int msgid, bool testOK) {
+    if (MONGO_unlikely(!testOK)) {
+        fassertFailedNoTrace(msgid);
+    }
+}
+
 inline void fassertNoTrace(int msgid, const Status& status) {
     if (MONGO_unlikely(!status.isOK())) {
         fassertFailedWithStatusNoTrace(msgid, status);

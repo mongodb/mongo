@@ -302,7 +302,7 @@ Status SyncTail::syncApply(OperationContext* txn,
                            ApplyCommandInLockFn applyCommandInLock,
                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
     if (inShutdown()) {
-        return Status::OK();
+        return Status(ErrorCodes::InterruptedAtShutdown, "syncApply shutting down");
     }
 
     // Count each log op application as a separate operation, for reporting purposes
@@ -1005,7 +1005,9 @@ void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail*) {
     auto syncApply = [](OperationContext* txn, const BSONObj& op, bool convertUpdateToUpsert) {
         return SyncTail::syncApply(txn, op, convertUpdateToUpsert);
     };
-    fassertNoTrace(16359, multiSyncApply_noAbort(txn.get(), ops, syncApply));
+
+    auto status = multiSyncApply_noAbort(txn.get(), ops, syncApply);
+    fassertNoTrace(16359, status.isOK() || status == ErrorCodes::InterruptedAtShutdown);
 }
 
 Status multiSyncApply_noAbort(OperationContext* txn,
@@ -1081,8 +1083,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                     // The group insert failed, log an error and fall through to the
                     // application of an individual op.
                     if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
-                        // Swallow this error to prevent fassert and nonzero exit code.
-                        return Status::OK();
+                        return e.toStatus();
                     }
 
                     str::stream msg;
@@ -1099,24 +1100,16 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 
         try {
             // Apply an individual (non-grouped) op.
-            const Status s = syncApply(txn, entry->raw, convertUpdatesToUpserts);
+            const Status status = syncApply(txn, entry->raw, convertUpdatesToUpserts);
 
-            if (!s.isOK()) {
-                severe() << "Error applying operation (" << entry->raw.toString() << "): " << s;
-                if (inShutdown()) {
-                    return {ErrorCodes::InterruptedAtShutdown, s.toString()};
-                }
-                return s;
+            if (!status.isOK()) {
+                severe() << "Error applying operation (" << entry->raw.toString()
+                         << "): " << status;
+                return status;
             }
         } catch (const DBException& e) {
             severe() << "writer worker caught exception: " << causedBy(e)
                      << " on: " << entry->raw.toString();
-
-            if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
-                // Swallow this error to prevent fassert and nonzero exit code.
-                return Status::OK();
-            }
-
             return e.toStatus();
         }
     }
@@ -1128,7 +1121,8 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 void multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st) {
     initializeWriterThread();
     auto txn = cc().makeOperationContext();
-    fassertNoTrace(15915, multiInitialSyncApply_noAbort(txn.get(), ops, st));
+    auto status = multiInitialSyncApply_noAbort(txn.get(), ops, st);
+    fassertNoTrace(15915, status.isOK() || status == ErrorCodes::InterruptedAtShutdown);
 }
 
 Status multiInitialSyncApply_noAbort(OperationContext* txn,
@@ -1167,12 +1161,6 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
             }
 
             severe() << "writer worker caught exception: " << causedBy(e) << " on: " << entry.raw;
-
-            if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
-                // Swallow this error to prevent fassert and nonzero exit code.
-                return Status::OK();
-            }
-
             return e.toStatus();
         }
     }
