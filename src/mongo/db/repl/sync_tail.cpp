@@ -1160,6 +1160,12 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
                 // subsequently got deleted and no longer exists on the Sync Target at all
             }
         } catch (const DBException& e) {
+            // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
+            // dropped before initial sync ends anyways and we should ignore it.
+            if (e.getCode() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType()) {
+                continue;
+            }
+
             severe() << "writer worker caught exception: " << causedBy(e) << " on: " << entry.raw;
 
             if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {

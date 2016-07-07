@@ -870,6 +870,28 @@ TEST_F(SyncTailTest,
     ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
 }
 
+TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
+    BSONObj emptyDoc;
+    SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
+    auto doc1 = BSON("_id" << 1);
+    auto doc2 = BSON("_id" << 2);
+    auto doc3 = BSON("_id" << 3);
+    auto op0 = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+    auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc1);
+    auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, badNss, doc2);
+    auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
+    MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+
+    OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+    auto iter = collectionReader.makeIterator();
+    ASSERT_EQUALS(doc3, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(doc1, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
 TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailableFromSyncSource) {
     SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
