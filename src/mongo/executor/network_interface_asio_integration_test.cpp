@@ -171,7 +171,9 @@ public:
     using Fixture = NetworkInterfaceASIOIntegrationTest;
     using Pool = ThreadPoolInterface;
 
-    Deferred<Status> run(Fixture* fixture, Pool* pool, Milliseconds timeout = Milliseconds(60000)) {
+    Deferred<Status> run(Fixture* fixture,
+                         Pool* pool,
+                         Milliseconds timeout = RemoteCommandRequest::kNoTimeout) {
         auto cb = makeCallbackHandle();
         auto self = *this;
         auto out = fixture
