@@ -91,6 +91,7 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
                 self.checkcount(uri, count)
             cursor[self.genkey(i)] = self.genvalue(i)
             count += 1
+
         # Remove a number of entries, at each step checking that stats match.
         for i in range(0, self.nentries / 37):
             cursor.set_key(self.genkey(i*11 % self.nentries))
@@ -98,6 +99,11 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
                 count -= 1
             self.checkcount(uri, count)
         cursor.close()
+
+        # Confirm the count is correct after writing to the backing file,
+        # that tests the on-disk format as well as the in-memory format.
+        self.reopen_conn()
+        self.checkcount(uri, count)
 
 if __name__ == '__main__':
     wttest.run()

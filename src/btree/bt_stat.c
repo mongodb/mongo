@@ -142,7 +142,7 @@ __stat_page_col_var(
 		} else {
 			orig_deleted = false;
 			__wt_cell_unpack(cell, unpack);
-			if (unpack->type == WT_CELL_ADDR_DEL)
+			if (unpack->type == WT_CELL_DEL)
 				orig_deleted = true;
 			else {
 				entry_cnt += __wt_cell_rle(unpack);
