@@ -3,6 +3,7 @@
 /**
  * Represents a MongoDB cluster.
  */
+load('jstests/hooks/check_repl_dbhash.js');     // Loads the checkDBHashes function.
 load('jstests/hooks/validate_collections.js');  // Loads the validateCollections function.
 
 var Cluster = function(options) {
@@ -415,64 +416,6 @@ var Cluster = function(options) {
         jsTest.log('Finished validating collections in ' + totalTime + ' ms, ' + phase);
     };
 
-    this.checkDBHashes = function checkDBHashes(rst, dbBlacklist, phase) {
-        assert(initialized, 'cluster must be initialized first');
-        assert(this.isReplication(), 'cluster is not a replica set');
-
-        // Use liveNodes.master instead of getPrimary() to avoid the detection of a new primary.
-        var primary = rst.liveNodes.master;
-
-        var res = primary.adminCommand({listDatabases: 1});
-        assert.commandWorked(res);
-
-        res.databases.forEach(dbInfo => {
-            var dbName = dbInfo.name;
-            if (Array.contains(dbBlacklist, dbName)) {
-                return;
-            }
-
-            var dbHashes = rst.getHashes(dbName);
-            var primaryDBHash = dbHashes.master;
-            assert.commandWorked(primaryDBHash);
-
-            dbHashes.slaves.forEach(secondaryDBHash => {
-                assert.commandWorked(secondaryDBHash);
-
-                var primaryNumCollections = Object.keys(primaryDBHash.collections).length;
-                var secondaryNumCollections = Object.keys(secondaryDBHash.collections).length;
-
-                assert.eq(primaryNumCollections,
-                          secondaryNumCollections,
-                          phase + ', the primary and secondary have a different number of' +
-                              ' collections: ' + tojson(dbHashes));
-
-                // Only compare the dbhashes of non-capped collections because capped collections
-                // are not necessarily truncated at the same points across replica set members.
-                var collNames =
-                    Object.keys(primaryDBHash.collections)
-                        .filter(collName => !primary.getDB(dbName)[collName].isCapped());
-
-                collNames.forEach(collName => {
-                    assert.eq(primaryDBHash.collections[collName],
-                              secondaryDBHash.collections[collName],
-                              phase + ', the primary and secondary have a different hash for the' +
-                                  ' collection ' + dbName + '.' + collName + ': ' +
-                                  tojson(dbHashes));
-                });
-
-                if (collNames.length === primaryNumCollections) {
-                    // If the primary and secondary have the same hashes for all the collections on
-                    // the database and there aren't any capped collections, then the hashes for the
-                    // whole database should match.
-                    assert.eq(primaryDBHash.md5,
-                              secondaryDBHash.md5,
-                              phase + ', the primary and secondary have a different hash for the ' +
-                                  dbName + ' database: ' + tojson(dbHashes));
-                }
-            });
-        });
-    };
-
     this.checkReplicationConsistency = function checkReplicationConsistency(
         dbBlacklist, phase, ttlIndexExists) {
         assert(initialized, 'cluster must be initialized first');
@@ -525,7 +468,7 @@ var Cluster = function(options) {
 
                 if (shouldCheckDBHashes) {
                     // Compare the dbhashes of the primary and secondaries.
-                    this.checkDBHashes(rst, dbBlacklist);
+                    checkDBHashes(rst, dbBlacklist, phase);
                 }
             } catch (e) {
                 activeException = true;
