@@ -5349,6 +5349,88 @@ buildvariants:
     - ubuntu1404-build
 
 ###########################################
+#          ASIO MP buildvariants          #
+###########################################
+
+- name: ubuntu1604-asio-mp
+  display_name: "z ASIO MessagingPort SSL Ubuntu 1604 64-bit"
+  modules:
+  - mongo-tools
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags ssl"
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: "--continueOnFailure --mongosSetParameters='{messagePortImpl: 'ASIO'}' --mongodSetParameters='{messagePortImpl: 'ASIO'}'"
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-build
+  - name: aggregation_auth
+  - name: aggregation_WT
+  - name: auth_WT
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: jsCore
+  - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_WT
+  - name: jstestfuzz
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: replicasets_auth
+  - name: replicasets_WT
+  - name: replication_auth
+  - name: replication_WT
+  - name: sharding_auth
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_WT
+  - name: slow1_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+
+- name: windows-64-2k8-debug-asio
+  display_name: "z ASIO MessagingPort Windows 2008R2 DEBUG"
+  modules:
+  - mongo-tools
+  run_on:
+  - windows-64-vs2015-small
+  expansions:
+    platform_decompress: unzip
+    exe: ".exe"
+    content_type: application/zip
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus
+    ext: zip
+  tasks:
+  - name: compile
+    distros:
+    - windows-64-vs2015-large
+  - name: aggregation_WT
+  - name: auth_WT
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: dbtest_WT
+  - name: jsCore
+  - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_WT
+  - name: mongosTest
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: replicasets_WT
+  - name: replication_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_WT
+  - name: slow1_WT
+  - name: tool_WT
+
+###########################################
 #          SUSE buildvariants             #
 ###########################################
 
