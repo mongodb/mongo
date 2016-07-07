@@ -25,6 +25,8 @@ selector:
     - jstests/sharding/commands_that_write_accept_wc_shards.js
     # NumInitialChunks verification changed. See SERVER-23327.
     - jstests/sharding/shard_collection_verify_initial_chunks.js
+    # avgObjSize scaling behavior fixed. See SERVER-19533.
+    - jstests/sharding/stats.js
     # TODO: Enable when SERVER-22672 is complete
     - jstests/sharding/printShardingStatus.js
     # TODO: Change in error reporting, enable when 3.4 becomes 'last-stable'.
