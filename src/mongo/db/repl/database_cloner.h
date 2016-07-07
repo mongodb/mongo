@@ -58,6 +58,16 @@ class DatabaseCloner : public BaseCloner {
     MONGO_DISALLOW_COPYING(DatabaseCloner);
 
 public:
+    struct Stats {
+        Date_t start;
+        Date_t end;
+        size_t collections{0};
+        size_t clonedCollections{0};
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+    };
+
     /**
      * Predicate used on the collection info objects returned by listCollections.
      * Each collection info is represented by a document in the following format:
@@ -121,6 +131,8 @@ public:
     void cancel() override;
 
     void wait() override;
+
+    DatabaseCloner::Stats getStats() const;
 
     //
     // Testing only functions below.
@@ -204,6 +216,7 @@ private:
     CollectionCloner::ScheduleDbWorkFn
         _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
     StartCollectionClonerFn _startCollectionCloner;  // (RT)
+    Stats _stats;                                    // (M) Stats about what this instance did.
 };
 
 }  // namespace repl

@@ -55,6 +55,16 @@ class CollectionCloner : public BaseCloner {
     MONGO_DISALLOW_COPYING(CollectionCloner);
 
 public:
+    struct Stats {
+        Date_t start;
+        Date_t end;
+        size_t documents{0};
+        size_t indexes{0};
+        size_t fetchBatches{0};
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+    };
     /**
      * Type of function to schedule database work with the executor.
      *
@@ -94,6 +104,8 @@ public:
     void cancel() override;
 
     void wait() override;
+
+    CollectionCloner::Stats getStats() const;
 
     //
     // Testing only functions below.
@@ -186,6 +198,7 @@ private:
         _dbWorkCallbackHandle;  // (M) Callback handle for database worker.
     ScheduleDbWorkFn
         _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
+    Stats _stats;           // (M) stats for this instance.
 };
 
 }  // namespace repl

@@ -158,6 +158,7 @@ Status CollectionCloner::start() {
         return Status(ErrorCodes::IllegalOperation, "collection cloner already started");
     }
 
+    _stats.start = _executor->now();
     Status scheduleResult = _listIndexesFetcher.schedule();
     if (!scheduleResult.isOK()) {
         return scheduleResult;
@@ -186,6 +187,11 @@ void CollectionCloner::cancel() {
     if (dbWorkCallbackHandle.isValid()) {
         _executor->cancel(dbWorkCallbackHandle);
     }
+}
+
+CollectionCloner::Stats CollectionCloner::getStats() const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _stats;
 }
 
 void CollectionCloner::wait() {
@@ -333,11 +339,18 @@ void CollectionCloner::_beginCollectionCallback(const ReplicationExecutor::Callb
     UniqueLock lk(_mutex);
     auto status = _storageInterface->createCollectionForBulkLoading(
         _destNss, _options, _idIndexSpec, _indexSpecs);
+
     if (!status.isOK()) {
         lk.unlock();
         _finishCallback(status.getStatus());
         return;
     }
+
+    _stats.indexes = _indexSpecs.size();
+    if (!_idIndexSpec.isEmpty()) {
+        ++_stats.indexes;
+    }
+
     _collLoader = std::move(status.getValue());
 
     Status scheduleStatus = _findFetcher.schedule();
@@ -368,6 +381,8 @@ void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::Callb
     }
 
     _documents.swap(docs);
+    _stats.documents += docs.size();
+    ++_stats.fetchBatches;
     const auto status = _collLoader->insertDocuments(docs.cbegin(), docs.cend());
     lk.unlock();
 
@@ -384,6 +399,7 @@ void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::Callb
 }
 
 void CollectionCloner::_finishCallback(const Status& status) {
+    LOG(1) << "CollectionCloner ns:" << _destNss << " finished with status: " << status;
     // Copy the status so we can change it below if needed.
     auto finalStatus = status;
     bool callCollectionLoader = false;
@@ -405,8 +421,28 @@ void CollectionCloner::_finishCallback(const Status& status) {
     }
     _onCompletion(finalStatus);
     lk.lock();
+    _stats.end = _executor->now();
     _active = false;
     _condition.notify_all();
+    LOG(1) << "    collection: " << _destNss << ", stats: " << _stats.toString();
+}
+
+
+std::string CollectionCloner::Stats::toString() const {
+    return toBSON().toString();
+}
+
+BSONObj CollectionCloner::Stats::toBSON() const {
+    BSONObjBuilder bob;
+    bob.appendNumber("documents", documents);
+    bob.appendNumber("indexes", indexes);
+    bob.appendNumber("fetchedBatches", fetchBatches);
+    bob.appendDate("start", start);
+    bob.appendDate("end", end);
+    auto elapsed = end - start;
+    long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
+    bob.appendNumber("elapsedMillis", elapsedMillis);
+    return bob.obj();
 }
 
 }  // namespace repl

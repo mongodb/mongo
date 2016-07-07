@@ -162,6 +162,8 @@ Status DatabaseCloner::start() {
         return Status(ErrorCodes::IllegalOperation, "database cloner already started");
     }
 
+    _stats.start = _executor->now();
+    LOG(1) << "Scheduling listCollections call for database: " << _dbname;
     Status scheduleResult = _listCollectionsFetcher.schedule();
     if (!scheduleResult.isOK()) {
         error() << "Error scheduling listCollections for database: " << _dbname
@@ -184,6 +186,11 @@ void DatabaseCloner::cancel() {
     }
 
     _listCollectionsFetcher.cancel();
+}
+
+DatabaseCloner::Stats DatabaseCloner::getStats() const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _stats;
 }
 
 void DatabaseCloner::wait() {
@@ -222,6 +229,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     UniqueLock lk(_mutex);
     // We may be called with multiple batches leading to a need to grow _collectionInfos.
     _collectionInfos.reserve(_collectionInfos.size() + documents.size());
+    _stats.collections += documents.size();
     std::copy_if(documents.begin(),
                  documents.end(),
                  std::back_inserter(_collectionInfos),
@@ -349,6 +357,8 @@ void DatabaseCloner::_collectionClonerCallback(const Status& status, const Names
                                    << "'"};
         _failedNamespaces.push_back({newStatus, nss});
     }
+    ++_stats.clonedCollections;
+
     // Forward collection cloner result to caller.
     // Failure to clone a collection does not stop the database cloner
     // from cloning the rest of the collections in the listCollections result.
@@ -385,6 +395,8 @@ void DatabaseCloner::_finishCallback(const Status& status) {
     LockGuard lk(_mutex);
     _active = false;
     _condition.notify_all();
+    _stats.end = _executor->now();
+    LOG(1) << "    database: " << _dbname << ", stats: " << _stats.toString();
 }
 
 void DatabaseCloner::_finishCallback_inlock(UniqueLock& lk, const Status& status) {
@@ -393,5 +405,23 @@ void DatabaseCloner::_finishCallback_inlock(UniqueLock& lk, const Status& status
     }
     _finishCallback(status);
 }
+
+
+std::string DatabaseCloner::Stats::toString() const {
+    return toBSON().toString();
+}
+
+BSONObj DatabaseCloner::Stats::toBSON() const {
+    BSONObjBuilder bob;
+    bob.appendNumber("collections", collections);
+    bob.appendNumber("clonedCollections", clonedCollections);
+    bob.appendDate("start", start);
+    bob.appendDate("end", end);
+    auto elapsed = end - start;
+    long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
+    bob.appendNumber("elapsedMillis", elapsedMillis);
+    return bob.obj();
+}
+
 }  // namespace repl
 }  // namespace mongo
