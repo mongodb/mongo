@@ -255,7 +255,8 @@ struct __wt_log {
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
 
-	uint32_t	 flags;
+#define	WT_LOG_OPENED	0x01		/* Log subsystem successfully open */
+	uint32_t	flags;
 };
 
 struct __wt_log_record {

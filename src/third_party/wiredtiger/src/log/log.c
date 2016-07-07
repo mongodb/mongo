@@ -775,6 +775,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LSN end_lsn;
 	int yield_cnt;
@@ -847,8 +848,15 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 		WT_RET(__wt_log_allocfile(
 		    session, log->fileid, WT_LOG_FILENAME));
 	}
+	/*
+	 * Since the file system clears the output file handle pointer before
+	 * searching the handle list and filling in the new file handle,
+	 * we must pass in a local file handle.  Otherwise there is a wide
+	 * window where another thread could see a NULL log file handle.
+	 */
 	WT_RET(__log_openfile(session,
-	    false, &log->log_fh, WT_LOG_FILENAME, log->fileid));
+	    false, &log_fh, WT_LOG_FILENAME, log->fileid));
+	WT_PUBLISH(log->log_fh, log_fh);
 	/*
 	 * We need to setup the LSNs.  Set the end LSN and alloc LSN to
 	 * the end of the header.
@@ -1165,6 +1173,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 
 err:	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
+	if (ret == 0)
+		F_SET(log, WT_LOG_OPENED);
 	return (ret);
 }
 
@@ -1205,6 +1215,7 @@ __wt_log_close(WT_SESSION_IMPL *session)
 		WT_RET(__wt_close(session, &log->log_dir_fh));
 		log->log_dir_fh = NULL;
 	}
+	F_CLR(log, WT_LOG_OPENED);
 	return (0);
 }
 
@@ -1818,9 +1829,10 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	/*
 	 * An error during opening the logging subsystem can result in it
 	 * being enabled, but without an open log file.  In that case,
-	 * just return.
+	 * just return.  We can also have logging opened for reading in a
+	 * read-only database and attempt to write a record on close.
 	 */
-	if (log->log_fh == NULL)
+	if (!F_ISSET(log, WT_LOG_OPENED) || F_ISSET(conn, WT_CONN_READONLY))
 		return (0);
 	ip = record;
 	if ((compressor = conn->log_compressor) != NULL &&
