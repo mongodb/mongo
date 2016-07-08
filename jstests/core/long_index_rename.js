@@ -16,4 +16,3 @@ var result = t.createIndex({a: 1}, {
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 });
 assert(!result.ok);
-assert(result.errmsg.indexOf("too long") >= 0);

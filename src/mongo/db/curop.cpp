@@ -311,9 +311,7 @@ void appendAsObjOrString(StringData name,
     } else {
         // Generate an abbreviated serialization for the object, by passing false as the
         // "full" argument to obj.toString().
-        const bool isArray = false;
-        const bool full = false;
-        std::string objToString = obj.toString(isArray, full);
+        std::string objToString = obj.toString();
         if (objToString.size() <= maxSize) {
             builder->append(name, objToString);
         } else {

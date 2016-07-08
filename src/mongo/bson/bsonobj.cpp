@@ -603,11 +603,11 @@ int BSONObj::nFields() const {
     return n;
 }
 
-std::string BSONObj::toString(bool isArray, bool full) const {
+std::string BSONObj::toString() const {
     if (isEmpty())
-        return (isArray ? "[]" : "{}");
+        return "{}";
     StringBuilder s;
-    toString(s, isArray, full);
+    toString(s, false, false);
     return s.str();
 }
 void BSONObj::toString(StringBuilder& s, bool isArray, bool full, int depth) const {
