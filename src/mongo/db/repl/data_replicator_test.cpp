@@ -534,6 +534,7 @@ protected:
 
             NetworkGuard guard(net);
             if (!net->hasReadyRequests() && processedRequests < expectedResponses) {
+                net->runReadyNetworkOperations();
                 guard.dismiss();
                 continue;
             }

@@ -260,8 +260,9 @@ DataReplicator::DataReplicator(
 
 DataReplicator::~DataReplicator() {
     DESTRUCTOR_GUARD({
+        UniqueLock lk(_mutex);
         _cancelAllHandles_inlock();
-        _waitOnAll_inlock();
+        _waitOnAndResetAll(lk);
     });
 }
 
@@ -696,9 +697,14 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
         // Reset state.
         if (_oplogFetcher) {
             _oplogFetcher->shutdown();
-            // TODO: cleanup fetcher, and make work with networkMock/tests.
-            //            _fetcher->join();
-            //            _fetcher.reset();
+            std::unique_ptr<OplogFetcher> oplogFetcher;
+            _oplogFetcher.swap(oplogFetcher);
+            lk.unlock();
+
+            oplogFetcher->join();
+            invariant(!oplogFetcher->isActive());
+
+            lk.lock();
             // TODO: clear buffer
             //            _clearFetcherBuffer();
         }
@@ -722,7 +728,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     // Success, cleanup
     _cancelAllHandles_inlock();
-    _waitOnAll_inlock();
+    _waitOnAndResetAll(lk);
     invariant(!_anyActiveHandles_inlock());
 
     _reporterPaused = false;
@@ -804,7 +810,8 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
 
 bool DataReplicator::_anyActiveHandles_inlock() const {
     return _applierActive || (_oplogFetcher && _oplogFetcher->isActive()) ||
-        (_initialSyncState && _initialSyncState->dbsCloner->isActive()) ||
+        (_initialSyncState && _initialSyncState->dbsCloner &&
+         _initialSyncState->dbsCloner->isActive()) ||
         (_reporter && _reporter->isActive());
 }
 
@@ -819,15 +826,42 @@ void DataReplicator::_cancelAllHandles_inlock() {
         _initialSyncState->dbsCloner->shutdown();
 }
 
-void DataReplicator::_waitOnAll_inlock() {
-    if (_oplogFetcher)
-        _oplogFetcher->join();
-    if (_applier)
-        _applier->wait();
-    if (_reporter)
-        _reporter->join();
-    if (_initialSyncState)
-        _initialSyncState->dbsCloner->join();
+void DataReplicator::_waitOnAndResetAll(UniqueLock& lk) {
+    if (_lastOplogEntryFetcher) {
+        std::unique_ptr<Fetcher> oldFetcher;
+        oldFetcher.swap(_lastOplogEntryFetcher);
+        lk.unlock();
+        oldFetcher->wait();
+        lk.lock();
+    }
+    if (_oplogFetcher) {
+        std::unique_ptr<OplogFetcher> oldFetcher;
+        oldFetcher.swap(_oplogFetcher);
+        lk.unlock();
+        oldFetcher->join();
+        lk.lock();
+    }
+    if (_applier) {
+        std::unique_ptr<MultiApplier> oldApplier;
+        oldApplier.swap(_applier);
+        lk.unlock();
+        oldApplier->wait();
+        lk.lock();
+    }
+    if (_reporter) {
+        std::unique_ptr<Reporter> oldReporter;
+        oldReporter.swap(_reporter);
+        lk.unlock();
+        oldReporter->join();
+        lk.lock();
+    }
+    if (_initialSyncState) {
+        std::unique_ptr<DatabasesCloner> cloner;
+        cloner.swap(_initialSyncState->dbsCloner);
+        lk.unlock();
+        cloner->join();
+        lk.lock();
+    }
 }
 
 void DataReplicator::_doNextActions() {

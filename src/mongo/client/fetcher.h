@@ -228,6 +228,9 @@ private:
     // Using boolean instead of a counter to avoid issues with wrap around.
     bool _first = true;
 
+    // _inShutdown is true after cancel() is called.
+    bool _inShutdown = false;
+
     // Callback handle to the scheduled getMore command.
     executor::TaskExecutor::CallbackHandle _getMoreCallbackHandle;
 

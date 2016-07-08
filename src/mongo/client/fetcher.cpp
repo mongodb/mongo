@@ -255,6 +255,7 @@ void Fetcher::cancel() {
         }
 
         handle = _getMoreCallbackHandle;
+        _inShutdown = true;
     }
 
     _executor->cancel(handle);
@@ -284,6 +285,17 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
 void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batchFieldName) {
     if (!rcbd.response.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(rcbd.response.getStatus()), nullptr, nullptr);
+        _finishCallback();
+        return;
+    }
+
+    bool inShutdown = false;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        inShutdown = _inShutdown;
+    }
+    if (inShutdown) {
+        _work(Status(ErrorCodes::ShutdownInProgress, "fetcher shutting down"), nullptr, nullptr);
         _finishCallback();
         return;
     }

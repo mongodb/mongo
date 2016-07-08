@@ -306,7 +306,7 @@ private:
     Status _scheduleReport();
 
     void _cancelAllHandles_inlock();
-    void _waitOnAll_inlock();
+    void _waitOnAndResetAll(UniqueLock& lk);
     bool _anyActiveHandles_inlock() const;
 
     Status _shutdown(OperationContext* txn);
