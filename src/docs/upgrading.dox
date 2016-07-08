@@ -1,5 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_281 Upgrading to Version 2.8.1
+<dl>
+<dt>Statistics logging path</dt>
+<dd>
+The statistics logging path configuration has been simplified to be only a
+path to a directory, and the file name component of the path may no longer
+be specified. Applications depending on the ability to set statistics log
+file names will require modifications.
+</dd>
+
+</dl><hr>
 @section version_280 Upgrading to Version 2.8.0
 <dl>
 <dt>LSM metadata</dt>
@@ -55,7 +66,6 @@ The WiredTiger public API used to define a structure that could encapsulate
 log sequence numbers. That structure is no longer exposed publicly.
 </dd>
 
-<dt>
 </dl><hr>
 @section version_270 Upgrading to Version 2.7.0
 

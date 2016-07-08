@@ -23,36 +23,15 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 	WT_DECL_RET;
 	char *p;
 
+	*startp = false;
+
 	conn = S2C(session);
 
-	/*
-	 * The checkpoint configuration requires a wait time and/or a log
-	 * size -- if one is not set, we're not running at all.
-	 * Checkpoints based on log size also require logging be enabled.
-	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
 	conn->ckpt_usecs = (uint64_t)cval.val * WT_MILLION;
 
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
 	conn->ckpt_logsize = (wt_off_t)cval.val;
-
-	/* Checkpoints are incompatible with in-memory configuration */
-	if (conn->ckpt_usecs != 0 || conn->ckpt_logsize != 0) {
-		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
-		if (cval.val != 0)
-			WT_RET_MSG(session, EINVAL,
-			    "In memory configuration incompatible with "
-			    "checkpoints");
-	}
-
-	__wt_log_written_reset(session);
-	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
-	    (conn->ckpt_logsize && conn->ckpt_usecs == 0 &&
-	     !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
-		*startp = false;
-		return (0);
-	}
-	*startp = true;
 
 	/*
 	 * The application can specify a checkpoint name, which we ignore if
@@ -70,6 +49,26 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 
 		__wt_free(session, conn->ckpt_config);
 		conn->ckpt_config = p;
+	}
+
+	/*
+	 * The checkpoint configuration requires a wait time and/or a log size,
+	 * if neither is set, we're not running at all. Checkpoints based on log
+	 * size also require logging be enabled.
+	 */
+	if (conn->ckpt_usecs != 0 ||
+	    (conn->ckpt_logsize != 0 &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
+		/* Checkpoints are incompatible with in-memory configuration */
+		WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
+		if (cval.val != 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "checkpoint configuration incompatible with "
+			    "in-memory configuration");
+
+		__wt_log_written_reset(session);
+
+		*startp = true;
 	}
 
 err:	__wt_scr_free(session, &tmp);
@@ -179,7 +178,16 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 	start = false;
 
-	/* If there is already a server running, shut it down. */
+	/*
+	 * Stop any server that is already running. This means that each time
+	 * reconfigure is called we'll bounce the server even if there are no
+	 * configuration changes. This makes our life easier as the underlying
+	 * configuration routine doesn't have to worry about freeing objects
+	 * in the connection structure (it's guaranteed to always start with a
+	 * blank slate), and we don't have to worry about races where a running
+	 * server is reading configuration information that we're updating, and
+	 * it's not expected that reconfiguration will happen a lot.
+	 */
 	if (conn->ckpt_session != NULL)
 		WT_RET(__wt_checkpoint_server_destroy(session));
 
