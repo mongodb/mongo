@@ -73,20 +73,37 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	WT_CONFIG objectconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	int cnt;
 	char **sources;
 
+	/*
+	 * A note on reconfiguration: the standard "is this configuration string
+	 * allowed" checks should fail if reconfiguration has invalid strings,
+	 * for example, "log=(enabled)", or "statistics_log=(path=XXX)", because
+	 * the connection reconfiguration method doesn't allow those strings.
+	 * Additionally, the base configuration values during reconfiguration
+	 * are the currently configured values (so we don't revert to default
+	 * values when repeatedly reconfiguring), and configuration processing
+	 * of a currently set value should not change the currently set value.
+	 *
+	 * In this code path, a previous statistics log server reconfiguration
+	 * may have stopped the server (and we're about to restart it). Because
+	 * stopping the server discarded the configured information stored in
+	 * the connection structure, we have to re-evaluate all configuration
+	 * values, reconfiguration can't skip any of them.
+	 */
+
 	conn = S2C(session);
 	sources = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	/* Only start the server if wait time is non-zero */
+	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	*runp = cval.val != 0;
 	conn->stat_usecs = (uint64_t)cval.val * WT_MILLION;
 
-	WT_RET(__wt_config_gets(
-	    session, cfg, "statistics_log.json", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "statistics_log.json", &cval));
 	if (cval.val != 0)
 		FLD_SET(conn->stat_flags, WT_CONN_STAT_JSON);
 
@@ -96,24 +113,30 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 		FLD_SET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE);
 
 	/*
-	 * Statistics logging configuration requires either a wait time or an
-	 * on-close setting.
+	 * We don't allow the log path to be reconfigured for security reasons.
+	 * (Applications passing input strings directly to reconfigure would
+	 * expose themselves to a potential security problem, the utility of
+	 * reconfiguring a statistics log path isn't worth the security risk.)
+	 *
+	 * See above for the details, but during reconfiguration we're loading
+	 * the path value from the saved configuration information, and it's
+	 * required during reconfiguration because we potentially stopped and
+	 * are restarting, the server.
 	 */
-	if (!*runp && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
-		return (0);
+	WT_RET(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_buf_fmt(session,
+	    tmp, "%.*s/%s", (int)cval.len, cval.str, WT_STATLOG_FILENAME));
+	WT_ERR(__wt_filename(session, tmp->data, &conn->stat_path));
 
-	/*
-	 * If any statistics logging is done, this must not be a read-only
-	 * connection.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
-	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
+	WT_ERR(__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
 		;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 	if (cnt != 0) {
-		WT_RET(__wt_calloc_def(session, cnt + 1, &sources));
-		WT_RET(__wt_config_subinit(session, &objectconf, &cval));
+		WT_ERR(__wt_calloc_def(session, cnt + 1, &sources));
+		WT_ERR(__wt_config_subinit(session, &objectconf, &cval));
 		for (cnt = 0;
 		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
 			/*
@@ -138,29 +161,34 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 		sources = NULL;
 	}
 
-	WT_ERR(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
-	WT_ERR(__wt_nfilename(session, cval.str, cval.len, &conn->stat_path));
-
 	/*
 	 * When using JSON format, use the same timestamp format as MongoDB by
-	 * default.
+	 * default. This requires caution: the user might have set the timestamp
+	 * in a previous reconfigure call and we don't want to override that, so
+	 * compare the retrieved value with the default value to decide if we
+	 * should use the JSON default.
+	 *
+	 * (This still implies if the user explicitly sets the timestamp to the
+	 * default value, then sets the JSON flag in a separate reconfigure
+	 * call, or vice-versa, we will incorrectly switch to the JSON default
+	 * timestamp. But there's no way to detect that, and this is all a low
+	 * probability path.)
 	 */
-	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON)) {
-		ret = __wt_config_gets(
-		    session, &cfg[1], "statistics_log.timestamp", &cval);
-		if (ret == WT_NOTFOUND)
-			WT_ERR(__wt_strdup(
-			    session, "%FT%T.000Z", &conn->stat_format));
-		WT_ERR_NOTFOUND_OK(ret);
-	}
-	if (conn->stat_format == NULL) {
-		WT_ERR(__wt_config_gets(
-		    session, cfg, "statistics_log.timestamp", &cval));
+#define	WT_TIMESTAMP_DEFAULT		"%b %d %H:%M:%S"
+#define	WT_TIMESTAMP_JSON_DEFAULT	"%FT%T.000Z"
+	WT_ERR(__wt_config_gets(
+	    session, cfg, "statistics_log.timestamp", &cval));
+	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON) &&
+	    WT_STRING_MATCH(WT_TIMESTAMP_DEFAULT, cval.str, cval.len))
+		WT_ERR(__wt_strdup(
+		    session, WT_TIMESTAMP_JSON_DEFAULT, &conn->stat_format));
+	else
 		WT_ERR(__wt_strndup(
 		    session, cval.str, cval.len, &conn->stat_format));
-	}
 
 err:	__stat_sources_free(session, &sources);
+	__wt_scr_free(session, &tmp);
+
 	return (ret);
 }
 
@@ -538,12 +566,16 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 	bool start;
 
 	conn = S2C(session);
-	start = false;
 
 	/*
 	 * Stop any server that is already running. This means that each time
 	 * reconfigure is called we'll bounce the server even if there are no
-	 * configuration changes - but that makes our lives easier.
+	 * configuration changes. This makes our life easier as the underlying
+	 * configuration routine doesn't have to worry about freeing objects
+	 * in the connection structure (it's guaranteed to always start with a
+	 * blank slate), and we don't have to worry about races where a running
+	 * server is reading configuration information that we're updating, and
+	 * it's not expected that reconfiguration will happen a lot.
 	 */
 	if (conn->stat_session != NULL)
 		WT_RET(__wt_statlog_destroy(session, false));

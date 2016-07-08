@@ -51,6 +51,25 @@ __logmgr_config(
 	WT_CONNECTION_IMPL *conn;
 	bool enabled;
 
+	/*
+	 * A note on reconfiguration: the standard "is this configuration string
+	 * allowed" checks should fail if reconfiguration has invalid strings,
+	 * for example, "log=(enabled)", or "statistics_log=(path=XXX)", because
+	 * the connection reconfiguration method doesn't allow those strings.
+	 * Additionally, the base configuration values during reconfiguration
+	 * are the currently configured values (so we don't revert to default
+	 * values when repeatedly reconfiguring), and configuration processing
+	 * of a currently set value should not change the currently set value.
+	 *
+	 * In this code path, log server reconfiguration does not stop/restart
+	 * the log server, so there's no point in re-evaluating configuration
+	 * strings that cannot be reconfigured, risking bugs in configuration
+	 * setup, and depending on evaluation of currently set values to always
+	 * result in the currently set value. Skip tests for any configuration
+	 * strings which don't make sense during reconfiguration, but don't
+	 * worry about error reporting because it should never happen.
+	 */
+
 	conn = S2C(session);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
@@ -62,6 +81,8 @@ __logmgr_config(
 	 *
 	 * If it is off and the user it turning it on, or it is on
 	 * and the user is turning it off, return an error.
+	 *
+	 * See above: should never happen.
 	 */
 	if (reconfig &&
 	    ((enabled && !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) ||
@@ -83,6 +104,8 @@ __logmgr_config(
 	 * Setup a log path and compression even if logging is disabled in case
 	 * we are going to print a log.  Only do this on creation.  Once a
 	 * compressor or log path are set they cannot be changed.
+	 *
+	 * See above: should never happen.
 	 */
 	if (!reconfig) {
 		conn->log_compressor = NULL;
@@ -95,6 +118,7 @@ __logmgr_config(
 		WT_RET(__wt_strndup(
 		    session, cval.str, cval.len, &conn->log_path));
 	}
+
 	/* We are done if logging isn't enabled. */
 	if (!*runp)
 		return (0);
@@ -103,13 +127,14 @@ __logmgr_config(
 	if (cval.val != 0)
 		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
 
+	/*
+	 * The file size cannot be reconfigured. The amount of memory allocated
+	 * to the log slots may be based on the log file size at creation and we
+	 * don't want to re-allocate that memory while running.
+	 *
+	 * See above: should never happen.
+	 */
 	if (!reconfig) {
-		/*
-		 * Ignore if the user tries to change the file size.  The
-		 * amount of memory allocated to the log slots may be based
-		 * on the log file size at creation and we don't want to
-		 * re-allocate that memory while running.
-		 */
 		WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 		conn->log_file_max = (wt_off_t)cval.val;
 		WT_STAT_FAST_CONN_SET(session,
@@ -125,12 +150,17 @@ __logmgr_config(
 		conn->log_prealloc = 1;
 
 	/*
-	 * Note that it is meaningless to reconfigure this value during
-	 * runtime.  It only matters on create before recovery runs.
+	 * Note it's meaningless to reconfigure this value during runtime, it
+	 * only matters on create before recovery runs.
+	 *
+	 * See above: should never happen.
 	 */
-	WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
-	if (cval.len != 0  && WT_STRING_MATCH("error", cval.str, cval.len))
-		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
+	if (!reconfig) {
+		WT_RET(__wt_config_gets_def(
+		    session, cfg, "log.recover", 0, &cval));
+		if (WT_STRING_MATCH("error", cval.str, cval.len))
+			FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
+	}
 
 	WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
 	if (cval.val != 0) {
