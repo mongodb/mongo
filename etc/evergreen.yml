@@ -368,9 +368,12 @@ functions:
 
         # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
         # resmoke will assign to the appropriate parameter on storage engines that support it.
-        if [[ "${resmoke_args}" != *storageEngineCacheSizeGB* ]]; then
+        set +o errexit
+        echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
+        if [ $? -eq 1 ]; then
           extra_args="$extra_args --storageEngineCacheSizeGB=1"
         fi
+        set -o errexit
 
         ${resmoke_wrapper} ${path_prefix} ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
