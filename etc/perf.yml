@@ -140,7 +140,6 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          pip install requests
           python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline 3.3.0-Baseline 3.3.3-Baseline 3.0.6-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --project_id performance --task_name ${task_name} --variant {build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true    
     - command: "json.send"
       params:
@@ -151,6 +150,9 @@ functions:
       params:
         working_dir: src
         script: |
+          set -o errexit
+          set -o verbose
+          source ./venv/bin/activate
           python ../dsi/analysis/perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.2.1-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
