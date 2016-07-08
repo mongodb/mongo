@@ -30,7 +30,7 @@ functions:
           set -v
           rm -rf ./dsi
           mkdir -p ./src
-          git clone mongo-perf git@github.com:10gen/dsi.git
+          git clone git@github.com:10gen/dsi.git
   "start server":
     - command: shell.exec
       params:
