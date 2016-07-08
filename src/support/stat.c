@@ -546,6 +546,7 @@ static const char * const __stats_connection_desc[] = {
 	"block-manager: blocks written",
 	"block-manager: bytes read",
 	"block-manager: bytes written",
+	"block-manager: bytes written for checkpoint",
 	"block-manager: mapped blocks read",
 	"block-manager: mapped bytes read",
 	"cache: bytes belonging to page images in the cache",
@@ -770,6 +771,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->block_write = 0;
 	stats->block_byte_read = 0;
 	stats->block_byte_write = 0;
+	stats->block_byte_write_checkpoint = 0;
 	stats->block_map_read = 0;
 	stats->block_byte_map_read = 0;
 		/* not clearing cache_bytes_image */
@@ -986,6 +988,8 @@ __wt_stat_connection_aggregate(
 	to->block_write += WT_STAT_READ(from, block_write);
 	to->block_byte_read += WT_STAT_READ(from, block_byte_read);
 	to->block_byte_write += WT_STAT_READ(from, block_byte_write);
+	to->block_byte_write_checkpoint +=
+	    WT_STAT_READ(from, block_byte_write_checkpoint);
 	to->block_map_read += WT_STAT_READ(from, block_map_read);
 	to->block_byte_map_read += WT_STAT_READ(from, block_byte_map_read);
 	to->cache_bytes_image += WT_STAT_READ(from, cache_bytes_image);

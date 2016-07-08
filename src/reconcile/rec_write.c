@@ -3343,8 +3343,8 @@ supd_check_complete:
 		    r->bnd_state));
 #endif
 
-	WT_ERR(__wt_bt_write(session,
-	    buf, addr, &addr_size, false, bnd->already_compressed));
+	WT_ERR(__wt_bt_write(session, buf, addr, &addr_size,
+	    false, F_ISSET(r, WT_CHECKPOINTING), bnd->already_compressed));
 	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
 	bnd->addr.size = (uint8_t)addr_size;
 
@@ -5667,7 +5667,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		if (bnd->addr.addr == NULL)
 			WT_RET(__wt_bt_write(session, &r->disk_image,
-			    NULL, NULL, true, bnd->already_compressed));
+			    NULL, NULL, true, F_ISSET(r, WT_CHECKPOINTING),
+			    bnd->already_compressed));
 		else {
 			mod->mod_replace = bnd->addr;
 			bnd->addr.addr = NULL;
@@ -6133,7 +6134,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 		/* Write the buffer. */
 		addr = buf;
-		WT_ERR(__wt_bt_write(session, tmp, addr, &size, false, false));
+		WT_ERR(__wt_bt_write(session, tmp,
+		    addr, &size, false, F_ISSET(r, WT_CHECKPOINTING), false));
 
 		/*
 		 * Track the overflow record (unless it's a bulk load, which

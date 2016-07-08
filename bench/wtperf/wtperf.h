@@ -83,7 +83,6 @@ typedef struct {
 typedef struct {
 	uint64_t stone_gap;
 	uint64_t needed_stones;
-	uint64_t final_stone_gap;
 	uint64_t expected_total;
 	uint64_t total_inserts;
 	uint64_t last_total_inserts;

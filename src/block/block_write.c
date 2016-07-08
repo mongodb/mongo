@@ -210,15 +210,15 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
 {
 	wt_off_t offset;
 	uint32_t size, cksum;
 	uint8_t *endp;
 
-	WT_RET(__wt_block_write_off(
-	    session, block, buf, &offset, &size, &cksum, data_cksum, false));
+	WT_RET(__wt_block_write_off(session, block,
+	    buf, &offset, &size, &cksum, data_cksum, checkpoint_io, false));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -235,7 +235,7 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 int
 __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
-    bool data_cksum, bool caller_locked)
+    bool data_cksum, bool checkpoint_io, bool caller_locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
@@ -380,6 +380,9 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_STAT_FAST_CONN_INCR(session, block_write);
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
+	if (checkpoint_io)
+		WT_STAT_FAST_CONN_INCRV(
+		    session, block_byte_write_checkpoint, align_size);
 
 	WT_RET(__wt_verbose(session, WT_VERB_WRITE,
 	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
