@@ -108,7 +108,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
 
     KeyRange orphanRange;
     if (!metadata->getNextOrphanRange(startingFromKey, &orphanRange)) {
-        LOG(1) << "orphaned data cleanup requested for " << ns.toString() << " starting from "
+        LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
                << startingFromKey << ", no orphan ranges remain";
 
         return CleanupResult_Done;
@@ -116,7 +116,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     orphanRange.ns = ns.ns();
     *stoppedAtKey = orphanRange.maxKey;
 
-    LOG(1) << "orphaned data cleanup requested for " << ns.toString() << " starting from "
+    LOG(0) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
            << startingFromKey << ", removing next orphan range"
            << " [" << orphanRange.minKey << "," << orphanRange.maxKey << ")";
 
