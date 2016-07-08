@@ -40,5 +40,5 @@ LogMessageFatal::LogMessageFatal(const char* file, int line) :
 
 LogMessageFatal::~LogMessageFatal() {
     _lsb.~LogstreamBuilder();
-    fassertFailed(40048);
+    mongo::fassertFailed(0);
 }
