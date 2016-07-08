@@ -58,6 +58,7 @@ selector:
     - jstests/sharding/sharding_balance4.js
     - jstests/sharding/sharding_migrate_cursor1.js
     - jstests/sharding/tag_auto_split.js
+    - jstests/sharding/tag_auto_split_partial_key.js
     - jstests/sharding/tag_range.js
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js

@@ -56,8 +56,8 @@ private:
      * Synchronous method, which iterates the collection's chunks and uses the tags information to
      * figure out whether some of them validate the tag range boundaries and need to be split.
      */
-    StatusWith<SplitInfoVector> _getSplitCandidatesForCollection(OperationContext* txn,
-                                                                 const NamespaceString& nss);
+    StatusWith<SplitInfoVector> _getSplitCandidatesForCollection(
+        OperationContext* txn, const NamespaceString& nss, const ShardStatisticsVector& shardStats);
 
     /**
      * Synchronous method, which iterates the collection's chunks and uses the cluster statistics to

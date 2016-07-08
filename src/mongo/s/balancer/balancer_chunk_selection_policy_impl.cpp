@@ -62,8 +62,8 @@ namespace {
  * Does a linear pass over the information cached in the specified chunk manager and extracts chunk
  * distrubution and chunk placement information which is needed by the balancer policy.
  */
-std::pair<ShardToChunksMap, ChunkMinimumsSet> createCollectionDistributionInfo(
-    const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
+StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDistributionInfo(
+    OperationContext* txn, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
     ShardToChunksMap shardToChunksMap;
     ChunkMinimumsSet chunkMinimums;
 
@@ -86,7 +86,34 @@ std::pair<ShardToChunksMap, ChunkMinimumsSet> createCollectionDistributionInfo(
         chunkMinimums.insert(chunkEntry->getMin());
     }
 
-    return std::make_pair(std::move(shardToChunksMap), std::move(chunkMinimums));
+    vector<TagsType> collectionTags;
+    Status tagsStatus = Grid::get(txn)->catalogClient(txn)->getTagsForCollection(
+        txn, chunkMgr->getns(), &collectionTags);
+    if (!tagsStatus.isOK()) {
+        return {tagsStatus.code(),
+                str::stream() << "Unable to load tags for collection " << chunkMgr->getns()
+                              << " due to "
+                              << tagsStatus.toString()};
+    }
+
+    DistributionStatus distribution(NamespaceString(chunkMgr->getns()),
+                                    std::move(shardToChunksMap));
+
+    // Cache the collection tags
+    const auto& keyPattern = chunkMgr->getShardKeyPattern().getKeyPattern();
+
+    for (const auto& tag : collectionTags) {
+        if (!distribution.addTagRange(TagRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
+                                               keyPattern.extendRangeBound(tag.getMaxKey(), false),
+                                               tag.getTag()))) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Tag ranges are not valid for collection " << chunkMgr->getns()
+                                  << ". Balancing for this collection will be skipped until "
+                                     "the ranges are fixed."};
+        }
+    }
+
+    return std::make_pair(std::move(distribution), std::move(chunkMinimums));
 }
 
 }  // namespace
@@ -99,6 +126,13 @@ BalancerChunkSelectionPolicyImpl::~BalancerChunkSelectionPolicyImpl() = default;
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSplit(
     OperationContext* txn) {
+    auto shardStatsStatus = _clusterStats->getStats(txn);
+    if (!shardStatsStatus.isOK()) {
+        return shardStatsStatus.getStatus();
+    }
+
+    const auto shardStats = std::move(shardStatsStatus.getValue());
+
     vector<CollectionType> collections;
 
     Status collsStatus =
@@ -116,7 +150,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
     for (const auto& coll : collections) {
         const NamespaceString nss(coll.getNs());
 
-        auto candidatesStatus = _getSplitCandidatesForCollection(txn, nss);
+        auto candidatesStatus = _getSplitCandidatesForCollection(txn, nss, shardStats);
         if (!candidatesStatus.isOK()) {
             warning() << "Unable to enforce tag range policy for collection " << nss.ns()
                       << causedBy(candidatesStatus.getStatus());
@@ -139,6 +173,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
     const auto shardStats = std::move(shardStatsStatus.getValue());
+
     if (shardStats.size() < 2) {
         return MigrateInfoVector{};
     }
@@ -184,6 +219,13 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 StatusWith<boost::optional<MigrateInfo>>
 BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* txn,
                                                             const ChunkType& chunk) {
+    auto shardStatsStatus = _clusterStats->getStats(txn);
+    if (!shardStatsStatus.isOK()) {
+        return shardStatsStatus.getStatus();
+    }
+
+    const auto shardStats = std::move(shardStatsStatus.getValue());
+
     const NamespaceString nss(chunk.getNS());
 
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
@@ -194,44 +236,44 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    auto tagForChunkStatus =
-        Grid::get(txn)->catalogClient(txn)->getTagForChunk(txn, nss.ns(), chunk);
-    if (!tagForChunkStatus.isOK()) {
-        return tagForChunkStatus.getStatus();
+    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    if (!collInfoStatus.isOK()) {
+        return collInfoStatus.getStatus();
     }
 
-    auto shardStatsStatus = _clusterStats->getStats(txn);
-    if (!shardStatsStatus.isOK()) {
-        return shardStatsStatus.getStatus();
-    }
+    auto collInfo = std::move(collInfoStatus.getValue());
 
-    auto collInfo = createCollectionDistributionInfo(shardStatsStatus.getValue(), cm);
-    ShardToChunksMap shardToChunksMap = std::move(std::get<0>(collInfo));
-
-    DistributionStatus distStatus(nss, shardStatsStatus.getValue(), shardToChunksMap);
-    const ShardId newShardId(distStatus.getBestReceieverShard(tagForChunkStatus.getValue()));
-    if (!newShardId.isValid() || newShardId == chunk.getShard()) {
-        return boost::optional<MigrateInfo>();
-    }
-
-    return boost::optional<MigrateInfo>{MigrateInfo(nss.ns(), newShardId, chunk)};
+    return BalancerPolicy::balanceSingleChunk(chunk, shardStats, std::get<0>(collInfo));
 }
 
 Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
                                                           const ChunkType& chunk,
                                                           const ShardId& newShardId) {
-    auto tagForChunkStatus =
-        Grid::get(txn)->catalogClient(txn)->getTagForChunk(txn, chunk.getNS(), chunk);
-    if (!tagForChunkStatus.isOK()) {
-        return tagForChunkStatus.getStatus();
-    }
-
     auto shardStatsStatus = _clusterStats->getStats(txn);
     if (!shardStatsStatus.isOK()) {
         return shardStatsStatus.getStatus();
     }
 
-    const auto& shardStats = shardStatsStatus.getValue();
+    auto shardStats = std::move(shardStatsStatus.getValue());
+
+    const NamespaceString nss(chunk.getNS());
+
+    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
+    }
+
+    auto scopedCM = std::move(scopedCMStatus.getValue());
+    ChunkManager* const cm = scopedCM.cm();
+
+    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    if (!collInfoStatus.isOK()) {
+        return collInfoStatus.getStatus();
+    }
+
+    auto collInfo = std::move(collInfoStatus.getValue());
+
+    DistributionStatus distribution = std::move(std::get<0>(collInfo));
 
     auto newShardIterator =
         std::find_if(shardStats.begin(),
@@ -245,12 +287,12 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
                               << ". Move to this shard will be disallowed."};
     }
 
-    return DistributionStatus::isShardSuitableReceiver(*newShardIterator,
-                                                       tagForChunkStatus.getValue());
+    return BalancerPolicy::isShardSuitableReceiver(*newShardIterator,
+                                                   distribution.getTagForChunk(chunk));
 }
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
-    OperationContext* txn, const NamespaceString& nss) {
+    OperationContext* txn, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
     if (!scopedCMStatus.isOK()) {
         return scopedCMStatus.getStatus();
@@ -259,33 +301,64 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    vector<TagsType> collectionTags;
-    Status tagsStatus =
-        Grid::get(txn)->catalogClient(txn)->getTagsForCollection(txn, nss.ns(), &collectionTags);
-    if (!tagsStatus.isOK()) {
-        return {tagsStatus.code(),
-                str::stream() << "Unable to load tags for collection " << nss.ns() << " due to "
-                              << tagsStatus.toString()};
+    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    if (!collInfoStatus.isOK()) {
+        return collInfoStatus.getStatus();
     }
 
-    auto collInfo = createCollectionDistributionInfo({}, cm);
+    auto collInfo = std::move(collInfoStatus.getValue());
+
+    DistributionStatus distribution = std::move(std::get<0>(collInfo));
     ChunkMinimumsSet allChunkMinimums = std::move(std::get<1>(collInfo));
 
     SplitInfoVector splitCandidates;
 
-    for (const auto& tagInfo : collectionTags) {
-        BSONObj min =
-            cm->getShardKeyPattern().getKeyPattern().extendRangeBound(tagInfo.getMinKey(), false);
+    // Accumulate split points for the same chunk together
+    shared_ptr<Chunk> currentChunk;
+    vector<BSONObj> currentSplitVector;
 
-        if (allChunkMinimums.count(min)) {
+    for (const auto& tagRangeEntry : distribution.tagRanges()) {
+        const auto& tagRange = tagRangeEntry.second;
+
+        if (allChunkMinimums.count(tagRange.min)) {
             continue;
         }
 
-        shared_ptr<Chunk> chunk = cm->findIntersectingChunk(txn, min);
-        invariant(chunk);
+        shared_ptr<Chunk> chunk = cm->findIntersectingChunk(txn, tagRange.min);
 
-        splitCandidates.emplace_back(
-            chunk->getShardId(), nss, cm->getVersion(), chunk->getMin(), chunk->getMax(), min);
+        if (!currentChunk) {
+            currentChunk = chunk;
+        }
+
+        invariant(currentChunk);
+
+        if (chunk == currentChunk) {
+            currentSplitVector.push_back(tagRange.min);
+        } else {
+            splitCandidates.emplace_back(currentChunk->getShardId(),
+                                         nss,
+                                         cm->getVersion(),
+                                         currentChunk->getLastmod(),
+                                         currentChunk->getMin(),
+                                         currentChunk->getMax(),
+                                         std::move(currentSplitVector));
+
+            currentChunk = chunk;
+            currentSplitVector.push_back(tagRange.min);
+        }
+    }
+
+    // Drain the current split vector if there are any entries left
+    if (currentChunk) {
+        invariant(!currentSplitVector.empty());
+
+        splitCandidates.emplace_back(currentChunk->getShardId(),
+                                     nss,
+                                     cm->getVersion(),
+                                     currentChunk->getLastmod(),
+                                     currentChunk->getMin(),
+                                     currentChunk->getMax(),
+                                     std::move(currentSplitVector));
     }
 
     return splitCandidates;
@@ -304,53 +377,36 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    auto collInfo = createCollectionDistributionInfo(shardStats, cm);
-    ShardToChunksMap shardToChunksMap = std::move(std::get<0>(collInfo));
+    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    if (!collInfoStatus.isOK()) {
+        return collInfoStatus.getStatus();
+    }
+
+    auto collInfo = std::move(collInfoStatus.getValue());
+
+    DistributionStatus distribution = std::move(std::get<0>(collInfo));
     ChunkMinimumsSet allChunkMinimums = std::move(std::get<1>(collInfo));
 
-    DistributionStatus distStatus(nss, shardStats, shardToChunksMap);
-    {
-        vector<TagsType> collectionTags;
-        Status status = Grid::get(txn)->catalogClient(txn)->getTagsForCollection(
-            txn, nss.ns(), &collectionTags);
-        if (!status.isOK()) {
-            return status;
-        }
+    for (const auto& tagRangeEntry : distribution.tagRanges()) {
+        const auto& tagRange = tagRangeEntry.second;
 
-        for (const auto& tagInfo : collectionTags) {
-            BSONObj min = cm->getShardKeyPattern().getKeyPattern().extendRangeBound(
-                tagInfo.getMinKey(), false);
-
-            if (!allChunkMinimums.count(min)) {
-                // This tag falls somewhere at the middle of a chunk. Therefore we must skip
-                // balancing this collection until it is split at the next iteration.
-                //
-                // TODO: We should be able to just skip chunks, which straddle tags and still make
-                // some progress balancing.
-                return {ErrorCodes::IllegalOperation,
-                        str::stream()
-                            << "Tag boundaries "
-                            << tagInfo.toString()
-                            << " fall in the middle of an existing chunk. Balancing for collection "
-                            << nss.ns()
-                            << " will be postponed until the chunk is split appropriately."};
-            }
-
-            // TODO: TagRange contains all the information from TagsType except for the namespace,
-            // so maybe the two can be merged at some point in order to avoid the transformation
-            // below.
-            if (!distStatus.addTagRange(TagRange(tagInfo.getMinKey().getOwned(),
-                                                 tagInfo.getMaxKey().getOwned(),
-                                                 tagInfo.getTag()))) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "Tag ranges are not valid for collection " << nss.ns()
-                                      << ". Balancing for this collection will be skipped until "
-                                         "the ranges are fixed."};
-            }
+        if (!allChunkMinimums.count(tagRange.min)) {
+            // This tag falls somewhere at the middle of a chunk. Therefore we must skip balancing
+            // this collection until it is split at the next iteration.
+            //
+            // TODO: We should be able to just skip chunks, which straddle tags and still make some
+            // progress balancing.
+            return {ErrorCodes::IllegalOperation,
+                    str::stream()
+                        << "Tag boundaries "
+                        << tagRange.toString()
+                        << " fall in the middle of an existing chunk. Balancing for collection "
+                        << nss.ns()
+                        << " will be postponed until the chunk is split appropriately."};
         }
     }
 
-    return BalancerPolicy::balance(distStatus, aggressiveBalanceHint);
+    return BalancerPolicy::balance(shardStats, distribution, aggressiveBalanceHint);
 }
 
 }  // namespace mongo

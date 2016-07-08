@@ -73,13 +73,17 @@ struct MigrateInfo {
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 
+/**
+ * This class constitutes a cache of the chunk distribution across the entire cluster along with the
+ * zone boundaries imposed on it. This information is stored in format, which makes it efficient to
+ * query utilization statististics and to decide what to balance.
+ */
 class DistributionStatus {
     MONGO_DISALLOW_COPYING(DistributionStatus);
 
 public:
-    DistributionStatus(NamespaceString nss,
-                       ShardStatisticsVector shardInfo,
-                       const ShardToChunksMap& shardToChunksMap);
+    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap);
+    DistributionStatus(DistributionStatus&&) = default;
 
     /**
      * Returns the namespace for which this balance status applies.
@@ -93,26 +97,6 @@ public:
      * valididty. Returns true if the range is valid or false otherwise.
      */
     bool addTagRange(const TagRange& range);
-
-    /**
-     * Determines whether a shard with the specified utilization statistics would be able to accept
-     * a chunk with the specified tag. According to the policy a shard cannot accept chunks if its
-     * size is maxed out and if the chunk's tag conflicts with the tag of the shard.
-     */
-    static Status isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
-                                          const std::string& chunkTag);
-
-    /**
-     * @param forTag "" if you don't care, or a tag
-     * @return shard best suited to receive a chunk
-     */
-    ShardId getBestReceieverShard(const std::string& tag) const;
-
-    /**
-     * @return the shard with the most chunks
-     *         based on # of chunks with the given tag
-     */
-    ShardId getMostOverloadedShard(const std::string& forTag) const;
 
     /**
      * Returns total number of chunks across all shards.
@@ -135,6 +119,13 @@ public:
     const std::vector<ChunkType>& getChunks(const ShardId& shardId) const;
 
     /**
+     * Returns all tag ranges defined for the collection.
+     */
+    const std::map<BSONObj, TagRange>& tagRanges() const {
+        return _tagRanges;
+    }
+
+    /**
      * Returns all tags defined for the collection.
      */
     const std::set<std::string>& tags() const {
@@ -147,22 +138,36 @@ public:
      */
     std::string getTagForChunk(const ChunkType& chunk) const;
 
-    const ShardStatisticsVector& getStats() const {
-        return _shardInfo;
-    }
+    /**
+     * Returns a BSON/string representation of this distribution status.
+     */
+    void report(BSONObjBuilder* builder) const;
+    std::string toString() const;
 
 private:
     // Namespace for which this distribution applies
-    const NamespaceString _nss;
+    NamespaceString _nss;
 
-    const ShardStatisticsVector _shardInfo;
-    const ShardToChunksMap& _shardChunks;
+    // Map of what chunks are owned by each shard
+    ShardToChunksMap _shardChunks;
+
+    // Map of zone max key to the zone description
     std::map<BSONObj, TagRange> _tagRanges;
+
+    // Set of all zones defined for this collection
     std::set<std::string> _allTags;
 };
 
 class BalancerPolicy {
 public:
+    /**
+     * Determines whether a shard with the specified utilization statistics would be able to accept
+     * a chunk with the specified tag. According to the policy a shard cannot accept chunks if its
+     * size is maxed out and if the chunk's tag conflicts with the tag of the shard.
+     */
+    static Status isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
+                                          const std::string& chunkTag);
+
     /**
      * Returns a suggested set of chunks to move whithin a collection's shards, given information
      * about space usage and number of chunks for that collection. If the policy doesn't recommend
@@ -177,8 +182,34 @@ public:
      * collection. The entries in the vector do not need to be done serially and can be scheduled in
      * parallel.
      */
-    static std::vector<MigrateInfo> balance(const DistributionStatus& distribution,
+    static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
+                                            const DistributionStatus& distribution,
                                             bool shouldAggressivelyBalance);
+
+    /**
+     * Using the specified distribution information, returns a suggested better location for the
+     * specified chunk if one is available.
+     */
+    static boost::optional<MigrateInfo> balanceSingleChunk(const ChunkType& chunk,
+                                                           const ShardStatisticsVector& shardStats,
+                                                           const DistributionStatus& distribution);
+
+private:
+    /**
+     * Return the shard with the specified tag, which has the least number of chunks. If the tag is
+     * empty, considers all shards.
+     */
+    static ShardId _getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
+                                                const DistributionStatus& distribution,
+                                                const std::string& tag);
+
+    /**
+     * Return the shard which has the least number of chunks with the specified tag. If the tag is
+     * empty, considers all chunks.
+     */
+    static ShardId _getMostOverloadedShard(const ShardStatisticsVector& shardStats,
+                                           const DistributionStatus& distribution,
+                                           const std::string& chunkTag);
 };
 
 }  // namespace mongo

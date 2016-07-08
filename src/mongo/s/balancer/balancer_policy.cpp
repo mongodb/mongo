@@ -55,10 +55,8 @@ using std::set;
 using std::string;
 using std::vector;
 
-DistributionStatus::DistributionStatus(NamespaceString nss,
-                                       ShardStatisticsVector shardInfo,
-                                       const ShardToChunksMap& shardToChunksMap)
-    : _nss(std::move(nss)), _shardInfo(std::move(shardInfo)), _shardChunks(shardToChunksMap) {}
+DistributionStatus::DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap)
+    : _nss(std::move(nss)), _shardChunks(std::move(shardToChunksMap)) {}
 
 size_t DistributionStatus::totalChunks() const {
     size_t total = 0;
@@ -71,92 +69,23 @@ size_t DistributionStatus::totalChunks() const {
 }
 
 size_t DistributionStatus::numberOfChunksInShard(const ShardId& shardId) const {
-    ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
-    if (i == _shardChunks.end()) {
-        return 0;
-    }
-
-    return i->second.size();
+    const auto& shardChunks = getChunks(shardId);
+    return shardChunks.size();
 }
 
 size_t DistributionStatus::numberOfChunksInShardWithTag(const ShardId& shardId,
                                                         const string& tag) const {
-    ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
-    if (i == _shardChunks.end()) {
-        return 0;
-    }
+    const auto& shardChunks = getChunks(shardId);
 
     size_t total = 0;
 
-    for (const auto& chunk : i->second) {
+    for (const auto& chunk : shardChunks) {
         if (tag == getTagForChunk(chunk)) {
             total++;
         }
     }
 
     return total;
-}
-
-Status DistributionStatus::isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
-                                                   const string& chunkTag) {
-    if (stat.isSizeMaxed()) {
-        return {ErrorCodes::IllegalOperation,
-                str::stream() << stat.shardId
-                              << " has already reached the maximum total chunk size."};
-    }
-
-    if (stat.isDraining) {
-        return {ErrorCodes::IllegalOperation,
-                str::stream() << stat.shardId << " is currently draining."};
-    }
-
-    if (!chunkTag.empty() && !stat.shardTags.count(chunkTag)) {
-        return {ErrorCodes::IllegalOperation,
-                str::stream() << stat.shardId << " doesn't have right tag"};
-    }
-
-    return Status::OK();
-}
-
-ShardId DistributionStatus::getBestReceieverShard(const string& tag) const {
-    ShardId best;
-    unsigned minChunks = numeric_limits<unsigned>::max();
-
-    for (const auto& stat : _shardInfo) {
-        auto status = isShardSuitableReceiver(stat, tag);
-        if (!status.isOK()) {
-            LOG(1) << status.codeString();
-            continue;
-        }
-
-        unsigned myChunks = numberOfChunksInShard(stat.shardId);
-        if (myChunks >= minChunks) {
-            LOG(1) << stat.shardId << " has more chunks me:" << myChunks << " best: " << best << ":"
-                   << minChunks;
-            continue;
-        }
-
-        best = stat.shardId;
-        minChunks = myChunks;
-    }
-
-    return best;
-}
-
-ShardId DistributionStatus::getMostOverloadedShard(const string& tag) const {
-    ShardId worst;
-    unsigned maxChunks = 0;
-
-    for (const auto& stat : _shardInfo) {
-        unsigned myChunks = numberOfChunksInShardWithTag(stat.shardId, tag);
-        if (myChunks <= maxChunks)
-            continue;
-
-        worst = stat.shardId;
-        maxChunks = myChunks;
-    }
-
-    return worst;
 }
 
 const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) const {
@@ -213,8 +142,117 @@ string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
     return range.tag;
 }
 
-std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distribution,
-                                                 bool shouldAggressivelyBalance) {
+void DistributionStatus::report(BSONObjBuilder* builder) const {
+    builder->append("ns", _nss.ns());
+
+    // Report all shards
+    BSONArrayBuilder shardArr(builder->subarrayStart("shards"));
+    for (const auto& shardChunk : _shardChunks) {
+        BSONObjBuilder shardEntry(shardArr.subobjStart());
+        shardEntry.append("name", shardChunk.first.toString());
+
+        BSONArrayBuilder chunkArr(shardEntry.subarrayStart("chunks"));
+        for (const auto& chunk : shardChunk.second) {
+            chunkArr.append(chunk.toBSON());
+        }
+        chunkArr.doneFast();
+
+        shardEntry.doneFast();
+    }
+    shardArr.doneFast();
+
+    // Report all tags
+    BSONArrayBuilder tagsArr(builder->subarrayStart("tags"));
+    tagsArr.append(_allTags);
+    tagsArr.doneFast();
+
+    // Report all tag ranges
+    BSONArrayBuilder tagRangesArr(builder->subarrayStart("tagRanges"));
+    for (const auto& tagRange : _tagRanges) {
+        BSONObjBuilder tagRangeEntry(tagRangesArr.subobjStart());
+        tagRangeEntry.append("tag", tagRange.second.tag);
+        tagRangeEntry.append("mapKey", tagRange.first);
+        tagRangeEntry.append("min", tagRange.second.min);
+        tagRangeEntry.append("max", tagRange.second.max);
+        tagRangeEntry.doneFast();
+    }
+    tagRangesArr.doneFast();
+}
+
+string DistributionStatus::toString() const {
+    BSONObjBuilder builder;
+    report(&builder);
+
+    return builder.obj().toString();
+}
+
+Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
+                                               const string& chunkTag) {
+    if (stat.isSizeMaxed()) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId
+                              << " has already reached the maximum total chunk size."};
+    }
+
+    if (stat.isDraining) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId << " is currently draining."};
+    }
+
+    if (!chunkTag.empty() && !stat.shardTags.count(chunkTag)) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId << " doesn't have right tag"};
+    }
+
+    return Status::OK();
+}
+
+ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
+                                                     const DistributionStatus& distribution,
+                                                     const string& tag) {
+    ShardId best;
+    unsigned minChunks = numeric_limits<unsigned>::max();
+
+    for (const auto& stat : shardStats) {
+        auto status = isShardSuitableReceiver(stat, tag);
+        if (!status.isOK()) {
+            continue;
+        }
+
+        unsigned myChunks = distribution.numberOfChunksInShard(stat.shardId);
+        if (myChunks >= minChunks) {
+            continue;
+        }
+
+        best = stat.shardId;
+        minChunks = myChunks;
+    }
+
+    return best;
+}
+
+ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& shardStats,
+                                                const DistributionStatus& distribution,
+                                                const string& chunkTag) {
+    ShardId worst;
+    unsigned maxChunks = 0;
+
+    for (const auto& stat : shardStats) {
+        const unsigned shardChunkCount =
+            distribution.numberOfChunksInShardWithTag(stat.shardId, chunkTag);
+        if (shardChunkCount <= maxChunks)
+            continue;
+
+        worst = stat.shardId;
+        maxChunks = shardChunkCount;
+    }
+
+    return worst;
+}
+
+vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
+                                            const DistributionStatus& distribution,
+                                            bool shouldAggressivelyBalance) {
     // 1) check for shards that policy require to us to move off of:
     //    draining only
     // 2) check tag policy violations
@@ -224,16 +262,17 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
 
     // 1) check things we have to move
     {
-        for (const auto& stat : distribution.getStats()) {
+        for (const auto& stat : shardStats) {
             if (!stat.isDraining)
                 continue;
 
-            if (distribution.numberOfChunksInShard(stat.shardId) == 0)
+            const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
+
+            if (chunks.empty())
                 continue;
 
             // Now we know we need to move to chunks off this shard, but only if permitted by the
             // tags policy
-            const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
             unsigned numJumboChunks = 0;
 
             // Since we have to move all chunks, lets just do in order
@@ -245,7 +284,7 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
 
                 const string tag = distribution.getTagForChunk(chunk);
 
-                const ShardId to = distribution.getBestReceieverShard(tag);
+                const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
                 if (!to.isValid()) {
                     warning() << "chunk " << chunk
                               << " is on a draining shard, but no appropriate recipient found";
@@ -266,7 +305,7 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
 
     // 2) tag violations
     if (!distribution.tags().empty()) {
-        for (const auto& stat : distribution.getStats()) {
+        for (const auto& stat : shardStats) {
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
             for (const auto& chunk : chunks) {
                 const string tag = distribution.getTagForChunk(chunk);
@@ -279,7 +318,7 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
                     continue;
                 }
 
-                const ShardId to = distribution.getBestReceieverShard(tag);
+                const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
                 if (!to.isValid()) {
                     warning() << "chunk " << chunk << " violates tag " << tag
                               << ", but no appropriate recipient found";
@@ -318,7 +357,7 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
     }
 
     for (const auto& tag : tagsPlusEmpty) {
-        const ShardId from = distribution.getMostOverloadedShard(tag);
+        const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag);
         if (!from.isValid())
             continue;
 
@@ -326,7 +365,7 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
         if (max == 0)
             continue;
 
-        const ShardId to = distribution.getBestReceieverShard(tag);
+        const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
         if (!to.isValid()) {
             log() << "no available shards to take chunks for tag [" << tag << "]";
             return vector<MigrateInfo>();
@@ -374,6 +413,20 @@ std::vector<MigrateInfo> BalancerPolicy::balance(const DistributionStatus& distr
 
     // Everything is balanced here!
     return vector<MigrateInfo>();
+}
+
+boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
+    const ChunkType& chunk,
+    const ShardStatisticsVector& shardStats,
+    const DistributionStatus& distribution) {
+    const string tag = distribution.getTagForChunk(chunk);
+
+    ShardId newShardId = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
+    if (!newShardId.isValid() || newShardId == chunk.getShard()) {
+        return boost::optional<MigrateInfo>();
+    }
+
+    return MigrateInfo(distribution.nss().ns(), newShardId, chunk);
 }
 
 string TagRange::toString() const {

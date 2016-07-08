@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/balancer/balancer_policy.h"
@@ -59,18 +60,20 @@ public:
         SplitInfo(ShardId shardId,
                   NamespaceString nss,
                   ChunkVersion collectionVersion,
+                  ChunkVersion chunkVersion,
                   const BSONObj& minKey,
                   const BSONObj& maxKey,
-                  const BSONObj& splitKey);
+                  std::vector<BSONObj> splitKeys);
 
         std::string toString() const;
 
         ShardId shardId;
         NamespaceString nss;
         ChunkVersion collectionVersion;
+        ChunkVersion chunkVersion;
         BSONObj minKey;
         BSONObj maxKey;
-        BSONObj splitKey;
+        std::vector<BSONObj> splitKeys;
     };
 
     typedef std::vector<SplitInfo> SplitInfoVector;

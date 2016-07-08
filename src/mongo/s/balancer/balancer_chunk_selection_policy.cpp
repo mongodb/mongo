@@ -41,20 +41,28 @@ BalancerChunkSelectionPolicy::~BalancerChunkSelectionPolicy() = default;
 BalancerChunkSelectionPolicy::SplitInfo::SplitInfo(ShardId inShardId,
                                                    NamespaceString inNss,
                                                    ChunkVersion inCollectionVersion,
+                                                   ChunkVersion inChunkVersion,
                                                    const BSONObj& inMinKey,
                                                    const BSONObj& inMaxKey,
-                                                   const BSONObj& inSplitKey)
+                                                   std::vector<BSONObj> inSplitKeys)
     : shardId(std::move(inShardId)),
       nss(std::move(inNss)),
       collectionVersion(inCollectionVersion),
+      chunkVersion(inChunkVersion),
       minKey(inMinKey),
       maxKey(inMaxKey),
-      splitKey(inSplitKey) {}
+      splitKeys(std::move(inSplitKeys)) {}
 
 std::string BalancerChunkSelectionPolicy::SplitInfo::toString() const {
+    StringBuilder splitKeysBuilder;
+    for (const auto& splitKey : splitKeys) {
+        splitKeysBuilder << splitKey.toString() << ", ";
+    }
+
     return str::stream() << "Splitting chunk in " << nss.ns() << " [ " << minKey << ", " << maxKey
-                         << "), residing on " << shardId << " at " << splitKey << " with version "
-                         << collectionVersion.toString();
+                         << "), residing on " << shardId << " at [ " << splitKeysBuilder.str()
+                         << " ] with version " << chunkVersion.toString()
+                         << " and collection version " << collectionVersion.toString();
 }
 
 }  // namespace mongo
