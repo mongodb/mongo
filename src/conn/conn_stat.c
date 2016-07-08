@@ -36,6 +36,31 @@ __stat_sources_free(WT_SESSION_IMPL *session, char ***sources)
 }
 
 /*
+ * __stat_config_discard --
+ *	Discard all statistics-log configuration.
+ */
+static int
+__stat_config_discard(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	/*
+	 * Discard all statistics-log configuration information, called when
+	 * reconfiguring or destroying the statistics logging setup,
+	 */
+	__wt_free(session, conn->stat_format);
+	ret = __wt_fclose(session, &conn->stat_fs);
+	__wt_free(session, conn->stat_path);
+	__stat_sources_free(session, &conn->stat_sources);
+	conn->stat_stamp = NULL;
+	conn->stat_usecs = 0;
+	return (ret);
+}
+
+/*
  * __wt_conn_stat_init --
  *	Initialize the per-connection statistics.
  */
@@ -576,8 +601,13 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 	 * blank slate), and we don't have to worry about races where a running
 	 * server is reading configuration information that we're updating, and
 	 * it's not expected that reconfiguration will happen a lot.
+	 *
+	 * If there's no server running, discard any configuration information
+	 * so we don't leak memory during reconfiguration.
 	 */
-	if (conn->stat_session != NULL)
+	if (conn->stat_session == NULL)
+		WT_RET(__stat_config_discard(session));
+	else
 		WT_RET(__wt_statlog_destroy(session, false));
 
 	WT_RET(__statlog_config(session, cfg, &start));
@@ -600,38 +630,28 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 
 	conn = S2C(session);
 
+	/* Stop the server thread. */
 	F_CLR(conn, WT_CONN_SERVER_STATISTICS);
 	if (conn->stat_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->stat_cond));
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
 		conn->stat_tid_set = false;
 	}
+	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
 
 	/* Log a set of statistics on shutdown if configured. */
 	if (is_close)
 		WT_TRET(__wt_statlog_log_one(session));
 
-	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
-
-	__stat_sources_free(session, &conn->stat_sources);
-	__wt_free(session, conn->stat_path);
-	__wt_free(session, conn->stat_format);
+	/* Discard all configuration information. */
+	WT_TRET(__stat_config_discard(session));
 
 	/* Close the server thread's session. */
 	if (conn->stat_session != NULL) {
 		wt_session = &conn->stat_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
+		conn->stat_session = NULL;
 	}
-
-	/* Clear connection settings so reconfigure is reliable. */
-	conn->stat_session = NULL;
-	conn->stat_tid_set = false;
-	conn->stat_format = NULL;
-	WT_TRET(__wt_fclose(session, &conn->stat_fs));
-	conn->stat_path = NULL;
-	conn->stat_sources = NULL;
-	conn->stat_stamp = NULL;
-	conn->stat_usecs = 0;
 
 	return (ret);
 }
