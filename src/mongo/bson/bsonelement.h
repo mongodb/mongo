@@ -183,6 +183,7 @@ public:
     void toString(StringBuilder& s,
                   bool includeFieldName = true,
                   bool full = false,
+                  bool redactValues = false,
                   int depth = 0) const;
     std::string jsonString(JsonStringFormat format,
                            bool includeFieldNames = true,

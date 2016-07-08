@@ -603,14 +603,15 @@ int BSONObj::nFields() const {
     return n;
 }
 
-std::string BSONObj::toString() const {
+std::string BSONObj::toString(bool redactValues) const {
     if (isEmpty())
         return "{}";
     StringBuilder s;
-    toString(s, false, false);
+    toString(s, false, false, redactValues);
     return s.str();
 }
-void BSONObj::toString(StringBuilder& s, bool isArray, bool full, int depth) const {
+void BSONObj::toString(
+    StringBuilder& s, bool isArray, bool full, bool redactValues, int depth) const {
     if (isEmpty()) {
         s << (isArray ? "[]" : "{}");
         return;
@@ -635,7 +636,7 @@ void BSONObj::toString(StringBuilder& s, bool isArray, bool full, int depth) con
             first = false;
         else
             s << ", ";
-        e.toString(s, !isArray, full, depth);
+        e.toString(s, !isArray, full, redactValues, depth);
     }
     s << (isArray ? " ]" : " }");
 }

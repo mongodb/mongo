@@ -79,5 +79,9 @@ void ComponentMessageLogDomain::clearMinimumLoggedSeverity(LogComponent componen
     _settings.clearMinimumLoggedSeverity(component);
 }
 
+void ComponentMessageLogDomain::setShouldRedactLogs(bool shouldRedact) {
+    _shouldRedact.store(shouldRedact);
+}
+
 }  // namespace logger
 }  // namespace mongo
