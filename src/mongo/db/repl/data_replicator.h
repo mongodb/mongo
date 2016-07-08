@@ -287,8 +287,7 @@ private:
     void _pauseApplier();
 
     StatusWith<Operations> _getNextApplierBatch_inlock();
-    void _onApplyBatchFinish(const CallbackArgs&,
-                             const StatusWith<Timestamp>&,
+    void _onApplyBatchFinish(const StatusWith<Timestamp>&,
                              const Operations&,
                              const size_t numApplied);
 

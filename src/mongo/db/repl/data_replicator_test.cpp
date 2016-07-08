@@ -47,13 +47,10 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -298,15 +295,9 @@ protected:
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
             Client::initThread(threadName.c_str());
         };
-        // This task executor is used by the MultiApplier only and should not be used to schedule
-        // remote commands.
-        _applierTaskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-            stdx::make_unique<ThreadPool>(threadPoolOptions),
-            executor::makeNetworkInterface("DataReplicatorTest-ASIO"));
-        _applierTaskExecutor->startup();
 
         auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
-        dataReplicatorExternalState->taskExecutor = _applierTaskExecutor.get();
+        dataReplicatorExternalState->taskExecutor = &getExecutor();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
@@ -338,10 +329,8 @@ protected:
     }
 
     void tearDown() override {
-        _applierTaskExecutor->shutdown();
         executor::ThreadPoolExecutorTest::shutdownExecutorThread();
         executor::ThreadPoolExecutorTest::joinExecutorThread();
-        _applierTaskExecutor->join();
 
         _dr.reset();
         // tearDown() destroys the task executor which was referenced by the data replicator.
@@ -371,7 +360,6 @@ protected:
     OpTime _myLastOpTime;
     MemberState _memberState;
     std::unique_ptr<SyncSourceSelector> _syncSourceSelector;
-    std::unique_ptr<executor::TaskExecutor> _applierTaskExecutor;
     StorageInterfaceMock* _storageInterface;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;

@@ -1053,17 +1053,9 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     return std::move(ops);
 }
 
-void DataReplicator::_onApplyBatchFinish(const CallbackArgs& cbData,
-                                         const StatusWith<Timestamp>& ts,
+void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
                                          const Operations& ops,
                                          const size_t numApplied) {
-    if (ErrorCodes::CallbackCanceled == cbData.status) {
-        LockGuard lk(_mutex);
-        _applierActive = false;
-        return;
-    }
-
-    invariant(cbData.status.isOK());
     UniqueLock lk(_mutex);
     _applierActive = false;
 
@@ -1175,27 +1167,11 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
             return;
         }
 
-        CBHStatus status = _exec->scheduleWork(stdx::bind(&DataReplicator::_onApplyBatchFinish,
-                                                          this,
-                                                          stdx::placeholders::_1,
-                                                          ts,
-                                                          theOps,
-                                                          theOps.size()));
-        if (!status.isOK()) {
-            LockGuard lk(_mutex);
-            error() << "Failed to schedule apply batch due to '" << status.getStatus() << "'";
-            _initialSyncState->status = status.getStatus();
-            _exec->signalEvent(_initialSyncState->finishEvent);
-            return;
-        }
-        // block until callback done.
-        _exec->wait(status.getValue());
+        _onApplyBatchFinish(ts, theOps, theOps.size());
     };
 
-    auto executor = _dataReplicatorExternalState->getTaskExecutor();
-
     invariant(!(_applier && _applier->isActive()));
-    _applier = stdx::make_unique<MultiApplier>(executor, ops, applierFn, multiApplyFn, lambda);
+    _applier = stdx::make_unique<MultiApplier>(_exec, ops, applierFn, multiApplyFn, lambda);
     _applierActive = true;
     return _applier->start();
 }
