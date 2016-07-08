@@ -690,7 +690,8 @@ void BSONElement::toString(StringBuilder& s, bool includeFieldName, bool full, i
             s << "MinKey";
             break;
         case CodeWScope:
-            s << "CodeWScope( " << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
+            s << "CodeWScope( " << codeWScopeCode() << ", "
+              << codeWScopeObject().toString(false, full) << ")";
             break;
         case Code:
             if (!full && valuestrsize() > 80) {

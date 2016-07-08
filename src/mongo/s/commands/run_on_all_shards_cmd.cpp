@@ -181,7 +181,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
     BSONObj errobj = errors.done();
 
     if (!errobj.isEmpty()) {
-        errmsg = errobj.toString();
+        errmsg = errobj.toString(false, true);
 
         // If every error has a code, and the code for all errors is the same, then add
         // a top-level field "code" with this value to the output object.

@@ -211,7 +211,7 @@ public:
     */
     enum { maxToStringRecursionDepth = 100 };
 
-    std::string toString() const;
+    std::string toString(bool isArray = false, bool full = false) const;
     void toString(StringBuilder& s, bool isArray = false, bool full = false, int depth = 0) const;
 
     /** Properly formatted JSON string.

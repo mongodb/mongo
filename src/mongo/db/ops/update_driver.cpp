@@ -387,7 +387,7 @@ BSONObj UpdateDriver::makeOplogEntryQuery(const BSONObj& doc, bool multi) const 
         uassert(16980,
                 str::stream() << "Multi-update operations require all documents to "
                                  "have an '_id' field. "
-                              << doc.toString(),
+                              << doc.toString(false, false),
                 !multi);
         return doc;
     }
