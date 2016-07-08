@@ -1,5 +1,4 @@
-// Test the creation of views with various options. Once created, views should also be accessible
-// via listCollections and the like.
+// Test the creation of views with various options.
 
 (function() {
     "use strict";
@@ -8,8 +7,10 @@
     load("jstests/aggregation/extras/utils.js");
 
     var viewsDB = db.getSiblingDB("views_creation");
-    viewsDB.dropDatabase();
-    assert.eq(0, viewsDB.getCollectionNames().length);
+    assert.commandWorked(viewsDB.dropDatabase());
+
+    var collNames = viewsDB.getCollectionNames();
+    assert.eq(0, collNames.length, tojson(collNames));
 
     // Create a collection for test purposes.
     assert.commandWorked(viewsDB.runCommand({create: "collection"}));
@@ -36,8 +37,7 @@
         viewsDB.runCommand({create: "viewOnView", viewOn: "view", pipeline: pipe}));
 
     // View names are constrained to the same limitations as collection names.
-    assert.commandFailed(
-        viewsDB.runCommand({create: "", viewOn: "collection", pipeline: pipe}));
+    assert.commandFailed(viewsDB.runCommand({create: "", viewOn: "collection", pipeline: pipe}));
     assert.commandFailedWithCode(
         viewsDB.runCommand({create: "system.local.new", viewOn: "collection", pipeline: pipe}),
         ErrorCodes.BadValue);
