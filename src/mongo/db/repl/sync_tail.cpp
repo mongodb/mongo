@@ -549,6 +549,11 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
     // stop all readers until we're done
     Lock::ParallelBatchWriterMode pbwm(txn->lockState());
 
+    if (inShutdownStrict()) {
+        log() << "Cannot apply operations due to shutdown in progress";
+        return OpTime();
+    }
+
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
     if (replCoord->getMemberState().primary() && !replCoord->isWaitingForApplierToDrain()) {
         severe() << "attempting to replicate ops while primary";
@@ -568,11 +573,8 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
         lastOpTime = writeOpsToOplog(txn, raws);
     }
 
-    if (inShutdownStrict()) {
-        log() << "Cannot apply operations due to shutdown in progress";
-        return OpTime();
-    }
-    // We have now written all database writes and updated the oplog to match.
+    // Due to SERVER-24933 we can't enter inShutdown while holding the PBWM lock.
+    invariant(!inShutdownStrict());
     return lastOpTime;
 }
 

@@ -1245,13 +1245,18 @@ static void shutdownServer() {
 stdx::mutex shutdownLock;
 
 void signalShutdown() {
-    // Notify all threads shutdown has started
+    // This call chain uses its own locker directly because it isn't always called in a context that
+    // already has one, and is illegal to call while holding any locks.
+    DefaultLockerImpl locker;
+
+    // Notify all threads shutdown has started. This is done while holding the PBWM lock to
+    // ensure that replication isn't mid-batch to avoid SERVER-24933.
+    Lock::ResourceLock pbwm(&locker, resourceIdParallelBatchWriterMode, MODE_IS);
     shutdownInProgress.fetchAndAdd(1);
 }
 
 void exitCleanly(ExitCode code) {
-    // Notify all threads shutdown has started
-    shutdownInProgress.fetchAndAdd(1);
+    signalShutdown();
 
     // Grab the shutdown lock to prevent concurrent callers
     stdx::lock_guard<stdx::mutex> lockguard(shutdownLock);

@@ -572,18 +572,22 @@ static void WINAPI initService(DWORD argc, LPTSTR* argv) {
 }
 
 static void serviceShutdown(const char* controlCodeName) {
-    Client::initThread("serviceShutdown");
+    // We spawn a detached thread here because signalShudown may block and it is illegal to block in
+    // anything called from serviceCtrl(). We are required to return ASAP.
+    stdx::thread([controlCodeName] {
+        Client::initThread("serviceShutdown");
 
-    log() << "got " << controlCodeName << " request from Windows Service Control Manager, "
-          << (inShutdown() ? "already in shutdown" : "will terminate after current cmd ends");
+        log() << "got " << controlCodeName << " request from Windows Service Control Manager, "
+              << (inShutdown() ? "already in shutdown" : "will terminate after current cmd ends");
 
-    reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
+        reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
 
-    // Note: This triggers _serviceCallback, ie  ServiceMain,
-    // to stop by setting inShutdown() == true
-    signalShutdown();
+        // Note: This triggers _serviceCallback, ie  ServiceMain,
+        // to stop by setting inShutdown() == true
+        signalShutdown();
 
-    // Note: we will report exit status in initService
+        // Note: we will report exit status in initService
+    }).detach();
 }
 
 static DWORD WINAPI
