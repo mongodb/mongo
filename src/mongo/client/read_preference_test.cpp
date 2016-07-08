@@ -31,6 +31,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 
 namespace {
 
@@ -64,11 +65,41 @@ TEST(ReadPreferenceSetting, ParseValid) {
                ReadPreferenceSetting(ReadPreference::SecondaryPreferred,
                                      TagSet(BSON_ARRAY(BSON("dc"
                                                             << "ny")))));
+    checkParse(
+        BSON("mode"
+             << "primary"
+             << "tags"
+             << BSON_ARRAY(BSONObj())
+             << "maxStalenessMS"
+             << 1),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly(), Milliseconds(1)));
+
+    checkParse(
+        BSON("mode"
+             << "primary"
+             << "maxStalenessMS"
+             << 1),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly(), Milliseconds(1)));
 }
 
 void checkParseFails(const BSONObj& rpsObj) {
     auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
     ASSERT_NOT_OK(swRps.getStatus());
+}
+
+TEST(ReadPreferenceSetting, NonEquality) {
+    auto tagSet = TagSet(BSON_ARRAY(BSON("dc"
+                                         << "ca")
+                                    << BSON("foo"
+                                            << "bar")));
+    auto rps = ReadPreferenceSetting(ReadPreference::Nearest, tagSet, Milliseconds(1));
+
+    auto unexpected1 =
+        ReadPreferenceSetting(ReadPreference::Nearest, TagSet::primaryOnly(), Milliseconds(1));
+    ASSERT_FALSE(rps.equals(unexpected1));
+
+    auto unexpected2 = ReadPreferenceSetting(ReadPreference::Nearest, tagSet, Milliseconds(2));
+    ASSERT_FALSE(rps.equals(unexpected2));
 }
 
 TEST(ReadPreferenceSetting, ParseInvalid) {
@@ -91,6 +122,24 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
                          << "nearest"
                          << "tags"
                          << "bad"));
+
+    // maxStalenessMS is negative
+    checkParseFails(BSON("mode"
+                         << "primary"
+                         << "maxStalenessMS"
+                         << -1));
+
+    // maxStalenessMS is NaN
+    checkParseFails(BSON("mode"
+                         << "primary"
+                         << "maxStalenessMS"
+                         << "ONE"));
+
+    // maxStalenessMS is greater than max
+    checkParseFails(BSON("mode"
+                         << "primary"
+                         << "maxStalenessMS"
+                         << Milliseconds::max().count()));
 }
 
 void checkRoundtrip(const ReadPreferenceSetting& rps) {
@@ -114,6 +163,13 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                                                 << "ca"
                                                                 << "rack"
                                                                 << "bar")))));
+
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
+                                         TagSet(BSON_ARRAY(BSON("dc"
+                                                                << "ca")
+                                                           << BSON("foo"
+                                                                   << "bar"))),
+                                         Milliseconds(1)));
 }
 
 }  // namespace
