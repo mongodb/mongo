@@ -137,6 +137,11 @@ public:
      */
     void cancel();
 
+    /**
+     * Waits for the task runner to become inactive.
+     */
+    void join();
+
 private:
     /**
      * Runs tasks in a loop.

@@ -279,6 +279,45 @@ TEST_F(TaskRunnerTest, Cancel) {
     ASSERT_OK(status);
 }
 
+TEST_F(TaskRunnerTest, JoinShouldWaitForTasksToComplete) {
+    unittest::Barrier barrier(2U);
+    stdx::mutex mutex;
+    Status status1 = getDetectableErrorStatus();
+    Status status2 = getDetectableErrorStatus();
+
+    // "task1" should start running before we invoke join() the task runner.
+    // Upon completion, "task1" requests the task runner to retain the operation context. This has
+    // effect of keeping the task runner active.
+    auto task1 = [&](OperationContext* theTxn, const Status& theStatus) {
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+        barrier.countDownAndWait();
+        status1 = theStatus;
+        return TaskRunner::NextAction::kKeepOperationContext;
+    };
+
+    // "task2" should start running after we invoke join() the task runner.
+    // Upon completion, "task2" requests the task runner to dispose the operation context. After the
+    // operation context is destroyed, the task runner will go into an inactive state.
+    auto task2 = [&](OperationContext* theTxn, const Status& theStatus) {
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+        status2 = theStatus;
+        return TaskRunner::NextAction::kDisposeOperationContext;
+    };
+
+    getTaskRunner().schedule(task1);
+    getTaskRunner().schedule(task2);
+    barrier.countDownAndWait();
+
+    // join() waits for "task1" and "task2" to complete execution.
+    getTaskRunner().join();
+
+    // This status should be OK because we ensured that the task
+    // was scheduled and invoked before we called cancel().
+    stdx::lock_guard<stdx::mutex> lk(mutex);
+    ASSERT_OK(status1);
+    ASSERT_OK(status2);
+}
+
 TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
     stdx::mutex mutex;
     stdx::condition_variable condition;
