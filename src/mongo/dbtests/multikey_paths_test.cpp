@@ -82,7 +82,10 @@ public:
                              BSONObj keyPattern,
                              const MultikeyPaths& expectedMultikeyPaths) {
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
-        IndexDescriptor* desc = indexCatalog->findIndexByKeyPattern(_opCtx.get(), keyPattern);
+        std::vector<IndexDescriptor*> indexes;
+        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), keyPattern, false, &indexes);
+        ASSERT_EQ(indexes.size(), 1U);
+        IndexDescriptor* desc = indexes[0];
         const IndexCatalogEntry* ice = indexCatalog->getEntry(desc);
 
         auto actualMultikeyPaths = ice->getMultikeyPaths(_opCtx.get());

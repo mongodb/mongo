@@ -97,10 +97,11 @@ Status verifySystemIndexes(OperationContext* txn) {
     }
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    IndexDescriptor* oldIndex = NULL;
+    std::vector<IndexDescriptor*> indexes;
+    indexCatalog->findIndexesByKeyPattern(txn, v1SystemUsersKeyPattern, false, &indexes);
 
-    if (indexCatalog &&
-        (oldIndex = indexCatalog->findIndexByKeyPattern(txn, v1SystemUsersKeyPattern))) {
+    if (indexCatalog && !indexes.empty()) {
+        fassert(ErrorCodes::AmbiguousIndexKeyPattern, indexes.size() == 1);
         return Status(ErrorCodes::AuthSchemaIncompatible,
                       "Old 2.4 style user index identified. "
                       "The authentication schema needs to be updated by "

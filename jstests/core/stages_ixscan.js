@@ -111,3 +111,45 @@ ixscan1 = {
 };
 res = db.runCommand({stageDebug: {collection: collname, plan: ixscan1}});
 assert.eq(res.ok, 0);
+
+t.drop();
+assert.commandWorked(t.createIndex(
+    {a: 1}, {name: "numeric", collation: {locale: "en_US", strength: 3, numericOrdering: true}}));
+assert.commandWorked(
+    t.createIndex({a: 1}, {name: "s3", collation: {locale: "en_US", strength: 3}}));
+
+// Stage debug does not allow ixscan with ambiguous key patterns.
+
+var ixscanAmbiguous = {
+    ixscan: {
+        args: {
+            keyPattern: {a: 1},
+            startKey: {a: 1},
+            endKey: {a: 2},
+            endKeyInclusive: true,
+            direction: 1
+        },
+        filter: {}
+    }
+};
+
+assert.commandFailed(db.runCommand({stageDebug: {collection: collname, plan: ixscanAmbiguous}}));
+
+// Stage debug allows selecting indexes by name.
+var ixscanName = {
+    ixscan: {
+        args: {
+            name: "numeric",
+            startKey: {a: ""},
+            endKey: {a: {}},  // All strings
+            endKeyInclusive: false,
+            direction: 1
+        },
+        filter: {}
+    }
+};
+
+assert.writeOK(t.insert([{a: "1234"}, {a: "124"}]));
+var res = db.runCommand({stageDebug: {collection: collname, plan: ixscanName}});
+assert.commandWorked(res);
+assert.eq(res.results.map((doc) => doc.a), ["124", "1234"]);

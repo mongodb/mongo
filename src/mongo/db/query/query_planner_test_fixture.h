@@ -72,6 +72,8 @@ protected:
                   MatchExpression* filterExpr,
                   const CollatorInterface* collator);
 
+    void addIndex(BSONObj keyPattern, const CollatorInterface* collator, StringData indexName);
+
     //
     // Execute planner.
     //

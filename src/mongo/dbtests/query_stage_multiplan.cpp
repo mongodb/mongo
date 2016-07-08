@@ -138,9 +138,12 @@ public:
         // Plan 0: IXScan over foo == 7
         // Every call to work() returns something so this should clearly win (by current scoring
         // at least).
+        std::vector<IndexDescriptor*> indexes;
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, BSON("foo" << 1), false, &indexes);
+        ASSERT_EQ(indexes.size(), 1U);
+
         IndexScanParams ixparams;
-        ixparams.descriptor =
-            coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("foo" << 1));
+        ixparams.descriptor = indexes[0];
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << 7);
         ixparams.bounds.endKey = BSON("" << 7);

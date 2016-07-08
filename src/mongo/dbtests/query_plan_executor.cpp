@@ -196,7 +196,10 @@ protected:
 private:
     IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
         Collection* collection = db->getCollection(nss.ns());
-        return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
+        std::vector<IndexDescriptor*> indexes;
+        collection->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        ASSERT_LTE(indexes.size(), 1U);
+        return indexes.size() == 0 ? nullptr : indexes[0];
     }
 
     DBDirectClient _client;

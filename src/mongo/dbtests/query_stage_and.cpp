@@ -72,11 +72,12 @@ public:
     }
 
     IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-        IndexDescriptor* descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
-        if (NULL == descriptor) {
+        std::vector<IndexDescriptor*> indexes;
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        if (indexes.empty()) {
             FAIL(mongoutils::str::stream() << "Unable to find index with key pattern " << obj);
         }
-        return descriptor;
+        return indexes[0];
     }
 
     void getRecordIds(set<RecordId>* out, Collection* coll) {

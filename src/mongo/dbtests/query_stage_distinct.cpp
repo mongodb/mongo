@@ -126,9 +126,12 @@ public:
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
+        std::vector<IndexDescriptor*> indexes;
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, BSON("a" << 1), false, &indexes);
+        ASSERT_EQ(indexes.size(), 1U);
+
         DistinctParams params;
-        params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
-        verify(params.descriptor);
+        params.descriptor = indexes[0];
         params.direction = 1;
         // Distinct-ing over the 0-th field of the keypattern.
         params.fieldNo = 0;
@@ -190,8 +193,12 @@ public:
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
+        std::vector<IndexDescriptor*> indexes;
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, BSON("a" << 1), false, &indexes);
+        verify(indexes.size() == 1);
+
         DistinctParams params;
-        params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
+        params.descriptor = indexes[0];
         ASSERT_TRUE(params.descriptor->isMultikey(&_txn));
 
         verify(params.descriptor);

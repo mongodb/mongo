@@ -60,7 +60,7 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
             }
         }
 
-        if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
+        if (!isn->bounds.isValidFor(isn->index.keyPattern, isn->direction)) {
             LOG(5) << "Invalid bounds: " << isn->bounds.toString() << std::endl;
             invariant(0);
         }

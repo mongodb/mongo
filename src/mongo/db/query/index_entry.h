@@ -92,15 +92,20 @@ struct IndexEntry {
     /**
      * For testing purposes only.
      */
-    IndexEntry(const BSONObj& kp)
+    IndexEntry(const BSONObj& kp, const std::string& indexName = "test_foo")
         : keyPattern(kp),
           multikey(false),
           sparse(false),
           unique(false),
-          name("test_foo"),
+          name(indexName),
           filterExpr(nullptr),
           infoObj(BSONObj()) {
         type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
+    }
+
+    bool operator==(const IndexEntry& rhs) const {
+        // Indexes are logically equal when names are equal.
+        return this->name == rhs.name;
     }
 
     std::string toString() const;

@@ -118,7 +118,9 @@ public:
     IndexDescriptor* getIndex(const BSONObj& obj) {
         AutoGetCollectionForRead ctx(&_txn, ns());
         Collection* collection = ctx.getCollection();
-        return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
+        std::vector<IndexDescriptor*> indexes;
+        collection->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        return indexes.empty() ? nullptr : indexes[0];
     }
 
     static int numObj() {

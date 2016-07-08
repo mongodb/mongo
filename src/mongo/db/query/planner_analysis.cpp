@@ -213,13 +213,10 @@ void explodeScan(const IndexScanNode* isn,
         verify(prefix.size() == fieldsToExplode);
 
         // Copy boring fields into new child.
-        IndexScanNode* child = new IndexScanNode();
-        child->indexKeyPattern = isn->indexKeyPattern;
+        IndexScanNode* child = new IndexScanNode(isn->index);
         child->direction = isn->direction;
         child->maxScan = isn->maxScan;
         child->addKeyMetadata = isn->addKeyMetadata;
-        child->indexIsMultiKey = isn->indexIsMultiKey;
-        child->indexCollator = isn->indexCollator;
         child->queryCollator = isn->queryCollator;
 
         // Copy the filter, if there is one.
@@ -380,7 +377,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
         // Skip every field that is a union of point intervals and build the resulting sort
         // order from the remaining fields.
-        BSONObjIterator kpIt(isn->indexKeyPattern);
+        BSONObjIterator kpIt(isn->index.keyPattern);
         size_t boundsIdx = 0;
         while (kpIt.more()) {
             const OrderedIntervalList& oil = bounds.fields[boundsIdx];
@@ -773,12 +770,12 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                         if (STAGE_IXSCAN == leafNodes[0]->getType()) {
                             projType = ProjectionNode::COVERED_ONE_INDEX;
                             IndexScanNode* ixn = static_cast<IndexScanNode*>(leafNodes[0]);
-                            coveredKeyObj = ixn->indexKeyPattern;
+                            coveredKeyObj = ixn->index.keyPattern;
                             LOG(5) << "PROJECTION: covered via IXSCAN, using COVERED fast path";
                         } else if (STAGE_DISTINCT_SCAN == leafNodes[0]->getType()) {
                             projType = ProjectionNode::COVERED_ONE_INDEX;
                             DistinctNode* dn = static_cast<DistinctNode*>(leafNodes[0]);
-                            coveredKeyObj = dn->indexKeyPattern;
+                            coveredKeyObj = dn->index.keyPattern;
                             LOG(5) << "PROJECTION: covered via DISTINCT, using COVERED fast path";
                         }
                     }

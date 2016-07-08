@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <iosfwd>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/optime.h"
@@ -219,7 +221,7 @@ public:
     /**
      * Finds the first document returned by a collection or index scan on the collection in the
      * requested direction.
-     * If "indexKeyPattern" is empty, a collection scan is used to locate the document.
+     * If "indexName" is boost::none, a collection scan is used to locate the document.
      */
     enum class ScanDirection {
         kForward = 1,
@@ -227,17 +229,17 @@ public:
     };
     virtual StatusWith<BSONObj> findOne(OperationContext* txn,
                                         const NamespaceString& nss,
-                                        const BSONObj& indexKeyPattern,
+                                        boost::optional<StringData> indexName,
                                         ScanDirection scanDirection) = 0;
 
     /**
      * Deletes the first document returned by a collection or index scan on the collection in the
      * requested direction. Returns deleted document on success.
-     * If "indexKeyPattern" is empty, a collection scan is used to locate the document.
+     * If "indexName" is null, a collection scan is used to locate the document.
      */
     virtual StatusWith<BSONObj> deleteOne(OperationContext* txn,
                                           const NamespaceString& nss,
-                                          const BSONObj& indexKeyPattern,
+                                          boost::optional<StringData> indexName,
                                           ScanDirection scanDirection) = 0;
 };
 

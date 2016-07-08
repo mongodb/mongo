@@ -32,6 +32,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db_raii.h"
@@ -106,12 +107,12 @@ public:
 
     StatusWith<BSONObj> findOne(OperationContext* txn,
                                 const NamespaceString& nss,
-                                const BSONObj& indexKeyPattern,
+                                boost::optional<StringData> indexName,
                                 ScanDirection scanDirection) override;
 
     StatusWith<BSONObj> deleteOne(OperationContext* txn,
                                   const NamespaceString& nss,
-                                  const BSONObj& indexKeyPattern,
+                                  boost::optional<StringData> indexName,
                                   ScanDirection scanDirection) override;
 
     Status isAdminDbValid(OperationContext* txn) override;

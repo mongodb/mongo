@@ -86,6 +86,8 @@ public:
     IndexDescriptor* findIdIndex(OperationContext* txn) const;
 
     /**
+     * Find index by name.  The index name uniquely identifies an index.
+     *
      * @return null if cannot find
      */
     IndexDescriptor* findIndexByName(OperationContext* txn,
@@ -93,11 +95,31 @@ public:
                                      bool includeUnfinishedIndexes = false) const;
 
     /**
-     * @return null if cannot find
+     * Find index by matching key pattern and collation spec.  The key pattern and collation spec
+     * uniquely identify an index.
+     *
+     * Collation is specified as a normalized collation spec as returned by
+     * CollationInterface::getSpec.  An empty object indicates the simple collation.
+     *
+     * @return null if cannot find index, otherwise the index with a matching key pattern and
+     * collation.
      */
-    IndexDescriptor* findIndexByKeyPattern(OperationContext* txn,
-                                           const BSONObj& key,
-                                           bool includeUnfinishedIndexes = false) const;
+    IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
+        OperationContext* txn,
+        const BSONObj& key,
+        const BSONObj& collationSpec,
+        bool includeUnfinishedIndexes = false) const;
+
+    /**
+     * Find indexes with a matching key pattern, putting them into the vector 'matches'.  The key
+     * pattern alone does not uniquely identify an index.
+     *
+     * Consider using 'findIndexByName' if expecting to match one index.
+     */
+    void findIndexesByKeyPattern(OperationContext* txn,
+                                 const BSONObj& key,
+                                 bool includeUnfinishedIndexes,
+                                 std::vector<IndexDescriptor*>* matches) const;
 
     /**
      * Returns an index suitable for shard key range scans.
@@ -105,6 +127,7 @@ public:
      * This index:
      * - must be prefixed by 'shardKey', and
      * - must not be a partial index.
+     * - must have the simple collation.
      *
      * If the parameter 'requireSingleKey' is true, then this index additionally must not be
      * multi-key.

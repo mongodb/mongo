@@ -656,6 +656,7 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
     invariant(name[0]);
 
     const BSONObj key = spec.getObjectField("key");
+    const BSONObj collation = spec.getObjectField("collation");
 
     {
         // Check both existing and in-progress indexes (2nd param = true)
@@ -663,15 +664,29 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
         if (desc) {
             // index already exists with same name
 
-            if (!desc->keyPattern().equal(key))
+            if (desc->keyPattern().equal(key) &&
+                desc->infoObj().getObjectField("collation") != collation) {
+                // key patterns are equal but collations differ.
+                return Status(ErrorCodes::IndexOptionsConflict,
+                              str::stream()
+                                  << "An index with the same key pattern, but a different "
+                                  << "collation already exists with the same name.  Try again with "
+                                  << "a unique name. "
+                                  << "Existing index: "
+                                  << desc->infoObj()
+                                  << " Requested index: "
+                                  << spec);
+            }
+
+            if (!desc->keyPattern().equal(key) ||
+                desc->infoObj().getObjectField("collation") != collation) {
                 return Status(ErrorCodes::IndexKeySpecsConflict,
-                              str::stream() << "Trying to create an index "
-                                            << "with same name "
-                                            << name
-                                            << " with different key spec "
-                                            << key
-                                            << " vs existing spec "
-                                            << desc->keyPattern());
+                              str::stream() << "Index must have unique name."
+                                            << "The existing index: "
+                                            << desc->infoObj()
+                                            << " has the same name as the requested index: "
+                                            << spec);
+            }
 
             IndexDescriptor temp(_collection, _getAccessMethodName(txn, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
@@ -682,30 +697,34 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
             // Index already exists with the same options, so no need to build a new
             // one (not an error). Most likely requested by a client using ensureIndex.
             return Status(ErrorCodes::IndexAlreadyExists,
-                          str::stream() << "index already exists: " << name);
+                          str::stream() << "Identical index already exists: " << name);
         }
     }
 
     {
-        // Check both existing and in-progress indexes (2nd param = true)
-        const IndexDescriptor* desc = findIndexByKeyPattern(txn, key, true);
+        // Check both existing and in-progress indexes.
+        const bool findInProgressIndexes = true;
+        const IndexDescriptor* desc =
+            findIndexByKeyPatternAndCollationSpec(txn, key, collation, findInProgressIndexes);
         if (desc) {
-            LOG(2) << "index already exists with diff name " << name << ' ' << key << endl;
+            LOG(2) << "index already exists with diff name " << name << " pattern: " << key
+                   << " collation: " << collation << endl;
 
             IndexDescriptor temp(_collection, _getAccessMethodName(txn, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
                 return Status(ErrorCodes::IndexOptionsConflict,
-                              str::stream() << "Index with pattern: " << key
-                                            << " already exists with different options");
+                              str::stream() << "Index: " << spec
+                                            << " already exists with different options: "
+                                            << desc->infoObj());
 
             return Status(ErrorCodes::IndexAlreadyExists,
-                          str::stream() << "index already exists: " << name);
+                          str::stream() << "index already exists with different name: " << name);
         }
     }
 
     if (numIndexesTotal(txn) >= _maxNumIndexesAllowed) {
         string s = str::stream() << "add index fails, too many indexes for "
-                                 << _collection->ns().ns() << " key:" << key.toString();
+                                 << _collection->ns().ns() << " key:" << key;
         log() << s;
         return Status(ErrorCodes::CannotCreateIndex, s);
     }
@@ -1051,16 +1070,33 @@ IndexDescriptor* IndexCatalog::findIndexByName(OperationContext* txn,
     return NULL;
 }
 
-IndexDescriptor* IndexCatalog::findIndexByKeyPattern(OperationContext* txn,
-                                                     const BSONObj& key,
-                                                     bool includeUnfinishedIndexes) const {
+IndexDescriptor* IndexCatalog::findIndexByKeyPatternAndCollationSpec(
+    OperationContext* txn,
+    const BSONObj& key,
+    const BSONObj& collationSpec,
+    bool includeUnfinishedIndexes) const {
     IndexIterator ii = getIndexIterator(txn, includeUnfinishedIndexes);
     while (ii.more()) {
         IndexDescriptor* desc = ii.next();
-        if (desc->keyPattern() == key)
+        if (desc->keyPattern() == key &&
+            desc->infoObj().getObjectField("collation") == collationSpec)
             return desc;
     }
     return NULL;
+}
+
+void IndexCatalog::findIndexesByKeyPattern(OperationContext* txn,
+                                           const BSONObj& key,
+                                           bool includeUnfinishedIndexes,
+                                           std::vector<IndexDescriptor*>* matches) const {
+    invariant(matches);
+    IndexIterator ii = getIndexIterator(txn, includeUnfinishedIndexes);
+    while (ii.more()) {
+        IndexDescriptor* desc = ii.next();
+        if (desc->keyPattern() == key) {
+            matches->push_back(desc);
+        }
+    }
 }
 
 IndexDescriptor* IndexCatalog::findShardKeyPrefixedIndex(OperationContext* txn,
@@ -1071,6 +1107,7 @@ IndexDescriptor* IndexCatalog::findShardKeyPrefixedIndex(OperationContext* txn,
     IndexIterator ii = getIndexIterator(txn, false);
     while (ii.more()) {
         IndexDescriptor* desc = ii.next();
+        bool hasSimpleCollation = desc->infoObj().getObjectField("collation").isEmpty();
 
         if (desc->isPartial())
             continue;
@@ -1078,10 +1115,10 @@ IndexDescriptor* IndexCatalog::findShardKeyPrefixedIndex(OperationContext* txn,
         if (!shardKey.isPrefixOf(desc->keyPattern()))
             continue;
 
-        if (!desc->isMultikey(txn))
+        if (!desc->isMultikey(txn) && hasSimpleCollation)
             return desc;
 
-        if (!requireSingleKey)
+        if (!requireSingleKey && hasSimpleCollation)
             best = desc;
     }
 

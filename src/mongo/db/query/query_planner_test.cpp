@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 
@@ -4172,9 +4173,9 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
     std::unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
-    indexTree->setIndexEntry(IndexEntry(BSON("a" << 1)));
+    indexTree->setIndexEntry(IndexEntry(BSON("a" << 1), "a_1"));
 
-    std::map<BSONObj, size_t> indexMap;
+    std::map<StringData, size_t> indexMap;
 
     // Null filter.
     Status s = QueryPlanner::tagAccordingToCache(NULL, indexTree.get(), indexMap);
@@ -4189,7 +4190,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_NOT_OK(s);
 
     // Index found once added to the map.
-    indexMap[BSON("a" << 1)] = 0;
+    indexMap["a_1"_sd] = 0;
     s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
     ASSERT_OK(s);
 
@@ -4246,6 +4247,21 @@ TEST_F(QueryPlannerTest, NorWithSingleChildCanUseIndexAfterComplementingBounds) 
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}, bounds:"
         "{a: [['MinKey', -Infinity, true, false], [3, 'MaxKey', true, true]]}}}}}");
+}
+
+// Multiple indexes
+TEST_F(QueryPlannerTest, PlansForMultipleIndexesOnTheSameKeyPatternAreGenerated) {
+    CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
+    CollatorInterfaceMock equalCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    addIndex(BSON("a" << 1), &reverseCollator, "reverse"_sd);
+    addIndex(BSON("a" << 1), &equalCollator, "forward"_sd);
+
+    runQuery(BSON("a" << 1));
+
+    assertNumSolutions(3U);
+    assertSolutionExists("{fetch: {node: {ixscan: {name: 'reverse'}}}}");
+    assertSolutionExists("{fetch: {node: {ixscan: {name: 'forward'}}}}");
+    assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 
 }  // namespace

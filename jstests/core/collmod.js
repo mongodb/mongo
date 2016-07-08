@@ -97,3 +97,18 @@ if (!isMongos) {
 }
 var info = findCollectionInfo();
 assert.eq(info.options.flags, 0, tojson(info));
+
+// Tests that collmod does not accept an ambiguous index key pattern.
+t.drop();
+assert.commandWorked(db.createCollection(coll));
+t = db.getCollection(coll);
+
+// It's odd to create multiple TTL indexes... but you can.
+assert.commandWorked(t.createIndex({a: 1}, {name: "TTL", expireAfterSeconds: 60}));
+assert.commandWorked(
+    t.createIndex({a: 1}, {name: "TTLfr", collation: {locale: "fr"}, expireAfterSeconds: 120}));
+
+// Ensure that coll mod will not accept an ambiguous key pattern.
+assert.commandFailed(
+    db.runCommand({collMod: coll, index: {keyPattern: {a: 1}, expireAfterSeconds: 240}}));
+assert(!findTTL({a: 1}, 240), "TTL index modified.");

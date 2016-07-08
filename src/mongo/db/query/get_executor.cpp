@@ -1095,8 +1095,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     }
 
     // Make the count node that we replace the fetch + ixscan with.
-    CountScanNode* csn = new CountScanNode();
-    csn->indexKeyPattern = isn->indexKeyPattern;
+    CountScanNode* csn = new CountScanNode(isn->index);
     csn->startKey = startKey;
     csn->startKeyInclusive = startKeyInclusive;
     csn->endKey = endKey;
@@ -1330,8 +1329,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
         }
 
         // Make a new DistinctNode.  We swap this for the ixscan in the provided solution.
-        DistinctNode* dn = new DistinctNode();
-        dn->indexKeyPattern = isn->indexKeyPattern;
+        DistinctNode* dn = new DistinctNode(isn->index);
         dn->direction = isn->direction;
         dn->bounds = isn->bounds;
 
@@ -1339,7 +1337,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
         // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
         // over.  Consider removing this code if we stick with that policy.
         dn->fieldNo = 0;
-        BSONObjIterator it(isn->indexKeyPattern);
+        BSONObjIterator it(isn->index.keyPattern);
         while (it.more()) {
             if (field == it.next().fieldName()) {
                 break;
@@ -1447,10 +1445,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                              parsedDistinct->getKey(),
                              cq->getCollator(),
                              &distinctNodeIndex)) {
-        auto dn = stdx::make_unique<DistinctNode>();
-        dn->indexKeyPattern = plannerParams.indices[distinctNodeIndex].keyPattern;
+        auto dn = stdx::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
         dn->direction = 1;
-        IndexBoundsBuilder::allValuesBounds(dn->indexKeyPattern, &dn->bounds);
+        IndexBoundsBuilder::allValuesBounds(dn->index.keyPattern, &dn->bounds);
         dn->fieldNo = 0;
 
         // An index with a non-simple collation requires a FETCH stage.

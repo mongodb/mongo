@@ -33,10 +33,12 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 
 #include <algorithm>
+#include <boost/optional.hpp>
 #include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
@@ -412,7 +414,7 @@ DeleteStageParams makeDeleteStageParamsForDeleteOne() {
 enum class FindDeleteMode { kFind, kDelete };
 StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
                                      const NamespaceString& nss,
-                                     const BSONObj& indexKeyPattern,
+                                     boost::optional<StringData> indexName,
                                      StorageInterface::ScanDirection scanDirection,
                                      FindDeleteMode mode) {
     auto isFind = mode == FindDeleteMode::kFind;
@@ -432,7 +434,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
         auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
 
         std::unique_ptr<PlanExecutor> planExecutor;
-        if (indexKeyPattern.isEmpty()) {
+        if (!indexName) {
             // Use collection scan.
             planExecutor = isFind
                 ? InternalPlanner::collectionScan(
@@ -447,22 +449,22 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
             auto indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
             bool includeUnfinishedIndexes = false;
-            auto indexDescriptor =
-                indexCatalog->findIndexByKeyPattern(txn, indexKeyPattern, includeUnfinishedIndexes);
+            IndexDescriptor* indexDescriptor =
+                indexCatalog->findIndexByName(txn, *indexName, includeUnfinishedIndexes);
             if (!indexDescriptor) {
                 return {ErrorCodes::IndexNotFound,
                         str::stream() << "Index not found, ns:" << nss.ns() << ", index: "
-                                      << indexKeyPattern};
+                                      << *indexName};
             }
             if (indexDescriptor->isPartial()) {
                 return {ErrorCodes::IndexOptionsConflict,
                         str::stream() << "Partial index is not allowed for this operation, ns:"
                                       << nss.ns()
                                       << ", index: "
-                                      << indexKeyPattern};
+                                      << *indexName};
             }
 
-            KeyPattern keyPattern(indexKeyPattern);
+            KeyPattern keyPattern(indexDescriptor->keyPattern());
             auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
             auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
             auto bounds =
@@ -494,8 +496,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
         auto state = planExecutor->getNext(&doc, nullptr);
         if (PlanExecutor::IS_EOF == state) {
             return {ErrorCodes::CollectionIsEmpty,
-                    str::stream() << "Collection is empty, ns: " << nss.ns() << ", index: "
-                                  << indexKeyPattern};
+                    str::stream() << "Collection is empty, ns: " << nss.ns()};
         }
         invariant(PlanExecutor::ADVANCED == state);
         return doc;
@@ -508,16 +509,16 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
 
 StatusWith<BSONObj> StorageInterfaceImpl::findOne(OperationContext* txn,
                                                   const NamespaceString& nss,
-                                                  const BSONObj& indexKeyPattern,
+                                                  boost::optional<StringData> indexName,
                                                   ScanDirection scanDirection) {
-    return _findOrDeleteOne(txn, nss, indexKeyPattern, scanDirection, FindDeleteMode::kFind);
+    return _findOrDeleteOne(txn, nss, indexName, scanDirection, FindDeleteMode::kFind);
 }
 
 StatusWith<BSONObj> StorageInterfaceImpl::deleteOne(OperationContext* txn,
                                                     const NamespaceString& nss,
-                                                    const BSONObj& indexKeyPattern,
+                                                    boost::optional<StringData> indexName,
                                                     ScanDirection scanDirection) {
-    return _findOrDeleteOne(txn, nss, indexKeyPattern, scanDirection, FindDeleteMode::kDelete);
+    return _findOrDeleteOne(txn, nss, indexName, scanDirection, FindDeleteMode::kDelete);
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* txn) {

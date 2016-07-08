@@ -90,8 +90,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         IndexScanParams params;
 
-        params.descriptor =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, ixn->indexKeyPattern);
+        params.descriptor = collection->getIndexCatalog()->findIndexByName(txn, ixn->index.name);
         invariant(params.descriptor);
 
         params.bounds = ixn->bounds;
@@ -223,7 +222,7 @@ PlanStage* buildStages(OperationContext* txn,
         params.addDistMeta = node->addDistMeta;
 
         IndexDescriptor* twoDIndex =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
+            collection->getIndexCatalog()->findIndexByName(txn, node->index.name);
         invariant(twoDIndex);
 
         GeoNear2DStage* nearStage = new GeoNear2DStage(params, txn, ws, collection, twoDIndex);
@@ -240,14 +239,14 @@ PlanStage* buildStages(OperationContext* txn,
         params.addDistMeta = node->addDistMeta;
 
         IndexDescriptor* s2Index =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
+            collection->getIndexCatalog()->findIndexByName(txn, node->index.name);
         invariant(s2Index);
 
         return new GeoNear2DSphereStage(params, txn, ws, collection, s2Index);
     } else if (STAGE_TEXT == root->getType()) {
         const TextNode* node = static_cast<const TextNode*>(root);
         IndexDescriptor* desc =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
+            collection->getIndexCatalog()->findIndexByName(txn, node->index.name);
         invariant(desc);
         const FTSAccessMethod* fam =
             static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
@@ -290,8 +289,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         DistinctParams params;
 
-        params.descriptor =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, dn->indexKeyPattern);
+        params.descriptor = collection->getIndexCatalog()->findIndexByName(txn, dn->index.name);
         invariant(params.descriptor);
         params.direction = dn->direction;
         params.bounds = dn->bounds;
@@ -307,8 +305,7 @@ PlanStage* buildStages(OperationContext* txn,
 
         CountScanParams params;
 
-        params.descriptor =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, csn->indexKeyPattern);
+        params.descriptor = collection->getIndexCatalog()->findIndexByName(txn, csn->index.name);
         invariant(params.descriptor);
         params.startKey = csn->startKey;
         params.startKeyInclusive = csn->startKeyInclusive;

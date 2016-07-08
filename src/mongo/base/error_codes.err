@@ -177,6 +177,7 @@ error_code("ZoneNotFound", 175)
 error_code("RangeOverlapConflict", 176)
 error_code("WindowsPdhError", 177)
 error_code("BadPerfCounterPath", 178)
+error_code("AmbiguousIndexKeyPattern", 179)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

@@ -103,14 +103,24 @@ Status wrappedRun(OperationContext* txn,
     }
 
     if (f.type() == Object) {
-        IndexDescriptor* desc =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, f.embeddedObject());
-        if (desc == NULL) {
+        std::vector<IndexDescriptor*> indexes;
+        collection->getIndexCatalog()->findIndexesByKeyPattern(
+            txn, f.embeddedObject(), false, &indexes);
+        if (indexes.empty()) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream() << "can't find index with key: "
-                                        << f.embeddedObject().toString());
+                          str::stream() << "can't find index with key: " << f.embeddedObject());
+        } else if (indexes.size() > 1) {
+            return Status(ErrorCodes::AmbiguousIndexKeyPattern,
+                          str::stream() << indexes.size() << " indexes found for key: "
+                                        << f.embeddedObject()
+                                        << ", identify by name instead."
+                                        << " Conflicting indexes: "
+                                        << indexes[0]->infoObj()
+                                        << ", "
+                                        << indexes[1]->infoObj());
         }
 
+        IndexDescriptor* desc = indexes[0];
         if (desc->isIdIndex()) {
             return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
         }

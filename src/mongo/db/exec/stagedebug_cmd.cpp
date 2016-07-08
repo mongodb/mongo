@@ -273,12 +273,30 @@ public:
         string nodeName = firstElt.fieldName();
 
         if ("ixscan" == nodeName) {
-            // This'll throw if it's not an obj but that's OK.
-            BSONObj keyPatternObj = nodeArgs["keyPattern"].Obj();
-
-            IndexDescriptor* desc =
-                collection->getIndexCatalog()->findIndexByKeyPattern(txn, keyPatternObj);
-            uassert(16890, "Can't find index: " + keyPatternObj.toString(), desc);
+            IndexDescriptor* desc;
+            if (BSONElement keyPatternElement = nodeArgs["keyPattern"]) {
+                // This'll throw if it's not an obj but that's OK.
+                BSONObj keyPatternObj = keyPatternElement.Obj();
+                std::vector<IndexDescriptor*> indexes;
+                collection->getIndexCatalog()->findIndexesByKeyPattern(
+                    txn, keyPatternObj, false, &indexes);
+                uassert(16890,
+                        str::stream() << "Can't find index: " << keyPatternObj,
+                        !indexes.empty());
+                uassert(ErrorCodes::AmbiguousIndexKeyPattern,
+                        str::stream() << indexes.size() << " matching indexes for key pattern: "
+                                      << keyPatternObj
+                                      << ". Conflicting indexes: "
+                                      << indexes[0]->infoObj()
+                                      << ", "
+                                      << indexes[1]->infoObj(),
+                        indexes.size() == 1);
+                desc = indexes[0];
+            } else {
+                StringData name = nodeArgs["name"].valueStringData();
+                desc = collection->getIndexCatalog()->findIndexByName(txn, name);
+                uassert(40223, str::stream() << "Can't find index: " << name.toString(), desc);
+            }
 
             IndexScanParams params;
             params.descriptor = desc;

@@ -291,30 +291,6 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     return kpBuilder.obj();
 }
 
-static bool findShardKeyIndexPattern(OperationContext* txn,
-                                     const string& ns,
-                                     const BSONObj& shardKeyPattern,
-                                     BSONObj* indexPattern) {
-    AutoGetCollectionForRead ctx(txn, ns);
-    Collection* collection = ctx.getCollection();
-    if (!collection) {
-        return false;
-    }
-
-    // Allow multiKey based on the invariant that shard keys must be single-valued.
-    // Therefore, any multi-key index prefixed by shard key cannot be multikey over
-    // the shard key fields.
-    const IndexDescriptor* idx =
-        collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn,
-                                                                 shardKeyPattern,
-                                                                 false);  // requireSingleKey
-
-    if (idx == NULL)
-        return false;
-    *indexPattern = idx->keyPattern().getOwned();
-    return true;
-}
-
 long long Helpers::removeRange(OperationContext* txn,
                                const KeyRange& range,
                                bool maxInclusive,
@@ -327,24 +303,45 @@ long long Helpers::removeRange(OperationContext* txn,
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
-    BSONObj indexKeyPatternDoc;
-    if (!findShardKeyIndexPattern(txn, ns, range.keyPattern, &indexKeyPatternDoc)) {
-        warning(LogComponent::kSharding) << "no index found to clean data over range of type "
-                                         << range.keyPattern << " in " << ns << endl;
-        return -1;
+    std::string indexName;
+    BSONObj min;
+    BSONObj max;
+
+    {
+        AutoGetCollectionForRead ctx(txn, ns);
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
+            warning(LogComponent::kSharding)
+                << "collection deleted before cleaning data over range of type " << range.keyPattern
+                << " in " << ns << endl;
+            return -1;
+        }
+
+        // Allow multiKey based on the invariant that shard keys must be single-valued.
+        // Therefore, any multi-key index prefixed by shard key cannot be multikey over
+        // the shard key fields.
+        const IndexDescriptor* idx =
+            collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn,
+                                                                     range.keyPattern,
+                                                                     false);  // requireSingleKey
+        if (!idx) {
+            warning(LogComponent::kSharding) << "no index found to clean data over range of type "
+                                             << range.keyPattern << " in " << ns << endl;
+            return -1;
+        }
+
+        indexName = idx->indexName();
+        KeyPattern indexKeyPattern(idx->keyPattern());
+
+        // Extend bounds to match the index we found
+
+        // Extend min to get (min, MinKey, MinKey, ....)
+        min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.minKey, false));
+        // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
+        // If not included, extend max to get (max, MinKey, MinKey, ....)
+        max = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.maxKey, maxInclusive));
     }
 
-    KeyPattern indexKeyPattern(indexKeyPatternDoc);
-
-    // Extend bounds to match the index we found
-
-    // Extend min to get (min, MinKey, MinKey, ....)
-    const BSONObj& min =
-        Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.minKey, false));
-    // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
-    // If not included, extend max to get (max, MinKey, MinKey, ....)
-    const BSONObj& max =
-        Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.maxKey, maxInclusive));
 
     MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
         << "begin removal of " << min << " to " << max << " in " << ns
@@ -362,8 +359,7 @@ long long Helpers::removeRange(OperationContext* txn,
             if (!collection)
                 break;
 
-            IndexDescriptor* desc =
-                collection->getIndexCatalog()->findIndexByKeyPattern(txn, indexKeyPattern.toBSON());
+            IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexName);
 
             unique_ptr<PlanExecutor> exec(
                 InternalPlanner::indexScan(txn,

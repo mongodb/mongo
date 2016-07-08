@@ -32,8 +32,10 @@
 
 #include "mongo/db/query/query_planner.h"
 
+#include <boost/optional.hpp>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -292,7 +294,7 @@ Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const tagged
 // static
 Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
                                          const PlanCacheIndexTree* const indexTree,
-                                         const map<BSONObj, size_t>& indexMap) {
+                                         const map<StringData, size_t>& indexMap) {
     if (NULL == filter) {
         return Status(ErrorCodes::BadValue, "Cannot tag tree: filter is NULL.");
     }
@@ -321,10 +323,10 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
     }
 
     if (NULL != indexTree->entry.get()) {
-        map<BSONObj, size_t>::const_iterator got = indexMap.find(indexTree->entry->keyPattern);
+        map<StringData, size_t>::const_iterator got = indexMap.find(indexTree->entry->name);
         if (got == indexMap.end()) {
             mongoutils::str::stream ss;
-            ss << "Did not find index with keyPattern: " << indexTree->entry->keyPattern.toString();
+            ss << "Did not find index with name: " << indexTree->entry->name;
             return Status(ErrorCodes::BadValue, ss);
         }
         filter->setTag(
@@ -386,11 +388,11 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     // Map from index name to index number.
     // TODO: can we assume that the index numbering has the same lifetime
     // as the cache state?
-    map<BSONObj, size_t> indexMap;
+    map<StringData, size_t> indexMap;
     for (size_t i = 0; i < params.indices.size(); ++i) {
         const IndexEntry& ie = params.indices[i];
-        indexMap[ie.keyPattern] = i;
-        LOG(5) << "Index " << i << ": " << ie.keyPattern.toString() << endl;
+        indexMap[ie.name] = i;
+        LOG(5) << "Index " << i << ": " << ie.name << endl;
     }
 
     Status s = tagAccordingToCache(clone.get(), winnerCacheData.tree.get(), indexMap);
@@ -531,7 +533,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         }
     }
 
-    size_t hintIndexNumber = numeric_limits<size_t>::max();
+    boost::optional<size_t> hintIndexNumber;
 
     if (hintIndex.isEmpty()) {
         QueryPlannerIXSelect::findRelevantIndices(fields, params.indices, &relevantIndices);
@@ -558,13 +560,20 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                     relevantIndices.push_back(params.indices[i]);
                     LOG(5) << "Hint specified, restricting indices to " << hintIndex.toString()
                            << endl;
+                    if (hintIndexNumber) {
+                        return Status(ErrorCodes::IndexNotFound,
+                                      str::stream() << "Hint matched multiple indexes, "
+                                                    << "must hint by index name. Matched: "
+                                                    << params.indices[i].toString()
+                                                    << " and "
+                                                    << params.indices[*hintIndexNumber].toString());
+                    }
                     hintIndexNumber = i;
-                    break;
                 }
             }
         }
 
-        if (hintIndexNumber == numeric_limits<size_t>::max()) {
+        if (!hintIndexNumber) {
             return Status(ErrorCodes::BadValue, "bad hint");
         }
     }
@@ -598,7 +607,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                 return Status(ErrorCodes::BadValue, "hint provided does not work with max query");
             }
 
-            const BSONObj& kp = params.indices[hintIndexNumber].keyPattern;
+            const BSONObj& kp = params.indices[*hintIndexNumber].keyPattern;
             finishedMinObj = finishMinObj(kp, minObj, maxObj);
             finishedMaxObj = finishMaxObj(kp, minObj, maxObj);
 
@@ -609,7 +618,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                               "hint provided does not work with min/max query");
             }
 
-            idxNo = hintIndexNumber;
+            idxNo = *hintIndexNumber;
         } else {
             // No hinted index, look for one that is compatible (has same field names and
             // ordering thereof).
@@ -807,7 +816,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // desired behavior when an index is hinted that is not relevant to the query.
     if (!hintIndex.isEmpty()) {
         if (0 == out->size()) {
-            QuerySolution* soln = buildWholeIXSoln(params.indices[hintIndexNumber], query, params);
+            QuerySolution* soln = buildWholeIXSoln(params.indices[*hintIndexNumber], query, params);
             verify(NULL != soln);
             LOG(5) << "Planner: outputting soln that uses hinted index as scan." << endl;
             out->push_back(soln);

@@ -449,7 +449,7 @@ class CachePlanSelectionTest : public mongo::unittest::Test {
 protected:
     void setUp() {
         params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
-        addIndex(BSON("_id" << 1));
+        addIndex(BSON("_id" << 1), "_id_");
     }
 
     void tearDown() {
@@ -458,22 +458,21 @@ protected:
         }
     }
 
-    void addIndex(BSONObj keyPattern, bool multikey = false) {
+    void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {
         // The first false means not multikey.
         // The second false means not sparse.
-        // The third arg is the index name and I am egotistical.
         // The NULL means no filter expression.
-        params.indices.push_back(IndexEntry(
-            keyPattern, multikey, false, false, "hari_king_of_the_stove", NULL, BSONObj()));
+        params.indices.push_back(
+            IndexEntry(keyPattern, multikey, false, false, indexName, NULL, BSONObj()));
     }
 
-    void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-        params.indices.push_back(IndexEntry(
-            keyPattern, multikey, sparse, false, "note_to_self_dont_break_build", NULL, BSONObj()));
+    void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
+        params.indices.push_back(
+            IndexEntry(keyPattern, multikey, sparse, false, indexName, NULL, BSONObj()));
     }
 
-    void addIndex(BSONObj keyPattern, CollatorInterface* collator) {
-        IndexEntry entry(keyPattern, false, false, false, "index_with_collation", NULL, BSONObj());
+    void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
+        IndexEntry entry(keyPattern, false, false, false, indexName, NULL, BSONObj());
         entry.collator = collator;
         params.indices.push_back(entry);
     }
@@ -782,7 +781,7 @@ const PlanCacheKey CachePlanSelectionTest::ck = "mock_cache_key";
 //
 
 TEST_F(CachePlanSelectionTest, EqualityIndexScan) {
-    addIndex(BSON("x" << 1));
+    addIndex(BSON("x" << 1), "x_1");
     runQuery(BSON("x" << 5));
 
     assertPlanCacheRecoversSolution(BSON("x" << 5),
@@ -790,7 +789,7 @@ TEST_F(CachePlanSelectionTest, EqualityIndexScan) {
 }
 
 TEST_F(CachePlanSelectionTest, EqualityIndexScanWithTrailingFields) {
-    addIndex(BSON("x" << 1 << "y" << 1));
+    addIndex(BSON("x" << 1 << "y" << 1), "x_1_y_1");
     runQuery(BSON("x" << 5));
 
     assertPlanCacheRecoversSolution(
@@ -803,7 +802,8 @@ TEST_F(CachePlanSelectionTest, EqualityIndexScanWithTrailingFields) {
 
 TEST_F(CachePlanSelectionTest, Basic2DSphereNonNear) {
     addIndex(BSON("a"
-                  << "2dsphere"));
+                  << "2dsphere"),
+             "a_2dsphere");
     BSONObj query;
 
     query = fromjson(
@@ -819,7 +819,8 @@ TEST_F(CachePlanSelectionTest, Basic2DSphereNonNear) {
 
 TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNear) {
     addIndex(BSON("a"
-                  << "2dsphere"));
+                  << "2dsphere"),
+             "a_2dsphere");
     BSONObj query;
 
     query = fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
@@ -838,9 +839,10 @@ TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNear) {
 }
 
 TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNearReverseCompound) {
-    addIndex(BSON("x" << 1));
+    addIndex(BSON("x" << 1), "x_1");
     addIndex(BSON("x" << 1 << "a"
-                      << "2dsphere"));
+                      << "2dsphere"),
+             "x_1_a_2dsphere");
     BSONObj query = fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}");
     runQuery(query);
     assertPlanCacheRecoversSolution(
@@ -851,7 +853,8 @@ TEST_F(CachePlanSelectionTest, Basic2DSphereGeoNearReverseCompound) {
 
 TEST_F(CachePlanSelectionTest, TwoDSphereNoGeoPred) {
     addIndex(BSON("x" << 1 << "a"
-                      << "2dsphere"));
+                      << "2dsphere"),
+             "x_1_a_2dsphere");
     runQuery(BSON("x" << 1));
     assertPlanCacheRecoversSolution(BSON("x" << 1),
                                     "{fetch: {node: {ixscan: {pattern: {x: 1, a: '2dsphere'}}}}}");
@@ -859,9 +862,11 @@ TEST_F(CachePlanSelectionTest, TwoDSphereNoGeoPred) {
 
 TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
     addIndex(BSON("a"
-                  << "2dsphere"));
+                  << "2dsphere"),
+             "a_2dsphere");
     addIndex(BSON("b"
-                  << "2dsphere"));
+                  << "2dsphere"),
+             "b_2dsphere");
     BSONObj query = fromjson(
         "{$or: [ {a: {$geoIntersects: {$geometry: {type: 'Point', coordinates: [10.0, 10.0]}}}},"
         " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}");
@@ -879,7 +884,8 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
     addIndex(BSON("a"
                   << "2dsphere"
                   << "b"
-                  << 1));
+                  << 1),
+             "a_2dsphere_b_2dsphere");
 
     BSONObj query = fromjson(
         "{$and: [{b: 1}, {a: {$within: {$polygon: [[0, 0], [0, 0], [0, 0], [0, 0]]}}}, {a: "
@@ -895,7 +901,7 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
 //
 
 TEST_F(CachePlanSelectionTest, TwoPredicatesAnding) {
-    addIndex(BSON("x" << 1));
+    addIndex(BSON("x" << 1), "x_1");
     BSONObj query = fromjson("{$and: [ {x: {$gt: 1}}, {x: {$lt: 3}} ] }");
     runQuery(query);
     assertPlanCacheRecoversSolution(
@@ -903,7 +909,7 @@ TEST_F(CachePlanSelectionTest, TwoPredicatesAnding) {
 }
 
 TEST_F(CachePlanSelectionTest, SimpleOr) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     BSONObj query = fromjson("{$or: [{a: 20}, {a: 21}]}");
     runQuery(query);
     assertPlanCacheRecoversSolution(
@@ -911,7 +917,7 @@ TEST_F(CachePlanSelectionTest, SimpleOr) {
 }
 
 TEST_F(CachePlanSelectionTest, OrWithAndChild) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     BSONObj query = fromjson("{$or: [{a: 20}, {$and: [{a:1}, {b:7}]}]}");
     runQuery(query);
     assertPlanCacheRecoversSolution(query,
@@ -922,7 +928,7 @@ TEST_F(CachePlanSelectionTest, OrWithAndChild) {
 }
 
 TEST_F(CachePlanSelectionTest, AndWithUnindexedOrChild) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     BSONObj query = fromjson("{a:20, $or: [{b:1}, {c:7}]}");
     runQuery(query);
     assertPlanCacheRecoversSolution(query,
@@ -932,8 +938,8 @@ TEST_F(CachePlanSelectionTest, AndWithUnindexedOrChild) {
 
 
 TEST_F(CachePlanSelectionTest, AndWithOrWithOneIndex) {
-    addIndex(BSON("b" << 1));
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1), "b_1");
+    addIndex(BSON("a" << 1), "a_1");
     BSONObj query = fromjson("{$or: [{b:1}, {c:7}], a:20}");
     runQuery(query);
     assertPlanCacheRecoversSolution(query,
@@ -947,8 +953,8 @@ TEST_F(CachePlanSelectionTest, AndWithOrWithOneIndex) {
 
 // SERVER-1205.
 TEST_F(CachePlanSelectionTest, MergeSort) {
-    addIndex(BSON("a" << 1 << "c" << 1));
-    addIndex(BSON("b" << 1 << "c" << 1));
+    addIndex(BSON("a" << 1 << "c" << 1), "a_1_c_1");
+    addIndex(BSON("b" << 1 << "c" << 1), "b_1_c_1");
 
     BSONObj query = fromjson("{$or: [{a:1}, {b:1}]}");
     BSONObj sort = BSON("c" << 1);
@@ -965,8 +971,8 @@ TEST_F(CachePlanSelectionTest, MergeSort) {
 
 // SERVER-1205 as well.
 TEST_F(CachePlanSelectionTest, NoMergeSortIfNoSortWanted) {
-    addIndex(BSON("a" << 1 << "c" << 1));
-    addIndex(BSON("b" << 1 << "c" << 1));
+    addIndex(BSON("a" << 1 << "c" << 1), "a_1_c_1");
+    addIndex(BSON("b" << 1 << "c" << 1), "b_1_c_1");
 
     BSONObj query = fromjson("{$or: [{a:1}, {b:1}]}");
     runQuerySortProj(query, BSONObj(), BSONObj());
@@ -983,7 +989,7 @@ TEST_F(CachePlanSelectionTest, NoMergeSortIfNoSortWanted) {
 // Disabled: SERVER-10801.
 /*
 TEST_F(CachePlanSelectionTest, SortOnGeoQuery) {
-    addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
+    addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"), "timestamp_-1_position_2dsphere");
     BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", "
                              "coordinates: [[[1, 1], [1, 90], [180, 90], "
                              "[180, 1], [1, 1]]]}}}}");
@@ -998,7 +1004,8 @@ TEST_F(CachePlanSelectionTest, SortOnGeoQuery) {
 // SERVER-9257
 TEST_F(CachePlanSelectionTest, CompoundGeoNoGeoPredicate) {
     addIndex(BSON("creationDate" << 1 << "foo.bar"
-                                 << "2dsphere"));
+                                 << "2dsphere"),
+             "creationDate_1_foo.bar_2dsphere");
     BSONObj query = fromjson("{creationDate: {$gt: 7}}");
     BSONObj sort = fromjson("{creationDate: 1}");
     runQuerySortProj(query, sort, BSONObj());
@@ -1012,7 +1019,7 @@ TEST_F(CachePlanSelectionTest, CompoundGeoNoGeoPredicate) {
 }
 
 TEST_F(CachePlanSelectionTest, ReverseScanForSort) {
-    addIndex(BSON("_id" << 1));
+    addIndex(BSON("_id" << 1), "_id_1");
     runQuerySortProj(BSONObj(), fromjson("{_id: -1}"), BSONObj());
     assertPlanCacheRecoversSolution(
         BSONObj(),
@@ -1027,22 +1034,22 @@ TEST_F(CachePlanSelectionTest, ReverseScanForSort) {
 //
 
 TEST_F(CachePlanSelectionTest, CollscanNoUsefulIndices) {
-    addIndex(BSON("a" << 1 << "b" << 1));
-    addIndex(BSON("c" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1");
+    addIndex(BSON("c" << 1), "c_1");
     runQuery(BSON("b" << 4));
     assertPlanCacheRecoversSolution(BSON("b" << 4), "{cscan: {filter: {b: 4}, dir: 1}}");
 }
 
 TEST_F(CachePlanSelectionTest, CollscanOrWithoutEnoughIndices) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     BSONObj query = fromjson("{$or: [{a: 20}, {b: 21}]}");
     runQuery(query);
     assertPlanCacheRecoversSolution(query, "{cscan: {filter: {$or:[{a:20},{b:21}]}, dir: 1}}");
 }
 
 TEST_F(CachePlanSelectionTest, CollscanMergeSort) {
-    addIndex(BSON("a" << 1 << "c" << 1));
-    addIndex(BSON("b" << 1 << "c" << 1));
+    addIndex(BSON("a" << 1 << "c" << 1), "a_1_c_1");
+    addIndex(BSON("b" << 1 << "c" << 1), "b_1_c_1");
 
     BSONObj query = fromjson("{$or: [{a:1}, {b:1}]}");
     BSONObj sort = BSON("c" << 1);
@@ -1064,7 +1071,7 @@ TEST_F(CachePlanSelectionTest, CachedPlanForCompoundMultikeyIndexCanCompoundBoun
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
-    addIndex(BSON("a" << 1 << "b" << 1), multikey);
+    addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1", multikey);
 
     BSONObj query = fromjson("{a: 2, b: 3}");
     runQuery(query);
@@ -1080,7 +1087,7 @@ TEST_F(CachePlanSelectionTest,
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
-    addIndex(BSON("a" << 1), multikey);
+    addIndex(BSON("a" << 1), "a_1", multikey);
 
     BSONObj query = fromjson("{$and: [{a: 2}, {a: 3}]}");
     runQuery(query);
@@ -1104,7 +1111,7 @@ TEST_F(CachePlanSelectionTest,
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
-    addIndex(BSON("a" << 1), multikey);
+    addIndex(BSON("a" << 1), "a_1", multikey);
 
     BSONObj query = fromjson("{$and: [{a: {$gte: 2}}, {a: {$lt: 3}}]}");
     runQuery(query);
@@ -1121,8 +1128,8 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsi
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
-    addIndex(BSON("a.b" << 1), multikey);
-    addIndex(BSON("a.c" << 1), multikey);
+    addIndex(BSON("a.b" << 1), "a.b_1", multikey);
+    addIndex(BSON("a.c" << 1), "a.c_1", multikey);
 
     BSONObj query = fromjson("{a: {$elemMatch: {b: 2, c: 3}}}");
     runQuery(query);
@@ -1145,8 +1152,8 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanI
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
-    addIndex(BSON("a.b" << 1), multikey);
-    addIndex(BSON("a.c" << 1), !multikey);
+    addIndex(BSON("a.b" << 1), "a.b_1", multikey);
+    addIndex(BSON("a.c" << 1), "a.c_1", !multikey);
 
     BSONObj query = fromjson("{'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}}}");
     runQuery(query);
@@ -1164,13 +1171,14 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanI
 
 TEST_F(CachePlanSelectionTest, GeoNear2DNotCached) {
     addIndex(BSON("a"
-                  << "2d"));
+                  << "2d"),
+             "a_2d");
     runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
     assertNotCached("{geoNear2d: {a: '2d'}}");
 }
 
 TEST_F(CachePlanSelectionTest, MinNotCached) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     runQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), BSONObj());
     assertNotCached(
         "{fetch: {filter: null, "
@@ -1178,7 +1186,7 @@ TEST_F(CachePlanSelectionTest, MinNotCached) {
 }
 
 TEST_F(CachePlanSelectionTest, MaxNotCached) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     runQueryHintMinMax(BSONObj(), BSONObj(), BSONObj(), fromjson("{a: 1}"));
     assertNotCached(
         "{fetch: {filter: null, "
@@ -1186,8 +1194,8 @@ TEST_F(CachePlanSelectionTest, MaxNotCached) {
 }
 
 TEST_F(CachePlanSelectionTest, NaturalHintNotCached) {
-    addIndex(BSON("a" << 1));
-    addIndex(BSON("b" << 1));
+    addIndex(BSON("a" << 1), "a_1");
+    addIndex(BSON("b" << 1), "b_1");
     runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("$natural" << 1));
     assertNotCached(
         "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
@@ -1195,7 +1203,7 @@ TEST_F(CachePlanSelectionTest, NaturalHintNotCached) {
 }
 
 TEST_F(CachePlanSelectionTest, HintValidNotCached) {
-    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1), "a_1");
     runQueryHint(BSONObj(), fromjson("{a: 1}"));
     assertNotCached(
         "{fetch: {filter: null, "
@@ -1208,7 +1216,8 @@ TEST_F(CachePlanSelectionTest, HintValidNotCached) {
 
 TEST_F(CachePlanSelectionTest, Basic2DNonNearNotCached) {
     addIndex(BSON("a"
-                  << "2d"));
+                  << "2d"),
+             "a_2d");
     BSONObj query;
 
     // Polygon
@@ -1234,9 +1243,11 @@ TEST_F(CachePlanSelectionTest, Basic2DNonNearNotCached) {
 
 TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
     addIndex(BSON("a"
-                  << "2d"));
+                  << "2d"),
+             "a_2d");
     addIndex(BSON("b"
-                  << "2d"));
+                  << "2d"),
+             "b_2d");
     BSONObj query = fromjson(
         "{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
         " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}");
@@ -1253,7 +1264,7 @@ TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
 
 TEST_F(CachePlanSelectionTest, MatchingCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    addIndex(BSON("x" << 1), &collator);
+    addIndex(BSON("x" << 1), "x_1", &collator);
     runQueryAsCommand(fromjson(
         "{find: 'testns', filter: {x: 'foo'}, collation: {locale: 'mock_reverse_string'}}"));
 

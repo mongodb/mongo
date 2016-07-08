@@ -182,12 +182,13 @@ private:
         }
 
         const BSONObj key = idx["key"].Obj();
+        const StringData name = idx["name"].valueStringData();
         if (key.nFields() != 1) {
             error() << "key for ttl index can only have 1 field, skipping ttl job for: " << idx;
             return;
         }
 
-        LOG(1) << "TTL -- ns: " << collectionNSS << " key: " << key;
+        LOG(1) << "TTL -- ns: " << collectionNSS << " key: " << key << " name: " << name;
 
         AutoGetCollection autoGetCollection(txn, collectionNSS, MODE_IX);
         Collection* collection = autoGetCollection.getCollection();
@@ -202,7 +203,7 @@ private:
             return;
         }
 
-        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByKeyPattern(txn, key);
+        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, name);
         if (!desc) {
             LOG(1) << "index not found (index build in progress? index dropped?), skipping "
                    << "ttl job for: " << idx;

@@ -69,7 +69,9 @@ public:
     }
 
     IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-        return coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
+        std::vector<IndexDescriptor*> indexes;
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        return indexes.empty() ? nullptr : indexes[0];
     }
 
     void insert(const BSONObj& obj) {

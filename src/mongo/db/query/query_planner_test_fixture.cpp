@@ -140,6 +140,20 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* col
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern,
+                                const CollatorInterface* collator,
+                                StringData indexName) {
+    const bool sparse = false;
+    const bool unique = false;
+    const bool multikey = false;
+    const auto name = indexName.toString();
+    const MatchExpression* filterExpr = nullptr;
+    const BSONObj infoObj;
+    IndexEntry entry(keyPattern, multikey, sparse, unique, name, filterExpr, infoObj);
+    entry.collator = collator;
+    params.indices.push_back(entry);
+}
+
+void QueryPlannerTest::addIndex(BSONObj keyPattern,
                                 MatchExpression* filterExpr,
                                 const CollatorInterface* collator) {
     const bool sparse = false;

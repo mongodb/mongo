@@ -266,10 +266,26 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONObj ixscanObj = el.Obj();
 
         BSONElement pattern = ixscanObj["pattern"];
-        if (pattern.eoo() || !pattern.isABSONObj()) {
-            return false;
+        if (!pattern.eoo()) {
+            if (!pattern.isABSONObj()) {
+                return false;
+            }
+            if (pattern.Obj() != ixn->index.keyPattern) {
+                return false;
+            }
         }
-        if (pattern.Obj() != ixn->indexKeyPattern) {
+
+        BSONElement name = ixscanObj["name"];
+        if (!name.eoo()) {
+            if (name.type() != BSONType::String) {
+                return false;
+            }
+            if (name.valueStringData() != ixn->index.name) {
+                return false;
+            }
+        }
+
+        if (name.eoo() && pattern.eoo()) {
             return false;
         }
 
@@ -314,7 +330,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             return false;
         }
         BSONObj geoObj = el.Obj();
-        return geoObj == node->indexKeyPattern;
+        return geoObj == node->index.keyPattern;
     } else if (STAGE_GEO_NEAR_2DSPHERE == trueSoln->getType()) {
         const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(trueSoln);
         BSONElement el = testSoln["geoNear2dsphere"];
@@ -327,7 +343,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (pattern.eoo() || !pattern.isABSONObj()) {
             return false;
         }
-        if (pattern.Obj() != node->indexKeyPattern) {
+        if (pattern.Obj() != node->index.keyPattern) {
             return false;
         }
 

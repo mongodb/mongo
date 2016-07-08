@@ -118,14 +118,29 @@ Status collMod(OperationContext* txn,
                 continue;
             }
 
-            const IndexDescriptor* idx =
-                coll->getIndexCatalog()->findIndexByKeyPattern(txn, keyPattern);
-            if (idx == NULL) {
+            std::vector<IndexDescriptor*> indexes;
+            coll->getIndexCatalog()->findIndexesByKeyPattern(txn, keyPattern, false, &indexes);
+
+            if (indexes.size() > 1) {
+                errorStatus =
+                    Status(ErrorCodes::AmbiguousIndexKeyPattern,
+                           str::stream() << "index keyPattern " << keyPattern << " matches "
+                                         << indexes.size()
+                                         << " indexes,"
+                                         << " must use index name. "
+                                         << "Conflicting indexes:"
+                                         << indexes[0]->infoObj()
+                                         << ", "
+                                         << indexes[1]->infoObj());
+                continue;
+            } else if (indexes.empty()) {
                 errorStatus = Status(
-                    ErrorCodes::InvalidOptions,
+                    ErrorCodes::IndexNotFound,
                     str::stream() << "cannot find index " << keyPattern << " for ns " << nss.ns());
                 continue;
             }
+
+            const IndexDescriptor* idx = indexes[0];
             BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
             if (oldExpireSecs.eoo()) {
                 errorStatus =
