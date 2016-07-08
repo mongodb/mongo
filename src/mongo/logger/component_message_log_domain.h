@@ -79,21 +79,8 @@ public:
      */
     void clearMinimumLoggedSeverity(LogComponent component);
 
-    /**
-     * Returns true if system logs should be redacted.
-     */
-    bool shouldRedactLogs() {
-        return _shouldRedact.loadRelaxed();
-    }
-
-    /**
-     * Set the 'redact' mode of the server.
-     */
-    void setShouldRedactLogs(bool shouldRedact);
-
 private:
     LogComponentSettings _settings;
-    AtomicBool _shouldRedact{false};
 };
 
 }  // namespace logger

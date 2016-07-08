@@ -26,10 +26,3 @@ env.CppUnitTest('rotatable_file_writer_test',
 env.CppUnitTest(target='parse_log_component_settings_test',
                 source='parse_log_component_settings_test.cpp',
                 LIBDEPS=['$BUILD_DIR/mongo/base', 'parse_log_component_settings'])
-
-env.CppUnitTest(target='redaction_test',
-                source='redaction_test.cpp',
-                LIBDEPS=[
-                    '$BUILD_DIR/mongo/base',
-                ]
-)

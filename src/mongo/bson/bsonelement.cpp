@@ -624,12 +624,11 @@ int BSONElement::size() const {
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {
     StringBuilder s;
-    toString(s, includeFieldName, full, false);
+    toString(s, includeFieldName, full);
     return s.str();
 }
 
-void BSONElement::toString(
-    StringBuilder& s, bool includeFieldName, bool full, bool redactValues, int depth) const {
+void BSONElement::toString(StringBuilder& s, bool includeFieldName, bool full, int depth) const {
     if (depth > BSONObj::maxToStringRecursionDepth) {
         // check if we want the full/complete string
         if (full) {
@@ -644,21 +643,6 @@ void BSONElement::toString(
 
     if (includeFieldName && type() != EOO)
         s << fieldName() << ": ";
-
-    switch (type()) {
-        case Object:
-            return embeddedObject().toString(s, false, full, redactValues, depth + 1);
-        case mongo::Array:
-            return embeddedObject().toString(s, true, full, redactValues, depth + 1);
-        default:
-            break;
-    }
-
-    if (redactValues) {
-        s << "\"###\"";
-        return;
-    }
-
     switch (type()) {
         case EOO:
             s << "EOO";
@@ -686,6 +670,12 @@ void BSONElement::toString(
             break;
         case mongo::Bool:
             s << (boolean() ? "true" : "false");
+            break;
+        case Object:
+            embeddedObject().toString(s, false, full, depth + 1);
+            break;
+        case mongo::Array:
+            embeddedObject().toString(s, true, full, depth + 1);
             break;
         case Undefined:
             s << "undefined";

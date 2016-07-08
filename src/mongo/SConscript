@@ -88,7 +88,6 @@ baseSource=[
     'logger/message_event_utf8_encoder.cpp',
     'logger/message_log_domain.cpp',
     'logger/ramlog.cpp',
-    'logger/redaction.cpp',
     'logger/rotatable_file_manager.cpp',
     'logger/rotatable_file_writer.cpp',
     'platform/decimal128.cpp',
