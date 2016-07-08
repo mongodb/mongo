@@ -49,6 +49,9 @@ namespace {
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
+// The batchSize to use for the query to get all documents from the collection.
+// 16MB max batch size / 12 byte min doc size * 10 (for good measure) = batchSize to use.
+const auto batchSize = (16 * 1024 * 1024) / 12 * 10;
 // The number of retries for the listIndexes commands.
 const size_t numListIndexesRetries = 1;
 // The number of retries for the find command, which gets the data.
@@ -84,21 +87,24 @@ CollectionCloner::CollectionCloner(ReplicationExecutor* executor,
                               numListIndexesRetries,
                               executor::RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::kAllRetriableErrors)),
-      _findFetcher(_executor,
-                   _source,
-                   _sourceNss.db().toString(),
-                   BSON("find" << _sourceNss.coll() << "noCursorTimeout" << true),  // SERVER-1387
-                   stdx::bind(&CollectionCloner::_findCallback,
-                              this,
-                              stdx::placeholders::_1,
-                              stdx::placeholders::_2,
-                              stdx::placeholders::_3),
-                   rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
-                   RemoteCommandRequest::kNoTimeout,
-                   RemoteCommandRetryScheduler::makeRetryPolicy(
-                       numFindRetries,
-                       executor::RemoteCommandRequest::kNoTimeout,
-                       RemoteCommandRetryScheduler::kAllRetriableErrors)),
+      _findFetcher(
+          _executor,
+          _source,
+          _sourceNss.db().toString(),
+          // noCursorTimeout true, large batchSize (for older server versions to get larger batch)
+          BSON("find" << _sourceNss.coll() << "noCursorTimeout" << true << "batchSize"
+                      << batchSize),
+          stdx::bind(&CollectionCloner::_findCallback,
+                     this,
+                     stdx::placeholders::_1,
+                     stdx::placeholders::_2,
+                     stdx::placeholders::_3),
+          rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+          RemoteCommandRequest::kNoTimeout,
+          RemoteCommandRetryScheduler::makeRetryPolicy(
+              numFindRetries,
+              executor::RemoteCommandRequest::kNoTimeout,
+              RemoteCommandRetryScheduler::kAllRetriableErrors)),
 
       _indexSpecs(),
       _documents(),
@@ -297,29 +303,22 @@ void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& f
     auto batchData(fetchResult.getValue());
     bool lastBatch = *nextAction == Fetcher::NextAction::kNoAction;
     if (batchData.documents.size() > 0) {
-        UniqueLock lk(_mutex);
+        LockGuard lk(_mutex);
         _documents.insert(_documents.end(), batchData.documents.begin(), batchData.documents.end());
-        lk.unlock();
-        auto&& scheduleResult = _scheduleDbWorkFn(stdx::bind(
-            &CollectionCloner::_insertDocumentsCallback, this, stdx::placeholders::_1, lastBatch));
-        if (!scheduleResult.isOK()) {
-            Status newStatus{scheduleResult.getStatus().code(),
-                             str::stream() << "While cloning collection '" << _sourceNss.ns()
-                                           << "' there was an error '"
-                                           << scheduleResult.getStatus().reason()
-                                           << "'"};
-            _finishCallback(newStatus);
-            return;
-        }
-    } else {
-        if (batchData.first && !batchData.cursorId) {
-            // Empty collection.
-            _finishCallback(Status::OK());
-        } else {
-            warning() << "No documents returned in batch; ns: " << _sourceNss
-                      << ", noCursorId:" << batchData.cursorId << ", lastBatch:" << lastBatch;
-            _finishCallback({ErrorCodes::IllegalOperation, "Cursor batch returned no documents."});
-        }
+    } else if (!batchData.first) {
+        warning() << "No documents returned in batch; ns: " << _sourceNss
+                  << ", cursorId:" << batchData.cursorId << ", isLastBatch:" << lastBatch;
+    }
+
+    auto&& scheduleResult = _scheduleDbWorkFn(stdx::bind(
+        &CollectionCloner::_insertDocumentsCallback, this, stdx::placeholders::_1, lastBatch));
+    if (!scheduleResult.isOK()) {
+        Status newStatus{scheduleResult.getStatus().code(),
+                         str::stream() << "While cloning collection '" << _sourceNss.ns()
+                                       << "' there was an error '"
+                                       << scheduleResult.getStatus().reason()
+                                       << "'"};
+        _finishCallback(newStatus);
         return;
     }
 
@@ -383,6 +382,7 @@ void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::Callb
     _documents.swap(docs);
     _stats.documents += docs.size();
     ++_stats.fetchBatches;
+    invariant(_collLoader);
     const auto status = _collLoader->insertDocuments(docs.cbegin(), docs.cend());
     lk.unlock();
 
@@ -395,6 +395,7 @@ void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::Callb
         return;
     }
 
+    // Done with last batch and time to call _finshCallback with Status::OK().
     _finishCallback(Status::OK());
 }
 

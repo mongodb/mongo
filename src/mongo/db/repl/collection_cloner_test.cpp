@@ -533,4 +533,85 @@ TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
     ASSERT_FALSE(collectionCloner->isActive());
 }
 
+TEST_F(CollectionClonerTest, LastBatchContainsNoDocuments) {
+    ASSERT_OK(collectionCloner->start());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
+
+    const BSONObj doc = BSON("_id" << 1);
+    processNetworkResponse(createCursorResponse(1, BSON_ARRAY(doc)));
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    const BSONObj doc2 = BSON("_id" << 2);
+    processNetworkResponse(createCursorResponse(1, BSON_ARRAY(doc2), "nextBatch"));
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(2, collectionStats.insertCount);
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    BSONArray emptyArray;
+    processNetworkResponse(createCursorResponse(0, emptyArray, "nextBatch"));
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(2, collectionStats.insertCount);
+    ASSERT_TRUE(collectionStats.commitCalled);
+
+    ASSERT_OK(getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+}
+
+TEST_F(CollectionClonerTest, MiddleBatchContainsNoDocuments) {
+    ASSERT_OK(collectionCloner->start());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
+
+    const BSONObj doc = BSON("_id" << 1);
+    processNetworkResponse(createCursorResponse(1, BSON_ARRAY(doc)));
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    BSONArray emptyArray;
+    processNetworkResponse(createCursorResponse(1, emptyArray, "nextBatch"));
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    const BSONObj doc2 = BSON("_id" << 2);
+    processNetworkResponse(createCursorResponse(0, BSON_ARRAY(doc2), "nextBatch"));
+
+    collectionCloner->waitForDbWorker();
+
+    ASSERT_EQUALS(2, collectionStats.insertCount);
+    ASSERT_TRUE(collectionStats.commitCalled);
+
+    ASSERT_OK(getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+}
+
 }  // namespace
