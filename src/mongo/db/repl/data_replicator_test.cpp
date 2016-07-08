@@ -319,10 +319,8 @@ protected:
 
 
         try {
-            _dr.reset(new DataReplicator(options,
-                                         std::move(dataReplicatorExternalState),
-                                         &(getExecutor()),
-                                         _storageInterface));
+            _dr.reset(new DataReplicator(
+                options, std::move(dataReplicatorExternalState), _storageInterface));
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }

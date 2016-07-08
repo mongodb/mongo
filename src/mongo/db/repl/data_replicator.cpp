@@ -220,11 +220,10 @@ std::string toString(DataReplicatorState s) {
 DataReplicator::DataReplicator(
     DataReplicatorOptions opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-    executor::TaskExecutor* exec,
     StorageInterface* storage)
     : _opts(opts),
       _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
-      _exec(exec),
+      _exec(_dataReplicatorExternalState->getTaskExecutor()),
       _state(DataReplicatorState::Uninitialized),
       _storage(storage) {
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);

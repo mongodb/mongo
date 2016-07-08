@@ -262,7 +262,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _canServeNonLocalReads(0U),
       _dr(createDataReplicatorOptions(this),
           stdx::make_unique<DataReplicatorExternalStateImpl>(this, externalState),
-          &_replExecutor,
           storage),
       _isDurableStorageEngine(isDurableStorageEngineFn ? *isDurableStorageEngineFn : []() -> bool {
           return getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();

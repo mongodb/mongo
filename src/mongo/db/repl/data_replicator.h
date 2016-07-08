@@ -184,7 +184,6 @@ class DataReplicator {
 public:
     DataReplicator(DataReplicatorOptions opts,
                    std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-                   executor::TaskExecutor* exec,
                    StorageInterface* storage);
 
     virtual ~DataReplicator();
