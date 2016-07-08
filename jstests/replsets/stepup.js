@@ -44,8 +44,8 @@ load("jstests/replsets/rslib.js");
     assert.commandWorked(
         secondary.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
 
-    // Wait for the secondary to catch up.
-    assert.writeOK(primary.getDB("test").bar.insert({x: 3}, {writeConcern: {w: 2, j: true}}));
+    // Wait for the secondary to catch up by replicating a doc to both nodes.
+    assert.writeOK(primary.getDB("test").bar.insert({x: 3}, {writeConcern: {w: "majority"}}));
     // Step up the secondary and succeed.
     res = secondary.adminCommand({replSetStepUp: 1});
     assert.commandWorked(res);
