@@ -51,7 +51,7 @@ load("jstests/replsets/rslib.js");
         'find': 'foo',
         readConcern: {level: "linearizable", 'afterOpTime': {ts: Timestamp(1, 2), t: 1}}
     }));
-    assert.eq(opTimeCmd.errmsg, "afterOpTime not compatible with read concern level linearizable");
+    assert.eq(opTimeCmd.errmsg, "afterOpTime not compatible with linearizable read concern");
     assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
 
 }());
