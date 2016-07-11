@@ -3525,7 +3525,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - ubuntu1604
+    - ubuntu1604-test
 
 - name: ubuntu1604-aarch64
   display_name: SSL Ubuntu 16.04 aarch64
@@ -3597,7 +3597,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - ubuntu1604
+    - ubuntu1604-test
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "* Enterprise Amazon Linux"
