@@ -54,7 +54,8 @@ ClusterIdentityLoader* ClusterIdentityLoader::get(OperationContext* operationCon
     return ClusterIdentityLoader::get(operationContext->getServiceContext());
 }
 
-StatusWith<OID> ClusterIdentityLoader::getClusterId(OperationContext* txn) {
+StatusWith<OID> ClusterIdentityLoader::getClusterId(
+    OperationContext* txn, const repl::ReadConcernLevel& readConcernLevel) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_initializationState == InitializationState::kInitialized) {
         invariant(_lastLoadResult.isOK());
@@ -72,7 +73,7 @@ StatusWith<OID> ClusterIdentityLoader::getClusterId(OperationContext* txn) {
     _initializationState = InitializationState::kLoading;
 
     lk.unlock();
-    auto loadStatus = _loadClusterId(txn);
+    auto loadStatus = _loadClusterId(txn, readConcernLevel);
     lk.lock();
 
     invariant(_initializationState == InitializationState::kLoading);
@@ -86,10 +87,10 @@ StatusWith<OID> ClusterIdentityLoader::getClusterId(OperationContext* txn) {
     return _lastLoadResult;
 }
 
-StatusWith<OID> ClusterIdentityLoader::_loadClusterId(OperationContext* txn) {
+StatusWith<OID> ClusterIdentityLoader::_loadClusterId(
+    OperationContext* txn, const repl::ReadConcernLevel& readConcernLevel) {
     auto catalogClient = Grid::get(txn)->catalogClient(txn);
-    auto loadResult =
-        catalogClient->getConfigVersion(txn, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto loadResult = catalogClient->getConfigVersion(txn, readConcernLevel);
     if (!loadResult.isOK()) {
         return Status(loadResult.getStatus().code(),
                       str::stream() << "Error loading clusterID"

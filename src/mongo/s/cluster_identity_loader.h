@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
@@ -65,7 +66,8 @@ public:
      * collection on the config servers, or if another thread is already in the process of loading
      * it, will wait for that thread to finish and then return its results.
      */
-    StatusWith<OID> getClusterId(OperationContext* txn);
+    StatusWith<OID> getClusterId(OperationContext* txn,
+                                 const repl::ReadConcernLevel& readConcernLevel);
 
 private:
     enum class InitializationState {
@@ -78,7 +80,8 @@ private:
      * Queries the config.version collection on the config server, extracts the cluster ID from
      * the version document, and returns it.
      */
-    StatusWith<OID> _loadClusterId(OperationContext* txn);
+    StatusWith<OID> _loadClusterId(OperationContext* txn,
+                                   const repl::ReadConcernLevel& readConcernLevel);
 
     stdx::mutex _mutex;
     stdx::condition_variable _inReloadCV;

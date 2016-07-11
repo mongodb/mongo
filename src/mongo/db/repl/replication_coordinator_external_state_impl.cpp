@@ -71,6 +71,7 @@
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -479,7 +480,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         status = Grid::get(txn)->catalogManager()->initializeConfigDatabaseIfNeeded(txn);
-        if (!status.isOK()) {
+        if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
             if (status == ErrorCodes::ShutdownInProgress ||
                 status == ErrorCodes::InterruptedAtShutdown) {
                 // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
@@ -492,6 +493,15 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
                                                << "Failed to initialize config database on config "
                                                   "server's first transition to primary"
                                                << causedBy(status)));
+        }
+
+        if (status != ErrorCodes::AlreadyInitialized) {
+            // Load the clusterId into memory. Use local readConcern, since we can't use majority
+            // readConcern in drain mode because the global lock prevents replication. This is
+            // safe, since if the clusterId write is rolled back, any writes that depend on it will
+            // also be rolled back.
+            ClusterIdentityLoader::get(txn)->getClusterId(
+                txn, repl::ReadConcernLevel::kLocalReadConcern);
         }
 
         // Free any leftover locks from previous instantiations

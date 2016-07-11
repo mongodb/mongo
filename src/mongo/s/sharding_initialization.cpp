@@ -202,7 +202,8 @@ Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
 
         try {
             auto clusterIdentity = ClusterIdentityLoader::get(txn);
-            auto clusterId = clusterIdentity->getClusterId(txn);
+            auto clusterId =
+                clusterIdentity->getClusterId(txn, repl::ReadConcernLevel::kMajorityReadConcern);
             if (!clusterId.isOK()) {
                 warning()
                     << "Error initializing sharding state, sleeping for 2 seconds and trying again"

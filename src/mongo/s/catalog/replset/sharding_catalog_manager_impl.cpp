@@ -500,7 +500,8 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     }
 
     auto clusterIdentity = ClusterIdentityLoader::get(txn);
-    auto clusterId = clusterIdentity->getClusterId(txn);
+    auto clusterId =
+        clusterIdentity->getClusterId(txn, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!clusterId.isOK()) {
         return clusterId.getStatus();
     }
@@ -736,7 +737,8 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_configInitialized) {
-            return Status::OK();
+            return {ErrorCodes::AlreadyInitialized,
+                    "Config database was previously loaded into memory"};
         }
     }
 

@@ -90,9 +90,13 @@ protected:
 
         // Ensure the cluster ID has been loaded and cached so that future requests for the cluster
         // ID will not require any network traffic.
+        // TODO: use kLocalReadConcern once this test is switched to using the
+        // ConfigServerTestFixture.
         auto future = launchAsync([&] {
-            auto clusterId = assertGet(
-                ClusterIdentityLoader::get(operationContext())->getClusterId(operationContext()));
+            auto clusterId =
+                assertGet(ClusterIdentityLoader::get(operationContext())
+                              ->getClusterId(operationContext(),
+                                             repl::ReadConcernLevel::kMajorityReadConcern));
             ASSERT_EQUALS(_clusterId, clusterId);
         });
         expectGetConfigVersion();
