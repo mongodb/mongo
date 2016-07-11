@@ -1531,8 +1531,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: linux-32
   display_name: Linux 32-bit
@@ -1685,7 +1683,7 @@ buildvariants:
   - name: tool
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-64-debug
   display_name: Windows 64-bit DEBUG
@@ -1765,7 +1763,7 @@ buildvariants:
   - name: tool
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-64-2k8-debug
   display_name: Windows 64-bit 2008R2+ DEBUG
@@ -1834,7 +1832,7 @@ buildvariants:
   - name: sslSpecial
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-32
   display_name: Windows 32-bit
@@ -1870,7 +1868,7 @@ buildvariants:
   - name: tool
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #             OSX buildvariants           #
@@ -1914,7 +1912,7 @@ buildvariants:
   - name: tool
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: osx-1010-debug
   display_name: OS X 10.10 DEBUG
@@ -2044,8 +2042,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-rhel-62-64-bit
   display_name: Enterprise RHEL 6.2 64-bit
@@ -2074,8 +2070,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0 64-bit
@@ -2102,8 +2096,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: rhel70
   display_name: SSL RHEL 7.0 64-bit
@@ -2152,8 +2144,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -2186,8 +2176,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-ubuntu1404-64
   display_name: Enterprise Ubuntu 1404 64-bit
@@ -2216,8 +2204,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: cxx11-ubuntu1204-64
   display_name: C++11 Ubuntu 1204 64-bit
@@ -2294,8 +2280,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-suse11-64
   display_name: Enterprise SUSE 11 64-bit
@@ -2324,8 +2308,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
 
 ###########################################
 #          Solaris buildvariants          #
@@ -2368,7 +2350,7 @@ buildvariants:
   - name: tool
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #          Debian buildvariants           #
@@ -2401,5 +2383,3 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
-    distros:
-    - rhel55-test
