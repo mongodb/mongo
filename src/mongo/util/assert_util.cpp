@@ -219,8 +219,8 @@ NOINLINE_DECL void uassertedWithLocation(int msgid,
                                          const char* file,
                                          unsigned line) {
     assertionCount.condrollover(++assertionCount.user);
-    log() << "User Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-          << endl;
+    LOG(1) << "User Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
+           << endl;
     throw UserException(msgid, msg);
 }
 
