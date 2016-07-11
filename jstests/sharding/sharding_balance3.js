@@ -1,4 +1,4 @@
-// Simple test to make sure things get balanced
+// Waits for the balancer to run once, then stops it and checks that it is no longer running.
 
 (function() {
 

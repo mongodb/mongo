@@ -708,21 +708,8 @@ int Balancer::_moveChunks(OperationContext* txn,
             } else if (status == ErrorCodes::ChunkTooBig) {
                 log() << "Performing a split because migrate failed for size reasons"
                       << causedBy(status);
-
-                auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
-                ChunkManager* const cm = scopedCM.cm();
-
-                auto c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
-
-                auto splitStatus = c->split(txn, Chunk::normal, nullptr);
-                if (!splitStatus.isOK()) {
-                    log() << "Marking chunk " << c->toString() << " as jumbo.";
-
-                    c->markAsJumbo(txn);
-
-                    // We increment moveCount so we do another round right away
-                    movedCount++;
-                }
+                _splitOrMarkJumbo(txn, nss, migrateInfo.minKey);
+                movedCount++;
             } else {
                 log() << "Balancer move failed" << causedBy(status);
             }
@@ -732,6 +719,21 @@ int Balancer::_moveChunks(OperationContext* txn,
     }
 
     return movedCount;
+}
+
+void Balancer::_splitOrMarkJumbo(OperationContext* txn,
+                                 const NamespaceString& nss,
+                                 const BSONObj& minKey) {
+    auto scopedChunkManager = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
+    ChunkManager* const chunkManager = scopedChunkManager.cm();
+
+    auto chunk = chunkManager->findIntersectingChunk(txn, minKey);
+
+    auto splitStatus = chunk->split(txn, Chunk::normal, nullptr);
+    if (!splitStatus.isOK()) {
+        log() << "Marking chunk " << chunk->toString() << " as jumbo.";
+        chunk->markAsJumbo(txn);
+    }
 }
 
 }  // namespace mongo

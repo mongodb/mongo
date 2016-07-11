@@ -186,6 +186,14 @@ private:
                     const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
+    /**
+     * Performs a split on the chunk with min value "minKey". If the split fails, it is marked as
+     * jumbo.
+     */
+    void _splitOrMarkJumbo(OperationContext* txn,
+                           const NamespaceString& nss,
+                           const BSONObj& minKey);
+
     // The main balancer thread
     stdx::thread _thread;
 
