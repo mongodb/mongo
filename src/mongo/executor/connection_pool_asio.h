@@ -76,6 +76,7 @@ public:
     ASIOConnection(const HostAndPort& hostAndPort, size_t generation, ASIOImpl* global);
 
     void indicateSuccess() override;
+    void indicateUsed() override;
     void indicateFailure(Status status) override;
     const HostAndPort& getHostAndPort() const override;
 
@@ -85,7 +86,6 @@ public:
     bool isHealthy() override;
 
 private:
-    void indicateUsed() override;
     Date_t getLastUsed() const override;
     const Status& getStatus() const override;
 

@@ -116,7 +116,6 @@ ASIOConnection::ASIOConnection(const HostAndPort& hostAndPort, size_t generation
       _timer(&_impl->strand()) {}
 
 void ASIOConnection::indicateSuccess() {
-    indicateUsed();
     _status = Status::OK();
 }
 
@@ -218,6 +217,10 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     _impl->strand().dispatch([this, timeout, cb] {
         auto op = _impl.get();
 
+        // We clear state transitions because we're re-running a portion of the asio state machine
+        // without entering in startCommand (which would call this for us).
+        op->clearStateTransitions();
+
         _refreshCallback = std::move(cb);
 
         // Actually timeout refreshes
@@ -244,6 +247,8 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
             cb(this, failedResponse.getStatus());
         });
 
+        op->_inRefresh = true;
+
         _global->_impl->_asyncRunCommand(op, [this, op](std::error_code ec, size_t bytes) {
             cancelTimeout();
 
@@ -252,6 +257,7 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
             if (ec)
                 return cb(this, Status(ErrorCodes::HostUnreachable, ec.message()));
 
+            op->_inRefresh = false;
             cb(this, Status::OK());
         });
     });

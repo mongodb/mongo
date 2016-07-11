@@ -33,6 +33,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_timer_asio.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -40,6 +41,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -172,6 +174,87 @@ TEST(ConnectionPoolASIO, ConnSetupTimeout) {
         [&](StatusWith<RemoteCommandResponse> resp) { deferred.emplace(std::move(resp)); });
 
     ASSERT_EQ(deferred.get().getStatus().code(), ErrorCodes::ExceededTimeLimit);
+}
+
+/**
+ * Verify that connection refreshes actually occur, and that they drop down the totalAvailable
+ * correctly.  Verifies SERVER-25006
+ */
+TEST(ConnectionPoolASIO, ConnRefreshHappens) {
+    auto fixture = unittest::getFixtureConnectionString();
+
+    NetworkInterfaceASIO::Options options;
+    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    options.connectionPoolOptions.refreshRequirement = Milliseconds(10);
+    NetworkInterfaceASIO net{std::move(options)};
+
+    net.startup();
+    auto guard = MakeGuard([&] { net.shutdown(); });
+
+    std::array<Deferred<StatusWith<RemoteCommandResponse>>, 10> deferreds;
+
+    for (auto& deferred : deferreds) {
+        net.startCommand(
+            makeCallbackHandle(),
+            RemoteCommandRequest{fixture.getServers()[0],
+                                 "admin",
+                                 BSON("sleep" << 1 << "lock"
+                                              << "none"
+                                              << "secs"
+                                              << 2),
+                                 BSONObj()},
+            [&](StatusWith<RemoteCommandResponse> resp) { deferred.emplace(std::move(resp)); });
+    }
+
+    for (auto& deferred : deferreds) {
+        ASSERT_EQ(deferred.get().isOK(), true);
+    }
+
+    sleepmillis(1000);
+
+    ConnectionPoolStats cps;
+    net.appendConnectionStats(&cps);
+
+    ASSERT_LTE(cps.totalAvailable + cps.totalInUse, 1u);
+    ASSERT_EQ(cps.totalCreated, 10u);
+}
+
+/**
+ * Verify that when a refresh fails, it doesn't trigger an invariant
+ */
+TEST(ConnectionPoolASIO, ConnRefreshSurvivesFailure) {
+    auto fixture = unittest::getFixtureConnectionString();
+
+    NetworkInterfaceASIO::Options options;
+    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    options.connectionPoolOptions.refreshRequirement = Milliseconds(0);
+    NetworkInterfaceASIO net{std::move(options)};
+
+    net.startup();
+    auto guard = MakeGuard([&] { net.shutdown(); });
+
+    Deferred<StatusWith<RemoteCommandResponse>> deferred;
+
+    net.startCommand(
+        makeCallbackHandle(),
+        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
+        [&](StatusWith<RemoteCommandResponse> resp) { deferred.emplace(std::move(resp)); });
+
+    deferred.get();
+
+    getGlobalFailPointRegistry()
+        ->getFailPoint("NetworkInterfaceASIOasyncRunCommandFail")
+        ->setMode(FailPoint::nTimes, 1);
+
+    sleepmillis(1000);
+
+    ConnectionPoolStats cps;
+    net.appendConnectionStats(&cps);
+
+    ASSERT_EQ(cps.totalAvailable, 0u);
+    ASSERT_EQ(cps.totalCreated, 1u);
 }
 
 }  // namespace

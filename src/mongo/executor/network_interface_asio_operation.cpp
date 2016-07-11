@@ -117,6 +117,7 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
       _id(kAsyncOpIdCounter.addAndFetch(1)),
       _access(std::make_shared<AsyncOp::AccessControl>()),
       _inSetup(true),
+      _inRefresh(false),
       _strand(owner->_io_service) {
     // No need to take lock when we aren't yet constructed.
     _transitionToState_inlock(State::kUninitialized);

@@ -47,6 +47,7 @@
 #include "mongo/rpc/request_builder_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -59,6 +60,8 @@ namespace executor {
  */
 
 namespace {
+
+MONGO_FP_DECLARE(NetworkInterfaceASIOasyncRunCommandFail);
 
 using asio::ip::tcp;
 using ResponseStatus = TaskExecutor::ResponseStatus;
@@ -292,6 +295,17 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         return;
     }
 
+    if (op->_inRefresh) {
+        // If we are in refresh we should only be here if we failed to heartbeat.
+        MONGO_ASIO_INVARIANT(!resp.isOK(), "In refresh, but did not fail to heartbeat", op);
+        // If we fail during heartbeating, we won't be able to access any of op's members after
+        // calling finish(), so we return here.
+        LOG(1) << "Failed to heartbeat to " << op->request().target << " - " << resp.getStatus();
+        _numFailedOps.fetchAndAdd(1);
+        op->finish(resp);
+        return;
+    }
+
     if (!resp.isOK()) {
         // In the case that resp is not OK, but _inSetup is false, we are using a connection
         // that
@@ -344,6 +358,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     if (!resp.isOK()) {
         asioConn->indicateFailure(resp.getStatus());
     } else {
+        asioConn->indicateUsed();
         asioConn->indicateSuccess();
     }
 
@@ -353,6 +368,12 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op, NetworkOpHandler handler) {
     LOG(2) << "Starting asynchronous command " << op->request().id << " on host "
            << op->request().target.toString();
+
+    if (MONGO_FAIL_POINT(NetworkInterfaceASIOasyncRunCommandFail)) {
+        _validateAndRun(op, asio::error::basic_errors::network_unreachable, [] {});
+        return;
+    }
+
     // We invert the following steps below to run a command:
     // 1 - send the given command
     // 2 - receive a header for the response

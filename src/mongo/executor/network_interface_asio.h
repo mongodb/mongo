@@ -401,6 +401,7 @@ private:
          */
         boost::optional<AsyncCommand> _command;
         bool _inSetup;
+        bool _inRefresh;
 
         /**
          * The explicit strand that all operations for this op must run on.
