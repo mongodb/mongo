@@ -1245,8 +1245,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_PAGE_HEADER *dsk;
-	size_t size;
-	uint32_t entries;
+	size_t entries, size;
 	uint8_t *p;
 
 	WT_RET(__block_extlist_dump(session, block, el, "write"));

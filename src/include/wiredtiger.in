@@ -131,13 +131,13 @@ struct __wt_item {
  * The maximum packed size of a 64-bit integer.  The ::wiredtiger_struct_pack
  * function will pack single long integers into at most this many bytes.
  */
-#define	WT_INTPACK64_MAXSIZE	((int)sizeof (int64_t) + 1)
+#define	WT_INTPACK64_MAXSIZE	((int)sizeof(int64_t) + 1)
 
 /*!
  * The maximum packed size of a 32-bit integer.  The ::wiredtiger_struct_pack
  * function will pack single integers into at most this many bytes.
  */
-#define	WT_INTPACK32_MAXSIZE	((int)sizeof (int32_t) + 1)
+#define	WT_INTPACK32_MAXSIZE	((int)sizeof(int32_t) + 1)
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.

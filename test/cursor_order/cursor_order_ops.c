@@ -130,7 +130,8 @@ ops_start(SHARED_CONFIG *cfg)
 	seconds = (stop.tv_sec - start.tv_sec) +
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
-	    seconds, (int)(((cfg->reverse_scanners + cfg->append_inserters) *
+	    seconds, (int)
+	    (((double)(cfg->reverse_scanners + cfg->append_inserters) *
 	    total_nops) / seconds));
 
 	/* Verify the files. */
