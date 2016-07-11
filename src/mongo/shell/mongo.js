@@ -222,7 +222,7 @@ connect = function(url, user, pass) {
     if (url.startsWith("mongodb://")) {
         db = new Mongo(url);
         if (db.defaultDB.length == 0) {
-            throw Error("Missing database name in connection string \"" + url + "\"");
+            db.defaultDB = "test";
         }
         db = db.getDB(db.defaultDB);
     } else if (slash == -1)
