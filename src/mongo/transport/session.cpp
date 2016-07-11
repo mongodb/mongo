@@ -62,11 +62,15 @@ Session::Session(Session&& other)
 }
 
 Session& Session::operator=(Session&& other) {
+    if (&other == this) {
+        return *this;
+    }
+
     _id = other._id;
     _remote = std::move(other._remote);
     _local = std::move(other._local);
     _tl = other._tl;
-    _tl = nullptr;
+    other._tl = nullptr;
 
     return *this;
 }
