@@ -264,6 +264,44 @@ TEST(BalancerPolicy, BalancerRespectsMaxShardSizeWhenAllBalanced) {
     ASSERT(migrations.empty());
 }
 
+TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
+    // shard1 drains the proper chunk to shard0, even though it is more loaded than shard2
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 6},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, true, {"a", "b"}, emptyShardVersion), 2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, {"b"}, emptyShardVersion), 2}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    distribution.addTagRange(TagRange(kMinBSONKey, BSON("x" << 7), "a"));
+    distribution.addTagRange(TagRange(BSON("x" << 8), kMaxBSONKey, "b"));
+
+    const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId1, migrations[0].from);
+    ASSERT_EQ(kShardId0, migrations[0].to);
+    ASSERT_EQ(cluster.second[kShardId1][0].getMin(), migrations[0].minKey);
+    ASSERT_EQ(cluster.second[kShardId1][0].getMax(), migrations[0].maxKey);
+}
+
+TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
+    // There is a large imbalance between shard0 and shard1, but the balancer must first fix the
+    // chunks, which are on a wrong shard due to tag policy
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 6},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    distribution.addTagRange(TagRange(kMinBSONKey, BSON("x" << 100), "a"));
+
+    const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId2, migrations[0].from);
+    ASSERT_EQ(kShardId0, migrations[0].to);
+    ASSERT_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
+    ASSERT_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
+}
+
 TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     // Chunks are balanced across shards, but there are wrong tags, which need to be fixed
     auto cluster = generateCluster(
@@ -282,298 +320,133 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     ASSERT_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
 }
 
-TEST(DistributionStatus, TagsSelector) {
+TEST(DistributionStatus, AddTagRangeOverlap) {
+    DistributionStatus d(kNamespace, {});
+
+    // Note that there is gap between 10 and 20 for which there is no tag
+    ASSERT(d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "a")));
+    ASSERT(d.addTagRange(TagRange(BSON("x" << 20), BSON("x" << 30), "b")));
+
+    ASSERT(!d.addTagRange(TagRange(kMinBSONKey, BSON("x" << 2), "d")));
+    ASSERT(!d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 5), "d")));
+    ASSERT(!d.addTagRange(TagRange(BSON("x" << 5), BSON("x" << 9), "d")));
+    ASSERT(!d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "d")));
+    ASSERT(!d.addTagRange(TagRange(BSON("x" << 5), BSON("x" << 25), "d")));
+    ASSERT(!d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 32), "d")));
+    ASSERT(!d.addTagRange(TagRange(BSON("x" << 25), kMaxBSONKey, "d")));
+}
+
+TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
     DistributionStatus d(kNamespace, {});
 
     ASSERT(d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "a")));
     ASSERT(d.addTagRange(TagRange(BSON("x" << 10), BSON("x" << 20), "b")));
     ASSERT(d.addTagRange(TagRange(BSON("x" << 20), BSON("x" << 30), "c")));
 
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 20), BSON("x" << 30), "c")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 22), BSON("x" << 28), "c")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 28), BSON("x" << 33), "c")));
-
     {
         ChunkType chunk;
-        chunk.setMin(BSON("x" << -4));
+        chunk.setMin(kMinBSONKey);
+        chunk.setMax(BSON("x" << 1));
         ASSERT_EQUALS("", d.getTagForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 1));
         ASSERT_EQUALS("", d.getTagForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 1));
+        chunk.setMax(BSON("x" << 5));
         ASSERT_EQUALS("a", d.getTagForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 10));
+        chunk.setMax(BSON("x" << 20));
         ASSERT_EQUALS("b", d.getTagForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 15));
+        chunk.setMax(BSON("x" << 20));
         ASSERT_EQUALS("b", d.getTagForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 25));
+        chunk.setMax(BSON("x" << 30));
         ASSERT_EQUALS("c", d.getTagForChunk(chunk));
     }
 
     {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 35));
+        chunk.setMax(BSON("x" << 40));
+        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+    }
+
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << 40));
+        chunk.setMax(kMaxBSONKey);
         ASSERT_EQUALS("", d.getTagForChunk(chunk));
     }
 }
 
-void addShard(ShardToChunksMap& shardToChunks, unsigned numChunks, bool last) {
-    unsigned total = 0;
-    for (const auto& chunk : shardToChunks) {
-        total += chunk.second.size();
-    }
+TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
+    DistributionStatus d(kNamespace, {});
 
-    const string myName = str::stream() << "shard" << shardToChunks.size();
+    ASSERT(d.addTagRange(TagRange(kMinBSONKey, BSON("x" << -100), "a")));
+    ASSERT(d.addTagRange(TagRange(BSON("x" << -10), BSON("x" << 10), "b")));
+    ASSERT(d.addTagRange(TagRange(BSON("x" << 100), kMaxBSONKey, "c")));
 
-    vector<ChunkType> chunksList;
-
-    for (unsigned i = 0; i < numChunks; i++) {
+    {
         ChunkType chunk;
-
-        if (i == 0 && total == 0) {
-            chunk.setMin(BSON("x" << BSON("$maxKey" << 1)));
-        } else {
-            chunk.setMin(BSON("x" << total + i));
-        }
-
-        if (last && i == (numChunks - 1)) {
-            chunk.setMax(BSON("x" << BSON("$maxKey" << 1)));
-        } else {
-            chunk.setMax(BSON("x" << 1 + total + i));
-        }
-
-        chunk.setShard(myName);
-
-        chunksList.push_back(chunk);
+        chunk.setMin(kMinBSONKey);
+        chunk.setMax(BSON("x" << -100));
+        ASSERT_EQUALS("a", d.getTagForChunk(chunk));
     }
 
-    shardToChunks[myName] = chunksList;
-}
-
-ShardStatistics& findStat(std::vector<ShardStatistics>& stats, const ShardId& shardId) {
-    for (auto& stat : stats) {
-        if (stat.shardId == shardId)
-            return stat;
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << -100));
+        chunk.setMax(BSON("x" << -11));
+        ASSERT_EQUALS("", d.getTagForChunk(chunk));
     }
 
-    MONGO_UNREACHABLE;
-}
-
-void moveChunk(ShardToChunksMap& shardToChunks, const MigrateInfo* m) {
-    vector<ChunkType>& chunks = shardToChunks[m->from];
-
-    for (vector<ChunkType>::iterator i = chunks.begin(); i != chunks.end(); ++i) {
-        if (i->getMin() == m->minKey) {
-            shardToChunks[m->to].push_back(*i);
-            chunks.erase(i);
-            return;
-        }
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << -10));
+        chunk.setMax(BSON("x" << 0));
+        ASSERT_EQUALS("b", d.getTagForChunk(chunk));
     }
 
-    MONGO_UNREACHABLE;
-}
-
-TEST(BalancerPolicySimulation, TagsDraining) {
-    ShardToChunksMap chunks;
-    addShard(chunks, 5, false);
-    addShard(chunks, 5, false);
-    addShard(chunks, 5, true);
-
-    while (true) {
-        DistributionStatus distributionStatus(NamespaceString("TestDB", "TestColl"), chunks);
-
-        distributionStatus.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 7), "a"));
-        distributionStatus.addTagRange(TagRange(BSON("x" << 7), BSON("x" << 1000), "b"));
-
-        const auto migrations(BalancerPolicy::balance(
-            {ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
-             ShardStatistics(kShardId1, kNoMaxSize, 5, true, {"a", "b"}, emptyShardVersion),
-             ShardStatistics(kShardId2, kNoMaxSize, 5, false, {"b"}, emptyShardVersion)},
-            distributionStatus,
-            false));
-        if (migrations.empty()) {
-            break;
-        }
-
-        if (migrations[0].minKey["x"].numberInt() < 7) {
-            ASSERT_EQUALS(kShardId0, migrations[0].to);
-        } else {
-            ASSERT_EQUALS(kShardId2, migrations[0].to);
-        }
-
-        moveChunk(chunks, &migrations[0]);
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 10));
+        ASSERT_EQUALS("b", d.getTagForChunk(chunk));
     }
 
-    ASSERT_EQUALS(7U, chunks[kShardId0].size());
-    ASSERT_EQUALS(0U, chunks[kShardId1].size());
-    ASSERT_EQUALS(8U, chunks[kShardId2].size());
-}
-
-TEST(BalancerPolicySimulation, TagsPolicyChange) {
-    ShardToChunksMap chunks;
-    addShard(chunks, 5, false);
-    addShard(chunks, 5, false);
-    addShard(chunks, 5, true);
-
-    while (true) {
-        DistributionStatus distributionStatus(NamespaceString("TestDB", "TestColl"), chunks);
-
-        distributionStatus.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 1000), "a"));
-
-        const auto migrations(BalancerPolicy::balance(
-            {ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
-             ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion),
-             ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion)},
-            distributionStatus,
-            false));
-        if (migrations.empty()) {
-            break;
-        }
-
-        moveChunk(chunks, &migrations[0]);
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << 10));
+        chunk.setMax(BSON("x" << 20));
+        ASSERT_EQUALS("", d.getTagForChunk(chunk));
     }
 
-    const size_t shard0Size = chunks[kShardId0].size();
-    const size_t shard1Size = chunks[kShardId1].size();
-
-    ASSERT_EQ(15U, shard0Size + shard1Size);
-    ASSERT(shard0Size == 7U || shard0Size == 8U);
-    ASSERT_EQ(0U, chunks[kShardId2].size());
-}
-
-/**
- * Idea behind this test is that we set up several shards, the first two of which are draining and
- * the second two of which have a data size limit.  We also simulate a random number of chunks on
- * each shard.
- *
- * Once the shards are setup, we virtually migrate numChunks times, or until there are no more
- * migrations to run.  Each chunk is assumed to have a size of 1 unit, and we increment our currSize
- * for each shard as the chunks move.
- *
- * Finally, we ensure that the drained shards are drained, the data-limited shards aren't
- * overloaded, and that all shards (including the data limited shard if the baseline isn't over the
- * limit are balanced to within 1 unit of some baseline.
- *
- */
-TEST(BalancerPolicySimulation, CompleteSimulation) {
-    // Hardcode seed here, make test deterministic.
-    const int64_t seed = 1337;
-    PseudoRandom rng(seed);
-
-    // Run test 10 times
-    for (int test = 0; test < 10; test++) {
-        // Setup our shards as draining, with maxSize, and normal
-        int numShards = 7;
-        int numChunks = 0;
-
-        ShardToChunksMap chunks;
-        vector<ShardStatistics> shards;
-
-        map<ShardId, int> expected;
-
-        for (int i = 0; i < numShards; i++) {
-            int numShardChunks = rng.nextInt32(100);
-            bool draining = i < 2;
-            bool maxed = i >= 2 && i < 4;
-
-            if (draining) {
-                expected[ShardId(str::stream() << "shard" << i)] = 0;
-            }
-
-            if (maxed) {
-                expected[ShardId(str::stream() << "shard" << i)] = numShardChunks + 1;
-            }
-
-            addShard(chunks, numShardChunks, false);
-            numChunks += numShardChunks;
-
-            shards.emplace_back(ShardId(str::stream() << "shard" << i),
-                                maxed ? numShardChunks + 1 : 0,
-                                numShardChunks,
-                                draining,
-                                emptyTagSet,
-                                emptyShardVersion);
-        }
-
-        for (const auto& stat : shards) {
-            log() << stat.shardId << " : " << stat.toBSON();
-        }
-
-        // Perform migrations and increment data size as chunks move
-        for (int i = 0; i < numChunks; i++) {
-            const auto migrations(BalancerPolicy::balance(
-                shards, DistributionStatus(NamespaceString("TestDB", "TestColl"), chunks), i != 0));
-            if (migrations.empty()) {
-                log() << "Finished with test moves.";
-                break;
-            }
-
-            moveChunk(chunks, &migrations[0]);
-
-            findStat(shards, migrations[0].from).currSizeMB -= 1;
-            findStat(shards, migrations[0].to).currSizeMB += 1;
-        }
-
-        // Make sure our balance is correct and our data size is low.
-
-        // The balanced value is the count on the last shard, since it's not draining or
-        // limited.
-        const int64_t balancedSize = (--shards.end())->currSizeMB;
-
-        for (const auto& stat : shards) {
-            log() << stat.shardId << " : " << stat.toBSON();
-
-            // Cast the size once and use it from here in order to avoid typecast errors
-            const int shardCurrSizeMB = static_cast<int>(stat.currSizeMB);
-
-            map<ShardId, int>::iterator expectedIt = expected.find(stat.shardId);
-
-            if (expectedIt == expected.end()) {
-                const bool isInRange =
-                    shardCurrSizeMB >= balancedSize - 1 && shardCurrSizeMB <= balancedSize + 1;
-                if (!isInRange) {
-                    warning() << "non-limited and non-draining shard had " << shardCurrSizeMB
-                              << " chunks, expected near " << balancedSize;
-                }
-
-                ASSERT(isInRange);
-            } else {
-                int expectedSize = expectedIt->second;
-                bool isInRange = shardCurrSizeMB <= expectedSize;
-
-                if (isInRange && expectedSize >= balancedSize) {
-                    isInRange =
-                        shardCurrSizeMB >= balancedSize - 1 && shardCurrSizeMB <= balancedSize + 1;
-                }
-
-                if (!isInRange) {
-                    warning() << "limited or draining shard had " << shardCurrSizeMB
-                              << " chunks, expected less than " << expectedSize
-                              << " and (if less than expected) near " << balancedSize;
-                }
-
-                ASSERT(isInRange);
-            }
-        }
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << 200));
+        chunk.setMax(kMaxBSONKey);
+        ASSERT_EQUALS("c", d.getTagForChunk(chunk));
     }
 }
 

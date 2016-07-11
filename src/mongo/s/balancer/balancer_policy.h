@@ -121,7 +121,7 @@ public:
     /**
      * Returns all tag ranges defined for the collection.
      */
-    const std::map<BSONObj, TagRange>& tagRanges() const {
+    const std::map<BSONObj, TagRange, BSONObjCmp>& tagRanges() const {
         return _tagRanges;
     }
 
@@ -152,7 +152,7 @@ private:
     ShardToChunksMap _shardChunks;
 
     // Map of zone max key to the zone description
-    std::map<BSONObj, TagRange> _tagRanges;
+    std::map<BSONObj, TagRange, BSONObjCmp> _tagRanges;
 
     // Set of all zones defined for this collection
     std::set<std::string> _allTags;

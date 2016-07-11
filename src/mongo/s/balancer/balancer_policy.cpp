@@ -96,50 +96,50 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
 }
 
 bool DistributionStatus::addTagRange(const TagRange& range) {
-    // Check for overlaps
-    for (const auto& tagRangesEntry : _tagRanges) {
-        const TagRange& tocheck = tagRangesEntry.second;
+    const auto minIntersect = _tagRanges.upper_bound(range.min);
+    const auto maxIntersect = _tagRanges.upper_bound(range.max);
 
-        if (range.min == tocheck.min) {
-            LOG(1) << "have 2 ranges with the same min " << range << " " << tocheck;
+    // Check for partial overlap
+    if (minIntersect != maxIntersect) {
+        return false;
+    }
+
+    // Check for containment
+    if (minIntersect != _tagRanges.end()) {
+        const TagRange& nextRange = minIntersect->second;
+        if (range.max > nextRange.min) {
+            invariant(range.max < nextRange.max);
             return false;
-        }
-
-        if (range.min < tocheck.min) {
-            if (range.max > tocheck.min) {
-                LOG(1) << "have overlapping ranges " << range << " " << tocheck;
-                return false;
-            }
-        } else {
-            // range.min > tocheck.min
-            if (tocheck.max > range.min) {
-                LOG(1) << "have overlapping ranges " << range << " " << tocheck;
-                return false;
-            }
         }
     }
 
     _tagRanges[range.max.getOwned()] = range;
     _allTags.insert(range.tag);
-
     return true;
 }
 
 string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
-    if (_tagRanges.empty())
+    const auto minIntersect = _tagRanges.upper_bound(chunk.getMin());
+    const auto maxIntersect = _tagRanges.lower_bound(chunk.getMax());
+
+    // We should never have a partial overlap with a chunk range. If it happens, treat it as if this
+    // chunk doesn't belong to a tag
+    if (minIntersect != maxIntersect) {
         return "";
+    }
 
-    const BSONObj min(chunk.getMin());
-
-    map<BSONObj, TagRange>::const_iterator i = _tagRanges.upper_bound(min);
-    if (i == _tagRanges.end())
+    if (minIntersect == _tagRanges.end()) {
         return "";
+    }
 
-    const TagRange& range = i->second;
-    if (min < range.min)
-        return "";
+    const TagRange& intersectRange = minIntersect->second;
 
-    return range.tag;
+    // Check for containment
+    if (intersectRange.min <= chunk.getMin() && chunk.getMax() <= intersectRange.max) {
+        return intersectRange.tag;
+    }
+
+    return "";
 }
 
 void DistributionStatus::report(BSONObjBuilder* builder) const {
