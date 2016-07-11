@@ -271,6 +271,7 @@ class TestReport(unittest.TestResult):
 
             if test_info.url_endpoint is not None:
                 result["url"] = test_info.url_endpoint
+                result["url_raw"] = test_info.url_endpoint + "?raw=1"
 
             results.append(result)
 
