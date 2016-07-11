@@ -680,7 +680,7 @@ list<string> DBClientWithCommands::getDatabaseNames() {
     BSONObj info;
     uassert(10005,
             "listdatabases failed",
-            runCommand("admin", BSON("listDatabases" << 1), info, QueryOption_SlaveOk));
+            runCommand("admin", BSON("listDatabases" << 1 << "nameOnly" << true), info, QueryOption_SlaveOk));
     uassert(10006, "listDatabases.databases not array", info["databases"].type() == Array);
 
     list<string> names;

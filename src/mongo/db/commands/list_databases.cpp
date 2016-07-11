@@ -79,6 +79,13 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
+    
+        bool nameOnly = false;
+        BSONElement nameOnlyElt = jsobj["nameOnly"];
+        if (!nameOnlyElt.eoo() && nameOnlyElt.trueValue()) {
+            nameOnly = true;
+        }
+
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&dbNames);
@@ -104,7 +111,7 @@ public:
                 const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
                 invariant(entry);
 
-                int64_t size = entry->sizeOnDisk(txn);
+                int64_t size = nameOnly ? 0 : entry->sizeOnDisk(txn);
                 b.append("sizeOnDisk", static_cast<double>(size));
                 totalSize += size;
 
@@ -118,6 +125,9 @@ public:
 
         result.append("databases", dbInfos);
         result.append("totalSize", double(totalSize));
+        if (nameOnly) {
+            result.append("nameOnly", nameOnly);
+        }
         return true;
     }
 } cmdListDatabases;
