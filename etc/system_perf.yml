@@ -152,6 +152,7 @@ functions:
           set -e
           set -v
           source ./dsienv.sh
+          source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           echo "Done test for ${test}-${storageEngine} with setup ${setup}!"
