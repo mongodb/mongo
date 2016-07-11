@@ -453,7 +453,8 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
             handleSERVER23299ForDb(txn, db);
         }
 
-        if (shouldClearNonLocalTmpCollections || dbName == "local") {
+        if (!storageGlobalParams.readOnly &&
+            (shouldClearNonLocalTmpCollections || dbName == "local")) {
             db->clearTmpCollections(txn);
         }
     }
