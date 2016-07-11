@@ -1500,7 +1500,7 @@ __split_multi_inmem(
 	 * This code re-creates an in-memory page that is part of a set created
 	 * while evicting a large page, and adds references to any unresolved
 	 * update chains to the new page. We get here due to choosing to keep
-	 * the results of a split in memory or because and update could not be
+	 * the results of a split in memory or because an update could not be
 	 * written when attempting to evict a page.
 	 *
 	 * Clear the disk image and link the page into the passed-in WT_REF to
@@ -2208,9 +2208,9 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Build the new page.
 	 *
-	 * Allocate a WT_REF because the error path uses routines that will ea
-	 * free memory. The only field we need to set is the record number, as
-	 * it's used by the search routines.
+	 * Allocate a WT_REF, the error path calls routines that free memory.
+	 * The only field we need to set is the record number, as it's used by
+	 * the search routines.
 	 */
 	WT_RET(__wt_calloc_one(session, &new));
 	new->ref_recno = ref->ref_recno;

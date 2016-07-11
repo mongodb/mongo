@@ -82,13 +82,24 @@ __curbackup_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	WT_TRET(__backup_cleanup_handles(session, cb));
+	/*
+	 * When starting a hot backup, we serialize hot backup cursors and set
+	 * the connection's hot-backup flag. Once that's done, we set the
+	 * cursor's backup-locker flag, implying the cursor owns all necessary
+	 * cleanup (including removing temporary files), regardless of error or
+	 * success. The cursor's backup-locker flag is never cleared (it's just
+	 * discarded when the cursor is closed), because that cursor will never
+	 * not be responsible for cleanup.
+	 */
+	if (F_ISSET(cb, WT_CURBACKUP_LOCKER)) {
+		WT_TRET(__backup_cleanup_handles(session, cb));
+		WT_WITH_SCHEMA_LOCK(session, tret,
+		    tret = __backup_stop(session));
+		WT_TRET(tret);
+	}
+
 	WT_TRET(__wt_cursor_close(cursor));
 	session->bkp_cursor = NULL;
-
-	WT_WITH_SCHEMA_LOCK(session, tret,
-	    tret = __backup_stop(session));		/* Stop the backup. */
-	WT_TRET(tret);
 
 err:	API_END_RET(session, ret);
 }
@@ -144,11 +155,11 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 		ret = __backup_start(session, cb, cfg)));
 	WT_ERR(ret);
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		__wt_free(session, cb);
+err:		WT_TRET(__curbackup_close(cursor));
+		*cursorp = NULL;
 	}
 
 	return (ret);
@@ -226,6 +237,9 @@ __backup_start(
 	conn->hot_backup = true;
 	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
 
+	/* We're the lock holder, we own cleanup. */
+	F_SET(cb, WT_CURBACKUP_LOCKER);
+
 	/*
 	 * Create a temporary backup file.  This must be opened before
 	 * generating the list of targets in backup_uri.  This file will
@@ -282,10 +296,7 @@ err:	/* Close the hot backup file. */
 	WT_TRET(__wt_fclose(session, &cb->bfs));
 	if (srcfs != NULL)
 		WT_TRET(__wt_fclose(session, &srcfs));
-	if (ret != 0) {
-		WT_TRET(__backup_cleanup_handles(session, cb));
-		WT_TRET(__backup_stop(session));
-	} else {
+	if (ret == 0) {
 		WT_ASSERT(session, dest != NULL);
 		WT_TRET(__wt_fs_rename(session, WT_BACKUP_TMP, dest));
 	}

@@ -3556,8 +3556,9 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	WT_PAGE *parent;
 	WT_RECONCILE *r;
 
-	r = cbulk->reconcile;
 	btree = S2BT(session);
+	if ((r = cbulk->reconcile) == NULL)
+		return (0);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:

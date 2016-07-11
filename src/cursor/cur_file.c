@@ -388,11 +388,11 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __wt_curfile_create --
+ * __curfile_create --
  *	Open a cursor for a given btree handle.
  */
-int
-__wt_curfile_create(WT_SESSION_IMPL *session,
+static int
+__curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner, const char *cfg[], bool bulk, bool bitmap,
     WT_CURSOR **cursorp)
 {
@@ -439,6 +439,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->value_format = btree->value_format;
 	cbt->btree = btree;
 
+	/*
+	 * Increment the data-source's in-use counter; done now because closing
+	 * the cursor will decrement it, and all failure paths from here close
+	 * the cursor.
+	 */
+	__wt_cursor_dhandle_incr_use(session);
+
 	if (session->dhandle->checkpoint != NULL)
 		F_SET(cbt, WT_CBT_NO_TXN);
 
@@ -478,7 +485,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	/* Underlying btree initialization. */
 	__wt_btcur_open(cbt);
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(
 	    cursor, cursor->internal_uri, owner, cfg, cursorp));
 
@@ -486,7 +492,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_DATA_INCR(session, cursor_create);
 
 	if (0) {
-err:		__wt_free(session, cbt);
+err:		WT_TRET(__curfile_close(cursor));
+		*cursorp = NULL;
 	}
 
 	return (ret);
@@ -555,10 +562,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	} else
 		WT_RET(__wt_bad_object_type(session, uri));
 
-	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
+	WT_ERR(__curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 
-	/* Increment the data-source's in-use counter. */
-	__wt_cursor_dhandle_incr_use(session);
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */

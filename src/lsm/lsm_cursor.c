@@ -1521,6 +1521,8 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_LSM_TREE *lsm_tree;
 	bool bulk;
 
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
+
 	clsm = NULL;
 	cursor = NULL;
 	lsm_tree = NULL;
@@ -1566,6 +1568,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	cursor->value_format = lsm_tree->value_format;
 
 	clsm->lsm_tree = lsm_tree;
+	lsm_tree = NULL;
 
 	/*
 	 * The tree's dsk_gen starts at one, so starting the cursor on zero
@@ -1573,7 +1576,6 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 */
 	clsm->dsk_gen = 0;
 
-	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	if (bulk)
@@ -1585,10 +1587,6 @@ err:		if (clsm != NULL)
 		else if (lsm_tree != NULL)
 			__wt_lsm_tree_release(session, lsm_tree);
 
-		/*
-		 * We open bulk cursors after setting the returned cursor.
-		 * Fix that here.
-		 */
 		*cursorp = NULL;
 	}
 
