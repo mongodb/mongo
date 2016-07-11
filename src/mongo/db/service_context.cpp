@@ -294,7 +294,7 @@ void ServiceContext::setKillAllOperations() {
     }
 }
 
-void ServiceContext::_killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode) {
+void ServiceContext::killOperation(OperationContext* opCtx, ErrorCodes::Error killCode) {
     opCtx->markKilled(killCode);
 
     for (const auto listener : _killOpListeners) {
@@ -304,20 +304,6 @@ void ServiceContext::_killOperation_inlock(OperationContext* opCtx, ErrorCodes::
             std::terminate();
         }
     }
-}
-
-bool ServiceContext::killOperation(unsigned int opId) {
-    for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
-        stdx::lock_guard<Client> lk(*client);
-
-        OperationContext* opCtx = client->getOperationContext();
-        if (opCtx && opCtx->getOpID() == opId) {
-            _killOperation_inlock(opCtx, ErrorCodes::Interrupted);
-            return true;
-        }
-    }
-
-    return false;
 }
 
 void ServiceContext::killAllUserOperations(const OperationContext* txn,
@@ -333,7 +319,7 @@ void ServiceContext::killAllUserOperations(const OperationContext* txn,
 
         // Don't kill ourself.
         if (toKill && toKill->getOpID() != txn->getOpID()) {
-            _killOperation_inlock(toKill, killCode);
+            killOperation(toKill, killCode);
         }
     }
 }

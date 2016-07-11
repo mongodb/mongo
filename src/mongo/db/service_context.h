@@ -285,10 +285,11 @@ public:
     }
 
     /**
-     * @param i opid of operation to kill
-     * @return if operation was found
+     * Kills the operation "txn" with the code "killCode", if txn has not already been killed.
+     * Caller must own the lock on txn->getClient, and txn->getServiceContext() must be the same as
+     * this service context.
      **/
-    bool killOperation(unsigned int opId);
+    void killOperation(OperationContext* txn, ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
      * Kills all operations that have a Client that is associated with an incoming user

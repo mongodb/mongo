@@ -624,6 +624,30 @@ void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernam
     _impersonationFlag = true;
 }
 
+bool AuthorizationSession::isCoauthorizedWithClient(ClientBasic* opClient) {
+    auto getUserNames = [](AuthorizationSession* authSession) {
+        if (authSession->isImpersonating()) {
+            return authSession->getImpersonatedUserNames();
+        } else {
+            return authSession->getAuthenticatedUserNames();
+        }
+    };
+
+    UserNameIterator it = getUserNames(this);
+    while (it.more()) {
+        UserNameIterator opIt = getUserNames(AuthorizationSession::get(opClient));
+        while (opIt.more()) {
+            if (it.get() == opIt.get()) {
+                return true;
+            }
+            opIt.next();
+        }
+        it.next();
+    }
+
+    return false;
+}
+
 UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
     return makeUserNameIterator(_impersonatedUserNames.begin(), _impersonatedUserNames.end());
 }

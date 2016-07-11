@@ -247,6 +247,13 @@ public:
     // Clears the data for impersonated users.
     void clearImpersonatedUserData();
 
+    // Returns true if the session and 'opClient's AuthorizationSession share an
+    // authenticated user. If either object has impersonated users,
+    // those users will be considered as 'authenticated' for the purpose of this check.
+    //
+    // The existence of 'opClient' must be guaranteed through locks taken by the caller.
+    bool isCoauthorizedWithClient(ClientBasic* opClient);
+
     // Tells whether impersonation is active or not.  This state is set when
     // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
     // called.
