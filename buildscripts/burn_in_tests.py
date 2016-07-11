@@ -20,16 +20,22 @@ if __name__ == "__main__" and __package__ is None:
 
 
 def parse_command_line():
-    parser = optparse.OptionParser()
+    parser = optparse.OptionParser(usage="Usage: %prog [options] [resmoke command]")
+
+    parser.add_option("--maxRevisions", dest="max_revisions",
+                      help="Maximum number of revisions to check for changes. Default is 25.")
+
+    parser.add_option("--branch", dest="branch",
+                      help="The name of the branch the working branch was based on.")
+
+    parser.add_option("--baseCommit", dest="base_commit",
+                      help="The base commit to compare to for determining changes.")
 
     parser.add_option("--noExec", dest="no_exec", action="store_true",
                       help="Do not run resmoke loop on new tests.")
 
     parser.add_option("--reportFile", dest="report_file",
                       help="Write a JSON file with test executor information.")
-
-    parser.add_option("--resmokeCmd", dest="resmoke_cmd",
-                      help="Arguments to pass through to resmoke.py")
 
     parser.add_option("--skipEnterpriseSuites", dest="no_enterprise", action="store_true",
                       help="Do not run against enterprise specific executors.")
@@ -39,7 +45,10 @@ def parse_command_line():
 
     # The executor_file and suite_files defaults are required to make the
     # suite resolver work correctly.
-    parser.set_defaults(executor_file="with_server",
+    parser.set_defaults(base_commit=None,
+                        branch="master",
+                        executor_file="with_server",
+                        max_revisions=25,
                         no_exec=False,
                         no_enterprise=False,
                         suite_files=None)
@@ -108,15 +117,26 @@ def callo(args):
     return check_output(args)
 
 
-def find_changed_tests():
+def find_changed_tests(branch_name, base_commit, max_revisions):
     """
     Use git to find which files have changed in this patch.
     TODO: This should be expanded to search for enterprise modules.
-    TODO: We should be able to specify a revision or parse like evergreen patch does.
     """
 
     changed_tests = []
-    changed_files = callo(["git", "diff", "--name-only", "HEAD"])
+    if base_commit is None:
+        base_commit = callo(["git", "merge-base", branch_name + "@{upstream}", "HEAD"]).rstrip()
+    revisions = callo(["git", "rev-list", base_commit + "...HEAD"]).splitlines()
+    revision_count = len(revisions)
+
+    if revision_count > max_revisions:
+        print "There are too many revisions included (%d)." % revision_count, \
+              "This is likely because your base branch is not " + branch_name + ".", \
+              "You can allow us to review more than 25 revisions by using", \
+              "the --maxRevisions option."
+        return changed_tests
+
+    changed_files = callo(["git", "diff", "--name-only", base_commit])
     for line in changed_files.splitlines():
         line = line.rstrip()
         # Check that the file exists because it may have been moved or deleted in the patch.
@@ -209,7 +229,7 @@ def main():
 
     # Run the executor finder.
     else:
-        changed_tests = find_changed_tests()
+        changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions)
         # If there are no changed tests, exit cleanly.
         if not changed_tests:
             print "No new or modified tests found."
@@ -234,9 +254,9 @@ def main():
                         tests_by_executor.pop(executor)
                         print "Skipping executor", executor
                     elif not os.path.isfile(ekf2_file):
-                        print "The mongo enterprise module is not installed."
-                        print "You may specify the --skipEnterpriseSuites flag to skip these"
-                        print "test executors, or run against an enterprise build."
+                        print "The mongo enterprise module is not installed.", \
+                              "You may specify the --skipEnterpriseSuites flag to skip these" \
+                              "test executors, or run against an enterprise build."
                         sys.exit(1)
                     else:
                         # We have the files to run enterprise executors.
