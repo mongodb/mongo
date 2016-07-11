@@ -47,7 +47,8 @@ public:
 
     StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-    bool killOperation(unsigned int opId) override;
+    void killOperation(OperationContext* txn,
+                       ErrorCodes::Error killCode = ErrorCodes::Interrupted) override;
 
     void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) override;
 

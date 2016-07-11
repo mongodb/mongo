@@ -65,7 +65,8 @@ public:
 
     bool getKillAllOperations() override;
 
-    bool killOperation(unsigned int opId) override;
+    void killOperation(OperationContext* txn,
+                       ErrorCodes::Error killCode = ErrorCodes::Interrupted) override;
 
     void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) override;
 
@@ -77,13 +78,6 @@ public:
 
 private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
-
-    /**
-     * Kills the given operation.
-     *
-     * Caller must own the service context's _mutex.
-     */
-    void _killOperation_inlock(OperationContext* opCtx, ErrorCodes::Error killCode);
 
     bool _globalKill;
 

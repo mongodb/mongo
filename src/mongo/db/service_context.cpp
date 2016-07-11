@@ -260,4 +260,5 @@ BSONArray storageEngineList() {
 void appendStorageEngineList(BSONObjBuilder* result) {
     result->append("storageEngines", storageEngineList());
 }
+
 }  // namespace mongo
