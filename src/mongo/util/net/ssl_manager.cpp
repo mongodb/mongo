@@ -1140,12 +1140,14 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
 
     bool sanMatch = false;
     bool cnMatch = false;
+    StringBuilder certificateNames;
 
     STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>(
         X509_get_ext_d2i(peerCert, NID_subject_alt_name, NULL, NULL));
 
     if (sanNames != NULL) {
         int sanNamesList = sk_GENERAL_NAME_num(sanNames);
+        certificateNames << "SAN(s): ";
         for (int i = 0; i < sanNamesList; i++) {
             const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
             if (currentName && currentName->type == GEN_DNS) {
@@ -1154,11 +1156,13 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
                     sanMatch = true;
                     break;
                 }
+                certificateNames << std::string(dnsName) << " ";
             }
         }
         sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
-    } else {
-        // If Subject Alternate Name (SAN) didn't exist, check Common Name (CN).
+    } else if (peerSubjectName.find("CN=") != std::string::npos) {
+        // If Subject Alternate Name (SAN) doesn't exist and Common Name (CN) does,
+        // check Common Name.
         int cnBegin = peerSubjectName.find("CN=") + 3;
         int cnEnd = peerSubjectName.find(",", cnBegin);
         std::string commonName = peerSubjectName.substr(cnBegin, cnEnd - cnBegin);
@@ -1166,15 +1170,20 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
         if (_hostNameMatch(remoteHost.c_str(), commonName.c_str())) {
             cnMatch = true;
         }
+        certificateNames << "CN: " << commonName;
+    } else {
+        certificateNames << "No Common Name (CN) or Subject Alternate Names (SAN) found";
     }
 
     if (!sanMatch && !cnMatch) {
+        StringBuilder msgBuilder;
+        msgBuilder << "The server certificate does not match the host name. Hostname: "
+                   << remoteHost << " does not match " << certificateNames.str();
+        std::string msg = msgBuilder.str();
         if (_allowInvalidCertificates || _allowInvalidHostnames) {
-            warning() << "The server certificate does not match the host name " << remoteHost;
+            warning() << msg;
         } else {
-            str::stream msg;
-            msg << "The server certificate does not match the host name " << remoteHost;
-            error() << msg.ss.str();
+            error() << msg;
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
