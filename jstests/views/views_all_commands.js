@@ -57,6 +57,7 @@
     let viewsCommandTests = {
         _configsvrAddShard: {skip: isAnInternalCommand},
         _configsvrAddShardToZone: {skip: isAnInternalCommand},
+        _configsvrAssignKeyRangeToZone: {skip: isAnInternalCommand},
         _configsvrBalancerStart: {skip: isAnInternalCommand},
         _configsvrBalancerStatus: {skip: isAnInternalCommand},
         _configsvrBalancerStop: {skip: isAnInternalCommand},

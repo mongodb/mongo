@@ -2763,6 +2763,36 @@ var authCommandsLib = {
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
           ]
         },
+        {
+          testname: "assignKeyRangeToZone",
+          command: {assignKeyRangeToZone: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
+          skipStandalone: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                // assignKeyRangeToZone only checks that you can write on config.tags,
+                // that's why readWriteAnyDatabase passes.
+                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
+                privileges: [
+                    {resource: {db: 'config', collection: 'shards'}, actions: ['find']},
+                    {
+                      resource: {db: 'config', collection: 'tags'},
+                      actions: ['find', 'update', 'remove']
+                    },
+                ],
+                expectFail: true
+              },
+          ]
+        },
+        {
+          testname: "_configsvrAssignKeyRangeToZone",
+          command:
+              {_configsvrAssignKeyRangeToZone: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
+          skipSharded: true,
+          testcases: [
+              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
+          ]
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

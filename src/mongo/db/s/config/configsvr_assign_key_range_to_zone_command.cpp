@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/remove_shard_from_zone_request_type.h"
+#include "mongo/s/request_types/assign_key_range_to_zone_request_type.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -47,22 +47,24 @@ namespace {
 using std::string;
 
 /**
- * Internal sharding command run on config servers to remove a shard from the given zone.
+ * Internal sharding command run on config servers to add a shard to zone.
  *
  * Format:
  * {
- *   _configsvrRemoveShardFromZone: <string shardName>,
- *   zone: <string zoneName>,
+ *   _configsvrAssignKeyRangeToZone: <string namespace>,
+ *   min: <BSONObj min>,
+ *   max: <BSONObj max>,
+ *   zone: <string zone|null>,
  *   writeConcern: <BSONObj>
  * }
  */
-class ConfigSvrRemoveShardFromZoneCommand : public Command {
+class ConfigSvrAssignKeyRangeToZoneCommand : public Command {
 public:
-    ConfigSvrRemoveShardFromZoneCommand() : Command("_configsvrRemoveShardFromZone") {}
+    ConfigSvrAssignKeyRangeToZoneCommand() : Command("_configsvrAssignKeyRangeToZone") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "
-                "directly. Validates and removes the shard from the zone.";
+                "directly. Validates and assigns a new range to a zone.";
     }
 
     bool slaveOk() const override {
@@ -95,19 +97,29 @@ public:
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrRemoveShardFromZone can only be run on config servers");
+                      "_configsvrAssignKeyRangeToZone can only be run on config servers");
         }
 
         auto parsedRequest =
-            uassertStatusOK(RemoveShardFromZoneRequest::parseFromConfigCommand(cmdObj));
+            uassertStatusOK(AssignKeyRangeToZoneRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(Grid::get(txn)->catalogManager()->removeShardFromZone(
-            txn, parsedRequest.getShardName(), parsedRequest.getZoneName()));
+        std::string zoneName;
+        if (!parsedRequest.isRemove()) {
+            zoneName = parsedRequest.getZoneName();
+        }
+
+        if (parsedRequest.isRemove()) {
+            uassertStatusOK(Grid::get(txn)->catalogManager()->removeKeyRangeFromZone(
+                txn, parsedRequest.getNS(), parsedRequest.getRange()));
+        } else {
+            uassertStatusOK(Grid::get(txn)->catalogManager()->assignKeyRangeToZone(
+                txn, parsedRequest.getNS(), parsedRequest.getRange(), zoneName));
+        }
 
         return true;
     }
 
-} configsvrRemoveShardFromZoneCmd;
+} configsvrAssignKeyRangeToZoneCmd;
 
 }  // namespace
 }  // namespace mongo

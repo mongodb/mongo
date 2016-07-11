@@ -11,6 +11,7 @@ selector:
     - jstests/sharding/shard_aware_primary_failover.js
     - jstests/sharding/shard_identity_config_update.js
     - jstests/sharding/add_shard_to_zone.js
+    - jstests/sharding/assign_key_range_to_zone.js
     - jstests/sharding/remove_shard_from_zone.js
     # v3.4 replace noAutoSplit flag with document in config.settings
     - jstests/sharding/disable_autosplit.js
