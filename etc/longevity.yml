@@ -7,16 +7,15 @@ pre:
 post:
     - command: attach.results
       params:
-        file_location: src/dsi/dsi/report.json
+        file_location: work/report.json
     - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         script: |
           set -e
           set -o verbose
-          cd ./clusters/${cluster}
           # call terraform destroy twice to avoid AWS timeout
           yes yes | ./terraform destroy
           yes yes | ./terraform destroy
@@ -29,6 +28,11 @@ functions:
         script: |
           rm -rf ./*
           mkdir src
+          mkdir work
+          mkdir bin
+          mkdir keys
+          pwd
+          ls
     - command: manifest.load
     - command: git.get_project
       params:
@@ -40,74 +44,91 @@ functions:
       params:
         directory: src
     - command: shell.exec
-      # configure environment, has private information, no logging
       params:
-        working_dir: src/dsi/dsi
         silent: true
         script: |
-          ./bin/setup-dsi-env.sh
-          cd ./clusters/${cluster}
-          # stage aws credential for terraform
-          cp ../../terraform/* . #I think this should be done in DSI, since it's pulling down terraform. Or we should pull down terraform in this script
-          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
           # generate aws private key file
-          echo "${ec2_pem}" > ../../keys/aws.pem
-          chmod 400 ../../keys/aws.pem
+          echo "${terraform_secret}" > secret
+          chmod 400 secret
+          echo "${ec2_pem}" > keys/aws.pem
+          chmod 400 keys/aws.pem
+    - command: shell.exec
+      params:
+        working_dir: work
+        # setup execution environment
+        # configure environment
+        script: |
+          virtualenv ./venv
+          source ./venv/bin/activate
+          pip install -r ../src/dsi/dsi/requirements.txt
+          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz --production
+    - command: shell.exec
+      params:
+        script: |
+          set -v
+          source work/dsienv.sh
+          $DSI_PATH/bin/setup-dsi-env.sh
+          cp terraform/* work/
+          ls work
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+           set -v
+           ./terraform get --update
 
   "bring up 3 shard cluster":
     - command: shell.exec
       # bring up the cluster
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         silent: true
         script: |
           # to create a mongod EC2 cluster
           set -e
           set -o verbose
-          cd ./clusters/${cluster}
-          ../../bin/setup-cluster.sh ${cluster}
-          echo "EC2 Cluster CREATED."
+          source ./dsienv.sh
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
 
   "configure mongodb cluster":
     - command: shell.exec
       # bring up the mongod
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         script: |
           set -e
           set -o verbose
+          source ./dsienv.sh
           source ./venv/bin/activate
-          cd ./clusters/${cluster}
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          ../../bin/mongodb_setup.py --config
+          $DSI_PATH/bin/mongodb_setup.py --config
 
   "run test":
     - command: shell.exec
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         script: |
           set -e
           set -v
-          cd ./clusters/${cluster}
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          ../../bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          cd ..
-          cat perf.json >> perf_all.json
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           echo "Complete test for ${test} with setup ${setup}!"
     - command: "json.send"
       params:
           name: "perf"
-          file: "src/dsi/dsi/clusters/perf.json"
+          file: "work/perf.json"
 
   "destroy cluster":
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         script: |
           set -e
           set -o verbose
-          cd ./clusters/${cluster}
+          source ./dsienv.sh
           # destroy the EC2 cluster
           yes yes | ./terraform destroy
           yes yes | ./terraform destroy
@@ -116,32 +137,31 @@ functions:
           echo "Cluster DESTROYED."
           echo "All perf results"
           cd ..
-          cat perf_all.json | egrep "name|ops_per_sec"
+          cat perf.json | egrep "name|ops_per_sec"
 
   "make test log artifact":
     - command: shell.exec
       # destroy the cluster
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         script: |
           set -e
           set -o verbose
-          cd ./clusters/${cluster}/reports
+          source ./dsienv.sh
           # move additional file here
+          cd reports
           cp ../infrastructure_provisioning.out.yml .
           cp ../ips.sh .
           cp ../ips.py .
-          cp ../../perf_all.json .
+          cp ../perf.json .
           cd ..
-          ../../bin/retrieve-diag-data.sh
-          ../../bin/generate-timeseries-html.sh
-          rm -rf ../reports
-          mv ./reports ..
+          $DSI_PATH/bin/retrieve-diag-data.sh
+          $DSI_PATH/bin/generate-timeseries-html.sh
 
     - command: archive.targz_pack
       params:
         target: "reports.tgz"
-        source_dir: "src/dsi/dsi/clusters"
+        source_dir: "work"
         include:
           - "reports/**"
 
@@ -160,7 +180,7 @@ functions:
       params:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
-            local_file: /src/dsi/dsi/clusters/reports/graphs/timeseries-p1.html
+            local_file: work/reports/graphs/timeseries-p1.html
             remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
             bucket: mciuploads
             permissions: public-read
@@ -171,23 +191,23 @@ functions:
     - command: json.get_history
       params:
         task: ${task_name}
-        file: "src/dsi/dsi/history.json"
+        file: "work/history.json"
         name: "perf"
     - command: json.get_history
       params:
         tags: true
         task: ${task_name}
-        file: "src/dsi/dsi/tags.json"
+        file: "work/tags.json"
         name: "perf"
     - command: shell.exec
       # post_run_check.py and longevity_override.json for DSI tests are part of dsi repo
       type : test
       params:
-        working_dir: src/dsi/dsi
+        working_dir: work
         script: |
           set -o errexit
           set -o verbose
-          python -u analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
+          python -u ../src/dsi/dsi/analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
 
 
 tasks:
