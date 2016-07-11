@@ -104,6 +104,7 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
       _timedOut(0),
       _access(std::make_shared<AsyncOp::AccessControl>()),
       _inSetup(true),
+      _inRefresh(false),
       _strand(owner->_io_service) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {

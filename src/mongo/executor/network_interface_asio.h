@@ -42,8 +42,8 @@
 #include "mongo/base/system_error.h"
 #include "mongo/executor/async_stream_factory_interface.h"
 #include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/async_timer_interface.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
@@ -340,6 +340,7 @@ private:
          */
         boost::optional<AsyncCommand> _command;
         bool _inSetup;
+        bool _inRefresh;
 
         /**
          * The explicit strand that all operations for this op must run on.
