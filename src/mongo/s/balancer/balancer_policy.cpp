@@ -33,6 +33,7 @@
 #include "mongo/s/balancer/balancer_policy.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -55,6 +56,15 @@ using std::set;
 using std::string;
 using std::vector;
 
+namespace {
+
+// These values indicate the minimum deviation shard's number of chunks need to have from the
+// optimal average across all shards for a zone for a rebalancing migration to be initiated.
+const size_t kDefaultImbalanceThreshold = 2;
+const size_t kAggressiveImbalanceThreshold = 1;
+
+}  // namespace
+
 DistributionStatus::DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap)
     : _nss(std::move(nss)), _shardChunks(std::move(shardToChunksMap)) {}
 
@@ -63,6 +73,16 @@ size_t DistributionStatus::totalChunks() const {
 
     for (const auto& shardChunk : _shardChunks) {
         total += shardChunk.second.size();
+    }
+
+    return total;
+}
+
+size_t DistributionStatus::totalChunksWithTag(const std::string& tag) const {
+    size_t total = 0;
+
+    for (const auto& shardChunk : _shardChunks) {
+        total += numberOfChunksInShardWithTag(shardChunk.first, tag);
     }
 
     return total;
@@ -209,11 +229,15 @@ Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardSta
 
 ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
                                                      const DistributionStatus& distribution,
-                                                     const string& tag) {
+                                                     const string& tag,
+                                                     const set<ShardId>& excludedShards) {
     ShardId best;
     unsigned minChunks = numeric_limits<unsigned>::max();
 
     for (const auto& stat : shardStats) {
+        if (excludedShards.count(stat.shardId))
+            continue;
+
         auto status = isShardSuitableReceiver(stat, tag);
         if (!status.isOK()) {
             continue;
@@ -233,11 +257,15 @@ ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector
 
 ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& shardStats,
                                                 const DistributionStatus& distribution,
-                                                const string& chunkTag) {
+                                                const string& chunkTag,
+                                                const set<ShardId>& excludedShards) {
     ShardId worst;
     unsigned maxChunks = 0;
 
     for (const auto& stat : shardStats) {
+        if (excludedShards.count(stat.shardId))
+            continue;
+
         const unsigned shardChunkCount =
             distribution.numberOfChunksInShardWithTag(stat.shardId, chunkTag);
         if (shardChunkCount <= maxChunks)
@@ -253,14 +281,13 @@ ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& sha
 vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
                                             bool shouldAggressivelyBalance) {
-    // 1) check for shards that policy require to us to move off of:
-    //    draining only
-    // 2) check tag policy violations
-    // 3) then we make sure chunks are balanced for each tag
+    vector<MigrateInfo> migrations;
 
-    // ----
+    // Set of shards, which have already been used for migrations. Used so we don't return multiple
+    // migrations for the same shard.
+    set<ShardId> usedShards;
 
-    // 1) check things we have to move
+    // 1) Check for shards, which are in draining mode and must have chunks moved off of them
     {
         for (const auto& stat : shardStats) {
             if (!stat.isDraining)
@@ -284,32 +311,40 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
 
                 const string tag = distribution.getTagForChunk(chunk);
 
-                const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
+                const ShardId to =
+                    _getLeastLoadedReceiverShard(shardStats, distribution, tag, usedShards);
                 if (!to.isValid()) {
-                    warning() << "chunk " << chunk
-                              << " is on a draining shard, but no appropriate recipient found";
+                    if (migrations.empty()) {
+                        warning() << "Chunk " << chunk
+                                  << " is on a draining shard, but no appropriate recipient found";
+                    }
                     continue;
                 }
 
-                log() << "going to move " << chunk << " from " << stat.shardId << " (" << tag
-                      << ") to " << to;
-
-                return {MigrateInfo(distribution.nss().ns(), to, chunk)};
+                invariant(to != stat.shardId);
+                migrations.emplace_back(distribution.nss().ns(), to, chunk);
+                invariant(usedShards.insert(stat.shardId).second);
+                invariant(usedShards.insert(to).second);
+                break;
             }
 
-            warning() << "can't find any chunk to move from: " << stat.shardId
-                      << " but we want to. "
-                      << " numJumboChunks: " << numJumboChunks;
+            if (migrations.empty()) {
+                warning() << "Unable to find any chunk to move from draining shard " << stat.shardId
+                          << ". numJumboChunks: " << numJumboChunks;
+            }
         }
     }
 
-    // 2) tag violations
+    // 2) Check for chunks, which are on the wrong shard and must be moved off of it
     if (!distribution.tags().empty()) {
         for (const auto& stat : shardStats) {
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
             for (const auto& chunk : chunks) {
                 const string tag = distribution.getTagForChunk(chunk);
-                if (tag.empty() || stat.shardTags.count(tag))
+                if (tag.empty())
+                    continue;
+
+                if (stat.shardTags.count(tag))
                     continue;
 
                 if (chunk.getJumbo()) {
@@ -318,101 +353,40 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                     continue;
                 }
 
-                const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
+                const ShardId to =
+                    _getLeastLoadedReceiverShard(shardStats, distribution, tag, usedShards);
                 if (!to.isValid()) {
-                    warning() << "chunk " << chunk << " violates tag " << tag
-                              << ", but no appropriate recipient found";
+                    if (migrations.empty()) {
+                        warning() << "chunk " << chunk << " violates tag " << tag
+                                  << ", but no appropriate recipient found";
+                    }
                     continue;
                 }
 
                 invariant(to != stat.shardId);
-
-                log() << "going to move " << chunk << " from " << stat.shardId << " (" << tag
-                      << ") to " << to;
-
-                return {MigrateInfo(distribution.nss().ns(), to, chunk)};
+                migrations.emplace_back(distribution.nss().ns(), to, chunk);
+                invariant(usedShards.insert(stat.shardId).second);
+                invariant(usedShards.insert(to).second);
+                break;
             }
         }
     }
 
     // 3) for each tag balance
-    int threshold = 8;
+    const size_t imbalanceThreshold = (shouldAggressivelyBalance || distribution.totalChunks() < 20)
+        ? kAggressiveImbalanceThreshold
+        : kDefaultImbalanceThreshold;
 
-    if (shouldAggressivelyBalance || distribution.totalChunks() < 20) {
-        threshold = 2;
-    } else if (distribution.totalChunks() < 80) {
-        threshold = 4;
-    }
-
-    // Randomize the order in which we balance the tags so that one bad tag doesn't prevent others
-    // from getting balanced
-    vector<string> tagsPlusEmpty;
-    {
-        for (const auto& tag : distribution.tags()) {
-            tagsPlusEmpty.push_back(tag);
-        }
-        tagsPlusEmpty.push_back("");
-
-        std::random_shuffle(tagsPlusEmpty.begin(), tagsPlusEmpty.end());
-    }
+    vector<string> tagsPlusEmpty(distribution.tags().begin(), distribution.tags().end());
+    tagsPlusEmpty.push_back("");
 
     for (const auto& tag : tagsPlusEmpty) {
-        const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag);
-        if (!from.isValid())
-            continue;
-
-        const unsigned max = distribution.numberOfChunksInShardWithTag(from, tag);
-        if (max == 0)
-            continue;
-
-        const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
-        if (!to.isValid()) {
-            log() << "no available shards to take chunks for tag [" << tag << "]";
-            return vector<MigrateInfo>();
-        }
-
-        const unsigned min = distribution.numberOfChunksInShardWithTag(to, tag);
-
-        const int imbalance = max - min;
-
-        LOG(1) << "collection : " << distribution.nss().ns();
-        LOG(1) << "donor      : " << from << " chunks on " << max;
-        LOG(1) << "receiver   : " << to << " chunks on " << min;
-        LOG(1) << "threshold  : " << threshold;
-
-        if (imbalance < threshold)
-            continue;
-
-        const vector<ChunkType>& chunks = distribution.getChunks(from);
-        unsigned numJumboChunks = 0;
-
-        for (const auto& chunk : chunks) {
-            if (distribution.getTagForChunk(chunk) != tag)
-                continue;
-
-            if (chunk.getJumbo()) {
-                numJumboChunks++;
-                continue;
-            }
-
-            log() << " ns: " << distribution.nss().ns() << " going to move " << chunk
-                  << " from: " << from << " to: " << to << " tag [" << tag << "]";
-
-            return {MigrateInfo(distribution.nss().ns(), to, chunk)};
-        }
-
-        if (numJumboChunks) {
-            error() << "shard: " << from << " ns: " << distribution.nss().ns()
-                    << " has too many chunks, but they are all jumbo "
-                    << " numJumboChunks: " << numJumboChunks;
-            continue;
-        }
-
-        MONGO_UNREACHABLE;
+        while (_singleZoneBalance(
+            shardStats, distribution, tag, imbalanceThreshold, &migrations, &usedShards))
+            ;
     }
 
-    // Everything is balanced here!
-    return vector<MigrateInfo>();
+    return migrations;
 }
 
 boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
@@ -421,12 +395,98 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
     const DistributionStatus& distribution) {
     const string tag = distribution.getTagForChunk(chunk);
 
-    ShardId newShardId = _getLeastLoadedReceiverShard(shardStats, distribution, tag);
+    ShardId newShardId = _getLeastLoadedReceiverShard(shardStats, distribution, tag, {});
     if (!newShardId.isValid() || newShardId == chunk.getShard()) {
         return boost::optional<MigrateInfo>();
     }
 
     return MigrateInfo(distribution.nss().ns(), newShardId, chunk);
+}
+
+bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
+                                        const DistributionStatus& distribution,
+                                        const string& tag,
+                                        size_t imbalanceThreshold,
+                                        vector<MigrateInfo>* migrations,
+                                        set<ShardId>* usedShards) {
+    const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag, *usedShards);
+    if (!from.isValid())
+        return false;
+
+    const size_t max = distribution.numberOfChunksInShardWithTag(from, tag);
+    if (max == 0)
+        return false;
+
+    const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag, *usedShards);
+    if (!to.isValid()) {
+        if (migrations->empty()) {
+            log() << "No available shards to take chunks for tag [" << tag << "]";
+        }
+        return false;
+    }
+
+    const size_t min = distribution.numberOfChunksInShardWithTag(to, tag);
+    if (min >= max)
+        return false;
+
+    const size_t totalNumberOfChunksWithTag =
+        (tag.empty() ? distribution.totalChunks() : distribution.totalChunksWithTag(tag));
+
+    size_t totalNumberOfShardsWithTag = 0;
+
+    for (const auto& stat : shardStats) {
+        if (tag.empty() || stat.shardTags.count(tag)) {
+            totalNumberOfShardsWithTag++;
+        }
+    }
+
+    // totalNumberOfShardsWithTag cannot be zero if the to shard is valid
+    invariant(totalNumberOfShardsWithTag);
+    invariant(totalNumberOfChunksWithTag >= max);
+
+    // The ideal should be at least one per shard
+    const size_t idealNumberOfChunksPerShardWithTag =
+        std::ceil(totalNumberOfChunksWithTag / totalNumberOfShardsWithTag);
+
+    const size_t imbalance = max - idealNumberOfChunksPerShardWithTag;
+
+    LOG(1) << "collection : " << distribution.nss().ns();
+    LOG(1) << "zone       : " << tag;
+    LOG(1) << "donor      : " << from << " chunks on " << max;
+    LOG(1) << "receiver   : " << to << " chunks on " << min;
+    LOG(1) << "ideal      : " << idealNumberOfChunksPerShardWithTag;
+    LOG(1) << "threshold  : " << imbalanceThreshold;
+
+    // Check whether it is necessary to balance within this zone
+    if (imbalance < imbalanceThreshold)
+        return false;
+
+    const vector<ChunkType>& chunks = distribution.getChunks(from);
+
+    unsigned numJumboChunks = 0;
+
+    for (const auto& chunk : chunks) {
+        if (distribution.getTagForChunk(chunk) != tag)
+            continue;
+
+        if (chunk.getJumbo()) {
+            numJumboChunks++;
+            continue;
+        }
+
+        migrations->emplace_back(distribution.nss().ns(), to, chunk);
+        invariant(usedShards->insert(chunk.getShard()).second);
+        invariant(usedShards->insert(to).second);
+        return true;
+    }
+
+    if (numJumboChunks) {
+        warning() << "Shard: " << from << ", collection: " << distribution.nss().ns()
+                  << " has only jumbo chunks for zone \'" << tag
+                  << "\' and cannot be balanced. Jumbo chunks count: " << numJumboChunks;
+    }
+
+    return false;
 }
 
 string TagRange::toString() const {

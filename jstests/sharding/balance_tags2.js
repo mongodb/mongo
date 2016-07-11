@@ -1,52 +1,56 @@
 // Test balancing all chunks to one shard by tagging the full shard-key range on that collection
-var s = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+(function() {
+    'use strict';
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', 'shard0001');
+    var st = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
-var db = s.getDB("test");
+    assert.commandWorked(st.s0.adminCommand({enablesharding: 'test'}));
+    st.ensurePrimaryShard('test', 'shard0001');
 
-var bulk = db.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 21; i++) {
-    bulk.insert({_id: i, x: i});
-}
-assert.writeOK(bulk.execute());
+    var testDB = st.s0.getDB('test');
 
-assert.commandWorked(s.s0.adminCommand({shardCollection: "test.foo", key: {_id: 1}}));
+    var bulk = testDB.foo.initializeUnorderedBulkOp();
+    for (var i = 0; i < 21; i++) {
+        bulk.insert({_id: i, x: i});
+    }
+    assert.writeOK(bulk.execute());
 
-s.stopBalancer();
+    assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {_id: 1}}));
 
-for (var i = 0; i < 20; i++) {
-    sh.splitAt("test.foo", {_id: i});
-}
+    st.stopBalancer();
 
-s.startBalancer();
+    for (var i = 0; i < 20; i++) {
+        assert.commandWorked(st.s0.adminCommand({split: 'test.foo', middle: {_id: i}}));
+    }
 
-s.printShardingStatus(true);
+    st.startBalancer();
 
-// Wait for the initial balance to happen
-assert.soon(function() {
-    var counts = s.chunkCounts("foo");
-    printjson(counts);
-    return counts["shard0000"] == 7 && counts["shard0001"] == 7 && counts["shard0002"] == 7;
-}, "balance 1 didn't happen", 1000 * 60 * 10, 1000);
+    st.printShardingStatus(true);
 
-// Tag one shard
-sh.addShardTag("shard0000", "a");
-assert.eq(["a"], s.config.shards.findOne({_id: "shard0000"}).tags);
+    // Wait for the initial balance to happen
+    assert.soon(function() {
+        var counts = st.chunkCounts('foo');
+        printjson(counts);
+        return counts['shard0000'] == 7 && counts['shard0001'] == 7 && counts['shard0002'] == 7;
+    }, 'balance 1 did not happen', 1000 * 60 * 10, 1000);
 
-// Tag the whole collection (ns) to one shard
-sh.addTagRange("test.foo", {_id: MinKey}, {_id: MaxKey}, "a");
+    // Tag one shard
+    st.addShardTag('shard0000', 'a');
+    assert.eq(['a'], st.config.shards.findOne({_id: 'shard0000'}).tags);
 
-// Wait for things to move to that one shard
-s.printShardingStatus(true);
+    // Tag the whole collection (ns) to one shard
+    st.addTagRange('test.foo', {_id: MinKey}, {_id: MaxKey}, 'a');
 
-assert.soon(function() {
-    var counts = s.chunkCounts("foo");
-    printjson(counts);
-    return counts["shard0001"] == 0 && counts["shard0002"] == 0;
-}, "balance 2 didn't happen", 1000 * 60 * 10, 1000);
+    // Wait for things to move to that one shard
+    st.printShardingStatus(true);
 
-s.printShardingStatus(true);
+    assert.soon(function() {
+        var counts = st.chunkCounts('foo');
+        printjson(counts);
+        return counts['shard0001'] == 0 && counts['shard0002'] == 0;
+    }, 'balance 2 did not happen', 1000 * 60 * 10, 1000);
 
-s.stop();
+    st.printShardingStatus(true);
+
+    st.stop();
+})();

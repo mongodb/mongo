@@ -104,6 +104,12 @@ public:
     size_t totalChunks() const;
 
     /**
+     * Returns the total number of chunks across all shards, which fall into the specified zone's
+     * range.
+     */
+    size_t totalChunksWithTag(const std::string& tag) const;
+
+    /**
      * Returns number of chunks in the specified shard.
      */
     size_t numberOfChunksInShard(const ShardId& shardId) const;
@@ -169,18 +175,18 @@ public:
                                           const std::string& chunkTag);
 
     /**
-     * Returns a suggested set of chunks to move whithin a collection's shards, given information
-     * about space usage and number of chunks for that collection. If the policy doesn't recommend
-     * moving, it returns an empty vector.
+     * Returns a suggested set of chunks to move whithin a collection's shards, given the specified
+     * state of the shards (draining, max size reached, etc) and the number of chunks for that
+     * collection. If the policy doesn't recommend anything to move, it returns an empty vector. The
+     * entries in the vector do are all for separate source/destination shards and as such do not
+     * need to be done serially and can be scheduled in parallel.
      *
-     * ns is the collection which needs balancing.
-     * distribution holds all the info about the current state of the cluster/namespace.
-     * shouldAggressivelyBalance indicates that the last round successfully moved chunks around and
-     * causes the threshold for chunk number disparity between shards to be lowered.
+     * The balancing logic calculates the optimum number of chunks per shard for each zone and if
+     * any of the shards have chunks, which are sufficiently higher than this number, suggests
+     * moving chunks to shards, which are under this number.
      *
-     * Returns vector of MigrateInfos of the best moves to make towards balacing the specified
-     * collection. The entries in the vector do not need to be done serially and can be scheduled in
-     * parallel.
+     * The shouldAggressivelyBalance parameter causes the threshold for chunk could disparity
+     * between shards to be lowered.
      */
     static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
@@ -201,7 +207,8 @@ private:
      */
     static ShardId _getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
                                                 const DistributionStatus& distribution,
-                                                const std::string& tag);
+                                                const std::string& tag,
+                                                const std::set<ShardId>& excludedShards);
 
     /**
      * Return the shard which has the least number of chunks with the specified tag. If the tag is
@@ -209,7 +216,23 @@ private:
      */
     static ShardId _getMostOverloadedShard(const ShardStatisticsVector& shardStats,
                                            const DistributionStatus& distribution,
-                                           const std::string& chunkTag);
+                                           const std::string& chunkTag,
+                                           const std::set<ShardId>& excludedShards);
+
+    /**
+     * Selects one chunk for the specified zone (if appropriate) to be moved in order to bring the
+     * deviation of the shards chunk contents closer to even across all shards in the specified
+     * zone. Takes into account the shards, which have already been used for migrations.
+     *
+     * Returns true if a migration was suggested, false otherwise. This method is intented to be
+     * called multiple times until all posible migrations for a zone have been selected.
+     */
+    static bool _singleZoneBalance(const ShardStatisticsVector& shardStats,
+                                   const DistributionStatus& distribution,
+                                   const std::string& tag,
+                                   size_t imbalanceThreshold,
+                                   std::vector<MigrateInfo>* migrations,
+                                   std::set<ShardId>* usedShards);
 };
 
 }  // namespace mongo
