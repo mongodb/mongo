@@ -679,9 +679,27 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConcern) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandWithInvalidWriteConcernSingleNode) {
+    // Tests that if you send a non-majority write concern it will not be accepted
+    BSONObjBuilder responseBuilder;
+    bool ok =
+        catalogClient()->runUserManagementWriteCommand(operationContext(),
+                                                       "dropUser",
+                                                       "test",
+                                                       BSON("dropUser"
+                                                            << "test"
+                                                            << "writeConcern"
+                                                            << BSON("w" << 1 << "wtimeout" << 30)),
+                                                       &responseBuilder);
+    ASSERT_FALSE(ok);
 
+    Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, commandStatus);
+    ASSERT_STRING_CONTAINS(commandStatus.reason(), "Invalid replication write concern");
+}
+
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConcernTwoNodes) {
+    // Tests that if you send a non-majority write concern it will not be accepted
     BSONObjBuilder responseBuilder;
     bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
                                                              "dropUser",
@@ -696,62 +714,6 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConce
     Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, commandStatus);
     ASSERT_STRING_CONTAINS(commandStatus.reason(), "Invalid replication write concern");
-}
-
-TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConcern) {
-    // Tests that if you send a w:1 write concern it gets replaced with w:majority
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           Milliseconds waitFor,
-           Milliseconds lockTryInterval) {
-            ASSERT_EQUALS("authorizationData", name);
-            ASSERT_EQUALS("dropUser", whyMessage);
-        },
-        Status::OK());
-
-    auto future = launchAsync([this] {
-        BSONObjBuilder responseBuilder;
-        bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                                 "dropUser",
-                                                                 "test",
-                                                                 BSON("dropUser"
-                                                                      << "test"
-                                                                      << "writeConcern"
-                                                                      << BSON("w" << 1 << "wtimeout"
-                                                                                  << 30)),
-                                                                 &responseBuilder);
-        ASSERT_FALSE(ok);
-
-        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-        ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
-    });
-
-    onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS("test", request.dbname);
-        ASSERT_EQUALS(BSON("dropUser"
-                           << "test"
-                           << "writeConcern"
-                           << BSON("w"
-                                   << "majority"
-                                   << "wtimeout"
-                                   << 30)
-                           << "maxTimeMS"
-                           << 30000),
-                      request.cmdObj);
-
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
-        BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder,
-                                     Status(ErrorCodes::UserNotFound, "User test@test not found"));
-        return responseBuilder.obj();
-    });
-
-    // Now wait for the runUserManagementWriteCommand call to return
-    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
