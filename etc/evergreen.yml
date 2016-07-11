@@ -1010,19 +1010,6 @@ tasks:
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_time_limit: --time-limit 150
 
-- <<: *run_jepsen_template
-  name: jepsen_findAndModify_600s_WT
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-      hang_analyzer_processes: "java"
-      jepsen_read_with_find_and_modify: --read-with-find-and-modify
-      jepsen_storage_engine: --storage-engine wiredTiger
-      jepsen_time_limit: --time-limit 600
-
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz
@@ -7172,7 +7159,6 @@ buildvariants:
     - ubuntu1404-build
   - name: jepsen_findAndModify_WT
   - name: jepsen_findAndModify_150s_WT
-  - name: jepsen_findAndModify_600s_WT
   - name: unittests
     distros:
     - ubuntu1404-test
