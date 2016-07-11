@@ -103,7 +103,7 @@ const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
 // repl::SnapshotThread introduces.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useDataReplicatorInitialSync, bool, false);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(use3dot2InitialSync, bool, true);
 
 // Set this to specify whether to use a collection to buffer the oplog on the destination server
 // during initial sync to prevent rolling over the oplog.
@@ -117,10 +117,10 @@ MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
         return Status(ErrorCodes::BadValue,
                       "unsupported initial sync oplog buffer option: " + initialSyncOplogBuffer);
     }
-    if (!useDataReplicatorInitialSync && (initialSyncOplogBuffer == kCollectionOplogBufferName)) {
+    if (use3dot2InitialSync && (initialSyncOplogBuffer == kCollectionOplogBufferName)) {
         return Status(ErrorCodes::BadValue,
                       "cannot use collection oplog buffer without --setParameter "
-                      "useDataReplicatorInitialSync=true");
+                      "use3dot2InitialSync=false");
     }
 
     return Status::OK();
@@ -627,7 +627,7 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteady
 }
 
 bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync() const {
-    return useDataReplicatorInitialSync;
+    return !use3dot2InitialSync;
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {

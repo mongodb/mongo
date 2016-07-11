@@ -7162,3 +7162,92 @@ buildvariants:
   - name: unittests
     distros:
     - ubuntu1404-test
+
+- name: initsync-3dot2-rhel-62
+  display_name: "~ Initial Sync 3.2 Enterprise RHEL 6.2"
+  modules:
+  - enterprise
+  - mongo-tools
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: "\"--mongodSetParameters={use3dot2InitialSync: false}\""
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel62
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-large
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_small_oplog_rs
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_WT
+    distros:
+    - rhel62-large
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: read_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replicasets
+    distros:
+    - rhel62-large
+  - name: replicasets_WT
+    distros:
+    - rhel62-large
+  - name: replicasets_WT_ese
+    distros:
+    - rhel62-large
+  - name: replicasets_auth
+    distros:
+    - rhel62-large
+  - name: replicasets_legacy
+    distros:
+    - rhel62-large
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+    distros:
+    - rhel62-large
+  - name: sharding_WT
+    distros:
+    - rhel62-large
+  - name: sharding_WT_ese
+    distros:
+    - rhel62-large
+  - name: sharding_auth
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_WT
+    distros:
+    - rhel62-large
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_WT
+    distros:
+    - rhel62-large
+  - name: sharding_csrs_continuous_config_stepdown_WT
+    distros:
+    - rhel62-large
+  - name: slow1
+  - name: slow1_WT
