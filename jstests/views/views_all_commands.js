@@ -246,6 +246,7 @@
         listDatabases: {skip: isUnrelated},
         listIndexes: {command: {listIndexes: "view"}, skip: "TODO(SERVER-24823)"},
         lockInfo: {skip: isUnrelated},
+        logApplicationMessage: {skip: isUnrelated},
         logRotate: {skip: isUnrelated},
         logout: {skip: isUnrelated},
         makeSnapshot: {skip: isAnInternalCommand},

@@ -2218,6 +2218,24 @@ tasks:
       resmoke_args: --suites=read_only_sharded --storageEngine=wiredTiger
       run_multiple_jobs: true
 
+- <<: *task_template
+  name: views
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=views --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: views_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=views --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
 - name: push
   patchable: false
   depends_on:
@@ -2847,6 +2865,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -2986,6 +3006,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -3051,6 +3073,8 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: tool
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: linux-64-lsm
   stepback: false
@@ -3104,6 +3128,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool_WT
   - name: unittests
+  - name: views_WT
 
 - name: ubuntu1204
   display_name: SSL Ubuntu 12.04
@@ -3211,6 +3236,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -3324,6 +3351,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -3435,6 +3464,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -3516,6 +3547,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -3629,6 +3662,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -3960,6 +3995,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: enterprise-windows-64
   display_name: "* Enterprise Windows"
@@ -4020,6 +4057,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -4269,6 +4308,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -4407,6 +4448,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: enterprise-osx-107
   display_name: Enterprise OS X 10.7
@@ -4449,6 +4492,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -4634,6 +4679,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -4795,6 +4842,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -4906,6 +4955,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -5040,6 +5091,7 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -5173,6 +5225,7 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -5596,6 +5649,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -5756,6 +5811,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -5839,6 +5896,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -6058,6 +6117,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -6171,6 +6232,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -6264,6 +6327,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
+  - name: views_WT
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
@@ -6337,6 +6401,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: unittests
+  - name: views_WT
 
 - name: enterprise-rhel-71-ppc64le-inmem
   display_name: Enterprise RHEL 7.1 PPC64LE (inMemory) DEBUG
@@ -6414,6 +6479,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
+  - name: views
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -6498,6 +6564,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
+  - name: views
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
@@ -6563,6 +6630,7 @@ buildvariants:
   - name: serial_run
   - name: sharding_jscore_passthrough
   - name: unittests
+  - name: views
 
 ###########################################
 #     Experimental buildvariants          #
@@ -6694,6 +6762,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -6849,6 +6919,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: ubuntu1410-fast-clang
   display_name: ~ Clang/libc++ SSL Ubuntu 14.10
@@ -6954,6 +7026,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
   - name: push
     distros:
     - rhel55-test
@@ -7105,6 +7179,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: views
+  - name: views_WT
 
 - name: ubuntu1404-jepsen
   display_name: ~ Jepsen Ubuntu 14.04
