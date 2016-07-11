@@ -198,9 +198,12 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	 * call, or vice-versa, we will incorrectly switch to the JSON default
 	 * timestamp. But there's no way to detect that, and this is all a low
 	 * probability path.)
+	 *
+	 * !!!
+	 * Don't rewrite in the compressed "%FT%T.000Z" form, MSVC13 segfaults.
 	 */
 #define	WT_TIMESTAMP_DEFAULT		"%b %d %H:%M:%S"
-#define	WT_TIMESTAMP_JSON_DEFAULT	"%FT%T.000Z"
+#define	WT_TIMESTAMP_JSON_DEFAULT	"%Y-%m-%dT%H:%M:%S.000Z"
 	WT_ERR(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
 	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON) &&
