@@ -168,7 +168,9 @@ var server11675 = function() {
     assertErrorCode(t, [{$sort: {text: 1}}, {$match: {$text: {$search: 'apple banana'}}}], 17313);
 
     // wrong $stage, but correct position
-    assertErrorCode(t, [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}], 15999);
+    assertErrorCode(t,
+                    [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}],
+                    ErrorCodes.InvalidPipelineOperator);
     assertErrorCode(t, [{$sort: {$text: {$search: 'apple banana'}}}], 17312);
 };
 server11675();

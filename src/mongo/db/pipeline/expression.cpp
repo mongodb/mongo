@@ -224,7 +224,7 @@ intrusive_ptr<Expression> Expression::parseExpression(BSONObj obj, const Variabl
     // Look up the parser associated with the expression name.
     const char* opName = obj.firstElementFieldName();
     auto op = parserMap.find(opName);
-    uassert(15999,
+    uassert(ErrorCodes::InvalidPipelineOperator,
             str::stream() << "Unrecognized expression '" << opName << "'",
             op != parserMap.end());
     return op->second(obj.firstElement(), vps);
