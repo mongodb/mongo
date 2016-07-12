@@ -30,8 +30,10 @@
 #include "mongo/db/write_concern_options.h"
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -46,6 +48,14 @@ namespace {
  * Default is NORMAL.
  */
 enum WriteConcern { W_NONE = 0, W_NORMAL = 1 };
+
+constexpr StringData kJFieldName = "j"_sd;
+constexpr StringData kFSyncFieldName = "fsync"_sd;
+constexpr StringData kWFieldName = "w"_sd;
+constexpr StringData kWTimeoutFieldName = "wtimeout"_sd;
+constexpr StringData kGetLastErrorFieldName = "getLastError"_sd;
+constexpr StringData kWOpTimeFieldName = "wOpTime"_sd;
+constexpr StringData kWElectionIdFieldName = "wElectionId"_sd;
 
 }  // namespace
 
@@ -79,18 +89,41 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
         return Status(ErrorCodes::FailedToParse, "write concern object cannot be empty");
     }
 
-    BSONElement jEl = obj["j"];
-    if (!jEl.eoo() && !jEl.isNumber() && jEl.type() != Bool) {
-        return Status(ErrorCodes::FailedToParse, "j must be numeric or a boolean value");
+    BSONElement jEl;
+    BSONElement fsyncEl;
+    BSONElement wEl;
+
+
+    for (auto e : obj) {
+        const auto fieldName = e.fieldNameStringData();
+        if (fieldName == kJFieldName) {
+            jEl = e;
+            if (!jEl.isNumber() && jEl.type() != Bool) {
+                return Status(ErrorCodes::FailedToParse, "j must be numeric or a boolean value");
+            }
+        } else if (fieldName == kFSyncFieldName) {
+            fsyncEl = e;
+            if (!fsyncEl.isNumber() && fsyncEl.type() != Bool) {
+                return Status(ErrorCodes::FailedToParse,
+                              "fsync must be numeric or a boolean value");
+            }
+        } else if (fieldName == kWFieldName) {
+            wEl = e;
+        } else if (fieldName == kWTimeoutFieldName) {
+            wTimeout = e.numberInt();
+        } else if (fieldName == kWElectionIdFieldName) {
+            // Ignore.
+        } else if (fieldName == kWOpTimeFieldName) {
+            // Ignore.
+        } else if (fieldName.equalCaseInsensitive(kGetLastErrorFieldName)) {
+            // Ignore GLE field.
+        } else {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "unrecognized write concern field: " << fieldName);
+        }
     }
 
     const bool j = jEl.trueValue();
-
-    BSONElement fsyncEl = obj["fsync"];
-    if (!fsyncEl.eoo() && !fsyncEl.isNumber() && fsyncEl.type() != Bool) {
-        return Status(ErrorCodes::FailedToParse, "fsync must be numeric or a boolean value");
-    }
-
     const bool fsync = fsyncEl.trueValue();
 
     if (j && fsync)
@@ -104,18 +137,15 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
         syncMode = SyncMode::NONE;
     }
 
-    BSONElement e = obj["w"];
-    if (e.isNumber()) {
-        wNumNodes = e.numberInt();
-    } else if (e.type() == String) {
-        wMode = e.valuestrsafe();
-    } else if (e.eoo() || e.type() == jstNULL || e.type() == Undefined) {
+    if (wEl.isNumber()) {
+        wNumNodes = wEl.numberInt();
+    } else if (wEl.type() == String) {
+        wMode = wEl.valuestrsafe();
+    } else if (wEl.eoo() || wEl.type() == jstNULL || wEl.type() == Undefined) {
         wNumNodes = 1;
     } else {
         return Status(ErrorCodes::FailedToParse, "w has to be a number or a string");
     }
-
-    wTimeout = obj["wtimeout"].numberInt();
 
     return Status::OK();
 }

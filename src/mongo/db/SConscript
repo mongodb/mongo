@@ -458,6 +458,14 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target= 'write_concern_options_test',
+    source= 'write_concern_options_test.cpp',
+    LIBDEPS=[
+        'write_concern_options',
+    ],
+)
+
 env.Library(
     target='service_context',
     source=[
