@@ -670,5 +670,27 @@ TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
     ASSERT_EQUALS(inExpr->getCollator(), cq->getCollator());
 }
 
+TEST(CanonicalQueryTest, NorWithOneChildNormalizedToNot) {
+    unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}]}"));
+    auto root = cq->root();
+    ASSERT_EQ(MatchExpression::NOT, root->matchType());
+    ASSERT_EQ(1U, root->numChildren());
+    ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());
+}
+
+TEST(CanonicalQueryTest, NorWithTwoChildrenNotNormalized) {
+    unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}, {b: 1}]}"));
+    auto root = cq->root();
+    ASSERT_EQ(MatchExpression::NOR, root->matchType());
+}
+
+TEST(CanonicalQueryTest, NorWithOneChildNormalizedAfterNormalizingChild) {
+    unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{$or: [{a: 1}]}]}"));
+    auto root = cq->root();
+    ASSERT_EQ(MatchExpression::NOT, root->matchType());
+    ASSERT_EQ(1U, root->numChildren());
+    ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());
+}
+
 }  // namespace
 }  // namespace mongo
