@@ -215,6 +215,20 @@ void CollectionCloner::setScheduleDbWorkFn(const ScheduleDbWorkFn& scheduleDbWor
 void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                             Fetcher::NextAction* nextAction,
                                             BSONObjBuilder* getMoreBob) {
+    const bool collectionIsEmpty = fetchResult == ErrorCodes::NamespaceNotFound;
+    if (collectionIsEmpty) {
+        // Schedule collection creation and finish callback.
+        auto&& scheduleResult =
+            _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackArgs& cbd) {
+                auto&& createStatus =
+                    _storageInterface->createCollection(cbd.txn, _destNss, _options);
+                _finishCallback(createStatus);
+            });
+        if (!scheduleResult.isOK()) {
+            _finishCallback(scheduleResult.getStatus());
+        }
+        return;
+    };
     if (!fetchResult.isOK()) {
         Status newStatus{fetchResult.getStatus().code(),
                          str::stream() << "During listIndexes call on collection '"

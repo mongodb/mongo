@@ -546,9 +546,9 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(BSON("ok" << 0 << "errmsg"
-                                         << "collection missing (where are you little collection?)"
+                                         << "fake message"
                                          << "code"
-                                         << ErrorCodes::NamespaceNotFound));
+                                         << ErrorCodes::CursorNotFound));
 
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
         processNetworkResponse(createCursorResponse(0, BSONArray()));
@@ -560,7 +560,7 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     ASSERT_EQUALS(2U, _collections.size());
 
     auto collInfo = _collections[NamespaceString{"db.a"}];
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, collInfo.status.code());
+    ASSERT_EQUALS(ErrorCodes::CursorNotFound, collInfo.status.code());
     auto stats = collInfo.stats;
     stats.insertCount = 0;
     stats.commitCalled = false;

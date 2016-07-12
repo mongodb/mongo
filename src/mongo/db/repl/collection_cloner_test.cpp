@@ -254,6 +254,31 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNoIndexes) {
     }
 }
 
+TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
+    ASSERT_OK(collectionCloner->start());
+
+    bool collectionCreated = false;
+    NamespaceString collNss;
+    storageInterface->createCollFn = [&collNss, &collectionCreated](
+        OperationContext*, const NamespaceString& nss, const CollectionOptions& options) {
+        collectionCreated = true;
+        collNss = nss;
+        return Status::OK();
+    };
+    // Using a non-zero cursor to ensure that
+    // the cloner stops the fetcher from retrieving more results.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(ErrorCodes::NamespaceNotFound, "The collection doesn't exist.");
+    }
+
+    collectionCloner->wait();
+    ASSERT_OK(getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionCreated);
+    ASSERT_EQ(collNss, nss);
+}
+
 TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {
     ASSERT_OK(collectionCloner->start());
 
