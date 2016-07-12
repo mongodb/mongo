@@ -9,13 +9,12 @@
 #include "wt_internal.h"
 
 static int __backup_all(WT_SESSION_IMPL *);
-static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_list_uri_append(WT_SESSION_IMPL *, const char *, bool *);
 static int __backup_start(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
-static int __backup_stop(WT_SESSION_IMPL *);
+static int __backup_stop(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_uri(WT_SESSION_IMPL *, const char *[], bool *, bool *);
 
 /*
@@ -76,7 +75,6 @@ __curbackup_close(WT_CURSOR *cursor)
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
 
@@ -91,12 +89,8 @@ __curbackup_close(WT_CURSOR *cursor)
 	 * discarded when the cursor is closed), because that cursor will never
 	 * not be responsible for cleanup.
 	 */
-	if (F_ISSET(cb, WT_CURBACKUP_LOCKER)) {
-		WT_TRET(__backup_cleanup_handles(session, cb));
-		WT_WITH_SCHEMA_LOCK(session, tret,
-		    tret = __backup_stop(session));
-		WT_TRET(tret);
-	}
+	if (F_ISSET(cb, WT_CURBACKUP_LOCKER))
+		WT_TRET(__backup_stop(session, cb));
 
 	WT_TRET(__wt_cursor_close(cursor));
 	session->bkp_cursor = NULL;
@@ -306,9 +300,7 @@ err:	/* Close the hot backup file. */
 
 /*
  * __backup_cleanup_handles --
- *	Release and free all btree handles held by the backup. This is kept
- *	separate from __backup_stop because it can be called without the
- *	schema lock held.
+ *	Release and free all btree handles held by the backup.
  */
 static int
 __backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
@@ -336,15 +328,18 @@ __backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
  *	Stop a backup.
  */
 static int
-__backup_stop(WT_SESSION_IMPL *session)
+__backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	conn = S2C(session);
 
+	/* Release all btree handles held by the backup. */
+	WT_TRET(__backup_cleanup_handles(session, cb));
+
 	/* Remove any backup specific file. */
-	ret = __wt_backup_file_remove(session);
+	WT_TRET(__wt_backup_file_remove(session));
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
 	WT_TRET(__wt_writelock(session, conn->hot_backup_lock));
