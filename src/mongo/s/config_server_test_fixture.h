@@ -42,7 +42,7 @@ class BSONObj;
 class CatalogCache;
 struct ChunkVersion;
 class CollectionType;
-class ReplSetDistLockManager;
+class DistLockManagerMock;
 class NamespaceString;
 class Shard;
 class ShardFactoryMock;
@@ -100,7 +100,7 @@ public:
 
     MessagingPortMock* getMessagingPort() const;
 
-    ReplSetDistLockManager* distLock() const;
+    DistLockManagerMock* distLock() const;
 
     OperationContext* operationContext() const;
 
@@ -172,7 +172,7 @@ private:
     executor::TaskExecutor* _executorForAddShard;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
     std::unique_ptr<executor::NetworkTestEnv> _addShardNetworkTestEnv;
-    ReplSetDistLockManager* _distLockManager = nullptr;
+    DistLockManagerMock* _distLockManager = nullptr;
     ShardingCatalogClientImpl* _catalogClient = nullptr;
     ShardingCatalogManagerImpl* _catalogManager = nullptr;
 };

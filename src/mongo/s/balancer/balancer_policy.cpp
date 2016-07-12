@@ -384,10 +384,6 @@ string TagRange::toString() const {
     return str::stream() << min << " -->> " << max << "  on  " << tag;
 }
 
-std::string MigrateInfo::getName() const {
-    return ChunkType::genID(ns, minKey);
-}
-
 string MigrateInfo::toString() const {
     return str::stream() << ns << ": [" << minKey << ", " << maxKey << "), from " << from << ", to "
                          << to;

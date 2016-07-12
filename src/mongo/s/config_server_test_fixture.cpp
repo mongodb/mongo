@@ -52,8 +52,7 @@
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/replset/sharding_catalog_manager_impl.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -105,23 +104,8 @@ void ConfigServerTestFixture::setUp() {
     _opCtx = cc().makeOperationContext();
 
     repl::ReplSettings replSettings;
-    auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(replSettings);
-    repl::ReplicaSetConfig config;
-    config.initialize(BSON("_id"
-                           << "mySet"
-                           << "protocolVersion"
-                           << 1
-                           << "version"
-                           << 3
-                           << "members"
-                           << BSON_ARRAY(BSON("host"
-                                              << "node2:12345"
-                                              << "_id"
-                                              << 1))));
-    replCoord->setGetConfigReturnValue(config);
-    repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    repl::ReplicationCoordinator::set(
+        serviceContext, stdx::make_unique<repl::ReplicationCoordinatorMock>(replSettings));
 
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
@@ -147,9 +131,17 @@ void ConfigServerTestFixture::setUp() {
     _addShardNetworkTestEnv = stdx::make_unique<NetworkTestEnv>(specialExec.get(), specialMockNet);
     _executorForAddShard = specialExec.get();
 
+    auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
+    _distLockManager = uniqueDistLockManager.get();
+    std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
+        stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
+    _catalogClient = catalogClient.get();
+    catalogClient->startup();
+
     std::unique_ptr<ShardingCatalogManagerImpl> catalogManager(
         stdx::make_unique<ShardingCatalogManagerImpl>(_catalogClient, std::move(specialExec)));
     _catalogManager = catalogManager.get();
+    catalogManager->startup();
 
     auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
     auto targeterFactoryPtr = targeterFactory.get();
@@ -185,19 +177,6 @@ void ConfigServerTestFixture::setUp() {
         stdx::make_unique<ShardRegistry>(std::move(shardFactory), ConnectionString::forLocal()));
     executorPool->startup();
 
-    auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry.get());
-
-    auto uniqueDistLockManager =
-        stdx::make_unique<ReplSetDistLockManager>(serviceContext,
-                                                  "distLockProcessId",
-                                                  std::move(distLockCatalog),
-                                                  ReplSetDistLockManager::kDistLockPingInterval,
-                                                  ReplSetDistLockManager::kDistLockExpirationTime);
-    _distLockManager = uniqueDistLockManager.get();
-    std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
-        stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
-    _catalogClient = catalogClient.get();
-
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     grid.init(std::move(catalogClient),
@@ -208,9 +187,6 @@ void ConfigServerTestFixture::setUp() {
               stdx::make_unique<BalancerConfiguration>(),
               std::move(executorPool),
               _mockNetwork);
-
-    _catalogClient->startup();
-    _catalogManager->startup();
 }
 
 void ConfigServerTestFixture::tearDown() {
@@ -279,7 +255,7 @@ MessagingPortMock* ConfigServerTestFixture::getMessagingPort() const {
     return _messagePort.get();
 }
 
-ReplSetDistLockManager* ConfigServerTestFixture::distLock() const {
+DistLockManagerMock* ConfigServerTestFixture::distLock() const {
     invariant(_distLockManager);
     return _distLockManager;
 }

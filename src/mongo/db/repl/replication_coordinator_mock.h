@@ -30,7 +30,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -259,18 +258,12 @@ public:
 
     virtual Status stepUpIfEligible() override;
 
-    /**
-     * Sets the return value for calls to getConfig.
-     */
-    void setGetConfigReturnValue(ReplicaSetConfig returnValue);
-
 private:
     AtomicUInt64 _snapshotNameGenerator;
     const ReplSettings _settings;
     MemberState _memberState;
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;
-    ReplicaSetConfig _getConfigReturnValue;
 };
 
 }  // namespace repl
