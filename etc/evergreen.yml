@@ -2278,18 +2278,23 @@ tasks:
 
           if [ "${has_packages|}" = "true" ] ; then
             for rpm in $(find repo/ -name \*.rpm) ; do
-              pushd $(dirname $rpm)
+              cd $(dirname $rpm)
+
               # Use --package-file-suffix "" to overwrite existing RPM's instead of saving new "-signed.rpm" RPM files
               #
               /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
-              popd
+
+              cd ${workdir}
             done
             for release_file in $(find repo/ -name Release) ; do
-              pushd $(dirname $release_file)
+              cd $(dirname $release_file)
+
               /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
-              popd
+
+              cd ${workdir}
             done
           fi
+
           tar zcvf repo-${push_arch}.tgz repo || true
           rm signing_auth_token
 
