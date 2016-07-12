@@ -3513,6 +3513,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: push
+    distros:
+    - rhel70
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0 64-bit
@@ -3703,6 +3705,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: push
+    distros:
+    - rhel70
 
 - name: rhel70
   display_name: SSL RHEL 7.0 64-bit
