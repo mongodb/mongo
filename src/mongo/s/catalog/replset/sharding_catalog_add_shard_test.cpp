@@ -92,14 +92,13 @@ protected:
         // TODO: use kLocalReadConcern once this test is switched to using the
         // ConfigServerTestFixture.
         auto future = launchAsync([&] {
-            auto clusterId =
-                assertGet(ClusterIdentityLoader::get(operationContext())
-                              ->getClusterId(operationContext(),
-                                             repl::ReadConcernLevel::kMajorityReadConcern));
-            ASSERT_EQUALS(_clusterId, clusterId);
+            ASSERT_OK(ClusterIdentityLoader::get(operationContext())
+                          ->loadClusterId(operationContext(),
+                                          repl::ReadConcernLevel::kMajorityReadConcern));
         });
         expectGetConfigVersion();
         future.timed_get(kFutureTimeout);
+        ASSERT_EQUALS(_clusterId, ClusterIdentityLoader::get(operationContext())->getClusterId());
     }
 
     /**

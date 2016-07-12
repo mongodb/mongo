@@ -111,9 +111,9 @@ TEST_F(ClusterIdentityTest, BasicLoadSuccess) {
     auto future = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(clusterIdStatus);
-        ASSERT_EQUALS(clusterId, clusterIdStatus.getValue());
+        ASSERT_EQUALS(clusterId, ClusterIdentityLoader::get(operationContext())->getClusterId());
     });
 
     expectConfigVersionLoad(clusterId);
@@ -122,11 +122,9 @@ TEST_F(ClusterIdentityTest, BasicLoadSuccess) {
 
     // Subsequent requests for the cluster ID should not require any network traffic as we consult
     // the cached version.
-    auto clusterIdStatus =
+    ASSERT_OK(
         ClusterIdentityLoader::get(operationContext())
-            ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_OK(clusterIdStatus);
-    ASSERT_EQUALS(clusterId, clusterIdStatus.getValue());
+            ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern));
 }
 
 TEST_F(ClusterIdentityTest, MultipleThreadsLoadingSuccess) {
@@ -135,23 +133,23 @@ TEST_F(ClusterIdentityTest, MultipleThreadsLoadingSuccess) {
     auto future1 = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(clusterIdStatus);
-        ASSERT_EQUALS(clusterId, clusterIdStatus.getValue());
+        ASSERT_EQUALS(clusterId, ClusterIdentityLoader::get(operationContext())->getClusterId());
     });
     auto future2 = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(clusterIdStatus);
-        ASSERT_EQUALS(clusterId, clusterIdStatus.getValue());
+        ASSERT_EQUALS(clusterId, ClusterIdentityLoader::get(operationContext())->getClusterId());
     });
     auto future3 = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(clusterIdStatus);
-        ASSERT_EQUALS(clusterId, clusterIdStatus.getValue());
+        ASSERT_EQUALS(clusterId, ClusterIdentityLoader::get(operationContext())->getClusterId());
     });
 
     expectConfigVersionLoad(clusterId);
@@ -167,7 +165,7 @@ TEST_F(ClusterIdentityTest, BasicLoadFailureFollowedBySuccess) {
     auto future = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
     });
 
@@ -180,9 +178,9 @@ TEST_F(ClusterIdentityTest, BasicLoadFailureFollowedBySuccess) {
     future = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(clusterIdStatus);
-        ASSERT_EQUALS(clusterId, clusterIdStatus.getValue());
+        ASSERT_EQUALS(clusterId, ClusterIdentityLoader::get(operationContext())->getClusterId());
     });
 
     expectConfigVersionLoad(clusterId);
@@ -196,19 +194,19 @@ TEST_F(ClusterIdentityTest, MultipleThreadsLoadFailure) {
     auto future1 = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
     });
     auto future2 = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
     });
     auto future3 = launchAsync([&] {
         auto clusterIdStatus =
             ClusterIdentityLoader::get(operationContext())
-                ->getClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
+                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
     });
 

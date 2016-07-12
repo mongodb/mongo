@@ -59,15 +59,19 @@ public:
     static ClusterIdentityLoader* get(ServiceContext* serviceContext);
     static ClusterIdentityLoader* get(OperationContext* operationContext);
 
-    /**
-     * Returns the cluster ID.  If the cluster ID has been successfully loaded in the past, will
-     * return the cached version which will be stored in _lastLoadResult.  If we've never
-     * successfully loaded the cluster ID, will attempt to load it from the config.version
-     * collection on the config servers, or if another thread is already in the process of loading
-     * it, will wait for that thread to finish and then return its results.
+    /*
+     * Returns the cached cluster ID.  Invalid to call unless loadClusterId has previously been
+     * called and returned success.
      */
-    StatusWith<OID> getClusterId(OperationContext* txn,
-                                 const repl::ReadConcernLevel& readConcernLevel);
+    OID getClusterId();
+
+    /**
+     * Loads the cluster ID from the config server's config.version collection and stores it into
+     * _lastLoadResult.  If the cluster ID has previously been successfully loaded, this is a no-op.
+     * If another thread is already in the process of loading the cluster ID, concurrent calls will
+     * wait for that thread to finish and then return its results.
+     */
+    Status loadClusterId(OperationContext* txn, const repl::ReadConcernLevel& readConcernLevel);
 
 private:
     enum class InitializationState {
@@ -80,8 +84,8 @@ private:
      * Queries the config.version collection on the config server, extracts the cluster ID from
      * the version document, and returns it.
      */
-    StatusWith<OID> _loadClusterId(OperationContext* txn,
-                                   const repl::ReadConcernLevel& readConcernLevel);
+    StatusWith<OID> _fetchClusterIdFromConfig(OperationContext* txn,
+                                              const repl::ReadConcernLevel& readConcernLevel);
 
     stdx::mutex _mutex;
     stdx::condition_variable _inReloadCV;

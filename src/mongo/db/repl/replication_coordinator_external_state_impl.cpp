@@ -502,8 +502,12 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
             // readConcern in drain mode because the global lock prevents replication. This is
             // safe, since if the clusterId write is rolled back, any writes that depend on it will
             // also be rolled back.
-            ClusterIdentityLoader::get(txn)->getClusterId(
-                txn, repl::ReadConcernLevel::kLocalReadConcern);
+            // Since we *just* wrote the cluster ID to the config.version document (via
+            // ShardingCatalogManager::initializeConfigDatabaseIfNeeded), this should always
+            // succeed.
+            fassertStatusOK(40217,
+                            ClusterIdentityLoader::get(txn)->loadClusterId(
+                                txn, repl::ReadConcernLevel::kLocalReadConcern));
         }
 
         // Free any leftover locks from previous instantiations

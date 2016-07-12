@@ -499,18 +499,11 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
         shardType.setMaxSizeMB(maxSize);
     }
 
-    auto clusterIdentity = ClusterIdentityLoader::get(txn);
-    auto clusterId =
-        clusterIdentity->getClusterId(txn, repl::ReadConcernLevel::kMajorityReadConcern);
-    if (!clusterId.isOK()) {
-        return clusterId.getStatus();
-    }
-
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         Grid::get(txn)->shardRegistry()->getConfigServerConnectionString());
     shardIdentity.setShardName(shardType.getName());
-    shardIdentity.setClusterId(clusterId.getValue());
+    shardIdentity.setClusterId(ClusterIdentityLoader::get(txn)->getClusterId());
     auto validateStatus = shardIdentity.validate();
     if (!validateStatus.isOK()) {
         return validateStatus;

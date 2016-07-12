@@ -54,26 +54,32 @@ ClusterIdentityLoader* ClusterIdentityLoader::get(OperationContext* operationCon
     return ClusterIdentityLoader::get(operationContext->getServiceContext());
 }
 
-StatusWith<OID> ClusterIdentityLoader::getClusterId(
-    OperationContext* txn, const repl::ReadConcernLevel& readConcernLevel) {
+OID ClusterIdentityLoader::getClusterId() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    invariant(_initializationState == InitializationState::kInitialized && _lastLoadResult.isOK());
+    return _lastLoadResult.getValue();
+}
+
+Status ClusterIdentityLoader::loadClusterId(OperationContext* txn,
+                                            const repl::ReadConcernLevel& readConcernLevel) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_initializationState == InitializationState::kInitialized) {
         invariant(_lastLoadResult.isOK());
-        return _lastLoadResult;
+        return Status::OK();
     }
 
     if (_initializationState == InitializationState::kLoading) {
         while (_initializationState == InitializationState::kLoading) {
             _inReloadCV.wait(lk);
         }
-        return _lastLoadResult;
+        return _lastLoadResult.getStatus();
     }
 
     invariant(_initializationState == InitializationState::kUninitialized);
     _initializationState = InitializationState::kLoading;
 
     lk.unlock();
-    auto loadStatus = _loadClusterId(txn, readConcernLevel);
+    auto loadStatus = _fetchClusterIdFromConfig(txn, readConcernLevel);
     lk.lock();
 
     invariant(_initializationState == InitializationState::kLoading);
@@ -84,10 +90,10 @@ StatusWith<OID> ClusterIdentityLoader::getClusterId(
         _initializationState = InitializationState::kUninitialized;
     }
     _inReloadCV.notify_all();
-    return _lastLoadResult;
+    return _lastLoadResult.getStatus();
 }
 
-StatusWith<OID> ClusterIdentityLoader::_loadClusterId(
+StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
     OperationContext* txn, const repl::ReadConcernLevel& readConcernLevel) {
     auto catalogClient = Grid::get(txn)->catalogClient(txn);
     auto loadResult = catalogClient->getConfigVersion(txn, readConcernLevel);
