@@ -68,7 +68,7 @@
         bulk.find({_id: i}).update({$set: {x: bigstring}});
         bigstring = bigstring.slice(0, -1);  // remove last char
     }
-    result = assert.writeOK(bulk.execute({writeConcern: {w: rt.nodes.length}}));
+    result = assert.writeOK(bulk.execute({w: rt.nodes.length}));
     jsTestLog('update ' + (doccount + 1) + '-' + (doccount * 2 - 1) + ' result: ' + tojson(result));
     assert.eq(doccount - 1, result.nMatched);
     assert.eq(doccount - 1, result.nModified);
