@@ -1154,9 +1154,12 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
                 // subsequently got deleted and no longer exists on the Sync Target at all
             }
         } catch (const DBException& e) {
-            // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
+            // SERVER-24927 and SERVER-24997 If we have a NamespaceNotFound or a
+            // CannotIndexParallelArrays exception, then this document will be
             // dropped before initial sync ends anyways and we should ignore it.
-            if (e.getCode() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType()) {
+            if ((e.getCode() == ErrorCodes::NamespaceNotFound ||
+                 e.getCode() == ErrorCodes::CannotIndexParallelArrays) &&
+                entry.isCrudOpType()) {
                 continue;
             }
 
