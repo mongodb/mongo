@@ -190,7 +190,8 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     // Now drop all databases and re-run initializeConfigDatabaseIfNeeded()
     _dropAllDBs(operationContext());
 
-    ASSERT_EQUALS(ErrorCodes::AlreadyInitialized, catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+    ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
+                  catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
 
     // Even though there was no version document, initializeConfigDatabaseIfNeeded() returned
     // without making one because it has already run once successfully so didn't bother to check.
