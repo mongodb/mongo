@@ -64,12 +64,7 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
       _nss{coll->ns()},
       _idIndexBlock{txn, coll},
       _secondaryIndexesBlock{txn, coll},
-      _idIndexSpec(!idIndexSpec.isEmpty() ? idIndexSpec : BSON("ns" << _nss.toString() << "name"
-                                                                    << "_id_"
-                                                                    << "key"
-                                                                    << BSON("_id" << 1)
-                                                                    << "unique"
-                                                                    << true)) {
+      _idIndexSpec(idIndexSpec) {
     invariant(txn);
     invariant(coll);
     invariant(runner);
@@ -97,10 +92,11 @@ Status CollectionBulkLoaderImpl::init(OperationContext* txn,
             return status;
         }
     }
-
-    auto status = _idIndexBlock.init(_idIndexSpec);
-    if (!status.isOK()) {
-        return status;
+    if (!_idIndexSpec.isEmpty()) {
+        auto status = _idIndexBlock.init(_idIndexSpec);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     return Status::OK();
@@ -113,7 +109,10 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
         invariant(txn);
 
         for (auto iter = begin; iter != end; ++iter) {
-            std::vector<MultiIndexBlock*> indexers{&_idIndexBlock};
+            std::vector<MultiIndexBlock*> indexers;
+            if (!_idIndexSpec.isEmpty()) {
+                indexers.push_back(&_idIndexBlock);
+            }
             if (_hasSecondaryIndexes) {
                 indexers.push_back(&_secondaryIndexesBlock);
             }
@@ -150,7 +149,9 @@ Status CollectionBulkLoaderImpl::commit() {
                 }
                 if (secDups.size()) {
                     return Status{ErrorCodes::UserDataInconsistent,
-                                  "Found duplicates when dups are disabled in MultiIndexBlock."};
+                                  str::stream() << "Found " << secDups.size()
+                                                << " duplicates on secondary index(es) even though "
+                                                   "MultiIndexBlock::ignoreUniqueConstraint set."};
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                     WriteUnitOfWork wunit(txn);
@@ -161,36 +162,38 @@ Status CollectionBulkLoaderImpl::commit() {
                     _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
             }
 
-            // Delete dups.
-            std::set<RecordId> dups;
-            // Do not do inside a WriteUnitOfWork (required by doneInserting).
-            auto status = _idIndexBlock.doneInserting(&dups);
-            if (!status.isOK()) {
-                return status;
-            }
+            if (!_idIndexSpec.isEmpty()) {
+                // Delete dups.
+                std::set<RecordId> dups;
+                // Do not do inside a WriteUnitOfWork (required by doneInserting).
+                auto status = _idIndexBlock.doneInserting(&dups);
+                if (!status.isOK()) {
+                    return status;
+                }
 
-            for (auto&& it : dups) {
+                for (auto&& it : dups) {
+                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                        WriteUnitOfWork wunit(_txn);
+                        _coll->deleteDocument(_txn,
+                                              it,
+                                              nullptr /** OpDebug **/,
+                                              false /* fromMigrate */,
+                                              true /* noWarn */);
+                        wunit.commit();
+                    }
+                    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                        _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
+                }
+
+                // Commit _id index, without dups.
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(_txn);
-                    _coll->deleteDocument(_txn,
-                                          it,
-                                          nullptr /** OpDebug **/,
-                                          false /* fromMigrate */,
-                                          true /* noWarn */);
+                    WriteUnitOfWork wunit(txn);
+                    _idIndexBlock.commit();
                     wunit.commit();
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
                     _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
             }
-
-            // Commit _id index, without dups.
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wunit(txn);
-                _idIndexBlock.commit();
-                wunit.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
 
             // release locks.
             _autoColl.reset(nullptr);

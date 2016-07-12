@@ -178,19 +178,59 @@ TEST_F(CollectionClonerTest, FirstRemoteCommand) {
     ASSERT_TRUE(collectionCloner->isActive());
 }
 
-TEST_F(CollectionClonerTest, RemoteCollectionMissing) {
-    ASSERT_OK(collectionCloner->start());
+TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
+    options.reset();
+    options.autoIndexId = CollectionOptions::NO;
+    collectionCloner.reset(new CollectionCloner(
+        &getExecutor(),
+        target,
+        nss,
+        options,
+        stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
+        storageInterface.get()));
 
+    NamespaceString collNss;
+    CollectionOptions collOptions;
+    std::vector<BSONObj> collIndexSpecs{BSON("fakeindexkeys" << 1)};  // init with one doc.
+    storageInterface->createCollectionForBulkFn = [&,
+                                                   this](const NamespaceString& theNss,
+                                                         const CollectionOptions& theOptions,
+                                                         const BSONObj idIndexSpec,
+                                                         const std::vector<BSONObj>& theIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+            CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&collectionStats);
+            collNss = theNss;
+            collOptions = theOptions;
+            collIndexSpecs = theIndexSpecs;
+            loader->init(nullptr, nullptr, theIndexSpecs);
+            return std::unique_ptr<CollectionBulkLoader>(loader);
+        };
+
+    ASSERT_OK(collectionCloner->start());
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(BSON("ok" << 0 << "errmsg"
-                                         << ""
-                                         << "code"
-                                         << ErrorCodes::NamespaceNotFound));
+        processNetworkResponse(createListIndexesResponse(0, BSONArray()));
     }
+    ASSERT_TRUE(collectionCloner->isActive());
 
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getStatus().code());
+    collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
+
+    const BSONObj doc = BSON("_id" << 1);
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCursorResponse(0, BSON_ARRAY(doc)));
+    }
+    collectionCloner->wait();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+    ASSERT_TRUE(collectionStats.commitCalled);
+
+    ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());
+    ASSERT_EQ(collOptions.autoIndexId, CollectionOptions::NO);
+    ASSERT_EQ(0UL, collIndexSpecs.size());
+    ASSERT_EQ(collNss, nss);
 }
 
 // A collection may have no indexes. The cloner will produce a warning but

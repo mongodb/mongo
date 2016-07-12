@@ -314,6 +314,12 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     }
 
     UniqueLock lk(_mutex);
+    if (!_idIndexSpec.isEmpty() && _options.autoIndexId == CollectionOptions::NO) {
+        warning()
+            << "Found the _id_ index spec but the collection specified autoIndexId of false on ns:"
+            << this->_sourceNss;
+    }
+
     auto status = _storageInterface->createCollectionForBulkLoading(
         _destNss, _options, _idIndexSpec, _indexSpecs);
 

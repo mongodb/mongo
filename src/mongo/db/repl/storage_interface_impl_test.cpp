@@ -30,6 +30,7 @@
 
 #include <memory>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -57,6 +58,15 @@ namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
+
+BSONObj makeIdIndexSpec(const NamespaceString& nss) {
+    return BSON("ns" << nss.toString() << "name"
+                     << "_id_"
+                     << "key"
+                     << BSON("_id" << 1)
+                     << "unique"
+                     << true);
+}
 
 /**
  * Generates a unique namespace from the test registration agent.
@@ -423,7 +433,8 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionWithIDIndexCommits
     NamespaceString nss("foo.bar");
     CollectionOptions opts;
     std::vector<BSONObj> indexes;
-    auto loaderStatus = storage.createCollectionForBulkLoading(nss, opts, {}, indexes);
+    auto loaderStatus =
+        storage.createCollectionForBulkLoading(nss, opts, makeIdIndexSpec(nss), indexes);
     ASSERT_OK(loaderStatus.getStatus());
     auto loader = std::move(loaderStatus.getValue());
     std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
@@ -449,7 +460,8 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionThatAlreadyExistsF
 
     const CollectionOptions opts;
     const std::vector<BSONObj> indexes;
-    const auto status = storage.createCollectionForBulkLoading(nss, opts, {}, indexes);
+    const auto status =
+        storage.createCollectionForBulkLoading(nss, opts, makeIdIndexSpec(nss), indexes);
     ASSERT_NOT_OK(status.getStatus());
 }
 
@@ -564,8 +576,8 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                              << nss.ns()
                                              << "partialFilterExpression"
                                              << BSON("y" << 1))};
-    auto loader = unittest::assertGet(
-        storage.createCollectionForBulkLoading(nss, CollectionOptions(), {}, indexes));
+    auto loader = unittest::assertGet(storage.createCollectionForBulkLoading(
+        nss, CollectionOptions(), makeIdIndexSpec(nss), indexes));
     std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
     ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
     ASSERT_OK(loader->commit());
