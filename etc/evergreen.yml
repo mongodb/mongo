@@ -331,7 +331,11 @@ functions:
           # exit immediately if virtualenv is not found
           set -o errexit
           set -o verbose
-          virtualenv --system-site-packages ./venv
+          if [ ${build_variant} == enterprise-suse12-64 ]; then
+              virtualenv ./venv
+          else
+              virtualenv --system-site-packages ./venv
+          fi
 
   "run tests" :
     command: shell.exec
