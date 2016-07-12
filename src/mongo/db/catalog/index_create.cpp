@@ -122,6 +122,10 @@ MultiIndexBlock::~MultiIndexBlock() {
             return;
         } catch (const WriteConflictException& e) {
             continue;
+        } catch (const DBException& e) {
+            if (e.toStatus() == ErrorCodes::ExceededMemoryLimit)
+                continue;
+            error() << "Caught exception while cleaning up partially built indexes: " << e.what();
         } catch (const std::exception& e) {
             error() << "Caught exception while cleaning up partially built indexes: " << e.what();
         } catch (...) {
