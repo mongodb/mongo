@@ -41,10 +41,6 @@ namespace mongo {
 
 namespace dps = ::mongo::dotted_path_support;
 
-// SortStage checks for this error code in order to informatively error when we try to sort keys
-// with parallel arrays.
-const int BtreeKeyGenerator::ParallelArraysCode = 10088;
-
 namespace {
 
 const BSONObj nullObj = BSON("" << BSONNULL);
@@ -81,7 +77,7 @@ void BtreeKeyGenerator::getKeys(const BSONObj& obj,
 static void assertParallelArrays(const char* first, const char* second) {
     std::stringstream ss;
     ss << "cannot index parallel arrays [" << first << "] [" << second << "]";
-    uasserted(BtreeKeyGenerator::ParallelArraysCode, ss.str());
+    uasserted(ErrorCodes::CannotIndexParallelArrays, ss.str());
 }
 
 BtreeKeyGeneratorV0::BtreeKeyGeneratorV0(std::vector<const char*> fieldNames,

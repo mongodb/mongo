@@ -52,8 +52,6 @@ public:
 
     void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const;
 
-    static const int ParallelArraysCode;
-
 protected:
     // These are used by the getKeysImpl(s) below.
     std::vector<const char*> _fieldNames;

@@ -188,7 +188,7 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromObject(const WorkingSetMembe
         _keyGen->getKeys(member.obj.value(), &keys, multikeyPaths);
     } catch (const UserException& e) {
         // Probably a parallel array.
-        if (BtreeKeyGenerator::ParallelArraysCode == e.getCode()) {
+        if (ErrorCodes::CannotIndexParallelArrays == e.getCode()) {
             return Status(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
         } else {
             return e.toStatus();
