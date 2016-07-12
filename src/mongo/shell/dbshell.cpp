@@ -767,7 +767,13 @@ int _main(int argc, char* argv[], char** envp) {
 
         if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet && isatty(fileno(stdin))) {
             scope->exec(
-                "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false);
+                "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings)", false, true, false);
+
+            scope->exec("shellHelper( 'show', 'automationNotices' )",
+                        "(automationnotices)",
+                        false,
+                        true,
+                        false);
         }
 
         shellHistoryInit();

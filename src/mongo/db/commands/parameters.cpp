@@ -603,5 +603,52 @@ ExportedServerParameter<int, ServerParameterType::kRuntimeOnly> MaxConsecutiveFa
 
 ExportedServerParameter<bool, ServerParameterType::kRuntimeOnly> TraceExceptionsSetting(
     ServerParameterSet::getGlobal(), "traceExceptions", &DBException::traceExceptions);
+
+class AutomationServiceDescriptor final : public ServerParameter {
+public:
+    static constexpr auto kName = "automationServiceDescriptor"_sd;
+    static constexpr auto kMaxSize = 64U;
+
+    AutomationServiceDescriptor()
+        : ServerParameter(ServerParameterSet::getGlobal(), kName.toString(), true, true) {}
+
+    virtual void append(OperationContext* txn,
+                        BSONObjBuilder& builder,
+                        const std::string& name) override {
+        const stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (!_value.empty())
+            builder << name << _value;
+    }
+
+    virtual Status set(const BSONElement& newValueElement) override {
+        if (newValueElement.type() != mongo::String)
+            return {ErrorCodes::TypeMismatch,
+                    mongoutils::str::stream() << "Value for parameter " << kName
+                                              << " must be of type 'string'"};
+        return setFromString(newValueElement.String());
+    }
+
+    virtual Status setFromString(const std::string& str) override {
+        if (str.size() > kMaxSize)
+            return {ErrorCodes::Overflow,
+                    mongoutils::str::stream() << "Value for parameter " << kName
+                                              << " must be no more than "
+                                              << kMaxSize
+                                              << " bytes"};
+
+        {
+            const stdx::lock_guard<stdx::mutex> lock(_mutex);
+            _value = str;
+        }
+
+        return Status::OK();
+    }
+
+private:
+    stdx::mutex _mutex;
+    std::string _value;
+} automationServiceDescriptor;
+
+constexpr decltype(AutomationServiceDescriptor::kName) AutomationServiceDescriptor::kName;
 }
 }

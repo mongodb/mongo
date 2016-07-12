@@ -29,9 +29,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/map_util.h"
 
 namespace mongo {
 namespace {
@@ -76,6 +79,11 @@ public:
         // it is compiled.
         result.append("maxWireVersion", WireSpec::instance().maxWireVersionIncoming);
         result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
+
+        const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
+                                                  "automationServiceDescriptor");
+        if (parameter)
+            parameter->append(txn, result, "automationServiceDescriptor");
 
         return true;
     }

@@ -818,6 +818,39 @@ shellHelper.show = function(what) {
         }
     }
 
+    if (what == "automationNotices") {
+        var dbDeclared, ex;
+        try {
+            // !!db essentially casts db to a boolean
+            // Will throw a reference exception if db hasn't been declared.
+            dbDeclared = !!db;
+        } catch (ex) {
+            dbDeclared = false;
+        }
+
+        if (dbDeclared) {
+            var res = db.runCommand({isMaster: 1, forShell: 1});
+            if (!res.ok) {
+                print("Note: Cannot determine if automation is active");
+                return "";
+            }
+
+            if (res.hasOwnProperty("automationServiceDescriptor")) {
+                print("Note: This server is managed by automation service '" +
+                      res.automationServiceDescriptor + "'.");
+                print(
+                    "Note: Many administrative actions are inappropriate, and may be automatically reverted.");
+                return "";
+            }
+
+            return "";
+
+        } else {
+            print("Cannot show automationNotices, \"db\" is not set");
+            return "";
+        }
+    }
+
     throw Error("don't know how to show [" + what + "]");
 
 };
