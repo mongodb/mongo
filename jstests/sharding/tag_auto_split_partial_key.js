@@ -11,6 +11,7 @@
     assert.eq(1, s.config.chunks.count());
 
     s.addShardTag("shard0000", "a");
+    s.addShardTag("shard0000", "b");
 
     s.addTagRange("test.foo", {_id: 5}, {_id: 10}, "a");
     s.addTagRange("test.foo", {_id: 10}, {_id: 15}, "b");

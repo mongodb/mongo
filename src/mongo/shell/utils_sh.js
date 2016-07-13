@@ -55,9 +55,9 @@ sh._writeBalancerStateDeprecated = function(onOrNot) {
 
 sh.help = function() {
     print("\tsh.addShard( host )                       server:port OR setname/server:port");
-    print("\tsh.addShardTag(shard,tag)                 adds the tag to the shard");
-    print(
-        "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection");
+    print("\tsh.addShardToZone(shard,zone)             adds the shard to the zone");
+    print("\tsh.updateZoneKeyRange(fullName,min,max,zone)      " +
+          "assigns the specified range of the given collection to a zone");
     print("\tsh.disableBalancing(coll)                 disable balancing on one collection");
     print("\tsh.enableBalancing(coll)                  re-enable balancing on one collection");
     print("\tsh.enableSharding(dbname)                 enables sharding on the database dbname");
@@ -66,9 +66,9 @@ sh.help = function() {
         "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos");
     print(
         "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
-    print("\tsh.removeShardTag(shard,tag)              removes the tag from the shard");
+    print("\tsh.removeShardFromZone(shard,zone)      removes the shard from zone");
     print(
-        "\tsh.removeTagRange(fullName,min,max,tag)   removes the tagged range of the given collection");
+        "\tsh.removeRangeFromZone(fullName,min,max)   removes the range of the given collection from any zone");
     print("\tsh.shardCollection(fullName,key,unique)   shards the collection");
     print(
         "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle");
@@ -417,6 +417,11 @@ sh._lastMigration = function(ns) {
 };
 
 sh.addShardTag = function(shard, tag) {
+    var result = sh.addShardToZone(shard, tag);
+    if (result.code != ErrorCodes.CommandNotFound) {
+        return result;
+    }
+
     var config = sh._getConfigDB();
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
@@ -426,6 +431,11 @@ sh.addShardTag = function(shard, tag) {
 };
 
 sh.removeShardTag = function(shard, tag) {
+    var result = sh.removeShardFromZone(shard, tag);
+    if (result.code != ErrorCodes.CommandNotFound) {
+        return result;
+    }
+
     var config = sh._getConfigDB();
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
@@ -435,6 +445,11 @@ sh.removeShardTag = function(shard, tag) {
 };
 
 sh.addTagRange = function(ns, min, max, tag) {
+    var result = sh.updateZoneKeyRange(ns, min, max, tag);
+    if (result.code != ErrorCodes.CommandNotFound) {
+        return result;
+    }
+
     if (bsonWoCompare(min, max) == 0) {
         throw new Error("min and max cannot be the same");
     }
@@ -447,6 +462,11 @@ sh.addTagRange = function(ns, min, max, tag) {
 };
 
 sh.removeTagRange = function(ns, min, max, tag) {
+    var result = sh.removeRangeFromZone(ns, min, max);
+    if (result.code != ErrorCodes.CommandNotFound) {
+        return result;
+    }
+
     var config = sh._getConfigDB();
     // warn if the namespace does not exist, even dropped
     if (config.collections.findOne({_id: ns}) == null) {
@@ -460,6 +480,23 @@ sh.removeTagRange = function(ns, min, max, tag) {
     // behavior.
     return assert.writeOK(config.tags.remove({_id: {ns: ns, min: min}, max: max, tag: tag},
                                              {writeConcern: {w: 'majority', wtimeout: 60000}}));
+};
+
+sh.addShardToZone = function(shardName, zoneName) {
+    return sh._getConfigDB().adminCommand({addShardToZone: shardName, zone: zoneName});
+};
+
+sh.removeShardFromZone = function(shardName, zoneName) {
+    return sh._getConfigDB().adminCommand({removeShardFromZone: shardName, zone: zoneName});
+};
+
+sh.updateZoneKeyRange = function(ns, min, max, zoneName) {
+    return sh._getConfigDB().adminCommand(
+        {updateZoneKeyRange: ns, min: min, max: max, zone: zoneName});
+};
+
+sh.removeRangeFromZone = function(ns, min, max) {
+    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min: min, max: max, zone: null});
 };
 
 sh.getBalancerLockDetails = function(configDB) {
