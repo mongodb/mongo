@@ -36,11 +36,35 @@
 
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/md5.hpp"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
 
 using std::unique_ptr;
+
+namespace {
+
+typedef unsigned char HashDigest[16];
+
+class Hasher {
+    MONGO_DISALLOW_COPYING(Hasher);
+
+public:
+    explicit Hasher(HashSeed seed);
+    ~Hasher(){};
+
+    // pointer to next part of input key, length in bytes to read
+    void addData(const void* keyData, size_t numBytes);
+
+    // finish computing the hash, put the result in the digest
+    // only call this once per Hasher
+    void finish(HashDigest out);
+
+private:
+    md5_state_t _md5State;
+    HashSeed _seed;
+};
 
 Hasher::Hasher(HashSeed seed) : _seed(seed) {
     md5_init(&_md5State);
@@ -55,17 +79,7 @@ void Hasher::finish(HashDigest out) {
     md5_finish(&_md5State, out);
 }
 
-long long int BSONElementHasher::hash64(const BSONElement& e, HashSeed seed) {
-    unique_ptr<Hasher> h(HasherFactory::createHasher(seed));
-    recursiveHash(h.get(), e, false);
-    HashDigest d;
-    h->finish(d);
-    // HashDigest is actually 16 bytes, but we just read 8 bytes
-    ConstDataView digestView(reinterpret_cast<const char*>(d));
-    return digestView.read<LittleEndian<long long int>>();
-}
-
-void BSONElementHasher::recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
+void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
     int canonicalType = endian::nativeToLittle(e.canonicalType());
     h->addData(&canonicalType, sizeof(canonicalType));
 
@@ -110,4 +124,17 @@ struct HasherUnitTest : public StartupTest {
         verify(BSONElementHasher::hash64(o.firstElement(), 0) == -944302157085130861LL);
     }
 } hasherUnitTest;
+
+}  // namespace
+
+long long int BSONElementHasher::hash64(const BSONElement& e, HashSeed seed) {
+    Hasher h(seed);
+    recursiveHash(&h, e, false);
+    HashDigest d;
+    h.finish(d);
+    // HashDigest is actually 16 bytes, but we just read 8 bytes
+    ConstDataView digestView(reinterpret_cast<const char*>(d));
+    return digestView.read<LittleEndian<long long int>>();
 }
+
+}  // namespace mongo
