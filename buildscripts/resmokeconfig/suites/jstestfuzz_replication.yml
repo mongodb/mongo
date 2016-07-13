@@ -10,7 +10,6 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
-    - class: CheckReplDBHashDeprecated
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture

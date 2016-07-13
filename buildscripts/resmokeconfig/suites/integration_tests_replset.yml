@@ -7,7 +7,6 @@ executor:
     config: {}
     hooks:
     - class: ValidateCollections
-    - class: CheckReplDBHashDeprecated
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture
