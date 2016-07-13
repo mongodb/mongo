@@ -2288,14 +2288,14 @@ tasks:
               #
               /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
 
-              cd ${workdir}
+              cd ${workdir}/src
             done
             for release_file in $(find repo/ -name Release) ; do
               cd $(dirname $release_file)
 
               /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
 
-              cd ${workdir}
+              cd ${workdir}/src
             done
           fi
 
