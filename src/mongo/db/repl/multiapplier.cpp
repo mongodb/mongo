@@ -129,27 +129,24 @@ void MultiApplier::wait() {
     }
 }
 
-// TODO change the passed in function to be multiapply instead of apply inlock
 void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
     if (!cbd.status.isOK()) {
         _finishCallback(cbd.status, _operations);
         return;
     }
 
-    auto txn = cc().makeOperationContext();
-
-    // Refer to multiSyncApply() and multiInitialSyncApply() in sync_tail.cpp.
-    txn->setReplicatedWrites(false);
-
-    // allow us to get through the magic barrier
-    txn->lockState()->setIsBatchWriter(true);
+    invariant(!_operations.empty());
 
     StatusWith<OpTime> applyStatus(ErrorCodes::InternalError, "not mutated");
-
-    invariant(!_operations.empty());
     try {
-        // TODO restructure to support moving _operations into this call. Can't do it today since
-        // _finishCallback gets _operations on failure.
+        auto txn = cc().makeOperationContext();
+
+        // Refer to multiSyncApply() and multiInitialSyncApply() in sync_tail.cpp.
+        txn->setReplicatedWrites(false);
+
+        // allow us to get through the magic barrier
+        txn->lockState()->setIsBatchWriter(true);
+
         applyStatus = _multiApply(txn.get(), _operations, _applyOperation);
     } catch (...) {
         applyStatus = exceptionToStatus();
