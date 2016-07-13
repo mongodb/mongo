@@ -912,6 +912,19 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='multiapplier_test',
+    source='multiapplier_test.cpp',
+    LIBDEPS=[
+        'multiapplier',
+        'service_context_repl_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/commands_test_crutch',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+    ],
+)
+
 env.Library(
     target='applier',
     source=[

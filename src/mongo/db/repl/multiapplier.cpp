@@ -26,13 +26,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/multiapplier.h"
-
-#include <algorithm>
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -62,6 +58,7 @@ MultiApplier::MultiApplier(executor::TaskExecutor* executor,
             str::stream() << "'ts' in last operation not a timestamp: " << operations.back().raw,
             BSONType::bsonTimestamp == operations.back().raw.getField("ts").type());
     uassert(ErrorCodes::BadValue, "apply operation function cannot be null", applyOperation);
+    uassert(ErrorCodes::BadValue, "multi apply function cannot be null", multiApply);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
 }
 
