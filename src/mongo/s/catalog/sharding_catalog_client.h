@@ -126,6 +126,10 @@ public:
      *
      * @param ns: namespace of collection to shard
      * @param fieldsAndOrder: shardKey pattern
+     * @param defaultCollation: the default collation for the collection, to be written to
+     *     config.collections. If empty, the collection default collation is simple binary
+     *     comparison. Note the the shard key collation will always be simple binary comparison,
+     *     even if the collection default collation is non-simple.
      * @param unique: if true, ensure underlying index enforces a unique constraint.
      * @param initPoints: create chunks based on a set of specified split points.
      * @param initShardIds: If non-empty, specifies the set of shards to assign chunks between.
@@ -139,6 +143,7 @@ public:
     virtual Status shardCollection(OperationContext* txn,
                                    const std::string& ns,
                                    const ShardKeyPattern& fieldsAndOrder,
+                                   const BSONObj& defaultCollation,
                                    bool unique,
                                    const std::vector<BSONObj>& initPoints,
                                    const std::set<ShardId>& initShardIds) = 0;

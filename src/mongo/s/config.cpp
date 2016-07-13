@@ -117,6 +117,7 @@ void CollectionInfo::save(OperationContext* txn, const string& ns) {
         // in config.collections, as a historical oddity.
         coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(_cm->getVersion().toLong()));
         coll.setKeyPattern(_cm->getShardKeyPattern().toBSON());
+        coll.setDefaultCollation(_cm->getDefaultCollation());
         coll.setUnique(_cm->isUnique());
     } else {
         invariant(_dropped);
@@ -360,8 +361,10 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             }
         }
 
-        tempChunkManager.reset(new ChunkManager(
-            oldManager->getns(), oldManager->getShardKeyPattern(), oldManager->isUnique()));
+        tempChunkManager.reset(new ChunkManager(oldManager->getns(),
+                                                oldManager->getShardKeyPattern(),
+                                                oldManager->getDefaultCollation(),
+                                                oldManager->isUnique()));
         tempChunkManager->loadExistingRanges(txn, oldManager.get());
 
         if (tempChunkManager->numChunks() == 0) {

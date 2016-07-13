@@ -234,9 +234,34 @@ public:
             return false;
         }
 
+        // Get collection default collation.
+        BSONObj defaultCollation;
+        {
+            BSONElement collationElement;
+            auto status = bsonExtractTypedField(
+                collectionOptions, "collation", BSONType::Object, &collationElement);
+            if (status.isOK()) {
+                defaultCollation = collationElement.Obj();
+                if (defaultCollation.isEmpty()) {
+                    conn.done();
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::BadValue,
+                         "Default collation in collection metadata cannot be empty."});
+                }
+            } else if (status != ErrorCodes::NoSuchKey) {
+                conn.done();
+                return appendCommandStatus(
+                    result,
+                    {status.code(),
+                     str::stream() << "Could not parse default collation in collection metadata "
+                                   << causedBy(status)});
+            }
+        }
+
         // If the collection has a non-simple default collation but the user did not specify the
         // simple collation explicitly, return an error.
-        if (collectionOptions["collation"] && !simpleCollationSpecified) {
+        if (!defaultCollation.isEmpty() && !simpleCollationSpecified) {
             return appendCommandStatus(result,
                                        {ErrorCodes::BadValue,
                                         str::stream()
@@ -453,8 +478,13 @@ public:
         audit::logShardCollection(
             ClientBasic::getCurrent(), nss.ns(), proposedKey, careAboutUnique);
 
-        Status status = grid.catalogClient(txn)->shardCollection(
-            txn, nss.ns(), proposedShardKey, careAboutUnique, initSplits, std::set<ShardId>{});
+        Status status = grid.catalogClient(txn)->shardCollection(txn,
+                                                                 nss.ns(),
+                                                                 proposedShardKey,
+                                                                 defaultCollation,
+                                                                 careAboutUnique,
+                                                                 initSplits,
+                                                                 std::set<ShardId>{});
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }

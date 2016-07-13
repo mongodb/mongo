@@ -63,13 +63,19 @@ public:
     explicit ChunkManager(const CollectionType& coll);
 
     // Creates an empty chunk manager for the namespace
-    ChunkManager(const std::string& ns, const ShardKeyPattern& pattern, bool unique);
+    ChunkManager(const std::string& ns,
+                 const ShardKeyPattern& pattern,
+                 const BSONObj& defaultCollation,
+                 bool unique);
 
     const std::string& getns() const {
         return _ns;
     }
     const ShardKeyPattern& getShardKeyPattern() const {
         return _keyPattern;
+    }
+    const BSONObj& getDefaultCollation() const {
+        return _defaultCollation;
     }
     bool isUnique() const {
         return _unique;
@@ -234,6 +240,7 @@ private:
     // All members should be const for thread-safety
     const std::string _ns;
     const ShardKeyPattern _keyPattern;
+    const BSONObj _defaultCollation;
     const bool _unique;
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload

@@ -160,6 +160,7 @@ TEST_F(ChunkManagerTests, Basic) {
     vector<BSONObj> splitKeys;
     genUniqueRandomSplitKeys(keyName, &splitKeys);
     ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
+    BSONObj defaultCollation;
 
     std::vector<BSONObj> shards{
         BSON(ShardType::name() << _shardId << ShardType::host()
@@ -169,7 +170,7 @@ TEST_F(ChunkManagerTests, Basic) {
 
     std::vector<BSONObj> chunks;
     auto future = launchAsync([&] {
-        ChunkManager manager(_collName, shardKeyPattern, false);
+        ChunkManager manager(_collName, shardKeyPattern, defaultCollation, false);
         auto status = manager.createFirstChunks(operationContext(), _shardId, &splitKeys, NULL);
         ASSERT_OK(status);
     });
@@ -223,7 +224,10 @@ TEST_F(ChunkManagerTests, Basic) {
 
     // Make new manager load chunk diff
     future = launchAsync([&] {
-        ChunkManager newManager(manager.getns(), manager.getShardKeyPattern(), manager.isUnique());
+        ChunkManager newManager(manager.getns(),
+                                manager.getShardKeyPattern(),
+                                manager.getDefaultCollation(),
+                                manager.isUnique());
         newManager.loadExistingRanges(operationContext(), &manager);
 
         ASSERT_EQ(numChunks, static_cast<int>(manager.getChunkMap().size()));
@@ -246,9 +250,10 @@ TEST_F(ChunkManagerTests, FullTest) {
     vector<BSONObj> splitKeys;
     genUniqueRandomSplitKeys(keyName, &splitKeys);
     ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
+    BSONObj defaultCollation;
 
     auto future = launchAsync([&] {
-        ChunkManager manager(_collName, shardKeyPattern, false);
+        ChunkManager manager(_collName, shardKeyPattern, defaultCollation, false);
         auto status = manager.createFirstChunks(operationContext(), _shardId, &splitKeys, NULL);
         ASSERT_OK(status);
     });

@@ -159,15 +159,20 @@ bool isChunkMapValid(const ChunkMap& chunkMap) {
 
 AtomicUInt32 ChunkManager::NextSequenceNumber(1U);
 
-ChunkManager::ChunkManager(const string& ns, const ShardKeyPattern& pattern, bool unique)
+ChunkManager::ChunkManager(const string& ns,
+                           const ShardKeyPattern& pattern,
+                           const BSONObj& defaultCollation,
+                           bool unique)
     : _ns(ns),
       _keyPattern(pattern.getKeyPattern()),
+      _defaultCollation(defaultCollation.getOwned()),
       _unique(unique),
       _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {}
 
 ChunkManager::ChunkManager(const CollectionType& coll)
     : _ns(coll.getNs().ns()),
       _keyPattern(coll.getKeyPattern()),
+      _defaultCollation(coll.getDefaultCollation()),
       _unique(coll.getUnique()),
       _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {
     // coll does not have correct version. Use same initial version as _load and createFirstChunks.

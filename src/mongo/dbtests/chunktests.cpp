@@ -43,7 +43,7 @@ using std::vector;
 class TestableChunkManager : public ChunkManager {
 public:
     TestableChunkManager(const string& ns, const ShardKeyPattern& keyPattern, bool unique)
-        : ChunkManager(ns, keyPattern, unique) {}
+        : ChunkManager(ns, keyPattern, BSONObj(), unique) {}
 
     void setSingleChunkForShards(const vector<BSONObj>& splitPoints) {
         vector<BSONObj> mySplitPoints(splitPoints);

@@ -50,6 +50,7 @@ public:
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
+                           const BSONObj& defaultCollation,
                            bool unique,
                            const std::vector<BSONObj>& initPoints,
                            const std::set<ShardId>& initShardIds) override;

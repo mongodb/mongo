@@ -480,8 +480,18 @@ public:
 
                 BSONObj sortKey = BSON("_id" << 1);
                 ShardKeyPattern sortKeyPattern(sortKey);
-                Status status = grid.catalogClient(txn)->shardCollection(
-                    txn, outputCollNss.ns(), sortKeyPattern, true, sortedSplitPts, outShardIds);
+
+                // The collection default collation for the output collection. This is empty,
+                // representing the simple binary comparison collation.
+                BSONObj defaultCollation;
+
+                Status status = grid.catalogClient(txn)->shardCollection(txn,
+                                                                         outputCollNss.ns(),
+                                                                         sortKeyPattern,
+                                                                         defaultCollation,
+                                                                         true,
+                                                                         sortedSplitPts,
+                                                                         outShardIds);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

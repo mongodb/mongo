@@ -231,10 +231,15 @@ TEST_F(ShardCollectionTest, distLockFails) {
         Status(ErrorCodes::LockBusy, "lock already held"));
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
-    ASSERT_EQUALS(
-        ErrorCodes::LockBusy,
-        catalogClient()->shardCollection(
-            operationContext(), "test.foo", keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+    BSONObj defaultCollation;
+    ASSERT_EQUALS(ErrorCodes::LockBusy,
+                  catalogClient()->shardCollection(operationContext(),
+                                                   "test.foo",
+                                                   keyPattern,
+                                                   defaultCollation,
+                                                   false,
+                                                   vector<BSONObj>{},
+                                                   set<ShardId>{}));
 }
 
 TEST_F(ShardCollectionTest, anotherMongosSharding) {
@@ -252,6 +257,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     string ns = "db1.foo";
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
+    BSONObj defaultCollation;
 
     distLock()->expectLock(
         [&](StringData name,
@@ -265,10 +271,14 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
 
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
-        ASSERT_EQUALS(
-            ErrorCodes::AlreadyInitialized,
-            catalogClient()->shardCollection(
-                operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+        ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
+                      catalogClient()->shardCollection(operationContext(),
+                                                       ns,
+                                                       keyPattern,
+                                                       defaultCollation,
+                                                       false,
+                                                       vector<BSONObj>{},
+                                                       set<ShardId>{}));
     });
 
     expectGetDatabase(db);
@@ -321,11 +331,19 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
         },
         Status::OK());
 
+    BSONObj defaultCollation = BSON("locale"
+                                    << "fr_CA");
+
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogClient()->shardCollection(
-            operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+        ASSERT_OK(catalogClient()->shardCollection(operationContext(),
+                                                   ns,
+                                                   keyPattern,
+                                                   defaultCollation,
+                                                   false,
+                                                   vector<BSONObj>{},
+                                                   set<ShardId>{}));
     });
 
     expectGetDatabase(db);
@@ -367,6 +385,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     expectedCollection.setUpdatedAt(
         Date_t::fromMillisSinceEpoch(expectedChunk.getVersion().toLong()));
     expectedCollection.setKeyPattern(keyPattern.toBSON());
+    expectedCollection.setDefaultCollation(defaultCollation);
     expectedCollection.setUnique(false);
 
     // Handle the update to the collection entry in config.collectinos.
@@ -489,6 +508,9 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         },
         Status::OK());
 
+    BSONObj defaultCollation = BSON("locale"
+                                    << "fr_CA");
+
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
@@ -497,6 +519,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
             operationContext(),
             ns,
             keyPattern,
+            defaultCollation,
             true,
             vector<BSONObj>{splitPoint0, splitPoint1, splitPoint2, splitPoint3},
             shards));
@@ -540,6 +563,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectedCollection.setUpdatedAt(
         Date_t::fromMillisSinceEpoch(expectedChunks[4].getVersion().toLong()));
     expectedCollection.setKeyPattern(keyPattern.toBSON());
+    expectedCollection.setDefaultCollation(defaultCollation);
     expectedCollection.setUnique(true);
 
     // Handle the update to the collection entry in config.collectinos.
@@ -641,11 +665,19 @@ TEST_F(ShardCollectionTest, withInitialData) {
         },
         Status::OK());
 
+    BSONObj defaultCollation = BSON("locale"
+                                    << "fr_CA");
+
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogClient()->shardCollection(
-            operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
+        ASSERT_OK(catalogClient()->shardCollection(operationContext(),
+                                                   ns,
+                                                   keyPattern,
+                                                   defaultCollation,
+                                                   false,
+                                                   vector<BSONObj>{},
+                                                   set<ShardId>{}));
     });
 
     expectGetDatabase(db);
@@ -711,6 +743,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectedCollection.setUpdatedAt(
         Date_t::fromMillisSinceEpoch(expectedChunks[4].getVersion().toLong()));
     expectedCollection.setKeyPattern(keyPattern.toBSON());
+    expectedCollection.setDefaultCollation(defaultCollation);
     expectedCollection.setUnique(false);
 
     // Handle the update to the collection entry in config.collectinos.

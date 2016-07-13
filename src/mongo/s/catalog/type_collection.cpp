@@ -50,6 +50,7 @@ const BSONField<std::string> CollectionType::fullNs("_id");
 const BSONField<OID> CollectionType::epoch("lastmodEpoch");
 const BSONField<Date_t> CollectionType::updatedAt("lastmod");
 const BSONField<BSONObj> CollectionType::keyPattern("key");
+const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> CollectionType::unique("unique");
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
@@ -107,6 +108,22 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         } else if ((status == ErrorCodes::NoSuchKey) && coll.getDropped()) {
             // Sharding key can be missing if the collection is dropped
         } else {
+            return status;
+        }
+    }
+
+    {
+        BSONElement collDefaultCollation;
+        Status status =
+            bsonExtractTypedField(source, defaultCollation.name(), Object, &collDefaultCollation);
+        if (status.isOK()) {
+            BSONObj obj = collDefaultCollation.Obj();
+            if (obj.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "empty defaultCollation");
+            }
+
+            coll._defaultCollation = obj.getOwned();
+        } else if (status != ErrorCodes::NoSuchKey) {
             return status;
         }
     }
@@ -190,6 +207,10 @@ BSONObj CollectionType::toBSON() const {
 
     if (_keyPattern.is_initialized()) {
         builder.append(keyPattern.name(), _keyPattern->toBSON());
+    }
+
+    if (!_defaultCollation.isEmpty()) {
+        builder.append(defaultCollation.name(), _defaultCollation);
     }
 
     if (_unique.is_initialized()) {

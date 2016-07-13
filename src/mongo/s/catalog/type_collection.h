@@ -56,6 +56,7 @@ public:
     static const BSONField<OID> epoch;
     static const BSONField<Date_t> updatedAt;
     static const BSONField<BSONObj> keyPattern;
+    static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
 
     /**
@@ -106,6 +107,13 @@ public:
     }
     void setKeyPattern(const KeyPattern& keyPattern);
 
+    const BSONObj& getDefaultCollation() const {
+        return _defaultCollation;
+    }
+    void setDefaultCollation(const BSONObj& collation) {
+        _defaultCollation = collation.getOwned();
+    }
+
     bool getUnique() const {
         return _unique.get_value_or(false);
     }
@@ -132,6 +140,9 @@ private:
 
     // Sharding key. Required, if collection is not dropped.
     boost::optional<KeyPattern> _keyPattern;
+
+    // Optional collection default collation. If empty, implies simple collation.
+    BSONObj _defaultCollation;
 
     // Optional uniqueness of the sharding key. If missing, implies false.
     boost::optional<bool> _unique;

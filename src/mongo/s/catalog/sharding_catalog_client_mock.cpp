@@ -62,6 +62,7 @@ Status ShardingCatalogClientMock::enableSharding(OperationContext* txn, const st
 Status ShardingCatalogClientMock::shardCollection(OperationContext* txn,
                                                   const string& ns,
                                                   const ShardKeyPattern& fieldsAndOrder,
+                                                  const BSONObj& defaultCollation,
                                                   bool unique,
                                                   const vector<BSONObj>& initPoints,
                                                   const std::set<ShardId>& initShardIds) {

@@ -390,6 +390,7 @@ StatusWith<DistLockManager::ScopedDistLock> ShardingCatalogClientImpl::distLock(
 Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
                                                   const string& ns,
                                                   const ShardKeyPattern& fieldsAndOrder,
+                                                  const BSONObj& defaultCollation,
                                                   bool unique,
                                                   const vector<BSONObj>& initPoints,
                                                   const set<ShardId>& initShardIds) {
@@ -447,7 +448,8 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
         logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
     }
 
-    shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
+    shared_ptr<ChunkManager> manager(
+        new ChunkManager(ns, fieldsAndOrder, defaultCollation, unique));
     Status createFirstChunksStatus =
         manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
     if (!createFirstChunksStatus.isOK()) {
