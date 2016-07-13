@@ -32,6 +32,7 @@
 
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -188,8 +189,6 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
     reparsedPipeline.getValue()->optimizePipeline();
     return reparsedPipeline.getValue();
 }
-
-}  // namespace
 
 class PipelineCommand : public Command {
 public:
@@ -413,6 +412,13 @@ public:
 
         return true;
     }
-} cmdPipeline;
+};
 
+MONGO_INITIALIZER(PipelineCommand)(InitializerContext* context) {
+    new PipelineCommand();
+
+    return Status::OK();
+}
+
+}  // namespace
 }  // namespace mongo
