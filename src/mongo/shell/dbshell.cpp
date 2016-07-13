@@ -85,6 +85,10 @@ bool gotInterrupted = false;
 bool inMultiLine = false;
 static volatile bool atPrompt = false;  // can eval before getting to prompt
 
+namespace {
+const auto kDefaultMongoURL = "mongodb://127.0.0.1:27017"_sd;
+}
+
 namespace mongo {
 
 Scope* shellMainScope;
@@ -200,35 +204,49 @@ void setupSignals() {
     signal(SIGINT, quitNicely);
 }
 
-string fixHost(const std::string& url, const std::string& host, const std::string& port) {
+string getURIFromArgs(const std::string& url, const std::string& host, const std::string& port) {
     if (host.size() == 0 && port.size() == 0) {
-        if (url.find("/") == string::npos) {
-            // check for ips
-            if (url.find(".") != string::npos)
-                return url + "/test";
-
-            if (url.rfind(":") != string::npos && isdigit(url[url.rfind(":") + 1]))
-                return url + "/test";
-        }
-        return url;
+        return url.size() == 0 ? kDefaultMongoURL.toString() : url;
     }
 
+    // The name URL is misleading; really it's just a positional argument that wasn't a file. The
+    // check for "/" means "this 'URL' is probably a real URL and not the db name (e.g.)".
     if (url.find("/") != string::npos) {
-        cerr << "url can't have host or port if you specify them individually" << endl;
+        cerr << "if a full URI is provided, you cannot also specify host or port" << endl;
         quickExit(-1);
     }
 
-    string newurl((host.size() == 0) ? "127.0.0.1" : host);
-    if (port.size() > 0)
-        newurl += ":" + port;
-    else if (host.find(':') == string::npos) {
-        // need to add port with IPv6 addresses
-        newurl += ":27017";
+    bool hostEndsInSock = str::endsWith(host, ".sock");
+
+    // If host looks like a full URI (i.e. has a slash and isn't a unix socket) and the other fields
+    // are empty, then just return host.
+    if (url.size() == 0 && port.size() == 0 &&
+        (!hostEndsInSock && host.find("/") != string::npos)) {
+        return host;
     }
 
-    newurl += "/" + url;
+    stringstream ss;
+    if (host.size() == 0) {
+        ss << "mongodb://127.0.0.1";
+    } else {
+        if (!str::startsWith(host, "mongodb://")) {
+            ss << "mongodb://";
+        }
+        ss << host;
+    }
 
-    return newurl;
+    if (!hostEndsInSock) {
+        if (port.size() > 0) {
+            ss << ":" << port;
+        } else if (host.find(':') == string::npos || str::endsWith(host, "]")) {
+            // Default the port to 27017 if the host did not provide one (i.e. the host has no
+            // colons or ends in ']' like an IPv6 address).
+            ss << ":27017";
+        }
+    }
+
+    ss << "/" << url;
+    return ss.str();
 }
 
 static string OpSymbols = "~!%^&*-+=|:,<>/?.";
@@ -585,8 +603,6 @@ int _main(int argc, char* argv[], char** envp) {
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
 
-    shellGlobalParams.url = "test";
-
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     // hide password from ps output
@@ -615,7 +631,8 @@ int _main(int argc, char* argv[], char** envp) {
         if (mongo::serverGlobalParams.quiet)
             ss << "__quiet = true;";
         ss << "db = connect( \""
-           << fixHost(shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
+           << getURIFromArgs(
+                  shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
            << "\")";
 
         mongo::shell_utils::_dbConnect = ss.str();

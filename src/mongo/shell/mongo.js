@@ -194,6 +194,11 @@ Mongo.prototype.getReadConcern = function() {
 };
 
 connect = function(url, user, pass) {
+    if (url instanceof MongoURI) {
+        user = url.user;
+        pass = url.password;
+        url = url.uri;
+    }
     if (user && !pass)
         throw Error("you specified a user and not a password.  " +
                     "either you need a password, or you're using the old connect api");
@@ -201,8 +206,7 @@ connect = function(url, user, pass) {
     // Validate connection string "url" as "hostName:portNumber/databaseName"
     //                                  or "hostName/databaseName"
     //                                  or "databaseName"
-    // hostName may be an IPv6 address (with colons), in which case ":portNumber" is required
-    //
+    //                                  or full mongo uri.
     var urlType = typeof url;
     if (urlType == "undefined") {
         throw Error("Missing connection string");
@@ -215,45 +219,20 @@ connect = function(url, user, pass) {
     if (0 == url.length) {
         throw Error("Empty connection string");
     }
+
     if (!url.startsWith("mongodb://")) {
         var colon = url.lastIndexOf(":");
         var slash = url.lastIndexOf("/");
-        if (0 == colon || 0 == slash) {
-            throw Error("Missing host name in connection string \"" + url + "\"");
-        }
-        if (colon == slash - 1 || colon == url.length - 1) {
-            throw Error("Missing port number in connection string \"" + url + "\"");
-        }
-        if (colon != -1 && colon < slash) {
-            var portNumber = url.substring(colon + 1, slash);
-            if (portNumber.length > 5 || !/^\d*$/.test(portNumber) ||
-                parseInt(portNumber) > 65535) {
-                throw Error("Invalid port number \"" + portNumber + "\" in connection string \"" +
-                            url + "\"");
-            }
-        }
-        if (slash == url.length - 1) {
-            throw Error("Missing database name in connection string \"" + url + "\"");
+        if (slash == -1 && colon == -1) {
+            url = "mongodb://127.0.0.1:27017/" + url;
+        } else {
+            url = "mongodb://" + url;
         }
     }
 
-    var db;
-    if (url.startsWith("mongodb://")) {
-        chatty("connecting to: " + url);
-        db = new Mongo(url);
-        if (db.defaultDB.length == 0) {
-            db.defaultDB = "test";
-        }
-        db = db.getDB(db.defaultDB);
-    } else if (slash == -1) {
-        chatty("connecting to: 127.0.0.1:27017/" + url);
-        db = new Mongo().getDB(url);
-    } else {
-        var hostPart = url.substring(0, slash);
-        var dbPart = url.substring(slash + 1);
-        chatty("connecting to: " + hostPart + "/" + dbPart);
-        db = new Mongo(hostPart).getDB(dbPart);
-    }
+    chatty("connecting to: " + url);
+    var m = new Mongo(url);
+    db = m.getDB(m.defaultDB);
 
     if (user && pass) {
         if (!db.auth(user, pass)) {

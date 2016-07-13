@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015 MongoDB Inc.
+ * Copyright (C) 2016 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,35 +28,24 @@
 
 #pragma once
 
-#include <jsapi.h>
-#include <string>
-
-#include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
 namespace mozjs {
 
 /**
- * Reads into a JS Value from some Mongo C++ primitive
+ * A MongoURI object.
  */
-class ValueReader {
-public:
-    /**
-     * Depth is used when readers are invoked from ObjectWrappers to avoid
-     * reading out overly nested objects
-     */
-    ValueReader(JSContext* cx, JS::MutableHandleValue value);
+struct URIInfo : public BaseInfo {
+    static void construct(JSContext* cx, JS::CallArgs args);
 
-    void fromBSONElement(const BSONElement& elem, const BSONObj& parent, bool readOnly);
-    void fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly);
-    void fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool readOnly);
-    void fromDouble(double d);
-    void fromStringData(StringData sd);
-    void fromDecimal128(Decimal128 decimal);
+    struct Functions {
+        MONGO_DECLARE_JS_FUNCTION(toString);
+    };
 
-private:
-    JSContext* _context;
-    JS::MutableHandleValue _value;
+    static const JSFunctionSpec methods[2];
+
+    static const char* const className;
 };
 
 }  // namespace mozjs

@@ -336,12 +336,12 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _bsonProto(_context),
       _codeProto(_context),
       _countDownLatchProto(_context),
-      _cursorProto(_context),
       _cursorHandleProto(_context),
+      _cursorProto(_context),
       _dbCollectionProto(_context),
+      _dbProto(_context),
       _dbPointerProto(_context),
       _dbQueryProto(_context),
-      _dbProto(_context),
       _dbRefProto(_context),
       _errorProto(_context),
       _jsThreadProto(_context),
@@ -351,13 +351,14 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _mongoHelpersProto(_context),
       _mongoLocalProto(_context),
       _nativeFunctionProto(_context),
+      _numberDecimalProto(_context),
       _numberIntProto(_context),
       _numberLongProto(_context),
-      _numberDecimalProto(_context),
       _objectProto(_context),
       _oidProto(_context),
       _regExpProto(_context),
-      _timestampProto(_context) {
+      _timestampProto(_context),
+      _uriProto(_context) {
     kCurrentScope = this;
 
     // The default is quite low and doesn't seem to directly correlate with
@@ -790,6 +791,7 @@ void MozJSImplScope::installBSONTypes() {
     _oidProto.install(_global);
     _regExpProto.install(_global);
     _timestampProto.install(_global);
+    _uriProto.install(_global);
 
     // This builtin map is a javascript 6 thing.  We want our version.  so
     // take theirs out

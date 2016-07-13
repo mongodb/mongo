@@ -123,6 +123,12 @@ Status HostAndPort::initialize(StringData s) {
         hostPart = s.substr(openBracketPos + 1, closeBracketPos - openBracketPos - 1);
         // prevent accidental assignment of port to the value of the final portion of hostPart
         if (colonPos < closeBracketPos) {
+            // If the last colon is inside the brackets, then there must not be a port.
+            if (s.size() != closeBracketPos + 1) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "missing colon after ']' before the port in "
+                                            << s.toString());
+            }
             colonPos = std::string::npos;
         } else if (colonPos != closeBracketPos + 1) {
             return Status(ErrorCodes::FailedToParse,
@@ -154,7 +160,7 @@ Status HostAndPort::initialize(StringData s) {
         if (!status.isOK()) {
             return status;
         }
-        if (port <= 0) {
+        if (port <= 0 || port > 65535) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Port number " << port
                                         << " out of range parsing HostAndPort from \""

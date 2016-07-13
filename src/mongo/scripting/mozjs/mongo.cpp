@@ -638,8 +638,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     auto statusWithHost = MongoURI::parse(host);
-    uassertStatusOK(statusWithHost);
-    auto cs = statusWithHost.getValue();
+    auto cs = uassertStatusOK(statusWithHost);
 
     std::string errmsg;
     std::unique_ptr<DBClientBase> conn(cs.connect("MongoDB Shell", errmsg));
@@ -657,8 +656,9 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
 
     o.setBoolean(InternedString::slaveOk, false);
-    o.setString(InternedString::host, host);
-    o.setString(InternedString::defaultDB, cs.getDatabase());
+    o.setString(InternedString::host, cs.toString());
+    auto defaultDB = cs.getDatabase() == "" ? "test" : cs.getDatabase();
+    o.setString(InternedString::defaultDB, defaultDB);
 
     args.rval().setObjectOrNull(thisv);
 }
