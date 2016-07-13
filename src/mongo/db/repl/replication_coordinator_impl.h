@@ -1272,8 +1272,8 @@ private:
     // _lastCommittedOpTime cannot be set to an earlier OpTime.
     OpTime _firstOpTimeOfMyTerm;  // (M)
 
-    // Data Replicator used to replicate data
-    DataReplicator _dr;  // (S)
+    // Storage interface used by data replicator.
+    StorageInterface* _storage;  // (PS)
 
     // Hands out the next snapshot name.
     AtomicUInt64 _snapshotNameGenerator;  // (S)

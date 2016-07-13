@@ -260,9 +260,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _sleptLastElection(false),
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
-      _dr(createDataReplicatorOptions(this),
-          stdx::make_unique<DataReplicatorExternalStateImpl>(this, externalState),
-          storage),
+      _storage(storage),
       _isDurableStorageEngine(isDurableStorageEngineFn ? *isDurableStorageEngineFn : []() -> bool {
           return getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
       }) {
@@ -509,7 +507,11 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
     // Do initial sync.
     if (_externalState->shouldUseDataReplicatorInitialSync()) {
         _externalState->runOnInitialSyncThread([this](OperationContext* txn) {
-            const auto status = _dr.doInitialSync(txn);
+            DataReplicator dr(
+                createDataReplicatorOptions(this),
+                stdx::make_unique<DataReplicatorExternalStateImpl>(this, _externalState.get()),
+                _storage);
+            const auto status = dr.doInitialSync(txn);
             fassertStatusOK(40088, status);
             const auto lastApplied = status.getValue();
             _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
