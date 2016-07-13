@@ -122,56 +122,6 @@ class MasterSlaveFixture(interface.ReplFixture):
     def get_secondaries(self):
         return [self.slave]
 
-    def await_repl(self):
-        """
-        Inserts a document into each database on the master and waits
-        for all write operations to be acknowledged by the master-slave
-        deployment.
-        """
-
-        client = utils.new_mongo_client(self.port)
-
-        self.logger.info("Starting fsync on master on port %d to flush all pending writes",
-                         self.port)
-        client.fsync()
-        self.logger.info("fsync on master completed")
-
-        # We verify that each database has replicated to the slave because in the case of an initial
-        # sync, the slave may acknowledge writes to one database before it has finished syncing
-        # others.
-        db_names = client.database_names()
-        self.logger.info("Awaiting replication of inserts to each of the following databases on"
-                         " master on port %d: %s",
-                         self.port,
-                         db_names)
-
-        for db_name in db_names:
-            if db_name == "local":
-                continue  # The local database is expected to differ, ignore.
-
-            self.logger.info("Awaiting replication of insert to database %s (w=2, wtimeout=%d min)"
-                             " to master on port %d",
-                             db_name,
-                             interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS,
-                             self.port)
-
-            # Keep retrying this until it times out waiting for replication.
-            def insert_fn(remaining_secs):
-                remaining_millis = int(round(remaining_secs * 1000))
-                write_concern = pymongo.WriteConcern(w=2, wtimeout=remaining_millis)
-                coll = client[db_name].get_collection("await_repl", write_concern=write_concern)
-                coll.insert_one({"awaiting": "repl"})
-
-            try:
-                self.retry_until_wtimeout(insert_fn)
-            except pymongo.errors.WTimeoutError:
-                self.logger.info("Replication of write operation timed out.")
-                raise
-
-            self.logger.info("Replication of write operation completed for database %s.", db_name)
-
-        self.logger.info("Finished awaiting replication.")
-
     def _new_mongod(self, mongod_logger, mongod_options):
         """
         Returns a standalone.MongoDFixture with the specified logger and

@@ -96,13 +96,6 @@ class ReplFixture(Fixture):
         """
         raise NotImplementedError("get_secondaries must be implemented by ReplFixture subclasses")
 
-    def await_repl(self):
-        """
-        Blocks until all operations on the primary/master have
-        replicated to all other nodes.
-        """
-        raise NotImplementedError("await_repl must be implemented by ReplFixture subclasses")
-
     def retry_until_wtimeout(self, insert_fn):
         """
         Given a callback function representing an insert operation on

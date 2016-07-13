@@ -156,33 +156,6 @@ class ReplicaSetFixture(interface.ReplFixture):
     def get_secondaries(self):
         return self.nodes[1:]
 
-    def await_repl(self):
-        client = utils.new_mongo_client(port=self.port)
-
-        self.logger.info("Starting fsync on primary on port %d to flush all pending writes",
-                         self.port)
-        client.fsync()
-        self.logger.info("fsync on primary completed")
-
-        self.logger.info("Awaiting replication of insert (w=%d, wtimeout=%d min) to primary on port"
-                         " %d", self.num_nodes, interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS,
-                         self.port)
-
-        # Keep retrying this until it times out waiting for replication.
-        def insert_fn(remaining_secs):
-            remaining_millis = int(round(remaining_secs * 1000))
-            write_concern = pymongo.WriteConcern(w=self.num_nodes, wtimeout=remaining_millis)
-            coll = client.resmoke.get_collection("await_repl", write_concern=write_concern)
-            coll.insert_one({"awaiting": "repl"})
-
-        try:
-            self.retry_until_wtimeout(insert_fn)
-        except pymongo.errors.WTimeoutError:
-            self.logger.info("Replication of write operation timed out.")
-            raise
-
-        self.logger.info("Replication of write operation completed.")
-
     def _new_mongod(self, index, replset_name):
         """
         Returns a standalone.MongoDFixture configured to be used as a
