@@ -14,15 +14,22 @@ load("jstests/libs/csrs_upgrade_util.js");
 (function() {
     "use strict";
 
-    var assertIsSCCCConnectionString = function(connStr) {
-        assert.eq(-1, connStr.indexOf('/'), connStr);
-        var hosts = connStr.split(',');
-        assert.eq(3, hosts.length, connStr);
+    var isCSRSConnectionString = function(connStr) {
+        var setAndHosts = connStr.split('/');
+        return 2 == setAndHosts.length;
     };
 
-    var assertIsCSRSConnectionString = function(connStr) {
-        var setAndHosts = connStr.split('/');
-        assert.eq(2, setAndHosts.length, connStr);
+    var assertCatalogSwapHappens = function(shardConn) {
+        var connstr;
+        assert.soon(
+            function() {
+                connstr = shardConn.adminCommand('serverStatus').sharding.configsvrConnectionString;
+                return isCSRSConnectionString(connstr);
+            },
+            function() {
+                return "Shard " + shardConn.host +
+                    " still has an SCCC connection string for the config servers: " + connstr;
+            });
     };
 
     var coordinator = new CSRSUpgradeCoordinator();
@@ -66,9 +73,7 @@ load("jstests/libs/csrs_upgrade_util.js");
                   .find()
                   .itcount());
 
-    assertIsCSRSConnectionString(
-        coordinator.getShard(0).adminCommand('serverStatus').sharding.configsvrConnectionString);
-    assertIsCSRSConnectionString(
-        coordinator.getShard(1).adminCommand('serverStatus').sharding.configsvrConnectionString);
+    assertCatalogSwapHappens(coordinator.getShard(0));
+    assertCatalogSwapHappens(coordinator.getShard(1));
 
 }());
