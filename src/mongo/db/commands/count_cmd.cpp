@@ -36,9 +36,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -104,14 +106,28 @@ public:
                            ExplainCommon::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
-        auto request = CountRequest::parseFromBSON(dbname, cmdObj);
+        const bool isExplain = true;
+        auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);
         if (!request.isOK()) {
             return request.getStatus();
         }
 
         // Acquire the db read lock.
-        AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
+        AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
+        if (ctx.getView()) {
+            ctx.releaseLocksForView();
+
+            auto viewAggregation = request.getValue().asAggregationCommand();
+            if (!viewAggregation.isOK()) {
+                return viewAggregation.getStatus();
+            }
+
+            std::string errmsg;
+            (void)Command::findCommand("aggregate")
+                ->run(txn, dbname, viewAggregation.getValue(), 0, errmsg, *out);
+            return Status::OK();
+        }
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
@@ -135,16 +151,36 @@ public:
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
+                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        auto request = CountRequest::parseFromBSON(dbname, cmdObj);
+        const bool isExplain = false;
+        auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);
         if (!request.isOK()) {
             return appendCommandStatus(result, request.getStatus());
         }
 
-        AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
+        AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
+        if (ctx.getView()) {
+            ctx.releaseLocksForView();
+
+            auto viewAggregation = request.getValue().asAggregationCommand();
+            if (!viewAggregation.isOK()) {
+                return appendCommandStatus(result, viewAggregation.getStatus());
+            }
+
+            BSONObjBuilder aggResult;
+            (void)Command::findCommand("aggregate")
+                ->run(txn, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+
+            ViewResponseFormatter formatter(aggResult.obj());
+            Status formatStatus = formatter.appendAsCountResponse(&result);
+            if (!formatStatus.isOK()) {
+                return appendCommandStatus(result, formatStatus);
+            }
+            return true;
+        }
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.

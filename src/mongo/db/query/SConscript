@@ -131,6 +131,7 @@ env.Library(
         'getmore_request.cpp',
         'killcursors_request.cpp',
         'killcursors_response.cpp',
+        'view_response_formatter.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

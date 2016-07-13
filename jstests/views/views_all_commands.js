@@ -111,7 +111,7 @@
         copydb: {skip: "TODO(SERVER-24823)"},
         copydbgetnonce: {skip: isUnrelated},
         copydbsaslstart: {skip: isUnrelated},
-        count: {skip: "TODO(SERVER-24766)"},
+        count: {command: {count: "view"}},
         create: {skip: "tested in views/views_creation.js"},
         createIndexes: {
             command: {createIndexes: "view", indexes: [{key: {x: 1}, name: "x_1"}]},
@@ -146,7 +146,7 @@
         dbStats: {command: {dbStats: 1}, skip: "TODO(SERVER-24568)"},
         delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
         diagLogging: {skip: isUnrelated},
-        distinct: {command: {distinct: "view", key: "x"}, expectFailure: true},
+        distinct: {command: {distinct: "view", key: "_id"}},
         driverOIDTest: {skip: isUnrelated},
         drop: {command: {drop: "view"}, skip: "TODO(SERVER-24766)"},
         dropAllRolesFromDatabase: {skip: isUnrelated},
@@ -170,7 +170,7 @@
             skip: needsToFailWithViewsErrorCode
         },
         eval: {skip: "TODO(SERVER-24823)"},
-        explain: {command: {explain: {count: "view"}}, expectFailure: true},
+        explain: {command: {explain: {count: "view"}}},
         features: {skip: isUnrelated},
         filemd5: {skip: isUnrelated},
         find: {command: {find: "view"}},

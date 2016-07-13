@@ -86,6 +86,14 @@ public:
 
     void setCollation(BSONObj collation);
 
+    bool isExplain() const {
+        return _explain;
+    }
+
+    void setExplain(bool explain) {
+        _explain = explain;
+    }
+
     /**
      * Constructs a BSON representation of this request, which can be used for sending it in
      * commands.
@@ -93,9 +101,17 @@ public:
     BSONObj toBSON() const;
 
     /**
-     * Construct a CountRequest from the command specification and db name.
+     * Converts this CountRequest into an aggregation.
      */
-    static StatusWith<CountRequest> parseFromBSON(const std::string& dbname, const BSONObj& cmdObj);
+    StatusWith<BSONObj> asAggregationCommand() const;
+
+    /**
+     * Construct a CountRequest from the command specification and db name. Caller must indicate if
+     * this is an explained count via 'isExplain'.
+     */
+    static StatusWith<CountRequest> parseFromBSON(const std::string& dbname,
+                                                  const BSONObj& cmdObj,
+                                                  bool isExplain);
 
 private:
     // Namespace to operate on (e.g. "foo.bar").
@@ -116,6 +132,9 @@ private:
 
     // Optional. The collation used to compare strings.
     boost::optional<BSONObj> _collation;
+
+    // If true, generate an explain plan instead of the actual count.
+    bool _explain = false;
 };
 
 }  // namespace mongo

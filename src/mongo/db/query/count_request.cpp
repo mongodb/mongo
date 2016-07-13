@@ -41,6 +41,7 @@ const char kLimitField[] = "limit";
 const char kSkipField[] = "skip";
 const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
+const char kExplainField[] = "explain";
 
 }  // namespace
 
@@ -81,7 +82,8 @@ BSONObj CountRequest::toBSON() const {
 }
 
 StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
-                                                     const BSONObj& cmdObj) {
+                                                     const BSONObj& cmdObj,
+                                                     bool isExplain) {
     BSONElement firstElt = cmdObj.firstElement();
     const std::string coll = (firstElt.type() == BSONType::String) ? firstElt.str() : "";
 
@@ -134,7 +136,59 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
         return Status(ErrorCodes::BadValue, "collation value is not a document");
     }
 
+    // Explain
+    request.setExplain(isExplain);
+
     return request;
 }
 
+StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
+    // The 'hint' option is not supported in aggregation.
+    if (_hint) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kHintField << " not supported in aggregation."};
+    }
+
+    // TODO(SERVER-25186): Views may not override the collation of the underlying collection.
+    if (_collation) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << kCollationField << " not supported on a view."};
+    }
+
+    BSONObjBuilder aggregationBuilder;
+    aggregationBuilder.append("aggregate", _nss.coll());
+
+    // Build an aggregation pipeline that performs the counting. We add stages that satisfy the
+    // query, skip and limit before finishing with the actual $count stage.
+    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
+    if (!_query.isEmpty()) {
+        BSONObjBuilder matchBuilder(pipelineBuilder.subobjStart());
+        matchBuilder.append("$match", _query);
+        matchBuilder.doneFast();
+    }
+    if (_skip) {
+        BSONObjBuilder skipBuilder(pipelineBuilder.subobjStart());
+        skipBuilder.append("$skip", *_skip);
+        skipBuilder.doneFast();
+    }
+    if (_limit) {
+        BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
+        limitBuilder.append("$limit", *_limit);
+        limitBuilder.doneFast();
+    }
+    BSONObjBuilder countBuilder(pipelineBuilder.subobjStart());
+    countBuilder.append("$count", "count");
+    countBuilder.doneFast();
+    pipelineBuilder.doneFast();
+
+    // Complete the command by appending the other options to count.
+    if (_explain) {
+        aggregationBuilder.append(kExplainField, _explain);
+    }
+
+    // The 'cursor' option is always specified so that aggregation uses the cursor interface.
+    aggregationBuilder.append("cursor", BSONObj());
+
+    return aggregationBuilder.obj();
+}
 }  // namespace mongo

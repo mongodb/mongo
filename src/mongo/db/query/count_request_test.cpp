@@ -37,12 +37,14 @@ namespace mongo {
 namespace {
 
 TEST(CountRequest, ParseDefaults) {
+    const bool isExplain = false;
     const auto countRequestStatus =
         CountRequest::parseFromBSON("TestDB",
                                     BSON("count"
                                          << "TestColl"
                                          << "query"
-                                         << BSON("a" << BSON("$lte" << 10))));
+                                         << BSON("a" << BSON("$lte" << 10))),
+                                    isExplain);
 
     ASSERT_OK(countRequestStatus.getStatus());
 
@@ -59,6 +61,7 @@ TEST(CountRequest, ParseDefaults) {
 }
 
 TEST(CountRequest, ParseComplete) {
+    const bool isExplain = false;
     const auto countRequestStatus =
         CountRequest::parseFromBSON("TestDB",
                                     BSON("count"
@@ -73,7 +76,8 @@ TEST(CountRequest, ParseComplete) {
                                          << BSON("b" << 5)
                                          << "collation"
                                          << BSON("locale"
-                                                 << "en_US")));
+                                                 << "en_US")),
+                                    isExplain);
 
     ASSERT_OK(countRequestStatus.getStatus());
 
@@ -85,6 +89,31 @@ TEST(CountRequest, ParseComplete) {
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
     ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
     ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
+}
+
+TEST(CountRequest, ParseWithExplain) {
+    const bool isExplain = true;
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON("TestDB",
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query"
+                                         << BSON("a" << BSON("$lte" << 10))),
+                                    isExplain);
+
+    ASSERT_OK(countRequestStatus.getStatus());
+
+    const CountRequest& countRequest = countRequestStatus.getValue();
+
+    ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
+    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
+
+    // Defaults
+    ASSERT_EQUALS(countRequest.getLimit(), 0);
+    ASSERT_EQUALS(countRequest.getSkip(), 0);
+    ASSERT_EQUALS(countRequest.isExplain(), true);
+    ASSERT(countRequest.getHint().isEmpty());
+    ASSERT(countRequest.getCollation().isEmpty());
 }
 
 TEST(CountRequest, ParseNegativeLimit) {
@@ -102,7 +131,8 @@ TEST(CountRequest, ParseNegativeLimit) {
                                          << BSON("b" << 5)
                                          << "collation"
                                          << BSON("locale"
-                                                 << "en_US")));
+                                                 << "en_US")),
+                                    false);
 
     ASSERT_OK(countRequestStatus.getStatus());
 
@@ -117,13 +147,15 @@ TEST(CountRequest, ParseNegativeLimit) {
 }
 
 TEST(CountRequest, FailParseMissingNS) {
-    const auto countRequestStatus =
-        CountRequest::parseFromBSON("TestDB", BSON("query" << BSON("a" << BSON("$gte" << 11))));
+    const bool isExplain = false;
+    const auto countRequestStatus = CountRequest::parseFromBSON(
+        "TestDB", BSON("query" << BSON("a" << BSON("$gte" << 11))), isExplain);
 
     ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::InvalidNamespace);
 }
 
 TEST(CountRequest, FailParseBadSkipValue) {
+    const bool isExplain = false;
     const auto countRequestStatus =
         CountRequest::parseFromBSON("TestDB",
                                     BSON("count"
@@ -131,12 +163,14 @@ TEST(CountRequest, FailParseBadSkipValue) {
                                          << "query"
                                          << BSON("a" << BSON("$gte" << 11))
                                          << "skip"
-                                         << -1000));
+                                         << -1000),
+                                    isExplain);
 
     ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(CountRequest, FailParseBadCollationValue) {
+    const bool isExplain = false;
     const auto countRequestStatus =
         CountRequest::parseFromBSON("TestDB",
                                     BSON("count"
@@ -144,7 +178,8 @@ TEST(CountRequest, FailParseBadCollationValue) {
                                          << "query"
                                          << BSON("a" << BSON("$gte" << 11))
                                          << "collation"
-                                         << "en_US"));
+                                         << "en_US"),
+                                    isExplain);
 
     ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
 }

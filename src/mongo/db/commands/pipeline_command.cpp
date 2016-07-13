@@ -444,7 +444,7 @@ public:
         }
         // Any code that needs the cursor pinned must be inside the try block, above.
 
-        return true;
+        return appendCommandStatus(result, Status::OK());
     }
 };
 

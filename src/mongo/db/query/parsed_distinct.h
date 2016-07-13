@@ -70,6 +70,11 @@ public:
     }
 
     /**
+     * Convert this ParsedDistinct into an aggregation command object.
+     */
+    StatusWith<BSONObj> asAggregationCommand() const;
+
+    /**
      * 'extensionsCallback' allows for additional mongod parsing. If called from mongos, an
      * ExtensionsCallbackNoop object should be passed to skip this parsing.
      */

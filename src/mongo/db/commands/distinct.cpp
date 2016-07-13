@@ -48,12 +48,14 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/view_response_formatter.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -120,9 +122,21 @@ public:
             return parsedDistinct.getStatus();
         }
 
-        AutoGetCollectionForRead ctx(txn, ns);
-
+        AutoGetCollectionOrViewForRead ctx(txn, ns);
         Collection* collection = ctx.getCollection();
+
+        if (ctx.getView()) {
+            ctx.releaseLocksForView();
+
+            auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
+            if (!viewAggregation.isOK()) {
+                return viewAggregation.getStatus();
+            }
+            std::string errmsg;
+            (void)Command::findCommand("aggregate")
+                ->run(txn, dbname, viewAggregation.getValue(), 0, errmsg, *out);
+            return Status::OK();
+        }
 
         auto executor = getExecutorDistinct(
             txn, collection, ns, &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
@@ -137,7 +151,7 @@ public:
     bool run(OperationContext* txn,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
+             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         const string ns = parseNs(dbname, cmdObj);
@@ -149,9 +163,28 @@ public:
             return appendCommandStatus(result, parsedDistinct.getStatus());
         }
 
-        AutoGetCollectionForRead ctx(txn, ns);
-
+        AutoGetCollectionOrViewForRead ctx(txn, ns);
         Collection* collection = ctx.getCollection();
+
+        if (ctx.getView()) {
+            ctx.releaseLocksForView();
+
+            auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
+            if (!viewAggregation.isOK()) {
+                return appendCommandStatus(result, viewAggregation.getStatus());
+            }
+            BSONObjBuilder aggResult;
+
+            (void)Command::findCommand("aggregate")
+                ->run(txn, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+
+            ViewResponseFormatter formatter(aggResult.obj());
+            Status formatStatus = formatter.appendAsDistinctResponse(&result);
+            if (!formatStatus.isOK()) {
+                return appendCommandStatus(result, formatStatus);
+            }
+            return true;
+        }
 
         auto executor = getExecutorDistinct(
             txn, collection, ns, &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
