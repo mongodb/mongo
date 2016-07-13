@@ -205,3 +205,4 @@ error_class("WriteConcernError", ["WriteConcernFailed",
                                   "WriteConcernLegacyOK",
                                   "UnknownReplWriteConcern",
                                   "CannotSatisfyWriteConcern"])
+error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])

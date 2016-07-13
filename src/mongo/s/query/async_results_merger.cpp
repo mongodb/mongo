@@ -586,7 +586,7 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
     // Make '_killCursorsScheduledEvent', which we will signal as soon as we have scheduled a
     // killCursors command to run on all the remote shards.
     auto statusWithEvent = _executor->makeEvent();
-    if (statusWithEvent.getStatus().code() == ErrorCodes::ShutdownInProgress) {
+    if (ErrorCodes::isShutdownError(statusWithEvent.getStatus().code())) {
         // The underlying task executor is shutting down.
         if (!haveOutstandingBatchRequests_inlock()) {
             _lifecycleState = kKillComplete;

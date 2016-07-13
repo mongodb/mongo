@@ -470,7 +470,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
 void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(OperationContext* txn) {
     auto status = ShardingStateRecovery::recover(txn);
 
-    if (status == ErrorCodes::ShutdownInProgress) {
+    if (ErrorCodes::isShutdownError(status.code())) {
         // Note: callers of this method don't expect exceptions, so throw only unexpected fatal
         // errors.
         return;
@@ -483,8 +483,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         status = Grid::get(txn)->catalogManager()->initializeConfigDatabaseIfNeeded(txn);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
-            if (status == ErrorCodes::ShutdownInProgress ||
-                status == ErrorCodes::InterruptedAtShutdown) {
+            if (ErrorCodes::isShutdownError(status.code())) {
                 // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
                 return;
             }
