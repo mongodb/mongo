@@ -24,7 +24,7 @@
     }
 
     // Make sure the documents are journaled
-    assert.writeOK(bulk.execute({writeConcern: {j: true}}));
+    assert.writeOK(bulk.execute({j: true}));
 
     assert.eq(100, t.count(), 'unexpected number of documents after bulk insert.');
 

@@ -154,11 +154,10 @@ coll.remove({});
 request = {
     insert: coll.getName(),
     documents: [{_id: 1}, {_id: 1}],
-    writeConcern: {wTimeout: 1},
+    writeConcern: {wtimeout: 1},
     ordered: false
 };
-result = coll.runCommand(request);
-assert(result.ok);
+result = assert.commandWorked(coll.runCommand(request));
 assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);

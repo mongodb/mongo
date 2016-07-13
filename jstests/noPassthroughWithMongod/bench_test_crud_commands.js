@@ -80,9 +80,9 @@
 
         testInsert([bigDoc], writeCmd, {});
         testInsert(docs, writeCmd, {});
-        testInsert(docs, writeCmd, {"writeConcern": {"w": "majority"}});
-        testInsert(docs, writeCmd, {"writeConcern": {"w": 1, "j": false}});
-        testInsert(docs, writeCmd, {"writeConcern": {"j": true}});
+        testInsert(docs, writeCmd, {"w": "majority"});
+        testInsert(docs, writeCmd, {"w": 1, "j": false});
+        testInsert(docs, writeCmd, {"j": true});
     }
 
     testWriteConcern(false);
