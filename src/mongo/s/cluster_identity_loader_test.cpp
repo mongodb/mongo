@@ -188,34 +188,5 @@ TEST_F(ClusterIdentityTest, BasicLoadFailureFollowedBySuccess) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(ClusterIdentityTest, MultipleThreadsLoadFailure) {
-    // Check that multiple threads calling getClusterId at once still results in only one network
-    // operation.
-    auto future1 = launchAsync([&] {
-        auto clusterIdStatus =
-            ClusterIdentityLoader::get(operationContext())
-                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
-        ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
-    });
-    auto future2 = launchAsync([&] {
-        auto clusterIdStatus =
-            ClusterIdentityLoader::get(operationContext())
-                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
-        ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
-    });
-    auto future3 = launchAsync([&] {
-        auto clusterIdStatus =
-            ClusterIdentityLoader::get(operationContext())
-                ->loadClusterId(operationContext(), repl::ReadConcernLevel::kMajorityReadConcern);
-        ASSERT_EQUALS(ErrorCodes::Interrupted, clusterIdStatus);
-    });
-
-    expectConfigVersionLoad(Status(ErrorCodes::Interrupted, "interrupted"));
-
-    future1.timed_get(kFutureTimeout);
-    future2.timed_get(kFutureTimeout);
-    future3.timed_get(kFutureTimeout);
-}
-
 }  // namespace
 }  // namespace mongo
