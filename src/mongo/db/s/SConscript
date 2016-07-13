@@ -48,6 +48,7 @@ env.Library(
     source=[
         'active_migrations_registry.cpp',
         'chunk_move_write_concern_options.cpp',
+        'collection_range_deleter.cpp',
         'collection_sharding_state.cpp',
         'metadata_manager.cpp',
         'migration_chunk_cloner_source.cpp',
