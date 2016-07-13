@@ -623,8 +623,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     const int maxFailedAttempts = kInitialSyncMaxRetries + 1;
     int failedAttempts = 0;
-    Status attemptErrorStatus(Status::OK());
     while (failedAttempts < maxFailedAttempts) {
+        Status attemptErrorStatus(Status::OK());
         _initialSyncState.reset();
         _reporterPaused = true;
         _applierPaused = true;
