@@ -263,6 +263,7 @@ env.Library(
         'sharding_uptime_reporter.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
