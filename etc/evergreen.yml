@@ -7431,6 +7431,8 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: auth
+  - name: auth_WT
   - name: concurrency_replication
   - name: concurrency_replication_WT
   - name: concurrency_sharded
