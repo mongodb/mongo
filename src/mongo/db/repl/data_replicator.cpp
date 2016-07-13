@@ -629,7 +629,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
     int failedAttempts = 0;
     Status attemptErrorStatus(Status::OK());
     while (failedAttempts < maxFailedAttempts) {
-        // TODO: Move into _doInitialSync(...);
         _initialSyncState.reset();
         _reporterPaused = true;
         _applierPaused = true;
@@ -685,8 +684,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
             invariant(!oplogFetcher->isActive());
 
             lk.lock();
-            // TODO: clear buffer
-            //            _clearFetcherBuffer();
         }
 
         // Sleep for retry time
@@ -1350,8 +1347,6 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
     } else if (status.isOK()) {
         LockGuard lk(_mutex);
         _lastFetched = lastFetched;
-
-        // TODO: create new fetcher?, with new query from where we left off -- d'tor fetcher
     } else {
         invariant(!status.isOK());
         // Got an error, now decide what to do...
