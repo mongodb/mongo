@@ -74,6 +74,7 @@ env.Library(
         'service_entry_point_utils.cpp',
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context",
         'transport_layer_common',
     ],
 )
