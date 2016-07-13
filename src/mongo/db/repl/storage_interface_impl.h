@@ -126,7 +126,7 @@ private:
 
     // Each runner services a single collection and holds on to the OperationContext (and thread)
     // until it is done with the collection (CollectionBulkLoaderImpl::commit/abort is called).
-    std::vector<std::pair<const NamespaceString&, std::unique_ptr<TaskRunner>>> _runners;
+    std::vector<std::pair<const NamespaceString, std::unique_ptr<TaskRunner>>> _runners;
 };
 
 }  // namespace repl
