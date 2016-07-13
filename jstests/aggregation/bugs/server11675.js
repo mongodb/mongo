@@ -141,9 +141,10 @@ var server11675 = function() {
                ]).toArray();
     assert.eq(res[0].score, score);
 
-    // Make sure the metadata is 'missing()' when it doesn't exist because it was never created
-    var res = t.aggregate([{$project: {_id: 1, score: {$meta: 'textScore'}}}]).toArray();
-    assert(!("score" in res[0]));
+    // Make sure the pipeline fails if it tries to reference the text score and it doesn't exist.
+    var res = t.runCommand(
+        {aggregate: t.getName(), pipeline: [{$project: {_id: 1, score: {$meta: 'textScore'}}}]});
+    assert.commandFailed(res);
 
     // Make sure the metadata is 'missing()' when it doesn't exist because the document changed
     var res = t.aggregate([

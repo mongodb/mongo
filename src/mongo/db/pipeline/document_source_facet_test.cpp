@@ -473,5 +473,21 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextS
     ASSERT_TRUE(deps.getNeedTextScore());
 }
 
+TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIsNotAvailable) {
+    auto ctx = getExpCtx();
+
+    auto needsA = DocumentSourceNeedsA::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({needsA}, ctx));
+
+    auto needsTextScore = DocumentSourceNeedsOnlyTextScore::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({needsTextScore}, ctx));
+
+    auto facetStage = DocumentSourceFacet::create(
+        {{"needsA", firstPipeline}, {"needsTextScore", secondPipeline}}, ctx);
+
+    DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
+    ASSERT_THROWS(facetStage->getDependencies(&deps), UserException);
+}
+
 }  // namespace
 }  // namespace mongo

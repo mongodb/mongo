@@ -1249,6 +1249,15 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfThereIsNoScoreAvaila
     ASSERT_FALSE(depsTracker.getNeedTextScore());
 }
 
+TEST_F(PipelineDependenciesTest, ShouldThrowIfTextScoreIsNeededButNotPresent) {
+    auto ctx = getExpCtx();
+    auto needsText = DocumentSourceNeedsOnlyTextScore::create();
+    auto pipeline = unittest::assertGet(Pipeline::create({needsText}, ctx));
+
+    ASSERT_THROWS(pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata),
+                  UserException);
+}
+
 TEST_F(PipelineDependenciesTest, ShouldRequireTextScoreIfAvailableAndNoStageReturnsExhaustiveMeta) {
     auto ctx = getExpCtx();
     auto pipeline = unittest::assertGet(Pipeline::create({}, ctx));

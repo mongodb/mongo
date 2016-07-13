@@ -77,6 +77,11 @@ struct DepsTracker {
     }
 
     void setNeedTextScore(bool needTextScore) {
+        if (needTextScore && !isTextScoreAvailable()) {
+            uasserted(
+                40218,
+                "pipeline requires text score metadata, but there is no text score available");
+        }
         _needTextScore = needTextScore;
     }
 
