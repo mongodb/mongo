@@ -123,7 +123,11 @@ void launchWrappedServiceEntryWorkerThread(transport::Session&& session,
             if (kDebugBuild)
                 stackSizeToSet /= 2;
 #endif
-            pthread_attr_setstacksize(&attrs, stackSizeToSet);
+            int failed = pthread_attr_setstacksize(&attrs, stackSizeToSet);
+            if (failed) {
+                const auto ewd = errnoWithDescription(failed);
+                warning() << "pthread_attr_setstacksize failed: " << ewd;
+            }
         } else if (limits.rlim_cur < 1024 * 1024) {
             warning() << "Stack size set to " << (limits.rlim_cur / 1024) << "KB. We suggest 1MB";
         }
