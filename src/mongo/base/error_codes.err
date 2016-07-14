@@ -173,6 +173,8 @@ error_code("CannotIndexParallelArrays", 171)
 error_code("TransportSessionNotFound", 172)
 error_code("QueryPlanKilled", 173)
 error_code("FileOpenFailed", 174)
+error_code("ZoneNotFound", 175)
+error_code("RangeOverlapConflict", 176)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

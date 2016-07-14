@@ -39,17 +39,17 @@ namespace mongo {
 class ChunkManager;
 class OperationContext;
 
-struct TagRange {
-    TagRange() = default;
+struct ZoneRange {
+    ZoneRange() = default;
 
-    TagRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& a_tag)
-        : min(a_min.getOwned()), max(a_max.getOwned()), tag(a_tag) {}
+    ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone)
+        : min(a_min.getOwned()), max(a_max.getOwned()), zone(_zone) {}
 
     std::string toString() const;
 
     BSONObj min;
     BSONObj max;
-    std::string tag;
+    std::string zone;
 };
 
 struct MigrateInfo {
@@ -93,10 +93,10 @@ public:
     }
 
     /**
-     * Appends the specified range to the set of ranges tracked for this collection and checks its
-     * valididty. Returns true if the range is valid or false otherwise.
+     * Appends the specified range to the set of ranges tracked for this collection and checks if
+     * it overlaps with existing ranges.
      */
-    bool addTagRange(const TagRange& range);
+    Status addRangeToZone(const ZoneRange& range);
 
     /**
      * Returns total number of chunks across all shards.
@@ -127,8 +127,8 @@ public:
     /**
      * Returns all tag ranges defined for the collection.
      */
-    const std::map<BSONObj, TagRange, BSONObjCmp>& tagRanges() const {
-        return _tagRanges;
+    const std::map<BSONObj, ZoneRange, BSONObjCmp>& tagRanges() const {
+        return _zoneRanges;
     }
 
     /**
@@ -158,7 +158,7 @@ private:
     ShardToChunksMap _shardChunks;
 
     // Map of zone max key to the zone description
-    std::map<BSONObj, TagRange, BSONObjCmp> _tagRanges;
+    std::map<BSONObj, ZoneRange, BSONObjCmp> _zoneRanges;
 
     // Set of all zones defined for this collection
     std::set<std::string> _allTags;

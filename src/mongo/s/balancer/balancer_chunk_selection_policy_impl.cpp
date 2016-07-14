@@ -103,13 +103,13 @@ StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDist
     const auto& keyPattern = chunkMgr->getShardKeyPattern().getKeyPattern();
 
     for (const auto& tag : collectionTags) {
-        if (!distribution.addTagRange(TagRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
-                                               keyPattern.extendRangeBound(tag.getMaxKey(), false),
-                                               tag.getTag()))) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "Tag ranges are not valid for collection " << chunkMgr->getns()
-                                  << ". Balancing for this collection will be skipped until "
-                                     "the ranges are fixed."};
+        auto status = distribution.addRangeToZone(
+            ZoneRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
+                      keyPattern.extendRangeBound(tag.getMaxKey(), false),
+                      tag.getTag()));
+
+        if (!status.isOK()) {
+            return status;
         }
     }
 

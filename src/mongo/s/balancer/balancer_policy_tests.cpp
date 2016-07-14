@@ -299,8 +299,8 @@ TEST(BalancerPolicy, DrainingSingleAppropriateShardFoundDueToTag) {
          {ShardStatistics(kShardId2, kNoMaxSize, 1, true, {"LAX"}, emptyShardVersion), 1}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    distribution.addTagRange(TagRange(
-        cluster.second[kShardId2][0].getMin(), cluster.second[kShardId2][0].getMax(), "LAX"));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(
+        cluster.second[kShardId2][0].getMin(), cluster.second[kShardId2][0].getMax(), "LAX")));
 
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
     ASSERT_EQ(1U, migrations.size());
@@ -317,8 +317,8 @@ TEST(BalancerPolicy, DrainingNoAppropriateShardsFoundDueToTag) {
          {ShardStatistics(kShardId2, kNoMaxSize, 1, true, {"SEA"}, emptyShardVersion), 1}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    distribution.addTagRange(TagRange(
-        cluster.second[kShardId2][0].getMin(), cluster.second[kShardId2][0].getMax(), "SEA"));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(
+        cluster.second[kShardId2][0].getMin(), cluster.second[kShardId2][0].getMax(), "SEA")));
 
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
     ASSERT(migrations.empty());
@@ -376,8 +376,8 @@ TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
          {ShardStatistics(kShardId2, kNoMaxSize, 5, false, {"b"}, emptyShardVersion), 2}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    distribution.addTagRange(TagRange(kMinBSONKey, BSON("x" << 7), "a"));
-    distribution.addTagRange(TagRange(BSON("x" << 8), kMaxBSONKey, "b"));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 7), "a")));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 8), kMaxBSONKey, "b")));
 
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
     ASSERT_EQ(1U, migrations.size());
@@ -396,7 +396,7 @@ TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
          {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    distribution.addTagRange(TagRange(kMinBSONKey, BSON("x" << 100), "a"));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 100), "a")));
 
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
     ASSERT_EQ(1U, migrations.size());
@@ -414,7 +414,7 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
          {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    distribution.addTagRange(TagRange(kMinBSONKey, BSON("x" << 10), "a"));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 10), "a")));
 
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
     ASSERT_EQ(1U, migrations.size());
@@ -433,7 +433,7 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParalle
          {ShardStatistics(kShardId3, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3}});
 
     DistributionStatus distribution(kNamespace, cluster.second);
-    distribution.addTagRange(TagRange(kMinBSONKey, BSON("x" << 20), "a"));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 20), "a")));
 
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
     ASSERT_EQ(2U, migrations.size());
@@ -453,24 +453,31 @@ TEST(DistributionStatus, AddTagRangeOverlap) {
     DistributionStatus d(kNamespace, {});
 
     // Note that there is gap between 10 and 20 for which there is no tag
-    ASSERT(d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "a")));
-    ASSERT(d.addTagRange(TagRange(BSON("x" << 20), BSON("x" << 30), "b")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 20), BSON("x" << 30), "b")));
 
-    ASSERT(!d.addTagRange(TagRange(kMinBSONKey, BSON("x" << 2), "d")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 5), "d")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 5), BSON("x" << 9), "d")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "d")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 5), BSON("x" << 25), "d")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << -1), BSON("x" << 32), "d")));
-    ASSERT(!d.addTagRange(TagRange(BSON("x" << 25), kMaxBSONKey, "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 2), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << -1), BSON("x" << 5), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << 5), BSON("x" << 9), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << 5), BSON("x" << 25), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << -1), BSON("x" << 32), "d")));
+    ASSERT_EQ(ErrorCodes::RangeOverlapConflict,
+              d.addRangeToZone(ZoneRange(BSON("x" << 25), kMaxBSONKey, "d")));
 }
 
 TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
     DistributionStatus d(kNamespace, {});
 
-    ASSERT(d.addTagRange(TagRange(BSON("x" << 1), BSON("x" << 10), "a")));
-    ASSERT(d.addTagRange(TagRange(BSON("x" << 10), BSON("x" << 20), "b")));
-    ASSERT(d.addTagRange(TagRange(BSON("x" << 20), BSON("x" << 30), "c")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 10), BSON("x" << 20), "b")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 20), BSON("x" << 30), "c")));
 
     {
         ChunkType chunk;
@@ -532,9 +539,9 @@ TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
 TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
     DistributionStatus d(kNamespace, {});
 
-    ASSERT(d.addTagRange(TagRange(kMinBSONKey, BSON("x" << -100), "a")));
-    ASSERT(d.addTagRange(TagRange(BSON("x" << -10), BSON("x" << 10), "b")));
-    ASSERT(d.addTagRange(TagRange(BSON("x" << 100), kMaxBSONKey, "c")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << -100), "a")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << -10), BSON("x" << 10), "b")));
+    ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 100), kMaxBSONKey, "c")));
 
     {
         ChunkType chunk;
