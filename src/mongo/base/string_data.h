@@ -36,6 +36,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "mongo/stdx/type_traits.h"
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "mongo/util/invariant.h"
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
@@ -62,6 +63,9 @@ class StringData {
 public:
     // Declared in string_data_comparator_interface.h.
     class ComparatorInterface;
+
+    // Iterator type
+    using const_iterator = const char*;
 
     /** Constructs an empty StringData. */
     constexpr StringData() = default;
@@ -96,6 +100,23 @@ public:
      * for constexpr creation of StringData's that are known at compile time.
      */
     constexpr friend StringData operator"" _sd(const char* c, std::size_t len);
+
+    /**
+     * Constructs a StringData with begin and end iterators. begin points to the beginning of the
+     * string. end points to the position past the end of the string. In a null-terminated string,
+     * end points to the null-terminator.
+     *
+     * We template the second parameter to ensure if StringData is called with 0 in the second
+     * parameter, the (ptr,len) constructor is chosen instead.
+     */
+    template <
+        typename InputIt,
+        typename = stdx::enable_if_t<std::is_same<StringData::const_iterator, InputIt>::value>>
+    StringData(InputIt begin, InputIt end) {
+        invariant(begin && end);
+        _data = begin;
+        _size = std::distance(begin, end);
+    }
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
@@ -170,9 +191,6 @@ public:
     //
     // iterators
     //
-
-    typedef const char* const_iterator;
-
     const_iterator begin() const {
         return rawData();
     }
