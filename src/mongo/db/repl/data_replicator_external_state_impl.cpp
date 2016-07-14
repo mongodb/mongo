@@ -49,6 +49,10 @@ executor::TaskExecutor* DataReplicatorExternalStateImpl::getTaskExecutor() const
     return _replicationCoordinatorExternalState->getTaskExecutor();
 }
 
+OldThreadPool* DataReplicatorExternalStateImpl::getDbWorkThreadPool() const {
+    return _replicationCoordinatorExternalState->getDbWorkThreadPool();
+}
+
 OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOpTime() {
     if (!_replicationCoordinator->isV1ElectionProtocol()) {
         return {OpTime::kUninitializedTerm, OpTime()};

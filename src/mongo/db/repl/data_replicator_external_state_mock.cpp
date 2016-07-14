@@ -45,6 +45,10 @@ executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const
     return taskExecutor;
 }
 
+OldThreadPool* DataReplicatorExternalStateMock::getDbWorkThreadPool() const {
+    return dbWorkThreadPool;
+}
+
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
     return {currentTerm, lastCommittedOpTime};
 }

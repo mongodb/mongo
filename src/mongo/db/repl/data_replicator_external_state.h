@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+class OldThreadPool;
+
 namespace executor {
 class TaskExecutor;
 }  // namespace executor
@@ -72,6 +74,11 @@ public:
      * Returns task executor for scheduling tasks to be run asynchronously.
      */
     virtual executor::TaskExecutor* getTaskExecutor() const = 0;
+
+    /**
+     * Returns shared db worker thread pool for collection cloning.
+     */
+    virtual OldThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
      * Returns the current term and last committed optime.
