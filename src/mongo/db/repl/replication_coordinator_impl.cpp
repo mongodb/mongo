@@ -206,7 +206,8 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
     return ReplicationCoordinator::modeNone;
 }
 
-DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCoord) {
+DataReplicatorOptions createDataReplicatorOptions(
+    ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
     DataReplicatorOptions options;
     options.rollbackFn = [](OperationContext*, const OpTime&, const HostAndPort&) -> Status {
         return Status::OK();
@@ -217,8 +218,9 @@ DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCo
             return replCoord->prepareReplSetUpdatePositionCommand(commandStyle);
         };
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
-    options.setMyLastOptime = [replCoord](const OpTime& opTime) {
+    options.setMyLastOptime = [replCoord, externalState](const OpTime& opTime) {
         replCoord->setMyLastAppliedOpTime(opTime);
+        externalState->setGlobalTimestamp(opTime.getTimestamp());
     };
     options.setFollowerMode = [replCoord](const MemberState& newState) {
         return replCoord->setFollowerMode(newState);
@@ -508,7 +510,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
     if (_externalState->shouldUseDataReplicatorInitialSync()) {
         _externalState->runOnInitialSyncThread([this](OperationContext* txn) {
             DataReplicator dr(
-                createDataReplicatorOptions(this),
+                createDataReplicatorOptions(this, _externalState.get()),
                 stdx::make_unique<DataReplicatorExternalStateImpl>(this, _externalState.get()),
                 _storage);
             const auto status = dr.doInitialSync(txn);

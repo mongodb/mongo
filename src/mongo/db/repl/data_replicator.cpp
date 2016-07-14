@@ -718,6 +718,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     _storage->clearInitialSyncFlag(txn);
     _storage->setMinValid(txn, _lastApplied.opTime, DurableRequirement::Strong);
+    _opts.setMyLastOptime(_lastApplied.opTime);
     log() << "initial sync done; took " << t.millis() << " milliseconds.";
     return _lastApplied;
 }
@@ -1078,7 +1079,7 @@ void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
     _lastApplied = uassertStatusOK(opTimeWithHashStatus);
     lk.unlock();
 
-    _opts.setMyLastOptime(OpTime(ts.getValue(), OpTime::kUninitializedTerm));
+    _opts.setMyLastOptime(_lastApplied.opTime);
 
     lk.lock();
     if (_reporter) {
