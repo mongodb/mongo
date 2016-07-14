@@ -48,12 +48,12 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/unittest/barrier.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
-
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
 
 namespace {
 using namespace mongo;
@@ -86,10 +86,15 @@ struct StorageInterfaceResults {
 
 class DBsClonerTest : public executor::ThreadPoolExecutorTest {
 public:
-    DBsClonerTest() : _storageInterface{} {}
+    DBsClonerTest()
+        : _storageInterface{}, _dbWorkThreadPool{OldThreadPool::DoNotStartThreadsTag(), 1} {}
 
     StorageInterface& getStorage() {
         return _storageInterface;
+    }
+
+    OldThreadPool& getDbWorkThreadPool() {
+        return _dbWorkThreadPool;
     }
 
     void scheduleNetworkResponse(std::string cmdName, const BSONObj& obj) {
@@ -184,9 +189,16 @@ protected:
                 return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
                     std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
             };
+
+        _dbWorkThreadPool.startThreads();
     }
 
     void tearDown() override {
+        executor::ThreadPoolExecutorTest::shutdownExecutorThread();
+        executor::ThreadPoolExecutorTest::joinExecutorThread();
+
+        _dbWorkThreadPool.join();
+
         executor::ThreadPoolExecutorTest::tearDown();
     }
 
@@ -282,6 +294,7 @@ protected:
         stdx::condition_variable cvDone;
         DatabasesCloner cloner{&getStorage(),
                                &getExecutor(),
+                               &getDbWorkThreadPool(),
                                HostAndPort{"local:1234"},
                                [](const BSONObj&) { return true; },
                                [&](const Status& status) {
@@ -307,6 +320,7 @@ protected:
 
 private:
     StorageInterfaceMock _storageInterface;
+    OldThreadPool _dbWorkThreadPool;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
     StorageInterfaceResults _storageInterfaceWorkDone;
@@ -315,11 +329,65 @@ private:
 // TODO: Move tests here from data_replicator_test here and figure out
 //       how to script common data (dbs, collections, indexes) scenarios w/failures.
 
+TEST_F(DBsClonerTest, InvalidConstruction) {
+    HostAndPort source{"local:1234"};
+    auto includeDbPred = [](const BSONObj&) { return true; };
+    auto finishFn = [](const Status&) {};
+
+    // Null storage interface.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabasesCloner(
+            nullptr, &getExecutor(), &getDbWorkThreadPool(), source, includeDbPred, finishFn),
+        UserException,
+        ErrorCodes::InvalidOptions,
+        "storage interface must be provided.");
+
+    // Null task executor.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabasesCloner(
+            &getStorage(), nullptr, &getDbWorkThreadPool(), source, includeDbPred, finishFn),
+        UserException,
+        ErrorCodes::InvalidOptions,
+        "executor must be provided.");
+
+    // Null db worker thread pool.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabasesCloner(&getStorage(), &getExecutor(), nullptr, source, includeDbPred, finishFn),
+        UserException,
+        ErrorCodes::InvalidOptions,
+        "db worker thread pool must be provided.");
+
+    // Empty source.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabasesCloner(
+            &getStorage(), &getExecutor(), &getDbWorkThreadPool(), {}, includeDbPred, finishFn),
+        UserException,
+        ErrorCodes::InvalidOptions,
+        "source must be provided.");
+
+    // Null include database predicate.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabasesCloner(
+            &getStorage(), &getExecutor(), &getDbWorkThreadPool(), source, {}, finishFn),
+        UserException,
+        ErrorCodes::InvalidOptions,
+        "includeDbPred must be provided.");
+
+    // Null finish callback.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabasesCloner(
+            &getStorage(), &getExecutor(), &getDbWorkThreadPool(), source, includeDbPred, {}),
+        UserException,
+        ErrorCodes::InvalidOptions,
+        "finishFn must be provided.");
+}
+
 TEST_F(DBsClonerTest, FailsOnListDatabases) {
     Status result{Status::OK()};
     Status expectedResult{ErrorCodes::BadValue, "foo"};
     DatabasesCloner cloner{&getStorage(),
                            &getExecutor(),
+                           &getDbWorkThreadPool(),
                            HostAndPort{"local:1234"},
                            [](const BSONObj&) { return true; },
                            [&result](const Status& status) {
@@ -340,6 +408,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnOnlyDatabase) {
     Status result{Status::OK()};
     DatabasesCloner cloner{&getStorage(),
                            &getExecutor(),
+                           &getDbWorkThreadPool(),
                            HostAndPort{"local:1234"},
                            [](const BSONObj&) { return true; },
                            [&result](const Status& status) {
@@ -368,6 +437,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnFirstOfTwoDatabases) {
     Status expectedStatus{ErrorCodes::NoSuchKey, "fake"};
     DatabasesCloner cloner{&getStorage(),
                            &getExecutor(),
+                           &getDbWorkThreadPool(),
                            HostAndPort{"local:1234"},
                            [](const BSONObj&) { return true; },
                            [&result](const Status& status) {

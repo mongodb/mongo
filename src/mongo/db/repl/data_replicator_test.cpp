@@ -48,6 +48,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
@@ -204,6 +205,10 @@ public:
         return *_storageInterface;
     }
 
+    OldThreadPool& getDbWorkThreadPool() {
+        return *_dbWorkThreadPool;
+    }
+
 protected:
     struct StorageInterfaceResults {
         bool createOplogCalled = false;
@@ -260,6 +265,8 @@ protected:
                     std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
             };
 
+        _dbWorkThreadPool = stdx::make_unique<OldThreadPool>(1);
+
         Client::initThreadIfNotAlready();
         reset();
 
@@ -297,6 +304,7 @@ protected:
 
         auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
         dataReplicatorExternalState->taskExecutor = &getExecutor();
+        dataReplicatorExternalState->dbWorkThreadPool = &getDbWorkThreadPool();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
@@ -330,6 +338,8 @@ protected:
         executor::ThreadPoolExecutorTest::joinExecutorThread();
 
         _dr.reset();
+        _dbWorkThreadPool->join();
+        _dbWorkThreadPool.reset();
         _storageInterface.reset();
 
         // tearDown() destroys the task executor which was referenced by the data replicator.
@@ -360,6 +370,7 @@ protected:
     MemberState _memberState;
     std::unique_ptr<SyncSourceSelector> _syncSourceSelector;
     std::unique_ptr<StorageInterfaceMock> _storageInterface;
+    std::unique_ptr<OldThreadPool> _dbWorkThreadPool;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
 

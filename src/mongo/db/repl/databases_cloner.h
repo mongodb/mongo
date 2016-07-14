@@ -46,6 +46,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+class OldThreadPool;
+
 namespace repl {
 namespace {
 
@@ -64,6 +67,7 @@ public:
     using OnFinishFn = stdx::function<void(const Status&)>;
     DatabasesCloner(StorageInterface* si,
                     executor::TaskExecutor* exec,
+                    OldThreadPool* dbWorkThreadPool,
                     HostAndPort source,
                     IncludeDbFilterFn includeDbPred,
                     OnFinishFn finishFn);
@@ -112,8 +116,9 @@ private:
     mutable stdx::mutex _mutex;                         // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
-    HostAndPort _source;   // (R) The source to use, until we get an error
-    bool _active = false;  // (M) false until we start
+    OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
+    HostAndPort _source;               // (R) The source to use, until we get an error
+    bool _active = false;              // (M) false until we start
     std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;  // (M) database cloners by name
     int _clonersActive = 0;  // (M) Number of active cloners left.
     std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.

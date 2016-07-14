@@ -64,17 +64,21 @@ const size_t numListDatabasesRetries = 1;
 
 DatabasesCloner::DatabasesCloner(StorageInterface* si,
                                  executor::TaskExecutor* exec,
+                                 OldThreadPool* dbWorkThreadPool,
                                  HostAndPort source,
                                  IncludeDbFilterFn includeDbPred,
                                  OnFinishFn finishFn)
     : _status(ErrorCodes::NotYetInitialized, ""),
       _exec(exec),
+      _dbWorkThreadPool(dbWorkThreadPool),
       _source(source),
       _includeDbFn(includeDbPred),
       _finishFn(finishFn),
       _storage(si) {
     uassert(ErrorCodes::InvalidOptions, "storage interface must be provided.", si);
     uassert(ErrorCodes::InvalidOptions, "executor must be provided.", exec);
+    uassert(
+        ErrorCodes::InvalidOptions, "db worker thread pool must be provided.", dbWorkThreadPool);
     uassert(ErrorCodes::InvalidOptions, "source must be provided.", !source.empty());
     uassert(ErrorCodes::InvalidOptions, "finishFn must be provided.", finishFn);
     uassert(ErrorCodes::InvalidOptions, "includeDbPred must be provided.", includeDbPred);

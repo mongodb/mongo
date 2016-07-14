@@ -482,6 +482,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
         stdx::make_unique<DatabasesCloner>(
             _storage,
             _exec,
+            _dataReplicatorExternalState->getDbWorkThreadPool(),
             syncSource,
             [](BSONObj dbInfo) {
                 const std::string name = dbInfo["name"].str();
