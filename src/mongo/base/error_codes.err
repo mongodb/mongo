@@ -171,6 +171,7 @@ error_code("CommandOnShardedViewNotSupportedOnMongos", 169)
 error_code("TooManyMatchingDocuments", 170)
 error_code("CannotIndexParallelArrays", 171)
 error_code("TransportSessionNotFound", 172)
+error_code("QueryPlanKilled", 173)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

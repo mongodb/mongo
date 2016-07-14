@@ -428,6 +428,10 @@ private:
      * this calls into their underlying plan selection facilities. Otherwise, does nothing.
      *
      * If a YIELD_AUTO policy is set then locks are yielded during plan selection.
+     *
+     * Returns a non-OK status if query planning fails. In particular, this function returns
+     * ErrorCodes::QueryPlanKilled if plan execution cannot proceed due to a concurrent write or
+     * catalog operation.
      */
     Status pickBestPlan(YieldPolicy policy, const Collection* collection);
 
