@@ -55,6 +55,22 @@ StringMap toStringMap(BSONObj& obj) {
     return map;
 }
 
+StringMap toNestedStringMap(BSONObj& obj) {
+    StringMap map;
+
+    for (const auto& e : obj) {
+        if (e.isABSONObj()) {
+            std::string prefix = std::string(e.fieldName()) + ".";
+
+            for (const auto& child : e.Obj()) {
+                map[prefix + child.fieldName()] = child.numberLong();
+            }
+        }
+    }
+
+    return map;
+}
+
 #define ASSERT_KEY(_key) ASSERT_TRUE(stringMap.find(_key) != stringMap.end());
 #define ASSERT_NO_KEY(_key) ASSERT_TRUE(stringMap.find(_key) == stringMap.end());
 #define ASSERT_KEY_AND_VALUE(_key, _value) ASSERT_EQUALS(stringMap.at(_key), _value);
@@ -69,6 +85,11 @@ StringMap toStringMap(BSONObj& obj) {
     ASSERT_OK(procparser::parseProcMemInfo(_keys, _x, &builder)); \
     auto obj = builder.obj();                                     \
     auto stringMap = toStringMap(obj);
+#define ASSERT_PARSE_DISKSTATS(_disks, _x)                           \
+    BSONObjBuilder builder;                                          \
+    ASSERT_OK(procparser::parseProcDiskStats(_disks, _x, &builder)); \
+    auto obj = builder.obj();                                        \
+    auto stringMap = toNestedStringMap(obj);
 
 TEST(FTDCProcStat, TestStat) {
 
@@ -345,6 +366,144 @@ TEST(FTDCProcMemInfo, TestLocalNonExistentMemInfo) {
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcMemInfoFile("/proc/does_not_exist", keys, &builder));
+}
+
+
+TEST(FTDCProcDiskStats, TestDiskStats) {
+
+    std::vector<StringData> disks{"dm-1", "sda", "sdb"};
+
+    // Normal case including high device major numbers.
+    {
+        ASSERT_PARSE_DISKSTATS(
+            disks,
+            "   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 "
+            "2554160\n"
+            "   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329\n"
+            "   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 "
+            "2550739\n"
+            "   8      16 sdb 12707 3876 1525418 57507 997 3561 297576 97976 0 37870 155619\n"
+            "   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468\n"
+            "  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0\n"
+            "2253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275\n"
+            "2253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226");
+        ASSERT_KEY_AND_VALUE("sda.reads", 120611UL);
+        ASSERT_KEY_AND_VALUE("sda.writes", 349797UL);
+        ASSERT_KEY_AND_VALUE("sda.io_queued_ms", 2554160UL);
+        ASSERT_KEY_AND_VALUE("sdb.reads", 12707UL);
+        ASSERT_KEY_AND_VALUE("sdb.writes", 997UL);
+        ASSERT_KEY_AND_VALUE("sdb.io_queued_ms", 155619UL);
+        ASSERT_KEY_AND_VALUE("dm-1.reads", 109UL);
+        ASSERT_KEY_AND_VALUE("dm-1.writes", 0UL);
+        ASSERT_KEY_AND_VALUE("dm-1.io_queued_ms", 226UL);
+    }
+
+    // Exclude a block device without any activity
+    {
+        ASSERT_PARSE_DISKSTATS(
+            disks,
+            "   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 "
+            "2554160\n"
+            "   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329\n"
+            "   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 "
+            "2550739\n"
+            "   8      16 sdb 0 0 0 0 0 0 0 0 0 0 0\n"
+            "   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468\n"
+            "  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0\n"
+            "2253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275\n"
+            "2253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226");
+        ASSERT_KEY_AND_VALUE("sda.reads", 120611UL);
+        ASSERT_KEY_AND_VALUE("sda.writes", 349797UL);
+        ASSERT_KEY_AND_VALUE("sda.io_queued_ms", 2554160UL);
+        ASSERT_NO_KEY("sdb.reads");
+        ASSERT_NO_KEY("sdb.writes");
+        ASSERT_NO_KEY("sdb.io_queued_ms");
+        ASSERT_KEY_AND_VALUE("dm-1.reads", 109UL);
+        ASSERT_KEY_AND_VALUE("dm-1.writes", 0UL);
+        ASSERT_KEY_AND_VALUE("dm-1.io_queued_ms", 226UL);
+    }
+
+
+    // Strings with less numbers
+    { ASSERT_PARSE_DISKSTATS(disks, "8       0 sda 120611 33630 6297628 96550 349797 "); }
+
+    // Strings with no numbers
+    { ASSERT_PARSE_DISKSTATS(disks, "8       0 sda"); }
+
+    // Strings that are too short
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8       0", &builder));
+        ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8", &builder));
+        ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "", &builder));
+    }
+}
+
+TEST(FTDCProcDiskStats, TestLocalNonExistentStat) {
+    std::vector<StringData> disks{"dm-1", "sda", "sdb"};
+    BSONObjBuilder builder;
+
+    ASSERT_NOT_OK(procparser::parseProcDiskStatsFile("/proc/does_not_exist", disks, &builder));
+}
+
+TEST(FTDCProcDiskStats, TestFindBadPhysicalDiskPaths) {
+    // Validate nothing goes wrong when we check a non-existent path.
+    {
+        auto disks = procparser::findPhysicalDisks("/proc/does_not_exist");
+        ASSERT_EQUALS(0UL, disks.size());
+    }
+
+    // Validate nothing goes wrong when we check a path we do not have permission.
+    {
+        auto disks = procparser::findPhysicalDisks("/sys/kernel/debug");
+        ASSERT_EQUALS(0UL, disks.size());
+    }
+}
+
+// Test we can parse the /proc/diskstats on this machine. Also assert we have the expected fields
+// This tests is designed to exercise our parsing code on various Linuxes and fail
+// Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
+// otherwise.
+TEST(FTDCProcDiskStats, TestLocalDiskStats) {
+    auto disks = procparser::findPhysicalDisks("/sys/block");
+
+    std::vector<StringData> disks2;
+    for (const auto& disk : disks) {
+        log() << "DISK:" << disk;
+        disks2.emplace_back(disk);
+    }
+
+    ASSERT_NOT_EQUALS(0UL, disks.size());
+
+    BSONObjBuilder builder;
+
+    ASSERT_OK(procparser::parseProcDiskStatsFile("/proc/diskstats", disks2, &builder));
+
+    BSONObj obj = builder.obj();
+    auto stringMap = toNestedStringMap(obj);
+    log() << "OBJ:" << obj;
+
+    bool foundDisk = false;
+
+    for (const auto& disk : disks) {
+        std::string prefix(disk);
+        prefix += ".";
+
+        auto reads = prefix + "reads";
+        auto io_queued_ms = prefix + "io_queued_ms";
+
+        // Make sure that if have the first field, then we have the last field.
+        if (stringMap.find(reads) != stringMap.end()) {
+            foundDisk = true;
+            if (stringMap.find(io_queued_ms) == stringMap.end()) {
+                FAIL(std::string("Inconsistency for ") + disk);
+            }
+        }
+    }
+
+    if (!foundDisk) {
+        FAIL("Did not find any interesting disks on this machine.");
+    }
 }
 
 }  // namespace

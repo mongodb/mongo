@@ -36,6 +36,7 @@
 #include <array>
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/filesystem.hpp>
 #include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
@@ -73,6 +74,8 @@ double convertTicksToMilliSeconds(const int64_t ticks, const int64_t ticksPerSec
 
 const size_t kFileBufferSize = 16384;
 const size_t kFileReadRetryCount = 5;
+
+constexpr auto kSysBlockDeviceDirectoryName = "device";
 
 /**
  * Read a file from disk as a string with a null-terminating byte using the POSIX file api.
@@ -148,6 +151,22 @@ const char* const kAdditionCpuFields[] = {"user_ms",
                                           "guest_ms",
                                           "guest_nice_ms"};
 const size_t kAdditionCpuFieldCount = std::extent<decltype(kAdditionCpuFields)>::value;
+
+const char* const kDiskFields[] = {
+    "reads",
+    "reads_merged",
+    "read_sectors",
+    "read_time_ms",
+    "writes",
+    "writes_merged",
+    "write_sectors",
+    "write_time_ms",
+    "io_in_progress",
+    "io_time_ms",
+    "io_queued_ms",
+};
+
+const size_t kDiskFieldCount = std::extent<decltype(kDiskFields)>::value;
 
 }  // namespace
 
@@ -386,5 +405,216 @@ Status parseProcMemInfoFile(StringData filename,
 
     return parseProcMemInfo(keys, swString.getValue(), builder);
 }
+
+// Here is an example of the type of string it supports:
+//
+// For more information, see:
+// Documentation/iostats.txt in the Linux kernel
+// proc(5) man page
+//
+// > cat /proc/diskstats
+//   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 2554160
+//   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329
+//   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 2550739
+//   8      16 sdb 12707 3876 1525418 57507 997 3561 297576 97976 0 37870 155619
+//   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468
+//  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0
+// 253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275
+// 253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226
+//
+Status parseProcDiskStats(const std::vector<StringData>& disks,
+                          StringData data,
+                          BSONObjBuilder* builder) {
+    bool foundKeys = false;
+    std::vector<uint64_t> stats;
+    stats.reserve(kDiskFieldCount);
+
+    using string_split_iterator = boost::split_iterator<StringData::const_iterator>;
+
+    // Split the file by lines.
+    // token_compress_on means the iterator skips over consecutive '\n'. This should not be a
+    // problem in normal /proc/diskstats output.
+    for (string_split_iterator lineIt = string_split_iterator(
+             data.begin(),
+             data.end(),
+             boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on));
+         lineIt != string_split_iterator();
+         ++lineIt) {
+
+        StringData line((*lineIt).begin(), (*lineIt).end());
+
+        // Skip leading whitespace so that the split_iterator starts on non-whitespace otherwise we
+        // get an empty first token. Device major numbers (the first number on each line) are right
+        // aligned to 4 spaces and start from
+        // single digits.
+        auto beginNonWhitespace =
+            std::find_if_not(line.begin(), line.end(), [](char c) { return c == ' '; });
+
+        // Split the line by spaces since that is the only delimiter for diskstats files.
+        // token_compress_on means the iterator skips over consecutive ' '.
+        string_split_iterator partIt = string_split_iterator(
+            beginNonWhitespace,
+            line.end(),
+            boost::token_finder([](char c) { return c == ' '; }, boost::token_compress_on));
+
+        // Skip processing this line if the line is blank
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        ++partIt;
+
+        // Skip processing this line if we only have a device major number.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        ++partIt;
+
+        // Skip processing this line if we only have a device major minor.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        StringData disk((*partIt).begin(), (*partIt).end());
+
+        // Skip processing this line if we only have a block device name.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        ++partIt;
+
+        // Check if the disk is in the list. /proc/diskstats will have extra disks, and may not have
+        // the disk we want.
+        if (disks.empty() || std::find(disks.begin(), disks.end(), disk) != disks.end()) {
+            foundKeys = true;
+
+            stats.clear();
+
+            // Only generate a disk document if the disk has some activity. For instance, there
+            // could be a CD-ROM drive that is not used.
+            bool hasSomeNonZeroStats = false;
+
+            for (size_t index = 0; partIt != string_split_iterator() && index < kDiskFieldCount;
+                 ++partIt, ++index) {
+
+                StringData stringValue((*partIt).begin(), (*partIt).end());
+
+                uint64_t value;
+
+                if (!parseNumberFromString(stringValue, &value).isOK()) {
+                    value = 0;
+                }
+
+                if (value != 0) {
+                    hasSomeNonZeroStats = true;
+                }
+
+                stats.push_back(value);
+            }
+
+            if (hasSomeNonZeroStats) {
+                // Start a new document with disk as the name.
+                BSONObjBuilder sub(builder->subobjStart(disk));
+
+                for (size_t index = 0; index < stats.size() && index < kDiskFieldCount; ++index) {
+                    sub.appendNumber(kDiskFields[index], stats[index]);
+                }
+
+                sub.doneFast();
+            }
+        }
+    }
+
+    return foundKeys ? Status::OK()
+                     : Status(ErrorCodes::NoSuchKey, "Failed to find any keys in diskstats string");
+}
+
+Status parseProcDiskStatsFile(StringData filename,
+                              const std::vector<StringData>& disks,
+                              BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    return parseProcDiskStats(disks, swString.getValue(), builder);
+}
+
+namespace {
+
+/**
+ * Is this a disk that is interesting to us? We only want physical disks, not multiple disk devices,
+ * LVM2 devices, partitions, or RAM disks.
+ *
+ * A physical disk has a symlink to a directory at /sys/block/<device name>/device.
+ *
+ * Note: returns false upon any errors such as access denied.
+ */
+bool isInterestingDisk(const boost::filesystem::path& path) {
+    boost::filesystem::path blockDevicePath(path);
+    blockDevicePath /= kSysBlockDeviceDirectoryName;
+
+    boost::system::error_code ec;
+    auto statusSysBlock = boost::filesystem::status(blockDevicePath, ec);
+    if (!boost::filesystem::exists(statusSysBlock)) {
+        return false;
+    }
+
+    if (ec) {
+        warning() << "Error checking directory '" << blockDevicePath.generic_string()
+                  << "': " << ec.message();
+        return false;
+    }
+
+    if (!boost::filesystem::is_directory(statusSysBlock)) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace
+
+std::vector<std::string> findPhysicalDisks(StringData sysBlockPath) {
+    boost::system::error_code ec;
+    auto sysBlockPathStr = sysBlockPath.toString();
+
+    auto statusSysBlock = boost::filesystem::status(sysBlockPathStr, ec);
+    if (ec) {
+        warning() << "Error checking directory '" << sysBlockPathStr << "': " << ec.message();
+        return {};
+    }
+
+    if (!(boost::filesystem::exists(statusSysBlock) &&
+          boost::filesystem::is_directory(statusSysBlock))) {
+        warning() << "Could not find directory '" << sysBlockPathStr << "': " << ec.message();
+        return {};
+    }
+
+    std::vector<std::string> files;
+
+    // Iterate through directories in /sys/block. The directories in this directory can be physical
+    // block devices (like SSD or HDD) or virtual devices like the LVM2 device mapper or a multiple
+    // disk device. It does not contain disk partitions.
+    boost::filesystem::directory_iterator di(sysBlockPathStr, ec);
+    if (ec) {
+        warning() << "Error getting directory iterator '" << sysBlockPathStr
+                  << "': " << ec.message();
+        return {};
+    }
+
+    for (; di != boost::filesystem::directory_iterator(); di++) {
+        auto path = (*di).path();
+
+        if (isInterestingDisk(path)) {
+            files.push_back(path.filename().generic_string());
+        }
+    }
+
+    return files;
+}
+
 }  // namespace procparser
 }  // namespace mongo

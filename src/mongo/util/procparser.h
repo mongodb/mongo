@@ -87,5 +87,34 @@ Status parseProcMemInfoFile(StringData filename,
                             const std::vector<StringData>& keys,
                             BSONObjBuilder* builder);
 
+/**
+ * Read a string matching /proc/diskstats format, and write the specified list of disks in builder.
+ *
+ * disks - vector of block devices to include in output. For each disk selected, 11 fields are
+ *         output in a nested document. There is no error if the disk is not found in the data. Also
+ *         a disk is excluded if it has no activity since startup (i.e. an idle CD-ROM drive). If
+ *         disks is empty, all non-zero block devices are outputed (this will include partitions,
+ *         etc).
+ * data - string to parsee
+ * builder - BSON output
+ */
+Status parseProcDiskStats(const std::vector<StringData>& disks,
+                          StringData data,
+                          BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the specified list of disks in builder.
+ */
+Status parseProcDiskStatsFile(StringData filename,
+                              const std::vector<StringData>& disks,
+                              BSONObjBuilder* builder);
+
+/**
+ * Get a vector of disks to monitor by enumerating the specified directory.
+ *
+ * If the directory does not exist, or otherwise permission is denied, returns an empty vector.
+ */
+std::vector<std::string> findPhysicalDisks(StringData directory);
+
 }  // namespace procparser
 }  // namespace mongo
