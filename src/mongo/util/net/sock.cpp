@@ -64,7 +64,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::pair;
 using std::string;
 using std::stringstream;
@@ -88,20 +87,20 @@ void setSockTimeouts(int sock, double secs) {
     int status =
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
     if (report && (status == SOCKET_ERROR))
-        log() << "unable to set SO_RCVTIMEO: " << errnoWithDescription(WSAGetLastError()) << endl;
+        log() << "unable to set SO_RCVTIMEO: " << errnoWithDescription(WSAGetLastError());
     status =
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
-    DEV if (report && (status == SOCKET_ERROR)) log()
-        << "unable to set SO_SNDTIMEO: " << errnoWithDescription(WSAGetLastError()) << endl;
+    DEV if (report && (status == SOCKET_ERROR)) log() << "unable to set SO_SNDTIMEO: "
+                                                      << errnoWithDescription(WSAGetLastError());
 #else
     struct timeval tv;
     tv.tv_sec = (int)secs;
     tv.tv_usec = (int)((long long)(secs * 1000 * 1000) % (1000 * 1000));
     bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv)) == 0;
     if (report && !ok)
-        log() << "unable to set SO_RCVTIMEO" << endl;
+        log() << "unable to set SO_RCVTIMEO";
     ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, sizeof(tv)) == 0;
-    DEV if (report && !ok) log() << "unable to set SO_SNDTIMEO" << endl;
+    DEV if (report && !ok) log() << "unable to set SO_SNDTIMEO";
 #endif
 }
 
@@ -109,9 +108,9 @@ void setSockTimeouts(int sock, double secs) {
 void disableNagle(int sock) {
     int x = 1;
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&x, sizeof(x)))
-        error() << "disableNagle failed: " << errnoWithDescription() << endl;
+        error() << "disableNagle failed: " << errnoWithDescription();
     if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&x, sizeof(x)))
-        error() << "SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
+        error() << "SO_KEEPALIVE failed: " << errnoWithDescription();
 }
 #else
 
@@ -125,32 +124,32 @@ void disableNagle(int sock) {
 #endif
 
     if (setsockopt(sock, level, TCP_NODELAY, (char*)&x, sizeof(x)))
-        error() << "disableNagle failed: " << errnoWithDescription() << endl;
+        error() << "disableNagle failed: " << errnoWithDescription();
 
 #ifdef SO_KEEPALIVE
     if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&x, sizeof(x)))
-        error() << "SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
+        error() << "SO_KEEPALIVE failed: " << errnoWithDescription();
 
 #ifdef __linux__
     socklen_t len = sizeof(x);
     if (getsockopt(sock, level, TCP_KEEPIDLE, (char*)&x, &len))
-        error() << "can't get TCP_KEEPIDLE: " << errnoWithDescription() << endl;
+        error() << "can't get TCP_KEEPIDLE: " << errnoWithDescription();
 
     if (x > 300) {
         x = 300;
         if (setsockopt(sock, level, TCP_KEEPIDLE, (char*)&x, sizeof(x))) {
-            error() << "can't set TCP_KEEPIDLE: " << errnoWithDescription() << endl;
+            error() << "can't set TCP_KEEPIDLE: " << errnoWithDescription();
         }
     }
 
     len = sizeof(x);  // just in case it changed
     if (getsockopt(sock, level, TCP_KEEPINTVL, (char*)&x, &len))
-        error() << "can't get TCP_KEEPINTVL: " << errnoWithDescription() << endl;
+        error() << "can't get TCP_KEEPINTVL: " << errnoWithDescription();
 
     if (x > 300) {
         x = 300;
         if (setsockopt(sock, level, TCP_KEEPINTVL, (char*)&x, sizeof(x))) {
-            error() << "can't set TCP_KEEPINTVL: " << errnoWithDescription() << endl;
+            error() << "can't set TCP_KEEPINTVL: " << errnoWithDescription();
         }
     }
 #endif
@@ -193,7 +192,7 @@ string getHostName() {
     char buf[256];
     int ec = gethostname(buf, 127);
     if (ec || *buf == 0) {
-        log() << "can't get this server's hostname " << errnoWithDescription() << endl;
+        log() << "can't get this server's hostname " << errnoWithDescription();
         return "";
     }
     return buf;
@@ -367,7 +366,7 @@ bool Socket::connect(SockAddr& remote) {
 
     _fd = socket(remote.getType(), SOCK_STREAM, 0);
     if (_fd == INVALID_SOCKET) {
-        LOG(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
+        LOG(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription();
         return false;
     }
 
@@ -381,7 +380,7 @@ bool Socket::connect(SockAddr& remote) {
     if (bg.wait(connectTimeoutMillis)) {
         if (bg.inError()) {
             warning() << "Failed to connect to " << _remote.getAddr() << ":" << _remote.getPort()
-                      << ", reason: " << bg.getErrnoWithDescription() << endl;
+                      << ", reason: " << bg.getErrnoWithDescription();
             close();
             return false;
         }
@@ -390,7 +389,7 @@ bool Socket::connect(SockAddr& remote) {
         close();
         bg.wait();  // so bg stays in scope until bg thread terminates
         warning() << "Failed to connect to " << _remote.getAddr() << ":" << _remote.getPort()
-                  << " after " << connectTimeoutMillis << " milliseconds, giving up." << endl;
+                  << " after " << connectTimeoutMillis << " milliseconds, giving up.";
         return false;
     }
 
@@ -502,11 +501,11 @@ void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
         if (ret == -1) {
             if (errno != EAGAIN || _timeout == 0) {
                 LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription()
-                               << ' ' << remoteString() << endl;
+                               << ' ' << remoteString();
                 throw SocketException(SocketException::SEND_ERROR, remoteString());
             } else {
                 LOG(_logLevel) << "Socket " << context << " send() remote timeout "
-                               << remoteString() << endl;
+                               << remoteString();
                 throw SocketException(SocketException::SEND_TIMEOUT, remoteString());
             }
         } else {
@@ -579,18 +578,18 @@ void Socket::handleSendError(int ret, const char* context) {
     const int mongo_errno = errno;
     if ((mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK) && _timeout != 0) {
 #endif
-        LOG(_logLevel) << "Socket " << context << " send() timed out " << remoteString() << endl;
+        LOG(_logLevel) << "Socket " << context << " send() timed out " << remoteString();
         throw SocketException(SocketException::SEND_TIMEOUT, remoteString());
     } else {
         LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription(mongo_errno)
-                       << ' ' << remoteString() << endl;
+                       << ' ' << remoteString();
         throw SocketException(SocketException::SEND_ERROR, remoteString());
     }
 }
 
 void Socket::handleRecvError(int ret, int len) {
     if (ret == 0) {
-        LOG(3) << "Socket recv() conn closed? " << remoteString() << endl;
+        LOG(3) << "Socket recv() conn closed? " << remoteString();
         throw SocketException(SocketException::CLOSED, remoteString());
     }
 
@@ -614,11 +613,11 @@ void Socket::handleRecvError(int ret, int len) {
     if (e == EAGAIN && _timeout > 0) {
 #endif
         // this is a timeout
-        LOG(_logLevel) << "Socket recv() timeout  " << remoteString() << endl;
+        LOG(_logLevel) << "Socket recv() timeout  " << remoteString();
         throw SocketException(SocketException::RECV_TIMEOUT, remoteString());
     }
 
-    LOG(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() << endl;
+    LOG(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString();
     throw SocketException(SocketException::RECV_ERROR, remoteString());
 }
 
@@ -672,8 +671,7 @@ bool Socket::isStillConnected() {
     int nEvents = socketPoll(&pollInfo, 1, 0);
 
     LOG(2) << "polling for status of connection to " << remoteString() << ", "
-           << (nEvents == 0 ? "no events" : nEvents == -1 ? "error detected" : "event detected")
-           << endl;
+           << (nEvents == 0 ? "no events" : nEvents == -1 ? "error detected" : "event detected");
 
     if (nEvents == 0) {
         // No events incoming, return still connected AFAWK
@@ -682,8 +680,7 @@ bool Socket::isStillConnected() {
         // Poll itself failed, this is weird, warn and log errno
         warning() << "Socket poll() failed during connectivity check"
                   << " (idle " << idleTimeSecs << " secs,"
-                  << " remote host " << remoteString() << ")" << causedBy(errnoWithDescription())
-                  << endl;
+                  << " remote host " << remoteString() << ")" << causedBy(errnoWithDescription());
 
         // Return true since it's not clear that we're disconnected.
         return true;
@@ -709,7 +706,7 @@ bool Socket::isStillConnected() {
             warning() << "Socket recv() failed during connectivity check"
                       << " (idle " << idleTimeSecs << " secs,"
                       << " remote host " << remoteString() << ")"
-                      << causedBy(errnoWithDescription()) << endl;
+                      << causedBy(errnoWithDescription());
         } else if (recvd > 0) {
             // We got nonzero data from this socket, very weird?
             // Log and warn at runtime, log and abort at devtime
@@ -717,41 +714,41 @@ bool Socket::isStillConnected() {
             error() << "Socket found pending " << recvd
                     << " bytes of data during connectivity check"
                     << " (idle " << idleTimeSecs << " secs,"
-                    << " remote host " << remoteString() << ")" << endl;
+                    << " remote host " << remoteString() << ")";
             DEV {
                 std::string hex = hexdump(testBuf, recvd);
-                error() << "Hex dump of stale log data: " << hex << endl;
+                error() << "Hex dump of stale log data: " << hex;
             }
             dassert(false);
         } else {
             // recvd == 0, socket closed remotely, just return false
             LOG(0) << "Socket closed remotely, no longer connected"
                    << " (idle " << idleTimeSecs << " secs,"
-                   << " remote host " << remoteString() << ")" << endl;
+                   << " remote host " << remoteString() << ")";
         }
     } else if (pollInfo.revents & POLLHUP) {
         // A hangup has occurred on this socket
         LOG(0) << "Socket hangup detected, no longer connected"
                << " (idle " << idleTimeSecs << " secs,"
-               << " remote host " << remoteString() << ")" << endl;
+               << " remote host " << remoteString() << ")";
     } else if (pollInfo.revents & POLLERR) {
         // An error has occurred on this socket
         LOG(0) << "Socket error detected, no longer connected"
                << " (idle " << idleTimeSecs << " secs,"
-               << " remote host " << remoteString() << ")" << endl;
+               << " remote host " << remoteString() << ")";
     } else if (pollInfo.revents & POLLNVAL) {
         // Socket descriptor itself is weird
         // Log and warn at runtime, log and abort at devtime
         error() << "Socket descriptor detected as invalid"
                 << " (idle " << idleTimeSecs << " secs,"
-                << " remote host " << remoteString() << ")" << endl;
+                << " remote host " << remoteString() << ")";
         dassert(false);
     } else {
         // Don't know what poll is saying here
         // Log and warn at runtime, log and abort at devtime
         error() << "Socket had unknown event (" << static_cast<int>(pollInfo.revents) << ")"
                 << " (idle " << idleTimeSecs << " secs,"
-                << " remote host " << remoteString() << ")" << endl;
+                << " remote host " << remoteString() << ")";
         dassert(false);
     }
 
@@ -763,7 +760,7 @@ struct WinsockInit {
     WinsockInit() {
         WSADATA d;
         if (WSAStartup(MAKEWORD(2, 2), &d) != 0) {
-            log() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+            log() << "ERROR: wsastartup failed " << errnoWithDescription();
             quickExit(EXIT_NTSERVICE_ERROR);
         }
     }

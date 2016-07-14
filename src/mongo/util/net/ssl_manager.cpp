@@ -68,8 +68,6 @@
 #endif
 #endif
 
-using std::endl;
-
 namespace mongo {
 
 SSLParams sslGlobalParams;
@@ -317,10 +315,10 @@ void setupFIPS() {
     int status = FIPS_mode_set(1);
     if (!status) {
         severe() << "can't activate FIPS mode: "
-                 << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()) << endl;
+                 << SSLManagerInterface::getSSLErrorMessage(ERR_get_error());
         fassertFailedNoTrace(16703);
     }
-    log() << "FIPS 140-2 mode activated" << endl;
+    log() << "FIPS 140-2 mode activated";
 #else
     severe() << "this version of mongodb was not compiled with FIPS support";
     fassertFailedNoTrace(17089);
@@ -388,7 +386,7 @@ std::string getCertificateSubjectName(X509* cert) {
             BIO_read(out, &result[0], result.size());
         }
     } else {
-        log() << "failed to convert subject name to RFC2253 format" << endl;
+        log() << "failed to convert subject name to RFC2253 format";
     }
 
     return result;
@@ -759,7 +757,7 @@ bool SSLManager::_setupPEM(SSL_CTX* context,
 
     if (SSL_CTX_use_certificate_chain_file(context, keyFile.c_str()) != 1) {
         error() << "cannot read certificate file: " << keyFile << ' '
-                << getSSLErrorMessage(ERR_get_error()) << endl;
+                << getSSLErrorMessage(ERR_get_error());
         return false;
     }
 
@@ -772,13 +770,13 @@ bool SSLManager::_setupPEM(SSL_CTX* context,
 
     if (SSL_CTX_use_PrivateKey_file(context, keyFile.c_str(), SSL_FILETYPE_PEM) != 1) {
         error() << "cannot read PEM key file: " << keyFile << ' '
-                << getSSLErrorMessage(ERR_get_error()) << endl;
+                << getSSLErrorMessage(ERR_get_error());
         return false;
     }
 
     // Verify that the certificate and the key go together.
     if (SSL_CTX_check_private_key(context) != 1) {
-        error() << "SSL certificate validation: " << getSSLErrorMessage(ERR_get_error()) << endl;
+        error() << "SSL certificate validation: " << getSSLErrorMessage(ERR_get_error());
         return false;
     }
 
@@ -972,12 +970,12 @@ bool SSLManager::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
 
     int status = X509_load_crl_file(lookup, crlFile.c_str(), X509_FILETYPE_PEM);
     if (status == 0) {
-        error() << "cannot read CRL file: " << crlFile << ' ' << getSSLErrorMessage(ERR_get_error())
-                << endl;
+        error() << "cannot read CRL file: " << crlFile << ' '
+                << getSSLErrorMessage(ERR_get_error());
         return false;
     }
     log() << "ssl imported " << status << " revoked certificate" << ((status == 1) ? "" : "s")
-          << " from the revocation list." << endl;
+          << " from the revocation list.";
     return true;
 }
 
@@ -1100,7 +1098,7 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
 
     if (NULL == peerCert) {  // no certificate presented by peer
         if (_weakValidation) {
-            warning() << "no SSL certificate provided by peer" << endl;
+            warning() << "no SSL certificate provided by peer";
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
             error() << msg;

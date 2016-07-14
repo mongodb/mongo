@@ -208,8 +208,7 @@ void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
     }
 
     log() << "MozJS GC " << (status == JSGC_BEGIN ? "prologue" : "epilogue") << " heap stats - "
-          << " total: " << mongo::sm::get_total_bytes() << " limit: " << mongo::sm::get_max_bytes()
-          << std::endl;
+          << " total: " << mongo::sm::get_total_bytes() << " limit: " << mongo::sm::get_max_bytes();
 }
 
 MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
@@ -823,7 +822,7 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     _error = _status.reason();
 
     if (reportError)
-        error() << _error << std::endl;
+        error() << redact(_error);
 
     // Clear the status state
     auto status = std::move(_status);

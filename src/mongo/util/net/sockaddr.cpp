@@ -117,8 +117,7 @@ SockAddr::SockAddr(const char* _iporhost, int port) {
         // we were unsuccessful
         if (target != "0.0.0.0") {  // don't log if this as it is a
                                     // CRT construction and log() may not work yet.
-            log() << "getaddrinfo(\"" << target << "\") failed: " << getAddrInfoStrError(ret)
-                  << std::endl;
+            log() << "getaddrinfo(\"" << target << "\") failed: " << getAddrInfoStrError(ret);
             _isValid = false;
             return;
         }

@@ -89,7 +89,7 @@ namespace {
 #ifdef _WIN32
 void consoleTerminate(const char* controlCodeName) {
     setThreadName("consoleTerminate");
-    log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
+    log() << "got " << controlCodeName << ", will terminate after current cmd ends";
     exitCleanly(EXIT_KILL);
 }
 

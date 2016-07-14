@@ -48,7 +48,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::set;
 using std::shared_ptr;
 using std::string;
@@ -126,7 +125,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     boost::filesystem::path p(filename);
 #endif
     if (!exists(p)) {
-        error() << "file [" << filename << "] doesn't exist" << endl;
+        error() << "file [" << filename << "] doesn't exist";
         return false;
     }
 
@@ -145,7 +144,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
         }
 
         if (empty) {
-            error() << "directory [" << filename << "] doesn't have any *.js files" << endl;
+            error() << "directory [" << filename << "] doesn't have any *.js files";
             return false;
         }
 
@@ -160,7 +159,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
 
     fileofs fo = f.len();
     if (fo > kMaxJsFileLength) {
-        warning() << "attempted to execute javascript file larger than 2GB" << endl;
+        warning() << "attempted to execute javascript file larger than 2GB";
         return false;
     }
     unsigned len = static_cast<unsigned>(fo);
@@ -237,7 +236,7 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
             }
 
             error() << "unable to load stored JavaScript function " << n.valuestr()
-                    << "(): " << setElemEx.what() << endl;
+                    << "(): " << redact(setElemEx);
         }
     }
 
@@ -319,7 +318,7 @@ public:
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
-            log() << "Clearing all idle JS contexts due to out of memory" << endl;
+            log() << "Clearing all idle JS contexts due to out of memory";
             _pools.clear();
             return;
         }

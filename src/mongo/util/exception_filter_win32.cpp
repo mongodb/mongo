@@ -83,7 +83,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
     if (INVALID_HANDLE_VALUE == hFile) {
         DWORD lasterr = GetLastError();
         log() << "failed to open minidump file " << toUtf8String(dumpName.c_str()) << " : "
-              << errnoWithDescription(lasterr) << std::endl;
+              << errnoWithDescription(lasterr);
         return;
     }
 
@@ -99,7 +99,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
         static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithIndirectlyReferencedMemory |
                                    MiniDumpWithProcessThreadData);
 #endif
-    log() << "writing minidump diagnostic file " << toUtf8String(dumpName.c_str()) << std::endl;
+    log() << "writing minidump diagnostic file " << toUtf8String(dumpName.c_str());
 
     BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
                                      GetCurrentProcessId(),
@@ -110,7 +110,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
                                      NULL);
     if (FALSE == bstatus) {
         DWORD lasterr = GetLastError();
-        log() << "failed to create minidump : " << errnoWithDescription(lasterr) << std::endl;
+        log() << "failed to create minidump : " << errnoWithDescription(lasterr);
     }
 
     CloseHandle(hFile);
@@ -130,7 +130,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
               "0x%p",
               excPointers->ExceptionRecord->ExceptionAddress);
     log() << "*** unhandled exception " << exceptionString << " at " << addressString
-          << ", terminating" << std::endl;
+          << ", terminating";
     if (excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
         const char* acTypeString;
@@ -152,10 +152,10 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
                   sizeof(addressString),
                   " 0x%p",
                   excPointers->ExceptionRecord->ExceptionInformation[1]);
-        log() << "*** access violation was a " << acTypeString << addressString << std::endl;
+        log() << "*** access violation was a " << acTypeString << addressString;
     }
 
-    log() << "*** stack trace for unhandled exception:" << std::endl;
+    log() << "*** stack trace for unhandled exception:";
 
     // Create a copy of context record because printWindowsStackTrace will mutate it.
     CONTEXT contextCopy(*(excPointers->ContextRecord));
@@ -166,7 +166,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
 
     // Don't go through normal shutdown procedure. It may make things worse.
     // Do not go through _exit or ExitProcess(), terminate immediately
-    log() << "*** immediate exit due to unhandled exception" << std::endl;
+    log() << "*** immediate exit due to unhandled exception";
     TerminateProcess(GetCurrentProcess(), EXIT_ABRUPT);
 
     // We won't reach here

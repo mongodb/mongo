@@ -106,7 +106,7 @@ TEST(NetworkInterfaceASIO, SerialPerf) {
 
     int duration = timeNetworkTestMillis(numOperations, &netAsio);
     int result = numOperations * 1000 / duration;
-    log() << "THROUGHPUT asio ping ops/s: " << result << std::endl;
+    log() << "THROUGHPUT asio ping ops/s: " << result;
 }
 
 }  // namespace

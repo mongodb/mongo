@@ -334,7 +334,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     if (!cbHandle.isOK())
         return cbHandle;
     const auto cbState = _networkInProgressQueue.back();
-    LOG(3) << "Scheduling remote command request: " << scheduledRequest.toString();
+    LOG(3) << "Scheduling remote command request: " << redact(scheduledRequest.toString());
     lk.unlock();
     _net->startCommand(
         cbHandle.getValue(),
@@ -349,8 +349,8 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
                 return;
             }
             LOG(3) << "Received remote response: "
-                   << (response.isOK() ? response.getValue().toString()
-                                       : response.getStatus().toString());
+                   << redact(response.isOK() ? response.getValue().toString()
+                                             : response.getStatus().toString());
             swap(cbState->callback, newCb);
             scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
         });

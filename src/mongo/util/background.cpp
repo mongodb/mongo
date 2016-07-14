@@ -145,12 +145,12 @@ void BackgroundJob::jobBody() {
         setThreadName(threadName.c_str());
     }
 
-    LOG(1) << "BackgroundJob starting: " << threadName << endl;
+    LOG(1) << "BackgroundJob starting: " << threadName;
 
     try {
         run();
     } catch (const std::exception& e) {
-        error() << "backgroundjob " << threadName << " exception: " << e.what();
+        error() << "backgroundjob " << threadName << " exception: " << redact(e.what());
         throw;
     }
 
@@ -333,14 +333,14 @@ void PeriodicTaskRunner::_runTask(PeriodicTask* const task) {
     try {
         task->taskDoWork();
     } catch (const std::exception& e) {
-        error() << "task: " << taskName << " failed: " << e.what() << endl;
+        error() << "task: " << taskName << " failed: " << redact(e.what());
     } catch (...) {
-        error() << "task: " << taskName << " failed with unknown error" << endl;
+        error() << "task: " << taskName << " failed with unknown error";
     }
 
     const int ms = timer.millis();
     const int kMinLogMs = 100;
-    LOG(ms <= kMinLogMs ? 3 : 0) << "task: " << taskName << " took: " << ms << "ms" << endl;
+    LOG(ms <= kMinLogMs ? 3 : 0) << "task: " << taskName << " took: " << ms << "ms";
 }
 
 }  // namespace mongo

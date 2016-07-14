@@ -124,7 +124,7 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
 }
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
-    LOG(2) << "Canceling operation; original request was: " << request().toString();
+    LOG(2) << "Canceling operation; original request was: " << redact(request().toString());
     stdx::lock_guard<stdx::mutex> lk(_access->mutex);
     auto access = _access;
     auto generation = access->id;
@@ -148,7 +148,7 @@ bool NetworkInterfaceASIO::AsyncOp::canceled() const {
 }
 
 void NetworkInterfaceASIO::AsyncOp::timeOut_inlock() {
-    LOG(2) << "Operation timing out; original request was: " << request().toString();
+    LOG(2) << "Operation timing out; original request was: " << redact(request().toString());
     auto access = _access;
     auto generation = access->id;
 
@@ -244,8 +244,8 @@ void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {
     _transitionToState(AsyncOp::State::kFinished);
 
     LOG(2) << "Request " << _request.id << " finished with response: "
-           << (status.getStatus().isOK() ? status.getValue().data.toString()
-                                         : status.getStatus().toString());
+           << redact(status.getStatus().isOK() ? status.getValue().data.toString()
+                                               : status.getStatus().toString());
 
     // Calling the completion handler may invalidate state in this op, so do it last.
     _onFinish(status);

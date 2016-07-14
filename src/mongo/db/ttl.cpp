@@ -267,7 +267,8 @@ private:
 
         Status result = exec->executePlan();
         if (!result.isOK()) {
-            error() << "ttl query execution for index " << idx << " failed with status: " << result;
+            error() << "ttl query execution for index " << idx
+                    << " failed with status: " << redact(result);
             return;
         }
 

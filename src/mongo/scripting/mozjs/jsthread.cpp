@@ -198,7 +198,7 @@ private:
             } catch (...) {
                 auto status = exceptionToStatus();
 
-                log() << "js thread raised js exception: " << status.reason()
+                log() << "js thread raised js exception: " << redact(status)
                       << thisv->_sharedData->_stack;
                 thisv->_sharedData->setErrored(true);
                 thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);

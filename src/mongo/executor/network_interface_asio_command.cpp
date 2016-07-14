@@ -219,7 +219,7 @@ ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protoc
 }
 
 void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
-    LOG(3) << "running command " << op->request().cmdObj << " against database "
+    LOG(3) << "running command " << redact(op->request().cmdObj) << " against database "
            << op->request().dbname << " across network to " << op->request().target.toString();
     if (inShutdown()) {
         return;
@@ -244,7 +244,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
         return;
     }
 
-    LOG(3) << "Initiating asynchronous command: " << op->request().toString();
+    LOG(3) << "Initiating asynchronous command: " << redact(op->request().toString());
 
     auto beginStatus = op->beginCommand(op->request(), _metadataHook.get());
     if (!beginStatus.isOK()) {
@@ -300,7 +300,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         MONGO_ASIO_INVARIANT(!resp.isOK(), "In refresh, but did not fail to heartbeat", op);
         // If we fail during heartbeating, we won't be able to access any of op's members after
         // calling finish(), so we return here.
-        LOG(1) << "Failed to heartbeat to " << op->request().target << " - " << resp.getStatus();
+        LOG(1) << "Failed to heartbeat to " << op->request().target << " - "
+               << redact(resp.getStatus());
         _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;
@@ -310,8 +311,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         // In the case that resp is not OK, but _inSetup is false, we are using a connection
         // that
         // we got from the pool to execute a command, but it failed for some reason.
-        LOG(2) << "Failed to execute command: " << op->request().toString()
-               << " reason: " << resp.getStatus();
+        LOG(2) << "Failed to execute command: " << redact(op->request().toString())
+               << " reason: " << redact(resp.getStatus());
 
         if (resp.getStatus().code() != ErrorCodes::CallbackCanceled) {
             _numFailedOps.fetchAndAdd(1);

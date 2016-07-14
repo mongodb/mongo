@@ -77,7 +77,6 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::cout;
-using std::endl;
 using std::map;
 
 const std::map<OpType, std::string> opTypeName{{OpType::NONE, "none"},
@@ -732,7 +731,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                             if (err) {
                                 log() << "Error checking in benchRun thread [findOne]"
-                                      << causedBy(scope->getError()) << endl;
+                                      << causedBy(scope->getError());
 
                                 stats.errCount++;
 
@@ -741,7 +740,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         }
 
                         if (!_config->hideResults || op.showResult)
-                            log() << "Result from benchRun thread [findOne] : " << result << endl;
+                            log() << "Result from benchRun thread [findOne] : " << result;
                     } break;
                     case OpType::COMMAND: {
                         bool ok;
@@ -789,11 +788,11 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                             if (err) {
                                 log() << "Error checking in benchRun thread [command]"
-                                      << causedBy(scope->getError()) << endl;
+                                      << causedBy(scope->getError());
                                 int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                                 if (err) {
                                     log() << "Error checking in benchRun thread [command]"
-                                          << causedBy(scope->getError()) << endl;
+                                          << causedBy(scope->getError());
 
                                     stats.errCount++;
 
@@ -802,8 +801,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             }
 
                             if (!_config->hideResults || op.showResult)
-                                log() << "Result from benchRun thread [command] : " << result
-                                      << endl;
+                                log() << "Result from benchRun thread [command] : " << result;
                         }
                     } break;
                     case OpType::FIND: {
@@ -854,8 +852,8 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         }
 
                         if (op.expected >= 0 && count != op.expected) {
-                            cout << "bench query on: " << op.ns << " expected: " << op.expected
-                                 << " got: " << count << endl;
+                            log() << "bench query on: " << op.ns << " expected: " << op.expected
+                                  << " got: " << count;
                             verify(false);
                         }
 
@@ -864,7 +862,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             int err = scope->invoke(scopeFunc, 0, &thisValue, 1000 * 60, false);
                             if (err) {
                                 log() << "Error checking in benchRun thread [find]"
-                                      << causedBy(scope->getError()) << endl;
+                                      << causedBy(scope->getError());
 
                                 stats.errCount++;
 
@@ -873,7 +871,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         }
 
                         if (!_config->hideResults || op.showResult)
-                            log() << "Result from benchRun thread [query] : " << count << endl;
+                            log() << "Result from benchRun thread [query] : " << count;
                     } break;
                     case OpType::UPDATE: {
                         BSONObj result;
@@ -907,7 +905,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                                 if (err) {
                                     log() << "Error checking in benchRun thread [update]"
-                                          << causedBy(scope->getError()) << endl;
+                                          << causedBy(scope->getError());
 
                                     stats.errCount++;
 
@@ -916,8 +914,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             }
 
                             if (!_config->hideResults || op.showResult)
-                                log() << "Result from benchRun thread [safe update] : " << result
-                                      << endl;
+                                log() << "Result from benchRun thread [safe update] : " << result;
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
@@ -974,7 +971,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                                 if (err) {
                                     log() << "Error checking in benchRun thread [insert]"
-                                          << causedBy(scope->getError()) << endl;
+                                          << causedBy(scope->getError());
 
                                     stats.errCount++;
 
@@ -983,8 +980,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             }
 
                             if (!_config->hideResults || op.showResult)
-                                log() << "Result from benchRun thread [safe insert] : " << result
-                                      << endl;
+                                log() << "Result from benchRun thread [safe insert] : " << result;
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
@@ -1022,7 +1018,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                                 if (err) {
                                     log() << "Error checking in benchRun thread [delete]"
-                                          << causedBy(scope->getError()) << endl;
+                                          << causedBy(scope->getError());
 
                                     stats.errCount++;
 
@@ -1031,8 +1027,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             }
 
                             if (!_config->hideResults || op.showResult)
-                                log() << "Result from benchRun thread [safe remove] : " << result
-                                      << endl;
+                                log() << "Result from benchRun thread [safe remove] : " << result;
 
                             if (!result["err"].eoo() && result["err"].type() == String &&
                                 (_config->throwGLE || op.throwGLE))
@@ -1071,7 +1066,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                          yesWatch) ||  // If we're just watching things
                         (_config->watchPattern && _config->noWatchPattern && yesWatch && !noWatch))
                         log() << "Error in benchRun thread for op "
-                              << opTypeName.find(op.op)->second << causedBy(ex) << endl;
+                              << opTypeName.find(op.op)->second << causedBy(ex);
                 }
 
                 bool yesTrap = (_config->trapPattern && _config->trapPattern->FullMatch(ex.what()));
@@ -1097,7 +1092,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
             } catch (...) {
                 if (!_config->hideErrors || op.showError)
                     log() << "Error in benchRun thread caused by unknown error for op "
-                          << opTypeName.find(op.op)->second << endl;
+                          << opTypeName.find(op.op)->second;
                 if (!_config->handleErrors && !op.handleError)
                     return;
 
@@ -1146,11 +1141,11 @@ void BenchRunWorker::run() {
         BenchRunWorkerStateGuard _workerStateGuard(_brState);
         generateLoadOnConnection(conn.get());
     } catch (DBException& e) {
-        error() << "DBException not handled in benchRun thread" << causedBy(e) << endl;
+        error() << "DBException not handled in benchRun thread" << causedBy(e);
     } catch (std::exception& e) {
-        error() << "std::exception not handled in benchRun thread" << causedBy(e) << endl;
+        error() << "std::exception not handled in benchRun thread" << causedBy(e);
     } catch (...) {
-        error() << "Unknown exception not handled in benchRun thread." << endl;
+        error() << "Unknown exception not handled in benchRun thread.";
     }
 }
 

@@ -226,7 +226,7 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceASIO shutdown in progress"};
     }
 
-    LOG(2) << "startCommand: " << request.toString();
+    LOG(2) << "startCommand: " << redact(request.toString());
 
     auto getConnectionStartTime = now();
 
@@ -341,12 +341,13 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
                         if (!ec) {
                             LOG(2) << "Request " << requestId << " timed out"
                                    << ", adjusted timeout after getting connection from pool was "
-                                   << adjustedTimeout << ", op was " << op->toString();
+                                   << adjustedTimeout << ", op was " << redact(op->toString());
 
                             op->timeOut_inlock();
                         } else {
                             LOG(2) << "Failed to time request " << requestId
-                                   << "out: " << ec.message() << ", op was " << op->toString();
+                                   << "out: " << ec.message() << ", op was "
+                                   << redact(op->toString());
                         }
                     });
             }

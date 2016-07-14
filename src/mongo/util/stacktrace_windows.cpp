@@ -188,8 +188,7 @@ void printWindowsStackTrace(CONTEXT& context, std::ostream& os) {
     BOOL ret = SymInitialize(process, getSymbolSearchPath(process), TRUE);
     if (ret == FALSE) {
         DWORD dosError = GetLastError();
-        log() << "Stack trace failed, SymInitialize failed with error " << std::dec << dosError
-              << std::endl;
+        log() << "Stack trace failed, SymInitialize failed with error " << std::dec << dosError;
         return;
     }
     DWORD options = SymGetOptions();
@@ -270,15 +269,14 @@ void printWindowsStackTrace(CONTEXT& context, std::ostream& os) {
             ++width;
         }
         ss << traceList[i].symbolAndOffset;
-        log() << ss.str() << std::endl;
+        log() << ss.str();
     }
 }
 
 // Print error message from C runtime, then fassert
 int crtDebugCallback(int, char* originalMessage, int*) {
     StringData message(originalMessage);
-    log() << "*** C runtime error: " << message.substr(0, message.find('\n')) << ", terminating"
-          << std::endl;
+    log() << "*** C runtime error: " << message.substr(0, message.find('\n')) << ", terminating";
     fassertFailed(17006);
 }
 }

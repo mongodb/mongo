@@ -105,7 +105,7 @@ int ProcessInfo::getVirtualMemorySize() {
     int cnt = 0;
     char err[_POSIX2_LINE_MAX] = {0};
     if ((kd = kvm_openfiles(NULL, NULL, NULL, KVM_NO_FILES, err)) == NULL) {
-        log() << "Unable to get virt mem size: " << err << endl;
+        log() << "Unable to get virt mem size: " << err;
         return -1;
     }
 
@@ -120,7 +120,7 @@ int ProcessInfo::getResidentSize() {
     int cnt = 0;
     char err[_POSIX2_LINE_MAX] = {0};
     if ((kd = kvm_openfiles(NULL, NULL, NULL, KVM_NO_FILES, err)) == NULL) {
-        log() << "Unable to get res mem size: " << err << endl;
+        log() << "Unable to get res mem size: " << err;
         return -1;
     }
     kinfo_proc* task = kvm_getprocs(kd, KERN_PROC_PID, _pid.toNative(), sizeof(kinfo_proc), &cnt);
@@ -142,14 +142,14 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     int status = getSysctlByIDWithDefault(mib, 2, string("unknown"), &osVersion);
     if (status != 0)
         log() << "Unable to collect OS Version. (errno: " << status << " msg: " << strerror(status)
-              << ")" << endl;
+              << ")";
 
     mib[0] = CTL_HW;
     mib[1] = HW_MACHINE;
     status = getSysctlByIDWithDefault(mib, 2, string("unknown"), &cpuArch);
     if (status != 0)
         log() << "Unable to collect Machine Architecture. (errno: " << status
-              << " msg: " << strerror(status) << ")" << endl;
+              << " msg: " << strerror(status) << ")";
     addrSize = cpuArch.find("64") != std::string::npos ? 64 : 32;
 
     uintptr_t numBuffer;
@@ -160,7 +160,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     memSize = numBuffer;
     if (status != 0)
         log() << "Unable to collect Physical Memory. (errno: " << status
-              << " msg: " << strerror(status) << ")" << endl;
+              << " msg: " << strerror(status) << ")";
 
     mib[0] = CTL_HW;
     mib[1] = HW_NCPU;
@@ -168,7 +168,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     numCores = numBuffer;
     if (status != 0)
         log() << "Unable to collect Number of CPUs. (errno: " << status
-              << " msg: " << strerror(status) << ")" << endl;
+              << " msg: " << strerror(status) << ")";
 
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 
@@ -188,7 +188,7 @@ bool ProcessInfo::blockCheckSupported() {
 bool ProcessInfo::blockInMemory(const void* start) {
     char x = 0;
     if (mincore((void*)alignToStartOfPage(start), getPageSize(), &x)) {
-        log() << "mincore failed: " << errnoWithDescription() << endl;
+        log() << "mincore failed: " << errnoWithDescription();
         return 1;
     }
     return x & 0x1;
@@ -198,7 +198,7 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>
     out->resize(numPages);
     // int mincore(const void *addr, size_t len, char *vec);
     if (mincore((void*)alignToStartOfPage(start), numPages * getPageSize(), &(out->front()))) {
-        log() << "mincore failed: " << errnoWithDescription() << endl;
+        log() << "mincore failed: " << errnoWithDescription();
         return false;
     }
     for (size_t i = 0; i < numPages; ++i) {

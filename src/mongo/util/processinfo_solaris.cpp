@@ -142,7 +142,7 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     struct utsname unameData;
     if (uname(&unameData) == -1) {
-        log() << "Unable to collect detailed system information: " << strerror(errno) << endl;
+        log() << "Unable to collect detailed system information: " << strerror(errno);
     }
 
     char buf_64[32];
@@ -151,7 +151,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
         sysinfo(SI_ARCHITECTURE_NATIVE, buf_native, sizeof(buf_native)) != -1) {
         addrSize = mongoutils::str::equals(buf_64, buf_native) ? 64 : 32;
     } else {
-        log() << "Unable to determine system architecture: " << strerror(errno) << endl;
+        log() << "Unable to determine system architecture: " << strerror(errno);
     }
 
     osType = unameData.sysname;
@@ -225,7 +225,7 @@ bool ProcessInfo::blockInMemory(const void* start) {
     char x = 0;
     if (mincore(
             static_cast<char*>(const_cast<void*>(alignToStartOfPage(start))), getPageSize(), &x)) {
-        log() << "mincore failed: " << errnoWithDescription() << endl;
+        log() << "mincore failed: " << errnoWithDescription();
         return 1;
     }
     return x & 0x1;
@@ -236,7 +236,7 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<
     if (mincore(static_cast<char*>(const_cast<void*>(alignToStartOfPage(start))),
                 numPages * getPageSize(),
                 &out->front())) {
-        log() << "mincore failed: " << errnoWithDescription() << endl;
+        log() << "mincore failed: " << errnoWithDescription();
         return false;
     }
     for (size_t i = 0; i < numPages; ++i) {

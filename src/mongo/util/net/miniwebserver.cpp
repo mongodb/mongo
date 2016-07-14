@@ -45,7 +45,6 @@
 namespace mongo {
 
 using std::shared_ptr;
-using std::endl;
 using std::stringstream;
 using std::vector;
 
@@ -157,7 +156,7 @@ void MiniWebServer::_accepted(const std::shared_ptr<Socket>& psock, long long co
             }
         }
     } catch (const SocketException& e) {
-        LOG(1) << "couldn't recv data via http client: " << e << endl;
+        LOG(1) << "couldn't recv data via http client: " << e;
         return;
     }
     buf[len] = 0;
@@ -200,7 +199,7 @@ void MiniWebServer::_accepted(const std::shared_ptr<Socket>& psock, long long co
         psock->send(response.c_str(), response.size(), "http response");
         psock->close();
     } catch (SocketException& e) {
-        LOG(1) << "couldn't send data to http client: " << e << endl;
+        LOG(1) << "couldn't send data to http client: " << e;
     }
 }
 

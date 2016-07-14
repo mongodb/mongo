@@ -362,7 +362,7 @@ void ThreadPool::_startWorkerThread_inlock() {
     } catch (const std::exception& ex) {
         error() << "Failed to start " << threadName << "; " << _threads.size()
                 << " other thread(s) still running in pool " << _options.poolName
-                << "; caught exception: " << ex.what();
+                << "; caught exception: " << redact(ex.what());
     }
 }
 

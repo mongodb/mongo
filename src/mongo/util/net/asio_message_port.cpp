@@ -427,7 +427,7 @@ bool ASIOMessagingPort::recv(Message& m) {
         return true;
 
     } catch (const asio::system_error& e) {
-        LOG(_logLevel) << "SocketException: remote: " << remote() << " error: " << e.what();
+        LOG(_logLevel) << "SocketException: remote: " << remote() << " error: " << redact(e.what());
         m.reset();
         return false;
     }

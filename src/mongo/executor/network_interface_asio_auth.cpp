@@ -113,8 +113,8 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
             // Add relatively verbose logging here, since this should not happen unless we are
             // mongos and we try to connect to a node that doesn't support OP_COMMAND.
             warning() << "failed to negotiate protocol with remote host: " << op->request().target;
-            warning() << "request was: " << op->request().cmdObj;
-            warning() << "response was: " << commandReply.data;
+            warning() << "request was: " << redact(op->request().cmdObj);
+            warning() << "response was: " << redact(commandReply.data);
 
             auto clientProtos = rpc::toString(op->connection().clientProtocols());
             if (clientProtos.isOK()) {
