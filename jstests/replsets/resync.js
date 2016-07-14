@@ -47,8 +47,10 @@
         catch (except) {
             // An error is expected in the case that capped deletions blow away the position of the
             // collection scan during a yield. In this case, we just try again.
-            var errorRegex = /CappedPositionLost/;
-            assert(errorRegex.test(except.message));
+            var errorRegex = /UnknownError/;
+            assert(errorRegex.test(except.message),
+                   "Reading from the oplog returned an error other than UnknownError: " +
+                   except.message);
             return hasCycled();
         }
     }
