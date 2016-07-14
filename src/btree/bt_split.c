@@ -511,7 +511,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * array, a thread might see a freed WT_REF.  Set the eviction
 		 * transaction requirement for the newly created internal pages.
 		 */
-		child->modify->mod_split_txn = __wt_txn_id_alloc(session, false);
+		child->modify->mod_split_txn =
+		    __wt_txn_id_alloc(session, false);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -865,7 +866,7 @@ __split_parent_lock(
 		}
 		/*
 		 * If a checkpoint is running and we fail to lock the parent
-		 * page, give up immmediately to avoid deadlock.
+		 * page, give up immediately to avoid deadlock.
 		 */
 		if (S2BT(session)->checkpointing)
 			return (EBUSY);
