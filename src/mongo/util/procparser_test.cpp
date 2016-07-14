@@ -64,6 +64,11 @@ StringMap toStringMap(BSONObj& obj) {
     ASSERT_OK(procparser::parseProcStat(_keys, _x, 1000, &builder)); \
     auto obj = builder.obj();                                        \
     auto stringMap = toStringMap(obj);
+#define ASSERT_PARSE_MEMINFO(_keys, _x)                           \
+    BSONObjBuilder builder;                                       \
+    ASSERT_OK(procparser::parseProcMemInfo(_keys, _x, &builder)); \
+    auto obj = builder.obj();                                     \
+    auto stringMap = toStringMap(obj);
 
 TEST(FTDCProcStat, TestStat) {
 
@@ -210,6 +215,136 @@ TEST(FTDCProcStat, TestLocalNonExistentStat) {
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcStatFile("/proc/does_not_exist", keys, &builder));
+}
+
+TEST(FTDCProcMemInfo, TestMemInfo) {
+
+    std::vector<StringData> keys{"Key1", "Key2", "Key3"};
+
+    // Normal case
+    {
+        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB\nKey2: 456 kB");
+        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
+        ASSERT_KEY_AND_VALUE("Key2_kb", 456UL);
+    }
+
+    // Space in key name
+    {
+        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB\nKey 2: 456 kB");
+        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
+        ASSERT_NO_KEY("Key2_kb");
+    }
+
+    // No newline
+    {
+        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB Key2: 456 kB");
+        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
+        ASSERT_NO_KEY("Key2_kb");
+    }
+
+    // Missing colon on first key
+    {
+        ASSERT_PARSE_MEMINFO(keys, "Key1 123 kB\nKey2: 456 kB");
+        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
+        ASSERT_KEY_AND_VALUE("Key2_kb", 456UL);
+    }
+
+    // One token missing kB, HugePages is not size in kB
+    {
+        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB\nKey2: 456\nKey3: 789 kB\nKey4: 789 kB");
+        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
+        ASSERT_KEY_AND_VALUE("Key2", 456UL);
+        ASSERT_KEY_AND_VALUE("Key3_kb", 789UL);
+        ASSERT_NO_KEY("Key4_kb");
+    }
+
+    // Empty string
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(procparser::parseProcMemInfo(keys, "", &builder));
+    }
+}
+
+// Test we can parse the /proc/meminfo on this machine. Also assert we have the expected fields
+// This tests is designed to exercise our parsing code on various Linuxes and fail
+// Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
+// otherwise.
+TEST(FTDCProcMemInfo, TestLocalMemInfo) {
+    std::vector<StringData> keys{
+        "Active",         "Active(anon)",
+        "Active(file)",   "AnonHugePages",
+        "AnonPages",      "Bounce",
+        "Buffers",        "Cached",
+        "CmaFree",        "CmaTotal",
+        "CommitLimit",    "Committed_AS",
+        "Dirty",          "HardwareCorrupted",
+        "Inactive",       "Inactive(anon)",
+        "Inactive(file)", "KernelStack",
+        "Mapped",         "MemAvailable",
+        "MemFree",        "MemTotal",
+        "Mlocked",        "NFS_Unstable",
+        "PageTables",     "SReclaimable",
+        "SUnreclaim",     "Shmem",
+        "Slab",           "SwapCached",
+        "SwapFree",       "SwapTotal",
+        "Unevictable",    "VmallocChunk",
+        "VmallocTotal",   "VmallocUsed",
+        "Writeback",      "WritebackTmp",
+    };
+
+    BSONObjBuilder builder;
+
+    ASSERT_OK(procparser::parseProcMemInfoFile("/proc/meminfo", keys, &builder));
+
+    BSONObj obj = builder.obj();
+    auto stringMap = toStringMap(obj);
+    log() << "OBJ:" << obj;
+    ASSERT_KEY("MemTotal_kb");
+    ASSERT_KEY("MemFree_kb");
+    // Needs in 3.15+ - ASSERT_KEY("MemAvailable_kb");
+    ASSERT_KEY("Buffers_kb");
+    ASSERT_KEY("Cached_kb");
+    ASSERT_KEY("SwapCached_kb");
+    ASSERT_KEY("Active_kb");
+    ASSERT_KEY("Inactive_kb");
+    // Needs 2.6.28+ - ASSERT_KEY("Active(anon)_kb");
+    // Needs 2.6.28+ - ASSERT_KEY("Inactive(anon)_kb");
+    // Needs 2.6.28+ - ASSERT_KEY("Active(file)_kb");
+    // Needs 2.6.28+ - ASSERT_KEY("Inactive(file)_kb");
+    // Needs 2.6.28+ - ASSERT_KEY("Unevictable_kb");
+    // Needs 2.6.28+ - ASSERT_KEY("Mlocked_kb");
+    ASSERT_KEY("SwapTotal_kb");
+    ASSERT_KEY("SwapFree_kb");
+    ASSERT_KEY("Dirty_kb");
+    ASSERT_KEY("Writeback_kb");
+    ASSERT_KEY("AnonPages_kb");
+    ASSERT_KEY("Mapped_kb");
+    // Needs 2.6.32+ - ASSERT_KEY("Shmem_kb");
+    ASSERT_KEY("Slab_kb");
+    // Needs 2.6.19+ - ASSERT_KEY("SReclaimable_kb");
+    // Needs 2.6.19+ - ASSERT_KEY("SUnreclaim_kb");
+    // Needs 2.6.32+ - ASSERT_KEY("KernelStack_kb");
+    ASSERT_KEY("PageTables_kb");
+    ASSERT_KEY("NFS_Unstable_kb");
+    ASSERT_KEY("Bounce_kb");
+    // Needs 2.6.19+ - ASSERT_KEY("WritebackTmp_kb");
+    ASSERT_KEY("CommitLimit_kb");
+    ASSERT_KEY("Committed_AS_kb");
+    ASSERT_KEY("VmallocTotal_kb");
+    ASSERT_KEY("VmallocUsed_kb");
+    ASSERT_KEY("VmallocChunk_kb");
+    // Needs CONFIG_MEMORY_FAILURE & 2.6.32+ ASSERT_KEY("HardwareCorrupted_kb");
+    // Needs CONFIG_TRANSPARENT_HUGEPAGE - ASSERT_KEY("AnonHugePages_kb");
+    // Needs CONFIG_CMA & 3.19+ - ASSERT_KEY("CmaTotal_kb");
+    // Needs CONFIG_CMA & 3.19+ - ASSERT_KEY("CmaFree_kb");
+}
+
+
+TEST(FTDCProcMemInfo, TestLocalNonExistentMemInfo) {
+    std::vector<StringData> keys{};
+    BSONObjBuilder builder;
+
+    ASSERT_NOT_OK(procparser::parseProcMemInfoFile("/proc/does_not_exist", keys, &builder));
 }
 
 }  // namespace

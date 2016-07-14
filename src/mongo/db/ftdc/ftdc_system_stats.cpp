@@ -50,6 +50,9 @@ constexpr auto kSystemMetricsCollector = "systemMetrics";
 static const std::vector<StringData> kCpuKeys{
     "btime", "cpu", "ctxt", "processes", "procs_blocked", "procs_running"};
 
+// Collect all the memory keys by specifying an empty set.
+static const std::vector<StringData> kMemKeys{};
+
 /**
  *  Collect metrics from the Linux /proc file system.
  */
@@ -60,6 +63,14 @@ public:
             BSONObjBuilder subObjBuilder(builder.subobjStart("cpu"));
             processStatusErrors(
                 procparser::parseProcStatFile("/proc/stat", kCpuKeys, &subObjBuilder),
+                &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("memory"));
+            processStatusErrors(
+                procparser::parseProcMemInfoFile("/proc/meminfo", kMemKeys, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }

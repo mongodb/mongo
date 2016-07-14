@@ -279,5 +279,112 @@ Status parseProcStatFile(StringData filename,
     return parseProcStat(keys, swString.getValue(), getTicksPerSecond(), builder);
 }
 
+// Here is an example of the type of string it supports:
+// Note: output has been trimmed
+//
+// For more information, see:
+// Documentation/filesystems/proc.txt in the Linux kernel
+// proc(5) man page
+//
+// > cat /proc/meminfo
+// MemTotal:       12294392 kB
+// MemFree:         3652612 kB
+// MemAvailable:   11831704 kB
+// Buffers:          568536 kB
+// Cached:          6421520 kB
+// SwapCached:            0 kB
+// HugePages_Total:       0
+//
+// Note: HugePages_* do not end in kB, it is not a typo
+//
+Status parseProcMemInfo(const std::vector<StringData>& keys,
+                        StringData data,
+                        BSONObjBuilder* builder) {
+    bool foundKeys = false;
+
+    using string_split_iterator = boost::split_iterator<StringData::const_iterator>;
+
+    // Split the file by lines.
+    // token_compress_on means the iterator skips over consecutive '\n'. This should not be a
+    // problem in normal /proc/memInfo output.
+    for (string_split_iterator lineIt = string_split_iterator(
+             data.begin(),
+             data.end(),
+             boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on));
+         lineIt != string_split_iterator();
+         ++lineIt) {
+
+        StringData line((*lineIt).begin(), (*lineIt).end());
+
+        // Split the line by spaces and colons since these are the delimiters for meminfo files.
+        // token_compress_on means the iterator skips over consecutive ' '. This is needed for
+        // every line.
+        string_split_iterator partIt =
+            string_split_iterator(line.begin(),
+                                  line.end(),
+                                  boost::token_finder([](char c) { return c == ' ' || c == ':'; },
+                                                      boost::token_compress_on));
+
+        // Skip processing this line if we do not have a key.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        StringData key((*partIt).begin(), (*partIt).end());
+
+        ++partIt;
+
+        // Skip processing this line if we only have a key, and no number.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        // Check if the key is in the list. /proc/meminfo will have extra keys, and may not have the
+        // keys we want.
+        if (keys.empty() || std::find(keys.begin(), keys.end(), key) != keys.end()) {
+            foundKeys = true;
+
+            StringData stringValue((*partIt).begin(), (*partIt).end());
+
+            uint64_t value;
+
+            if (!parseNumberFromString(stringValue, &value).isOK()) {
+                value = 0;
+            }
+
+            // Check if the line ends in "kB"
+            ++partIt;
+
+            // If there is one last token, check if it is actually "kB"
+            if (partIt != string_split_iterator()) {
+                StringData kb_token((*partIt).begin(), (*partIt).end());
+                auto keyWithSuffix = key.toString();
+
+                if (kb_token == "kB") {
+                    keyWithSuffix.append("_kb");
+                }
+
+                builder->appendNumber(keyWithSuffix, value);
+            } else {
+
+                builder->appendNumber(key, value);
+            }
+        }
+    }
+
+    return foundKeys ? Status::OK()
+                     : Status(ErrorCodes::NoSuchKey, "Failed to find any keys in meminfo string");
+}
+
+Status parseProcMemInfoFile(StringData filename,
+                            const std::vector<StringData>& keys,
+                            BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    return parseProcMemInfo(keys, swString.getValue(), builder);
+}
 }  // namespace procparser
 }  // namespace mongo
