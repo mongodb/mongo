@@ -50,12 +50,16 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
@@ -525,6 +529,8 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
             _shardName = shardIdentity.getShardName();
             _clusterId = shardIdentity.getClusterId();
 
+            _initializeRangeDeleterTaskExecutor();
+
             return status;
         } catch (const DBException& ex) {
             auto errorStatus = ex.toStatus();
@@ -552,6 +558,8 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
             ReplicaSetMonitor::setSynchronousConfigChangeHook(
                 &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
             ReplicaSetMonitor::setAsynchronousConfigChangeHook(&updateShardIdentityConfigStringCB);
+
+            _initializeRangeDeleterTaskExecutor();
         }
 
         _signalInitializationComplete(status);
@@ -961,6 +969,19 @@ Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,
     }
 
     return Status::OK();
+}
+
+void ShardingState::_initializeRangeDeleterTaskExecutor() {
+    invariant(!_rangeDeleterTaskExecutor);
+    auto net =
+        executor::makeNetworkInterface("NetworkInterfaceCollectionRangeDeleter-TaskExecutor");
+    auto netPtr = net.get();
+    _rangeDeleterTaskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        stdx::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net));
+}
+
+executor::ThreadPoolTaskExecutor* ShardingState::getRangeDeleterTaskExecutor() {
+    return _rangeDeleterTaskExecutor.get();
 }
 
 /**

@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -244,6 +245,11 @@ public:
      */
     void setGlobalInitMethodForTest(GlobalInitFunc func);
 
+    /**
+     * Returns a pointer to the collection range deleter task executor.
+     */
+    executor::ThreadPoolTaskExecutor* getRangeDeleterTaskExecutor();
+
 private:
     friend class ScopedRegisterMigration;
 
@@ -320,6 +326,9 @@ private:
                             bool useRequestedVersion,
                             ChunkVersion* latestShardVersion);
 
+    // Initializes a TaskExecutor for cleaning up orphaned ranges
+    void _initializeRangeDeleterTaskExecutor();
+
     // Manages the state of the migration recipient shard
     MigrationDestinationManager _migrationDestManager;
 
@@ -354,6 +363,9 @@ private:
 
     // Function for initializing the external sharding state components not owned here.
     GlobalInitFunc _globalInit;
+
+    // Task executor for the collection range deleter.
+    std::unique_ptr<executor::ThreadPoolTaskExecutor> _rangeDeleterTaskExecutor;
 };
 
 }  // namespace mongo
