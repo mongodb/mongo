@@ -1352,9 +1352,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
     distinctNode->direction = indexScanNode->direction;
     distinctNode->bounds = indexScanNode->bounds;
 
-    // Figure out which field we're skipping to the next value of.  TODO: We currently only
-    // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
-    // over.  Consider removing this code if we stick with that policy.
+    // Figure out which field we're skipping to the next value of.
     distinctNode->fieldNo = 0;
     BSONObjIterator it(indexScanNode->index.keyPattern);
     while (it.more()) {
@@ -1431,9 +1429,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
-        // The distinct hack can work if any field is in the index but it's not always clear
-        // if it's a win unless it's the first field.
-        if (desc->keyPattern().firstElement().fieldName() == parsedDistinct->getKey()) {
+        if (desc->keyPattern().hasField(parsedDistinct->getKey())) {
             plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
                                                        desc->getAccessMethodName(),
                                                        desc->isMultikey(txn),
