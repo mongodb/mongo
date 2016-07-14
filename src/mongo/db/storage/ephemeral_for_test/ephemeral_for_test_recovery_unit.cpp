@@ -69,11 +69,6 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
 }
 
 Status EphemeralForTestRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
-    if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
-        return Status::OK();
-    } else {
-        return {ErrorCodes::CommandNotSupported,
-                "Current storage engine does not support majority readConcerns"};
-    }
+    return Status::OK();
 }
 }

@@ -251,6 +251,7 @@ mongodLibDeps = [
     "db/mongodandmongos",
     "db/mongodwebserver",
     "db/serveronly",
+    "db/repl/replset_commands",
     "db/repl/storage_interface_impl",
     "executor/network_interface_factory",
     's/commands/shared_cluster_commands',

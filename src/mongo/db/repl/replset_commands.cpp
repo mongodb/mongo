@@ -71,7 +71,6 @@ namespace repl {
 using std::string;
 using std::stringstream;
 
-
 class ReplExecutorSSM : public ServerStatusMetric {
 public:
     ReplExecutorSSM() : ServerStatusMetric("repl.executor") {}

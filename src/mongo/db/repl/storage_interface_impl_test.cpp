@@ -331,10 +331,10 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     ASSERT_TRUE(recoveryUnit->waitUntilDurableCalled);
 }
 
-TEST_F(StorageInterfaceImplTest, SnapshotNotSupported) {
+TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
     auto txn = getClient()->makeOperationContext();
     Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-    ASSERT_EQUALS(status, ErrorCodes::CommandNotSupported);
+    ASSERT(status.isOK());
 }
 
 TEST_F(StorageInterfaceImplTest,

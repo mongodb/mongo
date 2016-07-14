@@ -200,9 +200,10 @@ void MigrationManager::_executeMigrations(OperationContext* txn,
     // If there are rescheduled migrations, move them to active and run the function again.
     if (!_rescheduledMigrations.empty()) {
         // Clear all the callback handles of the rescheduled migrations.
-        for (auto migration : _rescheduledMigrations) {
+        for (auto& migration : _rescheduledMigrations) {
             migration.clearCallbackHandle();
         }
+
         _activeMigrations = std::move(_rescheduledMigrations);
         _rescheduledMigrations.clear();
         _executeMigrations(txn, migrationStatuses);

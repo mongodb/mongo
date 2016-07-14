@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/storage/snapshot_name.h"
@@ -244,7 +245,13 @@ Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* resul
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
+void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {
+    result->setReplSetVersion(_getConfigReturnValue.getConfigVersion());
+    result->setIsMaster(true);
+    result->setIsSecondary(false);
+    result->setMe(_getConfigReturnValue.getMemberAt(0).getHostAndPort());
+    result->setElectionId(OID::gen());
+}
 
 void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
 
