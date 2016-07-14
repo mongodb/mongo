@@ -22,11 +22,10 @@
      * This function filters for the operations that we're looking for, based on their state and
      * the contents of their query object.
      */
-    function ops() {
-        var p = db.currentOp().inprog;
+    function findRelevantOps(curops) {
         var ids = [];
-        for (var i in p) {
-            var o = p[i];
+        for (var i in curops) {
+            var o = curops[i];
             // We *can't* check for ns, b/c it's not guaranteed to be there unless the query is
             // active, which it may not be in our polling cycle - particularly b/c we sleep every
             // second in both the query and the assert
@@ -46,23 +45,23 @@
     var s2 = startParallelShell(countWithWhereOp);
 
     jsTestLog("Finding ops in currentOp() output");
-    var o = [];
+    var allOps;
+    var relevantOps = [];
     assert.soon(
         function() {
-            o = ops();
-            return o.length == 2;
+            allOps = db.currentOp().inprog;
+            relevantOps = findRelevantOps(allOps);
+            return relevantOps.length == 2;
         },
-        {
-          toString: function() {
-              return tojson(db.currentOp().inprog);
-          }
+        function() {
+            return tojson(allOps);
         },
         60000);
 
     var start = new Date();
     jsTestLog("Killing ops");
-    db.killOp(o[0]);
-    db.killOp(o[1]);
+    db.killOp(relevantOps[0]);
+    db.killOp(relevantOps[1]);
 
     jsTestLog("Waiting for ops to terminate");
     [s1, s2].forEach(function(awaitShell) {
