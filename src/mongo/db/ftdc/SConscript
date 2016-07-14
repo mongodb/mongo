@@ -28,10 +28,18 @@ ftdcEnv.Library(
     ],
 )
 
+platform_libs = []
+
+if env.TargetOSIs('linux'):
+    platform_libs = [
+        '$BUILD_DIR/mongo/util/procparser'
+    ]
+
 env.Library(
     target='ftdc_mongod',
     source=[
         'ftdc_mongod.cpp',
+        'ftdc_system_stats.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -40,7 +48,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'ftdc'
-    ],
+    ] + platform_libs,
 )
 
 env.CppUnitTest(

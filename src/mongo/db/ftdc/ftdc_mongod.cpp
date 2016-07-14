@@ -35,11 +35,11 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-
 #include "mongo/db/commands.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_system_stats.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -283,7 +283,6 @@ private:
 
 }  // namespace
 
-
 // Register the FTDC system
 // Note: This must be run before the server parameters are parsed during startup
 // so that the FTDCController is initialized.
@@ -325,6 +324,9 @@ void startFTDC() {
                                                                   BSON("collStats"
                                                                        << "oplog.rs")));
     }
+
+    // Install System Metric Collector as a periodic collector
+    installSystemMetricsCollector(controller.get());
 
     // Install file rotation collectors
     // These are collected on each file rotation.
