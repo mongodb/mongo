@@ -99,9 +99,9 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
 
 TEST(BalancerPolicy, Basic) {
     auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},
+        {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
          {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
-         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 3}});
+         {ShardStatistics(kShardId2, kNoMaxSize, 3, false, emptyTagSet, emptyShardVersion), 3}});
 
     const auto migrations(BalancerPolicy::balance(
         cluster.first, DistributionStatus(kNamespace, cluster.second), false));
@@ -112,7 +112,32 @@ TEST(BalancerPolicy, Basic) {
     ASSERT_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
 }
 
-TEST(BalancerPolicy, BasicParallel) {
+TEST(BalancerPolicy, SmallClusterShouldBePerfectlyBalanced) {
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+
+    const auto migrations(BalancerPolicy::balance(
+        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId1, migrations[0].from);
+    ASSERT_EQ(kShardId2, migrations[0].to);
+    ASSERT_EQ(cluster.second[kShardId1][0].getMin(), migrations[0].minKey);
+    ASSERT_EQ(cluster.second[kShardId1][0].getMax(), migrations[0].maxKey);
+}
+
+TEST(BalancerPolicy, SingleChunkShouldNotMove) {
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+
+    const auto migrations(BalancerPolicy::balance(
+        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
+    ASSERT(migrations.empty());
+}
+
+TEST(BalancerPolicy, ParallelBalancing) {
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
          {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"

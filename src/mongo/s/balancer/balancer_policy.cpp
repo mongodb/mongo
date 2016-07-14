@@ -32,19 +32,8 @@
 
 #include "mongo/s/balancer/balancer_policy.h"
 
-#include <algorithm>
-#include <cmath>
-
-#include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
@@ -446,7 +435,9 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
 
     // The ideal should be at least one per shard
     const size_t idealNumberOfChunksPerShardWithTag =
-        std::ceil(totalNumberOfChunksWithTag / totalNumberOfShardsWithTag);
+        (totalNumberOfChunksWithTag < totalNumberOfShardsWithTag)
+        ? 1
+        : (totalNumberOfChunksWithTag / totalNumberOfShardsWithTag);
 
     const size_t imbalance = max - idealNumberOfChunksPerShardWithTag;
 
