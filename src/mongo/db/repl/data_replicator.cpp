@@ -682,11 +682,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
             lk.lock();
         }
 
-        // Sleep for retry time
-        lk.unlock();
-        sleepmillis(durationCount<Milliseconds>(_opts.initialSyncRetryWait));
-        lk.lock();
-
         // Check if need to do more retries.
         if (failedAttempts >= maxFailedAttempts) {
             const std::string err =
@@ -697,6 +692,11 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
             _setState_inlock(DataReplicatorState::Uninitialized);
             return Status(ErrorCodes::InitialSyncFailure, err);
         }
+
+        // Sleep for retry time
+        lk.unlock();
+        sleepmillis(durationCount<Milliseconds>(_opts.initialSyncRetryWait));
+        lk.lock();
     }
 
     // Success, cleanup
