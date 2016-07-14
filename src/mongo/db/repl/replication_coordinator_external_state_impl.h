@@ -66,6 +66,7 @@ public:
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown(OperationContext* txn);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
+    virtual OldThreadPool* getDbWorkThreadPool() const override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();

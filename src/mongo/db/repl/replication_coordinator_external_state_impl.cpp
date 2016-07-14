@@ -244,6 +244,10 @@ executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor
     return _taskExecutor.get();
 }
 
+OldThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const {
+    return _writerPool.get();
+}
+
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* txn,
                                                                          const BSONObj& config) {
     try {

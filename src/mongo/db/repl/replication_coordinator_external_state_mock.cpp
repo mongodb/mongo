@@ -88,6 +88,10 @@ executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor
     return nullptr;
 }
 
+OldThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const {
+    return nullptr;
+}
+
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
 OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {

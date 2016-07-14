@@ -43,6 +43,7 @@ namespace mongo {
 
 class BSONObj;
 class OID;
+class OldThreadPool;
 class OperationContext;
 class ServiceContext;
 class SnapshotName;
@@ -116,6 +117,11 @@ public:
      * Returns task executor for scheduling tasks to be run asynchronously.
      */
     virtual executor::TaskExecutor* getTaskExecutor() const = 0;
+
+    /**
+     * Returns shared db worker thread pool for collection cloning.
+     */
+    virtual OldThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
      * Creates the oplog, writes the first entry and stores the replica set config document.
