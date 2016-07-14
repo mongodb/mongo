@@ -467,6 +467,10 @@ post:
       optional: true
   - command: shell.exec
     params:
+      script: |
+        rm -rf ~/.aws
+  - command: shell.exec
+    params:
       system_log: true
       working_dir: src # Temporary files created in src will be cleaned up in "pre".
       script: |
@@ -1874,11 +1878,29 @@ tasks:
         silent: true
         script: |
           set -o errexit
-          echo "${signing_auth_token_32}" > signing_auth_token
+
+          mkdir ~/.aws
+
+          cat <<EOF > ~/.aws/config
+          [default]
+          region = us-east-1
+          EOF
+
+          cat <<EOF > ~/.aws/credentials
+          [default]
+          aws_access_key_id = ${aws_key}
+          aws_secret_access_key = ${aws_secret}
+          EOF
+
+          cat <<EOF > notary_env.sh
+          export NOTARY_TOKEN=${signing_auth_token_32}
+          EOF
     - command: shell.exec
       params:
         working_dir: src
         script: |
+          . ./notary_env.sh
+
           set -o errexit
           set -o verbose
 
@@ -1897,22 +1919,12 @@ tasks:
 
           notary-client.py --key-name "server-3.2" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
 
-          if [ "${has_packages|}" = "true" ] ; then
-            for rpm in $(find repo/ -name \*.rpm) ; do
-              cd $(dirname $rpm)
-              # Use --package-file-suffix "" to overwrite existing RPM's instead of saving new "-signed.rpm" RPM files
-              #
-              notary-client.py --key-name "server-3.2" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
-              cd ${workdir}/src
-            done
-            for release_file in $(find repo/ -name Release) ; do
-              cd $(dirname $release_file)
-              notary-client.py --key-name "server-3.2" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
-              cd ${workdir}/src
-            done
+          if [ "${has_packages|}" = "true" ]; then
+             CURATOR_RELEASE="90080e97b430c197ec487f52de569b2adc028b4e"
+             curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
+             tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
+             ./curator repo --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages $(find repo \(-name "*.deb" -o -name "*.rpm"\) -printf "%h\n" | head -n 1)/\*
           fi
-          tar zcvf repo-${push_arch}.tgz repo || true
-          rm signing_auth_token
 
     # Put the binaries tarball/zipfile
     - command: s3.put
@@ -2187,29 +2199,11 @@ tasks:
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5
 
-    # Put the tarred up Package repo
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        build_variants: *packaging_variants
-        local_file: src/repo-${push_arch}.tgz
-        bucket: build-push-testing
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/repo-${push_arch}-${task_id}.tgz
-
     - command: s3Copy.copy
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         s3_copy_files:
-            #Package repo tarballs
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/repo-${push_arch}-${task_id}.tgz', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'packages/repo-${push_arch}-${suffix}.tgz', 'bucket': '${push_bucket}'},
-                build_variants: *packaging_variants
-                 }
-
             #Binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
@@ -2357,6 +2351,7 @@ modules:
 #######################################
 
 buildvariants:
+
 
 ###########################################
 #         Linux buildvariants             #
@@ -2791,6 +2786,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: ubuntu1204
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -2900,6 +2896,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: ubuntu1404
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -3009,6 +3006,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: ubuntu1604
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -3118,6 +3116,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: amazon
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3193,6 +3192,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: amazon
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -4187,6 +4187,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: rhel57
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -4235,6 +4236,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: rhel62
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -4381,6 +4383,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: rhel70
+    repo_edition: enterprise
   tasks:
   - name: compile
   - name: audit
@@ -4431,6 +4434,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-rhel71
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -4566,6 +4570,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: rhel55
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -4686,6 +4691,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: rhel62
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -4796,6 +4802,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: rhel70
+    repo_edition: org
   tasks:
   - name: compile
   - name: aggregation
@@ -4909,6 +4916,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: ubuntu1204
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -4957,6 +4965,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: ubuntu1404
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5005,6 +5014,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: ubuntu1604
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5059,6 +5069,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: suse12
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5106,6 +5117,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: suse12
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -5218,6 +5230,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: suse11
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5265,6 +5278,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: suse11
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -5465,6 +5479,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: debian71
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5513,6 +5528,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: debian81
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5561,6 +5577,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: debian71
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -5674,6 +5691,7 @@ buildvariants:
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: debian81
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -5791,6 +5809,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: rhel62
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
