@@ -56,7 +56,6 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -141,8 +140,6 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        Timer t;
-
         const string ns = parseNs(dbname, cmdObj);
         const NamespaceString nss(ns);
 
@@ -238,16 +235,6 @@ public:
         verify(start == bb.buf());
 
         result.appendArray("values", arr.done());
-
-        {
-            BSONObjBuilder b;
-            b.appendNumber("n", stats.nReturned);
-            b.appendNumber("nscanned", stats.totalKeysExamined);
-            b.appendNumber("nscannedObjects", stats.totalDocsExamined);
-            b.appendNumber("timems", t.millis());
-            b.append("planSummary", Explain::getPlanSummary(executor.getValue().get()));
-            result.append("stats", b.obj());
-        }
 
         return true;
     }
