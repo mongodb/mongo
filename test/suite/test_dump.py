@@ -30,7 +30,8 @@ import os, shutil
 import wiredtiger, wttest
 from helper import \
     complex_populate, complex_populate_check, \
-    simple_populate, simple_populate_check
+    simple_populate, simple_populate_check, \
+    simple_index_populate, simple_index_populate_check
 from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 
@@ -64,6 +65,9 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-simple', dict(uri='table:', config='', lsm=False,
           populate=simple_populate,
           populate_check=simple_populate_check)),
+        ('table-index', dict(uri='table:', config='', lsm=False,
+          populate=simple_index_populate,
+          populate_check=simple_index_populate_check)),
         ('table-simple-lsm', dict(uri='table:', config='type=lsm', lsm=True,
           populate=simple_populate,
           populate_check=simple_populate_check)),

@@ -242,6 +242,7 @@ dump_table_config(
 	char *p, **cfg, *_cfg[4] = {NULL, NULL, NULL, NULL};
 
 	p = NULL;
+	srch = NULL;
 	cfg = &_cfg[3];
 
 	/* Get the table name. */
@@ -306,32 +307,31 @@ dump_table_config(
 
 	WT_ERR(print_config(session, uri, cfg, json, true));
 
-	if (complex_table) {
-		/*
-		 * The underlying table configuration function needs a second
-		 * cursor: open one before calling it, it makes error handling
-		 * hugely simpler.
-		 */
-		if ((ret = session->open_cursor(
-		    session, "metadata:", NULL, NULL, &srch)) != 0)
-			WT_ERR(util_cerr(cursor, "open_cursor", ret));
+	/*
+	 * The underlying table configuration function needs a second
+	 * cursor: open one before calling it, it makes error handling
+	 * hugely simpler.
+	 */
+	if ((ret = session->open_cursor(
+	    session, "metadata:", NULL, NULL, &srch)) != 0)
+		WT_ERR(util_cerr(cursor, "open_cursor", ret));
 
-		if ((ret = dump_table_config_complex(
-		    session, cursor, srch, name, "colgroup:", json)) == 0)
-			ret = dump_table_config_complex(
-			    session, cursor, srch, name, "index:", json);
-
-		if ((tret = srch->close(srch)) != 0) {
-			tret = util_cerr(cursor, "close", tret);
-			if (ret == 0)
-				ret = tret;
-		}
-	} else if (json && printf(
-		    "            \"colgroups\" : [],\n"
-		    "            \"indices\" : []\n") < 0)
+	if (complex_table)
+		WT_ERR(dump_table_config_complex(
+		    session, cursor, srch, name, "colgroup:", json));
+	else if (json && printf(
+		    "            \"colgroups\" : [],\n") < 0)
 		WT_ERR(util_cerr(cursor, NULL, EIO));
 
-err:	free(p);
+	WT_ERR(dump_table_config_complex(
+	    session, cursor, srch, name, "index:", json));
+
+err:	if (srch != NULL && (tret = srch->close(srch)) != 0) {
+		tret = util_cerr(cursor, "close", tret);
+		if (ret == 0)
+			ret = tret;
+	}
+	free(p);
 	free(_cfg[0]);
 	free(_cfg[1]);
 	free(_cfg[2]);
