@@ -82,6 +82,7 @@ BSONObj createListCollectionsCommandObject(const BSONObj& filter) {
 }  // namespace
 
 DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
+                               OldThreadPool* dbWorkThreadPool,
                                const HostAndPort& source,
                                const std::string& dbname,
                                const BSONObj& listCollectionsFilter,
@@ -90,6 +91,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                                const CollectionCallbackFn& collWork,
                                const CallbackFn& onCompletion)
     : _executor(executor),
+      _dbWorkThreadPool(dbWorkThreadPool),
       _source(source),
       _dbname(dbname),
       _listCollectionsFilter(listCollectionsFilter),
@@ -118,6 +120,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
       _startCollectionCloner([](CollectionCloner& cloner) { return cloner.start(); }) {
     // Fetcher throws an exception on null executor.
     invariant(executor);
+    uassert(ErrorCodes::BadValue, "db worker thread pool cannot be null", dbWorkThreadPool);
     uassert(ErrorCodes::BadValue, "empty database name", !dbname.empty());
     uassert(ErrorCodes::BadValue, "storage interface cannot be null", si);
     uassert(ErrorCodes::BadValue, "collection callback function cannot be null", collWork);

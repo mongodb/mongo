@@ -101,12 +101,19 @@ void BaseClonerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     clear();
     launchExecutorThread();
+    dbWorkThreadPool = stdx::make_unique<OldThreadPool>(1);
     storageInterface.reset(new StorageInterfaceMock());
 }
 
 void BaseClonerTest::tearDown() {
-    executor::ThreadPoolExecutorTest::tearDown();
+    executor::ThreadPoolExecutorTest::shutdownExecutorThread();
+    executor::ThreadPoolExecutorTest::joinExecutorThread();
+
     storageInterface.reset();
+    dbWorkThreadPool->join();
+    dbWorkThreadPool.reset();
+
+    executor::ThreadPoolExecutorTest::tearDown();
 }
 
 void BaseClonerTest::clear() {

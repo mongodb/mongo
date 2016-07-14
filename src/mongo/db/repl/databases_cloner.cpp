@@ -242,6 +242,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
         try {
             dbCloner.reset(new DatabaseCloner(
                 _exec,
+                _dbWorkThreadPool,
                 _source,
                 dbName,
                 BSONObj(),  // do not filter collections out during listCollections call.

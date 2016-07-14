@@ -74,6 +74,7 @@ void DatabaseClonerTest::setUp() {
     BaseClonerTest::setUp();
     _databaseCloner.reset(new DatabaseCloner(
         &getExecutor(),
+        dbWorkThreadPool.get(),
         target,
         dbname,
         BSONObj(),
@@ -124,41 +125,54 @@ TEST_F(DatabaseClonerTest, InvalidConstruction) {
     const auto& cb = [](const Status&) { FAIL("should not reach here"); };
 
     // Null executor -- error from Fetcher, not _databaseCloner.
-    ASSERT_THROWS_CODE_AND_WHAT(DatabaseCloner(nullptr, target, dbname, filter, pred, si, ccb, cb),
-                                UserException,
-                                ErrorCodes::BadValue,
-                                "task executor cannot be null");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabaseCloner(nullptr, dbWorkThreadPool.get(), target, dbname, filter, pred, si, ccb, cb),
+        UserException,
+        ErrorCodes::BadValue,
+        "task executor cannot be null");
+
+    // Null db worker thread pool.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabaseCloner(&executor, nullptr, target, dbname, filter, pred, si, ccb, cb),
+        UserException,
+        ErrorCodes::BadValue,
+        "db worker thread pool cannot be null");
 
     // Empty database name -- error from Fetcher, not _databaseCloner.
-    ASSERT_THROWS_CODE_AND_WHAT(DatabaseCloner(&executor, target, "", filter, pred, si, ccb, cb),
-                                UserException,
-                                ErrorCodes::BadValue,
-                                "database name in remote command request cannot be empty");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        DatabaseCloner(&executor, dbWorkThreadPool.get(), target, "", filter, pred, si, ccb, cb),
+        UserException,
+        ErrorCodes::BadValue,
+        "database name in remote command request cannot be empty");
 
     // Callback function cannot be null.
     ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(&executor, target, dbname, filter, pred, si, ccb, nullptr),
+        DatabaseCloner(
+            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, si, ccb, nullptr),
         UserException,
         ErrorCodes::BadValue,
         "callback function cannot be null");
 
     // Storage interface cannot be null.
     ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(&executor, target, dbname, filter, pred, nullptr, ccb, cb),
+        DatabaseCloner(
+            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, nullptr, ccb, cb),
         UserException,
         ErrorCodes::BadValue,
         "storage interface cannot be null");
 
     // CollectionCallbackFn function cannot be null.
     ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(&executor, target, dbname, filter, pred, si, nullptr, cb),
+        DatabaseCloner(
+            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, si, nullptr, cb),
         UserException,
         ErrorCodes::BadValue,
         "collection callback function cannot be null");
 
     // Completion callback cannot be null.
     ASSERT_THROWS_CODE_AND_WHAT(
-        DatabaseCloner(&executor, target, dbname, filter, pred, si, ccb, nullptr),
+        DatabaseCloner(
+            &executor, dbWorkThreadPool.get(), target, dbname, filter, pred, si, ccb, nullptr),
         UserException,
         ErrorCodes::BadValue,
         "callback function cannot be null");
@@ -189,6 +203,7 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithFilter) {
                                                << "coll");
     _databaseCloner.reset(new DatabaseCloner(
         &getExecutor(),
+        dbWorkThreadPool.get(),
         target,
         dbname,
         listCollectionsFilter,
@@ -260,6 +275,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
     };
     _databaseCloner.reset(new DatabaseCloner(
         &getExecutor(),
+        dbWorkThreadPool.get(),
         target,
         dbname,
         BSONObj(),
@@ -445,6 +461,7 @@ TEST_F(DatabaseClonerTest, InvalidCollectionOptions) {
 TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
     _databaseCloner.reset(new DatabaseCloner(
         &getExecutor(),
+        dbWorkThreadPool.get(),
         target,
         dbname,
         BSONObj(),

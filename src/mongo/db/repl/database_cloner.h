@@ -45,6 +45,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+class OldThreadPool;
+
 namespace repl {
 namespace {
 
@@ -105,6 +108,7 @@ public:
      * Takes ownership of the passed StorageInterface object.
      */
     DatabaseCloner(executor::TaskExecutor* executor,
+                   OldThreadPool* dbWorkThreadPool,
                    const HostAndPort& source,
                    const std::string& dbname,
                    const BSONObj& listCollectionsFilter,
@@ -191,6 +195,7 @@ private:
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;                 // (M)
     executor::TaskExecutor* _executor;                           // (R)
+    OldThreadPool* _dbWorkThreadPool;                            // (R)
     const HostAndPort _source;                                   // (R)
     const std::string _dbname;                                   // (R)
     const BSONObj _listCollectionsFilter;                        // (R)
