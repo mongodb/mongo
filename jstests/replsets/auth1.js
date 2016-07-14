@@ -6,10 +6,6 @@
 load("jstests/replsets/rslib.js");
 
 (function() {
-    // Turn this test off everywhere until it works with Data Replicator Initial Sync.
-    if (true) {
-        return;
-    }
     var name = "rs_auth1";
     var port = allocatePorts(5);
     var path = "jstests/libs/";
