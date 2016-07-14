@@ -29,31 +29,25 @@
 
 #pragma once
 
-#include <vector>
-
-#include "mongo/platform/basic.h"
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
-#include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/queue.h"
 
 namespace mongo {
 
@@ -90,9 +84,9 @@ MONGO_FP_FORWARD_DECLARE(rsSyncApplyStop);
 
 struct InitialSyncState;
 struct MemberState;
-class ReplicationProgressManager;
-class SyncSourceSelector;
 class RollbackChecker;
+class StorageInterface;
+
 
 /** State for decision tree */
 enum class DataReplicatorState {

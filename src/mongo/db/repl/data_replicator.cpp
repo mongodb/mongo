@@ -52,16 +52,12 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/queue.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -484,7 +480,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     invariant(initialSyncFinishEvent.isValid());
     _initialSyncState.reset(new InitialSyncState(
         stdx::make_unique<DatabasesCloner>(
-            StorageInterface::get(txn),
+            _storage,
             _exec,
             _syncSource,
             [](BSONObj dbInfo) {
@@ -623,7 +619,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
         lk.unlock();
     });
 
-    StorageInterface::get(txn)->setInitialSyncFlag(txn);
+    _storage->setInitialSyncFlag(txn);
 
     const int maxFailedAttempts = kInitialSyncMaxRetries + 1;
     int failedAttempts = 0;
@@ -719,9 +715,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     _lastFetched = _lastApplied;
 
-    auto si = StorageInterface::get(txn);
-    si->clearInitialSyncFlag(txn);
-    si->setMinValid(txn, _lastApplied.opTime, DurableRequirement::Strong);
+    _storage->clearInitialSyncFlag(txn);
+    _storage->setMinValid(txn, _lastApplied.opTime, DurableRequirement::Strong);
     log() << "initial sync done; took " << t.millis() << " milliseconds.";
     return _lastApplied;
 }

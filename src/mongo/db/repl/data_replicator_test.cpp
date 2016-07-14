@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -52,21 +50,25 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
+
 using namespace mongo;
 using namespace mongo::repl;
+
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using unittest::log;
+
 using LockGuard = stdx::lock_guard<stdx::mutex>;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
+using ResponseStatus = executor::TaskExecutor::ResponseStatus;
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 struct CollectionCloneInfo {
     CollectionMockStats stats;
@@ -216,7 +218,7 @@ protected:
 
     void setUp() override {
         executor::ThreadPoolExecutorTest::setUp();
-        _storageInterface = new StorageInterfaceMock;
+        _storageInterface = stdx::make_unique<StorageInterfaceMock>();
         _storageInterface->createOplogFn = [this](OperationContext* txn,
                                                   const NamespaceString& nss) {
             _storageInterfaceWorkDone.createOplogCalled = true;
@@ -257,9 +259,6 @@ protected:
                 return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
                     std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
             };
-
-        StorageInterface::set(getGlobalServiceContext(),
-                              std::unique_ptr<StorageInterface>(_storageInterface));
 
         Client::initThreadIfNotAlready();
         reset();
@@ -320,7 +319,7 @@ protected:
 
         try {
             _dr.reset(new DataReplicator(
-                options, std::move(dataReplicatorExternalState), _storageInterface));
+                options, std::move(dataReplicatorExternalState), _storageInterface.get()));
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }
@@ -331,6 +330,8 @@ protected:
         executor::ThreadPoolExecutorTest::joinExecutorThread();
 
         _dr.reset();
+        _storageInterface.reset();
+
         // tearDown() destroys the task executor which was referenced by the data replicator.
         executor::ThreadPoolExecutorTest::tearDown();
     }
@@ -358,7 +359,7 @@ protected:
     OpTime _myLastOpTime;
     MemberState _memberState;
     std::unique_ptr<SyncSourceSelector> _syncSourceSelector;
-    StorageInterfaceMock* _storageInterface;
+    std::unique_ptr<StorageInterfaceMock> _storageInterface;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
 
