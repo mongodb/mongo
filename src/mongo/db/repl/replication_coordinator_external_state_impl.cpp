@@ -504,9 +504,15 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
             // Since we *just* wrote the cluster ID to the config.version document (via
             // ShardingCatalogManager::initializeConfigDatabaseIfNeeded), this should always
             // succeed.
-            fassertStatusOK(40217,
-                            ClusterIdentityLoader::get(txn)->loadClusterId(
-                                txn, repl::ReadConcernLevel::kLocalReadConcern));
+            status = ClusterIdentityLoader::get(txn)->loadClusterId(
+                txn, repl::ReadConcernLevel::kLocalReadConcern);
+
+            if (ErrorCodes::isShutdownError(status.code())) {
+                // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
+                return;
+            }
+
+            fassertStatusOK(40217, status);
         }
 
         // Free any leftover locks from previous instantiations
