@@ -49,6 +49,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+class OldThreadPool;
+
 namespace repl {
 
 class StorageInterface;
@@ -85,6 +88,7 @@ public:
      * Takes ownership of the passed StorageInterface object.
      */
     CollectionCloner(executor::TaskExecutor* executor,
+                     OldThreadPool* dbWorkThreadPool,
                      const HostAndPort& source,
                      const NamespaceString& sourceNss,
                      const CollectionOptions& options,
@@ -181,6 +185,7 @@ private:
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;        // (M)
     executor::TaskExecutor* _executor;                  // (R) Not owned by us.
+    OldThreadPool* _dbWorkThreadPool;                   // (R) Not owned by us.
     HostAndPort _source;                                // (R)
     NamespaceString _sourceNss;                         // (R)
     NamespaceString _destNss;                           // (R)
@@ -194,7 +199,6 @@ private:
     std::vector<BSONObj> _indexSpecs;     // (M)
     BSONObj _idIndexSpec;                 // (M)
     std::vector<BSONObj> _documents;      // (M) Documents read from fetcher to insert.
-    OldThreadPool _dbWorkThreadPool;      // (R)
     TaskRunner _dbWorkTaskRunner;         // (R)
     ScheduleDbWorkFn
         _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.

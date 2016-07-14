@@ -59,12 +59,14 @@ const size_t numFindRetries = 3;
 }  // namespace
 
 CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
+                                   OldThreadPool* dbWorkThreadPool,
                                    const HostAndPort& source,
                                    const NamespaceString& sourceNss,
                                    const CollectionOptions& options,
                                    const CallbackFn& onCompletion,
                                    StorageInterface* storageInterface)
     : _executor(executor),
+      _dbWorkThreadPool(dbWorkThreadPool),
       _source(source),
       _sourceNss(sourceNss),
       _destNss(_sourceNss),
@@ -108,10 +110,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
 
       _indexSpecs(),
       _documents(),
-      _dbWorkThreadPool(OldThreadPool::DoNotStartThreadsTag(),
-                        1,
-                        "CollectionCloner-" + _sourceNss.toString() + "-"),
-      _dbWorkTaskRunner(&_dbWorkThreadPool),
+      _dbWorkTaskRunner(_dbWorkThreadPool),
       _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
           auto task = [work](OperationContext* txn,
                              const Status& status) -> TaskRunner::NextAction {
@@ -172,8 +171,6 @@ Status CollectionCloner::start() {
     if (!scheduleResult.isOK()) {
         return scheduleResult;
     }
-
-    _dbWorkThreadPool.startThreads();
 
     _active = true;
 

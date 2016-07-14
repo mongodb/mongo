@@ -319,6 +319,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         try {
             _collectionCloners.emplace_back(
                 _executor,
+                _dbWorkThreadPool,
                 _source,
                 nss,
                 options,

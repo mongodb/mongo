@@ -36,6 +36,7 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -73,13 +74,14 @@ void CollectionClonerTest::setUp() {
     BaseClonerTest::setUp();
     options.reset();
     collectionCloner.reset(nullptr);
-    collectionCloner.reset(new CollectionCloner(
+    collectionCloner = stdx::make_unique<CollectionCloner>(
         &getExecutor(),
+        dbWorkThreadPool.get(),
         target,
         nss,
         options,
         stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-        storageInterface.get()));
+        storageInterface.get());
     collectionStats = CollectionMockStats();
     storageInterface->createCollectionForBulkFn =
         [this](const NamespaceString& nss,
@@ -107,32 +109,35 @@ BaseCloner* CollectionClonerTest::getCloner() const {
 
 TEST_F(CollectionClonerTest, InvalidConstruction) {
     executor::TaskExecutor& executor = getExecutor();
+    auto pool = dbWorkThreadPool.get();
 
     const auto& cb = [](const Status&) { FAIL("should not reach here"); };
 
     // Null executor -- error from Fetcher, not CollectionCloner.
     {
         StorageInterface* si = storageInterface.get();
-        ASSERT_THROWS_CODE_AND_WHAT(CollectionCloner(nullptr, target, nss, options, cb, si),
+        ASSERT_THROWS_CODE_AND_WHAT(CollectionCloner(nullptr, pool, target, nss, options, cb, si),
                                     UserException,
                                     ErrorCodes::BadValue,
                                     "task executor cannot be null");
     }
 
     // Null storage interface
-    ASSERT_THROWS_CODE_AND_WHAT(CollectionCloner(&executor, target, nss, options, cb, nullptr),
-                                UserException,
-                                ErrorCodes::BadValue,
-                                "storage interface cannot be null");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        CollectionCloner(&executor, pool, target, nss, options, cb, nullptr),
+        UserException,
+        ErrorCodes::BadValue,
+        "storage interface cannot be null");
 
     // Invalid namespace.
     {
         NamespaceString badNss("db.");
         StorageInterface* si = storageInterface.get();
-        ASSERT_THROWS_CODE_AND_WHAT(CollectionCloner(&executor, target, badNss, options, cb, si),
-                                    UserException,
-                                    ErrorCodes::BadValue,
-                                    "invalid collection namespace: db.");
+        ASSERT_THROWS_CODE_AND_WHAT(
+            CollectionCloner(&executor, pool, target, badNss, options, cb, si),
+            UserException,
+            ErrorCodes::BadValue,
+            "invalid collection namespace: db.");
     }
 
     // Invalid collection options - error from CollectionOptions::validate(), not CollectionCloner.
@@ -142,7 +147,7 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
                                             << "not a document");
         StorageInterface* si = storageInterface.get();
         ASSERT_THROWS_CODE_AND_WHAT(
-            CollectionCloner(&executor, target, nss, invalidOptions, cb, si),
+            CollectionCloner(&executor, pool, target, nss, invalidOptions, cb, si),
             UserException,
             ErrorCodes::BadValue,
             "'storageEngine.storageEngine1' has to be an embedded document.");
@@ -152,10 +157,11 @@ TEST_F(CollectionClonerTest, InvalidConstruction) {
     {
         CollectionCloner::CallbackFn nullCb;
         StorageInterface* si = storageInterface.get();
-        ASSERT_THROWS_CODE_AND_WHAT(CollectionCloner(&executor, target, nss, options, nullCb, si),
-                                    UserException,
-                                    ErrorCodes::BadValue,
-                                    "callback function cannot be null");
+        ASSERT_THROWS_CODE_AND_WHAT(
+            CollectionCloner(&executor, pool, target, nss, options, nullCb, si),
+            UserException,
+            ErrorCodes::BadValue,
+            "callback function cannot be null");
     }
 }
 
@@ -183,6 +189,7 @@ TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
     options.autoIndexId = CollectionOptions::NO;
     collectionCloner.reset(new CollectionCloner(
         &getExecutor(),
+        dbWorkThreadPool.get(),
         target,
         nss,
         options,
