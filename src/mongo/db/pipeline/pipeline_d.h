@@ -38,7 +38,7 @@ namespace mongo {
 class Collection;
 class DocumentSourceCursor;
 class DocumentSourceSort;
-struct ExpressionContext;
+struct AggregationExecContext;
 class OperationContext;
 class Pipeline;
 class PlanExecutor;
@@ -76,14 +76,14 @@ public:
      * it receives appropriate invalidate and kill messages.
      *
      * @param pPipeline the logical "this" for this operation
-     * @param pExpCtx the expression context for this pipeline
+     * @param paggrExcCtx the expression context for this pipeline
      */
     static std::shared_ptr<PlanExecutor> prepareCursorSource(
         OperationContext* txn,
         Collection* collection,
         const NamespaceString& nss,
         const boost::intrusive_ptr<Pipeline>& pPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     static std::string getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline);
 
@@ -107,7 +107,7 @@ private:
         Collection* collection,
         const NamespaceString& nss,
         const boost::intrusive_ptr<Pipeline>& pipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
         const DepsTracker& deps,
         const BSONObj& queryObj,
@@ -120,7 +120,7 @@ private:
      */
     static std::shared_ptr<PlanExecutor> addCursorSource(
         const boost::intrusive_ptr<Pipeline>& pipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx,
         std::shared_ptr<PlanExecutor> exec,
         DepsTracker deps,
         const BSONObj& queryObj = BSONObj(),

@@ -45,7 +45,7 @@ class ClientBasic;
 class CollatorInterface;
 struct DepsTracker;
 class DocumentSource;
-struct ExpressionContext;
+struct AggregationExecContext;
 class OperationContext;
 
 /**
@@ -63,7 +63,7 @@ public:
      */
     static StatusWith<boost::intrusive_ptr<Pipeline>> parse(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx);
 
     /**
      * Creates a Pipeline from an existing SourceContainer.
@@ -72,7 +72,7 @@ public:
      * is present but is not the last stage.
      */
     static StatusWith<boost::intrusive_ptr<Pipeline>> create(
-        SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        SourceContainer sources, const boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx);
 
     /**
      * Helper to implement Command::checkAuthForCommand.
@@ -86,7 +86,7 @@ public:
      */
     static bool aggSupportsWriteConcern(const BSONObj& cmd);
 
-    const boost::intrusive_ptr<ExpressionContext>& getContext() const {
+    const boost::intrusive_ptr<AggregationExecContext>& getContext() const {
         return pCtx;
     }
 
@@ -210,8 +210,8 @@ private:
     friend class Optimizations::Local;
     friend class Optimizations::Sharded;
 
-    Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
-    Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
+    Pipeline(const boost::intrusive_ptr<AggregationExecContext>& pCtx);
+    Pipeline(SourceContainer stages, const boost::intrusive_ptr<AggregationExecContext>& pCtx);
 
     /**
      * Stitch together the source pointers by calling setSource() for each source in '_sources'.
@@ -228,6 +228,6 @@ private:
 
     SourceContainer _sources;
 
-    boost::intrusive_ptr<ExpressionContext> pCtx;
+    boost::intrusive_ptr<AggregationExecContext> pCtx;
 };
 }  // namespace mongo

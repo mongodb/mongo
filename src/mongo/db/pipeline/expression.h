@@ -64,7 +64,7 @@ class DocumentSource;
         return Status::OK();                                                 \
     }
 
-// TODO: Look into merging with ExpressionContext.
+// TODO: Look into merging with AggregationExecContext.
 /// The state used as input and working space for Expressions.
 class Variables {
     MONGO_DISALLOW_COPYING(Variables);

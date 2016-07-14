@@ -45,11 +45,11 @@ const char* DocumentSourceCollStats::getSourceName() const {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
-    BSONElement specElem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement specElem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(40166,
             str::stream() << "$collStats must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);
-    intrusive_ptr<DocumentSourceCollStats> collStats(new DocumentSourceCollStats(pExpCtx));
+    intrusive_ptr<DocumentSourceCollStats> collStats(new DocumentSourceCollStats(pAggrExcCtx));
 
     for (const auto& elem : specElem.embeddedObject()) {
         StringData fieldName = elem.fieldNameStringData();
@@ -78,7 +78,7 @@ boost::optional<Document> DocumentSourceCollStats::getNext() {
 
     builder.appendDate("localTime", jsTime());
     if (_latencySpecified) {
-        _mongod->appendLatencyStats(pExpCtx->ns, &builder);
+        _mongod->appendLatencyStats(pAggrExcCtx->ns, &builder);
     }
 
     return Document(builder.obj());

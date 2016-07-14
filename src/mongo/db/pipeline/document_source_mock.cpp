@@ -39,7 +39,7 @@ DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs)
     : DocumentSource(NULL), queue(std::move(docs)) {}
 
 DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs,
-                                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
+                                       const boost::intrusive_ptr<AggregationExecContext>& expCtx)
     : DocumentSource(expCtx), queue(std::move(docs)) {}
 
 const char* DocumentSourceMock::getSourceName() const {

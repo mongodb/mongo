@@ -47,7 +47,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -76,14 +76,14 @@ class RecordCursor;
  * 'createFromBson', you would add this line:
  * REGISTER_DOCUMENT_SOURCE(foo, DocumentSourceFoo::createFromBson);
  */
-#define REGISTER_DOCUMENT_SOURCE(key, parser)                                                      \
-    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                        \
-        auto parserWrapper = [](BSONElement stageSpec,                                             \
-                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {           \
-            return std::vector<boost::intrusive_ptr<DocumentSource>>{(parser)(stageSpec, expCtx)}; \
-        };                                                                                         \
-        DocumentSource::registerParser("$" #key, parserWrapper);                                   \
-        return Status::OK();                                                                       \
+#define REGISTER_DOCUMENT_SOURCE(key, parser)                                                          \
+    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                            \
+        auto parserWrapper = [](BSONElement stageSpec,                                                 \
+                                const boost::intrusive_ptr<AggregationExecContext>& aggrExcCtx) {      \
+            return std::vector<boost::intrusive_ptr<DocumentSource>>{(parser)(stageSpec, aggrExcCtx)}; \
+        };                                                                                             \
+        DocumentSource::registerParser("$" #key, parserWrapper);                                       \
+        return Status::OK();                                                                           \
     }
 
 /**
@@ -103,12 +103,12 @@ class RecordCursor;
 class DocumentSource : public IntrusiveCounterUnsigned {
 public:
     using Parser = stdx::function<std::vector<boost::intrusive_ptr<DocumentSource>>(
-        BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
+        BSONElement, const boost::intrusive_ptr<AggregationExecContext>&)>;
 
     virtual ~DocumentSource() {}
 
     /** Returns the next Document if there is one or boost::none if at EOF.
-     *  Subclasses must call pExpCtx->checkForInterupt().
+     *  Subclasses must call pAggrExcCtx->checkForInterupt().
      */
     virtual boost::optional<Document> getNext() = 0;
 
@@ -233,7 +233,7 @@ public:
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
     static std::vector<boost::intrusive_ptr<DocumentSource>> parse(
-        const boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj stageObj);
+        const boost::intrusive_ptr<AggregationExecContext> expCtx, BSONObj stageObj);
 
     /**
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
@@ -262,7 +262,7 @@ protected:
     /**
        Base constructor.
      */
-    explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSource(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /*
       Most DocumentSources have an underlying source they get their data
@@ -274,7 +274,7 @@ protected:
     */
     DocumentSource* pSource;
 
-    boost::intrusive_ptr<ExpressionContext> pExpCtx;
+    boost::intrusive_ptr<AggregationExecContext> pAggrExcCtx;
 
 private:
     /**
@@ -321,7 +321,7 @@ public:
 
         /**
          * Sets the OperationContext of the DBDirectClient returned by directClient(). This method
-         * must be called after updating the 'opCtx' member of the ExpressionContext associated with
+         * must be called after updating the 'opCtx' member of the AggregationExecContext associated with
          * the document source.
          */
         virtual void setOperationContext(OperationContext* opCtx) = 0;
@@ -358,7 +358,7 @@ public:
         // Add new methods as needed.
     };
 
-    DocumentSourceNeedsMongod(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceNeedsMongod(const boost::intrusive_ptr<AggregationExecContext>& expCtx)
         : DocumentSource(expCtx) {}
 
     void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
@@ -436,7 +436,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         const std::string& ns,
         const std::shared_ptr<PlanExecutor>& exec,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /*
       Record the query that was specified for the cursor this wraps, if
@@ -494,7 +494,7 @@ public:
 private:
     DocumentSourceCursor(const std::string& ns,
                          const std::shared_ptr<PlanExecutor>& exec,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                         const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     void loadBatch();
 
@@ -536,14 +536,14 @@ public:
     BSONObjSet getOutputSorts() final;
 
     static boost::intrusive_ptr<DocumentSourceGroup> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /**
      * This is a convenience method that uses create(), and operates on a BSONElement that has been
      * determined to be an Object with an element named $group.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /**
      * Add an accumulator.
@@ -574,7 +574,7 @@ public:
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
 private:
-    explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceGroup(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /**
      * getNext() dispatches to one of these three depending on what type of $group it is. All three
@@ -679,10 +679,10 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
-    DocumentSourceIndexStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    DocumentSourceIndexStats(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     CollectionIndexUsageMap _indexStatsMap;
     CollectionIndexUsageMap::const_iterator _indexStatsIter;
@@ -716,7 +716,7 @@ public:
       @returns the filter
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pCtx);
 
     /**
      * Access the MatchExpression stored inside the DocumentSourceMatch. Does not release ownership.
@@ -787,11 +787,11 @@ public:
     static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
         MatchExpression* matchExpr,
         const std::string& path,
-        boost::intrusive_ptr<ExpressionContext> expCtx);
+        boost::intrusive_ptr<AggregationExecContext> expCtx);
 
 private:
     DocumentSourceMatch(const BSONObj& query,
-                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     void addDependencies(DepsTracker* deps) const;
 
@@ -827,11 +827,11 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     static boost::intrusive_ptr<DocumentSource> create(
         std::vector<CursorDescriptor> cursorDescriptors,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /** Returns non-owning pointers to cursors managed by this stage.
      *  Call this instead of getNext() if you want access to the raw streams.
@@ -856,7 +856,7 @@ private:
     typedef std::list<std::shared_ptr<CursorAndConnection>> Cursors;
 
     DocumentSourceMergeCursors(std::vector<CursorDescriptor> cursorDescriptors,
-                               const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                               const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     // Converts _cursorDescriptors into active _cursors.
     void start();
@@ -879,7 +879,7 @@ class DocumentSourceMock : public DocumentSource {
 public:
     DocumentSourceMock(std::deque<Document> docs);
     DocumentSourceMock(std::deque<Document> docs,
-                       const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                       const boost::intrusive_ptr<AggregationExecContext>& expCtx);
 
     boost::optional<Document> getNext() override;
     const char* getSourceName() const override;
@@ -954,15 +954,15 @@ public:
       well as pass it on.
 
       @param pBsonElement the raw BSON specification for the source
-      @param pExpCtx the expression context for the pipeline
+      @param pAggrExcCtx the expression context for the pipeline
       @returns the newly created document source
     */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
     DocumentSourceOut(const NamespaceString& outputNs,
-                      const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                      const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     // Sets _tempsNs and prepares it to receive data.
     void prepTempCollection();
@@ -1005,11 +1005,11 @@ public:
      * Parse the projection from the user-supplied BSON.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
     DocumentSourceProject(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& expCtx,
         std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> parsedProject);
 
     std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> _parsedProject;
@@ -1029,12 +1029,12 @@ public:
                                                    Pipeline::SourceContainer* container) final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& expCtx);
 
     Value serialize(bool explain = false) const final;
 
 private:
-    DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    DocumentSourceRedact(const boost::intrusive_ptr<AggregationExecContext>& expCtx,
                          const boost::intrusive_ptr<Expression>& previsit);
 
     // These both work over _variables
@@ -1064,10 +1064,10 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& expCtx);
 
 private:
-    explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceSample(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     long long _size;
 
@@ -1087,13 +1087,13 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& expCtx,
         long long size,
         std::string idField,
         long long collectionSize);
 
 private:
-    DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<AggregationExecContext>& expCtx,
                                          long long size,
                                          std::string idField,
                                          long long collectionSize);
@@ -1145,11 +1145,11 @@ public:
     /**
       Create a new limiting DocumentSource.
 
-      @param pExpCtx the expression context for the pipeline
+      @param pAggrExcCtx the expression context for the pipeline
       @returns the DocumentSource
      */
     static boost::intrusive_ptr<DocumentSourceLimit> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx, long long limit);
 
     // Virtuals for SplittableDocumentSource
     // Need to run on rounter. Running on shard as well is an optimization.
@@ -1175,14 +1175,14 @@ public:
       element named $limit.
 
       @param pBsonElement the BSONELement that defines the limit
-      @param pExpCtx the expression context
+      @param pAggrExcCtx the expression context
       @returns the grouping DocumentSource
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
-    DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
+    DocumentSourceLimit(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx, long long limit);
 
     long long limit;
     long long count;
@@ -1236,15 +1236,15 @@ public:
       element named $group.
 
       @param pBsonElement the BSONELement that defines the group
-      @param pExpCtx the expression context for the pipeline
+      @param pAggrExcCtx the expression context for the pipeline
       @returns the grouping DocumentSource
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /// Create a DocumentSourceSort with a given sort and (optional) limit
     static boost::intrusive_ptr<DocumentSourceSort> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx,
         BSONObj sortOrder,
         long long limit = -1);
 
@@ -1279,7 +1279,7 @@ public:
     }
 
 private:
-    explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceSort(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     Value serialize(bool explain = false) const final {
         verify(false);  // should call addToBsonArray instead
@@ -1368,11 +1368,11 @@ public:
     /**
       Create a new skipping DocumentSource.
 
-      @param pExpCtx the expression context
+      @param pAggrExcCtx the expression context
       @returns the DocumentSource
      */
     static boost::intrusive_ptr<DocumentSourceSkip> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     // Virtuals for SplittableDocumentSource
     // Need to run on rounter. Can't run on shards.
@@ -1398,14 +1398,14 @@ public:
       element named $skip.
 
       @param pBsonElement the BSONELement that defines the skip
-      @param pExpCtx the expression context
+      @param pAggrExcCtx the expression context
       @returns the grouping DocumentSource
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
-    explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceSkip(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     long long _skip;
     bool _needToSkip;
@@ -1433,10 +1433,10 @@ public:
      * Creates a new $unwind DocumentSource from a BSON specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     static boost::intrusive_ptr<DocumentSourceUnwind> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& expCtx,
         const std::string& path,
         bool includeNullIfEmptyOrMissing,
         const boost::optional<std::string>& includeArrayIndex);
@@ -1454,7 +1454,7 @@ public:
     }
 
 private:
-    DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    DocumentSourceUnwind(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx,
                          const FieldPath& fieldPath,
                          bool includeNullIfEmptyOrMissing,
                          const boost::optional<FieldPath>& includeArrayIndex);
@@ -1499,7 +1499,7 @@ public:
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pCtx);
 
     static char geoNearName[];
 
@@ -1513,10 +1513,10 @@ public:
 
     // this should only be used for testing
     static boost::intrusive_ptr<DocumentSourceGeoNear> create(
-        const boost::intrusive_ptr<ExpressionContext>& pCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& pCtx);
 
 private:
-    explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceGeoNear(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     void parseOptions(BSONObj options);
     BSONObj buildGeoNearCmd() const;
@@ -1580,7 +1580,7 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     /**
      * Build the BSONObj used to query the foreign collection.
@@ -1595,7 +1595,7 @@ private:
                          std::string as,
                          std::string localField,
                          std::string foreignField,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                         const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     Value serialize(bool explain = false) const final {
         invariant(false);
@@ -1648,7 +1648,7 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
     DocumentSourceGraphLookUp(NamespaceString from,
@@ -1659,7 +1659,7 @@ private:
                               boost::optional<BSONObj> additionalFilter,
                               boost::optional<FieldPath> depthField,
                               boost::optional<long long> maxDepth,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                              const boost::intrusive_ptr<AggregationExecContext>& expCtx);
 
     Value serialize(bool explain = false) const final {
         // Should not be called; use serializeToArray instead.
@@ -1760,7 +1760,7 @@ private:
 class DocumentSourceSortByCount final {
 public:
     static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
     DocumentSourceSortByCount() = default;
@@ -1769,7 +1769,7 @@ private:
 class DocumentSourceCount final {
 public:
     static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
     DocumentSourceCount() = default;
@@ -1790,8 +1790,8 @@ private:
  */
 class DocumentSourceCollStats : public DocumentSourceNeedsMongod {
 public:
-    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-        : DocumentSourceNeedsMongod(pExpCtx) {}
+    DocumentSourceCollStats(const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+        : DocumentSourceNeedsMongod(pAggrExcCtx) {}
 
     boost::optional<Document> getNext() final;
 
@@ -1802,7 +1802,7 @@ public:
     Value serialize(bool explain = false) const;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
 private:
     bool _latencySpecified = false;

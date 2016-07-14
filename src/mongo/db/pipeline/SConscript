@@ -10,7 +10,7 @@ env.Library(
         'aggregation_request',
         'document_source',
         'document_source_facet',
-        'expression_context',
+        'aggregation_exec_context',
         'pipeline',
     ]
 )
@@ -80,9 +80,9 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='expression_context',
+    target='aggregation_exec_context',
     source=[
-        'expression_context.cpp',
+        'aggregation_exec_context.cpp',
     ],
     LIBDEPS=[
         'aggregation_request',
@@ -182,7 +182,7 @@ docSourceEnv.Library(
         'dependencies',
         'document_value',
         'expression',
-        'expression_context',
+        'aggregation_exec_context',
         'parsed_aggregation_projection',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -210,7 +210,7 @@ env.Library(
         'dependencies',
         'document_source',
         'document_value',
-        'expression_context',
+        'aggregation_exec_context',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/authcore',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',

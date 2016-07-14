@@ -32,15 +32,15 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _skip(0), _needToSkip(true) {}
+DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSource(pAggrExcCtx), _skip(0), _needToSkip(true) {}
 
 REGISTER_DOCUMENT_SOURCE(skip, DocumentSourceSkip::createFromBson);
 
@@ -49,7 +49,7 @@ const char* DocumentSourceSkip::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceSkip::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (_needToSkip) {
         _needToSkip = false;
@@ -92,18 +92,18 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
 }
 
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceSkip> pSource(new DocumentSourceSkip(pExpCtx));
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
+    intrusive_ptr<DocumentSourceSkip> pSource(new DocumentSourceSkip(pAggrExcCtx));
     return pSource;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(15972,
             str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
             elem.isNumber());
 
-    intrusive_ptr<DocumentSourceSkip> pSkip(DocumentSourceSkip::create(pExpCtx));
+    intrusive_ptr<DocumentSourceSkip> pSkip(DocumentSourceSkip::create(pAggrExcCtx));
 
     pSkip->_skip = elem.numberLong();
     uassert(15956, "Argument to $skip cannot be negative", pSkip->_skip >= 0);

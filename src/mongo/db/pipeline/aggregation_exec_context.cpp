@@ -28,12 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 
 namespace mongo {
 
-ExpressionContext::ExpressionContext(OperationContext* opCtx, const AggregationRequest& request)
+AggregationExecContext::AggregationExecContext(OperationContext* opCtx, const AggregationRequest& request)
     : isExplain(request.isExplain()),
       inShard(request.isFromRouter()),
       extSortAllowed(request.shouldAllowDiskUse()),
@@ -49,7 +49,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx, const AggregationR
     }
 }
 
-void ExpressionContext::checkForInterrupt() {
+void AggregationExecContext::checkForInterrupt() {
     // This check could be expensive, at least in relative terms, so don't check every time.
     if (--interruptCounter == 0) {
         opCtx->checkForInterrupt();

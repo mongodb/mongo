@@ -41,7 +41,7 @@ namespace mongo {
 class BSONElement;
 class TeeBuffer;
 class DocumentSourceTeeConsumer;
-struct ExpressionContext;
+struct AggregationExecContext;
 class NamespaceString;
 class Pipeline;
 
@@ -60,11 +60,11 @@ class Pipeline;
 class DocumentSourceFacet final : public DocumentSourceNeedsMongod {
 public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     static boost::intrusive_ptr<DocumentSourceFacet> create(
         StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<AggregationExecContext>& expCtx);
 
     /**
      * Blocking call. Will consume all input and produces one output document.
@@ -96,7 +96,7 @@ public:
 
 private:
     DocumentSourceFacet(StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,
-                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                        const boost::intrusive_ptr<AggregationExecContext>& pAggrExcCtx);
 
     Value serialize(bool explain = false) const final;
 

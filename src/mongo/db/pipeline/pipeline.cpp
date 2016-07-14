@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -57,13 +57,13 @@ using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
 
-Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
+Pipeline::Pipeline(const intrusive_ptr<AggregationExecContext>& pTheCtx) : pCtx(pTheCtx) {}
 
-Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
+Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<AggregationExecContext>& expCtx)
     : _sources(stages), pCtx(expCtx) {}
 
 StatusWith<intrusive_ptr<Pipeline>> Pipeline::parse(
-    const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
+    const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<AggregationExecContext>& expCtx) {
     intrusive_ptr<Pipeline> pipeline(new Pipeline(expCtx));
 
     for (auto&& stageObj : rawPipeline) {
@@ -81,7 +81,7 @@ StatusWith<intrusive_ptr<Pipeline>> Pipeline::parse(
 }
 
 StatusWith<intrusive_ptr<Pipeline>> Pipeline::create(
-    SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
+    SourceContainer stages, const intrusive_ptr<AggregationExecContext>& expCtx) {
     intrusive_ptr<Pipeline> pipeline(new Pipeline(stages, expCtx));
     auto status = pipeline->ensureAllStagesAreInLegalPositions();
     if (!status.isOK()) {

@@ -46,7 +46,7 @@ using parsed_aggregation_projection::ParsedAggregationProjection;
 using parsed_aggregation_projection::ProjectionType;
 
 DocumentSourceProject::DocumentSourceProject(
-    const intrusive_ptr<ExpressionContext>& expCtx,
+    const intrusive_ptr<AggregationExecContext>& expCtx,
     std::unique_ptr<ParsedAggregationProjection> parsedProject)
     : DocumentSource(expCtx), _parsedProject(std::move(parsedProject)) {}
 
@@ -57,7 +57,7 @@ const char* DocumentSourceProject::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceProject::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     auto input = pSource->getNext();
     if (!input) {
@@ -97,7 +97,7 @@ Value DocumentSourceProject::serialize(bool explain) const {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& expCtx) {
     uassert(15969, "$project specification must be an object", elem.type() == Object);
 
     return new DocumentSourceProject(expCtx, ParsedAggregationProjection::create(elem.Obj()));

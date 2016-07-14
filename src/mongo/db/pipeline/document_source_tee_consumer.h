@@ -32,13 +32,13 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/tee_buffer.h"
 
 namespace mongo {
 
 class Document;
-struct ExpressionContext;
+struct AggregationExecContext;
 class Value;
 
 /**
@@ -49,7 +49,7 @@ class Value;
 class DocumentSourceTeeConsumer : public DocumentSource {
 public:
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<AggregationExecContext>& expCtx,
         const boost::intrusive_ptr<TeeBuffer>& bufferSource);
 
     void dispose() final;
@@ -58,7 +58,7 @@ public:
     Value serialize(bool explain = false) const final;
 
 private:
-    DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    DocumentSourceTeeConsumer(const boost::intrusive_ptr<AggregationExecContext>& expCtx,
                               const boost::intrusive_ptr<TeeBuffer>& bufferSource);
 
     bool _initialized = false;

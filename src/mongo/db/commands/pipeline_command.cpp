@@ -47,7 +47,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/cursor_response.h"
@@ -165,7 +165,7 @@ bool handleCursorCommand(OperationContext* txn,
 boost::intrusive_ptr<Pipeline> reparsePipeline(
     const boost::intrusive_ptr<Pipeline>& pipeline,
     const AggregationRequest& request,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<AggregationExecContext>& expCtx) {
     auto serialized = pipeline->serialize();
 
     // Convert vector<Value> to vector<BSONObj>.
@@ -251,24 +251,24 @@ public:
             return appendCommandStatus(result, request.getStatus());
         }
 
-        // Set up the ExpressionContext.
-        intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(txn, request.getValue());
-        expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+        // Set up the AggregationExecContext.
+        intrusive_ptr<AggregationExecContext> aggrExcCtx = new AggregationExecContext(txn, request.getValue());
+        aggrExcCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
         // Parse the pipeline.
-        auto statusWithPipeline = Pipeline::parse(request.getValue().getPipeline(), expCtx);
+        auto statusWithPipeline = Pipeline::parse(request.getValue().getPipeline(), aggrExcCtx);
         if (!statusWithPipeline.isOK()) {
             return appendCommandStatus(result, statusWithPipeline.getStatus());
         }
         auto pipeline = std::move(statusWithPipeline.getValue());
         pipeline->optimizePipeline();
 
-        if (kDebugBuild && !expCtx->isExplain && !expCtx->inShard) {
+        if (kDebugBuild && !aggrExcCtx->isExplain && !aggrExcCtx->inShard) {
             // Make sure all operations round-trip through Pipeline::serialize() correctly by
             // re-parsing every command in debug builds. This is important because sharded
             // aggregations rely on this ability.  Skipping when inShard because this has already
             // been through the transformation (and this un-sets expCtx->inShard).
-            pipeline = reparsePipeline(pipeline, request.getValue(), expCtx);
+            pipeline = reparsePipeline(pipeline, request.getValue(), aggrExcCtx);
         }
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
@@ -295,7 +295,7 @@ public:
             // This does mongod-specific stuff like creating the input PlanExecutor and adding
             // it to the front of the pipeline if needed.
             std::shared_ptr<PlanExecutor> input =
-                PipelineD::prepareCursorSource(txn, collection, nss, pipeline, expCtx);
+                PipelineD::prepareCursorSource(txn, collection, nss, pipeline, aggrExcCtx);
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
             // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
@@ -365,7 +365,7 @@ public:
             }
 
             // If both explain and cursor are specified, explain wins.
-            if (expCtx->isExplain) {
+            if (aggrExcCtx->isExplain) {
                 result << "stages" << Value(pipeline->writeExplainOps());
             } else if (request.getValue().isCursorCommand()) {
                 keepCursor = handleCursorCommand(txn,
@@ -378,7 +378,7 @@ public:
                 pipeline->run(result);
             }
 
-            if (!expCtx->isExplain) {
+            if (!aggrExcCtx->isExplain) {
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(pin ? *pin->c()->getExecutor() : *exec.get(), &stats);
                 curOp->debug().setPlanSummaryMetrics(stats);

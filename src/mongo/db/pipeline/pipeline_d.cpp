@@ -72,7 +72,7 @@ using std::unique_ptr;
 namespace {
 class MongodImplementation final : public DocumentSourceNeedsMongod::MongodInterface {
 public:
-    MongodImplementation(const intrusive_ptr<ExpressionContext>& ctx)
+    MongodImplementation(const intrusive_ptr<AggregationExecContext>& ctx)
         : _ctx(ctx), _client(ctx->opCtx) {}
 
     void setOperationContext(OperationContext* opCtx) {
@@ -135,7 +135,7 @@ public:
     }
 
 private:
-    intrusive_ptr<ExpressionContext> _ctx;
+    intrusive_ptr<AggregationExecContext> _ctx;
     DBDirectClient _client;
 };
 
@@ -210,12 +210,12 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
 StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     OperationContext* txn,
     Collection* collection,
-    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx,
     BSONObj queryObj,
     BSONObj projectionObj,
     BSONObj sortObj,
     const size_t plannerOpts) {
-    auto qr = stdx::make_unique<QueryRequest>(pExpCtx->ns);
+    auto qr = stdx::make_unique<QueryRequest>(pAggrExcCtx->ns);
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
@@ -226,10 +226,10 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     //
     // If pipeline has a null collator (representing the "simple" collation), we simply set the
     // collation option to the original user BSON.
-    qr->setCollation(pExpCtx->collator ? pExpCtx->collator->getSpec().toBSON()
-                                       : pExpCtx->collation);
+    qr->setCollation(pAggrExcCtx->collator ? pAggrExcCtx->collator->getSpec().toBSON()
+                                       : pAggrExcCtx->collation);
 
-    const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
+    const ExtensionsCallbackReal extensionsCallback(pAggrExcCtx->opCtx, &pAggrExcCtx->ns);
 
     auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
 
@@ -252,7 +252,7 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     Collection* collection,
     const NamespaceString& nss,
     const intrusive_ptr<Pipeline>& pPipeline,
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     // We will be modifying the source vector as we go.
     Pipeline::SourceContainer& sources = pPipeline->_sources;
 
@@ -261,7 +261,7 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
         DocumentSourceNeedsMongod* needsMongod =
             dynamic_cast<DocumentSourceNeedsMongod*>(source.get());
         if (needsMongod) {
-            needsMongod->injectMongodInterface(std::make_shared<MongodImplementation>(pExpCtx));
+            needsMongod->injectMongodInterface(std::make_shared<MongodImplementation>(pAggrExcCtx));
         }
     }
 
@@ -288,11 +288,11 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
                 sources.pop_front();
                 std::string idString = collection->ns().isOplog() ? "ts" : "_id";
                 sources.emplace_front(DocumentSourceSampleFromRandomCursor::create(
-                    pExpCtx, sampleSize, idString, numRecords));
+                    pAggrExcCtx, sampleSize, idString, numRecords));
 
                 const BSONObj initialQuery;
                 return addCursorSource(
-                    pPipeline, pExpCtx, exec, pPipeline->getDependencies(initialQuery));
+                    pPipeline, pAggrExcCtx, exec, pPipeline->getDependencies(initialQuery));
             }
         }
     }
@@ -339,14 +339,14 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
                                 collection,
                                 nss,
                                 pPipeline,
-                                pExpCtx,
+                                pAggrExcCtx,
                                 sortStage,
                                 deps,
                                 queryObj,
                                 &sortObj,
                                 &projForQuery);
 
-    return addCursorSource(pPipeline, pExpCtx, exec, deps, queryObj, sortObj, projForQuery);
+    return addCursorSource(pPipeline, pAggrExcCtx, exec, deps, queryObj, sortObj, projForQuery);
 }
 
 std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
@@ -354,7 +354,7 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
     Collection* collection,
     const NamespaceString& nss,
     const intrusive_ptr<Pipeline>& pipeline,
-    const intrusive_ptr<ExpressionContext>& expCtx,
+    const intrusive_ptr<AggregationExecContext>& expCtx,
     const intrusive_ptr<DocumentSourceSort>& sortStage,
     const DepsTracker& deps,
     const BSONObj& queryObj,
@@ -454,7 +454,7 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
 }
 
 shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline>& pipeline,
-                                                    const intrusive_ptr<ExpressionContext>& expCtx,
+                                                    const intrusive_ptr<AggregationExecContext>& expCtx,
                                                     shared_ptr<PlanExecutor> exec,
                                                     DepsTracker deps,
                                                     const BSONObj& queryObj,

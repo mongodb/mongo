@@ -42,7 +42,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
-DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
+DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<AggregationExecContext>& expCtx,
                                            const intrusive_ptr<Expression>& expression)
     : DocumentSource(expCtx), _expression(expression) {}
 
@@ -86,7 +86,7 @@ Pipeline::SourceContainer::iterator DocumentSourceRedact::optimizeAt(
             container->insert(
                 itr,
                 DocumentSourceMatch::createFromBson(
-                    BSON("$match" << redactSafePortion).firstElement(), this->pExpCtx));
+                    BSON("$match" << redactSafePortion).firstElement(), this->pAggrExcCtx));
 
             return returnItr;
         }
@@ -165,7 +165,7 @@ Value DocumentSourceRedact::serialize(bool explain) const {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& expCtx) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
     Variables::Id currentId = vps.defineVariable("CURRENT");  // will differ from ROOT

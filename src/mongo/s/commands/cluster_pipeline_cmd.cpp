@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/random.h"
@@ -123,12 +123,12 @@ public:
             return appendCommandStatus(result, request.getStatus());
         }
 
-        intrusive_ptr<ExpressionContext> mergeCtx = new ExpressionContext(txn, request.getValue());
-        mergeCtx->inRouter = true;
-        // explicitly *not* setting mergeCtx->tempDir
+        intrusive_ptr<AggregationExecContext> aggrExcCtx = new AggregationExecContext(txn, request.getValue());
+        aggrExcCtx->inRouter = true;
+        // explicitly *not* setting aggrExcCtx->tempDir
 
         // Parse and optimize the pipeline specification.
-        auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
+        auto pipeline = Pipeline::parse(request.getValue().getPipeline(), aggrExcCtx);
         if (!pipeline.isOK()) {
             return appendCommandStatus(result, pipeline.getStatus());
         }
@@ -188,7 +188,7 @@ public:
         Strategy::commandOp(
             txn, dbname, shardedCommand, options, fullns, shardQuery, &shardResults);
 
-        if (mergeCtx->isExplain) {
+        if (aggrExcCtx->isExplain) {
             // This must be checked before we start modifying result.
             uassertAllShardsSupportExplain(shardResults);
 
@@ -224,7 +224,7 @@ public:
         }
 
         pipeline.getValue()->addInitialSource(
-            DocumentSourceMergeCursors::create(parseCursors(shardResults), mergeCtx));
+            DocumentSourceMergeCursors::create(parseCursors(shardResults), aggrExcCtx));
 
         MutableDocument mergeCmd(request.getValue().serializeToCommandObj());
         mergeCmd["pipeline"] = Value(pipeline.getValue()->serialize());

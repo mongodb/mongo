@@ -47,7 +47,7 @@ const char* DocumentSourceGeoNear::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceGeoNear::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (!resultsIterator)
         runCommand();
@@ -88,7 +88,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getShardSource() {
     return this;
 }
 intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getMergeSource() {
-    return DocumentSourceSort::create(pExpCtx, BSON(distanceField->fullPath() << 1), limit);
+    return DocumentSourceSort::create(pAggrExcCtx, BSON(distanceField->fullPath() << 1), limit);
 }
 
 Value DocumentSourceGeoNear::serialize(bool explain) const {
@@ -127,7 +127,7 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
 
     BSONObjBuilder geoNear;  // not building a subField
 
-    geoNear.append("geoNear", pExpCtx->ns.coll());  // not in toBson
+    geoNear.append("geoNear", pAggrExcCtx->ns.coll());  // not in toBson
 
     if (coordsIsArray) {
         geoNear.appendArray("near", coords);
@@ -157,19 +157,19 @@ void DocumentSourceGeoNear::runCommand() {
     massert(16603, "Already ran geoNearCommand", !resultsIterator);
 
     bool ok = _mongod->directClient()->runCommand(
-        pExpCtx->ns.db().toString(), buildGeoNearCmd(), cmdOutput);
+        pAggrExcCtx->ns.db().toString(), buildGeoNearCmd(), cmdOutput);
     uassert(16604, "geoNear command failed: " + cmdOutput.toString(), ok);
 
     resultsIterator.reset(new BSONObjIterator(cmdOutput["results"].embeddedObject()));
 }
 
 intrusive_ptr<DocumentSourceGeoNear> DocumentSourceGeoNear::create(
-    const intrusive_ptr<ExpressionContext>& pCtx) {
+    const intrusive_ptr<AggregationExecContext>& pCtx) {
     return new DocumentSourceGeoNear(pCtx);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGeoNear::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pCtx) {
     intrusive_ptr<DocumentSourceGeoNear> out = new DocumentSourceGeoNear(pCtx);
     out->parseOptions(elem.embeddedObjectUserCheck());
     return out;
@@ -222,8 +222,8 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
         warning() << "ignoring deprecated uniqueDocs option in $geoNear aggregation stage";
 }
 
-DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
+DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSourceNeedsMongod(pAggrExcCtx),
       coordsIsArray(false),
       limit(DocumentSourceGeoNear::kDefaultLimit),
       maxDistance(-1.0),

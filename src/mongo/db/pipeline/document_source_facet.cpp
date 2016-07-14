@@ -37,7 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/db/pipeline/value.h"
@@ -50,14 +50,14 @@ using boost::intrusive_ptr;
 using std::vector;
 
 DocumentSourceFacet::DocumentSourceFacet(StringMap<intrusive_ptr<Pipeline>> facetPipelines,
-                                         const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceNeedsMongod(expCtx), _facetPipelines(std::move(facetPipelines)) {
+                                         const intrusive_ptr<AggregationExecContext>& aggrExcCtx)
+    : DocumentSourceNeedsMongod(aggrExcCtx), _facetPipelines(std::move(facetPipelines)) {
 
     // Build the tee stage, and the consumers of the tee.
     _teeBuffer = TeeBuffer::create();
     for (auto&& facet : _facetPipelines) {
         auto pipeline = facet.second;
-        pipeline->addInitialSource(DocumentSourceTeeConsumer::create(pExpCtx, _teeBuffer));
+        pipeline->addInitialSource(DocumentSourceTeeConsumer::create(pAggrExcCtx, _teeBuffer));
     }
 }
 
@@ -65,7 +65,7 @@ REGISTER_DOCUMENT_SOURCE(facet, DocumentSourceFacet::createFromBson);
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     StringMap<intrusive_ptr<Pipeline>> facetPipelines,
-    const intrusive_ptr<ExpressionContext>& expCtx) {
+    const intrusive_ptr<AggregationExecContext>& expCtx) {
     return new DocumentSourceFacet(std::move(facetPipelines), expCtx);
 }
 
@@ -74,7 +74,7 @@ void DocumentSourceFacet::setSource(DocumentSource* source) {
 }
 
 boost::optional<Document> DocumentSourceFacet::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (_done) {
         return boost::none;
@@ -145,7 +145,7 @@ void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) 
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& expCtx) {
     uassert(40169,
             str::stream() << "the $facet specification must be a non-empty object, but found: "
                           << elem,

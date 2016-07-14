@@ -41,10 +41,10 @@ const char* DocumentSourceIndexStats::getSourceName() const {
 }
 
 boost::optional<Document> DocumentSourceIndexStats::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (_indexStatsMap.empty()) {
-        _indexStatsMap = _mongod->getIndexStats(pExpCtx->opCtx, pExpCtx->ns);
+        _indexStatsMap = _mongod->getIndexStats(pAggrExcCtx->opCtx, pAggrExcCtx->ns);
         _indexStatsIter = _indexStatsMap.begin();
     }
 
@@ -63,16 +63,16 @@ boost::optional<Document> DocumentSourceIndexStats::getNext() {
     return boost::none;
 }
 
-DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongod(pExpCtx),
+DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSourceNeedsMongod(pAggrExcCtx),
       _processName(str::stream() << getHostNameCached() << ":" << serverGlobalParams.port) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(28803,
             "The $indexStats stage specification must be an empty object",
             elem.type() == Object && elem.Obj().isEmpty());
-    return new DocumentSourceIndexStats(pExpCtx);
+    return new DocumentSourceIndexStats(pAggrExcCtx);
 }
 
 Value DocumentSourceIndexStats::serialize(bool explain) const {

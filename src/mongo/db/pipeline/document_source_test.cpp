@@ -33,7 +33,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
@@ -212,10 +212,10 @@ public:
         : _service(makeTestServiceContext()),
           _client(_service->makeClient("DocumentSourceTest")),
           _opCtx(_client->makeOperationContext()),
-          _ctx(new ExpressionContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}))) {}
+          _ctx(new AggregationExecContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}))) {}
 
 protected:
-    intrusive_ptr<ExpressionContext> ctx() {
+    intrusive_ptr<AggregationExecContext> ctx() {
         return _ctx;
     }
 
@@ -224,7 +224,7 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
 
 private:
-    intrusive_ptr<ExpressionContext> _ctx;
+    intrusive_ptr<AggregationExecContext> _ctx;
 };
 
 TEST(Mock, OneDoc) {
@@ -450,14 +450,14 @@ protected:
         BSONObj namedSpec = BSON("$group" << spec);
         BSONElement specElement = namedSpec.firstElement();
 
-        intrusive_ptr<ExpressionContext> expressionContext =
-            new ExpressionContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}));
-        expressionContext->inShard = inShard;
-        expressionContext->inRouter = inRouter;
+        intrusive_ptr<AggregationExecContext> aggrExcContext =
+            new AggregationExecContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}));
+        aggrExcContext->inShard = inShard;
+        aggrExcContext->inRouter = inRouter;
         // Won't spill to disk properly if it needs to.
-        expressionContext->tempDir = _tempDir.path();
+        aggrExcContext->tempDir = _tempDir.path();
 
-        _group = DocumentSourceGroup::createFromBson(specElement, expressionContext);
+        _group = DocumentSourceGroup::createFromBson(specElement, aggrExcContext);
         assertRoundTrips(_group);
     }
     DocumentSourceGroup* group() {

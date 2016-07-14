@@ -38,7 +38,7 @@
 namespace mongo {
 
 class Document;
-struct ExpressionContext;
+struct AggregationExecContext;
 class Value;
 
 /**

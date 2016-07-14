@@ -64,7 +64,7 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
 }
 
 boost::optional<Document> DocumentSourceMatch::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
@@ -389,13 +389,13 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     BSONObjBuilder firstBob;
     newExpr.first->serialize(&firstBob);
 
-    intrusive_ptr<DocumentSource> firstMatch(new DocumentSourceMatch(firstBob.obj(), pExpCtx));
+    intrusive_ptr<DocumentSource> firstMatch(new DocumentSourceMatch(firstBob.obj(), pAggrExcCtx));
 
     // This $match stage is still needed, so update the MatchExpression as needed.
     BSONObjBuilder secondBob;
     newExpr.second->serialize(&secondBob);
 
-    intrusive_ptr<DocumentSource> secondMatch(new DocumentSourceMatch(secondBob.obj(), pExpCtx));
+    intrusive_ptr<DocumentSource> secondMatch(new DocumentSourceMatch(secondBob.obj(), pAggrExcCtx));
 
     return {firstMatch, secondMatch};
 }
@@ -403,7 +403,7 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(
     MatchExpression* matchExpr,
     const std::string& descendOn,
-    intrusive_ptr<ExpressionContext> expCtx) {
+    intrusive_ptr<AggregationExecContext> expCtx) {
     expression::mapOver(matchExpr, [&descendOn](MatchExpression* node, std::string path) -> void {
         // Cannot call this method on a $match including a $elemMatch.
         invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
@@ -452,12 +452,12 @@ static void uassertNoDisallowedClauses(BSONObj query) {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<AggregationExecContext>& pAggrExcCtx) {
     uassert(15959, "the match filter must be an expression in an object", elem.type() == Object);
 
     uassertNoDisallowedClauses(elem.Obj());
 
-    return new DocumentSourceMatch(elem.Obj(), pExpCtx);
+    return new DocumentSourceMatch(elem.Obj(), pAggrExcCtx);
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {
@@ -487,8 +487,8 @@ void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
-                                         const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
+                                         const intrusive_ptr<AggregationExecContext>& pAggrExcCtx)
+    : DocumentSource(pAggrExcCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
     // TODO SERVER-23349: Pass the appropriate CollatorInterface* instead of nullptr.
     StatusWithMatchExpression status = uassertStatusOK(
         MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), nullptr));

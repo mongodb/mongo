@@ -31,7 +31,7 @@
 #include "mongo/db/pipeline/tee_buffer.h"
 
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {

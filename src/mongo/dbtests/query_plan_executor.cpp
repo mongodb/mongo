@@ -44,7 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
@@ -280,10 +280,10 @@ public:
 
         // Create the aggregation pipeline.
         std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
-        boost::intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(
+        boost::intrusive_ptr<AggregationExecContext> aggrExcCtx = new AggregationExecContext(
             &_txn, AggregationRequest(NamespaceString(nss.ns()), rawPipeline));
 
-        auto statusWithPipeline = Pipeline::parse(rawPipeline, expCtx);
+        auto statusWithPipeline = Pipeline::parse(rawPipeline, aggrExcCtx);
         auto pipeline = assertGet(statusWithPipeline);
 
         // Create the output PlanExecutor that pulls results from the pipeline.

@@ -37,7 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/aggregation_exec_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/log.h"
 
@@ -45,11 +45,11 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
-    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    const intrusive_ptr<AggregationExecContext>& pAggrExcCtx,
     long long size,
     std::string idField,
     long long nDocsInCollection)
-    : DocumentSource(pExpCtx),
+    : DocumentSource(pAggrExcCtx),
       _size(size),
       _idField(std::move(idField)),
       _nDocsInColl(nDocsInCollection) {}
@@ -74,7 +74,7 @@ double smallestFromSampleOfUniform(PseudoRandom* prng, size_t N) {
 }  // namespace
 
 boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNext() {
-    pExpCtx->checkForInterrupt();
+    pAggrExcCtx->checkForInterrupt();
 
     if (_seenDocs.size() >= static_cast<size_t>(_size))
         return {};
@@ -85,7 +85,7 @@ boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNext() {
 
     // Assign it a random value to enable merging by random value, attempting to avoid bias in that
     // process.
-    auto& prng = pExpCtx->opCtx->getClient()->getPrng();
+    auto& prng = pAggrExcCtx->opCtx->getClient()->getPrng();
     _randMetaFieldVal -= smallestFromSampleOfUniform(&prng, _nDocsInColl);
 
     MutableDocument md(std::move(*doc));
@@ -137,7 +137,7 @@ DocumentSource::GetDepsReturn DocumentSourceSampleFromRandomCursor::getDependenc
 }
 
 intrusive_ptr<DocumentSourceSampleFromRandomCursor> DocumentSourceSampleFromRandomCursor::create(
-    const intrusive_ptr<ExpressionContext>& expCtx,
+    const intrusive_ptr<AggregationExecContext>& expCtx,
     long long size,
     std::string idField,
     long long nDocsInCollection) {
