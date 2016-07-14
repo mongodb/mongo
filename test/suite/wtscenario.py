@@ -66,9 +66,9 @@ megabyte = 1024 * 1024
 
 def check_scenarios(scenes):
     """
-    Make sure all scenarios have unique names
+    Make sure all scenarios have unique case insensitive names
     """
-    assert len(scenes) == len(dict(scenes))
+    assert len(scenes) == len(dict((k.lower(), v) for k, v in scenes))
     return scenes
 
 def multiply_scenarios(sep, *args):
