@@ -60,7 +60,9 @@ const char kMaxKey[] = "max";
 }  // namespace
 
 ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
-    : _minKey(std::move(minKey)), _maxKey(std::move(maxKey)) {}
+    : _minKey(std::move(minKey)), _maxKey(std::move(maxKey)) {
+    dassert(_minKey < _maxKey);
+}
 
 StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
     BSONElement minKey;
@@ -87,6 +89,12 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
         if (maxKey.Obj().isEmpty()) {
             return {ErrorCodes::BadValue, "The max key cannot be empty"};
         }
+    }
+
+    if (minKey.Obj() >= maxKey.Obj()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "min: " << minKey.Obj() << " should be less than max: "
+                              << maxKey.Obj()};
     }
 
     return ChunkRange(minKey.Obj().getOwned(), maxKey.Obj().getOwned());

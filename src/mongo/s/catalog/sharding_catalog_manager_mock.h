@@ -60,6 +60,15 @@ public:
                                const std::string& shardName,
                                const std::string& zoneName) override;
 
+    Status assignKeyRangeToZone(OperationContext* txn,
+                                const NamespaceString& ns,
+                                const ChunkRange& range,
+                                const std::string& zoneName) override;
+
+    Status removeKeyRangeFromZone(OperationContext* txn,
+                                  const NamespaceString& ns,
+                                  const ChunkRange& range) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;

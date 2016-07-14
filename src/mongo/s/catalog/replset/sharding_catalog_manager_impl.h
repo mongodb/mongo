@@ -76,6 +76,15 @@ public:
                                const std::string& shardName,
                                const std::string& zoneName) override;
 
+    Status assignKeyRangeToZone(OperationContext* txn,
+                                const NamespaceString& ns,
+                                const ChunkRange& range,
+                                const std::string& zoneName) override;
+
+    Status removeKeyRangeFromZone(OperationContext* txn,
+                                  const NamespaceString& ns,
+                                  const ChunkRange& range) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
@@ -198,6 +207,7 @@ private:
      * Builds all the expected indexes on the config server.
      */
     Status _initConfigIndexes(OperationContext* txn);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

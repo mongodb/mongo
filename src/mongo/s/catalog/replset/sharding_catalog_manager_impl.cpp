@@ -51,9 +51,11 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer/balancer_policy.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_lockpings.h"
@@ -121,6 +123,123 @@ private:
     Lock::GlobalLock _recursiveGlobalIXLock;
     Lock::ResourceLock _zoneLock;
 };
+
+/**
+ * Checks if the given key range for the given namespace conflicts with an existing key range.
+ * Note: range should have the full shard key.
+ * Returns ErrorCodes::RangeOverlapConflict is an overlap is detected.
+ */
+Status checkForOveralappedZonedKeyRange(OperationContext* txn,
+                                        Shard* configServer,
+                                        const NamespaceString& ns,
+                                        const ChunkRange& range,
+                                        const string& zoneName,
+                                        const KeyPattern& shardKeyPattern) {
+    DistributionStatus chunkDist(ns, {});
+
+    auto tagStatus = configServer->exhaustiveFindOnConfig(txn,
+                                                          kConfigPrimarySelector,
+                                                          repl::ReadConcernLevel::kLocalReadConcern,
+                                                          NamespaceString(TagsType::ConfigNS),
+                                                          BSON(TagsType::ns(ns.ns())),
+                                                          BSONObj(),
+                                                          0);
+    if (!tagStatus.isOK()) {
+        return tagStatus.getStatus();
+    }
+
+    const auto& tagDocList = tagStatus.getValue().docs;
+    for (const auto& tagDoc : tagDocList) {
+        auto tagParseStatus = TagsType::fromBSON(tagDoc);
+        if (!tagParseStatus.isOK()) {
+            return tagParseStatus.getStatus();
+        }
+
+        // Always extend ranges to full shard key to be compatible with tags created before
+        // the zone commands were implemented.
+        const auto& parsedTagDoc = tagParseStatus.getValue();
+        auto overlapStatus = chunkDist.addRangeToZone(
+            ZoneRange(shardKeyPattern.extendRangeBound(parsedTagDoc.getMinKey(), false),
+                      shardKeyPattern.extendRangeBound(parsedTagDoc.getMaxKey(), false),
+                      parsedTagDoc.getTag()));
+        if (!overlapStatus.isOK()) {
+            return overlapStatus;
+        }
+    }
+
+    auto overlapStatus =
+        chunkDist.addRangeToZone(ZoneRange(range.getMin(), range.getMax(), zoneName));
+    if (!overlapStatus.isOK()) {
+        return overlapStatus;
+    }
+
+    return Status::OK();
+}
+
+/**
+ * Returns a new range based on the given range with the full shard key.
+ * Returns:
+ * - ErrorCodes::NamespaceNotSharded if ns is not sharded.
+ * - ErrorCodes::ShardKeyNotFound if range is not compatible (for example, not a prefix of shard
+ * key) with the shard key of ns.
+ */
+StatusWith<ChunkRange> includeFullShardKey(OperationContext* txn,
+                                           Shard* configServer,
+                                           const NamespaceString& ns,
+                                           const ChunkRange& range,
+                                           KeyPattern* shardKeyPatternOut) {
+    auto findCollStatus =
+        configServer->exhaustiveFindOnConfig(txn,
+                                             kConfigPrimarySelector,
+                                             repl::ReadConcernLevel::kLocalReadConcern,
+                                             NamespaceString(CollectionType::ConfigNS),
+                                             BSON(CollectionType::fullNs(ns.ns())),
+                                             BSONObj(),
+                                             1);
+
+    if (!findCollStatus.isOK()) {
+        return findCollStatus.getStatus();
+    }
+
+    const auto& findCollResult = findCollStatus.getValue().docs;
+
+    if (findCollResult.size() < 1) {
+        return {ErrorCodes::NamespaceNotSharded, str::stream() << ns.ns() << " is not sharded"};
+    }
+
+    auto parseStatus = CollectionType::fromBSON(findCollResult.front());
+    if (!parseStatus.isOK()) {
+        return parseStatus.getStatus();
+    }
+
+    auto collDoc = parseStatus.getValue();
+    if (collDoc.getDropped()) {
+        return {ErrorCodes::NamespaceNotSharded, str::stream() << ns.ns() << " is not sharded"};
+    }
+
+    const auto& shardKeyPattern = collDoc.getKeyPattern();
+    const auto& shardKeyBSON = shardKeyPattern.toBSON();
+    *shardKeyPatternOut = shardKeyPattern;
+
+    if (!range.getMin().isFieldNamePrefixOf(shardKeyBSON)) {
+        return {ErrorCodes::ShardKeyNotFound,
+                str::stream() << "min: " << range.getMin() << " is not a prefix of the shard key "
+                              << shardKeyBSON
+                              << " of ns: "
+                              << ns.ns()};
+    }
+
+    if (!range.getMax().isFieldNamePrefixOf(shardKeyBSON)) {
+        return {ErrorCodes::ShardKeyNotFound,
+                str::stream() << "max: " << range.getMax() << " is not a prefix of the shard key "
+                              << shardKeyBSON
+                              << " of ns: "
+                              << ns.ns()};
+    }
+
+    return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),
+                      shardKeyPattern.extendRangeBound(range.getMax(), false));
+}
 
 }  // namespace
 
@@ -716,6 +835,92 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
     }
 
     return Status::OK();
+}
+
+
+Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
+                                                        const NamespaceString& ns,
+                                                        const ChunkRange& givenRange,
+                                                        const string& zoneName) {
+    ScopedZoneOpExclusiveLock scopedLock(txn);
+
+    auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
+
+    KeyPattern shardKeyPattern{BSONObj()};
+    auto fullShardKeyStatus =
+        includeFullShardKey(txn, configServer.get(), ns, givenRange, &shardKeyPattern);
+    if (!fullShardKeyStatus.isOK()) {
+        return fullShardKeyStatus.getStatus();
+    }
+
+    const auto& fullShardKeyRange = fullShardKeyStatus.getValue();
+
+    auto zoneExistStatus =
+        configServer->exhaustiveFindOnConfig(txn,
+                                             kConfigPrimarySelector,
+                                             repl::ReadConcernLevel::kLocalReadConcern,
+                                             NamespaceString(ShardType::ConfigNS),
+                                             BSON(ShardType::tags() << zoneName),
+                                             BSONObj(),
+                                             1);
+
+    if (!zoneExistStatus.isOK()) {
+        return zoneExistStatus.getStatus();
+    }
+
+    auto zoneExist = zoneExistStatus.getValue().docs.size() > 0;
+    if (!zoneExist) {
+        return {ErrorCodes::ZoneNotFound,
+                str::stream() << "zone " << zoneName << " does not exist"};
+    }
+
+    auto overlapStatus = checkForOveralappedZonedKeyRange(
+        txn, configServer.get(), ns, fullShardKeyRange, zoneName, shardKeyPattern);
+    if (!overlapStatus.isOK()) {
+        return overlapStatus;
+    }
+
+    BSONObj updateQuery(
+        BSON("_id" << BSON(TagsType::ns(ns.ns()) << TagsType::min(fullShardKeyRange.getMin()))));
+
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append("_id",
+                         BSON(TagsType::ns(ns.ns()) << TagsType::min(fullShardKeyRange.getMin())));
+    updateBuilder.append(TagsType::ns(), ns.ns());
+    updateBuilder.append(TagsType::min(), fullShardKeyRange.getMin());
+    updateBuilder.append(TagsType::max(), fullShardKeyRange.getMax());
+    updateBuilder.append(TagsType::tag(), zoneName);
+
+    auto updateStatus = _catalogClient->updateConfigDocument(
+        txn, TagsType::ConfigNS, updateQuery, updateBuilder.obj(), true, kNoWaitWriteConcern);
+
+    if (!updateStatus.isOK()) {
+        return updateStatus.getStatus();
+    }
+
+    return Status::OK();
+}
+
+Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* txn,
+                                                          const NamespaceString& ns,
+                                                          const ChunkRange& range) {
+    ScopedZoneOpExclusiveLock scopedLock(txn);
+
+    auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
+
+    KeyPattern shardKeyPattern{BSONObj()};
+    auto fullShardKeyStatus =
+        includeFullShardKey(txn, configServer.get(), ns, range, &shardKeyPattern);
+    if (!fullShardKeyStatus.isOK()) {
+        return fullShardKeyStatus.getStatus();
+    }
+
+    BSONObjBuilder removeBuilder;
+    removeBuilder.append("_id", BSON(TagsType::ns(ns.ns()) << TagsType::min(range.getMin())));
+    removeBuilder.append(TagsType::max(), range.getMax());
+
+    return _catalogClient->removeConfigDocuments(
+        txn, TagsType::ConfigNS, removeBuilder.obj(), kNoWaitWriteConcern);
 }
 
 void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) {

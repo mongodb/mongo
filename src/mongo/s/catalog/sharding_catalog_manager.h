@@ -36,7 +36,9 @@
 namespace mongo {
 
 class BSONObj;
+class ChunkRange;
 class ConnectionString;
+class NamespaceString;
 class OperationContext;
 class RemoteCommandTargeter;
 class ShardId;
@@ -111,6 +113,25 @@ public:
     virtual Status removeShardFromZone(OperationContext* txn,
                                        const std::string& shardName,
                                        const std::string& zoneName) = 0;
+
+    /**
+     * Assigns a range of a sharded collection to a particular shard zone. If range is a prefix of
+     * the shard key, the range will be converted into a new range with full shard key filled
+     * with MinKey values.
+     */
+    virtual Status assignKeyRangeToZone(OperationContext* txn,
+                                        const NamespaceString& ns,
+                                        const ChunkRange& range,
+                                        const std::string& zoneName) = 0;
+
+    /**
+     * Removes a range from a zone.
+     * Note: unlike assignKeyRangeToZone, the given range will never be converted to include the
+     * full shard key.
+     */
+    virtual Status removeKeyRangeFromZone(OperationContext* txn,
+                                          const NamespaceString& ns,
+                                          const ChunkRange& range) = 0;
 
     /**
      * Append information about the connection pools owned by the CatalogManager.

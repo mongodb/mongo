@@ -216,7 +216,7 @@ TEST_F(ChunkManagerTests, Basic) {
     newChunk.append("_id", oldChunk.getStringField("_id"));
     newChunk.append("ns", oldChunk.getStringField("ns"));
     newChunk.append("min", oldChunk.getObjectField("min"));
-    newChunk.append("max", oldChunk.getObjectField("min"));
+    newChunk.append("max", oldChunk.getObjectField("max"));
     newChunk.append("shard", oldChunk.getStringField("shard"));
     laterVersion.addToBSON(newChunk, ChunkType::DEPRECATED_lastmod());
     newChunk.append("lastmodEpoch", oldChunk.getField("lastmodEpoch").OID());

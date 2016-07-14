@@ -119,8 +119,7 @@ TEST(ChunkType, NotAscending) {
                                                               << chunkVersion.epoch()
                                                               << ChunkType::shard("shard0001"));
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
-    ASSERT_OK(chunkRes.getStatus());
-    ASSERT_FALSE(chunkRes.getValue().validate().isOK());
+    ASSERT_EQ(ErrorCodes::FailedToParse, chunkRes.getStatus());
 }
 
 TEST(ChunkType, CorrectContents) {
@@ -173,6 +172,22 @@ TEST(ChunkType, BadType) {
     BSONObj obj = BSON(ChunkType::name() << 0);
     StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
     ASSERT_FALSE(chunkRes.isOK());
+}
+
+TEST(ChunkRange, BasicBSONParsing) {
+    auto parseStatus =
+        ChunkRange::fromBSON(BSON("min" << BSON("x" << 0) << "max" << BSON("x" << 10)));
+    ASSERT_OK(parseStatus.getStatus());
+
+    auto chunkRange = parseStatus.getValue();
+    ASSERT_EQ(BSON("x" << 0), chunkRange.getMin());
+    ASSERT_EQ(BSON("x" << 10), chunkRange.getMax());
+}
+
+TEST(ChunkRange, MinGreaterThanMaxShouldError) {
+    auto parseStatus =
+        ChunkRange::fromBSON(BSON("min" << BSON("x" << 10) << "max" << BSON("x" << 0)));
+    ASSERT_EQ(ErrorCodes::FailedToParse, parseStatus.getStatus());
 }
 
 }  // unnamed namespace

@@ -114,6 +114,11 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
         const auto& intersectingRange =
             (minIntersect->second.min < range.max) ? minIntersect->second : maxIntersect->second;
 
+        if (intersectingRange.min == range.min && intersectingRange.max == range.max &&
+            intersectingRange.zone == range.zone) {
+            return Status::OK();
+        }
+
         return {ErrorCodes::RangeOverlapConflict,
                 str::stream() << "Zone range: " << range.toString()
                               << " is overlapping with existing: "

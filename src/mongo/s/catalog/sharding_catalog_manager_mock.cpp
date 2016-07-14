@@ -67,6 +67,18 @@ Status ShardingCatalogManagerMock::removeShardFromZone(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+Status ShardingCatalogManagerMock::assignKeyRangeToZone(OperationContext* txn,
+                                                        const NamespaceString& ns,
+                                                        const ChunkRange& range,
+                                                        const std::string& zoneName) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+Status ShardingCatalogManagerMock::removeKeyRangeFromZone(OperationContext* txn,
+                                                          const NamespaceString& ns,
+                                                          const ChunkRange& range) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
 
 void ShardingCatalogManagerMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
 
