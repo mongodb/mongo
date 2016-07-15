@@ -1066,6 +1066,19 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger --numClientsPerFixture=10
 
+## jstestfuzz concurrent sharded cluster WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_sharded_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger --numClientsPerFixture=10
+
 ## jstestfuzz replica set mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication
@@ -3864,6 +3877,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
@@ -3970,6 +3984,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
@@ -4176,6 +4191,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
@@ -4241,6 +4257,7 @@ buildvariants:
   - name: jstestfuzz
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
@@ -4300,6 +4317,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
