@@ -373,8 +373,6 @@ connection_runtime_config = [
         periodically checkpoint the database. Enabling the checkpoint server
         uses a session from the configured session_max''',
         type='category', subconfig=[
-        Config('name', '"WiredTigerCheckpoint"', r'''
-            the checkpoint name'''),
         Config('log_size', '0', r'''
             wait for this amount of log record bytes to be written to
                 the log between each checkpoint.  A database can configure

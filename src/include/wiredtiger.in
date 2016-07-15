@@ -1789,8 +1789,6 @@ struct __wt_connection {
 	 * database can configure both log_size and wait to set an upper bound
 	 * for checkpoints; setting this value above 0 configures periodic
 	 * checkpoints., an integer between 0 and 2GB; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string;
-	 * default \c "WiredTigerCheckpoint".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
 	 * checkpoint; setting this value above 0 configures periodic
 	 * checkpoints., an integer between 0 and 100000; default \c 0.}
@@ -2207,11 +2205,10 @@ struct __wt_connection {
  * configure both log_size and wait to set an upper bound for checkpoints;
  * setting this value above 0 configures periodic checkpoints., an integer
  * between 0 and 2GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the
- * checkpoint name., a string; default \c "WiredTigerCheckpoint".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
- * checkpoint; setting this value above 0 configures periodic checkpoints., an
- * integer between 0 and 100000; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
+ * seconds to wait between each checkpoint; setting this value above 0
+ * configures periodic checkpoints., an integer between 0 and 100000; default \c
+ * 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}

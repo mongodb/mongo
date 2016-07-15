@@ -139,6 +139,7 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 
 	p += snprintf(p, REMAIN(p, end),
 	    "create=true,"
+	    "checkpoint=(wait=5),"
 	    "cache_size=%" PRIu32 "MB,"
 	    "checkpoint_sync=false,"
 	    "error_prefix=\"%s\"",
