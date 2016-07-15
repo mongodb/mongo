@@ -122,6 +122,7 @@ error_code("FailedToSatisfyReadPreference", 133)
 # backported
 error_code("OplogStartMissing", 120)
 error_code("CappedPositionLost", 121)
+error_code("QueryPlanKilled", 173)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

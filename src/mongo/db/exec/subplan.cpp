@@ -423,6 +423,11 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // Plan each branch of the $or.
     Status subplanningStatus = planSubqueries();
     if (!subplanningStatus.isOK()) {
+        if (subplanningStatus == ErrorCodes::QueryPlanKilled) {
+            // Query planning cannot continue if the plan for one of the subqueries was killed
+            // because the collection or a candidate index may have been dropped.
+            return subplanningStatus;
+        }
         return choosePlanWholeQuery(yieldPolicy);
     }
 
@@ -430,6 +435,11 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // the overall winning plan from the resulting index tags.
     Status subplanSelectStat = choosePlanForSubqueries(yieldPolicy);
     if (!subplanSelectStat.isOK()) {
+        if (subplanSelectStat == ErrorCodes::QueryPlanKilled) {
+            // Query planning cannot continue if the plan was killed because the collection or a
+            // candidate index may have been dropped.
+            return subplanSelectStat;
+        }
         return choosePlanWholeQuery(yieldPolicy);
     }
 

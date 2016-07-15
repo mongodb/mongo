@@ -203,7 +203,7 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
         bool alive = yieldPolicy->yield(_fetcher.get());
 
         if (!alive) {
-            return Status(ErrorCodes::OperationFailed,
+            return Status(ErrorCodes::QueryPlanKilled,
                           "PlanExecutor killed during cached plan trial period");
         }
     }

@@ -171,7 +171,7 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 
         if (!alive) {
             _failure = true;
-            Status failStat(ErrorCodes::OperationFailed,
+            Status failStat(ErrorCodes::QueryPlanKilled,
                             "PlanExecutor killed during plan selection");
             _statusMemberId = WorkingSetCommon::allocateStatusMember(_candidates[0].ws, failStat);
             return failStat;

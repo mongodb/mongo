@@ -100,7 +100,8 @@ public:
      * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
      * take place.
      *
-     * Returns a non-OK status if the plan was killed during yield.
+     * Returns a non-OK status if query planning fails. In particular, this function returns
+     * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield.
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
