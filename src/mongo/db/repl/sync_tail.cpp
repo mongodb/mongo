@@ -760,7 +760,7 @@ void SyncTail::oplogApplication() {
         // (last) failed batch, whichever is larger.
         // This will cause this node to go into RECOVERING state
         // if we should crash and restart before updating finishing.
-        const OpTime start(getLastSetTimestamp(), OpTime::kUninitializedTerm);
+        const auto& start = lastWriteOpTime;
 
 
         // Take the max of the first endOptime (if we recovered) and the end of our batch.
