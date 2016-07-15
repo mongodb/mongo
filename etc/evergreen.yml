@@ -1891,7 +1891,7 @@ tasks:
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
 
           # Extract shell and banner files out of scons-made archive for separate shell archive
-          ${platform_decompress|tar zxvf} mongodb-binaries.${ext|tgz} mongodb-\*/bin/mongo${exe} mongodb-\*/[A-Z]\*
+          ${platform_decompress|tar --wildcards -zxvf} mongodb-binaries.${ext|tgz} mongodb-*/bin/mongo${exe} mongodb-*/\[A-Z\]*
 
           # Create new shell archive (make_archive.py uses filename to determine what format archive to create)
           ${python|python} buildscripts/make_archive.py -o mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} $(ls -d mongodb-*/bin/mongo${exe} mongodb-*/[A-Z]*)
@@ -1900,16 +1900,16 @@ tasks:
 
           if [ "${has_packages|}" = "true" ] ; then
             for rpm in $(find repo/ -name \*.rpm) ; do
-              pushd $(dirname $rpm)
+              cd $(dirname $rpm)
               # Use --package-file-suffix "" to overwrite existing RPM's instead of saving new "-signed.rpm" RPM files
               #
               notary-client.py --key-name "server-3.2" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
-              popd
+              cd ${workdir}/src
             done
             for release_file in $(find repo/ -name Release) ; do
-              pushd $(dirname $release_file)
+              cd $(dirname $release_file)
               notary-client.py --key-name "server-3.2" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
-              popd
+              cd ${workdir}/src
             done
           fi
           tar zcvf repo-${push_arch}.tgz repo || true
@@ -2478,8 +2478,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: linux-64-repeated-execution
   stepback: false
@@ -2858,8 +2856,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: ubuntu1404
   display_name: SSL Ubuntu 14.04
@@ -2969,9 +2965,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
-
 
 - name: ubuntu1604
   display_name: SSL Ubuntu 16.04
@@ -3081,9 +3074,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
-
 
 - name: enterprise-linux-64-amazon-ami
   display_name: Enterprise Amazon Linux
@@ -3159,8 +3149,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: amazon
   display_name: SSL Amazon Linux
@@ -3274,7 +3262,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: linux-32
   display_name: Linux 32-bit
@@ -3304,7 +3292,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: linux-64-decimal
   display_name: Linux (Decimal Enabled)
@@ -3436,7 +3424,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-64-2k8
   display_name: Windows 2008R2
@@ -3542,7 +3530,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-64-2k8-debug
   display_name: Windows 2008R2 DEBUG
@@ -3699,7 +3687,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: enterprise-windows-64-inmem
   display_name: Enterprise Windows (inMemory)
@@ -3845,10 +3833,10 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: ssl
-  - name: sslSpecial
+  - name: sslspecial
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: windows-32
   display_name: Windows 32-bit
@@ -3883,7 +3871,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #             OSX buildvariants           #
@@ -3977,7 +3965,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: osx-107-ssl
   display_name: SSL OS X 10.7
@@ -4068,7 +4056,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: osx-107-debug
   display_name: OS X 10.7 DEBUG
@@ -4148,7 +4136,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #          Redhat buildvariants           #
@@ -4201,8 +4189,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-rhel-62-64-bit
   display_name: Enterprise RHEL 6.2
@@ -4346,8 +4332,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0
@@ -4394,8 +4378,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
@@ -4534,7 +4516,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 - name: rhel55
   display_name: SSL RHEL 5.5
@@ -4756,8 +4738,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: rhel70
   display_name: SSL RHEL 7.0
@@ -4781,8 +4761,6 @@ buildvariants:
     packager_distro: rhel70
   tasks:
   - name: compile
-    distros:
-    - rhel70
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -4868,8 +4846,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -4922,8 +4898,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-ubuntu1404-64
   display_name: Enterprise Ubuntu 14.04
@@ -4972,8 +4946,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-ubuntu1604-64
   display_name: Enterprise Ubuntu 16.04
@@ -5022,8 +4994,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 
 
@@ -5078,8 +5048,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: suse12
   display_name: SSL SUSE 12
@@ -5190,8 +5158,7 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
+
 
 - name: enterprise-suse11-64
   display_name: Enterprise SLES 11
@@ -5240,8 +5207,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: suse11
   display_name: SSL SUSE 11
@@ -5352,8 +5317,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 ###########################################
 #          Solaris buildvariants          #
@@ -5438,7 +5401,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel55-test
+    - rhel70
 
 ###########################################
 #          Debian buildvariants           #
@@ -5491,8 +5454,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 - name: enterprise-debian81-64
   display_name: Enterprise Debian 8.1
@@ -5541,8 +5502,6 @@ buildvariants:
   - name: sslSpecial
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 
 - name: debian71
@@ -5657,9 +5616,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
-
 
 - name: debian81
   display_name: SSL Debian 8.1
@@ -5773,8 +5729,6 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
 
 
 ################################
@@ -6271,5 +6225,3 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: push
-    distros:
-    - rhel55-test
