@@ -29,8 +29,9 @@
 #pragma once
 
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/s/balancer/balancer_policy.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -52,8 +53,26 @@ class MigrationManager {
     MONGO_DISALLOW_COPYING(MigrationManager);
 
 public:
-    MigrationManager() = default;
-    ~MigrationManager() = default;
+    MigrationManager();
+    ~MigrationManager();
+
+    /**
+     * Encapsulates a migration request along with its parameters
+     */
+    struct MigrationRequest {
+    public:
+        MigrationRequest(MigrateInfo migrateInfo,
+                         uint64_t maxChunkSizeBytes,
+                         MigrationSecondaryThrottleOptions secondaryThrottle,
+                         bool waitForDelete);
+
+        MigrateInfo migrateInfo;
+        uint64_t maxChunkSizeBytes;
+        MigrationSecondaryThrottleOptions secondaryThrottle;
+        bool waitForDelete;
+    };
+
+    using MigrationRequestVector = std::vector<MigrationRequest>;
 
     /**
      * A blocking method that attempts to schedule all the migrations specified in
@@ -62,9 +81,8 @@ public:
      *
      * Returns a map of migration Status objects to indicate the success/failure of each migration.
      */
-    MigrationStatuses scheduleMigrations(
-        OperationContext* txn,
-        const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateMigrations);
+    MigrationStatuses scheduleMigrations(OperationContext* txn,
+                                         MigrationRequestVector candidateMigrations);
 
 private:
     /**
@@ -73,14 +91,13 @@ private:
      * v3.2 and must take the distributed lock itself.
      */
     struct Migration {
-        Migration(const MigrateInfo& migrateInfo,
-                  boost::optional<executor::TaskExecutor::CallbackHandle> callbackHandle);
+        explicit Migration(MigrationRequest migrationRequest);
 
         void setCallbackHandle(executor::TaskExecutor::CallbackHandle callbackHandle);
         void clearCallbackHandle();
 
-        // Pointer to the chunk details.
-        const MigrateInfo* chunkInfo;
+        // Migration request
+        MigrationRequest chunkInfo;
 
         // Callback handle for the active moveChunk request. If no migration is active for the chunk
         // specified in "chunkInfo", this won't be set.
@@ -89,7 +106,7 @@ private:
         // Indicates that the first moveChunk request failed with LockBusy. The second attempt must
         // be made without the balancer holding the collection distlock. This is necessary for
         // compatibility with a v3.2 shard, which expects to take the distlock itself.
-        bool oldShard;
+        bool oldShard{false};
     };
 
     /**

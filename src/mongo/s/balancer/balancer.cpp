@@ -32,30 +32,28 @@
 
 #include "mongo/s/balancer/balancer.h"
 
+#include <algorithm>
 #include <string>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_request.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
+#include "mongo/s/balancer/migration_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_raii.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/represent_as.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 
@@ -69,8 +67,6 @@ namespace {
 
 const Seconds kBalanceRoundDefaultInterval(10);
 const Seconds kShortBalanceRoundInterval(1);
-
-const char kChunkTooBig[] = "chunkTooBig";
 
 const auto getBalancer = ServiceContext::declareDecoration<std::unique_ptr<Balancer>>();
 
@@ -143,152 +139,6 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
     }
 
     warning() << sb.str();
-}
-
-void appendOperationDeadlineIfSet(OperationContext* txn, BSONObjBuilder* cmdBuilder) {
-    if (!txn->hasDeadline()) {
-        return;
-    }
-    // Treat a remaining max time less than 1ms as 1ms, since any smaller is treated as infinity
-    // or an error on the receiving node.
-    const auto remainingMicros = std::max(txn->getRemainingMaxTimeMicros(), Microseconds{1000});
-    const auto maxTimeMsArg = representAs<int32_t>(durationCount<Milliseconds>(remainingMicros));
-
-    // We know that remainingMicros > 1000us, so if maxTimeMsArg is not engaged, it is because
-    // remainingMicros was too big to represent as a 32-bit signed integer number of
-    // milliseconds. In that case, we omit a maxTimeMs argument on the command, implying "no max
-    // time".
-    if (!maxTimeMsArg) {
-        return;
-    }
-    cmdBuilder->append(QueryRequest::cmdOptionMaxTimeMS, *maxTimeMsArg);
-}
-
-/**
- * Blocking method, which requests a single chunk migration to run.
- */
-Status executeSingleMigration(OperationContext* txn,
-                              const MigrateInfo& migrateInfo,
-                              uint64_t maxChunkSizeBytes,
-                              const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                              bool waitForDelete) {
-    const NamespaceString nss(migrateInfo.ns);
-
-    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
-    }
-
-    ChunkManager* const cm = scopedCMStatus.getValue().cm();
-
-    auto c = cm->findIntersectingChunk(txn, migrateInfo.minKey);
-
-    BSONObjBuilder builder;
-    MoveChunkRequest::appendAsCommand(
-        &builder,
-        nss,
-        cm->getVersion(),
-        Grid::get(txn)->shardRegistry()->getConfigServerConnectionString(),
-        migrateInfo.from,
-        migrateInfo.to,
-        ChunkRange(c->getMin(), c->getMax()),
-        maxChunkSizeBytes,
-        secondaryThrottle,
-        waitForDelete,
-        false);  // takeDistLock flag.
-
-    appendOperationDeadlineIfSet(txn, &builder);
-
-    BSONObj cmdObj = builder.obj();
-
-    Status status{ErrorCodes::NotYetInitialized, "Uninitialized"};
-
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, migrateInfo.from);
-    if (!shard) {
-        status = {ErrorCodes::ShardNotFound,
-                  str::stream() << "shard " << migrateInfo.from << " not found"};
-    } else {
-        const std::string whyMessage(
-            str::stream() << "migrating chunk " << ChunkRange(c->getMin(), c->getMax()).toString()
-                          << " in "
-                          << nss.ns());
-        StatusWith<Shard::CommandResponse> cmdStatus{ErrorCodes::InternalError, "Uninitialized"};
-
-        // Send the first moveChunk command with the balancer holding the distlock.
-        {
-            StatusWith<DistLockManager::ScopedDistLock> distLockStatus =
-                Grid::get(txn)->catalogClient(txn)->distLock(txn, nss.ns(), whyMessage);
-            if (!distLockStatus.isOK()) {
-                const std::string msg = str::stream()
-                    << "Could not acquire collection lock for " << nss.ns() << " to migrate chunk ["
-                    << c->getMin() << "," << c->getMax() << ") due to "
-                    << distLockStatus.getStatus().toString();
-                warning() << msg;
-                return {distLockStatus.getStatus().code(), msg};
-            }
-
-            cmdStatus = shard->runCommand(txn,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          "admin",
-                                          cmdObj,
-                                          Shard::RetryPolicy::kNotIdempotent);
-        }
-
-        if (cmdStatus == ErrorCodes::LockBusy) {
-            // The moveChunk source shard attempted to take the distlock despite being told not to
-            // do so. The shard is likely v3.2 or earlier, which always expects to take the
-            // distlock. Reattempt the moveChunk without the balancer holding the distlock so that
-            // the shard can successfully acquire it.
-            BSONObjBuilder builder;
-            MoveChunkRequest::appendAsCommand(
-                &builder,
-                nss,
-                cm->getVersion(),
-                Grid::get(txn)->shardRegistry()->getConfigServerConnectionString(),
-                migrateInfo.from,
-                migrateInfo.to,
-                ChunkRange(c->getMin(), c->getMax()),
-                maxChunkSizeBytes,
-                secondaryThrottle,
-                waitForDelete,
-                true);  // takeDistLock flag.
-
-            appendOperationDeadlineIfSet(txn, &builder);
-
-            cmdObj = builder.obj();
-
-            cmdStatus = shard->runCommand(txn,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          "admin",
-                                          cmdObj,
-                                          Shard::RetryPolicy::kIdempotent);
-        }
-
-        if (!cmdStatus.isOK()) {
-            status = std::move(cmdStatus.getStatus());
-        } else {
-            status = std::move(cmdStatus.getValue().commandStatus);
-            BSONObj cmdResponse = std::move(cmdStatus.getValue().response);
-
-            // For backwards compatibility with 3.2 and earlier, where the move chunk command
-            // instead of returning a ChunkTooBig status includes an extra field in the response
-            bool chunkTooBig = false;
-            bsonExtractBooleanFieldWithDefault(cmdResponse, kChunkTooBig, false, &chunkTooBig);
-            if (chunkTooBig) {
-                invariant(!status.isOK());
-                status = {ErrorCodes::ChunkTooBig, status.reason()};
-            }
-        }
-    }
-
-    if (!status.isOK()) {
-        log() << "Move chunk " << cmdObj << " failed" << causedBy(status);
-        return {status.code(), str::stream() << "move failed due to " << status.toString()};
-    }
-
-    cm->reload(txn);
-
-    return Status::OK();
 }
 
 }  // namespace
@@ -388,11 +238,26 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
         return refreshStatus;
     }
 
-    return executeSingleMigration(txn,
-                                  *migrateInfo,
-                                  balancerConfig->getMaxChunkSizeBytes(),
-                                  balancerConfig->getSecondaryThrottle(),
-                                  balancerConfig->waitForDelete());
+    MigrationManager migrationManager;
+    auto migrationStatuses = migrationManager.scheduleMigrations(
+        txn,
+        {MigrationManager::MigrationRequest(std::move(*migrateInfo),
+                                            balancerConfig->getMaxChunkSizeBytes(),
+                                            balancerConfig->getSecondaryThrottle(),
+                                            balancerConfig->waitForDelete())});
+
+    invariant(migrationStatuses.size() == 1);
+
+    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
+    }
+
+    auto scopedCM = std::move(scopedCMStatus.getValue());
+    ChunkManager* const cm = scopedCM.cm();
+    cm->reload(txn);
+
+    return migrationStatuses.begin()->second;
 }
 
 Status Balancer::moveSingleChunk(OperationContext* txn,
@@ -406,11 +271,26 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
         return moveAllowedStatus;
     }
 
-    return executeSingleMigration(txn,
-                                  MigrateInfo(chunk.getNS(), newShardId, chunk),
-                                  maxChunkSizeBytes,
-                                  secondaryThrottle,
-                                  waitForDelete);
+    MigrationManager migrationManager;
+    auto migrationStatuses = migrationManager.scheduleMigrations(
+        txn,
+        {MigrationManager::MigrationRequest(MigrateInfo(chunk.getNS(), newShardId, chunk),
+                                            maxChunkSizeBytes,
+                                            secondaryThrottle,
+                                            waitForDelete)});
+
+    invariant(migrationStatuses.size() == 1);
+
+    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
+    }
+
+    auto scopedCM = std::move(scopedCMStatus.getValue());
+    ChunkManager* const cm = scopedCM.cm();
+    cm->reload(txn);
+
+    return migrationStatuses.begin()->second;
 }
 
 void Balancer::report(OperationContext* txn, BSONObjBuilder* builder) {
@@ -506,12 +386,9 @@ void Balancer::_mainThread() {
 
                 if (candidateChunks.empty()) {
                     LOG(1) << "no need to move any chunk";
-                    _balancedLastTime = 0;
+                    _balancedLastTime = false;
                 } else {
-                    _balancedLastTime = _moveChunks(txn.get(),
-                                                    candidateChunks,
-                                                    balancerConfig->getSecondaryThrottle(),
-                                                    balancerConfig->waitForDelete());
+                    _balancedLastTime = _moveChunks(txn.get(), candidateChunks);
 
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
                                               _balancedLastTime);
@@ -665,60 +542,69 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
             warning() << "Failed to enforce tag range for chunk " << splitInfo
                       << causedBy(splitStatus.getStatus());
         }
+
+        cm->reload(txn);
     }
 
     return Status::OK();
 }
 
 int Balancer::_moveChunks(OperationContext* txn,
-                          const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks,
-                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                          bool waitForDelete) {
-    int movedCount = 0;
+                          const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks) {
+    auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
 
-    for (const auto& migrateInfo : candidateChunks) {
-        auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
-
-        // If the balancer was disabled since we started this round, don't start new chunk moves
-        if (_stopRequested() || !balancerConfig->shouldBalance()) {
-            LOG(1) << "Stopping balancing round early as balancing was disabled";
-            return movedCount;
-        }
-
-        // Changes to metadata, borked metadata, and connectivity problems between shards
-        // should cause us to abort this chunk move, but shouldn't cause us to abort the entire
-        // round of chunks.
-        //
-        // TODO(spencer): We probably *should* abort the whole round on issues communicating
-        // with the config servers, but its impossible to distinguish those types of failures
-        // at the moment.
-        //
-        // TODO: Handle all these things more cleanly, since they're expected problems
-
-        const NamespaceString nss(migrateInfo.ns);
-
-        try {
-            Status status = executeSingleMigration(txn,
-                                                   migrateInfo,
-                                                   balancerConfig->getMaxChunkSizeBytes(),
-                                                   balancerConfig->getSecondaryThrottle(),
-                                                   balancerConfig->waitForDelete());
-            if (status.isOK()) {
-                movedCount++;
-            } else if (status == ErrorCodes::ChunkTooBig) {
-                log() << "Performing a split because migrate failed for size reasons"
-                      << causedBy(status);
-                _splitOrMarkJumbo(txn, nss, migrateInfo.minKey);
-                movedCount++;
-            } else {
-                log() << "Balancer move failed" << causedBy(status);
-            }
-        } catch (const DBException& ex) {
-            log() << "balancer move " << migrateInfo << " failed" << causedBy(ex);
-        }
+    // If the balancer was disabled since we started this round, don't start new chunk moves
+    if (_stopRequested() || !balancerConfig->shouldBalance()) {
+        LOG(1) << "Skipping balancing round because balancer was stopped";
+        return 0;
     }
 
-    return movedCount;
+    // Schedule all migrations in parallel
+    MigrationManager migrationManager;
+
+    MigrationManager::MigrationRequestVector migrationRequests;
+
+    for (const auto& migrateInfo : candidateChunks) {
+        migrationRequests.emplace_back(migrateInfo,
+                                       balancerConfig->getMaxChunkSizeBytes(),
+                                       balancerConfig->getSecondaryThrottle(),
+                                       balancerConfig->waitForDelete());
+    }
+
+    int numChunksProcessed = 0;
+
+    auto migrationStatuses = migrationManager.scheduleMigrations(txn, std::move(migrationRequests));
+
+    for (const auto& migrationStatusEntry : migrationStatuses) {
+        const Status& status = migrationStatusEntry.second;
+        if (status.isOK()) {
+            numChunksProcessed++;
+            continue;
+        }
+
+        const MigrationIdentifier& migrationId = migrationStatusEntry.first;
+
+        if (status == ErrorCodes::ChunkTooBig) {
+            numChunksProcessed++;
+
+            auto failedRequestIt = std::find_if(candidateChunks.begin(),
+                                                candidateChunks.end(),
+                                                [&migrationId](const MigrateInfo& migrateInfo) {
+                                                    return migrateInfo.getName() == migrationId;
+                                                });
+            invariant(failedRequestIt != candidateChunks.end());
+
+            log() << "Performing a split because migration " << failedRequestIt->toString()
+                  << " failed for size reasons" << causedBy(status);
+
+            _splitOrMarkJumbo(txn, NamespaceString(failedRequestIt->ns), failedRequestIt->minKey);
+            continue;
+        }
+
+        log() << "Balancer move " << migrationId << " failed" << causedBy(status);
+    }
+
+    return numChunksProcessed;
 }
 
 void Balancer::_splitOrMarkJumbo(OperationContext* txn,

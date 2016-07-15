@@ -13,7 +13,8 @@ selector:
     - jstests/sharding/addshard1.js
     - jstests/sharding/addshard2.js
     - jstests/sharding/auto1.js
-    - jstests/sharding/auto_rebalance.js
+    - jstests/sharding/auto_rebalance_parallel.js
+    - jstests/sharding/auto_rebalance_parallel_replica_sets.js
     - jstests/sharding/autosplit_heuristics.js
     - jstests/sharding/balance_tags1.js
     - jstests/sharding/balance_tags2.js

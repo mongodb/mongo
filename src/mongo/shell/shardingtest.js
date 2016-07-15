@@ -191,7 +191,7 @@ var ShardingTest = function(params) {
                 db = self.getDB('test');
 
                 try {
-                    sh[fn].apply(sh, arguments);
+                    return sh[fn].apply(sh, arguments);
                 } finally {
                     db = oldDb;
                 }
