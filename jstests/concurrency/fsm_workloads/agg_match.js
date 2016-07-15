@@ -20,10 +20,18 @@ var $config = extendWorkload($config, function($config, $super) {
         var cursor = db[collName].aggregate([{$match: {flag: true}}, {$out: otherCollName}]);
         assertAlways.eq(0, cursor.itcount(), 'cursor returned by $out should always be empty');
         // NOTE: This relies on the fast-path for .count() with no query being isolated.
-        // NOTE: There's a bug, SERVER-3645, where .count() is wrong on sharded collections, so
-        // we
+        // NOTE: There's a bug, SERVER-3645, where .count() is wrong on sharded collections, so we
         // blacklisted this test for sharded clusters.
         assertWhenOwnColl.eq(db[collName].count() / 2, db[otherCollName].count());
+    };
+
+    $config.setup = function setup(db, collName, cluster) {
+        $super.setup.apply(this, arguments);
+
+        // Create the collection to avoid a race in the initial aggregations. If the collection
+        // doesn't exist, only one $out can create it, and the others will see their target has been
+        // changed, and throw an error.
+        assertWhenOwnColl.commandWorked(db.runCommand({create: this.getOutCollName(collName)}));
     };
 
     $config.teardown = function teardown(db, collName, cluster) {

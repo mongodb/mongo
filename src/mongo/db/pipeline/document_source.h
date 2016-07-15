@@ -360,8 +360,6 @@ public:
         // avoid false negatives.
         virtual bool isSharded(const NamespaceString& ns) = 0;
 
-        virtual bool isCapped(const NamespaceString& ns) = 0;
-
         /**
          * Inserts 'objs' into 'ns' and returns the "detailed" last error object.
          */
@@ -377,6 +375,22 @@ public:
          */
         virtual void appendLatencyStats(const NamespaceString& nss,
                                         BSONObjBuilder* builder) const = 0;
+
+        /**
+         * Gets the collection options for the collection given by 'nss'.
+         */
+        virtual BSONObj getCollectionOptions(const NamespaceString& nss) = 0;
+
+        /**
+         * Performs the given rename command if the collection given by 'targetNs' has the same
+         * options as specified in 'originalCollectionOptions', and has the same indexes as
+         * 'originalIndexes'.
+         */
+        virtual Status renameIfOptionsAndIndexesHaveNotChanged(
+            const BSONObj& renameCommandObj,
+            const NamespaceString& targetNs,
+            const BSONObj& originalCollectionOptions,
+            const std::list<BSONObj>& originalIndexes) = 0;
 
         // Add new methods as needed.
     };
@@ -1004,9 +1018,15 @@ private:
     DocumentSourceOut(const NamespaceString& outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    // Sets _tempsNs and prepares it to receive data.
-    void prepTempCollection();
+    /**
+     * Creates the temporary collection we will insert into, using the given collection options,
+     * then creates each index in 'indexes' on that collection.
+     */
+    void prepTempCollection(const BSONObj& collectionOptions, const std::list<BSONObj>& indexes);
 
+    /**
+     * Inserts all of 'toInsert' into the temporary collection.
+     */
     void spill(const std::vector<BSONObj>& toInsert);
 
     bool _done;

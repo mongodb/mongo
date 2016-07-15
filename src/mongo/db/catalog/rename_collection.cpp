@@ -202,10 +202,15 @@ Status renameCollection(OperationContext* txn,
         while (sourceIndIt.more()) {
             const BSONObj currIndex = sourceIndIt.next()->infoObj();
 
-            // Process the source index.
+            // Process the source index, adding fields in the same order as they were originally.
             BSONObjBuilder newIndex;
-            newIndex.append("ns", target.ns());
-            newIndex.appendElementsUnique(currIndex);
+            for (auto&& elem : currIndex) {
+                if (elem.fieldNameStringData() == "ns") {
+                    newIndex.append("ns", target.ns());
+                } else {
+                    newIndex.append(elem);
+                }
+            }
             indexesToCopy.push_back(newIndex.obj());
         }
         indexer.init(indexesToCopy);

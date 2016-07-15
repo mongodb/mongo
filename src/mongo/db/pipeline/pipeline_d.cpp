@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -52,6 +53,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -84,16 +86,10 @@ public:
         return &_client;
     }
 
-    bool isSharded(const NamespaceString& ns) final {
-        const ChunkVersion unsharded(0, 0, OID());
-        return !(
-            ShardingState::get(_ctx->opCtx)->getVersion(ns.ns()).isWriteCompatibleWith(unsharded));
-    }
-
-    bool isCapped(const NamespaceString& ns) final {
-        AutoGetCollectionForRead ctx(_ctx->opCtx, ns.ns());
-        Collection* collection = ctx.getCollection();
-        return collection && collection->isCapped();
+    bool isSharded(const NamespaceString& nss) final {
+        AutoGetCollectionForRead autoColl(_ctx->opCtx, nss.ns());
+        auto css = CollectionShardingState::get(_ctx->opCtx, nss);
+        return bool(css->getMetadata());
     }
 
     BSONObj insert(const NamespaceString& ns, const std::vector<BSONObj>& objs) final {
@@ -130,8 +126,41 @@ public:
         return collection->getIndexCatalog()->findIdIndex(_ctx->opCtx);
     }
 
-    void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const {
+    void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const final {
         Top::get(_ctx->opCtx->getServiceContext()).appendLatencyStats(nss.ns(), builder);
+    }
+
+    BSONObj getCollectionOptions(const NamespaceString& nss) final {
+        const auto infos =
+            _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+        return infos.empty() ? BSONObj() : infos.front().getObjectField("options").getOwned();
+    }
+
+    Status renameIfOptionsAndIndexesHaveNotChanged(
+        const BSONObj& renameCommandObj,
+        const NamespaceString& targetNs,
+        const BSONObj& originalCollectionOptions,
+        const std::list<BSONObj>& originalIndexes) final {
+        Lock::GlobalWrite globalLock(_ctx->opCtx->lockState());
+
+        if (originalCollectionOptions != getCollectionOptions(targetNs)) {
+            return {ErrorCodes::CommandFailed,
+                    str::stream() << "collection options of target collection " << targetNs.ns()
+                                  << " changed during processing. Original options: "
+                                  << originalCollectionOptions
+                                  << ", new options: "
+                                  << getCollectionOptions(targetNs)};
+        }
+        if (originalIndexes != _client.getIndexSpecs(targetNs.ns())) {
+            return {ErrorCodes::CommandFailed,
+                    str::stream() << "indexes of target collection " << targetNs.ns()
+                                  << " changed during processing."};
+        }
+
+        BSONObj info;
+        bool ok = _client.runCommand("admin", renameCommandObj, info);
+        return ok ? Status::OK() : Status{ErrorCodes::CommandFailed,
+                                          str::stream() << "renameCollection failed: " << info};
     }
 
 private:

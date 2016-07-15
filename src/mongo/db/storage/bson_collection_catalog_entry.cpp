@@ -216,8 +216,14 @@ void BSONCollectionCatalogEntry::MetaData::rename(StringData toNS) {
     for (size_t i = 0; i < indexes.size(); i++) {
         BSONObj spec = indexes[i].spec;
         BSONObjBuilder b;
-        b.append("ns", toNS);
-        b.appendElementsUnique(spec);
+        // Add the fields in the same order they were in the original specification.
+        for (auto&& elem : spec) {
+            if (elem.fieldNameStringData() == "ns") {
+                b.append("ns", toNS);
+            } else {
+                b.append(elem);
+            }
+        }
         indexes[i].spec = b.obj();
     }
 }

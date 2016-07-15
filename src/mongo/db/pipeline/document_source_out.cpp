@@ -50,38 +50,18 @@ const char* DocumentSourceOut::getSourceName() const {
     return "$out";
 }
 
-static AtomicUInt32 aggOutCounter;
-void DocumentSourceOut::prepTempCollection() {
-    verify(_mongod);
-    verify(_tempNs.size() == 0);
+void DocumentSourceOut::prepTempCollection(const BSONObj& collectionOptions,
+                                           const std::list<BSONObj>& indexes) {
+    invariant(_mongod);
 
     DBClientBase* conn = _mongod->directClient();
 
-    // Fail early by checking before we do any work.
-    uassert(17017,
-            str::stream() << "namespace '" << _outputNs.ns()
-                          << "' is sharded so it can't be used for $out'",
-            !_mongod->isSharded(_outputNs));
-
-    // cannot $out to capped collection
-    uassert(17152,
-            str::stream() << "namespace '" << _outputNs.ns()
-                          << "' is capped so it can't be used for $out",
-            !_mongod->isCapped(_outputNs));
-
-    _tempNs = NamespaceString(StringData(str::stream() << _outputNs.db() << ".tmp.agg_out."
-                                                       << aggOutCounter.addAndFetch(1)));
-
     // Create output collection, copying options from existing collection if any.
     {
-        const auto infos =
-            conn->getCollectionInfos(_outputNs.db().toString(), BSON("name" << _outputNs.coll()));
-        const auto options = infos.empty() ? BSONObj() : infos.front().getObjectField("options");
-
         BSONObjBuilder cmd;
         cmd << "create" << _tempNs.coll();
         cmd << "temp" << true;
-        cmd.appendElementsUnique(options);
+        cmd.appendElementsUnique(collectionOptions);
 
         BSONObj info;
         bool ok = conn->runCommand(_outputNs.db().toString(), cmd.done(), info);
@@ -92,8 +72,7 @@ void DocumentSourceOut::prepTempCollection() {
                 ok);
     }
 
-    // copy indexes on _outputNs to _tempNs
-    const std::list<BSONObj> indexes = conn->getIndexSpecs(_outputNs.ns());
+    // copy indexes to _tempNs
     for (std::list<BSONObj>::const_iterator it = indexes.begin(); it != indexes.end(); ++it) {
         MutableDocument index((Document(*it)));
         index.remove("_id");  // indexes shouldn't have _ids but some existing ones do
@@ -119,20 +98,48 @@ void DocumentSourceOut::spill(const vector<BSONObj>& toInsert) {
             DBClientWithCommands::getLastErrorString(err).empty());
 }
 
+static AtomicUInt32 aggOutCounter;
 boost::optional<Document> DocumentSourceOut::getNext() {
     pExpCtx->checkForInterrupt();
 
-    // make sure we only write out once
+    // Make sure we only write out once.
     if (_done)
         return boost::none;
     _done = true;
 
-    verify(_mongod);
+    invariant(_mongod);
     DBClientBase* conn = _mongod->directClient();
 
-    prepTempCollection();
-    verify(_tempNs.size() != 0);
+    // Save the original collection options and index specs so we can check they didn't change
+    // during computation.
+    const BSONObj originalOutOptions = _mongod->getCollectionOptions(_outputNs);
+    const std::list<BSONObj> originalIndexes = conn->getIndexSpecs(_outputNs.ns());
 
+    // Check if it's sharded or capped to make sure we have a chance of succeeding before we do all
+    // the work. If the collection becomes capped during processing, the collection options will
+    // have changed, and the $out will fail. If it becomes sharded during processing, the final
+    // rename will fail.
+    uassert(17017,
+            str::stream() << "namespace '" << _outputNs.ns()
+                          << "' is sharded so it can't be used for $out'",
+            !_mongod->isSharded(_outputNs));
+
+    uassert(17152,
+            str::stream() << "namespace '" << _outputNs.ns()
+                          << "' is capped so it can't be used for $out",
+            originalOutOptions["capped"].eoo());
+
+    // We will write all results into a temporary collection, then rename the temporary collection
+    // to be the target collection once we are done.
+    _tempNs = NamespaceString(StringData(str::stream() << _outputNs.db() << ".tmp.agg_out."
+                                                       << aggOutCounter.addAndFetch(1)));
+    auto renameCommandObj =
+        BSON("renameCollection" << _tempNs.ns() << "to" << _outputNs.ns() << "dropTarget" << true);
+
+    // Copy all options and indexes from the output collection to temp collection, if any.
+    prepTempCollection(originalOutOptions, originalIndexes);
+
+    // Insert all documents into temp collection.
     vector<BSONObj> bufferedObjects;
     int bufferedBytes = 0;
     while (boost::optional<Document> next = pSource->getNext()) {
@@ -149,17 +156,9 @@ boost::optional<Document> DocumentSourceOut::getNext() {
     if (!bufferedObjects.empty())
         spill(bufferedObjects);
 
-    // Checking again to make sure we didn't become sharded while running.
-    uassert(17018,
-            str::stream() << "namespace '" << _outputNs.ns()
-                          << "' became sharded so it can't be used for $out'",
-            !_mongod->isSharded(_outputNs));
-
-    BSONObj rename =
-        BSON("renameCollection" << _tempNs.ns() << "to" << _outputNs.ns() << "dropTarget" << true);
-    BSONObj info;
-    bool ok = conn->runCommand("admin", rename, info);
-    uassert(16997, str::stream() << "renameCollection for $out failed: " << info, ok);
+    auto status = _mongod->renameIfOptionsAndIndexesHaveNotChanged(
+        renameCommandObj, _outputNs, originalOutOptions, originalIndexes);
+    uassert(16997, str::stream() << "$out failed: " << status.reason(), status.isOK());
 
     // We don't need to drop the temp collection in our destructor if the rename succeeded.
     _tempNs = NamespaceString("");
@@ -173,7 +172,7 @@ DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                      const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSourceNeedsMongod(pExpCtx),
       _done(false),
-      _tempNs("")  // filled in by prepTempCollection
+      _tempNs("")  // Filled in during getNext().
       ,
       _outputNs(outputNs) {}
 

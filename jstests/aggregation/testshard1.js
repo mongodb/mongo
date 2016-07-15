@@ -209,7 +209,8 @@ assert.eq(db.ts1.find().sort({_id: 1}).toArray(), outCollection.find().sort({_id
 shardedAggTest.startBalancer();  // TODO: remove after fixing SERVER-9622
 
 // Make sure we error out if $out collection is sharded
-assertErrorCode(outCollection, [{$out: db.ts1.getName()}], 17017);
+assert.commandFailed(
+    db.runCommand({aggregate: outCollection.getName(), pipeline: [{$out: db.ts1.getName()}]}));
 
 assert.writeOK(db.literal.save({dollar: false}));
 
