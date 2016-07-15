@@ -96,8 +96,6 @@ using str::stream;
 
 namespace {
 
-const char kWriteConcernField[] = "writeConcern";
-
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
@@ -767,12 +765,13 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* txn, const Na
             return {ErrorCodes::ShardNotFound,
                     str::stream() << "shard " << shardEntry.getName() << " not found"};
         }
-        auto dropResult = shard->runCommand(
-            txn,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            ns.db().toString(),
-            BSON("drop" << ns.coll() << "writeConcern" << txn->getWriteConcern().toBSON()),
-            Shard::RetryPolicy::kIdempotent);
+        auto dropResult =
+            shard->runCommand(txn,
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              ns.db().toString(),
+                              BSON("drop" << ns.coll() << WriteConcernOptions::kWriteConcernField
+                                          << txn->getWriteConcern().toBSON()),
+                              Shard::RetryPolicy::kIdempotent);
 
         if (!dropResult.isOK()) {
             return Status(dropResult.getStatus().code(),
@@ -1134,24 +1133,26 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         // convert w:1 or no write concern to w:majority before sending.
         WriteConcernOptions writeConcern;
         writeConcern.reset();
-        const char* writeConcernFieldName = "writeConcern";
-        BSONElement writeConcernElement = cmdObj[writeConcernFieldName];
+
+        BSONElement writeConcernElement = cmdObj[WriteConcernOptions::kWriteConcernField];
         bool initialCmdHadWriteConcern = !writeConcernElement.eoo();
         if (initialCmdHadWriteConcern) {
             Status status = writeConcern.parse(writeConcernElement.Obj());
             if (!status.isOK()) {
                 return Command::appendCommandStatus(*result, status);
             }
-            if (!writeConcern.validForConfigServers()) {
+
+            if (!(writeConcern.wNumNodes == 1 ||
+                  writeConcern.wMode == WriteConcernOptions::kMajority)) {
                 return Command::appendCommandStatus(
                     *result,
-                    Status(ErrorCodes::InvalidOptions,
-                           str::stream()
-                               << "Invalid replication write concern.  Writes to config server "
-                                  "replica sets must use w:'majority', got: "
-                               << writeConcern.toBSON()));
+                    {ErrorCodes::InvalidOptions,
+                     str::stream() << "Invalid replication write concern. User management write "
+                                      "commands may only use w:1 or w:'majority', got: "
+                                   << writeConcern.toBSON()});
             }
         }
+
         writeConcern.wMode = WriteConcernOptions::kMajority;
         writeConcern.wNumNodes = 0;
 
@@ -1162,13 +1163,13 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
             BSONObjIterator cmdObjIter(cmdObj);
             while (cmdObjIter.more()) {
                 BSONElement e = cmdObjIter.next();
-                if (str::equals(e.fieldName(), writeConcernFieldName)) {
+                if (WriteConcernOptions::kWriteConcernField == e.fieldName()) {
                     continue;
                 }
                 modifiedCmd.append(e);
             }
         }
-        modifiedCmd.append(writeConcernFieldName, writeConcern.toBSON());
+        modifiedCmd.append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
         cmdToRun = modifiedCmd.obj();
     }
 
@@ -1230,9 +1231,9 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
                                                           const BSONArray& preCondition,
                                                           const std::string& nss,
                                                           const ChunkVersion& lastChunkVersion) {
-    BSONObj cmd =
-        BSON("applyOps" << updateOps << "preCondition" << preCondition << kWriteConcernField
-                        << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
+                                  << WriteConcernOptions::kWriteConcernField
+                                  << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,
@@ -1511,9 +1512,9 @@ Status ShardingCatalogClientImpl::_checkDbDoesNotExist(OperationContext* txn,
 Status ShardingCatalogClientImpl::_createCappedConfigCollection(OperationContext* txn,
                                                                 StringData collName,
                                                                 int cappedSize) {
-    BSONObj createCmd =
-        BSON("create" << collName << "capped" << true << "size" << cappedSize << "writeConcern"
-                      << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+    BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize
+                                      << WriteConcernOptions::kWriteConcernField
+                                      << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     auto result = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,

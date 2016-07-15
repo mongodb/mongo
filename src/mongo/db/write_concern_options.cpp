@@ -62,6 +62,7 @@ constexpr StringData kWElectionIdFieldName = "wElectionId"_sd;
 const int WriteConcernOptions::kNoTimeout(0);
 const int WriteConcernOptions::kNoWaiting(-1);
 
+const StringData WriteConcernOptions::kWriteConcernField = "writeConcern"_sd;
 const char WriteConcernOptions::kMajority[] = "majority";
 
 const BSONObj WriteConcernOptions::Default = BSONObj();
@@ -159,7 +160,8 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
     }
 
     BSONElement writeConcernElement;
-    Status wcStatus = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
+    Status wcStatus =
+        bsonExtractTypedField(cmdObj, kWriteConcernField, Object, &writeConcernElement);
     if (!wcStatus.isOK()) {
         if (wcStatus == ErrorCodes::NoSuchKey) {
             // Return default write concern if no write concern is given.

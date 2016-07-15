@@ -47,6 +47,7 @@ public:
     static const BSONObj Unacknowledged;
     static const BSONObj Majority;
 
+    static const StringData kWriteConcernField;
     static const char kMajority[];  // = "majority"
 
     WriteConcernOptions() {

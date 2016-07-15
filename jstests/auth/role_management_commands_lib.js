@@ -2,20 +2,21 @@
  * This tests that all the different commands for role manipulation all work properly for all valid
  * forms of input.
  */
+function runAllRoleManagementCommandsTests(conn, writeConcern) {
+    'use strict';
 
-function runTest(conn) {
-    var authzErrorCode = 13;
     var hasAuthzError = function(result) {
         assert(result.hasWriteError());
-        assert.eq(authzErrorCode, result.getWriteError().code);
+        assert.eq(ErrorCodes.Unauthorized, result.getWriteError().code);
     };
 
     var userAdminConn = new Mongo(conn.host);
     var testUserAdmin = userAdminConn.getDB('test');
     var adminUserAdmin = userAdminConn.getDB('admin');
-    adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
+    adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']},
+                              writeConcern);
     adminUserAdmin.auth('userAdmin', 'pwd');
-    testUserAdmin.createUser({user: 'testUser', pwd: 'pwd', roles: []});
+    testUserAdmin.createUser({user: 'testUser', pwd: 'pwd', roles: []}, writeConcern);
     var db = conn.getDB('test');
     assert(db.auth('testUser', 'pwd'));
 
@@ -30,25 +31,30 @@ function runTest(conn) {
     (function testCreateRole() {
         jsTestLog("Testing createRole");
 
-        testUserAdmin.createRole({role: "testRole1", roles: ['read'], privileges: []});
+        testUserAdmin.createRole({role: "testRole1", roles: ['read'], privileges: []},
+                                 writeConcern);
         testUserAdmin.createRole({
             role: "testRole2",
             roles: [],
             privileges: [{resource: {db: 'test', collection: 'foo'}, actions: ['insert']}]
-        });
+        },
+                                 writeConcern);
         testUserAdmin.createRole({
             role: "testRole3",
             roles: ['testRole1', {role: 'testRole2', db: 'test'}],
             privileges: []
-        });
-        testUserAdmin.createRole({role: "testRole4", roles: [], privileges: []});
+        },
+                                 writeConcern);
+        testUserAdmin.createRole({role: "testRole4", roles: [], privileges: []}, writeConcern);
         adminUserAdmin.createRole({
             role: "adminRole",
             roles: [],
             privileges: [{resource: {cluster: true}, actions: ['connPoolSync']}]
-        });
+        },
+                                  writeConcern);
 
-        testUserAdmin.updateUser('testUser', {roles: [{role: 'adminRole', db: 'admin'}]});
+        testUserAdmin.updateUser(
+            'testUser', {roles: [{role: 'adminRole', db: 'admin'}]}, writeConcern);
         assert.throws(function() {
             db.foo.findOne();
         });
@@ -56,24 +62,24 @@ function runTest(conn) {
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.commandWorked(db.adminCommand('connPoolSync'));
 
-        testUserAdmin.updateUser('testUser', {roles: ['testRole1']});
+        testUserAdmin.updateUser('testUser', {roles: ['testRole1']}, writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
         assert.eq(0, db.foo.count());
         hasAuthzError(db.foo.insert({a: 1}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser('testUser', {roles: ['testRole2']});
+        testUserAdmin.updateUser('testUser', {roles: ['testRole2']}, writeConcern);
         assert.throws(function() {
             db.foo.findOne();
         });
         assert.writeOK(db.foo.insert({a: 1}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser('testUser', {roles: ['testRole3']});
+        testUserAdmin.updateUser('testUser', {roles: ['testRole3']}, writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -82,32 +88,34 @@ function runTest(conn) {
         assert.eq(2, db.foo.count());
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.eq(1, db.foo.findOne().a);
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser('testUser', {roles: [{role: 'testRole4', db: 'test'}]});
+        testUserAdmin.updateUser(
+            'testUser', {roles: [{role: 'testRole4', db: 'test'}]}, writeConcern);
         assert.throws(function() {
             db.foo.findOne();
         });
         hasAuthzError(db.foo.insert({a: 1}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
     })();
 
     (function testUpdateRole() {
         jsTestLog("Testing updateRole");
 
-        testUserAdmin.updateRole('testRole4',
-                                 {roles: [{role: 'testRole2', db: 'test'}, "testRole2"]});
+        testUserAdmin.updateRole(
+            'testRole4', {roles: [{role: 'testRole2', db: 'test'}, "testRole2"]}, writeConcern);
         assert.throws(function() {
             db.foo.findOne();
         });
         assert.writeOK(db.foo.insert({a: 1}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
 
         testUserAdmin.updateRole(
             'testRole4',
-            {privileges: [{resource: {db: 'test', collection: ''}, actions: ['find']}]});
+            {privileges: [{resource: {db: 'test', collection: ''}, actions: ['find']}]},
+            writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -116,9 +124,9 @@ function runTest(conn) {
         assert.eq(4, db.foo.count());
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.eq(1, db.foo.findOne().a);
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateRole('testRole4', {roles: []});
+        testUserAdmin.updateRole('testRole4', {roles: []}, writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -127,10 +135,11 @@ function runTest(conn) {
         assert.eq(4, db.foo.count());
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.eq(1, db.foo.findOne().a);
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
 
-        testUserAdmin.updateUser('testUser', {roles: [{role: 'adminRole', db: 'admin'}]});
-        adminUserAdmin.updateRole('adminRole', {roles: [{role: 'read', db: 'test'}]});
+        testUserAdmin.updateUser(
+            'testUser', {roles: [{role: 'adminRole', db: 'admin'}]}, writeConcern);
+        adminUserAdmin.updateRole('adminRole', {roles: [{role: 'read', db: 'test'}]}, writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -145,11 +154,12 @@ function runTest(conn) {
     (function testGrantRolesToRole() {
         jsTestLog("Testing grantRolesToRole");
 
-        assert.commandFailedWithCode(db.adminCommand('serverStatus'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('serverStatus'), ErrorCodes.Unauthorized);
 
         adminUserAdmin.grantRolesToRole(
             "adminRole",
-            ['clusterMonitor', {role: 'read', db: 'test'}, {role: 'testRole2', db: 'test'}]);
+            ['clusterMonitor', {role: 'read', db: 'test'}, {role: 'testRole2', db: 'test'}],
+            writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -167,23 +177,27 @@ function runTest(conn) {
 
         adminUserAdmin.revokeRolesFromRole(
             "adminRole",
-            ['clusterMonitor', {role: 'read', db: 'test'}, {role: 'testRole2', db: 'test'}]);
+            ['clusterMonitor', {role: 'read', db: 'test'}, {role: 'testRole2', db: 'test'}],
+            writeConcern);
         assert.throws(function() {
             db.foo.findOne();
         });
         hasAuthzError(db.foo.insert({a: 1}));
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.commandWorked(db.adminCommand('connPoolSync'));
-        assert.commandFailedWithCode(db.adminCommand('serverStatus'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('serverStatus'), ErrorCodes.Unauthorized);
     })();
 
     (function testGrantPrivilegesToRole() {
         jsTestLog("Testing grantPrivilegesToRole");
 
-        adminUserAdmin.grantPrivilegesToRole('adminRole', [
-            {resource: {cluster: true}, actions: ['serverStatus']},
-            {resource: {db: "", collection: ""}, actions: ['find']}
-        ]);
+        adminUserAdmin.grantPrivilegesToRole(
+            'adminRole',
+            [
+              {resource: {cluster: true}, actions: ['serverStatus']},
+              {resource: {db: "", collection: ""}, actions: ['find']}
+            ],
+            writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -194,11 +208,14 @@ function runTest(conn) {
         assert.commandWorked(db.adminCommand('connPoolSync'));
         assert.commandWorked(db.adminCommand('serverStatus'));
 
-        testUserAdmin.updateUser('testUser', {roles: ['testRole2']});
-        testUserAdmin.grantPrivilegesToRole('testRole2', [
-            {resource: {db: 'test', collection: ''}, actions: ['insert', 'update']},
-            {resource: {db: 'test', collection: 'foo'}, actions: ['find']}
-        ]);
+        testUserAdmin.updateUser('testUser', {roles: ['testRole2']}, writeConcern);
+        testUserAdmin.grantPrivilegesToRole(
+            'testRole2',
+            [
+              {resource: {db: 'test', collection: ''}, actions: ['insert', 'update']},
+              {resource: {db: 'test', collection: 'foo'}, actions: ['find']}
+            ],
+            writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -206,8 +223,8 @@ function runTest(conn) {
         assert.eq(6, db.foo.count());
         assert.writeOK(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.eq(2, db.foo.findOne().a);
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
-        assert.commandFailedWithCode(db.adminCommand('serverStatus'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(db.adminCommand('serverStatus'), ErrorCodes.Unauthorized);
     })();
 
     (function testRevokePrivilegesFromRole() {
@@ -215,7 +232,8 @@ function runTest(conn) {
 
         testUserAdmin.revokePrivilegesFromRole(
             'testRole2',
-            [{resource: {db: 'test', collection: ''}, actions: ['insert', 'update', 'find']}]);
+            [{resource: {db: 'test', collection: ''}, actions: ['insert', 'update', 'find']}],
+            writeConcern);
         assert.doesNotThrow(function() {
             db.foo.findOne();
         });
@@ -223,8 +241,8 @@ function runTest(conn) {
         assert.eq(7, db.foo.count());
         hasAuthzError(db.foo.update({}, {$inc: {a: 1}}, false, true));
         assert.eq(2, db.foo.findOne().a);
-        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
-        assert.commandFailedWithCode(db.adminCommand('serverStatus'), authzErrorCode);
+        assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
+        assert.commandFailedWithCode(db.adminCommand('serverStatus'), ErrorCodes.Unauthorized);
     })();
 
     (function testRolesInfo() {
@@ -265,7 +283,7 @@ function runTest(conn) {
     (function testDropRole() {
         jsTestLog("Testing dropRole");
 
-        testUserAdmin.grantRolesToUser('testUser', ['testRole4']);
+        testUserAdmin.grantRolesToUser('testUser', ['testRole4'], writeConcern);
 
         assert.doesNotThrow(function() {
             db.foo.findOne();
@@ -273,7 +291,7 @@ function runTest(conn) {
         assert.writeOK(db.foo.insert({a: 1}));
         assert.eq(8, db.foo.count());
 
-        assert.commandWorked(testUserAdmin.runCommand({dropRole: 'testRole2'}));
+        testUserAdmin.dropRole('testRole2', writeConcern);
 
         assert.doesNotThrow(function() {
             db.foo.findOne();
@@ -292,7 +310,7 @@ function runTest(conn) {
         });
         assert.eq(3, testUserAdmin.getRoles().length);
 
-        assert.commandWorked(testUserAdmin.runCommand({dropAllRolesFromDatabase: 1}));
+        testUserAdmin.dropAllRoles(writeConcern);
 
         assert.throws(function() {
             db.foo.findOne();
@@ -300,13 +318,3 @@ function runTest(conn) {
         assert.eq(0, testUserAdmin.getRoles().length);
     })();
 }
-
-jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: '', useHostname: false});
-runTest(conn);
-MongoRunner.stopMongod(conn.port);
-
-jsTest.log('Test sharding');
-var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1', useHostname: false});
-runTest(st.s);
-st.stop();
