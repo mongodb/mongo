@@ -46,6 +46,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/scopeguard.h"
 
@@ -88,6 +89,11 @@ Status renameCollection(OperationContext* txn,
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
+    // Make sure the source collection is not sharded.
+    if (CollectionShardingState::get(txn, source)->getMetadata()) {
+        return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    }
+
     {
         // Ensure that collection name does not exceed maximum length.
         // Ensure that index names do not push the length over the max.
@@ -120,8 +126,13 @@ Status renameCollection(OperationContext* txn,
         WriteUnitOfWork wunit(txn);
 
         // Check if the target namespace exists and if dropTarget is true.
-        // If target exists and dropTarget is not true, return false.
+        // Return a non-OK status if target exists and dropTarget is not true or if the collection
+        // is sharded.
         if (targetDB->getCollection(target)) {
+            if (CollectionShardingState::get(txn, target)->getMetadata()) {
+                return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
+            }
+
             if (!dropTarget) {
                 return Status(ErrorCodes::NamespaceExists, "target namespace exists");
             }

@@ -24,6 +24,24 @@
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard("test", "rename-rs0");
 
+    // Ensure renaming to or from a sharded collection fails.
+    jsTest.log('Testing renaming sharded collections');
+    s.adminCommand({shardCollection: 'test.shardedColl', key: {_id: 'hashed'}});
+
+    // Renaming from a sharded collection
+    assert.commandFailed(db.shardedColl.renameCollection('somethingElse'));
+
+    // Renaming to a sharded collection
+    assert.commandFailed(db.bar.renameCollection('shardedColl'));
+    const dropTarget = true;
+    assert.commandFailed(db.bar.renameCollection('shardedColl', dropTarget));
+
+    jsTest.log('Testing renaming sharded collections, directly on the shard');
+    var primary = replTest.getPrimary();
+    assert.commandFailed(primary.getDB('test').shardedColl.renameCollection('somethingElse'));
+    assert.commandFailed(primary.getDB('test').bar.renameCollection('shardedColl'));
+    assert.commandFailed(primary.getDB('test').bar.renameCollection('shardedColl', dropTarget));
+
     jsTest.log("Testing write concern (1)");
 
     db.foo.insert({_id: 3});
