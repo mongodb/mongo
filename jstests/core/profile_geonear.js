@@ -22,8 +22,12 @@
     }
     assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
-    assert.commandWorked(testDB.runCommand(
-        {geoNear: "test", near: {type: "Point", coordinates: [1, 1]}, spherical: true}));
+    assert.commandWorked(testDB.runCommand({
+        geoNear: "test",
+        near: {type: "Point", coordinates: [1, 1]},
+        spherical: true,
+        collation: {locale: "fr"}
+    }));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
@@ -36,6 +40,7 @@
     assert(profileObj.hasOwnProperty("execStats"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(coll.getName(), profileObj.command.geoNear, tojson(profileObj));
+    assert.eq({locale: "fr"}, profileObj.command.collation, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));

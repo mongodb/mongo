@@ -488,6 +488,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
         curOp.setNetworkOp_inlock(dbUpdate);
         curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
         curOp.setQuery_inlock(op.query);
+        curOp.setCollation_inlock(op.collation);
         curOp.ensureStarted();
     }
 
@@ -604,6 +605,7 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
         curOp.setNetworkOp_inlock(dbDelete);
         curOp.setLogicalOp_inlock(LogicalOp::opDelete);
         curOp.setQuery_inlock(op.query);
+        curOp.setCollation_inlock(op.collation);
         curOp.ensureStarted();
     }
 

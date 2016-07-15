@@ -30,7 +30,9 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    coll.mapReduce(mapFunction, reduceFunction, {query: {a: {$gte: 0}}, out: {inline: 1}});
+    coll.mapReduce(mapFunction,
+                   reduceFunction,
+                   {query: {a: {$gte: 0}}, out: {inline: 1}, collation: {locale: "fr"}});
 
     var profileObj = getLatestProfilerEntry(testDB);
 
@@ -42,6 +44,7 @@
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(coll.getName(), profileObj.command.mapreduce, tojson(profileObj));
+    assert.eq({locale: "fr"}, profileObj.command.collation, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));

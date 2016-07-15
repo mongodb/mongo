@@ -174,6 +174,14 @@ public:
     }
 
     /**
+     * The BSONObj returned may not be owned by CurOp. Callers should call getOwned() if they plan
+     * to reference beyond the lifetime of this CurOp instance.
+     */
+    BSONObj collation() const {
+        return _collation;
+    }
+
+    /**
      * Returns an owned BSONObj representing the original command. Used only by the getMore
      * command.
      */
@@ -302,6 +310,14 @@ public:
     }
 
     /**
+     * 'collation' must be either an owned BSONObj or guaranteed to outlive the OperationContext it
+     * is associated with.
+     */
+    void setCollation_inlock(const BSONObj& collation) {
+        _collation = collation;
+    }
+
+    /**
      * Sets the original command object. Used only by the getMore command.
      */
     void setOriginatingCommand_inlock(const BSONObj& commandObj) {
@@ -418,6 +434,7 @@ private:
     int _dbprofile{0};  // 0=off, 1=slow, 2=all
     std::string _ns;
     BSONObj _query;
+    BSONObj _collation;
     BSONObj _originatingCommand;  // Used by getMore to display original command.
     OpDebug _debug;
     std::string _message;

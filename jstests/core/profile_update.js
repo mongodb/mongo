@@ -21,12 +21,18 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert.writeOK(coll.update({a: {$gte: 2}}, {$set: {c: 1}, $inc: {a: -10}}));
+    assert.writeOK(
+        coll.update({a: {$gte: 2}},
+                    {$set: {c: 1}, $inc: {a: -10}},
+                    db.getMongo().writeMode() === "commands" ? {collation: {locale: "fr"}} : {}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "update", tojson(profileObj));
+    if (db.getMongo().writeMode() === "commands") {
+        assert.eq(profileObj.collation, {locale: "fr"}, tojson(profileObj));
+    }
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.keysInserted, 1, tojson(profileObj));

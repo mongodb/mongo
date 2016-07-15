@@ -22,7 +22,13 @@
     }
     assert.commandWorked(coll.createIndex({b: 1}));
 
-    coll.group({key: {a: 1, b: 1}, cond: {b: 3}, reduce: function() {}, initial: {}});
+    coll.group({
+        key: {a: 1, b: 1},
+        cond: {b: 3},
+        reduce: function() {},
+        initial: {},
+        collation: {locale: "fr"}
+    });
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
@@ -33,6 +39,7 @@
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.group.key, {a: 1, b: 1}, tojson(profileObj));
+    assert.eq(profileObj.command.group.collation, {locale: "fr"}, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.command.hasOwnProperty("group"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));

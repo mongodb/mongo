@@ -361,6 +361,10 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         appendAsObjOrString("query", _query, maxQuerySize, builder);
     }
 
+    if (!_collation.isEmpty()) {
+        appendAsObjOrString("collation", _collation, maxQuerySize, builder);
+    }
+
     if (!_originatingCommand.isEmpty()) {
         appendAsObjOrString("originatingCommand", _originatingCommand, maxQuerySize, builder);
     }
@@ -446,6 +450,12 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     if (!updateobj.isEmpty()) {
         s << " update: ";
         updateobj.toString(s);
+    }
+
+    auto collation = curop.collation();
+    if (!collation.isEmpty()) {
+        s << " collation: ";
+        collation.toString(s);
     }
 
     OPDEBUG_TOSTRING_HELP(cursorid);
@@ -547,6 +557,11 @@ void OpDebug::append(const CurOp& curop,
 
     if (!updateobj.isEmpty()) {
         appendAsObjOrString("updateobj", updateobj, maxElementSize, &b);
+    }
+
+    auto collation = curop.collation();
+    if (!collation.isEmpty()) {
+        appendAsObjOrString("collation", collation, maxElementSize, &b);
     }
 
     OPDEBUG_APPEND_NUMBER(cursorid);

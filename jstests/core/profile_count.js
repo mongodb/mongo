@@ -21,7 +21,7 @@
         assert.writeOK(coll.insert({a: i}));
     }
 
-    assert.eq(10, coll.count());
+    assert.eq(10, coll.count({}, {collation: {locale: "fr"}}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
@@ -29,6 +29,7 @@
     assert.eq(profileObj.op, "command", tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.count, coll.getName(), tojson(profileObj));
+    assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
     assert.eq(profileObj.planSummary, "COUNT", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));

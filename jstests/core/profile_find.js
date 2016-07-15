@@ -21,9 +21,13 @@
     for (i = 0; i < 3; ++i) {
         assert.writeOK(coll.insert({a: i, b: i}));
     }
-    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr"}}));
 
-    assert.neq(coll.findOne({a: 1}), null);
+    if (!isLegacyReadMode) {
+        assert.eq(coll.find({a: 1}).collation({locale: "fr"}).limit(1).itcount(), 1);
+    } else {
+        assert.neq(coll.findOne({a: 1}), null);
+    }
 
     var profileObj = getLatestProfilerEntry(testDB);
 
@@ -41,6 +45,10 @@
         assert.eq(profileObj.query.limit, 1, tojson(profileObj));
         assert.eq(
             profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+    }
+
+    if (!isLegacyReadMode) {
+        assert.eq(profileObj.query.collation, {locale: "fr"});
     }
     assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
     assert(!profileObj.hasOwnProperty("cursorid"), tojson(profileObj));

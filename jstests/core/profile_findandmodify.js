@@ -20,7 +20,9 @@
     }
     assert.commandWorked(coll.createIndex({b: 1}));
 
-    assert.eq({_id: 2, a: 2, b: 2}, coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}}));
+    assert.eq(
+        {_id: 2, a: 2, b: 2},
+        coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}, collation: {locale: "fr"}}));
 
     var profileObj = getLatestProfilerEntry(testDB);
 
@@ -28,6 +30,7 @@
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.command.query, {a: 2}, tojson(profileObj));
     assert.eq(profileObj.command.update, {$inc: {b: 1}}, tojson(profileObj));
+    assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
     assert.eq(profileObj.updateobj, {$inc: {b: 1}}, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 3, tojson(profileObj));

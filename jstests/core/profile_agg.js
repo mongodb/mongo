@@ -22,7 +22,7 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert.eq(8, coll.aggregate([{$match: {a: {$gte: 2}}}]).itcount());
+    assert.eq(8, coll.aggregate([{$match: {a: {$gte: 2}}}], {collation: {locale: "fr"}}).itcount());
     var profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
@@ -33,6 +33,7 @@
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
+    assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
