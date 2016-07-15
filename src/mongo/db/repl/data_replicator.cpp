@@ -482,7 +482,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
         stdx::make_unique<DatabasesCloner>(
             _storage,
             _exec,
-            _syncSource,
+            syncSource,
             [](BSONObj dbInfo) {
                 const std::string name = dbInfo["name"].str();
                 return (name != "local");
@@ -493,7 +493,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     const NamespaceString ns(_opts.remoteOplogNS);
     lk.unlock();
     // get the latest oplog entry, and parse out the optime + hash.
-    const auto lastOplogEntry = getLatestOplogEntry(_exec, _syncSource, ns);
+    const auto lastOplogEntry = getLatestOplogEntry(_exec, syncSource, ns);
     const auto lastOplogEntryOpTimeWithHashStatus = lastOplogEntry.isOK()
         ? parseOpTimeWithHash(lastOplogEntry.getValue())
         : StatusWith<OpTimeWithHash>{lastOplogEntry.getStatus()};
@@ -518,7 +518,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     const auto config = uassertStatusOK(_dataReplicatorExternalState->getCurrentConfig());
     _oplogFetcher = stdx::make_unique<OplogFetcher>(_exec,
                                                     lastOpTimeWithHash,
-                                                    _syncSource,
+                                                    syncSource,
                                                     _opts.remoteOplogNS,
                                                     config,
                                                     _dataReplicatorExternalState.get(),
