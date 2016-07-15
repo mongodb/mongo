@@ -5,6 +5,7 @@ Driver of the test execution framework.
 from __future__ import absolute_import
 
 import threading
+import time
 
 from . import fixtures
 from . import hooks as _hooks
@@ -148,6 +149,10 @@ class TestGroupExecutor(object):
                 t.daemon = True
                 t.start()
                 threads.append(t)
+                # SERVER-24729 Need to stagger when jobs start to reduce I/O load if there
+                # are many of them.  Both the 5 and the 10 are arbitrary.
+                if len(threads) >= 5:
+                    time.sleep(10)
 
             joined = False
             while not joined:
