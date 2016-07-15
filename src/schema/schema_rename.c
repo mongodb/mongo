@@ -64,7 +64,7 @@ __rename_file(
 	WT_ERR(__wt_metadata_insert(session, newuri, oldvalue));
 
 	/* Rename the underlying file. */
-	WT_ERR(__wt_fs_rename(session, filename, newfile));
+	WT_ERR(__wt_fs_rename(session, filename, newfile, false));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
 

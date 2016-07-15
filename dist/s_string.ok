@@ -118,6 +118,7 @@ FLv
 FNV
 FORALL
 FOREACH
+FS
 FULLFSYNC
 FindClose
 FindFirstFile

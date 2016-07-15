@@ -141,7 +141,8 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		    ret = bm->checkpoint_resolve(bm, session));
 		break;
 	case WT_ST_DROP_COMMIT:
-		if ((ret = __wt_block_manager_drop(session, trk->a)) != 0)
+		if ((ret =
+		    __wt_block_manager_drop(session, trk->a, false)) != 0)
 			__wt_err(session, ret,
 			    "metadata remove dropped file %s", trk->a);
 		break;
@@ -188,13 +189,15 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		 * For removes, b is NULL.
 		 */
 		if (trk->a != NULL && trk->b != NULL &&
-		    (ret = __wt_rename_and_sync_directory(session,
-		    trk->b + strlen("file:"), trk->a + strlen("file:"))) != 0)
+		    (ret = __wt_fs_rename(session,
+		    trk->b + strlen("file:"), trk->a + strlen("file:"),
+		    true)) != 0)
 			__wt_err(session, ret,
 			    "metadata unroll rename %s to %s", trk->b, trk->a);
 
-		if (trk->a == NULL && (ret =
-		    __wt_fs_remove(session, trk->b + strlen("file:"))) != 0)
+		if (trk->a == NULL &&
+		    (ret = __wt_fs_remove(session,
+		    trk->b + strlen("file:"), false)) != 0)
 			__wt_err(session, ret,
 			    "metadata unroll create %s", trk->b);
 

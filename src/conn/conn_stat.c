@@ -429,7 +429,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
 		WT_RET(__wt_fopen(session, tmp->mem,
-		    WT_OPEN_CREATE | WT_OPEN_FIXED, WT_STREAM_APPEND,
+		    WT_FS_OPEN_CREATE | WT_FS_OPEN_FIXED, WT_STREAM_APPEND,
 		    &log_stream));
 	}
 	conn->stat_fs = log_stream;

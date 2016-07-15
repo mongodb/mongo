@@ -243,7 +243,7 @@ __backup_start(
 	 * doesn't confuse restarting in the source database.
 	 */
 	WT_ERR(__wt_fopen(session, WT_BACKUP_TMP,
-	    WT_OPEN_CREATE, WT_STREAM_WRITE, &cb->bfs));
+	    WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &cb->bfs));
 	/*
 	 * If a list of targets was specified, work our way through them.
 	 * Else, generate a list of all database objects.
@@ -269,7 +269,7 @@ __backup_start(
 		 */
 		dest = WT_INCREMENTAL_BACKUP;
 		WT_ERR(__wt_fopen(session, WT_INCREMENTAL_SRC,
-		    WT_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
+		    WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
 	} else {
@@ -292,7 +292,7 @@ err:	/* Close the hot backup file. */
 		WT_TRET(__wt_fclose(session, &srcfs));
 	if (ret == 0) {
 		WT_ASSERT(session, dest != NULL);
-		WT_TRET(__wt_fs_rename(session, WT_BACKUP_TMP, dest));
+		WT_TRET(__wt_fs_rename(session, WT_BACKUP_TMP, dest, false));
 	}
 
 	return (ret);
@@ -449,10 +449,10 @@ __wt_backup_file_remove(WT_SESSION_IMPL *session)
 	 * always know we were a source directory while there's any chance of
 	 * an incremental backup file existing.
 	 */
-	WT_TRET(__wt_remove_if_exists(session, WT_BACKUP_TMP));
-	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_BACKUP));
-	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_SRC));
-	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP));
+	WT_TRET(__wt_remove_if_exists(session, WT_BACKUP_TMP, true));
+	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_BACKUP, true));
+	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_SRC, true));
+	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP, true));
 	return (ret);
 }
 

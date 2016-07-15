@@ -701,11 +701,11 @@ __log_openfile(WT_SESSION_IMPL *session,
 	    "opening log %s", (const char *)buf->data));
 	wtopen_flags = 0;
 	if (LF_ISSET(WT_LOG_OPEN_CREATE_OK))
-		FLD_SET(wtopen_flags, WT_OPEN_CREATE);
+		FLD_SET(wtopen_flags, WT_FS_OPEN_CREATE);
 	if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
-		FLD_SET(wtopen_flags, WT_OPEN_DIRECTIO);
+		FLD_SET(wtopen_flags, WT_FS_OPEN_DIRECTIO);
 	WT_ERR(__wt_open(
-	    session, buf->data, WT_OPEN_FILE_TYPE_LOG, wtopen_flags, fhp));
+	    session, buf->data, WT_FS_OPEN_FILE_TYPE_LOG, wtopen_flags, fhp));
 
 	/*
 	 * If we are not creating the log file but opening it for reading,
@@ -777,7 +777,7 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 	 * All file setup, writing the header and pre-allocation was done
 	 * before.  We only need to rename it.
 	 */
-	WT_ERR(__wt_fs_rename(session, from_path->data, to_path->data));
+	WT_ERR(__wt_fs_rename(session, from_path->data, to_path->data, false));
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
@@ -1063,7 +1063,7 @@ __wt_log_allocfile(
 	/*
 	 * Rename it into place and make it available.
 	 */
-	WT_ERR(__wt_fs_rename(session, from_path->data, to_path->data));
+	WT_ERR(__wt_fs_rename(session, from_path->data, to_path->data, false));
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
@@ -1086,7 +1086,7 @@ __wt_log_remove(WT_SESSION_IMPL *session,
 	WT_ERR(__log_filename(session, lognum, file_prefix, path));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_remove: remove log %s", (char *)path->data));
-	WT_ERR(__wt_fs_remove(session, path->data));
+	WT_ERR(__wt_fs_remove(session, path->data, false));
 err:	__wt_scr_free(session, &path);
 	return (ret);
 }
@@ -1122,7 +1122,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "log_open: open fh to directory %s", conn->log_path));
 		WT_RET(__wt_open(session, conn->log_path,
-		    WT_OPEN_FILE_TYPE_DIRECTORY, 0, &log->log_dir_fh));
+		    WT_FS_OPEN_FILE_TYPE_DIRECTORY, 0, &log->log_dir_fh));
 	}
 
 	if (!F_ISSET(conn, WT_CONN_READONLY)) {

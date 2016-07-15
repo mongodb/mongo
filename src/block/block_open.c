@@ -15,9 +15,10 @@ static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
  *	Drop a file.
  */
 int
-__wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_drop(
+    WT_SESSION_IMPL *session, const char *filename, bool durable)
 {
-	 return (__wt_remove_if_exists(session, filename));
+	return (__wt_remove_if_exists(session, filename, durable));
 }
 
 /*
@@ -43,8 +44,9 @@ __wt_block_manager_create(
 	 * in our space. Move any existing files out of the way and complain.
 	 */
 	for (;;) {
-		if ((ret = __wt_open(session, filename, WT_OPEN_FILE_TYPE_DATA,
-		    WT_OPEN_CREATE | WT_OPEN_EXCLUSIVE, &fh)) == 0)
+		if ((ret = __wt_open(session, filename,
+		    WT_FS_OPEN_FILE_TYPE_DATA, WT_FS_OPEN_CREATE |
+		    WT_FS_OPEN_DURABLE | WT_FS_OPEN_EXCLUSIVE, &fh)) == 0)
 			break;
 		WT_ERR_TEST(ret != EEXIST, ret);
 
@@ -56,7 +58,7 @@ __wt_block_manager_create(
 			WT_ERR(__wt_fs_exist(session, tmp->data, &exists));
 			if (!exists) {
 				WT_ERR(__wt_fs_rename(
-				    session, filename, tmp->data));
+				    session, filename, tmp->data, false));
 				WT_ERR(__wt_msg(session,
 				    "unexpected file %s found, renamed to %s",
 				    filename, (const char *)tmp->data));
@@ -77,16 +79,9 @@ __wt_block_manager_create(
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, &fh));
 
-	/*
-	 * Some filesystems require that we sync the directory to be confident
-	 * that the file will appear.
-	 */
-	if (ret == 0)
-		WT_TRET(__wt_fs_directory_sync(session, filename));
-
 	/* Undo any create on error. */
 	if (ret != 0)
-		WT_TRET(__wt_fs_remove(session, filename));
+		WT_TRET(__wt_fs_remove(session, filename, false));
 
 err:	__wt_scr_free(session, &tmp);
 
@@ -207,11 +202,11 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	 */
 	flags = 0;
 	if (readonly && FLD_ISSET(conn->direct_io, WT_DIRECT_IO_CHECKPOINT))
-		LF_SET(WT_OPEN_DIRECTIO);
+		LF_SET(WT_FS_OPEN_DIRECTIO);
 	if (!readonly && FLD_ISSET(conn->direct_io, WT_DIRECT_IO_DATA))
-		LF_SET(WT_OPEN_DIRECTIO);
+		LF_SET(WT_FS_OPEN_DIRECTIO);
 	WT_ERR(__wt_open(
-	    session, filename, WT_OPEN_FILE_TYPE_DATA, flags, &block->fh));
+	    session, filename, WT_FS_OPEN_FILE_TYPE_DATA, flags, &block->fh));
 
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(session, block->fh, &block->size));

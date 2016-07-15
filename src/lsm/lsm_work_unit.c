@@ -526,7 +526,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	    ret = __wt_schema_drop(session, uri, drop_cfg));
 
 	if (ret == 0)
-		ret = __wt_fs_remove(session, uri + strlen("file:"));
+		ret = __wt_fs_remove(session, uri + strlen("file:"), false);
 	WT_RET(__wt_verbose(session, WT_VERB_LSM, "Dropped %s", uri));
 
 	if (ret == EBUSY || ret == ENOENT)
