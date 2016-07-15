@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
@@ -154,20 +155,22 @@ void SDHasher_check(void);
 
 template <>
 void SDHasher_check<4>(void) {
-    ASSERT_EQUALS(StringData::Hasher()(""), static_cast<size_t>(0));
-    ASSERT_EQUALS(StringData::Hasher()("foo"), static_cast<size_t>(4138058784ULL));
-    ASSERT_EQUALS(StringData::Hasher()("pizza"), static_cast<size_t>(3587803311ULL));
-    ASSERT_EQUALS(StringData::Hasher()("mongo"), static_cast<size_t>(3724335885ULL));
-    ASSERT_EQUALS(StringData::Hasher()("murmur"), static_cast<size_t>(1945310157ULL));
+    const auto& strCmp = SimpleStringDataComparator::kInstance;
+    ASSERT_EQUALS(strCmp.hash(""), static_cast<size_t>(0));
+    ASSERT_EQUALS(strCmp.hash("foo"), static_cast<size_t>(4138058784ULL));
+    ASSERT_EQUALS(strCmp.hash("pizza"), static_cast<size_t>(3587803311ULL));
+    ASSERT_EQUALS(strCmp.hash("mongo"), static_cast<size_t>(3724335885ULL));
+    ASSERT_EQUALS(strCmp.hash("murmur"), static_cast<size_t>(1945310157ULL));
 }
 
 template <>
 void SDHasher_check<8>(void) {
-    ASSERT_EQUALS(StringData::Hasher()(""), static_cast<size_t>(0));
-    ASSERT_EQUALS(StringData::Hasher()("foo"), static_cast<size_t>(16316970633193145697ULL));
-    ASSERT_EQUALS(StringData::Hasher()("pizza"), static_cast<size_t>(12165495155477134356ULL));
-    ASSERT_EQUALS(StringData::Hasher()("mongo"), static_cast<size_t>(2861051452199491487ULL));
-    ASSERT_EQUALS(StringData::Hasher()("murmur"), static_cast<size_t>(18237957392784716687ULL));
+    const auto& strCmp = SimpleStringDataComparator::kInstance;
+    ASSERT_EQUALS(strCmp.hash(""), static_cast<size_t>(0));
+    ASSERT_EQUALS(strCmp.hash("foo"), static_cast<size_t>(16316970633193145697ULL));
+    ASSERT_EQUALS(strCmp.hash("pizza"), static_cast<size_t>(12165495155477134356ULL));
+    ASSERT_EQUALS(strCmp.hash("mongo"), static_cast<size_t>(2861051452199491487ULL));
+    ASSERT_EQUALS(strCmp.hash("murmur"), static_cast<size_t>(18237957392784716687ULL));
 }
 
 TEST(Hasher, Str1) {

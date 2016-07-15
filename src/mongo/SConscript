@@ -65,6 +65,7 @@ baseSource=[
     'base/initializer_dependency_graph.cpp',
     'base/make_string_vector.cpp',
     'base/parse_number.cpp',
+    'base/simple_string_data_comparator.cpp',
     'base/status.cpp',
     'base/string_data.cpp',
     'base/validate_locale.cpp',

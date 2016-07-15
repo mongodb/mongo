@@ -11,6 +11,7 @@ env.Library(
     source=[
         "collation_index_key.cpp",
         "collation_spec.cpp",
+        "collator_interface.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

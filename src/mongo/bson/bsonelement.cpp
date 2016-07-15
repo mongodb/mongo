@@ -36,6 +36,7 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/base64.h"
@@ -1057,7 +1058,7 @@ size_t BSONElement::Hasher::operator()(const BSONElement& elem) const {
 
     const StringData fieldName = elem.fieldNameStringData();
     if (!fieldName.empty()) {
-        boost::hash_combine(hash, StringData::Hasher()(fieldName));
+        boost::hash_combine(hash, SimpleStringDataComparator::kInstance.hash(fieldName));
     }
 
     switch (elem.type()) {
@@ -1126,7 +1127,8 @@ size_t BSONElement::Hasher::operator()(const BSONElement& elem) const {
         case mongo::Code:
         case mongo::Symbol:
         case mongo::String:
-            boost::hash_combine(hash, StringData::Hasher()(elem.valueStringData()));
+            boost::hash_combine(hash,
+                                SimpleStringDataComparator::kInstance.hash(elem.valueStringData()));
             break;
 
         case mongo::Object:
@@ -1138,18 +1140,20 @@ size_t BSONElement::Hasher::operator()(const BSONElement& elem) const {
         case mongo::BinData:
             // All bytes of the value are required to be identical.
             boost::hash_combine(hash,
-                                StringData::Hasher()(StringData(elem.value(), elem.valuesize())));
+                                SimpleStringDataComparator::kInstance.hash(
+                                    StringData(elem.value(), elem.valuesize())));
             break;
 
         case mongo::RegEx:
-            boost::hash_combine(hash, StringData::Hasher()(elem.regex()));
-            boost::hash_combine(hash, StringData::Hasher()(elem.regexFlags()));
+            boost::hash_combine(hash, SimpleStringDataComparator::kInstance.hash(elem.regex()));
+            boost::hash_combine(hash,
+                                SimpleStringDataComparator::kInstance.hash(elem.regexFlags()));
             break;
 
         case mongo::CodeWScope: {
-            boost::hash_combine(
-                hash,
-                StringData::Hasher()(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen())));
+            boost::hash_combine(hash,
+                                SimpleStringDataComparator::kInstance.hash(
+                                    StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen())));
             boost::hash_combine(hash, BSONObj::Hasher()(elem.codeWScopeObject()));
             break;
         }

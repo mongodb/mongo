@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/lock_manager.h"
 
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/concurrency/locker.h"
@@ -1105,22 +1106,20 @@ void DeadlockDetector::_processNextNode(const UnprocessedNode& node) {
 // ResourceId
 //
 
-static const StringData::Hasher stringDataHashFunction = StringData::Hasher();
-
 uint64_t ResourceId::fullHash(ResourceType type, uint64_t hashId) {
     return (static_cast<uint64_t>(type) << (64 - resourceTypeBits)) +
         (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
 }
 
 ResourceId::ResourceId(ResourceType type, StringData ns)
-    : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
+    : _fullHash(fullHash(type, SimpleStringDataComparator::kInstance.hash(ns))) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     _nsCopy = ns.toString();
 #endif
 }
 
 ResourceId::ResourceId(ResourceType type, const string& ns)
-    : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
+    : _fullHash(fullHash(type, SimpleStringDataComparator::kInstance.hash(ns))) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     _nsCopy = ns;
 #endif

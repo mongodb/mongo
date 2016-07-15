@@ -36,6 +36,7 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/platform/decimal128.h"
@@ -919,7 +920,7 @@ void Value::hash_combine(size_t& seed) const {
 
         case CodeWScope: {
             intrusive_ptr<const RCCodeWScope> cws = _storage.getCodeWScope();
-            boost::hash_combine(seed, StringData::Hasher()(cws->code));
+            boost::hash_combine(seed, SimpleStringDataComparator::kInstance.hash(cws->code));
             boost::hash_combine(seed, BSONObj::Hasher()(cws->scope));
             break;
         }

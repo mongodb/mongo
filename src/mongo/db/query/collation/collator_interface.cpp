@@ -1,4 +1,5 @@
-/*    Copyright 2012 10gen Inc.
+/**
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,23 +17,26 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
+#include "mongo/platform/basic.h"
 
-#include <ostream>
+#include "mongo/db/query/collation/collator_interface.h"
+
+#include "mongo/base/simple_string_data_comparator.h"
 
 namespace mongo {
 
-std::ostream& operator<<(std::ostream& stream, StringData value) {
-    return stream.write(value.rawData(), value.size());
+size_t CollatorInterface::hash(StringData stringToHash) const {
+    auto comparisonKey = getComparisonKey(stringToHash);
+    return SimpleStringDataComparator::kInstance.hash(comparisonKey.getKeyData());
 }
 
 }  // namespace mongo

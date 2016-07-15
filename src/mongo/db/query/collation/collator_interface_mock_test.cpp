@@ -190,4 +190,33 @@ TEST(CollatorInterfaceMockSelfTest, MockCollatorReportsMockVersionString) {
     ASSERT_EQ(alwaysEqualCollator.getSpec().version, "mock_version");
     ASSERT_EQ(toLowerCollator.getSpec().version, "mock_version");
 }
-};
+
+TEST(CollatorInterfaceMockSelfTest, StringsAreHashedWithRespectToCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    ASSERT_EQ(toLowerCollator.hash("foo"), toLowerCollator.hash("FOO"));
+    ASSERT_NE(toLowerCollator.hash("foo"), toLowerCollator.hash("FOOz"));
+}
+
+TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedSetOfStringsRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto set = toLowerCollator.makeStringDataUnorderedSet();
+    set.insert("foo");
+    set.insert("FOO");
+    set.insert("FOOz");
+    ASSERT_EQ(set.size(), 2U);
+    ASSERT_EQ(set.count("FoO"), 1U);
+    ASSERT_EQ(set.count("fooZ"), 1U);
+}
+
+TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedMapOfStringsRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    auto map = toLowerCollator.makeStringDataUnorderedMap<int>();
+    map["foo"] = 1;
+    map["FOO"] = 2;
+    map["FOOz"] = 3;
+    ASSERT_EQ(map.size(), 2U);
+    ASSERT_EQ(map["FoO"], 2);
+    ASSERT_EQ(map["fooZ"], 3);
+}
+
+}  // namespace

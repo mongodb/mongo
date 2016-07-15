@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/base/init.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status.h"
 #include "mongo/db/ops/modifier_add_to_set.h"
 #include "mongo/db/ops/modifier_bit.h"
@@ -63,7 +64,7 @@ struct ModifierEntry {
     ModifierEntry(StringData name, ModifierType type) : name(name.toString()), type(type) {}
 };
 
-typedef unordered_map<StringData, ModifierEntry*, StringData::Hasher> NameMap;
+typedef StringDataUnorderedMap<ModifierEntry*> NameMap;
 
 NameMap* MODIFIER_NAME_MAP;
 
@@ -120,7 +121,8 @@ void init(NameMap* nameMap) {
 }  // unnamed namespace
 
 MONGO_INITIALIZER(ModifierTable)(InitializerContext* context) {
-    MODIFIER_NAME_MAP = new NameMap;
+    MODIFIER_NAME_MAP = new NameMap(
+        SimpleStringDataComparator::kInstance.makeStringDataUnorderedMap<ModifierEntry*>());
     init(MODIFIER_NAME_MAP);
 
     return Status::OK();

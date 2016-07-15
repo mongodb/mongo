@@ -101,6 +101,12 @@ public:
     virtual int compare(StringData left, StringData right) const = 0;
 
     /**
+     * Hashes the string such that strings which are equal under this collation also have equal
+     * hashes.
+     */
+    size_t hash(StringData stringToHash) const final;
+
+    /**
      * Returns the comparison key for 'stringData', according to this collation. See ComparisonKey's
      * comments for details.
      */

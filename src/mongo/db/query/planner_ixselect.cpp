@@ -32,6 +32,7 @@
 
 #include <vector>
 
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
@@ -615,10 +616,9 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToPartialIndices(
  * Traverse the subtree rooted at 'node' to remove invalid RelevantTag assignments to text index
  * 'idx', which has prefix paths 'prefixPaths'.
  */
-static void stripInvalidAssignmentsToTextIndex(
-    MatchExpression* node,
-    size_t idx,
-    const unordered_set<StringData, StringData::Hasher>& prefixPaths) {
+static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
+                                               size_t idx,
+                                               const StringDataUnorderedSet& prefixPaths) {
     // If we're here, there are prefixPaths and node is either:
     // 1. a text pred which we can't use as we have nothing over its prefix, or
     // 2. a non-text pred which we can't use as we don't have a text pred AND-related.
@@ -653,7 +653,7 @@ static void stripInvalidAssignmentsToTextIndex(
     // The AND must have an EQ predicate for each prefix path.  When we encounter a child with a
     // tag we remove it from childrenPrefixPaths.  All children exist if this set is empty at
     // the end.
-    unordered_set<StringData, StringData::Hasher> childrenPrefixPaths = prefixPaths;
+    StringDataUnorderedSet childrenPrefixPaths = prefixPaths;
 
     for (size_t i = 0; i < node->numChildren(); ++i) {
         MatchExpression* child = node->getChild(i);
@@ -711,7 +711,8 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToTextIndexes(MatchExpression*
         // Gather the set of paths that comprise the index prefix for this text index.
         // Each of those paths must have an equality assignment, otherwise we can't assign
         // *anything* to this index.
-        unordered_set<StringData, StringData::Hasher> textIndexPrefixPaths;
+        auto textIndexPrefixPaths =
+            SimpleStringDataComparator::kInstance.makeStringDataUnorderedSet();
         BSONObjIterator it(index.keyPattern);
 
         // We stop when we see the first string in the key pattern.  We know that
