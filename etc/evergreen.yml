@@ -4742,7 +4742,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - name: rhel70
+    - rhel70
 
 - name: rhel70
   display_name: SSL RHEL 7.0
