@@ -63,6 +63,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -198,6 +199,20 @@ Status checkCanAcceptWritesForDatabase(const NamespaceString& nsString) {
                           << nsString.ns());
     }
     return Status::OK();
+}
+
+void recordStatsForTopCommand(OperationContext* txn) {
+    auto curOp = CurOp::get(txn);
+    const int writeLocked = 1;
+
+    Top::get(txn->getClient()->getServiceContext())
+        .record(txn,
+                curOp->getNS(),
+                curOp->getLogicalOp(),
+                writeLocked,
+                curOp->elapsedMicros(),
+                curOp->isCommand(),
+                curOp->getReadWriteType());
 }
 
 }  // namespace
@@ -416,6 +431,9 @@ public:
                 if (!advanceStatus.isOK()) {
                     return appendCommandStatus(result, advanceStatus.getStatus());
                 }
+                // Nothing after advancing the plan executor should throw a WriteConflictException,
+                // so the following bookkeeping with execution stats won't end up being done
+                // multiple times.
 
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
@@ -432,6 +450,7 @@ public:
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
                 }
+                recordStatsForTopCommand(txn);
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
@@ -513,6 +532,9 @@ public:
                 if (!advanceStatus.isOK()) {
                     return appendCommandStatus(result, advanceStatus.getStatus());
                 }
+                // Nothing after advancing the plan executor should throw a WriteConflictException,
+                // so the following bookkeeping with execution stats won't end up being done
+                // multiple times.
 
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
@@ -527,6 +549,7 @@ public:
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
                 }
+                recordStatsForTopCommand(txn);
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);

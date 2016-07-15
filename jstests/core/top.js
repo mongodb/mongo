@@ -6,11 +6,10 @@ var name = "toptest";
 
 var testDB = db.getSiblingDB(name);
 var testColl = testDB[name + "coll"];
-
-//  Ensure an empty collection exists for first top command
 testColl.drop();
-testColl.insert({x: 0});
-testColl.remove({x: 0});
+
+// Perform an operation on the collection so that it is present in the "top" command's output.
+assert.eq(testColl.find({}).itcount(), 0);
 
 // get top statistics for the test collection
 function getTop() {
@@ -23,7 +22,7 @@ var lastTop = getTop();
 //  return the number of operations since the last call to diffTop for the specified key
 function diffTop(key) {
     var thisTop = getTop();
-    difference = {
+    var difference = {
         time: thisTop[key].time - lastTop[key].time,
         count: thisTop[key].count - lastTop[key].count
     };
@@ -33,7 +32,7 @@ function diffTop(key) {
     assert.gte(difference.time, 0, "non-decreasing time");
 
     //  Time should advance iff operations were performed
-    assert.eq(difference.count != 0, difference.time > 0, "non-zero time iff non-zero count");
+    assert.eq(difference.count !== 0, difference.time > 0, "non-zero time iff non-zero count");
     return difference;
 }
 
@@ -48,15 +47,15 @@ function checkStats(key, expected) {
 }
 
 //  Insert
-for (i = 0; i < numRecords; i++) {
-    testColl.insert({_id: i});
+for (var i = 0; i < numRecords; i++) {
+    assert.writeOK(testColl.insert({_id: i}));
 }
 checkStats("insert", numRecords);
 checkStats("writeLock", numRecords);
 
 // Update
 for (i = 0; i < numRecords; i++) {
-    testColl.update({_id: i}, {x: i});
+    assert.writeOK(testColl.update({_id: i}, {x: i}));
 }
 checkStats("update", numRecords);
 
@@ -79,25 +78,52 @@ checkStats("getmore", numRecords);
 
 // Remove
 for (i = 0; i < numRecords; i++) {
-    testColl.remove({_id: 1});
+    assert.writeOK(testColl.remove({_id: 1}));
 }
 checkStats("remove", numRecords);
 
 // Upsert, note that these are counted as updates, not inserts
 for (i = 0; i < numRecords; i++) {
-    testColl.update({_id: i}, {x: i}, {upsert: 1});
+    assert.writeOK(testColl.update({_id: i}, {x: i}, {upsert: 1}));
 }
 checkStats("update", numRecords);
 
 // Commands
+var res;
+
+// "count" command
 diffTop("commands");  // ignore any commands before this
 for (i = 0; i < numRecords; i++) {
-    assert.eq(testDB.runCommand({count: "toptestcoll"}).n, numRecords);
+    res = assert.commandWorked(testDB.runCommand({count: testColl.getName()}));
+    assert.eq(res.n, numRecords, tojson(res));
 }
 checkStats("commands", numRecords);
 
-for (key in lastTop) {
-    if (!(key in checked)) {
+// "findAndModify" command
+diffTop("commands");
+for (i = 0; i < numRecords; i++) {
+    res = assert.commandWorked(testDB.runCommand({
+        findAndModify: testColl.getName(),
+        query: {_id: i},
+        update: {$inc: {x: 1}},
+    }));
+    assert.eq(res.value.x, i, tojson(res));
+}
+checkStats("commands", numRecords);
+
+diffTop("commands");
+for (i = 0; i < numRecords; i++) {
+    res = assert.commandWorked(testDB.runCommand({
+        findAndModify: testColl.getName(),
+        query: {_id: i},
+        remove: true,
+    }));
+    assert.eq(res.value.x, i + 1, tojson(res));
+}
+checkStats("commands", numRecords);
+
+for (var key of Object.keys(lastTop)) {
+    if (!checked.hasOwnProperty(key)) {
         printjson({key: key, stats: diffTop(key)});
     }
 }

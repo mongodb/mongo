@@ -118,8 +118,7 @@
 
     // FindAndModify
     testColl.findAndModify({query: {}, update: {pt: {type: "Point", coordinates: [0, 0]}}});
-    // TODO SERVER-24462: findAndModify is not currently counted in Top.
-    lastHistogram = checkHistogramDiff(0, 0, 0);
+    lastHistogram = checkHistogramDiff(0, 1, 0);
 
     // CreateIndex
     assert.commandWorked(testColl.createIndex({pt: "2dsphere"}));
