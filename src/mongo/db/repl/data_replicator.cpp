@@ -794,8 +794,10 @@ void DataReplicator::_cancelAllHandles_inlock() {
         _applier->cancel();
     if (_reporter)
         _reporter->shutdown();
-    if (_initialSyncState && _initialSyncState->dbsCloner->isActive())
+    if (_initialSyncState && _initialSyncState->dbsCloner &&
+        _initialSyncState->dbsCloner->isActive()) {
         _initialSyncState->dbsCloner->shutdown();
+    }
 }
 
 void DataReplicator::_waitOnAndResetAll(UniqueLock& lk) {
