@@ -187,6 +187,18 @@ err:		if (!closing)
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 
+	/*
+	 * When application threads perform eviction, we don't want to cache
+	 * reconciliation structures.
+	 */
+	if (!F_ISSET(session, WT_SESSION_INTERNAL)) {
+		if (session->block_manager_cleanup != NULL)
+			WT_TRET(session->block_manager_cleanup(session));
+
+		if (session->reconcile_cleanup != NULL)
+			WT_TRET(session->reconcile_cleanup(session));
+	}
+
 	return (ret);
 }
 
