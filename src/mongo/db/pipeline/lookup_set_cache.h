@@ -175,7 +175,7 @@ private:
         multi_index_container<Cached,
                               indexed_by<sequenced<>,
                                          hashed_unique<member<Cached, Value, &Cached::first>,
-                                                       Value::Hash,
+                                                       ValueComparator::Hasher,
                                                        ValueComparator::EqualTo>>>;
 
     IndexedContainer _container;

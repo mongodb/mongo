@@ -34,9 +34,9 @@
 
 namespace mongo {
 
-size_t CollatorInterface::hash(StringData stringToHash) const {
+void CollatorInterface::hash_combine(size_t& seed, StringData stringToHash) const {
     auto comparisonKey = getComparisonKey(stringToHash);
-    return SimpleStringDataComparator::kInstance.hash(comparisonKey.getKeyData());
+    SimpleStringDataComparator::kInstance.hash_combine(seed, comparisonKey.getKeyData());
 }
 
 }  // namespace mongo

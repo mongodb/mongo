@@ -290,17 +290,16 @@ public:
     /// Get the approximate memory size of the value, in bytes. Includes sizeof(Value)
     size_t getApproximateSize() const;
 
-    /** Calculate a hash value.
+    /**
+     * Calculate a hash value.
      *
-     *  Meant to be used to create composite hashes suitable for
-     *  hashed container classes such as unordered_map<>.
+     * Meant to be used to create composite hashes suitable for hashed container classes such as
+     * unordered_map<>.
+     *
+     * Most callers should prefer the utilities in ValueComparator for hashing and creating function
+     * objects for computing the hash. See value_comparator.h.
      */
-    void hash_combine(size_t& seed) const;
-
-    /// struct Hash is defined to enable the use of Values as keys in unordered_map.
-    struct Hash : std::unary_function<const Value&, size_t> {
-        size_t operator()(const Value& rV) const;
-    };
+    void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
 
     /// Call this after memcpying to update ref counts if needed
     void memcpyed() const {
@@ -359,12 +358,6 @@ namespace mongo {
 inline size_t Value::getArrayLength() const {
     verify(getType() == Array);
     return getArray().size();
-}
-
-inline size_t Value::Hash::operator()(const Value& v) const {
-    size_t seed = 0xf0afbeef;
-    v.hash_combine(seed);
-    return seed;
 }
 
 inline StringData Value::getStringData() const {

@@ -813,7 +813,8 @@ int Value::compare(const Value& rL,
     verify(false);
 }
 
-void Value::hash_combine(size_t& seed) const {
+void Value::hash_combine(size_t& seed,
+                         const StringData::ComparatorInterface* stringComparator) const {
     BSONType type = getType();
 
     boost::hash_combine(seed, canonicalizeBSONType(type));
@@ -881,21 +882,30 @@ void Value::hash_combine(size_t& seed) const {
             break;
 
         case Code:
-        case Symbol:
-        case String: {
+        case Symbol: {
             StringData sd = getStringData();
             MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
             break;
         }
 
+        case String: {
+            StringData sd = getStringData();
+            if (stringComparator) {
+                stringComparator->hash_combine(seed, sd);
+            } else {
+                MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            }
+            break;
+        }
+
         case Object:
-            getDocument().hash_combine(seed);
+            getDocument().hash_combine(seed, stringComparator);
             break;
 
         case Array: {
             const vector<Value>& vec = getArray();
             for (size_t i = 0; i < vec.size(); i++)
-                vec[i].hash_combine(seed);
+                vec[i].hash_combine(seed, stringComparator);
             break;
         }
 

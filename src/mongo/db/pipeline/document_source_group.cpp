@@ -156,7 +156,7 @@ boost::optional<Document> DocumentSourceGroup::getNextStreaming() {
 
 void DocumentSourceGroup::dispose() {
     // Free our resources.
-    GroupsMap().swap(*_groups);
+    _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
     _sorterIterator.reset();
 
     // Make us look done.
@@ -550,7 +550,7 @@ void DocumentSourceGroup::initialize() {
         }
 
         // We won't be using groups again so free its memory.
-        GroupsMap().swap(*_groups);
+        _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
 
         _sorterIterator.reset(
             Sorter<Value, Value>::Iterator::merge(sortedFiles, SortOptions(), SorterComparator()));

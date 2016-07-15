@@ -104,7 +104,7 @@ public:
      * Hashes the string such that strings which are equal under this collation also have equal
      * hashes.
      */
-    size_t hash(StringData stringToHash) const final;
+    void hash_combine(size_t& seed, StringData stringToHash) const final;
 
     /**
      * Returns the comparison key for 'stringData', according to this collation. See ComparisonKey's

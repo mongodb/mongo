@@ -45,7 +45,7 @@ public:
 
     int compare(StringData left, StringData right) const override;
 
-    size_t hash(StringData stringToHash) const override;
+    void hash_combine(size_t& seed, StringData stringToHash) const override;
 };
 
 }  // namespace mongo

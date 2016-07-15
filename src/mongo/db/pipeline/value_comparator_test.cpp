@@ -219,5 +219,55 @@ TEST(ValueComparatorTest, NestedArrayEqualityRespectsCollator) {
     ASSERT_FALSE(ValueComparator(&collator).evaluate(val3 == val1));
 }
 
+TEST(ValueComparatorTest, ValueHasherRespectsCollator) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    ValueComparator valueCmp(&toLowerCollator);
+    ASSERT_EQ(valueCmp.hash(Value("foo")), valueCmp.hash(Value("FOO")));
+    ASSERT_NE(valueCmp.hash(Value("foo")), valueCmp.hash(Value("FOOz")));
+}
+
+TEST(ValueComparatorTest, ValueHasherRespectsCollatorWithNestedObjects) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    ValueComparator valueCmp(&collator);
+    Value val1(Document{{"foo", "abc"}});
+    Value val2(Document{{"foo", "def"}});
+    ASSERT_EQ(valueCmp.hash(val1), valueCmp.hash(val2));
+}
+
+TEST(ValueComparatorTest, ValueHasherRespectsCollatorWithNestedArrays) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    ValueComparator valueCmp(&collator);
+    Value val1(std::vector<Value>{Value("a"), Value("b")});
+    Value val2(std::vector<Value>{Value("c"), Value("d")});
+    Value val3(std::vector<Value>{Value("c"), Value("d"), Value("e")});
+    ASSERT_EQ(valueCmp.hash(val1), valueCmp.hash(val2));
+    ASSERT_NE(valueCmp.hash(val1), valueCmp.hash(val3));
+    ASSERT_NE(valueCmp.hash(val2), valueCmp.hash(val3));
+}
+
+TEST(ValueComparatorTest, UnorderedSetOfValueRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    ValueComparator valueCmp(&toLowerCollator);
+    auto set = valueCmp.makeUnorderedValueSet();
+    ASSERT_TRUE(set.insert(Value("foo")).second);
+    ASSERT_FALSE(set.insert(Value("FOO")).second);
+    ASSERT_TRUE(set.insert(Value("FOOz")).second);
+    ASSERT_EQ(set.size(), 2U);
+    ASSERT_EQ(set.count(Value("FoO")), 1U);
+    ASSERT_EQ(set.count(Value("fooZ")), 1U);
+}
+
+TEST(ValueComparatorTest, UnorderedMapOfValueRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    ValueComparator valueCmp(&toLowerCollator);
+    auto map = valueCmp.makeUnorderedValueMap<int>();
+    map[Value("foo")] = 1;
+    map[Value("FOO")] = 2;
+    map[Value("FOOz")] = 3;
+    ASSERT_EQ(map.size(), 2U);
+    ASSERT_EQ(map[Value("FoO")], 2);
+    ASSERT_EQ(map[Value("fooZ")], 3);
+}
+
 }  // namespace
 }  // namespace mongo

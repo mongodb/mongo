@@ -373,11 +373,12 @@ size_t Document::getApproximateSize() const {
     return size;
 }
 
-void Document::hash_combine(size_t& seed) const {
+void Document::hash_combine(size_t& seed,
+                            const StringData::ComparatorInterface* stringComparator) const {
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
         StringData name = it->nameSD();
         boost::hash_range(seed, name.rawData(), name.rawData() + name.size());
-        it->val.hash_combine(seed);
+        it->val.hash_combine(seed, stringComparator);
     }
 }
 

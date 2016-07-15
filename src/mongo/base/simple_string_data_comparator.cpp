@@ -40,19 +40,19 @@ namespace mongo {
 namespace {
 
 template <int SizeofSizeT>
-size_t murmur3(StringData str);
+size_t murmur3(StringData str, size_t seed);
 
 template <>
-size_t murmur3<4>(StringData str) {
+size_t murmur3<4>(StringData str, size_t seed) {
     char hash[4];
-    MurmurHash3_x86_32(str.rawData(), str.size(), 0, &hash);
+    MurmurHash3_x86_32(str.rawData(), str.size(), seed, &hash);
     return ConstDataView(hash).read<LittleEndian<std::uint32_t>>();
 }
 
 template <>
-size_t murmur3<8>(StringData str) {
+size_t murmur3<8>(StringData str, size_t seed) {
     char hash[16];
-    MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
+    MurmurHash3_x64_128(str.rawData(), str.size(), seed, hash);
     return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
 }
 
@@ -64,8 +64,8 @@ int SimpleStringDataComparator::compare(StringData left, StringData right) const
     return left.compare(right);
 }
 
-size_t SimpleStringDataComparator::hash(StringData stringToHash) const {
-    return murmur3<sizeof(size_t)>(stringToHash);
+void SimpleStringDataComparator::hash_combine(size_t& seed, StringData stringToHash) const {
+    seed = murmur3<sizeof(size_t)>(stringToHash, seed);
 }
 
 }  // namespace mongo

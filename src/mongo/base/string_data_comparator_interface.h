@@ -94,7 +94,17 @@ public:
     /**
      * Hash a StringData in a way that respects this comparator.
      */
-    virtual size_t hash(StringData stringToHash) const = 0;
+    size_t hash(StringData stringToHash) const {
+        size_t seed = 0;
+        hash_combine(seed, stringToHash);
+        return seed;
+    }
+
+    /**
+     * Hash a StringData in a way that respects this comparator, and return the result in the 'seed'
+     * in-out parameter.
+     */
+    virtual void hash_combine(size_t& seed, StringData stringToHash) const = 0;
 
     /**
      * Returns a function object which can evaluate string equality according to this comparator.

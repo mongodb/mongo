@@ -34,6 +34,7 @@
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
@@ -188,7 +189,7 @@ public:
      * Meant to be used to create composite hashes suitable for
      * hashed container classes such as unordered_map.
      */
-    void hash_combine(size_t& seed) const;
+    void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
 
     /**
      * Add this document to the BSONObj under construction with the given BSONObjBuilder.
