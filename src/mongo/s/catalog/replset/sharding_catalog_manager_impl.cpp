@@ -102,27 +102,13 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setOk(false);
 }
 
-const ResourceId kZoneOpResourceId(RESOURCE_METADATA, "$configZonedSharding"_sd);
-
 /**
  * Lock for shard zoning operations. This should be acquired when doing any operations that
- * can afffect the config.tags (or the tags field of the config.shards) collection.
+ * can affect the config.tags collection or the tags field of the config.shards collection.
+ * No other locks should be held when locking this.  If an operation needs to take database locks
+ * (for example to write to a local collection) those locks should be taken after taking this.
  */
-class ScopedZoneOpExclusiveLock {
-public:
-    ScopedZoneOpExclusiveLock(OperationContext* txn)
-        : _transaction(txn, MODE_IX),
-          _globalIXLock(txn->lockState(), MODE_IX, UINT_MAX),
-          // Grab global lock recursively so locks will not be yielded.
-          _recursiveGlobalIXLock(txn->lockState(), MODE_IX, UINT_MAX),
-          _zoneLock(txn->lockState(), kZoneOpResourceId, MODE_X) {}
-
-private:
-    ScopedTransaction _transaction;
-    Lock::GlobalLock _globalIXLock;
-    Lock::GlobalLock _recursiveGlobalIXLock;
-    Lock::ResourceLock _zoneLock;
-};
+Lock::ResourceMutex kZoneOpLock;
 
 /**
  * Checks if the given key range for the given namespace conflicts with an existing key range.
@@ -704,7 +690,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
                                                   const std::string& shardName,
                                                   const std::string& zoneName) {
-    ScopedZoneOpExclusiveLock scopedLock(txn);
+    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
 
     auto updateStatus = _catalogClient->updateConfigDocument(
         txn,
@@ -729,7 +715,7 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
 Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
                                                        const std::string& shardName,
                                                        const std::string& zoneName) {
-    ScopedZoneOpExclusiveLock scopedLock(txn);
+    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     const NamespaceString shardNS(ShardType::ConfigNS);
@@ -842,7 +828,7 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
                                                         const NamespaceString& ns,
                                                         const ChunkRange& givenRange,
                                                         const string& zoneName) {
-    ScopedZoneOpExclusiveLock scopedLock(txn);
+    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
 
     auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
 
@@ -904,7 +890,7 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
 Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* txn,
                                                           const NamespaceString& ns,
                                                           const ChunkRange& range) {
-    ScopedZoneOpExclusiveLock scopedLock(txn);
+    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
 
     auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
 
