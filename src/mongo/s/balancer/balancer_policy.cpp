@@ -384,7 +384,8 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
     const DistributionStatus& distribution) {
     const string tag = distribution.getTagForChunk(chunk);
 
-    ShardId newShardId = _getLeastLoadedReceiverShard(shardStats, distribution, tag, {});
+    ShardId newShardId =
+        _getLeastLoadedReceiverShard(shardStats, distribution, tag, set<ShardId>());
     if (!newShardId.isValid() || newShardId == chunk.getShard()) {
         return boost::optional<MigrateInfo>();
     }
