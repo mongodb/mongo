@@ -34,6 +34,7 @@
 #include <limits>
 #include <sstream>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -69,5 +70,12 @@ std::string Timestamp::toString() const {
     std::stringstream ss;
     ss << std::hex << secs << ':' << i;
     return ss.str();
+}
+
+
+BSONObj Timestamp::toBSON() const {
+    BSONObjBuilder bldr;
+    bldr.append("", *this);
+    return bldr.obj();
 }
 }

@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+class BSONObj;
+
 /**
  * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
  */
@@ -112,6 +114,7 @@ public:
     // Append the BSON representation of this Timestamp to the given BufBuilder with the given
     // name. This lives here because Timestamp manages its own serialization format.
     void append(BufBuilder& builder, const StringData& fieldName) const;
+    BSONObj toBSON() const;
 
 private:
     std::tuple<unsigned, unsigned> tie() const {
