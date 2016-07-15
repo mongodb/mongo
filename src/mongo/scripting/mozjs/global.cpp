@@ -85,7 +85,7 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
-    ValueReader(cx, args.rval()).fromStringData(enterpriseVersionString());
+    ValueReader(cx, args.rval()).fromStringData(versionString);
 }
 
 void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {

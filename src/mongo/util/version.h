@@ -50,12 +50,6 @@ std::vector<std::string> compiledModules();
 // Checks whether another version is the same major version as us
 bool isSameMajorVersion(const char* version);
 
-// Checks whether this is an enterprise build or not (looks for enterprise module).
-bool hasEnterprise();
-
-// Returns the versionString, but prefixes with "Enterprise" if hasEnterprise.
-std::string enterpriseVersionString();
-
 // Get/print the version of OpenSSL that's used at runtime
 const std::string openSSLVersion(const std::string& prefix = "", const std::string& suffix = "");
 

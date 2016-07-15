@@ -600,7 +600,7 @@ int _main(int argc, char* argv[], char** envp) {
     }
 
     if (!mongo::serverGlobalParams.quiet)
-        cout << "MongoDB shell version: " << mongo::enterpriseVersionString() << endl;
+        cout << "MongoDB shell version: " << mongo::versionString << endl;
 
     mongo::StartupTest::runTests();
 

@@ -82,15 +82,6 @@ std::vector<std::string> compiledModules() {
     return modules_list;
 }
 
-bool hasEnterprise() {
-    for (const auto& module : compiledModules()) {
-        if (module == "enterprise") {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool isSameMajorVersion(const char* version) {
     int major = -1, minor = -1;
     pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");
@@ -104,15 +95,6 @@ bool isSameMajorVersion(const char* version) {
 string mongodVersion() {
     stringstream ss;
     ss << "db version v" << versionString;
-    return ss.str();
-}
-
-string enterpriseVersionString() {
-    stringstream ss;
-    if (hasEnterprise()) {
-        ss << "Enterprise ";
-    }
-    ss << versionString;
     return ss.str();
 }
 

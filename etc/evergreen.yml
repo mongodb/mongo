@@ -208,7 +208,7 @@ functions:
         fi
         bin_ver=$(${python|python} -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
-        mongo_ver=$($mongo_binary --version | rev | cut -f1 -d ' ' | rev | tr -d '[ \r\n]')
+        mongo_ver=$($mongo_binary --version | cut -f2 -d ':' | tr -d '[ \r\n]')
         # The versions must match
         if [ "$bin_ver" != "$mongo_ver" ]; then
           echo "The mongo version is $mongo_ver, expected version is $bin_ver"
