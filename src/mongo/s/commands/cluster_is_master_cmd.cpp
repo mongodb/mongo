@@ -81,7 +81,8 @@ public:
         result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
 
         const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
-                                                  "automationServiceDescriptor");
+                                                  "automationServiceDescriptor",
+                                                  static_cast<ServerParameter*>(nullptr));
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
 

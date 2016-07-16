@@ -650,5 +650,6 @@ private:
 } automationServiceDescriptor;
 
 constexpr decltype(AutomationServiceDescriptor::kName) AutomationServiceDescriptor::kName;
+constexpr decltype(AutomationServiceDescriptor::kMaxSize) AutomationServiceDescriptor::kMaxSize;
 }
 }

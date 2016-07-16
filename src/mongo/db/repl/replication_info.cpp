@@ -258,7 +258,8 @@ public:
         result.append("readOnly", storageGlobalParams.readOnly);
 
         const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
-                                                  "automationServiceDescriptor");
+                                                  "automationServiceDescriptor",
+                                                  static_cast<ServerParameter*>(nullptr));
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
 
