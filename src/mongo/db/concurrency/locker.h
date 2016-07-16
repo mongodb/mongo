@@ -302,8 +302,7 @@ public:
      */
     virtual bool hasLockPending() const = 0;
 
-    // Used for the replication parallel oplog application threads to prevent any other threads from
-    // using the system while it is in an inconsistent state.
+    // Used for the replication parallel log op application threads
     virtual void setIsBatchWriter(bool newValue) = 0;
     virtual bool isBatchWriter() const = 0;
 
