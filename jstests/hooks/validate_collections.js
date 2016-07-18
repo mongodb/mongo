@@ -20,14 +20,9 @@ function validateCollections(db, obj) {
     var full = obj.full;
 
     var success = true;
-
-    // Don't run validate on view namespaces.
-    let listCollectionsRes = db.runCommand({listCollections: 1, filter: {"type": "collection"}});
-    assert.commandWorked(listCollectionsRes);
-    let collInfo = new DBCommandCursor(db.getMongo(), listCollectionsRes).toArray();
-
-    for (var collDocument of collInfo) {
-        var coll = db.getCollection(collDocument["name"]);
+    var collNames = db.getCollectionNames();
+    for (var collName of collNames) {
+        var coll = db.getCollection(collName);
         var res = coll.validate(full);
 
         if (!res.ok || !res.valid) {
