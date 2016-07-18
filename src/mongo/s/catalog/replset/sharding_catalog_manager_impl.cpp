@@ -987,9 +987,11 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
     const RemoteCommandCallbackArgs& cbArgs,
     ShardType shardType,
     std::shared_ptr<RemoteCommandTargeter> targeter) {
-    stdx::lock_guard<stdx::mutex> lk(_addShardHandlesMutex);
+    stdx::unique_lock<stdx::mutex> lk(_addShardHandlesMutex);
 
-    // Untrack the handle from scheduleRemoteCommand.
+    // Untrack the handle from scheduleRemoteCommand regardless of whether the command
+    // succeeded. If it failed, we will track the handle for the rescheduled task before
+    // releasing the mutex.
     _untrackAddShardHandle_inlock(shardType.getName());
 
     Status responseStatus = cbArgs.response.getStatus();
@@ -1033,18 +1035,19 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
                        "or not have been properly removed from another cluster. The "
                        "shardIdentity upsert will continue to be retried.";
             } else {
-                warning()
-                    << "Failed to upsert shardIdentity document into shard " << shardType.getName()
-                    << "(" << shardType.getHost()
-                    << ") during addShard. The shardIdentity upsert will continue to be retried. "
-                    << causedBy(batchResponseStatus);
+                warning() << "Failed to upsert shardIdentity document into shard "
+                          << shardType.getName() << "(" << shardType.getHost()
+                          << ") during addShard. The shardIdentity upsert will continue to be "
+                             "retried. "
+                          << causedBy(batchResponseStatus);
             }
             rescheduleTask = true;
         }
     }
 
     if (rescheduleTask) {
-        // If the command did not succeed, schedule the task again with a delay.
+        // If the command did not succeed, schedule the upsert shardIdentity task again with a
+        // delay.
         const Date_t now = _executorForAddShard->now();
         const Date_t when = now + kAddShardTaskRetryInterval;
 
@@ -1060,37 +1063,48 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
                            std::move(targeter),
                            std::move(cbArgs.request.cmdObj))));
         return;
-    } else {
-        // If the command succeeded, update config.shards to mark the shard as shardAware.
+    }
 
-        // Create a unique operation context for this thread, and destroy it at the end of the
-        // scope.
-        Client::initThread("updateShardStateToShardAware");
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        auto txn = cc().makeOperationContext();
+    // If the command succeeded, update config.shards to mark the shard as shardAware.
 
-        auto updateStatus = _catalogClient->updateConfigDocument(
-            txn.get(),
-            ShardType::ConfigNS,
-            BSON(ShardType::name(shardType.getName())),
-            BSON("$set" << BSON(ShardType::state()
-                                << static_cast<std::underlying_type<ShardType::ShardState>::type>(
-                                    ShardType::ShardState::kShardAware))),
-            false,
-            ShardingCatalogClient::kMajorityWriteConcern);
+    // Release the _addShardHandlesMutex before updating config.shards, since it involves disk I/O.
+    // At worst, a redundant addShard task will be scheduled by a new primary if the current
+    // primary fails during that write.
+    lk.unlock();
 
-        // We do not handle a failed response status. If the command failed, when a new config
-        // server transitions to primary, an addShard task for this shard will be run again and
-        // the update to config.shards will be automatically retried then. If it fails because the
-        // shard was removed through the normal removeShard path (so the entry in config.shards
-        // was deleted), no new addShard task will get scheduled on the next transition to primary.
-        if (!updateStatus.isOK()) {
-            warning() << "Failed to mark shard " << shardType.getName() << "("
-                      << shardType.getHost()
-                      << ") as shardAware in config.shards. This will be retried the next time a "
-                         "config server transitions to primary. "
-                      << causedBy(updateStatus.getStatus());
-        }
+    // This thread is part of a thread pool owned by the addShard TaskExecutor. Threads in that
+    // pool are not created with Client objects associated with them, so a Client is created and
+    // attached here to do the local update. The Client is destroyed at the end of the scope,
+    // leaving the thread state as it was before.
+    Client::initThread(getThreadName().c_str());
+    ON_BLOCK_EXIT([&] { Client::destroy(); });
+
+    // Use the thread's Client to create an OperationContext to perform the local write to
+    // config.shards. This OperationContext will automatically be destroyed when it goes out of
+    // scope at the end of this code block.
+    auto txnPtr = cc().makeOperationContext();
+
+    // Use kNoWaitWriteConcern to prevent waiting in this callback, since we don't handle a failed
+    // response anyway. If the write is rolled back, the new config primary will attempt to
+    // initialize sharding awareness on this shard again, and this update to config.shards will be
+    // automatically retried then. If it fails because the shard was removed through the normal
+    // removeShard path (so the entry in config.shards was deleted), no new addShard task will get
+    // scheduled on the next transition to primary.
+    auto updateStatus = _catalogClient->updateConfigDocument(
+        txnPtr.get(),
+        ShardType::ConfigNS,
+        BSON(ShardType::name(shardType.getName())),
+        BSON("$set" << BSON(ShardType::state()
+                            << static_cast<std::underlying_type<ShardType::ShardState>::type>(
+                                ShardType::ShardState::kShardAware))),
+        false,
+        kNoWaitWriteConcern);
+
+    if (!updateStatus.isOK()) {
+        warning() << "Failed to mark shard " << shardType.getName() << "(" << shardType.getHost()
+                  << ") as shardAware in config.shards. This will be retried the next time a "
+                     "config server transitions to primary. "
+                  << causedBy(updateStatus.getStatus());
     }
 }
 
