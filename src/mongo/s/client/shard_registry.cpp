@@ -302,7 +302,8 @@ ShardRegistryData::ShardRegistryData(OperationContext* txn, ShardFactory* shardF
 }
 
 void ShardRegistryData::_init(OperationContext* txn, ShardFactory* shardFactory) {
-    auto shardsStatus = grid.catalogClient(txn)->getAllShards(txn);
+    auto shardsStatus =
+        grid.catalogClient(txn)->getAllShards(txn, repl::ReadConcernLevel::kMajorityReadConcern);
 
     if (!shardsStatus.isOK()) {
         uasserted(shardsStatus.getStatus().code(),

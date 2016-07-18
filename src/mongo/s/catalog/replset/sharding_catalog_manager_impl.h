@@ -106,6 +106,22 @@ private:
     StatusWith<std::string> _generateNewShardName(OperationContext* txn);
 
     /**
+     * Used during addShard to determine if there is already an existing shard that matches the
+     * shard that is currently being added.  An OK return with boost::none indicates that there
+     * is no conflicting shard, and we can proceed trying to add the new shard.  An OK return
+     * with a ShardType indicates that there is an existing shard that matches the shard being added
+     * but since the options match, this addShard request can do nothing and return success.  A
+     * non-OK return either indicates a problem reading the existing shards from disk or more likely
+     * indicates that an existing shard conflicts with the shard being added and they have different
+     * options, so the addShard attempt must be aborted.
+     */
+    StatusWith<boost::optional<ShardType>> _checkIfShardExists(
+        OperationContext* txn,
+        const ConnectionString& propsedShardConnectionString,
+        const std::string* shardProposedName,
+        long long maxSize);
+
+    /**
      * Validates that the specified endpoint can serve as a shard server. In particular, this
      * this function checks that the shard can be contacted and that it is not already member of
      * another sharded cluster.

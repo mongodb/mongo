@@ -104,7 +104,8 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
-    auto shardsStatus = Grid::get(txn)->catalogClient(txn)->getAllShards(txn);
+    auto shardsStatus = Grid::get(txn)->catalogClient(txn)->getAllShards(
+        txn, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!shardsStatus.isOK()) {
         return shardsStatus.getStatus();
     }

@@ -94,12 +94,13 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 const ReadPreferenceSetting kConfigPrimarySelector(ReadPreference::PrimaryOnly);
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
-void toBatchError(const Status& status, BatchedCommandResponse* response) {
-    response->clear();
-    response->setErrCode(status.code());
-    response->setErrMessage(status.reason());
-    response->setOk(false);
-}
+/**
+ * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
+ * requests).
+ * TODO: Currently only taken during addShard requests, this should also be taken in X mode during
+ * removeShard, once removeShard is moved to run on the config server primary instead of on mongos.
+ */
+Lock::ResourceMutex kShardMembershipLock;
 
 /**
  * Lock for shard zoning operations. This should be acquired when doing any operations that
@@ -300,26 +301,104 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
                                   std::move(writeConcernStatus));
 }
 
+StatusWith<boost::optional<ShardType>> ShardingCatalogManagerImpl::_checkIfShardExists(
+    OperationContext* txn,
+    const ConnectionString& proposedShardConnectionString,
+    const std::string* proposedShardName,
+    long long proposedShardMaxSize) {
+    // Check whether any host in the connection is already part of the cluster.
+    const auto existingShards =
+        _catalogClient->getAllShards(txn, repl::ReadConcernLevel::kLocalReadConcern);
+    if (!existingShards.isOK()) {
+        return Status(existingShards.getStatus().code(),
+                      str::stream() << "Failed to load existing shards during addShard"
+                                    << causedBy(existingShards.getStatus().reason()));
+    }
+
+    // Now check if this shard already exists - if it already exists *with the same options* then
+    // the addShard request can return success early without doing anything more.
+    for (const auto& existingShard : existingShards.getValue().value) {
+        auto swExistingShardConnStr = ConnectionString::parse(existingShard.getHost());
+        if (!swExistingShardConnStr.isOK()) {
+            return swExistingShardConnStr.getStatus();
+        }
+        auto existingShardConnStr = std::move(swExistingShardConnStr.getValue());
+        // Function for determining if the options for the shard that is being added match the
+        // options of an existing shard that conflicts with it.
+        auto shardsAreEquivalent = [&]() {
+            if (proposedShardName && *proposedShardName != existingShard.getName()) {
+                return false;
+            }
+            if (proposedShardConnectionString.type() != existingShardConnStr.type()) {
+                return false;
+            }
+            if (proposedShardConnectionString.type() == ConnectionString::SET &&
+                proposedShardConnectionString.getSetName() != existingShardConnStr.getSetName()) {
+                return false;
+            }
+            if (proposedShardMaxSize != existingShard.getMaxSizeMB()) {
+                return false;
+            }
+            return true;
+        };
+
+        if (existingShardConnStr.type() == ConnectionString::SET &&
+            proposedShardConnectionString.type() == ConnectionString::SET &&
+            existingShardConnStr.getSetName() == proposedShardConnectionString.getSetName()) {
+            // An existing shard has the same replica set name as the shard being added.
+            // If the options aren't the same, then this is an error,
+            // but if the options match then the addShard operation should be immediately
+            // considered a success and terminated.
+            if (shardsAreEquivalent()) {
+                return {existingShard};
+            } else {
+                return {ErrorCodes::IllegalOperation,
+                        str::stream() << "A shard already exists containing the replica set '"
+                                      << existingShardConnStr.getSetName()
+                                      << "'"};
+            }
+        }
+
+        for (const auto& existingHost : existingShardConnStr.getServers()) {
+            // Look if any of the hosts in the existing shard are present within the shard trying
+            // to be added.
+            for (const auto& addingHost : proposedShardConnectionString.getServers()) {
+                if (existingHost == addingHost) {
+                    // At least one of the hosts in the shard being added already exists in an
+                    // existing shard.  If the options aren't the same, then this is an error,
+                    // but if the options match then the addShard operation should be immediately
+                    // considered a success and terminated.
+                    if (shardsAreEquivalent()) {
+                        return {existingShard};
+                    } else {
+                        return {ErrorCodes::IllegalOperation,
+                                str::stream() << "'" << addingHost.toString() << "' "
+                                              << "is already a member of the existing shard '"
+                                              << existingShard.getHost()
+                                              << "' ("
+                                              << existingShard.getName()
+                                              << ")."};
+                    }
+                }
+            }
+        }
+        if (proposedShardName && *proposedShardName == existingShard.getName()) {
+            // If we get here then we're trying to add a shard with the same name as an existing
+            // shard, but there was no overlap in the hosts between the existing shard and the
+            // proposed connection string for the new shard.
+            return Status(ErrorCodes::IllegalOperation,
+                          str::stream() << "A shard named " << *proposedShardName
+                                        << " already exists");
+        }
+    }
+    return {boost::none};
+}
+
 StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
     OperationContext* txn,
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
     const ConnectionString& connectionString) {
-    // Check whether any host in the connection is already part of the cluster.
-    Grid::get(txn)->shardRegistry()->reload(txn);
-    for (const auto& hostAndPort : connectionString.getServers()) {
-        std::shared_ptr<Shard> shard;
-        shard = Grid::get(txn)->shardRegistry()->getShardNoReload(hostAndPort.toString());
-        if (shard) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "'" << hostAndPort.toString() << "' "
-                                  << "is already a member of the existing shard '"
-                                  << shard->getConnString().toString()
-                                  << "' ("
-                                  << shard->getId()
-                                  << ")."};
-        }
-    }
 
     // Check for mongos and older version mongod connections, and whether the hosts
     // can be found for the user specified replset.
@@ -556,6 +635,9 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
         return {ErrorCodes::BadValue, "shard name cannot be empty"};
     }
 
+    // Only one addShard operation can be in progress at a time.
+    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
+
     // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shard{
         Grid::get(txn)->shardRegistry()->createConnection(shardConnectionString)};
@@ -578,15 +660,29 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
-
     ShardType& shardType = shardStatus.getValue();
 
+
+    // Check if this shard has already been added (can happen in the case of a retry after a network
+    // error, for example) and thus this addShard request should be considered a no-op.
+    auto existingShard =
+        _checkIfShardExists(txn, shardConnectionString, shardProposedName, maxSize);
+    if (!existingShard.isOK()) {
+        return existingShard.getStatus();
+    }
+    if (existingShard.getValue()) {
+        // These hosts already belong to an existing shard, so report success and terminate the
+        // addShard request.
+        return existingShard.getValue()->getName();
+    }
+
+
+    // Check that none of the existing shard candidate's dbs exist already
     auto dbNamesStatus = _getDBNamesListFromShard(txn, targeter);
     if (!dbNamesStatus.isOK()) {
         return dbNamesStatus.getStatus();
     }
 
-    // Check that none of the existing shard candidate's dbs exist already
     for (const string& dbName : dbNamesStatus.getValue()) {
         auto dbt = _catalogClient->getDatabase(txn, dbName);
         if (dbt.isOK()) {
@@ -642,19 +738,6 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
         txn, ShardType::ConfigNS, shardType.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
-        if (result == ErrorCodes::DuplicateKey) {
-            // TODO(SERVER-24213): adding a shard that already exists should be considered success,
-            // however this approach does no validation that we are adding the shard with the same
-            // options.  It also does not protect against adding the same shard with a different
-            // shard name and slightly different connection string.  This is a temporary hack to
-            // get the continuous stepdown suite passing.
-            warning() << "Received duplicate key error when inserting new shard with name "
-                      << shardType.getName() << " and connection string "
-                      << shardConnectionString.toString()
-                      << " to config.shards collection.  This most likely means that there was an "
-                         "attempt to add a shard that already exists in the cluster";
-            return shardType.getName();
-        }
         return result;
     }
 

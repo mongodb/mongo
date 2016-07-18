@@ -274,7 +274,7 @@ public:
      * Returns a !OK status if an error occurs.
      */
     virtual StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-        OperationContext* txn) = 0;
+        OperationContext* txn, repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Runs a user management command on the config servers, potentially synchronizing through

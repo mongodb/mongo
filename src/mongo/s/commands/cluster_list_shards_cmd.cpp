@@ -74,7 +74,8 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        auto shardsStatus = grid.catalogClient(txn)->getAllShards(txn);
+        auto shardsStatus = grid.catalogClient(txn)->getAllShards(
+            txn, repl::ReadConcernLevel::kMajorityReadConcern);
         if (!shardsStatus.isOK()) {
             return appendCommandStatus(result, shardsStatus.getStatus());
         }

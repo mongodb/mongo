@@ -135,7 +135,7 @@ StatusWith<string> ShardingCatalogClientMock::getTagForChunk(OperationContext* t
 }
 
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::getAllShards(
-    OperationContext* txn) {
+    OperationContext* txn, repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

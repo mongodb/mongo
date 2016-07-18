@@ -389,7 +389,8 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
 
     auto future = launchAsync([this] {
-        auto shards = assertGet(catalogClient()->getAllShards(operationContext()));
+        auto shards = assertGet(catalogClient()->getAllShards(
+            operationContext(), repl::ReadConcernLevel::kMajorityReadConcern));
         return shards.value;
     });
 
@@ -423,7 +424,8 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        auto status = catalogClient()->getAllShards(operationContext());
+        auto status = catalogClient()->getAllShards(operationContext(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern);
 
         ASSERT_EQ(ErrorCodes::FailedToParse, status.getStatus());
     });

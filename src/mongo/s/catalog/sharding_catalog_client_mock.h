@@ -99,7 +99,7 @@ public:
                                            const ChunkType& chunk) override;
 
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-        OperationContext* txn) override;
+        OperationContext* txn, repl::ReadConcernLevel readConcern) override;
 
     bool runUserManagementWriteCommand(OperationContext* txn,
                                        const std::string& commandName,

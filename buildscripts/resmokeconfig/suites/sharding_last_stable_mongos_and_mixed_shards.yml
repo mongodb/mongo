@@ -50,6 +50,8 @@ selector:
     # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
     # 'last-stable'.
     - jstests/sharding/collation_targeting_inherited.js
+    # Behavior change to addShard
+    - jstests/sharding/addshard_idempotent.js
 
     # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
