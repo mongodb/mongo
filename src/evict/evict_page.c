@@ -187,18 +187,6 @@ err:		if (!closing)
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 
-	/*
-	 * When application threads perform eviction, we don't want to cache
-	 * reconciliation structures.
-	 */
-	if (!F_ISSET(session, WT_SESSION_INTERNAL)) {
-		if (session->block_manager_cleanup != NULL)
-			WT_TRET(session->block_manager_cleanup(session));
-
-		if (session->reconcile_cleanup != NULL)
-			WT_TRET(session->reconcile_cleanup(session));
-	}
-
 	return (ret);
 }
 
@@ -397,8 +385,6 @@ __evict_review(
 	bool modified;
 
 	flags = WT_EVICTING;
-	if (closing)
-		LF_SET(WT_VISIBILITY_ERR);
 	*flagsp = flags;
 
 	/*
@@ -513,7 +499,9 @@ __evict_review(
 	 * pages, they don't have update lists that can be saved and restored.
 	 */
 	cache = S2C(session)->cache;
-	if (!closing && !WT_PAGE_IS_INTERNAL(page)) {
+	if (closing)
+		LF_SET(WT_VISIBILITY_ERR);
+	else if (!WT_PAGE_IS_INTERNAL(page)) {
 		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 			LF_SET(WT_EVICT_IN_MEMORY | WT_EVICT_UPDATE_RESTORE);
 		else if (page->read_gen == WT_READGEN_OLDEST ||

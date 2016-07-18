@@ -669,14 +669,13 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (pages_evicted == cache->pages_evict) {
+			/*
+			 * Back off if we aren't making progress: walks hold the
+			 * handle list lock, blocking other operations that can
+			 * free space in cache, such as LSM discarding handles.
+			 */
 			WT_STAT_FAST_CONN_INCR(session,
 			    cache_eviction_server_slept);
-			/*
-			 * Back off if we aren't making progress: walks hold
-			 * the handle list lock, which blocks other operations
-			 * that can free space in cache, such as LSM discarding
-			 * handles.
-			 */
 			__wt_sleep(0, WT_THOUSAND * (uint64_t)loop);
 			if (loop == 100) {
 				/*
@@ -1887,13 +1886,15 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_PAGE *page;
 	WT_REF *next_walk;
-	uint64_t dirty_bytes, dirty_pages, intl_bytes, intl_pages;
-	uint64_t leaf_bytes, leaf_pages;
-	uint64_t max_dirty_bytes, max_intl_bytes, max_leaf_bytes, total_bytes;
+	uint64_t intl_bytes, intl_bytes_max, intl_dirty_bytes;
+	uint64_t intl_dirty_bytes_max, intl_dirty_pages, intl_pages;
+	uint64_t leaf_bytes, leaf_bytes_max, leaf_dirty_bytes;
+	uint64_t leaf_dirty_bytes_max, leaf_dirty_pages, leaf_pages;
+	uint64_t total_bytes, total_dirty_bytes;
 	size_t size;
 
 	conn = S2C(session);
-	total_bytes = 0;
+	total_bytes = total_dirty_bytes = 0;
 
 	if (ofile == NULL)
 		fp = stderr;
@@ -1909,9 +1910,10 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 
-		dirty_bytes = dirty_pages = intl_bytes = intl_pages = 0;
-		leaf_bytes = leaf_pages = 0;
-		max_dirty_bytes = max_intl_bytes = max_leaf_bytes = 0;
+		intl_bytes = intl_bytes_max = intl_dirty_bytes = 0;
+		intl_dirty_bytes_max = intl_dirty_pages = intl_pages = 0;
+		leaf_bytes = leaf_bytes_max = leaf_dirty_bytes = 0;
+		leaf_dirty_bytes_max = leaf_dirty_pages = leaf_pages = 0;
 
 		next_walk = NULL;
 		session->dhandle = dhandle;
@@ -1924,17 +1926,23 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 			if (WT_PAGE_IS_INTERNAL(page)) {
 				++intl_pages;
 				intl_bytes += size;
-				max_intl_bytes = WT_MAX(max_intl_bytes, size);
+				intl_bytes_max = WT_MAX(intl_bytes_max, size);
+				if (__wt_page_is_modified(page)) {
+					++intl_dirty_pages;
+					intl_dirty_bytes += size;
+					intl_dirty_bytes_max =
+					    WT_MAX(intl_dirty_bytes_max, size);
+				}
 			} else {
 				++leaf_pages;
 				leaf_bytes += size;
-				max_leaf_bytes = WT_MAX(max_leaf_bytes, size);
-			}
-			if (__wt_page_is_modified(page)) {
-				++dirty_pages;
-				dirty_bytes += size;
-				max_dirty_bytes =
-				    WT_MAX(max_dirty_bytes, size);
+				leaf_bytes_max = WT_MAX(leaf_bytes_max, size);
+				if (__wt_page_is_modified(page)) {
+					++leaf_dirty_pages;
+					leaf_dirty_bytes += size;
+					leaf_dirty_bytes_max =
+					    WT_MAX(leaf_dirty_bytes_max, size);
+				}
 			}
 		}
 		session->dhandle = NULL;
@@ -1946,21 +1954,41 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 			    dhandle->name, dhandle->checkpoint);
 		if (intl_pages != 0)
 			(void)fprintf(fp,
-			    "\t" "internal pages: %" PRIu64 " pages, %" PRIu64
-			    " max, %" PRIu64 "MB total\n",
-			    intl_pages, max_intl_bytes, intl_bytes >> 20);
+			    "\t" "internal: "
+			    "%" PRIu64 " pages, "
+			    "%" PRIu64 "MB, "
+			    "%" PRIu64 "/%" PRIu64 " clean/dirty pages, "
+			    "%" PRIu64 "/%" PRIu64 " clean/dirty MB, "
+			    "%" PRIu64 "MB max page, "
+			    "%" PRIu64 "MB max dirty page\n",
+			    intl_pages,
+			    intl_bytes >> 20,
+			    intl_pages - intl_dirty_pages,
+			    intl_dirty_pages,
+			    (intl_bytes - intl_dirty_bytes) >> 20,
+			    intl_dirty_bytes >> 20,
+			    intl_bytes_max >> 20,
+			    intl_dirty_bytes_max >> 20);
 		if (leaf_pages != 0)
 			(void)fprintf(fp,
-			    "\t" "leaf pages: %" PRIu64 " pages, %" PRIu64
-			    " max, %" PRIu64 "MB total\n",
-			    leaf_pages, max_leaf_bytes, leaf_bytes >> 20);
-		if (dirty_pages != 0)
-			(void)fprintf(fp,
-			    "\t" "dirty pages: %" PRIu64 " pages, %" PRIu64
-			    " max, %" PRIu64 "MB total\n",
-			    dirty_pages, max_dirty_bytes, dirty_bytes >> 20);
+			    "\t" "leaf: "
+			    "%" PRIu64 " pages, "
+			    "%" PRIu64 "MB, "
+			    "%" PRIu64 "/%" PRIu64 " clean/dirty pages, "
+			    "%" PRIu64 "/%" PRIu64 " clean/dirty MB, "
+			    "%" PRIu64 "MB max page, "
+			    "%" PRIu64 "MB max dirty page\n",
+			    leaf_pages,
+			    leaf_bytes >> 20,
+			    leaf_pages - leaf_dirty_pages,
+			    leaf_dirty_pages,
+			    (leaf_bytes - leaf_dirty_bytes) >> 20,
+			    leaf_dirty_bytes >> 20,
+			    leaf_bytes_max >> 20,
+			    leaf_dirty_bytes_max >> 20);
 
 		total_bytes += intl_bytes + leaf_bytes;
+		total_dirty_bytes += intl_dirty_bytes + leaf_dirty_bytes;
 	}
 	session->dhandle = saved_dhandle;
 
@@ -1972,10 +2000,13 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 		total_bytes +=
 		    (total_bytes * (uint64_t)conn->cache->overhead_pct) / 100;
 	(void)fprintf(fp,
-	    "cache dump: total found = %" PRIu64
-	    "MB vs tracked inuse %" PRIu64 "MB\n",
-	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
+	    "cache dump: "
+	    "total found = %" PRIu64 "MB vs tracked inuse %" PRIu64 "MB\n"
+	    "total dirty bytes = %" PRIu64 "MB\n",
+	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20,
+	    total_dirty_bytes >> 20);
 	(void)fprintf(fp, "==========\n");
+
 	if (ofile != NULL && fclose(fp) != 0)
 		return (EIO);
 	return (0);
