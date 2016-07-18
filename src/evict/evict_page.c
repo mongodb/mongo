@@ -135,12 +135,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 		return (0);
 
-	/*
-	 * Update the page's modification reference, reconciliation might have
-	 * changed it.
-	 */
-	mod = page->modify;
-
 	/* Count evictions of internal pages during normal operation. */
 	if (!closing && WT_PAGE_IS_INTERNAL(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
@@ -156,6 +150,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Figure out whether reconciliation was done on the page */
+	mod = page->modify;
 	clean_page = mod == NULL || mod->rec_result == 0;
 
 	/* Update the reference and discard the page. */

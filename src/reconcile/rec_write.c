@@ -1971,7 +1971,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 */
 	r->page_size = r->page_size_orig = max;
 	if (r->raw_compression)
-		r->page_size = WT_MIN(r->page_size * 10,
+		r->page_size = (uint32_t)WT_MIN(r->page_size * 10,
 		    WT_MAX(r->page_size, btree->maxmempage / 2));
 
 	/*
