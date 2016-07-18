@@ -1965,10 +1965,14 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * additional data because we don't know how well it will compress, and
 	 * we don't want to increment our way up to the amount of data needed by
 	 * the application to successfully compress to the target page size.
+	 * Ideally accumulate data several times the page size without
+	 * approaching the memory page maximum, but at least have data worth
+	 * one page.
 	 */
 	r->page_size = r->page_size_orig = max;
 	if (r->raw_compression)
-		r->page_size *= 10;
+		r->page_size = WT_MIN(r->page_size * 10,
+		    WT_MAX(r->page_size, btree->maxmempage / 2));
 
 	/*
 	 * Ensure the disk image buffer is large enough for the max object, as
