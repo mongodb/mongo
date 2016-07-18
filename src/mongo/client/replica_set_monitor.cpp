@@ -36,6 +36,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -151,12 +152,12 @@ struct HostNotIn {
     }
     const std::set<HostAndPort>& _hosts;
 };
+
 /**
  * Replica set refresh period on the task executor.
+ * This value must be equal to ReadPreferenceSettings::kMinimalMaxStalenessValue / 2
  */
 const Seconds kRefreshPeriod(30);
-
-
 }  // namespace
 
 // At 1 check every 10 seconds, 30 checks takes 5 minutes
@@ -175,6 +176,7 @@ ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort
 void ReplicaSetMonitor::init() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_executor);
+    invariant(kRefreshPeriod * 2 == ReadPreferenceSetting::kMinimalMaxStalenessValue);
     std::weak_ptr<ReplicaSetMonitor> that(shared_from_this());
     auto status = _executor->scheduleWork([=](const CallbackArgs& cbArgs) {
         if (auto ptr = that.lock()) {
@@ -868,6 +870,12 @@ void IsMasterReply::parse(const BSONObj& obj) {
         }
 
         tags = raw.getObjectField("tags");
+        BSONObj lastWriteField = raw.getObjectField("lastWrite");
+        if (!lastWriteField.isEmpty()) {
+            if (auto lastWrite = lastWriteField["lastWriteDate"]) {
+                lastWriteDate = lastWrite.date();
+            }
+        }
     } catch (const std::exception& e) {
         ok = false;
         log() << "exception while parsing isMaster reply: " << e.what() << " " << obj;
@@ -934,6 +942,10 @@ void Node::update(const IsMasterReply& reply) {
             latencyMicros += (reply.latencyMicros - latencyMicros) / 4;
         }
     }
+
+    LOG(3) << "Updating " << host << " lastWriteDate to " << lastWriteDate;
+    lastWriteDate = reply.lastWriteDate;
+    lastWriteDateUpdateTime = Date_t::now();
 }
 
 SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes)
@@ -974,13 +986,13 @@ HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) con
             // NOTE: the spec says we should use the primary even if tags don't match
             if (!out.empty())
                 return out;
-            return getMatchingHost(
-                ReadPreferenceSetting(ReadPreference::SecondaryOnly, criteria.tags));
+            return getMatchingHost(ReadPreferenceSetting(
+                ReadPreference::SecondaryOnly, criteria.tags, criteria.maxStalenessMS));
         }
 
         case ReadPreference::SecondaryPreferred: {
-            HostAndPort out = getMatchingHost(
-                ReadPreferenceSetting(ReadPreference::SecondaryOnly, criteria.tags));
+            HostAndPort out = getMatchingHost(ReadPreferenceSetting(
+                ReadPreference::SecondaryOnly, criteria.tags, criteria.maxStalenessMS));
             if (!out.empty())
                 return out;
             // NOTE: the spec says we should use the primary even if tags don't match
@@ -999,13 +1011,54 @@ HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) con
         // The difference between these is handled by Node::matches
         case ReadPreference::SecondaryOnly:
         case ReadPreference::Nearest: {
+            stdx::function<bool(const Node&)> matchNode = [](const Node& node) -> bool {
+                return true;
+            };
+            // build comparator
+            if (criteria.maxStalenessMS.count()) {
+                auto masterIt = std::find_if(nodes.begin(), nodes.end(), isMaster);
+                if (masterIt == nodes.end() || !masterIt->lastWriteDate.toMillisSinceEpoch()) {
+                    auto writeDateCmp = [](const Node* a, const Node* b) -> bool {
+                        return a->lastWriteDate < b->lastWriteDate;
+                    };
+                    // use only non failed nodes
+                    std::vector<const Node*> upNodes;
+                    for (auto nodeIt = nodes.begin(); nodeIt != nodes.end(); ++nodeIt) {
+                        if (nodeIt->isUp && nodeIt->lastWriteDate.toMillisSinceEpoch()) {
+                            upNodes.push_back(&(*nodeIt));
+                        }
+                    }
+                    auto latestSecNode =
+                        std::max_element(upNodes.begin(), upNodes.end(), writeDateCmp);
+                    if (latestSecNode == upNodes.end()) {
+                        matchNode = [](const Node& node) -> bool { return false; };
+                    } else {
+                        Date_t maxWriteTime = (*latestSecNode)->lastWriteDate;
+                        matchNode = [=](const Node& node) -> bool {
+                            return Milliseconds(maxWriteTime - node.lastWriteDate) +
+                                kRefreshPeriod <=
+                                criteria.maxStalenessMS;
+                        };
+                    }
+                } else {
+                    Milliseconds primaryStaleness =
+                        masterIt->lastWriteDateUpdateTime - masterIt->lastWriteDate;
+                    matchNode = [=](const Node& node) -> bool {
+                        return Milliseconds(node.lastWriteDateUpdateTime - node.lastWriteDate) -
+                            primaryStaleness + kRefreshPeriod <=
+                            criteria.maxStalenessMS;
+                    };
+                }
+            }
+
             BSONForEach(tagElem, criteria.tags.getTagBSON()) {
                 uassert(16358, "Tags should be a BSON object", tagElem.isABSONObj());
                 BSONObj tag = tagElem.Obj();
 
                 std::vector<const Node*> matchingNodes;
                 for (size_t i = 0; i < nodes.size(); i++) {
-                    if (nodes[i].matches(criteria.pref) && nodes[i].matches(tag)) {
+                    if (nodes[i].matches(criteria.pref) && nodes[i].matches(tag) &&
+                        matchNode(nodes[i])) {
                         matchingNodes.push_back(&nodes[i]);
                     }
                 }

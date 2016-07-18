@@ -113,6 +113,12 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 }  // namespace
 
+
+/**
+ * Replica set refresh period on the task executor.
+ */
+const Milliseconds ReadPreferenceSetting::kMinimalMaxStalenessValue(60000);
+
 TagSet::TagSet() : _tags(BSON_ARRAY(BSONObj())) {}
 
 TagSet TagSet::primaryOnly() {
@@ -123,6 +129,9 @@ ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref,
                                              TagSet tags,
                                              Milliseconds maxStalenessMS)
     : pref(std::move(pref)), tags(std::move(tags)), maxStalenessMS(std::move(maxStalenessMS)) {}
+
+ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, Milliseconds maxStalenessMS)
+    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessMS) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, TagSet tags)
     : pref(std::move(pref)), tags(std::move(tags)) {}
@@ -181,16 +190,28 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromBSON(const BSONObj&
         return maxStalenessMSExtractStatus;
     }
 
-    if (maxStalenessMSValue < 0) {
+    if (maxStalenessMSValue && maxStalenessMSValue < 0) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kMaxStalenessMSFieldName
                                     << " must be a non negative integer");
     }
 
-    if (maxStalenessMSValue >= Milliseconds::max().count()) {
+    if (maxStalenessMSValue && maxStalenessMSValue >= Milliseconds::max().count()) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessMSFieldName << " value can not exceed"
+                      str::stream() << kMaxStalenessMSFieldName << " value can not exceed "
                                     << Milliseconds::max().count());
+    }
+
+    if (maxStalenessMSValue && maxStalenessMSValue < kMinimalMaxStalenessValue.count()) {
+        return Status(ErrorCodes::MaxStalenessOutOfRange,
+                      str::stream() << kMaxStalenessMSFieldName << " value can not be less than "
+                                    << kMinimalMaxStalenessValue.count());
+    }
+
+    if ((mode == ReadPreference::PrimaryOnly) && maxStalenessMSValue) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << kMaxStalenessMSFieldName
+                                    << " can not be set for the primary mode");
     }
 
     return ReadPreferenceSetting(mode, tags, Milliseconds(maxStalenessMSValue));

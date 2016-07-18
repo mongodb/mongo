@@ -121,6 +121,7 @@ struct ReadPreferenceSetting {
      *     position).
      */
     ReadPreferenceSetting(ReadPreference pref, TagSet tags, Milliseconds maxStalenessMS);
+    ReadPreferenceSetting(ReadPreference pref, Milliseconds maxStalenessMS);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
 
@@ -153,6 +154,11 @@ struct ReadPreferenceSetting {
     ReadPreference pref;
     TagSet tags;
     Milliseconds maxStalenessMS{};
+
+    /**
+     * The minimal value maxStalenessMS can have. It MUST be ReplicaSetMonitor::kRefreshPeriod * 2
+     */
+    static const Milliseconds kMinimalMaxStalenessValue;
 };
 
 }  // namespace mongo
