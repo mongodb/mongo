@@ -89,6 +89,8 @@ public:
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
 
+    Status initializeShardingAwarenessOnUnawareShards(OperationContext* txn) override;
+
     Status upsertShardIdentityOnShard(OperationContext* txn, ShardType shardType) override;
 
 
@@ -150,6 +152,11 @@ private:
     Status _initConfigVersion(OperationContext* txn);
 
     /**
+     * Retrieves all shards that are not marked as sharding aware (state = 1) in this cluster.
+     */
+    StatusWith<std::vector<ShardType>> _getAllShardingUnawareShards(OperationContext* txn);
+
+    /**
      * Callback function used when rescheduling an addShard task after the first attempt failed.
      * Checks if the callback has been canceled, and if not, proceeds to call
      * _scheduleAddShardTask.
@@ -189,7 +196,7 @@ private:
     bool _hasAddShardHandle_inlock(const ShardId& shardId);
 
     /**
-     * Adds CallbackHandle handle for the shard with id shardID to the map of running or scheduled
+     * Adds CallbackHandle handle for the shard with id shardId to the map of running or scheduled
      * addShard tasks.
      * The caller must hold _addShardHandlesMutex.
      */

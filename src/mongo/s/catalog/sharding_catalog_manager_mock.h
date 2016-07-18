@@ -73,6 +73,8 @@ public:
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
 
+    Status initializeShardingAwarenessOnUnawareShards(OperationContext* txn) override;
+
     Status upsertShardIdentityOnShard(OperationContext* txn, ShardType shardType) override;
 
     BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,

@@ -70,6 +70,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/balancer/balancer.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -520,6 +521,16 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
             }
 
             fassertStatusOK(40217, status);
+        }
+
+        // For upgrade from 3.2 to 3.4, check if any shards in config.shards are not yet marked as
+        // shard aware, and attempt to initialize sharding awareness on them.
+        auto shardAwareInitializationStatus =
+            Grid::get(txn)->catalogManager()->initializeShardingAwarenessOnUnawareShards(txn);
+        if (!shardAwareInitializationStatus.isOK()) {
+            warning() << "Error while attempting to initialize sharding awareness on sharding "
+                         "unaware shards "
+                      << causedBy(shardAwareInitializationStatus);
         }
 
         // Free any leftover locks from previous instantiations

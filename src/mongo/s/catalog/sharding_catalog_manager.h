@@ -145,6 +145,13 @@ public:
     virtual Status initializeConfigDatabaseIfNeeded(OperationContext* txn) = 0;
 
     /**
+     * For upgrade from 3.2 to 3.4, for each shard in config.shards that is not marked as sharding
+     * aware, schedules a task to upsert a shardIdentity doc into the shard and mark the shard as
+     * sharding aware.
+     */
+    virtual Status initializeShardingAwarenessOnUnawareShards(OperationContext* txn) = 0;
+
+    /**
      * For rolling upgrade and backwards compatibility with 3.2 mongos, schedules an asynchronous
      * task against addShard executor to upsert a shardIdentity doc into the new shard described by
      * shardType. On failure to upsert the doc on the shard, the task reschedules itself with a

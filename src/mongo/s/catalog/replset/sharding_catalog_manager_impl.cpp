@@ -1086,6 +1086,62 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     return Status::OK();
 }
 
+Status ShardingCatalogManagerImpl::initializeShardingAwarenessOnUnawareShards(
+    OperationContext* txn) {
+    auto swShards = _getAllShardingUnawareShards(txn);
+    if (!swShards.isOK()) {
+        return swShards.getStatus();
+    } else {
+        auto shards = std::move(swShards.getValue());
+        for (const auto& shard : shards) {
+            auto status = upsertShardIdentityOnShard(txn, shard);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+    }
+
+    // Note: this OK status means only that tasks to initialize sharding awareness on the shards
+    // were scheduled against the task executor, not that the tasks actually succeeded.
+    return Status::OK();
+}
+
+StatusWith<std::vector<ShardType>> ShardingCatalogManagerImpl::_getAllShardingUnawareShards(
+    OperationContext* txn) {
+    std::vector<ShardType> shards;
+    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString(ShardType::ConfigNS),
+        BSON(
+            "state" << BSON("$ne" << static_cast<std::underlying_type<ShardType::ShardState>::type>(
+                                ShardType::ShardState::kShardAware))),  // shard is sharding unaware
+        BSONObj(),                                                      // no sort
+        boost::none);                                                   // no limit
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    for (const BSONObj& doc : findStatus.getValue().docs) {
+        auto shardRes = ShardType::fromBSON(doc);
+        if (!shardRes.isOK()) {
+            return {ErrorCodes::FailedToParse,
+                    stream() << "Failed to parse shard " << causedBy(shardRes.getStatus()) << doc};
+        }
+
+        Status validateStatus = shardRes.getValue().validate();
+        if (!validateStatus.isOK()) {
+            return {validateStatus.code(),
+                    stream() << "Failed to validate shard " << causedBy(validateStatus) << doc};
+        }
+
+        shards.push_back(shardRes.getValue());
+    }
+
+    return shards;
+}
+
 Status ShardingCatalogManagerImpl::upsertShardIdentityOnShard(OperationContext* txn,
                                                               ShardType shardType) {
 
@@ -1160,7 +1216,7 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
                 stdx::bind(&ShardingCatalogManagerImpl::_scheduleAddShardTaskUnlessCanceled,
                            this,
                            stdx::placeholders::_1,
-                           std::move(shardType),
+                           shardType,
                            std::move(targeter),
                            std::move(commandRequest))));
         return;
@@ -1173,7 +1229,7 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
         stdx::bind(&ShardingCatalogManagerImpl::_handleAddShardTaskResponse,
                    this,
                    stdx::placeholders::_1,
-                   std::move(shardType),
+                   shardType,
                    std::move(targeter));
 
     _trackAddShardHandle_inlock(shardType.getName(),
@@ -1256,7 +1312,7 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
                 stdx::bind(&ShardingCatalogManagerImpl::_scheduleAddShardTaskUnlessCanceled,
                            this,
                            stdx::placeholders::_1,
-                           std::move(shardType),
+                           shardType,
                            std::move(targeter),
                            std::move(cbArgs.request.cmdObj))));
         return;
@@ -1340,12 +1396,12 @@ bool ShardingCatalogManagerImpl::_hasAddShardHandle_inlock(const ShardId& shardI
 }
 
 void ShardingCatalogManagerImpl::_trackAddShardHandle_inlock(
-    const ShardId shardId, const StatusWith<CallbackHandle>& handle) {
-    if (handle.getStatus() == ErrorCodes::ShutdownInProgress) {
+    const ShardId shardId, const StatusWith<CallbackHandle>& swHandle) {
+    if (swHandle.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
-    fassert(40219, handle.getStatus());
-    _addShardHandles.insert(std::pair<ShardId, CallbackHandle>(shardId, handle.getValue()));
+    fassert(40219, swHandle.getStatus());
+    _addShardHandles.insert(std::pair<ShardId, CallbackHandle>(shardId, swHandle.getValue()));
 }
 
 void ShardingCatalogManagerImpl::_untrackAddShardHandle_inlock(const ShardId& shardId) {

@@ -1100,21 +1100,14 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
-            shards.clear();
             return {ErrorCodes::FailedToParse,
-                    stream() << "Failed to parse shard with id ("
-                             << doc[ShardType::name()].toString()
-                             << ")"
-                             << causedBy(shardRes.getStatus())};
+                    stream() << "Failed to parse shard " << causedBy(shardRes.getStatus()) << doc};
         }
 
         Status validateStatus = shardRes.getValue().validate();
         if (!validateStatus.isOK()) {
             return {validateStatus.code(),
-                    stream() << "Failed to validate shard with id ("
-                             << doc[ShardType::name()].toString()
-                             << ")"
-                             << causedBy(validateStatus)};
+                    stream() << "Failed to validate shard " << causedBy(validateStatus) << doc};
         }
 
         shards.push_back(shardRes.getValue());
