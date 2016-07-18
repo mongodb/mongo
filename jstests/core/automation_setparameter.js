@@ -38,8 +38,15 @@
     res = assert.commandWorked(db.runCommand({isMaster: 1}));
     assert(!res.hasOwnProperty('automationServiceDescriptor'));
 
+    // Verify that the shell has the correct prompt.
+    var originalPrompt = db.getMongo().promptPrefix;
+    assert.commandWorked(db.adminCommand({setParameter: 1, automationServiceDescriptor: "set"}));
+    db.getMongo().promptPrefix = undefined;
+    assert(/\[automated\]/.test(defaultPrompt()));
+
     // Restore whatever was there originally.
     if (!original)
         original = "";
     assert.commandWorked(db.adminCommand({setParameter: 1, automationServiceDescriptor: original}));
+    db.getMongo().promptPrefix = originalPrompt;
 }());

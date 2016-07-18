@@ -273,7 +273,15 @@ defaultPrompt = function() {
         var buildInfo = db.runCommand({buildInfo: 1});
         try {
             if (buildInfo.modules.indexOf("enterprise") > -1) {
-                prefix = "MongoDB Enterprise ";
+                prefix += "MongoDB Enterprise ";
+            }
+        } catch (e) {
+            // Don't do anything here. Just throw the error away.
+        }
+        var isMasterRes = db.runCommand({isMaster: 1, forShell: 1});
+        try {
+            if (isMasterRes.hasOwnProperty("automationServiceDescriptor")) {
+                prefix += "[automated] ";
             }
         } catch (e) {
             // Don't do anything here. Just throw the error away.
@@ -316,7 +324,7 @@ defaultPrompt = function() {
         // try to use isMaster?
         if (status.isMaster) {
             try {
-                var prompt = isMasterStatePrompt();
+                var prompt = isMasterStatePrompt(isMasterRes);
                 status.isMaster = true;
                 db.getMongo().authStatus = status;
                 return prefix + prompt;
@@ -361,9 +369,9 @@ replSetMemberStatePrompt = function() {
     return state + '> ';
 };
 
-isMasterStatePrompt = function() {
+isMasterStatePrompt = function(isMasterResponse) {
     var state = '';
-    var isMaster = db.runCommand({isMaster: 1, forShell: 1});
+    var isMaster = isMasterResponse || db.runCommand({isMaster: 1, forShell: 1});
     if (isMaster.ok) {
         var role = "";
 
