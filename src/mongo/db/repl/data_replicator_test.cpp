@@ -219,6 +219,7 @@ protected:
         int documentsInsertedCount = 0;
     };
 
+    stdx::mutex _storageInterfaceWorkDoneMutex;  // protects _storageInterfaceWorkDone.
     StorageInterfaceResults _storageInterfaceWorkDone;
 
     void setUp() override {
@@ -226,25 +227,30 @@ protected:
         _storageInterface = stdx::make_unique<StorageInterfaceMock>();
         _storageInterface->createOplogFn = [this](OperationContext* txn,
                                                   const NamespaceString& nss) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
         _storageInterface->insertDocumentFn =
             [this](OperationContext* txn, const NamespaceString& nss, const BSONObj& doc) {
+                LockGuard lock(_storageInterfaceWorkDoneMutex);
                 ++_storageInterfaceWorkDone.documentsInsertedCount;
                 return Status::OK();
             };
         _storageInterface->insertDocumentsFn = [this](
             OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.insertedOplogEntries = true;
             ++_storageInterfaceWorkDone.oplogEntriesInserted;
             return Status::OK();
         };
         _storageInterface->dropCollFn = [this](OperationContext* txn, const NamespaceString& nss) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns());
             return Status::OK();
         };
         _storageInterface->dropUserDBsFn = [this](OperationContext* txn) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.droppedUserDBs = true;
             return Status::OK();
         };
@@ -735,13 +741,16 @@ TEST_F(InitialSyncTest, Complete) {
     playResponses(true);
     log() << "done playing last responses";
 
-    log() << "doing asserts";
-    ASSERT_TRUE(_storageInterfaceWorkDone.droppedUserDBs);
-    ASSERT_TRUE(_storageInterfaceWorkDone.createOplogCalled);
-    ASSERT_EQ(1, _storageInterfaceWorkDone.oplogEntriesInserted);
-
     log() << "waiting for initial sync to verify it completed OK";
     verifySync(getNet());
+
+    log() << "doing asserts";
+    {
+        LockGuard lock(_storageInterfaceWorkDoneMutex);
+        ASSERT_TRUE(_storageInterfaceWorkDone.droppedUserDBs);
+        ASSERT_TRUE(_storageInterfaceWorkDone.createOplogCalled);
+        ASSERT_EQ(1, _storageInterfaceWorkDone.oplogEntriesInserted);
+    }
 
     log() << "checking initial sync flag isn't set.";
     // Initial sync flag should not be set after completion.
