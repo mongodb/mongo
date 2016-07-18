@@ -440,11 +440,11 @@ int mongoSMain(int argc, char* argv[], char** envp) {
         int exitCode = _main();
         return exitCode;
     } catch (const SocketException& e) {
-        error() << "uncaught SocketException in mongos main: " << e.toString();
+        error() << "uncaught SocketException in mongos main: " << redact(e);
     } catch (const DBException& e) {
-        error() << "uncaught DBException in mongos main: " << e.toString();
+        error() << "uncaught DBException in mongos main: " << redact(e);
     } catch (const std::exception& e) {
-        error() << "uncaught std::exception in mongos main:" << e.what();
+        error() << "uncaught std::exception in mongos main:" << redact(e.what());
     } catch (...) {
         error() << "uncaught unknown exception in mongos main";
     }

@@ -646,9 +646,9 @@ private:
                 conn.done();
             }
         } catch (const DBException& e) {
-            warning() << "Cannot cleanup shard results" << e.toString();
+            warning() << "Cannot cleanup shard results" << redact(e);
         } catch (const std::exception& e) {
-            severe() << "Cannot cleanup shard results" << causedBy(e);
+            severe() << "Cannot cleanup shard results" << causedBy(redact(e.what()));
         }
     }
 

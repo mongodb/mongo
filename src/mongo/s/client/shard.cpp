@@ -109,8 +109,9 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
         if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
-            LOG(2) << "Command " << cmdObj << " failed with retriable error and will be retried"
-                   << causedBy(commandStatus);
+            LOG(2) << "Command " << redact(cmdObj)
+                   << " failed with retriable error and will be retried"
+                   << causedBy(redact(commandStatus));
             continue;
         }
 
@@ -141,7 +142,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* txn,
 
         if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
             LOG(2) << "Batch write command failed with retriable error and will be retried"
-                   << causedBy(writeStatus);
+                   << causedBy(redact(writeStatus));
             continue;
         }
 

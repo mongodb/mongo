@@ -200,7 +200,7 @@ public:
         toconn.done();
 
         if (!worked) {
-            log() << "clone failed" << cloneRes;
+            log() << "clone failed" << redact(cloneRes);
             errmsg = "clone failed";
             return false;
         }

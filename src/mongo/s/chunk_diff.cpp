@@ -125,7 +125,8 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
 
         if (!chunkVersion.isSet() || !chunkVersion.hasEqualEpoch(currEpoch)) {
             warning() << "got invalid chunk version " << chunkVersion << " in document "
-                      << chunk.toString() << " when trying to load differing chunks at version "
+                      << redact(chunk.toString())
+                      << " when trying to load differing chunks at version "
                       << ChunkVersion(
                              _maxVersion->majorVersion(), _maxVersion->minorVersion(), currEpoch);
 

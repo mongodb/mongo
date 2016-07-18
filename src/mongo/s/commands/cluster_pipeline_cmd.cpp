@@ -385,10 +385,10 @@ void PipelineCommand::killAllCursors(const vector<Strategy::CommandResult>& shar
             conn.done();
         } catch (const DBException& e) {
             log() << "Couldn't kill aggregation cursor on shard: " << shardResults[i].target
-                  << " due to DBException: " << e.toString();
+                  << " due to DBException: " << redact(e);
         } catch (const std::exception& e) {
             log() << "Couldn't kill aggregation cursor on shard: " << shardResults[i].target
-                  << " due to std::exception: " << e.what();
+                  << " due to std::exception: " << redact(e.what());
         } catch (...) {
             log() << "Couldn't kill aggregation cursor on shard: " << shardResults[i].target
                   << " due to non-exception";

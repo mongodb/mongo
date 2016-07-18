@@ -329,8 +329,9 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
             return status;
         }
 
-        LOG(1) << "Received error status for query " << query.toStringShort() << " on attempt "
-               << retries << " of " << kMaxStaleConfigRetries << ": " << status;
+        LOG(1) << "Received error status for query " << redact(query.toStringShort())
+               << " on attempt " << retries << " of " << kMaxStaleConfigRetries << ": "
+               << redact(status);
 
         const bool staleEpoch = (status == ErrorCodes::StaleEpoch);
         if (staleEpoch) {

@@ -108,7 +108,7 @@ public:
             // legacy behavior
             if (!shardOps.isABSONObj()) {
                 warning() << "invalid currentOp response from shard " << shardName
-                          << ", got: " << shardOps;
+                          << ", got: " << redact(shardOps);
                 continue;
             }
 
@@ -119,7 +119,7 @@ public:
                 // but log it first
                 if (!shardOp.isABSONObj()) {
                     warning() << "invalid currentOp response from shard " << shardName
-                              << ", got: " << shardOp;
+                              << ", got: " << redact(shardOp);
                     continue;
                 }
 

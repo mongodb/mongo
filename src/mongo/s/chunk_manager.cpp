@@ -338,7 +338,7 @@ shared_ptr<ChunkManager> ChunkManager::reload(OperationContext* txn, bool force)
 
 void ChunkManager::_printChunks() const {
     for (ChunkMap::const_iterator it = _chunkMap.begin(), end = _chunkMap.end(); it != end; ++it) {
-        log() << *it->second;
+        log() << redact((*it->second).toString());
     }
 }
 
@@ -436,7 +436,7 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
             txn, ChunkType::ConfigNS, chunk.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             const string errMsg = str::stream() << "Creating first chunks failed: "
-                                                << status.reason();
+                                                << redact(status.reason());
             error() << errMsg;
             return Status(status.code(), errMsg);
         }
@@ -467,9 +467,9 @@ shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
                 return chunk;
             }
 
-            log() << chunkMin;
-            log() << *chunk;
-            log() << shardKey;
+            log() << redact(chunkMin.toString());
+            log() << redact((*chunk).toString());
+            log() << redact(shardKey);
 
             reload(txn);
             msgasserted(13141, "Chunk map pointed to incorrect chunk");
@@ -638,7 +638,8 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     // children.size() > 1, assert it's OR / SORT_MERGE.
     if (node->getType() != STAGE_OR && node->getType() != STAGE_SORT_MERGE) {
         // Unexpected node. We should never reach here.
-        error() << "could not generate index bounds on query solution tree: " << node->toString();
+        error() << "could not generate index bounds on query solution tree: "
+                << redact(node->toString());
         dassert(false);  // We'd like to know this error in testing.
 
         // Bail out with all shards in production, since this isn't a fatal error.

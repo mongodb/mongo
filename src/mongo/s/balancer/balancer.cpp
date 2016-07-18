@@ -228,7 +228,7 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
 
     auto migrateInfo = std::move(migrateStatus.getValue());
     if (!migrateInfo) {
-        LOG(1) << "Unable to find more appropriate location for chunk " << chunk;
+        LOG(1) << "Unable to find more appropriate location for chunk " << redact(chunk.toString());
         return Status::OK();
     }
 
@@ -539,8 +539,8 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
                                                                  splitInfo.maxKey,
                                                                  splitInfo.splitKeys);
         if (!splitStatus.isOK()) {
-            warning() << "Failed to enforce tag range for chunk " << splitInfo
-                      << causedBy(splitStatus.getStatus());
+            warning() << "Failed to enforce tag range for chunk " << redact(splitInfo.toString())
+                      << causedBy(redact(splitStatus.getStatus()));
         }
 
         cm->reload(txn);

@@ -445,7 +445,7 @@ void AsyncResultsMerger::handleBatchResponse(
                 invariant(remote.shardId);
                 LOG(1) << "Initial cursor establishment failed with retriable error and will be "
                           "retried"
-                       << causedBy(cursorResponseStatus.getStatus());
+                       << causedBy(redact(cursorResponseStatus.getStatus()));
 
                 ++remote.retryCount;
 

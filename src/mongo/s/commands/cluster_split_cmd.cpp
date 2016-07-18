@@ -247,7 +247,8 @@ public:
 
         invariant(chunk.get());
 
-        log() << "splitting chunk [" << chunk->getMin() << "," << chunk->getMax() << ")"
+        log() << "splitting chunk [" << redact(chunk->getMin().toString()) << ","
+              << redact(chunk->getMax().toString()) << ")"
               << " in collection " << nss.ns() << " on shard " << chunk->getShardId();
 
         BSONObj res;

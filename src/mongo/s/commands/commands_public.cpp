@@ -1316,7 +1316,7 @@ public:
                             result.append(e);
                     }
 
-                    log() << "Sharded filemd5 failed: " << result.asTempObj();
+                    log() << "Sharded filemd5 failed: " << redact(result.asTempObj());
 
                     errmsg =
                         string("sharded filemd5 failed because: ") + res["errmsg"].valuestrsafe();

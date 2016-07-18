@@ -369,14 +369,14 @@ Status ShardingCatalogClientImpl::_log(OperationContext* txn,
     changeLog.setDetails(detail);
 
     BSONObj changeLogBSON = changeLog.toBSON();
-    log() << "about to log metadata event into " << logCollName << ": " << changeLogBSON;
+    log() << "about to log metadata event into " << logCollName << ": " << redact(changeLogBSON);
 
     const NamespaceString nss("config", logCollName);
     Status result = insertConfigDocument(
         txn, nss.ns(), changeLogBSON, ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         warning() << "Error encountered while logging config change with ID [" << changeId
-                  << "] into collection " << logCollName << ": " << result;
+                  << "] into collection " << logCollName << ": " << redact(result);
     }
 
     return result;
@@ -1269,7 +1269,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
         // collection. The last chunk can be identified by namespace and version number.
 
         warning() << "chunk operation commit failed and metadata will be revalidated"
-                  << causedBy(status);
+                  << causedBy(redact(status));
 
         // Look for the chunk in this shard whose version got bumped. We assume that if that
         // mod made it to the config server, then applyOps was successful.
@@ -1281,12 +1281,13 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
 
         if (!chunkStatus.isOK()) {
             warning() << "getChunks function failed, unable to validate chunk operation metadata"
-                      << causedBy(chunkStatus);
-            errMsg = str::stream() << "getChunks function failed, unable to validate chunk "
-                                   << "operation metadata: " << causedBy(chunkStatus)
-                                   << ". applyChunkOpsDeprecated failed to get confirmation "
-                                   << "of commit. Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue().response;
+                      << causedBy(redact(chunkStatus));
+            errMsg = str::stream()
+                << "getChunks function failed, unable to validate chunk "
+                << "operation metadata: " << causedBy(redact(chunkStatus))
+                << ". applyChunkOpsDeprecated failed to get confirmation "
+                << "of commit. Unable to save chunk ops. Command: " << redact(cmd)
+                << ". Result: " << redact(response.getValue().response);
         } else if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
             log() << "chunk operation commit confirmed";

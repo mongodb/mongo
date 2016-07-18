@@ -53,8 +53,8 @@ void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
     if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
         return;
     } else if (!swShardingMetadata.isOK()) {
-        warning() << "Got invalid sharding metadata " << swShardingMetadata.getStatus()
-                  << " metadata object was '" << metadata << "'";
+        warning() << "Got invalid sharding metadata " << redact(swShardingMetadata.getStatus())
+                  << " metadata object was '" << redact(metadata) << "'";
         return;
     }
 

@@ -534,8 +534,9 @@ public:
                         MigrationSecondaryThrottleOptions::kOff),
                     true);
                 if (!moveStatus.isOK()) {
-                    warning() << "couldn't move chunk " << chunk->toString() << " to shard " << *to
-                              << " while sharding collection " << nss.ns() << causedBy(moveStatus);
+                    warning() << "couldn't move chunk " << redact(chunk->toString()) << " to shard "
+                              << *to << " while sharding collection " << nss.ns()
+                              << causedBy(redact(moveStatus));
                 }
             }
 
@@ -564,9 +565,9 @@ public:
                             currentChunk->getMax(),
                             subSplits);
                         if (!splitStatus.isOK()) {
-                            warning() << "couldn't split chunk " << currentChunk->toString()
+                            warning() << "couldn't split chunk " << redact(currentChunk->toString())
                                       << " while sharding collection " << nss.ns()
-                                      << causedBy(splitStatus.getStatus());
+                                      << causedBy(redact(splitStatus.getStatus()));
                         }
 
                         subSplits.clear();

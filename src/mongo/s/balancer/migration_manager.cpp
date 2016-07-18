@@ -352,10 +352,9 @@ StatusWith<DistLockManager::ScopedDistLock> MigrationManager::_getDistLock(
     if (!distLockStatus.isOK()) {
         const std::string msg = str::stream()
             << "Could not acquire collection lock for " << migration.chunkInfo.migrateInfo.ns
-            << " to migrate chunk "
-            << ChunkRange(migration.chunkInfo.migrateInfo.minKey,
-                          migration.chunkInfo.migrateInfo.maxKey)
-                   .toString()
+            << " to migrate chunk " << redact(ChunkRange(migration.chunkInfo.migrateInfo.minKey,
+                                                         migration.chunkInfo.migrateInfo.maxKey)
+                                                  .toString())
             << " due to " << distLockStatus.getStatus().toString();
         warning() << msg;
         return {distLockStatus.getStatus().code(), msg};

@@ -103,7 +103,7 @@ void ReplSetDistLockManager::shutDown(OperationContext* txn) {
     auto status = _catalog->stopPing(txn, _processID);
     if (!status.isOK()) {
         warning() << "error encountered while cleaning up distributed ping entry for " << _processID
-                  << causedBy(status);
+                  << causedBy(redact(status));
     }
 }
 
@@ -298,23 +298,29 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
             const BSONObj& data = customTimeout.getData();
             lockExpiration = Milliseconds(data["timeoutMs"].numberInt());
         }
-
+        // REDACT: can this whyMessage ever have PII?
         LOG(1) << "trying to acquire new distributed lock for " << name
                << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)
                << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
                << " ms, process : " << _processID << " )"
-               << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage;
+               << " with lockSessionID: " << lockSessionID
+               << ", why: " << redact(whyMessage.toString());
 
-        auto lockResult = _catalog->grabLock(
-            txn, name, lockSessionID, who, _processID, Date_t::now(), whyMessage);
+        auto lockResult = _catalog->grabLock(txn,
+                                             name,
+                                             lockSessionID,
+                                             who,
+                                             _processID,
+                                             Date_t::now(),
+                                             redact(whyMessage.toString()));
 
         auto status = lockResult.getStatus();
 
         if (status.isOK()) {
             // Lock is acquired since findAndModify was able to successfully modify
             // the lock document.
-            log() << "distributed lock '" << name << "' acquired for '" << whyMessage
-                  << "', ts : " << lockSessionID;
+            log() << "distributed lock '" << name << "' acquired for '"
+                  << redact(whyMessage.toString()) << "', ts : " << lockSessionID;
             return ScopedDistLock(txn, lockSessionID, this);
         }
 
@@ -323,7 +329,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
             networkErrorRetries < kMaxNumLockAcquireRetries) {
             LOG(1) << "Failed to acquire distributed lock because of retriable error. Retrying "
                       "acquisition by first unlocking the stale entry, which possibly exists now"
-                   << causedBy(status);
+                   << causedBy(redact(status));
 
             networkErrorRetries++;
 
@@ -338,7 +344,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
 
             LOG(1)
                 << "Failed to retry acqusition of distributed lock. No more attempts will be made"
-                << causedBy(status);
+                << causedBy(redact(status));
         }
 
         if (status != ErrorCodes::LockStateChangeFailed) {
@@ -405,7 +411,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
         // Periodically message for debugging reasons
         if (msgTimer.seconds() > 10) {
             LOG(0) << "waited " << timer.seconds() << "s for distributed lock " << name << " for "
-                   << whyMessage;
+                   << redact(whyMessage.toString());
 
             msgTimer.reset();
         }
@@ -436,7 +442,8 @@ void ReplSetDistLockManager::unlock(OperationContext* txn, const DistLockHandle&
 void ReplSetDistLockManager::unlockAll(OperationContext* txn, const std::string& processID) {
     Status status = _catalog->unlockAll(txn, processID);
     if (!status.isOK()) {
-        warning() << "Error while trying to unlock existing distributed locks" << causedBy(status);
+        warning() << "Error while trying to unlock existing distributed locks"
+                  << causedBy(redact(status));
     }
 }
 

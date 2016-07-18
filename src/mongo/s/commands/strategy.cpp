@@ -125,7 +125,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     audit::logQueryAuthzCheck(client, ns, q.query, status.code());
     uassertStatusOK(status);
 
-    LOG(3) << "query: " << q.ns << " " << q.query << " ntoreturn: " << q.ntoreturn
+    LOG(3) << "query: " << q.ns << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
            << " options: " << q.queryOptions;
 
     if (q.ntoreturn == 1 && strstr(q.ns, ".$cmd"))
@@ -213,7 +213,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
     QueryMessage q(request.d());
 
-    LOG(3) << "command: " << q.ns << " " << q.query << " ntoreturn: " << q.ntoreturn
+    LOG(3) << "command: " << q.ns << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
            << " options: " << q.queryOptions;
 
     if (q.queryOptions & QueryOption_Exhaust) {
@@ -272,7 +272,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 throw e;
 
             loops--;
-            log() << "retrying command: " << q.query;
+            log() << "retrying command: " << redact(q.query);
 
             // For legacy reasons, ns may not actually be set in the exception :-(
             string staleNS = e.getns();

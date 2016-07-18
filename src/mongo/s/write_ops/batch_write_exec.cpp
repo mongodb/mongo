@@ -236,7 +236,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                 request.setNS(nss);
 
                 LOG(4) << "sending write batch to " << shardHost.toString() << ": "
-                       << request.toString();
+                       << redact(request.toString());
 
                 _dispatcher->addCommand(shardHost, nss.db(), request.toBSON());
 
@@ -273,7 +273,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
 
                     LOG(4) << "write results received from " << shardHost.toString() << ": "
-                           << response.toString();
+                           << redact(response.toString());
 
                     // Dispatch was ok, note response
                     batchOp.noteBatchResponse(*batch, response, &trackedErrors);
@@ -305,7 +305,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     buildErrorFrom(Status(ErrorCodes::RemoteResultsUnavailable, msg.str()), &error);
 
                     LOG(4) << "unable to receive write results from " << shardHost.toString()
-                           << causedBy(dispatchStatus.toString());
+                           << causedBy(redact(dispatchStatus.toString()));
 
                     batchOp.noteBatchError(*batch, error);
                 }

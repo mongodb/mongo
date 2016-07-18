@@ -77,7 +77,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
                                 int options,
                                 std::string& errmsg,
                                 BSONObjBuilder& output) {
-    LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
+    LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << redact(cmdObj);
 
     if (_implicitCreateDb) {
         uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, dbName));

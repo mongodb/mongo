@@ -319,7 +319,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                     _getLeastLoadedReceiverShard(shardStats, distribution, tag, usedShards);
                 if (!to.isValid()) {
                     if (migrations.empty()) {
-                        warning() << "Chunk " << chunk
+                        warning() << "Chunk " << redact(chunk.toString())
                                   << " is on a draining shard, but no appropriate recipient found";
                     }
                     continue;
@@ -352,8 +352,8 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                     continue;
 
                 if (chunk.getJumbo()) {
-                    warning() << "chunk " << chunk << " violates tag " << tag
-                              << ", but it is jumbo and cannot be moved";
+                    warning() << "chunk " << redact(chunk.toString()) << " violates tag "
+                              << redact(tag) << ", but it is jumbo and cannot be moved";
                     continue;
                 }
 
@@ -361,8 +361,8 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                     _getLeastLoadedReceiverShard(shardStats, distribution, tag, usedShards);
                 if (!to.isValid()) {
                     if (migrations.empty()) {
-                        warning() << "chunk " << chunk << " violates tag " << tag
-                                  << ", but no appropriate recipient found";
+                        warning() << "chunk " << redact(chunk.toString()) << " violates tag "
+                                  << redact(tag) << ", but no appropriate recipient found";
                     }
                     continue;
                 }

@@ -222,7 +222,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     }
 
     if (!status.isOK()) {
-        log() << "Split chunk " << cmdObj << " failed" << causedBy(status);
+        log() << "Split chunk " << redact(cmdObj) << " failed" << causedBy(redact(status));
         return {status.code(), str::stream() << "split failed due to " << status.toString()};
     }
 
@@ -238,8 +238,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     } else if (status != ErrorCodes::NoSuchKey) {
         warning()
             << "Chunk migration will be skipped because splitChunk returned invalid response: "
-            << cmdResponse << ". Extracting " << kShouldMigrate << " field failed"
-            << causedBy(status);
+            << redact(cmdResponse) << ". Extracting " << kShouldMigrate << " field failed"
+            << causedBy(redact(status));
     }
 
     return boost::optional<ChunkRange>();

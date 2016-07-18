@@ -135,7 +135,8 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
         try {
             chunk = chunkManager->findIntersectingChunk(txn, it->first);
         } catch (const AssertionException& ex) {
-            warning() << "could not find chunk while checking for auto-split: " << causedBy(ex);
+            warning() << "could not find chunk while checking for auto-split: "
+                      << causedBy(redact(ex));
             return;
         }
 

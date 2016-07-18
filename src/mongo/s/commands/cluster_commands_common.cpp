@@ -85,7 +85,7 @@ void Future::CommandResult::init() {
             _ok = _conn->runCommand(_db, _cmd, _res, _options);
         }
     } catch (std::exception& e) {
-        error() << "Future::spawnCommand (part 1) exception: " << e.what();
+        error() << "Future::spawnCommand (part 1) exception: " << redact(e.what());
         _ok = false;
         _done = true;
     }
@@ -127,13 +127,15 @@ bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
                 staleNS = _db;
 
             if (i >= maxRetries) {
-                error() << "Future::spawnCommand (part 2) stale config exception" << causedBy(e);
+                error() << "Future::spawnCommand (part 2) stale config exception"
+                        << causedBy(redact(e));
                 throw e;
             }
 
             if (i >= maxRetries / 2) {
                 if (!versionManager.forceRemoteCheckShardVersionCB(txn, staleNS)) {
-                    error() << "Future::spawnCommand (part 2) no config detected" << causedBy(e);
+                    error() << "Future::spawnCommand (part 2) no config detected"
+                            << causedBy(redact(e));
                     throw e;
                 }
             }
@@ -142,19 +144,20 @@ bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
             // collection is supposed to be acted on, if any
             if (nsGetCollection(staleNS).size() == 0) {
                 warning() << "no collection namespace in stale config exception "
-                          << "for lazy command " << _cmd << ", could not refresh " << staleNS;
+                          << "for lazy command " << redact(_cmd) << ", could not refresh "
+                          << staleNS;
             } else {
                 versionManager.checkShardVersionCB(txn, _conn, staleNS, false, 1);
             }
 
-            LOG(i > 1 ? 0 : 1) << "retrying lazy command" << causedBy(e);
+            LOG(i > 1 ? 0 : 1) << "retrying lazy command" << causedBy(redact(e));
 
             verify(_conn->lazySupported());
             _done = false;
             init();
             continue;
         } catch (std::exception& e) {
-            error() << "Future::spawnCommand (part 2) exception: " << causedBy(e);
+            error() << "Future::spawnCommand (part 2) exception: " << causedBy(redact(e.what()));
             break;
         }
     }
