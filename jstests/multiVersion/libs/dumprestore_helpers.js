@@ -141,9 +141,11 @@ function multiVersionDumpRestoreTest(configObj) {
     assert.soon("destColl.findOne()", "no data after sleep");
     assert.soon("destCollCapped.findOne()", "no data after sleep");
 
+    let destDbVersion = destDB.version();
+
     // Validate that our collections were properly restored
-    assert(collValid.validateCollectionData(destColl));
-    assert(cappedCollValid.validateCollectionData(destCollCapped));
+    assert(collValid.validateCollectionData(destColl, destDbVersion));
+    assert(cappedCollValid.validateCollectionData(destCollCapped, destDbVersion));
 
     if (configObj.restoreType === "mongos") {
         shardingTest.stop();

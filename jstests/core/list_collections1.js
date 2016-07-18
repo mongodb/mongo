@@ -30,6 +30,8 @@
     })[0];
     assert(collObj);
     assert.eq('object', typeof(collObj.options));
+    assert.eq('collection', collObj.type, tojson(collObj));
+    assert.eq(false, collObj.info.readOnly, tojson(collObj));
 
     //
     // Test basic usage with DBCommandCursor.

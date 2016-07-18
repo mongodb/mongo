@@ -48,6 +48,8 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -105,26 +107,10 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
  * Does not add any information about the system.namespaces collection, or non-existent collections.
  */
 void _addWorkingSetMember(OperationContext* txn,
-                          const Collection* collection,
+                          const BSONObj& maybe,
                           const MatchExpression* matcher,
                           WorkingSet* ws,
                           QueuedDataStage* root) {
-    if (!collection) {
-        return;
-    }
-
-    StringData collectionName = collection->ns().coll();
-    if (collectionName == "system.namespaces") {
-        return;
-    }
-
-    BSONObjBuilder b;
-    b.append("name", collectionName);
-
-    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(txn);
-    b.append("options", options.toBSON());
-
-    BSONObj maybe = b.obj();
     if (matcher && !matcher->matchesBSON(maybe)) {
         return;
     }
@@ -136,6 +122,41 @@ void _addWorkingSetMember(OperationContext* txn,
     member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
     member->transitionToOwnedObj();
     root->pushBack(id);
+}
+
+BSONObj buildViewBson(const ViewDefinition& view) {
+    BSONObjBuilder b;
+    b.append("name", view.name().coll());
+    b.append("type", "view");
+    BSONObj options = BSON("viewOn" << view.viewOn().coll() << "pipeline" << view.pipeline());
+    b.append("options", options);
+    BSONObj info = BSON("readOnly" << true);
+    b.append("info", info);
+    return b.obj();
+}
+
+BSONObj buildCollectionBson(OperationContext* txn, const Collection* collection) {
+
+    if (!collection) {
+        return {};
+    }
+
+    StringData collectionName = collection->ns().coll();
+    if (collectionName == "system.namespaces") {
+        return {};
+    }
+
+    BSONObjBuilder b;
+    b.append("name", collectionName);
+    b.append("type", "collection");
+
+    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(txn);
+    b.append("options", options.toBSON());
+
+    BSONObj info = BSON("readOnly" << storageGlobalParams.readOnly);
+    b.append("info", info);
+
+    return b.obj();
 }
 
 class CmdListCollections : public Command {
@@ -212,7 +233,7 @@ public:
         ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetDb autoDb(txn, dbname, MODE_S);
 
-        const Database* db = autoDb.getDb();
+        Database* db = autoDb.getDb();
 
         auto ws = make_unique<WorkingSet>();
         auto root = make_unique<QueuedDataStage>(txn, ws.get());
@@ -221,12 +242,27 @@ public:
             if (auto collNames = _getExactNameMatches(matcher.get())) {
                 for (auto&& collName : *collNames) {
                     auto nss = NamespaceString(db->name(), collName);
-                    _addWorkingSetMember(
-                        txn, db->getCollection(nss), matcher.get(), ws.get(), root.get());
+                    Collection* collection = db->getCollection(nss);
+                    BSONObj collBson = buildCollectionBson(txn, collection);
+                    if (!collBson.isEmpty()) {
+                        _addWorkingSetMember(txn, collBson, matcher.get(), ws.get(), root.get());
+                    }
                 }
             } else {
                 for (auto&& collection : *db) {
-                    _addWorkingSetMember(txn, collection, matcher.get(), ws.get(), root.get());
+                    BSONObj collBson = buildCollectionBson(txn, collection);
+                    if (!collBson.isEmpty()) {
+                        _addWorkingSetMember(txn, collBson, matcher.get(), ws.get(), root.get());
+                    }
+                }
+            }
+            auto viewCatalog = db->getViewCatalog();
+            if (viewCatalog) {
+                for (auto& view : *viewCatalog) {
+                    BSONObj viewBson = buildViewBson(*(view.second.get()));
+                    if (!viewBson.isEmpty()) {
+                        _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
+                    }
                 }
             }
         }
