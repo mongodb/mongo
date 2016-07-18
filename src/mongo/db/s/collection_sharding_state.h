@@ -79,9 +79,27 @@ public:
     ScopedCollectionMetadata getMetadata();
 
     /**
-     * Set a new metadata to be used for this collection.
+     * Updates the metadata based on changes received from the config server and also resolves the
+     * pending receives map in case some of these pending receives have completed or have been
+     * abandoned.
+     *
+     * Must always be called with an exclusive collection lock.
      */
-    void setMetadata(std::unique_ptr<CollectionMetadata> newMetadata);
+    void refreshMetadata(OperationContext* txn, std::unique_ptr<CollectionMetadata> newMetadata);
+
+    /**
+     * Modifies the collection's sharding state to indicate that it is beginning to receive the
+     * given ChunkRange.
+     */
+    void beginReceive(const ChunkRange& range);
+
+    /*
+     * Modifies the collection's sharding state to indicate that the previous pending migration
+     * failed. If the range was not previously pending, this function will crash the server.
+     *
+     * This function is the mirror image of beginReceive.
+     */
+    void forgetReceive(const ChunkRange& range);
 
     /**
      * Returns the active migration source manager, if one is available.
@@ -146,6 +164,7 @@ private:
     // Namespace to which this state belongs.
     const NamespaceString _nss;
 
+    // Contains all the metadata associated with this collection.
     MetadataManager _metadataManager;
 
     // If this collection is serving as a source shard for chunk migration, this value will be

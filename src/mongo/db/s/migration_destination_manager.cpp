@@ -571,7 +571,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
 
         Status status = _notePending(txn, NamespaceString(ns), min, max, epoch);
         if (!status.isOK()) {
-            warning() << errmsg;
             setState(FAIL);
             return;
         }
@@ -998,11 +997,7 @@ Status MigrationDestinationManager::_notePending(OperationContext* txn,
                                            : ChunkVersion::UNSHARDED().epoch())};
     }
 
-    ChunkType chunk;
-    chunk.setMin(min);
-    chunk.setMax(max);
-
-    css->setMetadata(metadata->clonePlusPending(chunk));
+    css->beginReceive(ChunkRange(min, max));
 
     stdx::lock_guard<stdx::mutex> sl(_mutex);
     invariant(!_chunkMarkedPending);
@@ -1050,11 +1045,8 @@ Status MigrationDestinationManager::_forgetPending(OperationContext* txn,
                                            : ChunkVersion::UNSHARDED().epoch())};
     }
 
-    ChunkType chunk;
-    chunk.setMin(min);
-    chunk.setMax(max);
+    css->forgetReceive(ChunkRange(min, max));
 
-    css->setMetadata(metadata->cloneMinusPending(chunk));
     return Status::OK();
 }
 

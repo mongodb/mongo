@@ -333,14 +333,14 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         // committed, update the collection metadata to the new collection version in the command
         // response and forget the migrated chunk.
 
-        ChunkVersion uncommittedCollVersion;
+        ChunkVersion committedCollVersion;
         if (controlChunkType) {
-            uncommittedCollVersion = fassertStatusOK(
+            committedCollVersion = fassertStatusOK(
                 40084,
                 ChunkVersion::parseFromBSONWithFieldForCommands(
                     commitChunkMigrationResponse.getValue().response, kControlChunkVersionField));
         } else {
-            uncommittedCollVersion = fassertStatusOK(
+            committedCollVersion = fassertStatusOK(
                 40083,
                 ChunkVersion::parseFromBSONWithFieldForCommands(
                     commitChunkMigrationResponse.getValue().response, kMigratedChunkVersionField));
@@ -353,8 +353,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         migratingChunkToForget.setMin(_args.getMinKey());
         migratingChunkToForget.setMax(_args.getMaxKey());
         auto css = CollectionShardingState::get(txn, _args.getNss().ns());
-        css->setMetadata(
-            _committedMetadata->cloneMigrate(migratingChunkToForget, uncommittedCollVersion));
+        css->refreshMetadata(
+            txn, _committedMetadata->cloneMigrate(migratingChunkToForget, committedCollVersion));
         _committedMetadata = css->getMetadata();
     } else {
         // This could be an unrelated error (e.g. network error). Check whether the metadata update

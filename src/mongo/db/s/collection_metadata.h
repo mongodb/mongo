@@ -175,6 +175,10 @@ public:
         return _shardVersion;
     }
 
+    const RangeMap& getChunks() const {
+        return _chunksMap;
+    }
+
     BSONObj getKeyPattern() const {
         return _keyPattern;
     }
@@ -196,14 +200,9 @@ public:
     }
 
     /**
-     * BSON output of the metadata information.
+     * BSON output of the basic metadata information (chunk and shard version).
      */
-    BSONObj toBSON() const;
-
-    /**
-     * BSON output of the metadata information, into a builder.
-     */
-    void toBSON(BSONObjBuilder& bb) const;
+    void toBSONBasic(BSONObjBuilder& bb) const;
 
     /**
      * BSON output of the chunks metadata into a BSONArray
@@ -215,10 +214,7 @@ public:
      */
     void toBSONPending(BSONArrayBuilder& bb) const;
 
-    /**
-     * std::string output of the metadata information.
-     */
-    std::string toString() const;
+    std::string toStringBasic() const;
 
     /**
      * This method is used only for unit-tests and it returns a new metadata's instance based on

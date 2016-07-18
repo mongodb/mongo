@@ -45,9 +45,6 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-
 namespace {
 
 class GetShardVersion : public Command {
@@ -126,11 +123,19 @@ public:
         }
 
         if (cmdObj["fullMetadata"].trueValue()) {
+            BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
             if (metadata) {
-                result.append("metadata", metadata->toBSON());
-            } else {
-                result.append("metadata", BSONObj());
+                metadata->toBSONBasic(metadataBuilder);
+
+                BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
+                metadata->toBSONChunks(chunksArr);
+                chunksArr.doneFast();
+
+                BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));
+                metadata->toBSONPending(pendingArr);
+                pendingArr.doneFast();
             }
+            metadataBuilder.doneFast();
         }
 
         return true;

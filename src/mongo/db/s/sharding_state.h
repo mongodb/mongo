@@ -49,6 +49,7 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 struct ChunkVersion;
+class CollectionMetadata;
 class CollectionShardingState;
 class ConnectionString;
 class OperationContext;
@@ -313,14 +314,16 @@ private:
     void _setInitializationState_inlock(InitializationState newState);
 
     /**
-     * Refreshes collection metadata by asking the config server for the latest information. May or
-     * may not be based on a requested version.
+     * Refreshes collection metadata by asking the config server for the latest information and
+     * returns the latest version at the time the reload was done. This call does network I/O and
+     * should never be called with a lock.
+     *
+     * The metadataForDiff argument indicates that the specified metadata should be used as a base
+     * from which to only load the differences. If nullptr is passed, a full reload will be done.
      */
-    Status _refreshMetadata(OperationContext* txn,
-                            const std::string& ns,
-                            const ChunkVersion& reqShardVersion,
-                            bool useRequestedVersion,
-                            ChunkVersion* latestShardVersion);
+    StatusWith<ChunkVersion> _refreshMetadata(OperationContext* txn,
+                                              const NamespaceString& nss,
+                                              const CollectionMetadata* metadataForDiff);
 
     // Initializes a TaskExecutor for cleaning up orphaned ranges
     void _initializeRangeDeleterTaskExecutor();

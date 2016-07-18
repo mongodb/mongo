@@ -84,47 +84,8 @@ const auto getShardingState = ServiceContext::declareDecoration<ShardingState>()
 // Max number of concurrent config server refresh threads
 const int kMaxConfigServerRefreshThreads = 3;
 
-enum class VersionChoice { Local, Remote, Unknown };
-
-/**
- * Compares a remotely-loaded version (remoteVersion) to the latest local version of a collection
- * (localVersion) and returns which one is the newest.
- *
- * Because it isn't clear during epoch changes which epoch is newer, the local version before the
- * reload occurred, 'prevLocalVersion', is used to determine whether the remote epoch is definitely
- * newer, or we're not sure.
- */
-VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
-                                  ChunkVersion localVersion,
-                                  ChunkVersion remoteVersion) {
-    OID prevEpoch = prevLocalVersion.epoch();
-    OID localEpoch = localVersion.epoch();
-    OID remoteEpoch = remoteVersion.epoch();
-
-    // Everything changed in-flight, so we need to try again
-    if (prevEpoch != localEpoch && localEpoch != remoteEpoch) {
-        return VersionChoice::Unknown;
-    }
-
-    // We're in the same (zero) epoch as the latest metadata, nothing to do
-    if (localEpoch == remoteEpoch && !remoteEpoch.isSet()) {
-        return VersionChoice::Local;
-    }
-
-    // We're in the same (non-zero) epoch as the latest metadata, so increment the version
-    if (localEpoch == remoteEpoch && remoteEpoch.isSet()) {
-        // Use the newer version if possible
-        if (localVersion < remoteVersion) {
-            return VersionChoice::Remote;
-        } else {
-            return VersionChoice::Local;
-        }
-    }
-
-    // We're now sure we're installing a new epoch and the epoch didn't change during reload
-    dassert(prevEpoch == localEpoch && localEpoch != remoteEpoch);
-    return VersionChoice::Remote;
-}
+// Maximum number of times to try to refresh the collection metadata if conflicts are occurring
+const int kMaxNumMetadataRefreshAttempts = 3;
 
 /**
  * Updates the config server field of the shardIdentity document with the given connection string
@@ -153,10 +114,6 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
 }
 
 }  // namespace
-
-//
-// ShardingState
-//
 
 ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
@@ -302,56 +259,65 @@ Status ShardingState::onStaleShardVersion(OperationContext* txn,
 
     // Fast path - check if the requested version is at a higher version than the current metadata
     // version or a different epoch before verifying against config server.
+    ScopedCollectionMetadata currentMetadata;
+
     {
         AutoGetCollection autoColl(txn, nss, MODE_IS);
 
-        auto storedMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
-        if (storedMetadata) {
-            collectionShardVersion = storedMetadata->getShardVersion();
+        currentMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
+        if (currentMetadata) {
+            collectionShardVersion = currentMetadata->getShardVersion();
         }
 
-        if (collectionShardVersion >= expectedVersion &&
-            collectionShardVersion.epoch() == expectedVersion.epoch()) {
+        if (collectionShardVersion.epoch() == expectedVersion.epoch() &&
+            collectionShardVersion >= expectedVersion) {
             // Don't need to remotely reload if we're in the same epoch and the requested version is
             // smaller than the one we know about. This means that the remote side is behind.
             return Status::OK();
         }
     }
 
-    // The _configServerTickets serializes this process such that only a small number of threads can
-    // try to refresh at the same time
-    _configServerTickets.waitForTicket();
-    TicketHolderReleaser needTicketFrom(&_configServerTickets);
+    // At the first attempt try to use the currently loaded metadata and on subsequent attempts use
+    // the complete metadata
+    int numRefreshAttempts = 0;
 
-    //
-    // Slow path - remotely reload
-    //
-    // Cases:
-    // A) Initial config load and/or secondary take-over.
-    // B) Migration TO this shard finished, notified by mongos.
-    // C) Dropping a collection, notified (currently) by mongos.
-    // D) Stale client wants to reload metadata with a different *epoch*, so we aren't sure.
+    while (true) {
+        numRefreshAttempts++;
 
-    if (collectionShardVersion.epoch() != expectedVersion.epoch()) {
-        // Need to remotely reload if our epochs aren't the same, to verify
-        LOG(1) << "metadata change requested for " << nss.ns() << ", from shard version "
-               << collectionShardVersion << " to " << expectedVersion
-               << ", need to verify with config server";
-    } else {
-        // Need to remotely reload since our epochs aren't the same but our version is greater
-        LOG(1) << "metadata version update requested for " << nss.ns() << ", from shard version "
-               << collectionShardVersion << " to " << expectedVersion
-               << ", need to verify with config server";
+        auto refreshStatusAndVersion =
+            _refreshMetadata(txn, nss, (currentMetadata ? currentMetadata.getMetadata() : nullptr));
+        if (refreshStatusAndVersion.isOK()) {
+            LOG(1) << "Successfully refreshed metadata for " << nss.ns() << " to "
+                   << refreshStatusAndVersion.getValue();
+            return Status::OK();
+        }
+
+        if (refreshStatusAndVersion == ErrorCodes::RemoteChangeDetected &&
+            numRefreshAttempts < kMaxNumMetadataRefreshAttempts) {
+            currentMetadata = ScopedCollectionMetadata();
+
+            log() << "Refresh failed and will be retried as full reload "
+                  << refreshStatusAndVersion.getStatus();
+            continue;
+        }
+
+        return refreshStatusAndVersion.getStatus();
     }
 
-    ChunkVersion unusedLatestShardVersion;
-    return _refreshMetadata(txn, nss.ns(), expectedVersion, true, &unusedLatestShardVersion);
+
+    MONGO_UNREACHABLE;
 }
 
 Status ShardingState::refreshMetadataNow(OperationContext* txn,
                                          const string& ns,
                                          ChunkVersion* latestShardVersion) {
-    return _refreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
+    auto refreshLatestShardVersionStatus = _refreshMetadata(txn, NamespaceString(ns), nullptr);
+    if (!refreshLatestShardVersionStatus.isOK()) {
+        return refreshLatestShardVersionStatus.getStatus();
+    }
+
+    *latestShardVersion = refreshLatestShardVersionStatus.getValue();
+    return Status::OK();
 }
 
 void ShardingState::initializeFromConfigConnString(OperationContext* txn, const string& configSvr) {
@@ -616,258 +582,72 @@ void ShardingState::_signalInitializationComplete(Status status) {
     _initializationFinishedCondition.notify_all();
 }
 
-Status ShardingState::_refreshMetadata(OperationContext* txn,
-                                       const string& ns,
-                                       const ChunkVersion& reqShardVersion,
-                                       bool useRequestedVersion,
-                                       ChunkVersion* latestShardVersion) {
+StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
+    OperationContext* txn, const NamespaceString& nss, const CollectionMetadata* metadataForDiff) {
     invariant(!txn->lockState()->isLocked());
 
-    Status status = _waitForInitialization(txn->getDeadline());
-    if (!status.isOK())
-        return status;
+    {
+        Status status = _waitForInitialization(txn->getDeadline());
+        if (!status.isOK())
+            return status;
+    }
 
     // We can't reload if a shard name has not yet been set
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_shardName.empty()) {
-            string errMsg = str::stream() << "cannot refresh metadata for " << ns
+            string errMsg = str::stream() << "cannot refresh metadata for " << nss.ns()
                                           << " before shard name has been set";
-
             warning() << errMsg;
-            return Status(ErrorCodes::NotYetInitialized, errMsg);
+            return {ErrorCodes::NotYetInitialized, errMsg};
         }
     }
 
-    const NamespaceString nss(ns);
+    // The _configServerTickets serializes this process such that only a small number of threads can
+    // try to refresh at the same time
+    _configServerTickets.waitForTicket();
+    TicketHolderReleaser needTicketFrom(&_configServerTickets);
 
-    // The idea here is that we're going to reload the metadata from the config server, but we need
-    // to do so outside any locks.  When we get our result back, if the current metadata has
-    // changed, we may not be able to install the new metadata.
-    ScopedCollectionMetadata beforeMetadata;
-    {
-        ScopedTransaction transaction(txn, MODE_IS);
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
+    LOG(1) << "Remotely refreshing metadata for " << nss.ns() << ", based on collection version "
+           << (metadataForDiff ? metadataForDiff->getCollVersion().toString() : "(empty)");
 
-        beforeMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
-    }
-
-    ChunkVersion beforeShardVersion;
-    ChunkVersion beforeCollVersion;
-
-    if (beforeMetadata) {
-        beforeShardVersion = beforeMetadata->getShardVersion();
-        beforeCollVersion = beforeMetadata->getCollVersion();
-    }
-
-    *latestShardVersion = beforeShardVersion;
-
-    //
-    // Determine whether we need to diff or fully reload
-    //
-
-    bool fullReload = false;
-    if (!beforeMetadata) {
-        // We don't have any metadata to reload from
-        fullReload = true;
-    } else if (useRequestedVersion && reqShardVersion.epoch() != beforeShardVersion.epoch()) {
-        // It's not useful to use the metadata as a base because we think the epoch will differ
-        fullReload = true;
-    }
-
-    //
-    // Load the metadata from the remote server, start construction
-    //
-
-    LOG(0) << "remotely refreshing metadata for " << ns
-           << (useRequestedVersion
-                   ? string(" with requested shard version ") + reqShardVersion.toString()
-                   : "")
-           << (fullReload ? ", current shard version is " : " based on current shard version ")
-           << beforeShardVersion << ", current metadata version is " << beforeCollVersion;
-
-    string errMsg;
-
-    MetadataLoader mdLoader;
     std::unique_ptr<CollectionMetadata> remoteMetadata(stdx::make_unique<CollectionMetadata>());
 
-    Timer refreshTimer;
-    long long refreshMillis;
-
     {
-        Status status =
-            mdLoader.makeCollectionMetadata(txn,
-                                            grid.catalogClient(txn),
-                                            ns,
-                                            getShardName(),
-                                            fullReload ? nullptr : beforeMetadata.getMetadata(),
-                                            remoteMetadata.get());
-        refreshMillis = refreshTimer.millis();
+        Timer refreshTimer;
+
+        MetadataLoader mdLoader;
+        Status status = mdLoader.makeCollectionMetadata(txn,
+                                                        grid.catalogClient(txn),
+                                                        nss.ns(),
+                                                        getShardName(),
+                                                        metadataForDiff,
+                                                        remoteMetadata.get());
 
         if (status.code() == ErrorCodes::NamespaceNotFound) {
             remoteMetadata.reset();
         } else if (!status.isOK()) {
-            warning() << "could not remotely refresh metadata for " << ns
+            warning() << "Could not remotely refresh metadata for " << nss.ns()
                       << causedBy(status.reason());
 
             return status;
         }
     }
 
-    ChunkVersion remoteShardVersion;
-    ChunkVersion remoteCollVersion;
-    if (remoteMetadata) {
-        remoteShardVersion = remoteMetadata->getShardVersion();
-        remoteCollVersion = remoteMetadata->getCollVersion();
-    }
+    // Exclusive collection lock needed since we're now potentially changing the metadata, and don't
+    // want reads/writes to be ongoing
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
-    //
-    // Get ready to install loaded metadata if needed
-    //
+    auto css = CollectionShardingState::get(txn, nss);
 
-    ScopedCollectionMetadata afterMetadata;
-    ChunkVersion afterShardVersion;
-    ChunkVersion afterCollVersion;
-    VersionChoice choice;
+    // Resolve newer pending chunks with the remote metadata, finish construction
+    css->refreshMetadata(txn, std::move(remoteMetadata));
 
-    // If we choose to install the new metadata, this describes the kind of install
-    enum InstallType {
-        InstallType_New,
-        InstallType_Update,
-        InstallType_Replace,
-        InstallType_Drop,
-        InstallType_None
-    } installType = InstallType_None;  // compiler complains otherwise
+    auto metadata = css->getMetadata();
 
-    {
-        // Exclusive collection lock needed since we're now potentially changing the metadata,
-        // and don't want reads/writes to be ongoing.
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
-
-        // Get the metadata now that the load has completed
-        auto css = CollectionShardingState::get(txn, nss);
-        afterMetadata = css->getMetadata();
-
-        if (afterMetadata) {
-            afterShardVersion = afterMetadata->getShardVersion();
-            afterCollVersion = afterMetadata->getCollVersion();
-        }
-
-        *latestShardVersion = afterShardVersion;
-
-        //
-        // Resolve newer pending chunks with the remote metadata, finish construction
-        //
-
-        Status status =
-            mdLoader.promotePendingChunks(afterMetadata.getMetadata(), remoteMetadata.get());
-        if (!status.isOK()) {
-            warning() << "remote metadata for " << ns
-                      << " is inconsistent with current pending chunks"
-                      << causedBy(status.reason());
-
-            return status;
-        }
-
-        //
-        // Compare the 'before', 'after', and 'remote' versions/epochs and choose newest
-        // Zero-epochs (sentinel value for "dropped" collections), are tested by
-        // !epoch.isSet().
-        //
-
-        choice = chooseNewestVersion(beforeCollVersion, afterCollVersion, remoteCollVersion);
-
-        if (choice == VersionChoice::Remote) {
-            dassert(
-                !remoteCollVersion.epoch().isSet() || remoteShardVersion >= beforeShardVersion ||
-                (remoteShardVersion.minorVersion() == 0 && remoteShardVersion.majorVersion() == 0));
-
-            if (!afterCollVersion.epoch().isSet()) {
-                // First metadata load
-                installType = InstallType_New;
-                css->setMetadata(std::move(remoteMetadata));
-            } else if (remoteCollVersion.epoch().isSet() &&
-                       remoteCollVersion.epoch() == afterCollVersion.epoch()) {
-                // Update to existing metadata
-                installType = InstallType_Update;
-                css->setMetadata(std::move(remoteMetadata));
-            } else if (remoteCollVersion.epoch().isSet()) {
-                // New epoch detected, replacing metadata
-                installType = InstallType_Replace;
-                css->setMetadata(std::move(remoteMetadata));
-            } else {
-                dassert(!remoteCollVersion.epoch().isSet());
-
-                // Drop detected
-                installType = InstallType_Drop;
-                css->setMetadata(nullptr);
-            }
-
-            *latestShardVersion = remoteShardVersion;
-        }
-    }
-    // End _mutex
-    // End DBWrite
-
-    //
-    // Do messaging based on what happened above
-    //
-    string localShardVersionMsg = beforeShardVersion.epoch() == afterShardVersion.epoch()
-        ? afterShardVersion.toString()
-        : beforeShardVersion.toString() + " / " + afterShardVersion.toString();
-
-    if (choice == VersionChoice::Unknown) {
-        string errMsg = str::stream()
-            << "need to retry loading metadata for " << ns
-            << ", collection may have been dropped or recreated during load"
-            << " (loaded shard version : " << remoteShardVersion.toString()
-            << ", stored shard versions : " << localShardVersionMsg << ", took " << refreshMillis
-            << "ms)";
-
-        warning() << errMsg;
-        return Status(ErrorCodes::RemoteChangeDetected, errMsg);
-    }
-
-    if (choice == VersionChoice::Local) {
-        LOG(0) << "metadata of collection " << ns
-               << " already up to date (shard version : " << afterShardVersion.toString()
-               << ", took " << refreshMillis << "ms)";
-        return Status::OK();
-    }
-
-    dassert(choice == VersionChoice::Remote);
-
-    switch (installType) {
-        case InstallType_New:
-            LOG(0) << "collection " << ns << " was previously unsharded"
-                   << ", new metadata loaded with shard version " << remoteShardVersion;
-            break;
-        case InstallType_Update:
-            LOG(0) << "updating metadata for " << ns << " from shard version "
-                   << localShardVersionMsg << " to shard version " << remoteShardVersion;
-            break;
-        case InstallType_Replace:
-            LOG(0) << "replacing metadata for " << ns << " at shard version "
-                   << localShardVersionMsg << " with a new epoch (shard version "
-                   << remoteShardVersion << ")";
-            break;
-        case InstallType_Drop:
-            LOG(0) << "dropping metadata for " << ns << " at shard version " << localShardVersionMsg
-                   << ", took " << refreshMillis << "ms";
-            break;
-        default:
-            verify(false);
-            break;
-    }
-
-    if (installType != InstallType_Drop) {
-        LOG(0) << "collection version was loaded at version " << remoteCollVersion << ", took "
-               << refreshMillis << "ms";
-    }
-
-    return Status::OK();
+    return (metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED());
 }
 
 StatusWith<ScopedRegisterMigration> ShardingState::registerMigration(const MoveChunkRequest& args) {

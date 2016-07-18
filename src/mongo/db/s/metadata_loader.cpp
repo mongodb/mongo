@@ -170,7 +170,6 @@ Status MetadataLoader::initChunks(OperationContext* txn,
         }
     }
 
-
     // Exposes the new metadata's range map and version to the "differ," who
     // would ultimately be responsible of filling them up.
     SCMConfigDiffTracker differ(shard);
@@ -251,54 +250,5 @@ Status MetadataLoader::initChunks(OperationContext* txn,
                       str::stream() << "problem querying chunks metadata" << causedBy(e));
     }
 }
-
-Status MetadataLoader::promotePendingChunks(const CollectionMetadata* afterMetadata,
-                                            CollectionMetadata* remoteMetadata) const {
-    // Ensure pending chunks are applicable
-    bool notApplicable = (NULL == afterMetadata || NULL == remoteMetadata) ||
-        (afterMetadata->getShardVersion() > remoteMetadata->getShardVersion()) ||
-        (afterMetadata->getShardVersion().epoch() != remoteMetadata->getShardVersion().epoch());
-    if (notApplicable)
-        return Status::OK();
-
-    // The chunks from remoteMetadata are the latest version, and the pending chunks
-    // from afterMetadata are the latest version.  If no trickery is afoot, pending chunks
-    // should match exactly zero or one loaded chunk.
-
-    remoteMetadata->_pendingMap = afterMetadata->_pendingMap;
-
-    // Resolve our pending chunks against the chunks we've loaded
-    for (RangeMap::iterator it = remoteMetadata->_pendingMap.begin();
-         it != remoteMetadata->_pendingMap.end();) {
-        if (!rangeMapOverlaps(remoteMetadata->_chunksMap, it->first, it->second)) {
-            ++it;
-            continue;
-        }
-
-        // Our pending range overlaps at least one chunk
-
-        if (rangeMapContains(remoteMetadata->_chunksMap, it->first, it->second)) {
-            // Chunk was promoted from pending, successful migration
-            LOG(2) << "verified chunk " << rangeToString(it->first, it->second)
-                   << " was migrated earlier to this shard";
-
-            remoteMetadata->_pendingMap.erase(it++);
-        } else {
-            // Something strange happened, maybe manual editing of config?
-            RangeVector overlap;
-            getRangeMapOverlap(remoteMetadata->_chunksMap, it->first, it->second, &overlap);
-
-            string errMsg = str::stream()
-                << "the remote metadata changed unexpectedly, pending range "
-                << rangeToString(it->first, it->second)
-                << " does not exactly overlap loaded chunks " << overlapToString(overlap);
-
-            return Status(ErrorCodes::RemoteChangeDetected, errMsg);
-        }
-    }
-
-    return Status::OK();
-}
-
 
 }  // namespace mongo

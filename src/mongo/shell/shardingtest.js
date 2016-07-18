@@ -929,7 +929,7 @@ var ShardingTest = function(params) {
     var otherParams = Object.merge(params, params.other || {});
 
     var numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;
-    var verboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
+    var mongosVerboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
     var waitForCSRSSecondaries = otherParams.hasOwnProperty('waitForCSRSSecondaries')
@@ -1026,7 +1026,7 @@ var ShardingTest = function(params) {
                 noJournalPrealloc: otherParams.nopreallocj,
                 oplogSize: 16,
                 shardsvr: '',
-                pathOpts: Object.merge(pathOpts, {shard: i})
+                pathOpts: Object.merge(pathOpts, {shard: i}),
             };
 
             rsDefaults = Object.merge(rsDefaults, otherParams.rs);
@@ -1237,7 +1237,7 @@ var ShardingTest = function(params) {
             useHostname: otherParams.useHostname,
             pathOpts: Object.merge(pathOpts, {mongos: i}),
             configdb: this._configDB,
-            verbose: verboseLevel || 0,
+            verbose: mongosVerboseLevel,
             keyFile: keyFile,
         };
 

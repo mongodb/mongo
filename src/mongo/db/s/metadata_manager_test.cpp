@@ -44,32 +44,35 @@ using unittest::assertGet;
 
 namespace {
 
-std::unique_ptr<CollectionMetadata> makeMetadata() {
+std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
     return stdx::make_unique<CollectionMetadata>(BSON("key" << 1), ChunkVersion(1, 0, OID::gen()));
 }
 
 TEST(MetadataManager, SetAndGetActiveMetadata) {
     MetadataManager manager;
 
-    std::unique_ptr<CollectionMetadata> cm = makeMetadata();
+    std::unique_ptr<CollectionMetadata> cm = makeEmptyMetadata();
     auto cmPtr = cm.get();
 
-    manager.setActiveMetadata(std::move(cm));
+    manager.refreshActiveMetadata(std::move(cm));
     ScopedCollectionMetadata scopedMetadata = manager.getActiveMetadata();
 
     ASSERT_EQ(cmPtr, scopedMetadata.getMetadata());
 };
 
-TEST(MetadataManager, ResetActiveMetadata) {
+TEST(MetadataManager, RefreshActiveMetadata) {
     MetadataManager manager;
-    manager.setActiveMetadata(makeMetadata());
+    manager.refreshActiveMetadata(makeEmptyMetadata());
 
     ScopedCollectionMetadata scopedMetadata1 = manager.getActiveMetadata();
 
-    std::unique_ptr<CollectionMetadata> cm2 = makeMetadata();
+    ChunkVersion newVersion = scopedMetadata1->getCollVersion();
+    newVersion.incMajor();
+    std::unique_ptr<CollectionMetadata> cm2 =
+        scopedMetadata1->clonePlusChunk(BSON("key" << 0), BSON("key" << 10), newVersion);
     auto cm2Ptr = cm2.get();
 
-    manager.setActiveMetadata(std::move(cm2));
+    manager.refreshActiveMetadata(std::move(cm2));
     ScopedCollectionMetadata scopedMetadata2 = manager.getActiveMetadata();
 
     ASSERT_EQ(cm2Ptr, scopedMetadata2.getMetadata());
@@ -81,16 +84,17 @@ TEST(MetadataManager, AddAndRemoveRanges) {
     ChunkRange cr2 = ChunkRange(BSON("key" << 10), BSON("key" << 20));
 
     mm.addRangeToClean(cr1);
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 1UL);
     mm.removeRangeToClean(cr1);
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 0UL);
 
     mm.addRangeToClean(cr1);
     mm.addRangeToClean(cr2);
     mm.removeRangeToClean(cr1);
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
-    auto ranges = mm.getCopyOfRanges();
-    ChunkRange remainingChunk = ranges.find(cr2.getMin())->second;
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 1UL);
+    auto ranges = mm.getCopyOfRangesToClean();
+    auto it = ranges.find(cr2.getMin());
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
     ASSERT_EQ(remainingChunk.toString(), cr2.toString());
     mm.removeRangeToClean(cr2);
 }
@@ -103,19 +107,21 @@ TEST(MetadataManager, RemoveRangeInMiddleOfRange) {
 
     mm.addRangeToClean(cr1);
     mm.removeRangeToClean(ChunkRange(BSON("key" << 4), BSON("key" << 6)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 2UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 2UL);
 
-    auto ranges = mm.getCopyOfRanges();
+    auto ranges = mm.getCopyOfRangesToClean();
     auto it = ranges.find(BSON("key" << 0));
     ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 4));
-    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     it++;
     expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
-    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+    remainingChunk = ChunkRange(it->first, it->second);
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     mm.removeRangeToClean(cr1);
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 0UL);
 }
 
 // Tests removals that overlap with just one ChunkRange.
@@ -125,28 +131,31 @@ TEST(MetadataManager, RemoveRangeWithSingleRangeOverlap) {
 
     mm.addRangeToClean(cr1);
     mm.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 5)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
-    auto ranges = mm.getCopyOfRanges();
-    ChunkRange remainingChunk = ranges.find(BSON("key" << 5))->second;
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 1UL);
+    auto ranges = mm.getCopyOfRangesToClean();
+    auto it = ranges.find(BSON("key" << 5));
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
     ChunkRange expectedChunk = ChunkRange(BSON("key" << 5), BSON("key" << 10));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     mm.removeRangeToClean(ChunkRange(BSON("key" << 4), BSON("key" << 6)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
-    ranges = mm.getCopyOfRanges();
-    remainingChunk = ranges.find(BSON("key" << 6))->second;
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 1UL);
+    ranges = mm.getCopyOfRangesToClean();
+    it = ranges.find(BSON("key" << 6));
+    remainingChunk = ChunkRange(it->first, it->second);
     expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     mm.removeRangeToClean(ChunkRange(BSON("key" << 9), BSON("key" << 13)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 1UL);
-    ranges = mm.getCopyOfRanges();
-    remainingChunk = ranges.find(BSON("key" << 6))->second;
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 1UL);
+    ranges = mm.getCopyOfRangesToClean();
+    it = ranges.find(BSON("key" << 6));
+    remainingChunk = ChunkRange(it->first, it->second);
     expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 9));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     mm.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 10)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 0UL);
 }
 
 // Tests removals that overlap with more than one ChunkRange.
@@ -159,20 +168,146 @@ TEST(MetadataManager, RemoveRangeWithMultipleRangeOverlaps) {
     mm.addRangeToClean(cr1);
     mm.addRangeToClean(cr2);
     mm.addRangeToClean(cr3);
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 3UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 3UL);
 
     mm.removeRangeToClean(ChunkRange(BSON("key" << 8), BSON("key" << 22)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 2UL);
-    auto ranges = mm.getCopyOfRanges();
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 2UL);
+    auto ranges = mm.getCopyOfRangesToClean();
     auto it = ranges.find(BSON("key" << 0));
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
     ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 8));
-    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
     it++;
+    remainingChunk = ChunkRange(it->first, it->second);
     expectedChunk = ChunkRange(BSON("key" << 22), BSON("key" << 30));
-    ASSERT_EQ(it->second.toString(), expectedChunk.toString());
+    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     mm.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 30)));
-    ASSERT_EQ(mm.getCopyOfRanges().size(), 0UL);
+    ASSERT_EQ(mm.getCopyOfRangesToClean().size(), 0UL);
+}
+
+TEST(MetadataManager, RefreshAfterSuccessfulMigrationSinglePending) {
+    MetadataManager mm;
+    mm.refreshActiveMetadata(makeEmptyMetadata());
+
+    const ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    mm.beginReceive(cr1);
+    ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 1UL);
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 0UL);
+
+    ChunkVersion version = mm.getActiveMetadata()->getCollVersion();
+    version.incMajor();
+
+    mm.refreshActiveMetadata(
+        mm.getActiveMetadata()->clonePlusChunk(cr1.getMin(), cr1.getMax(), version));
+    ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 0UL);
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 1UL);
+}
+
+TEST(MetadataManager, RefreshAfterSuccessfulMigrationMultiplePending) {
+    MetadataManager mm;
+    mm.refreshActiveMetadata(makeEmptyMetadata());
+
+    const ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    mm.beginReceive(cr1);
+
+    const ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
+    mm.beginReceive(cr2);
+
+    ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 2UL);
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 0UL);
+
+    {
+        ChunkVersion version = mm.getActiveMetadata()->getCollVersion();
+        version.incMajor();
+
+        mm.refreshActiveMetadata(
+            mm.getActiveMetadata()->clonePlusChunk(cr1.getMin(), cr1.getMax(), version));
+        ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 1UL);
+        ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 1UL);
+    }
+
+    {
+        ChunkVersion version = mm.getActiveMetadata()->getCollVersion();
+        version.incMajor();
+
+        mm.refreshActiveMetadata(
+            mm.getActiveMetadata()->clonePlusChunk(cr2.getMin(), cr2.getMax(), version));
+        ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 0UL);
+        ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 2UL);
+    }
+}
+
+TEST(MetadataManager, RefreshAfterNotYetCompletedMigrationMultiplePending) {
+    MetadataManager mm;
+    mm.refreshActiveMetadata(makeEmptyMetadata());
+
+    const ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    mm.beginReceive(cr1);
+
+    const ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
+    mm.beginReceive(cr2);
+
+    ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 2UL);
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 0UL);
+
+    ChunkVersion version = mm.getActiveMetadata()->getCollVersion();
+    version.incMajor();
+
+    mm.refreshActiveMetadata(
+        mm.getActiveMetadata()->clonePlusChunk(BSON("key" << 50), BSON("key" << 60), version));
+    ASSERT_EQ(mm.getCopyOfReceivingChunks().size(), 2UL);
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 1UL);
+}
+
+TEST(MetadataManager, BeginReceiveWithOverlappingRange) {
+    MetadataManager mm;
+    mm.refreshActiveMetadata(makeEmptyMetadata());
+
+    const ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    mm.beginReceive(cr1);
+
+    const ChunkRange cr2(BSON("key" << 30), BSON("key" << 40));
+    mm.beginReceive(cr2);
+
+    const ChunkRange crOverlap(BSON("key" << 5), BSON("key" << 35));
+    mm.beginReceive(crOverlap);
+
+    const auto copyOfPending = mm.getCopyOfReceivingChunks();
+
+    ASSERT_EQ(copyOfPending.size(), 1UL);
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 0UL);
+
+    const auto it = copyOfPending.find(BSON("key" << 5));
+    ASSERT(it != copyOfPending.end());
+    ASSERT_EQ(it->second, BSON("key" << 35));
+}
+
+TEST(MetadataManager, RefreshMetadataAfterDropAndRecreate) {
+    MetadataManager mm;
+    mm.refreshActiveMetadata(makeEmptyMetadata());
+
+    {
+        auto metadata = mm.getActiveMetadata();
+        ChunkVersion newVersion = metadata->getCollVersion();
+        newVersion.incMajor();
+
+        mm.refreshActiveMetadata(
+            metadata->clonePlusChunk(BSON("key" << 0), BSON("key" << 10), newVersion));
+    }
+
+    // Now, pretend that the collection was dropped and recreated
+    auto recreateMetadata = makeEmptyMetadata();
+    ChunkVersion newVersion = recreateMetadata->getCollVersion();
+    newVersion.incMajor();
+
+    mm.refreshActiveMetadata(
+        recreateMetadata->clonePlusChunk(BSON("key" << 20), BSON("key" << 30), newVersion));
+    ASSERT_EQ(mm.getActiveMetadata()->getChunks().size(), 1UL);
+
+    const auto chunkEntry = mm.getActiveMetadata()->getChunks().begin();
+    ASSERT_EQ(BSON("key" << 20), chunkEntry->first);
+    ASSERT_EQ(BSON("key" << 30), chunkEntry->second);
 }
 
 }  // namespace

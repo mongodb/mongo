@@ -107,7 +107,7 @@ private:
 CollectionShardingState::CollectionShardingState(
     NamespaceString nss, std::unique_ptr<CollectionMetadata> initialMetadata)
     : _nss(std::move(nss)), _metadataManager{} {
-    _metadataManager.setActiveMetadata(std::move(initialMetadata));
+    _metadataManager.refreshActiveMetadata(std::move(initialMetadata));
 }
 
 CollectionShardingState::~CollectionShardingState() {
@@ -132,12 +132,19 @@ ScopedCollectionMetadata CollectionShardingState::getMetadata() {
     return _metadataManager.getActiveMetadata();
 }
 
-void CollectionShardingState::setMetadata(std::unique_ptr<CollectionMetadata> newMetadata) {
-    if (newMetadata) {
-        invariant(!newMetadata->getCollVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
-        invariant(!newMetadata->getShardVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
-    }
-    _metadataManager.setActiveMetadata(std::move(newMetadata));
+void CollectionShardingState::refreshMetadata(OperationContext* txn,
+                                              std::unique_ptr<CollectionMetadata> newMetadata) {
+    invariant(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+
+    _metadataManager.refreshActiveMetadata(std::move(newMetadata));
+}
+
+void CollectionShardingState::beginReceive(const ChunkRange& range) {
+    _metadataManager.beginReceive(range);
+}
+
+void CollectionShardingState::forgetReceive(const ChunkRange& range) {
+    _metadataManager.forgetReceive(range);
 }
 
 MigrationSourceManager* CollectionShardingState::getMigrationSourceManager() {

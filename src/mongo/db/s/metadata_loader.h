@@ -57,7 +57,6 @@ class OperationContext;
  * remoteMetadata = makeCollectionMetadata( beforeMetadata, remoteMetadata );
  * DBLock lock(txn, dbname, MODE_X);
  * afterMetadata = <get latest local metadata>;
- * promotePendingChunks( afterMetadata, remoteMetadata );
  *
  * The loader will go out of its way to try to fetch the smaller amount possible of data
  * from the config server without sacrificing the freshness and accuracy of the metadata it
@@ -96,30 +95,6 @@ public:
                                   const std::string& shard,
                                   const CollectionMetadata* oldMetadata,
                                   CollectionMetadata* metadata) const;
-
-    /**
-     * Replaces the pending chunks of the remote metadata with the more up-to-date pending
-     * chunks of the 'after' metadata (metadata from after the remote load), and removes pending
-     * chunks which are now regular chunks.
-     *
-     * Pending chunks should always correspond to one or zero chunks in the remoteMetadata
-     * if the epochs are the same and the remote version is the same or higher, otherwise they
-     * are not applicable.
-     *
-     * Locking note:
-     *    + Must be called in a DBLock, to ensure validity of afterMetadata
-     *
-     * Returns OK if pending chunks correctly follow the rule above or are not applicable
-     * Returns RemoteChangeDetected if pending chunks do not follow the rule above, indicating
-     *                              either the config server or us has changed unexpectedly.
-     *                              This should only occur with manual editing of the config
-     *                              server.
-     *
-     * TODO:  This is a bit ugly but necessary for now.  If/when pending chunk info is stored on
-     * the config server, this should go away.
-     */
-    Status promotePendingChunks(const CollectionMetadata* afterMetadata,
-                                CollectionMetadata* remoteMetadata) const;
 
 private:
     /**

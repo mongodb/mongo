@@ -393,10 +393,10 @@ bool CollectionMetadata::getDifferentChunk(const BSONObj& chunkMinKey,
     return false;
 }
 
-BSONObj CollectionMetadata::toBSON() const {
-    BSONObjBuilder bb;
-    toBSON(bb);
-    return bb.obj();
+void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
+    _collVersion.addToBSON(bb, "collVersion");
+    _shardVersion.addToBSON(bb, "shardVersion");
+    bb.append("keyPattern", _keyPattern);
 }
 
 void CollectionMetadata::toBSONChunks(BSONArrayBuilder& bb) const {
@@ -423,18 +423,9 @@ void CollectionMetadata::toBSONPending(BSONArrayBuilder& bb) const {
     }
 }
 
-void CollectionMetadata::toBSON(BSONObjBuilder& bb) const {
-    _collVersion.addToBSON(bb, "collVersion");
-    _shardVersion.addToBSON(bb, "shardVersion");
-    bb.append("keyPattern", _keyPattern);
-
-    BSONArrayBuilder chunksBB(bb.subarrayStart("chunks"));
-    toBSONChunks(chunksBB);
-    chunksBB.done();
-
-    BSONArrayBuilder pendingBB(bb.subarrayStart("pending"));
-    toBSONPending(pendingBB);
-    pendingBB.done();
+string CollectionMetadata::toStringBasic() const {
+    return stream() << "Coll version: " << _collVersion.toString()
+                    << ", shard version: " << _shardVersion.toString();
 }
 
 bool CollectionMetadata::getNextOrphanRange(const BSONObj& origLookupKey, KeyRange* range) const {
@@ -515,21 +506,6 @@ bool CollectionMetadata::getNextOrphanRange(const BSONObj& origLookupKey, KeyRan
     }
 
     return false;
-}
-
-string CollectionMetadata::toString() const {
-    StringBuilder ss;
-    ss << " CollectionManager version: " << _shardVersion.toString() << " key: " << _keyPattern;
-    if (_rangesMap.empty()) {
-        return ss.str();
-    }
-
-    RangeMap::const_iterator it = _rangesMap.begin();
-    ss << it->first << " -> " << it->second;
-    while (it != _rangesMap.end()) {
-        ss << ", " << it->first << " -> " << it->second;
-    }
-    return ss.str();
 }
 
 BSONObj CollectionMetadata::getMinKey() const {
