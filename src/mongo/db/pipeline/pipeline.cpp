@@ -128,6 +128,60 @@ void Pipeline::optimizePipeline() {
     stitch();
 }
 
+namespace {
+
+void addPrivilegesForStage(const std::string& db,
+                           const BSONObj& cmdObj,
+                           PrivilegeVector* requiredPrivileges,
+                           BSONObj stageSpec,
+                           bool haveRecursed = false) {
+    StringData stageName = stageSpec.firstElementFieldName();
+    if (stageName == "$out" && stageSpec.firstElementType() == BSONType::String) {
+        NamespaceString outputNs(db, stageSpec.firstElement().str());
+        uassert(17139,
+                mongoutils::str::stream() << "Invalid $out target namespace, " << outputNs.ns(),
+                outputNs.isValid());
+
+        ActionSet actions;
+        actions.addAction(ActionType::remove);
+        actions.addAction(ActionType::insert);
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+            actions.addAction(ActionType::bypassDocumentValidation);
+        }
+        Privilege::addPrivilegeToPrivilegeVector(
+            requiredPrivileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
+    } else if (stageName == "$lookup" && stageSpec.firstElementType() == BSONType::Object) {
+        NamespaceString fromNs(db, stageSpec.firstElement()["from"].str());
+        Privilege::addPrivilegeToPrivilegeVector(
+            requiredPrivileges,
+            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
+    } else if (stageName == "$graphLookup" && stageSpec.firstElementType() == BSONType::Object) {
+        NamespaceString fromNs(db, stageSpec.firstElement()["from"].str());
+        Privilege::addPrivilegeToPrivilegeVector(
+            requiredPrivileges,
+            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
+    } else if (stageName == "$facet" && stageSpec.firstElementType() == BSONType::Object &&
+               !haveRecursed) {
+        // Add privileges of sub-stages, but only if we haven't recursed already. We don't want to
+        // get a stack overflow while checking privileges. If we ever allow a $facet stage inside of
+        // a $facet stage, this code will have to be modified to avoid causing a stack overflow, but
+        // still check all required privileges of nested stages.
+        for (auto&& subPipeline : stageSpec.firstElement().embeddedObject()) {
+            if (subPipeline.type() == BSONType::Array) {
+                for (auto&& subPipeStageSpec : subPipeline.embeddedObject()) {
+                    addPrivilegesForStage(db,
+                                          cmdObj,
+                                          requiredPrivileges,
+                                          subPipeStageSpec.embeddedObjectUserCheck(),
+                                          true);
+                }
+            }
+        }
+    }
+}
+
+}  // namespace
+
 Status Pipeline::checkAuthForCommand(ClientBasic* client,
                                      const std::string& db,
                                      const BSONObj& cmdObj) {
@@ -137,7 +191,7 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             mongoutils::str::stream() << "Invalid input namespace, " << inputNs.ns(),
             inputNs.isValid());
 
-    std::vector<Privilege> privileges;
+    PrivilegeVector privileges;
 
     if (dps::extractElementAtPath(cmdObj, "pipeline.0.$indexStats")) {
         Privilege::addPrivilegeToPrivilegeVector(
@@ -154,34 +208,8 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
     }
 
     BSONObj pipeline = cmdObj.getObjectField("pipeline");
-    BSONForEach(stageElem, pipeline) {
-        BSONObj stage = stageElem.embeddedObjectUserCheck();
-        StringData stageName = stage.firstElementFieldName();
-        if (stageName == "$out" && stage.firstElementType() == String) {
-            NamespaceString outputNs(db, stage.firstElement().str());
-            uassert(17139,
-                    mongoutils::str::stream() << "Invalid $out target namespace, " << outputNs.ns(),
-                    outputNs.isValid());
-
-            ActionSet actions;
-            actions.addAction(ActionType::remove);
-            actions.addAction(ActionType::insert);
-            if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-                actions.addAction(ActionType::bypassDocumentValidation);
-            }
-            Privilege::addPrivilegeToPrivilegeVector(
-                &privileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-        } else if (stageName == "$lookup" && stage.firstElementType() == Object) {
-            NamespaceString fromNs(db, stage.firstElement()["from"].str());
-            Privilege::addPrivilegeToPrivilegeVector(
-                &privileges,
-                Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
-        } else if (stageName == "$graphLookup" && stage.firstElementType() == Object) {
-            NamespaceString fromNs(db, stage.firstElement()["from"].str());
-            Privilege::addPrivilegeToPrivilegeVector(
-                &privileges,
-                Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
-        }
+    for (auto&& stageElem : pipeline) {
+        addPrivilegesForStage(db, cmdObj, &privileges, stageElem.embeddedObjectUserCheck());
     }
 
     if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))

@@ -404,6 +404,64 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_facet",
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  // There are stages within the $facet stage that require additional privileges.
+                  $facet: {
+                      lookup: [{
+                          $lookup: {
+                              from: "bar",
+                              localField: "_id",
+                              foreignField: "_id",
+                              as: "results"
+                          }
+                      }],
+                      graphLookup: [{
+                          $graphLookup: {
+                              from: "baz",
+                              startWith: [1],
+                              connectFromField: "_id",
+                              connectToField: "bazId",
+                              as: "results"
+                          }
+                      }]
+                  }
+              }]
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createCollection("bar");
+              db.createCollection("baz");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.bar.drop();
+              db.baz.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "baz"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
           testname: "appendOplogNote",
           command: {appendOplogNote: 1, data: {a: 1}},
           skipSharded: true,
