@@ -141,13 +141,6 @@ void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
     StatusWith<OpTime> applyStatus(ErrorCodes::InternalError, "not mutated");
     try {
         auto txn = cc().makeOperationContext();
-
-        // Refer to multiSyncApply() and multiInitialSyncApply() in sync_tail.cpp.
-        txn->setReplicatedWrites(false);
-
-        // allow us to get through the magic barrier
-        txn->lockState()->setIsBatchWriter(true);
-
         applyStatus = _multiApply(txn.get(), _operations, _applyOperation);
     } catch (...) {
         applyStatus = exceptionToStatus();
