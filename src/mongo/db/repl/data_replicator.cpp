@@ -196,6 +196,30 @@ Timestamp findCommonPoint(HostAndPort host, Timestamp start) {
     return Timestamp();
 }
 
+template <typename T>
+void swapAndJoin_inlock(UniqueLock* lock, T& uniquePtrToReset) {
+    if (!uniquePtrToReset) {
+        return;
+    }
+    T tempPtr;
+    uniquePtrToReset.swap(tempPtr);
+    lock->unlock();
+    tempPtr->join();
+    lock->lock();
+}
+
+template <typename T>
+void swapAndWait_inlock(UniqueLock* lock, T& uniquePtrToReset) {
+    if (!uniquePtrToReset) {
+        return;
+    }
+    T tempPtr;
+    uniquePtrToReset.swap(tempPtr);
+    lock->unlock();
+    tempPtr->wait();
+    lock->lock();
+}
+
 }  // namespace
 
 std::string toString(DataReplicatorState s) {
@@ -238,7 +262,7 @@ DataReplicator::~DataReplicator() {
     DESTRUCTOR_GUARD({
         UniqueLock lk(_mutex);
         _cancelAllHandles_inlock();
-        _waitOnAndResetAll(lk);
+        _waitOnAndResetAll_inlock(&lk);
     });
 }
 
@@ -563,10 +587,10 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
         return _initialSyncState->status;
     }
 
+    auto oplogSeedDoc = _initialSyncState->oplogSeedDoc;
     lk.unlock();
     // Store the first oplog entry, after initial sync completes.
-    const auto insertStatus =
-        _storage->insertDocuments(txn, _opts.localOplogNS, {_initialSyncState->oplogSeedDoc});
+    const auto insertStatus = _storage->insertDocuments(txn, _opts.localOplogNS, {oplogSeedDoc});
     lk.lock();
 
     if (!insertStatus.isOK()) {
@@ -702,7 +726,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     // Success, cleanup
     _cancelAllHandles_inlock();
-    _waitOnAndResetAll(lk);
+    _waitOnAndResetAll_inlock(&lk);
     invariant(!_anyActiveHandles_inlock());
 
     _reporterPaused = false;
@@ -736,6 +760,7 @@ void DataReplicator::_onDataClonerFinish(const Status& status) {
     BSONObj query = BSON(
         "find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1) << "limit" << 1);
 
+    LockGuard lk(_mutex);
     _lastOplogEntryFetcher = stdx::make_unique<Fetcher>(
         _exec,
         _syncSource,
@@ -802,41 +827,13 @@ void DataReplicator::_cancelAllHandles_inlock() {
     }
 }
 
-void DataReplicator::_waitOnAndResetAll(UniqueLock& lk) {
-    if (_lastOplogEntryFetcher) {
-        std::unique_ptr<Fetcher> oldFetcher;
-        oldFetcher.swap(_lastOplogEntryFetcher);
-        lk.unlock();
-        oldFetcher->wait();
-        lk.lock();
-    }
-    if (_oplogFetcher) {
-        std::unique_ptr<OplogFetcher> oldFetcher;
-        oldFetcher.swap(_oplogFetcher);
-        lk.unlock();
-        oldFetcher->join();
-        lk.lock();
-    }
-    if (_applier) {
-        std::unique_ptr<MultiApplier> oldApplier;
-        oldApplier.swap(_applier);
-        lk.unlock();
-        oldApplier->wait();
-        lk.lock();
-    }
-    if (_reporter) {
-        std::unique_ptr<Reporter> oldReporter;
-        oldReporter.swap(_reporter);
-        lk.unlock();
-        oldReporter->join();
-        lk.lock();
-    }
-    if (_initialSyncState && _initialSyncState->dbsCloner) {
-        std::unique_ptr<DatabasesCloner> cloner;
-        cloner.swap(_initialSyncState->dbsCloner);
-        lk.unlock();
-        cloner->join();
-        lk.lock();
+void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
+    swapAndWait_inlock(lk, _lastOplogEntryFetcher);
+    swapAndJoin_inlock(lk, _oplogFetcher);
+    swapAndWait_inlock(lk, _applier);
+    swapAndJoin_inlock(lk, _reporter);
+    if (_initialSyncState) {
+        swapAndJoin_inlock(lk, _initialSyncState->dbsCloner);
     }
 }
 
@@ -1073,7 +1070,7 @@ void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
         _initialSyncState->oplogSeedDoc = ops.back().raw.getOwned();
     }
 
-    // TODO: Change OplogFetcher to pass in a OpTimeWithHash, and wire up here instead of parsing.
+    // TODO: Change OplogFetcher to pass in a OpTimeWithHash, and wire up here instead of arsing.
     const auto lastEntry = ops.back().raw;
     const auto opTimeWithHashStatus = parseOpTimeWithHash(lastEntry);
     _lastApplied = uassertStatusOK(opTimeWithHashStatus);
@@ -1194,7 +1191,9 @@ Status DataReplicator::_ensureGoodSyncSource_inlock() {
             return Status::OK();
         }
 
-        return Status{ErrorCodes::InvalidSyncSource, "No valid sync source."};
+        return Status{ErrorCodes::InvalidSyncSource,
+                      str::stream() << "No valid sync source available. Our last fetched optime: "
+                                    << _lastFetched.opTime.toString()};
     }
     return Status::OK();
 }
@@ -1382,9 +1381,13 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
             default: {
                 Date_t until{_exec->now() +
                              _opts.blacklistSyncSourcePenaltyForNetworkConnectionError};
-                _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
-                LockGuard lk(_mutex);
-                _syncSource = HostAndPort();
+                HostAndPort syncSource;
+                {
+                    LockGuard lk(_mutex);
+                    syncSource = _syncSource;
+                    _syncSource = HostAndPort();
+                }
+                _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
             }
         }
     }
@@ -1403,15 +1406,20 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
     if (!rollbackStatus.isOK()) {
         error() << "Failed rollback: " << rollbackStatus;
         Date_t until{_exec->now() + _opts.blacklistSyncSourcePenaltyForOplogStartMissing};
-        _opts.syncSourceSelector->blacklistSyncSource(_syncSource, until);
-        LockGuard lk(_mutex);
-        _syncSource = HostAndPort();
-        _oplogFetcher.reset();
-        _fetcherPaused = false;
+        HostAndPort syncSource;
+        {
+            LockGuard lk(_mutex);
+            syncSource = _syncSource;
+            _syncSource = HostAndPort();
+            _oplogFetcher.reset();
+            _fetcherPaused = false;
+        }
+        _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
     } else {
         // Go back to steady sync after a successful rollback.
         auto s = _opts.setFollowerMode(MemberState::RS_SECONDARY);
         if (!s) {
+            LockGuard lk(_mutex);
             error() << "Failed to transition to SECONDARY after rolling back from sync source: "
                     << _syncSource.toString();
         }
