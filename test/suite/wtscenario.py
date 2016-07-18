@@ -81,8 +81,8 @@ def multiply_scenarios(sep, *args):
             result = scenes
         else:
             total = []
-            for scena in scenes:
-                for scenb in result:
+            for scena in result:
+                for scenb in scenes:
                     # Create a merged scenario with a concatenated name
                     name = scena[0] + sep + scenb[0]
                     tdict = {}
