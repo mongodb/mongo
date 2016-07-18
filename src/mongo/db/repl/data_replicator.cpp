@@ -831,7 +831,7 @@ void DataReplicator::_waitOnAndResetAll(UniqueLock& lk) {
         oldReporter->join();
         lk.lock();
     }
-    if (_initialSyncState) {
+    if (_initialSyncState && _initialSyncState->dbsCloner) {
         std::unique_ptr<DatabasesCloner> cloner;
         cloner.swap(_initialSyncState->dbsCloner);
         lk.unlock();
