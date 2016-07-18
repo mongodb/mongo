@@ -77,6 +77,12 @@ public:
     void asFindCommand(BSONObjBuilder* cmdBuilder) const;
 
     /**
+     * Converts this QR into an aggregation using $match. If this QR has options that cannot be
+     * satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is not modified.
+     */
+    StatusWith<BSONObj> asAggregationCommand() const;
+
+    /**
      * Parses maxTimeMS from the BSONElement containing its value.
      */
     static StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);

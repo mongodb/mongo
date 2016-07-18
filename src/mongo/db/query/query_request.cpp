@@ -910,4 +910,123 @@ boost::optional<long long> QueryRequest::getEffectiveBatchSize() const {
     return _batchSize ? _batchSize : _ntoreturn;
 }
 
+StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
+    BSONObjBuilder aggregationBuilder;
+
+    // First, check if this query has options that are not supported in aggregation.
+    if (!_min.isEmpty()) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kMinField << " not supported in aggregation."};
+    }
+    if (!_max.isEmpty()) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kMaxField << " not supported in aggregation."};
+    }
+    if (!_wantMore) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kSingleBatchField
+                              << " not supported in aggregation."};
+    }
+    if (_maxScan != 0) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kMaxScanField << " not supported in aggregation."};
+    }
+    if (_returnKey) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kReturnKeyField << " not supported in aggregation."};
+    }
+    if (!_hint.isEmpty()) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kHintField << " not supported in aggregation."};
+    }
+    if (!_comment.empty()) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kCommentField << " not supported in aggregation."};
+    }
+    if (_showRecordId) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kShowRecordIdField
+                              << " not supported in aggregation."};
+    }
+    if (_snapshot) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kSnapshotField << " not supported in aggregation."};
+    }
+    if (_tailable) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kTailableField << " not supported in aggregation."};
+    }
+    if (_oplogReplay) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kOplogReplayField
+                              << " not supported in aggregation."};
+    }
+    if (_noCursorTimeout) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kNoCursorTimeoutField
+                              << " not supported in aggregation."};
+    }
+    if (_awaitData) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kAwaitDataField << " not supported in aggregation."};
+    }
+    if (_allowPartialResults) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kPartialResultsField
+                              << " not supported in aggregation."};
+    }
+    if (_ntoreturn) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Cannot convert to an aggregation if ntoreturn is set."};
+    }
+
+    // Now that we've successfully validated this QR, begin building the aggregation command.
+    aggregationBuilder.append("aggregate", _nss.coll());
+
+    // Construct an aggregation pipeline that finds the equivalent documents to this query request.
+    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
+    if (!_filter.isEmpty()) {
+        BSONObjBuilder matchBuilder(pipelineBuilder.subobjStart());
+        matchBuilder.append("$match", _filter);
+        matchBuilder.doneFast();
+    }
+    if (!_sort.isEmpty()) {
+        BSONObjBuilder sortBuilder(pipelineBuilder.subobjStart());
+        sortBuilder.append("$sort", _sort);
+        sortBuilder.doneFast();
+    }
+    if (_skip) {
+        BSONObjBuilder skipBuilder(pipelineBuilder.subobjStart());
+        skipBuilder.append("$skip", *_skip);
+        skipBuilder.doneFast();
+    }
+    if (_limit) {
+        BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
+        limitBuilder.append("$limit", *_limit);
+        limitBuilder.doneFast();
+    }
+    if (!_proj.isEmpty()) {
+        BSONObjBuilder projectBuilder(pipelineBuilder.subobjStart());
+        projectBuilder.append("$project", _proj);
+        projectBuilder.doneFast();
+    }
+    pipelineBuilder.doneFast();
+
+    // The aggregation 'cursor' option is always set, regardless of the presence of batchSize.
+    BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
+    if (_batchSize) {
+        batchSizeBuilder.append(kBatchSizeField, *_batchSize);
+    }
+    batchSizeBuilder.doneFast();
+
+    // Other options.
+    aggregationBuilder.append("collation", _collation);
+    if (_explain) {
+        aggregationBuilder.append("explain", _explain);
+    }
+    if (_maxTimeMS > 0) {
+        aggregationBuilder.append(cmdOptionMaxTimeMS, _maxTimeMS);
+    }
+    return StatusWith<BSONObj>(aggregationBuilder.obj());
+}
 }  // namespace mongo

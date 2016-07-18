@@ -173,7 +173,7 @@
         explain: {command: {explain: {count: "view"}}, expectFailure: true},
         features: {skip: isUnrelated},
         filemd5: {skip: isUnrelated},
-        find: {command: {find: "view"}, expectFailure: true},
+        find: {command: {find: "view"}},
         findAndModify: {skip: "TODO(SERVER-24766)"},
         forceerror: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
