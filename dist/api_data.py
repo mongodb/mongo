@@ -247,8 +247,8 @@ file_config = format_meta + [
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower
-        bound of <code>50 * leaf_page_max</code>, and an upper bound of
-        <code>cache_size / 2</code>.  This limit is soft - it is possible
+        bound of <code>leaf_page_max</code>, and an upper bound of
+        <code>cache_size / 10</code>.  This limit is soft - it is possible
         for pages to be temporarily larger than this value.  This setting
         is ignored for LSM trees, see \c chunk_size''',
         min='512B', max='10TB'),
