@@ -38,6 +38,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view.h"
@@ -50,8 +54,6 @@ bool enableViews = false;
 namespace mongo {
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableViewsParameter(
     ServerParameterSet::getGlobal(), "enableViews", &enableViews);
-
-const std::uint32_t ViewCatalog::kMaxViewDepth = 20;
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -77,24 +79,83 @@ Status ViewCatalog::_reloadIfNeeded_inlock(OperationContext* txn) {
     return status;
 }
 
-void ViewCatalog::_createOrUpdateView_inlock(OperationContext* txn,
-                                             const NamespaceString& viewName,
-                                             const NamespaceString& viewOn,
-                                             const BSONArray& pipeline) {
+Status ViewCatalog::_createOrUpdateView_inlock(OperationContext* txn,
+                                               const NamespaceString& viewName,
+                                               const NamespaceString& viewOn,
+                                               const BSONArray& pipeline) {
     invariant(_valid.load());
     BSONObj viewDef =
         BSON("_id" << viewName.ns() << "viewOn" << viewOn.coll() << "pipeline" << pipeline);
-    _durable->upsert(txn, viewName, viewDef);
 
     BSONObj ownedPipeline = pipeline.getOwned();
-    _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(
+    auto view = std::make_shared<ViewDefinition>(
         viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline);
-    txn->recoveryUnit()->onRollback([this, viewName]() { this->_viewMap.erase(viewName.ns()); });
+
+    // Check that the resulting dependency graph is acyclic and within the maximum depth.
+    Status graphStatus = _upsertIntoGraph(txn, *(view.get()));
+    if (!graphStatus.isOK()) {
+        return graphStatus;
+    }
+
+    _durable->upsert(txn, viewName, viewDef);
+    _viewMap[viewName.ns()] = view;
+    txn->recoveryUnit()->onRollback([this, viewName]() {
+        this->_viewMap.erase(viewName.ns());
+        this->_viewGraphNeedsRefresh = true;
+    });
 
     // We may get invalidated, but we're exclusively locked, so the change must be ours.
     txn->recoveryUnit()->onCommit([this]() { this->_valid.store(true); });
+    return Status::OK();
 }
 
+Status ViewCatalog::_upsertIntoGraph(OperationContext* txn, const ViewDefinition& viewDef) {
+
+    // Performs the insert into the graph.
+    auto doInsert = [this, &txn](const ViewDefinition& viewDef, bool needsValidation) -> Status {
+        // Parse the pipeline for this view to get the namespaces it references.
+        AggregationRequest request(viewDef.viewOn(), viewDef.pipeline());
+        boost::intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(txn, request);
+        auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), expCtx);
+        if (!pipelineStatus.isOK()) {
+            uassert(40255,
+                    str::stream() << "Invalid pipeline for existing view " << viewDef.name().ns()
+                                  << "; "
+                                  << pipelineStatus.getStatus().reason(),
+                    !needsValidation);
+            return pipelineStatus.getStatus();
+        }
+
+        std::vector<NamespaceString> refs = pipelineStatus.getValue()->getInvolvedCollections();
+        refs.push_back(viewDef.viewOn());
+
+        if (needsValidation) {
+            return _viewGraph.insertAndValidate(viewDef.name(), refs);
+        } else {
+            _viewGraph.insertWithoutValidating(viewDef.name(), refs);
+            return Status::OK();
+        }
+    };
+
+    if (_viewGraphNeedsRefresh) {
+        _viewGraph.clear();
+        for (auto&& iter : _viewMap) {
+            auto status = doInsert(*(iter.second.get()), false);
+            // If we cannot fully refresh the graph, we will keep '_viewGraphNeedsRefresh' true.
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        // Only if the inserts completed without error will we no longer need a refresh.
+        _viewGraphNeedsRefresh = false;
+    }
+
+    // Remove the view definition first in case this is an update. If it is not in the graph, it
+    // is simply a no-op.
+    _viewGraph.remove(viewDef.name());
+
+    return doInsert(viewDef, true);
+}
 
 Status ViewCatalog::createView(OperationContext* txn,
                                const NamespaceString& viewName,
@@ -116,10 +177,7 @@ Status ViewCatalog::createView(OperationContext* txn,
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
-    // TODO(SERVER-24768): Need to ensure view is correct and doesn't introduce a cycle.
-
-    _createOrUpdateView_inlock(txn, viewName, viewOn, pipeline);
-    return Status::OK();
+    return _createOrUpdateView_inlock(txn, viewName, viewOn, pipeline);
 }
 
 Status ViewCatalog::modifyView(OperationContext* txn,
@@ -132,7 +190,8 @@ Status ViewCatalog::modifyView(OperationContext* txn,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (!_lookup_inlock(txn, StringData(viewName.ns())))
+    ViewDefinition* viewPtr = _lookup_inlock(txn, viewName.ns());
+    if (!viewPtr)
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot modify missing view " << viewName.ns());
 
@@ -140,8 +199,11 @@ Status ViewCatalog::modifyView(OperationContext* txn,
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
-    _createOrUpdateView_inlock(txn, viewName, viewOn, pipeline);
-    return Status::OK();
+    ViewDefinition savedDefinition = *viewPtr;
+    txn->recoveryUnit()->onRollback([this, txn, viewName, savedDefinition]() {
+        this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
+    });
+    return _createOrUpdateView_inlock(txn, viewName, viewOn, pipeline);
 }
 
 Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewName) {
@@ -158,8 +220,10 @@ Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewN
 
     invariant(_valid.load());
     _durable->remove(txn, viewName);
+    _viewGraph.remove(savedDefinition.name());
     _viewMap.erase(viewName.ns());
-    txn->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
+    txn->recoveryUnit()->onRollback([this, txn, viewName, savedDefinition]() {
+        this->_viewGraphNeedsRefresh = true;
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
     });
 
@@ -188,7 +252,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* txn,
     const NamespaceString* resolvedNss = &nss;
     std::vector<BSONObj> resolvedPipeline;
 
-    for (std::uint32_t i = 0; i < ViewCatalog::kMaxViewDepth; i++) {
+    for (int i = 0; i < ViewGraph::kMaxViewDepth; i++) {
         ViewDefinition* view = _lookup_inlock(txn, resolvedNss->ns());
         if (!view)
             return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
@@ -207,6 +271,6 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* txn,
 
     return {ErrorCodes::ViewDepthLimitExceeded,
             str::stream() << "View depth too deep or view cycle detected; maximum depth is "
-                          << kMaxViewDepth};
+                          << ViewGraph::kMaxViewDepth};
 }
 }  // namespace mongo
