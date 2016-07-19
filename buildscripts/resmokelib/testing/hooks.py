@@ -166,10 +166,41 @@ class ValidateCollections(JsCustomBehavior):
     Runs full validation on all collections in all databases on every stand-alone
     node, primary replica-set node, or primary shard node.
     """
-    def __init__(self, logger, fixture):
-        description = "Full collection validation"
+
+    DEFAULT_N = 1
+
+    def __init__(self, logger, fixture, n=DEFAULT_N, improvedV33Validate=False):
+        description = "Collection validation"
         js_filename = os.path.join("jstests", "hooks", "run_validate_collections.js")
         JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
+        self.n = n
+        self.tests_run = 0
+        self.improved_validate = improvedV33Validate
+
+    def after_test(self, test, test_report):
+        self.tests_run += 1
+        if self.tests_run >= self.n:
+            self.tests_run = 0
+            
+            if not self.improved_validate:
+                JsCustomBehavior.after_test(self, test, test_report)
+                return
+            elif not isinstance(self.fixture, fixtures.MongoDFixture):
+                raise errors.TestFailure(("ValidateCollections with the improved validate command"
+                                          " can only be run against a stand-alone mongod"))
+
+            # Need to remember the dbpath and port of the original mongod.
+            mongod_options = self.fixture.mongod_options.copy()
+            mongod_options["queryableBackupMode"] = ""
+            mongod_executable = "/data/multiversion/mongod-3.3.10"
+            if sys.platform == "win32":
+                mongod_executable += ".exe"
+            
+            self.fixture.reconfigure(mongod_executable, mongod_options)
+
+            JsCustomBehavior.after_test(self, test, test_report)
+
+            self.fixture.reset_configuration()
 
 
 class CheckReplDBHash(JsCustomBehavior):
