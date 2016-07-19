@@ -272,6 +272,11 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
         cursor.readPref(readPrefMode, connObj.getReadPrefTagSet());
     }
 
+    var rc = connObj.getReadConcern();
+    if (rc) {
+        cursor.readConcern(rc);
+    }
+
     return cursor;
 };
 

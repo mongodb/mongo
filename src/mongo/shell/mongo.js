@@ -57,7 +57,7 @@ Mongo.prototype.getDB = function(name) {
 };
 
 Mongo.prototype.getDBs = function() {
-    var res = this.getDB("admin").runCommand({"listDatabases": 1});
+    var res = this.adminCommand({"listDatabases": 1});
     if (!res.ok)
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
     return res;
@@ -169,6 +169,28 @@ Mongo.prototype.getReadPref = function() {
     }
 
     return obj;
+};
+
+/**
+ * Sets the read concern.
+ *
+ * @param level {string} read concern level to use. Pass null to disable read concern.
+ */
+Mongo.prototype.setReadConcern = function(level) {
+    if (!level) {
+        this._readConcernLevel = undefined;
+    } else if (level === "local" || level === "majority") {
+        this._readConcernLevel = level;
+    } else {
+        throw Error("Invalid read concern.");
+    }
+};
+
+/**
+ * Gets the read concern.
+ */
+Mongo.prototype.getReadConcern = function() {
+    return this._readConcernLevel;
 };
 
 connect = function(url, user, pass) {

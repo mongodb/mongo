@@ -881,17 +881,22 @@ var _bulk_api_module = (function() {
             // Get command collection
             var cmdColl = collection._db.getCollection('$cmd');
             // Bypass runCommand to ignore slaveOk and read pref settings
-            result = new DBQuery(collection.getMongo(),
-                                 collection._db,
-                                 cmdColl,
-                                 cmdColl.getFullName(),
-                                 cmd,
-                                 {} /* proj */,
-                                 -1 /* limit */,
-                                 0 /* skip */,
-                                 0 /* batchSize */,
-                                 0 /* flags */)
-                         .next();
+            var cursor = new DBQuery(collection.getMongo(),
+                                     collection._db,
+                                     cmdColl,
+                                     cmdColl.getFullName(),
+                                     cmd,
+                                     {} /* proj */,
+                                     -1 /* limit */,
+                                     0 /* skip */,
+                                     0 /* batchSize */,
+                                     0 /* flags */);
+            var rc = collection.getMongo().getReadConcern();
+            if (rc) {
+                cursor.readConcern(rc);
+            }
+
+            result = cursor.next();
 
             if (result.ok == 0) {
                 throw new WriteCommandError(result);
