@@ -245,6 +245,21 @@
         assert(planHasStage(explainRes.queryPlanner.winningPlan, "IXSCAN"));
     }
 
+    // Should not be possible to create a text index with an explicit non-simple collation.
+    coll.drop();
+    assert.commandFailed(coll.createIndex({a: "text"}, {collation: {locale: "en"}}));
+
+    // Text index builds which inherit a non-simple default collation should fail.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en"}}));
+    assert.commandFailed(coll.createIndex({a: "text"}));
+
+    // Text index build should succeed on a collection with a non-simple default collation if it
+    // explicitly overrides the default with {locale: "simple"}.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en"}}));
+    assert.commandWorked(coll.createIndex({a: "text"}, {collation: {locale: "simple"}}));
+
     //
     // Collation tests for aggregation.
     //

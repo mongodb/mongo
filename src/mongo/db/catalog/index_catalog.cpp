@@ -544,13 +544,6 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
     std::unique_ptr<CollatorInterface> collator;
     BSONElement collationElement = spec.getField("collation");
     if (collationElement) {
-        string pluginName = IndexNames::findPluginName(key);
-        if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2DSPHERE) &&
-            (pluginName != IndexNames::HASHED)) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "\"collation\" not supported for index type "
-                                        << pluginName);
-        }
         if (collationElement.type() != BSONType::Object) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "\"collation\" for an index must be a document");
@@ -561,6 +554,15 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
             return statusWithCollator.getStatus();
         }
         collator = std::move(statusWithCollator.getValue());
+
+        string pluginName = IndexNames::findPluginName(key);
+        if (collator && (pluginName != IndexNames::BTREE) &&
+            (pluginName != IndexNames::GEO_2DSPHERE) && (pluginName != IndexNames::HASHED)) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "Index type '" << pluginName
+                                        << "' does not support collation: "
+                                        << collator->getSpec().toBSON());
+        }
     }
 
     const bool isSparse = spec["sparse"].trueValue();
