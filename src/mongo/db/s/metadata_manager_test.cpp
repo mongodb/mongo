@@ -44,10 +44,14 @@ using unittest::assertGet;
 
 namespace {
 
+std::unique_ptr<CollectionMetadata> makeMetadata() {
+    return stdx::make_unique<CollectionMetadata>(BSON("key" << 1), ChunkVersion(1, 0, OID::gen()));
+}
+
 TEST(MetadataManager, SetAndGetActiveMetadata) {
     MetadataManager manager;
 
-    std::unique_ptr<CollectionMetadata> cm = stdx::make_unique<CollectionMetadata>();
+    std::unique_ptr<CollectionMetadata> cm = makeMetadata();
     auto cmPtr = cm.get();
 
     manager.setActiveMetadata(std::move(cm));
@@ -58,11 +62,11 @@ TEST(MetadataManager, SetAndGetActiveMetadata) {
 
 TEST(MetadataManager, ResetActiveMetadata) {
     MetadataManager manager;
-    manager.setActiveMetadata(stdx::make_unique<CollectionMetadata>());
+    manager.setActiveMetadata(makeMetadata());
 
     ScopedCollectionMetadata scopedMetadata1 = manager.getActiveMetadata();
 
-    std::unique_ptr<CollectionMetadata> cm2 = stdx::make_unique<CollectionMetadata>();
+    std::unique_ptr<CollectionMetadata> cm2 = makeMetadata();
     auto cm2Ptr = cm2.get();
 
     manager.setActiveMetadata(std::move(cm2));

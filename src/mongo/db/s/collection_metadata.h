@@ -57,13 +57,13 @@ class CollectionMetadata {
 
 public:
     /**
-     * Use the MetadataLoader to fill the empty metadata from the config server, or use
-     * clone*() methods to use existing metadatas to build new ones.
+     * The main way to construct CollectionMetadata is through MetadataLoader or the clone*()
+     * methods.
      *
-     * Unless you are the MetadataLoader or a test you should probably not be using this
-     * directly.
+     * The constructors should not be used directly outside of tests.
      */
     CollectionMetadata();
+    CollectionMetadata(const BSONObj& keyPattern, ChunkVersion collectionVersion);
     ~CollectionMetadata();
 
     /**
@@ -230,6 +230,11 @@ public:
                                                        const BSONObj& maxKey,
                                                        const ChunkVersion& newShardVersion) const;
 
+    /**
+     * Returns true if this metadata was loaded with all necessary information.
+     */
+    bool isValid() const;
+
 private:
     // Effectively, the MetadataLoader is this class's builder. So we open an exception and grant it
     // friendship.
@@ -267,11 +272,6 @@ private:
     // w.r.t. _chunkMap but we expect high chunk contiguity, especially in small
     // installations.
     RangeMap _rangesMap;
-
-    /**
-     * Returns true if this metadata was loaded with all necessary information.
-     */
-    bool isValid() const;
 
     /**
      * Try to find chunks that are adjacent and record these intervals in the _rangesMap

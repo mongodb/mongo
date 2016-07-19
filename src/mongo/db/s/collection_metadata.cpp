@@ -48,6 +48,11 @@ using str::stream;
 
 CollectionMetadata::CollectionMetadata() = default;
 
+CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern, ChunkVersion collectionVersion)
+    : _collVersion(collectionVersion),
+      _shardVersion(ChunkVersion(0, 0, collectionVersion.epoch())),
+      _keyPattern(keyPattern.getOwned()) {}
+
 CollectionMetadata::~CollectionMetadata() = default;
 
 std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMigrate(

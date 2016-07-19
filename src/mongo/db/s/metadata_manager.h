@@ -106,8 +106,11 @@ private:
     void _addRangeToClean_inlock(const ChunkRange& range);
     void _removeRangeToClean_inlock(const ChunkRange& range);
 
+    // Holds the collection metadata, which is currently active
     std::unique_ptr<CollectionMetadataTracker> _activeMetadataTracker;
 
+    // Holds collection metadata instances, which have previously been active, but are still in use
+    // by still active server operations or cursors
     std::list<std::unique_ptr<CollectionMetadataTracker>> _metadataInUse;
 
     // Contains the information of which ranges of sharding keys need to

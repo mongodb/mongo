@@ -34,7 +34,8 @@
 
 namespace mongo {
 
-MetadataManager::MetadataManager() = default;
+MetadataManager::MetadataManager()
+    : _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)) {}
 
 MetadataManager::~MetadataManager() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
@@ -46,27 +47,34 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata() {
     if (!_activeMetadataTracker) {
         return ScopedCollectionMetadata();
     }
+
     return ScopedCollectionMetadata(this, _activeMetadataTracker.get());
 }
 
 void MetadataManager::setActiveMetadata(std::unique_ptr<CollectionMetadata> newMetadata) {
+    invariant(!newMetadata || newMetadata->isValid());
+
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    if (_activeMetadataTracker && _activeMetadataTracker->usageCounter > 0) {
+
+    if (_activeMetadataTracker->usageCounter > 0) {
         _metadataInUse.push_front(std::move(_activeMetadataTracker));
     }
+
     _activeMetadataTracker = stdx::make_unique<CollectionMetadataTracker>(std::move(newMetadata));
 }
 
 void MetadataManager::_removeMetadata_inlock(CollectionMetadataTracker* metadataTracker) {
     invariant(metadataTracker->usageCounter == 0);
+
     auto i = _metadataInUse.begin();
-    auto e = _metadataInUse.end();
+    const auto e = _metadataInUse.end();
     while (i != e) {
         if (metadataTracker == i->get()) {
             _metadataInUse.erase(i);
             return;
         }
-        i++;
+
+        ++i;
     }
 }
 
