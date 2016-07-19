@@ -142,6 +142,8 @@ Status CollectionOptions::parse(const BSONObj& options) {
             cappedSize = e.numberLong();
             if (cappedSize < 0)
                 return Status(ErrorCodes::BadValue, "size has to be >= 0");
+            if ( cappedSize >= 0x7fffffffffffffffLL)
+                return Status(ErrorCodes::BadValue, "size has to be < 2^63");
             cappedSize += 0xff;
             cappedSize &= 0xffffffffffffff00LL;
         } else if (fieldName == "max") {
