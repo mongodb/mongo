@@ -273,23 +273,6 @@ void ShardingState::clearCollectionMetadata() {
     _collections.clear();
 }
 
-ChunkVersion ShardingState::getVersion(const string& ns) {
-    ScopedCollectionMetadata p;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-        if (it != _collections.end()) {
-            p = it->second->getMetadata();
-        }
-    }
-
-    if (p) {
-        return p->getShardVersion();
-    }
-
-    return ChunkVersion::UNSHARDED();
-}
-
 void ShardingState::resetMetadata(const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -933,14 +916,6 @@ bool ShardingState::needCollectionMetadata(OperationContext* txn, const string& 
     // directly to the OperationContext.
     return ShardedConnectionInfo::get(client, false) ||
         OperationShardingState::get(txn).hasShardVersion();
-}
-
-ScopedCollectionMetadata ShardingState::getCollectionMetadata(const string& ns) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    invariant(it != _collections.end());
-    return it->second->getMetadata();
 }
 
 Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,

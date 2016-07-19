@@ -161,8 +161,6 @@ public:
      */
     void clearCollectionMetadata();
 
-    ChunkVersion getVersion(const std::string& ns);
-
     /**
      * Refreshes the local metadata based on whether the expected version is higher than what we
      * have cached.
@@ -200,8 +198,6 @@ public:
     void appendInfo(OperationContext* txn, BSONObjBuilder& b);
 
     bool needCollectionMetadata(OperationContext* txn, const std::string& ns);
-
-    ScopedCollectionMetadata getCollectionMetadata(const std::string& ns);
 
     /**
      * Updates the config server field of the shardIdentity document with the given connection

@@ -219,17 +219,22 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
             txn, ws.get(), idxIterator.release(), nullptr, collection);
     }
 
-    ShardingState* const shardingState = ShardingState::get(txn);
+    {
+        AutoGetCollection autoColl(txn, collection->ns(), MODE_IS);
 
-    // If we're in a sharded environment, we need to filter out documents we don't own.
-    if (shardingState->needCollectionMetadata(txn, collection->ns().ns())) {
-        auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
-            txn,
-            shardingState->getCollectionMetadata(collection->ns().ns()),
-            ws.get(),
-            stage.release());
-        return uassertStatusOK(PlanExecutor::make(
-            txn, std::move(ws), std::move(shardFilterStage), collection, PlanExecutor::YIELD_AUTO));
+        // If we're in a sharded environment, we need to filter out documents we don't own.
+        if (ShardingState::get(txn)->needCollectionMetadata(txn, collection->ns().ns())) {
+            auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
+                txn,
+                CollectionShardingState::get(txn, collection->ns())->getMetadata(),
+                ws.get(),
+                stage.release());
+            return uassertStatusOK(PlanExecutor::make(txn,
+                                                      std::move(ws),
+                                                      std::move(shardFilterStage),
+                                                      collection,
+                                                      PlanExecutor::YIELD_AUTO));
+        }
     }
 
     return uassertStatusOK(PlanExecutor::make(
