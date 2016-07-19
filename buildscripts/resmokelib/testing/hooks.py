@@ -139,10 +139,13 @@ class JsCustomBehavior(CustomBehavior):
                                               js_filename,
                                               shell_options=shell_options,
                                               test_kind="Hook")
+        self.test_case_is_configured = False
 
     def before_suite(self, test_report):
-        # Configure the test case after the fixture has been set up.
-        self.hook_test_case.configure(self.fixture)
+        if not self.test_case_is_configured:
+            # Configure the test case after the fixture has been set up.
+            self.hook_test_case.configure(self.fixture)
+            self.test_case_is_configured = True
 
     def after_test(self, test, test_report):
         description = "{0} after running '{1}'".format(self.description, test.short_name())

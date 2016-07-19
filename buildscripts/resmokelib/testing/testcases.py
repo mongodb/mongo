@@ -54,6 +54,8 @@ class TestCase(unittest.TestCase):
         self.fixture = None
         self.return_code = None
 
+        self.is_configured = False
+
     def long_name(self):
         """
         Returns the path to the test, relative to the current working directory.
@@ -82,6 +84,10 @@ class TestCase(unittest.TestCase):
         """
         Stores 'fixture' as an attribute for later use during execution.
         """
+        if self.is_configured:
+            raise RuntimeError("configure can only be called once")
+
+        self.is_configured = True
         self.fixture = fixture
 
     def run_test(self):
