@@ -51,6 +51,7 @@ variables:
     vars:
       resmoke_args: --help
       run_multiple_jobs: false
+      enable_coredumps: false
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
 - &jepsen_config_vars
@@ -360,6 +361,12 @@ functions:
         fi
 
         cp mongodb*/bin/* .
+
+        if [ ${build_variant} = ubuntu1604 ] && [ ${enable_coredumps|false} = true ]; then
+          # Set the process to dump ELF headers (bit 4) and anonymous private mappings (bit 0).
+          echo 0x11 > /proc/self/coredump_filter
+          ulimit -c unlimited
+        fi
 
         extra_args=""
         if [ ${run_multiple_jobs|false} = true ]; then
@@ -728,6 +735,14 @@ post:
 
         if [ -d "${scons_cache_path}" ]; then
             ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+        fi
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        file_list=$(find . -type f -maxdepth 1 -name core.*)
+        if [ -n "$file_list" ]; then
+            ${tar|tar} cvzf ../mongo-coredumps.tgz $file_list
         fi
   - command: archive.targz_pack
     params:
@@ -1535,6 +1550,7 @@ tasks:
     vars:
       resmoke_args: --suites=core --storageEngine=wiredTiger
       run_multiple_jobs: true
+      enable_coredumps: true
 
 - <<: *task_template
   name: jsCore_WT_ese
