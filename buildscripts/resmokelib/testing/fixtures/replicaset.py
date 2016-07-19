@@ -29,6 +29,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                  dbpath_prefix=None,
                  preserve_dbpath=False,
                  num_nodes=2,
+                 start_initial_sync_node=False,
                  write_concern_majority_journal_default=None,
                  auth_options=None,
                  replset_config_options=None):
@@ -39,6 +40,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.mongod_options = utils.default_if_none(mongod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.num_nodes = num_nodes
+        self.start_initial_sync_node = start_initial_sync_node
         self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
@@ -58,6 +60,8 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         self.nodes = []
         self.replset_name = None
+        self.initial_sync_node = None
+        self.initial_sync_node_idx = -1
 
     def setup(self):
         self.replset_name = self.mongod_options.get("replSet", "rs")
@@ -69,6 +73,14 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         for node in self.nodes:
             node.setup()
+
+        if self.start_initial_sync_node:
+            if not self.initial_sync_node:
+                self.initial_sync_node_idx = len(self.nodes)
+                self.initial_sync_node = self._new_mongod(self.initial_sync_node_idx,
+                                                          self.replset_name)
+            self.initial_sync_node.setup()
+            self.initial_sync_node.await_ready()
 
         self.port = self.get_primary().port
 
@@ -87,6 +99,13 @@ class ReplicaSetFixture(interface.ReplFixture):
                 # Only 7 nodes in a replica set can vote, so the other members must be non-voting.
                 member_info["votes"] = 0
             members.append(member_info)
+        if self.initial_sync_node:
+            members.append({"_id": self.initial_sync_node_idx,
+                            "host": self.initial_sync_node.get_connection_string(),
+                            "priority": 0,
+                            "hidden": 1,
+                            "votes": 0})
+
         initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
         if self.write_concern_majority_journal_default is not None:
@@ -136,6 +155,9 @@ class ReplicaSetFixture(interface.ReplFixture):
         else:
             self.logger.info("Stopping all members of the replica set...")
 
+        if self.initial_sync_node:
+            success = self.initial_sync_node.teardown() and success
+
         # Terminate the secondaries first to reduce noise in the logs.
         for node in reversed(self.nodes):
             success = node.teardown() and success
@@ -146,7 +168,12 @@ class ReplicaSetFixture(interface.ReplFixture):
         return success
 
     def is_running(self):
-        return all(node.is_running() for node in self.nodes)
+        running = all(node.is_running() for node in self.nodes)
+
+        if self.initial_sync_node:
+            running = self.initial_sync_node.is_running() or running
+
+        return running
 
     def get_primary(self):
         # The primary is always the first element of the 'nodes' list because all other members of
@@ -155,6 +182,9 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def get_secondaries(self):
         return self.nodes[1:]
+
+    def get_initial_sync_node(self):
+        return self.initial_sync_node
 
     def _new_mongod(self, index, replset_name):
         """
@@ -175,12 +205,14 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def _get_logger_for_mongod(self, index):
         """
-        Returns a new logging.Logger instance for use as the primary or
-        secondary of a replica-set.
+        Returns a new logging.Logger instance for use as the primary, secondary, or initial
+        sync member of a replica-set.
         """
 
         if index == 0:
             logger_name = "%s:primary" % (self.logger.name)
+        elif index == self.initial_sync_node_idx:
+            logger_name = "%s:initsync" % (self.logger.name)
         else:
             suffix = str(index - 1) if self.num_nodes > 2 else ""
             logger_name = "%s:secondary%s" % (self.logger.name, suffix)
@@ -192,4 +224,6 @@ class ReplicaSetFixture(interface.ReplFixture):
             raise ValueError("Must call setup() before calling get_connection_string()")
 
         conn_strs = [node.get_connection_string() for node in self.nodes]
+        if self.initial_sync_node:
+            conn_strs.append(self.initial_sync_node.get_connection_string())
         return self.replset_name + "/" + ",".join(conn_strs)

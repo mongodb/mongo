@@ -1,0 +1,33 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # These tests are not expected to pass with replica-sets:
+    - jstests/core/dbadmin.js
+    - jstests/core/opcounters_write_cmd.js
+    - jstests/core/read_after_optime.js
+    - jstests/core/capped_update.js
+    # Blacklisted due to SERVER-25131
+    - jstests/core/bypass_doc_validation.js
+
+run_hook_interval: &run_hook_interval 20
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval: "testingReplication = true;"
+        readMode: commands
+    hooks:
+    - class: IntermediateInitialSync
+      n: *run_hook_interval
+    - class: CleanEveryN
+      n: *run_hook_interval
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        oplogSize: 511
+        set_parameters:
+          enableTestCommands: 1
+      num_nodes: 2
+      start_initial_sync_node: True

@@ -75,6 +75,42 @@ function dumpCollectionDiff(primary, secondary, dbName, collName) {
     }
 }
 
+function checkDBHashesFsyncLocked(rst) {
+    // Call getPrimary to populate rst with information about the nodes.
+    var primary = rst.getPrimary();
+    assert(primary, 'calling getPrimary() failed');
+
+    var activeException = false;
+
+    try {
+        // Lock the primary to prevent the TTL monitor from deleting expired documents in
+        // the background while we are getting the dbhashes of the replica set members.
+        assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
+                             'failed to lock the primary');
+        rst.awaitReplication(60 * 1000 * 5);
+
+        var phaseName = 'after test hook';
+        var blacklist = [];
+        checkDBHashes(rst, blacklist, phaseName);
+    } catch (e) {
+        activeException = true;
+        throw e;
+    } finally {
+        // Allow writes on the primary.
+        var res = primary.adminCommand({fsyncUnlock: 1});
+
+        if (!res.ok) {
+            var msg = 'failed to unlock the primary, which may cause this' +
+                ' test to hang: ' + tojson(res);
+            if (activeException) {
+                print(msg);
+            } else {
+                throw new Error(msg);
+            }
+        }
+    }
+}
+
 function checkDBHashes(rst, dbBlacklist, phase) {
     // We don't expect the local database to match because some of its collections are not
     // replicated.

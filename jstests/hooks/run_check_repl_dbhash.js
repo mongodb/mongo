@@ -47,7 +47,7 @@
         };
 
         this.awaitReplication = function() {
-            assert.commandWorked(primary.adminCommand({fsyncUnlock: 1}),
+            assert.commandWorked(master.adminCommand({fsyncUnlock: 1}),
                                  'failed to unlock the primary');
 
             print('Starting fsync on master to flush all pending writes');
@@ -65,7 +65,7 @@
                                'Awaiting replication failed');
             }
             print('Finished awaiting replication');
-            assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
+            assert.commandWorked(master.adminCommand({fsync: 1, lock: 1}),
                                  'failed to re-lock the primary');
         };
     };
@@ -88,40 +88,8 @@
         rst = new ReplSetTest(db.getMongo().host);
     }
 
-    // Call getPrimary to populate rst with information about the nodes.
-    var primary = rst.getPrimary();
-    assert(primary, 'calling getPrimary() failed');
-
-    var activeException = false;
-
-    try {
-        // Lock the primary to prevent the TTL monitor from deleting expired documents in
-        // the background while we are getting the dbhashes of the replica set members.
-        assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
-                             'failed to lock the primary');
-        rst.awaitReplication(60 * 1000 * 5);  // 5min timeout
-
-        var phaseName = 'after test hook';
-        load('jstests/hooks/check_repl_dbhash.js');
-        var blacklist = [];
-        checkDBHashes(rst, blacklist, phaseName);
-    } catch (e) {
-        activeException = true;
-        throw e;
-    } finally {
-        // Allow writes on the primary.
-        var res = primary.adminCommand({fsyncUnlock: 1});
-
-        if (!res.ok) {
-            var msg = 'failed to unlock the primary, which may cause this' +
-                ' test to hang: ' + tojson(res);
-            if (activeException) {
-                print(msg);
-            } else {
-                throw new Error(msg);
-            }
-        }
-    }
+    load('jstests/hooks/check_repl_dbhash.js');
+    checkDBHashesFsyncLocked(rst);
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of cluster in ' + totalTime + ' ms.');

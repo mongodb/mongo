@@ -1637,6 +1637,28 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: jsCore_small_oplog_rs_initsync_static
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_initsync_static --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_small_oplog_rs_initsync_static_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_initsync_static --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: mongosTest
   commands:
   - func: "do setup"
@@ -4082,6 +4104,12 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
     distros:
     - windows-64-vs2015-large
+  - name: jsCore_small_oplog_rs_initsync_static
+    distros:
+    - windows-64-vs2015-large
+  - name: jsCore_small_oplog_rs_initsync_static_WT
+    distros:
+    - windows-64-vs2015-large
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -4740,6 +4768,12 @@ buildvariants:
     distros:
     - rhel62-large
   - name: jsCore_small_oplog_rs_WT
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_static
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_static_WT
     distros:
     - rhel62-large
   - name: jstestfuzz
@@ -6940,6 +6974,8 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_small_oplog_rs_initsync_static
+  - name: jsCore_small_oplog_rs_initsync_static_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -7097,6 +7133,8 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_small_oplog_rs_initsync_static
+  - name: jsCore_small_oplog_rs_initsync_static_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -7465,6 +7503,12 @@ buildvariants:
     distros:
     - rhel62-large
   - name: jsCore_small_oplog_rs_WT
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_static
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_static_WT
     distros:
     - rhel62-large
   - name: noPassthrough
