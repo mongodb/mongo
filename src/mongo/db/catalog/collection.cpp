@@ -1045,11 +1045,6 @@ public:
             }
 
             const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
-            BSONObjSet documentKeySet;
-            // There's no need to compute the prefixes of the indexed fields that cause the
-            // index to be multikey when validating the index keys.
-            MultikeyPaths* multikeyPaths = nullptr;
-            iam->getKeys(recordBson, &documentKeySet, multikeyPaths);
 
             if (descriptor->isPartial()) {
                 const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
@@ -1057,6 +1052,12 @@ public:
                     continue;
                 }
             }
+
+            BSONObjSet documentKeySet;
+            // There's no need to compute the prefixes of the indexed fields that cause the
+            // index to be multikey when validating the index keys.
+            MultikeyPaths* multikeyPaths = nullptr;
+            iam->getKeys(recordBson, &documentKeySet, multikeyPaths);
 
             if (!descriptor->isMultikey(_txn) && documentKeySet.size() > 1) {
                 string msg = str::stream() << "Index " << descriptor->indexName()
@@ -1064,13 +1065,6 @@ public:
                                            << " key in document " << recordId;
                 results.errors.push_back(msg);
                 results.valid = false;
-            }
-
-            if (descriptor->isPartial()) {
-                const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
-                if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                    continue;
-                }
             }
 
             uint32_t indexNsHash;
