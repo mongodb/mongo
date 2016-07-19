@@ -1210,7 +1210,8 @@ public:
             // If you don't need privileges, you can just do a regular query on system.users
             BSONObjBuilder queryBuilder;
             if (args.allForDB) {
-                queryBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, dbname);
+                queryBuilder.append("query",
+                                    BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname));
             } else {
                 BSONArrayBuilder usersMatchArray;
                 for (size_t i = 0; i < args.userNames.size(); ++i) {
@@ -1219,19 +1220,21 @@ public:
                                                 << AuthorizationManager::USER_DB_FIELD_NAME
                                                 << args.userNames[i].getDB()));
                 }
-                queryBuilder.append("$or", usersMatchArray.arr());
+                queryBuilder.append("query", BSON("$or" << usersMatchArray.arr()));
             }
+            // Order results by user field then db field, matching how UserNames are ordered
+            queryBuilder.append("orderby", BSON("user" << 1 << "db" << 1));
 
-            BSONObjBuilder projection;
+            BSONObj projection;
             if (!args.showCredentials) {
-                projection.append("credentials", 0);
+                projection = BSON("credentials" << 0);
             }
             const stdx::function<void(const BSONObj&)> function = stdx::bind(
                 appendBSONObjToBSONArrayBuilder, &usersArrayBuilder, stdx::placeholders::_1);
             queryAuthzDocument(txn,
                                AuthorizationManager::usersCollectionNamespace,
                                queryBuilder.done(),
-                               projection.done(),
+                               projection,
                                function);
         }
         result.append("users", usersArrayBuilder.arr());

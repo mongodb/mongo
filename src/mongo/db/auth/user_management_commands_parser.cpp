@@ -28,6 +28,7 @@
 
 #include "mongo/db/auth/user_management_commands_parser.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -352,6 +353,7 @@ Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfo
         if (!status.isOK()) {
             return status;
         }
+        std::sort(parsedArgs->userNames.begin(), parsedArgs->userNames.end());
     } else {
         UserName name;
         status = _parseNameFromBSONElement(cmdObj["usersInfo"],

@@ -185,37 +185,22 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         assert.eq(1, res.users.length);
         assert.eq(10036, res.users[0].customData.zipCode);
 
+        // UsersInfo results are ordered alphabetically by user field then db field,
+        // not by user insertion order
         res = testUserAdmin.runCommand({usersInfo: ['spencer', {user: 'userAdmin', db: 'admin'}]});
         printjson(res);
         assert.eq(2, res.users.length);
-        if (res.users[0].user == "spencer") {
-            assert.eq(10036, res.users[0].customData.zipCode);
-            assert(res.users[1].customData.userAdmin);
-        } else if (res.users[0].user == "userAdmin") {
-            assert.eq(10036, res.users[1].customData.zipCode);
-            assert(res.users[0].customData.userAdmin);
-        } else {
-            doassert(
-                "Expected user names returned by usersInfo to be either 'userAdmin' or 'spencer', " +
-                "but got: " + res.users[0].user);
-        }
+        assert.eq("spencer", res.users[0].user);
+        assert.eq(10036, res.users[0].customData.zipCode);
+        assert(res.users[1].customData.userAdmin);
+        assert.eq("userAdmin", res.users[1].user);
 
         res = testUserAdmin.runCommand({usersInfo: 1});
         assert.eq(2, res.users.length);
-        if (res.users[0].user == "spencer") {
-            assert.eq("andy", res.users[1].user);
-            assert.eq(10036, res.users[0].customData.zipCode);
-            assert(!res.users[1].customData);
-        } else if (res.users[0].user == "andy") {
-            assert.eq("spencer", res.users[1].user);
-            assert(!res.users[0].customData);
-            assert.eq(10036, res.users[1].customData.zipCode);
-        } else {
-            doassert(
-                "Expected user names returned by usersInfo to be either 'andy' or 'spencer', " +
-                "but got: " + res.users[0].user);
-        }
-
+        assert.eq("andy", res.users[0].user);
+        assert.eq("spencer", res.users[1].user);
+        assert(!res.users[0].customData);
+        assert.eq(10036, res.users[1].customData.zipCode);
     })();
 
     (function testDropUser() {
