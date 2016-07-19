@@ -194,6 +194,7 @@ jsTestOptions = function() {
             maxPort: TestData.maxPort,
             // Note: does not support the array version
             mongosBinVersion: TestData.mongosBinVersion || "",
+            shardMixedBinVersions: TestData.shardMixedBinVersions || false,
         });
     }
     return _jsTestOptions;

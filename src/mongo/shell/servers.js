@@ -255,10 +255,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.versionIterator.iterator = function(i, arr) {
 
         this.toString = function() {
-            i = (i + 1) % arr.length;
+            i = i % arr.length;
             print("Returning next version : " + i + " (" + arr[i] + ") from " + tojson(arr) +
                   "...");
-            return arr[i];
+            return arr[i++];
         };
 
         this.isVersionIterator = true;

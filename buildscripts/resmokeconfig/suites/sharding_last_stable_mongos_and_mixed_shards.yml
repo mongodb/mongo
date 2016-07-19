@@ -40,6 +40,12 @@ selector:
     # when 3.4 becomes 'last-stable'.
     - jstests/sharding/cursor_timeout.js
 
+    # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
+    - jstests/sharding/migration_failure.js
+    - jstests/sharding/migration_with_source_ops.js
+
 executor:
   js_test:
     config:
@@ -48,4 +54,5 @@ executor:
         global_vars:
           TestData:
             mongosBinVersion: 'last-stable'
+            shardMixedBinVersions: true
         nodb: ''
