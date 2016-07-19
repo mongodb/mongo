@@ -327,5 +327,31 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
     ASSERT_EQ(BSON("key" << 30), chunkEntry->second);
 }
 
+// Tests membership functions for _rangesToClean
+TEST_F(MetadataManagerTest, RangesToCleanMembership) {
+    MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
+    manager.refreshActiveMetadata(makeEmptyMetadata());
+
+    ASSERT(!manager.hasRangesToClean());
+
+    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
+    manager.addRangeToClean(cr1);
+
+    ASSERT(manager.hasRangesToClean());
+    ASSERT(manager.isInRangesToClean(cr1));
+}
+
+// Tests that getNextRangeToClean successfully pulls a stored ChunkRange
+TEST_F(MetadataManagerTest, GetNextRangeToClean) {
+    MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
+    manager.refreshActiveMetadata(makeEmptyMetadata());
+
+    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
+    manager.addRangeToClean(cr1);
+
+    ChunkRange cr2 = manager.getNextRangeToClean();
+    ASSERT_EQ(cr1.toString(), cr2.toString());
+}
+
 }  // namespace
 }  // namespace mongo

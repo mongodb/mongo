@@ -30,9 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/s/metadata_manager.h"
+
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_range_deleter.h"
-#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -395,6 +396,23 @@ void MetadataManager::append(BSONObjBuilder* builder) {
         amrArr.append(obj.done());
     }
     amrArr.done();
+}
+
+bool MetadataManager::hasRangesToClean() {
+    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
+    return !_rangesToClean.empty();
+}
+
+bool MetadataManager::isInRangesToClean(const ChunkRange& range) {
+    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
+    return rangeMapContains(_rangesToClean, range.getMin(), range.getMax());
+}
+
+ChunkRange MetadataManager::getNextRangeToClean() {
+    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
+    invariant(!_rangesToClean.empty());
+    auto it = _rangesToClean.begin();
+    return ChunkRange(it->first, it->second);
 }
 
 }  // namespace mongo

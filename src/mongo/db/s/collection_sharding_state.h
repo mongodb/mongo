@@ -160,6 +160,8 @@ public:
     void onDeleteOp(OperationContext* txn, const DeleteState& deleteState);
 
 private:
+    friend class CollectionRangeDeleter;
+
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *

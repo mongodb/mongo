@@ -104,6 +104,22 @@ public:
      */
     void append(BSONObjBuilder* builder);
 
+    /**
+     * Returns true if _rangesToClean is not empty.
+     */
+    bool hasRangesToClean();
+
+    /**
+     * Returns true if the exact range is in _rangesToClean.
+     */
+    bool isInRangesToClean(const ChunkRange& range);
+
+    /**
+     * Gets and returns, but does not remove, a single ChunkRange from _rangesToClean.
+     * Should not be called if _rangesToClean is empty: it will hit an invariant.
+     */
+    ChunkRange getNextRangeToClean();
+
 private:
     friend class ScopedCollectionMetadata;
 

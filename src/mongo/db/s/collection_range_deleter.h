@@ -29,9 +29,13 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
+
+class BSONObj;
+class Collection;
+class OperationContext;
 
 class CollectionRangeDeleter {
     MONGO_DISALLOW_COPYING(CollectionRangeDeleter);
@@ -48,14 +52,26 @@ public:
      * Acquires the collection IX lock and checks whether there are new entries for the collection's
      * rangesToClean structure.  If there are, deletes some small amount of entries and yields using
      * the standard query yielding logic.
-     * TODO: Make the yielding logic above more explicit.
      *
-     * Returns true if there are more entries in rangesToClean, false if the set is empty.
+     * Returns true if there are more entries in rangesToClean, false if there is no more progress
+     * to be made.
      */
     bool cleanupNextRange(OperationContext* txn);
 
 private:
+    /**
+     * Performs the deletion of a small amount of entries within the range in progress.
+     * This function will invariant if called while _rangeInProgress is not set.
+     *
+     * Returns the number of documents deleted (0 if deletion is finished), or -1 for error.
+     */
+    int _doDeletion(OperationContext* txn, Collection* collection, const BSONObj& keyPattern);
+
     NamespaceString _nss;
+
+    // Holds a range for which deletion has begun. If empty, then a new range
+    // must be requested from rangesToClean
+    boost::optional<ChunkRange> _rangeInProgress;
 };
 
 }  // namespace mongo

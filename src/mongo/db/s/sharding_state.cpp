@@ -123,12 +123,7 @@ ShardingState::ShardingState()
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
       _configServerTickets(kMaxConfigServerRefreshThreads),
       _globalInit(&initializeGlobalShardingStateForMongod),
-      _scheduleWorkFn([this](NamespaceString nss) {
-          getRangeDeleterTaskExecutor()->scheduleWork([=](const CallbackArgs& cbArgs) {
-              CollectionRangeDeleter* rd = new CollectionRangeDeleter(nss);
-              rd->run();
-          });
-      }) {}
+      _scheduleWorkFn([](NamespaceString nss) {}) {}
 
 ShardingState::~ShardingState() = default;
 
