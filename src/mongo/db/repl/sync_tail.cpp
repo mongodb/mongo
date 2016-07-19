@@ -669,7 +669,10 @@ class SyncTail::OpQueueBatcher {
     MONGO_DISALLOW_COPYING(OpQueueBatcher);
 
 public:
-    explicit OpQueueBatcher(SyncTail* syncTail) : _syncTail(syncTail), _thread([&] { run(); }) {}
+    OpQueueBatcher(SyncTail* syncTail, stdx::function<bool()> shouldShutdown)
+        : _syncTail(syncTail), _thread([this, shouldShutdown] {
+              run([this, shouldShutdown] { return _inShutdown.load() || shouldShutdown(); });
+          }) {}
     ~OpQueueBatcher() {
         _inShutdown.store(true);
         _cv.notify_all();
@@ -692,14 +695,14 @@ public:
     }
 
 private:
-    void run() {
+    void run(stdx::function<bool()> shouldShutdown) {
         Client::initThread("ReplBatcher");
         const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
         OperationContext& txn = *txnPtr;
         const auto replCoord = ReplicationCoordinator::get(&txn);
         const auto fastClockSource = txn.getServiceContext()->getFastClockSource();
 
-        while (!_inShutdown.load()) {
+        while (!shouldShutdown()) {
             const auto batchStartTime = fastClockSource->now();
             const int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
 
@@ -744,7 +747,7 @@ private:
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             while (!_ops.empty()) {
                 // Block until the previous batch has been taken.
-                if (_inShutdown.load())
+                if (shouldShutdown())
                     return;
                 _cv.wait(lk);
             }
@@ -764,12 +767,12 @@ private:
 };
 
 /* tail an oplog.  ok to return, will be re-called. */
-void SyncTail::oplogApplication() {
-    OpQueueBatcher batcher(this);
+void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
+                                stdx::function<bool()> shouldShutdown) {
+    OpQueueBatcher batcher(this, shouldShutdown);
 
     const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
     OperationContext& txn = *txnPtr;
-    auto replCoord = ReplicationCoordinator::get(&txn);
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
         getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
             ? new ApplyBatchFinalizerForJournal(replCoord)
@@ -778,7 +781,7 @@ void SyncTail::oplogApplication() {
     auto minValidBoundaries = StorageInterface::get(&txn)->getMinValid(&txn);
     OpTime originalEndOpTime(minValidBoundaries.end);
     OpTime lastWriteOpTime{replCoord->getMyLastAppliedOpTime()};
-    while (!inShutdown()) {
+    while (!shouldShutdown()) {
         if (replCoord->getInitialSyncRequestedFlag()) {
             // got a resync command
             return;

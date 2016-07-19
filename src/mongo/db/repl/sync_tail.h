@@ -106,7 +106,7 @@ public:
 
     static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
 
-    void oplogApplication();
+    void oplogApplication(ReplicationCoordinator* replCoord, stdx::function<bool()> shouldShutdown);
     bool peek(OperationContext* txn, BSONObj* obj);
 
     class OpQueue {

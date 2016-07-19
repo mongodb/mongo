@@ -182,7 +182,8 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(Operat
 
     log() << "Starting replication applier threads";
     invariant(!_applierThread);
-    _applierThread.reset(new stdx::thread(stdx::bind(&runSyncThread, _bgSync.get())));
+    _applierThread.reset(new RSDataSync{_bgSync.get(), ReplicationCoordinator::get(txn)});
+    _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
     _syncSourceFeedbackThread.reset(new stdx::thread(stdx::bind(
@@ -224,7 +225,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
             _syncSourceFeedbackThread->join();
         }
         if (_applierThread) {
+            _applierThread->shutdown();
             _applierThread->join();
+            _applierThread.reset();
         }
 
         if (_bgSync) {

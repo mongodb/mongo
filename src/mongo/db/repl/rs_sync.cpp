@@ -55,32 +55,69 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
 
-void runSyncThread(BackgroundSync* bgsync) {
+namespace {
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
+
+}  // namespace
+
+RSDataSync::RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord)
+    : _bgsync(bgsync), _replCoord(replCoord) {}
+
+void RSDataSync::startup() {
+    LockGuard lk(_mutex);
+    _runThread = stdx::make_unique<stdx::thread>(&RSDataSync::_run, this);
+    _stopped = false;
+    _inShutdown = _stopped;
+}
+
+void RSDataSync::shutdown() {
+    LockGuard lk(_mutex);
+    _inShutdown = true;
+}
+
+bool RSDataSync::_isInShutdown() const {
+    LockGuard lk(_mutex);
+    return _inShutdown;
+}
+
+void RSDataSync::join() {
+    UniqueLock lk(_mutex);
+    if (_stopped) {
+        return;
+    }
+    if (_runThread) {
+        lk.unlock();
+        _runThread->join();
+    }
+}
+
+void RSDataSync::_run() {
     Client::initThread("rsSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
     // Overwrite prefetch index mode in BackgroundSync if ReplSettings has a mode set.
-    ReplSettings replSettings = replCoord->getSettings();
+    auto&& replSettings = _replCoord->getSettings();
     if (replSettings.isPrefetchIndexModeSet())
-        replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
+        _replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
 
-    while (!inShutdown()) {
+    while (!_isInShutdown()) {
         // After a reconfig, we may not be in the replica set anymore, so
         // check that we are in the set (and not an arbiter) before
         // trying to sync with other replicas.
         // TODO(spencer): Use a condition variable to await loading a config
-        if (replCoord->getMemberState().startup()) {
+        if (_replCoord->getMemberState().startup()) {
             warning() << "did not receive a valid config yet";
             sleepsecs(1);
             continue;
         }
 
-        const MemberState memberState = replCoord->getMemberState();
+        const MemberState memberState = _replCoord->getMemberState();
 
         // An arbiter can never transition to any other state, and doesn't replicate, ever
         if (memberState.arbiter()) {
@@ -94,22 +131,25 @@ void runSyncThread(BackgroundSync* bgsync) {
         }
 
         try {
-            if (memberState.primary() && !replCoord->isWaitingForApplierToDrain()) {
+            if (memberState.primary() && !_replCoord->isWaitingForApplierToDrain()) {
                 sleepsecs(1);
                 continue;
             }
 
-            if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+            if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
                 continue;
             }
 
-            /* we have some data.  continue tailing. */
-            SyncTail tail(bgsync, multiSyncApply);
-            tail.oplogApplication();
+            SyncTail tail(_bgsync, multiSyncApply);
+            tail.oplogApplication(_replCoord, [this]() { return _isInShutdown(); });
         } catch (...) {
             std::terminate();
         }
     }
+
+    LockGuard lk(_mutex);
+    _inShutdown = false;
+    _stopped = true;
 }
 
 }  // namespace repl

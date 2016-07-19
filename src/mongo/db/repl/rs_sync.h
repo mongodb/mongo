@@ -28,22 +28,46 @@
 
 #pragma once
 
-#include <deque>
-#include <vector>
+#include <memory>
 
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/initial_sync.h"
-#include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+
 
 namespace mongo {
 namespace repl {
 class BackgroundSync;
+class ReplicationCoordinator;
 
-// Body of the thread that will do the background sync.
-void runSyncThread(BackgroundSync* bgsync);
+/**
+ * This class is used to apply
+ **/
+class RSDataSync {
+public:
+    RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord);
+    void startup();
+    void shutdown();
+    void join();
+
+private:
+    // Runs in a loop apply oplog entries from the buffer until this class cancels, or an error.
+    void _run();
+    bool _isInShutdown() const;
+
+    // _mutex protects all of the class variables declared below.
+    mutable stdx::mutex _mutex;
+    // Thread doing the work.
+    std::unique_ptr<stdx::thread> _runThread;
+    // Set to true if shutdown() has been called.
+    bool _inShutdown = false;
+    // If the thread should not be running.
+    bool _stopped = true;
+    // BackgroundSync instance that is paired to this instance.
+    BackgroundSync* _bgsync;
+    // ReplicationCordinator instance.
+    ReplicationCoordinator* _replCoord;
+};
 
 }  // namespace repl
 }  // namespace mongo

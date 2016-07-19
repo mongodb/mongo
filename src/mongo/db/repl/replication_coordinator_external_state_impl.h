@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
@@ -136,7 +137,7 @@ private:
     std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;
 
     // Thread running runSyncThread().
-    std::unique_ptr<stdx::thread> _applierThread;
+    std::unique_ptr<RSDataSync> _applierThread;
 
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
     stdx::mutex _nextThreadIdMutex;
