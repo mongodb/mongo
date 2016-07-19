@@ -31,9 +31,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_comparator.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/print.h"
 
@@ -244,7 +246,7 @@ public:
 
 public:
     int cmp(const BSONObj& a, const BSONObj& b) {
-        int result = Document::compare(fromBson(a), fromBson(b));
+        int result = DocumentComparator().compare(fromBson(a), fromBson(b));
         return  // sign
             result < 0 ? -1 : result > 0 ? 1 : 0;
     }
@@ -1584,7 +1586,7 @@ private:
             return 1;
     }
     int cmp(const Value& a, const Value& b) {
-        return sign(Value::compare(a, b));
+        return sign(ValueComparator().compare(a, b));
     }
     void assertComparison(int expectedResult, const BSONObj& a, const BSONObj& b) {
         assertComparison(expectedResult, fromBson(a), fromBson(b));

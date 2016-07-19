@@ -49,11 +49,13 @@ static void assertExpectedResults(
     std::string accumulator,
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
     auto factory = Accumulator::getFactory(accumulator);
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     for (auto&& op : operations) {
         try {
             // Asserts that result equals expected result when not sharded.
             {
                 boost::intrusive_ptr<Accumulator> accum = factory();
+                accum->injectExpressionContext(expCtx);
                 for (auto&& val : op.first) {
                     accum->process(val, false);
                 }
@@ -65,7 +67,9 @@ static void assertExpectedResults(
             // Asserts that result equals expected result when all input is on one shard.
             {
                 boost::intrusive_ptr<Accumulator> accum = factory();
+                accum->injectExpressionContext(expCtx);
                 boost::intrusive_ptr<Accumulator> shard = factory();
+                shard->injectExpressionContext(expCtx);
                 for (auto&& val : op.first) {
                     shard->process(val, false);
                 }
@@ -78,8 +82,10 @@ static void assertExpectedResults(
             // Asserts that result equals expected result when each input is on a separate shard.
             {
                 boost::intrusive_ptr<Accumulator> accum = factory();
+                accum->injectExpressionContext(expCtx);
                 for (auto&& val : op.first) {
                     boost::intrusive_ptr<Accumulator> shard = factory();
+                    shard->injectExpressionContext(expCtx);
                     shard->process(val, false);
                     accum->process(shard->getValue(true), true);
                 }

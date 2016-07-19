@@ -421,6 +421,7 @@ class ExpressionFromAccumulator
 public:
     Value evaluateInternal(Variables* vars) const final {
         Accumulator accum;
+        accum.injectExpressionContext(this->getExpressionContext());
         const size_t n = this->vpOperand.size();
         // If a single array arg is given, loop through it passing each member to the accumulator.
         // If a single, non-array arg is given, pass it directly to the accumulator.

@@ -1575,7 +1575,9 @@ public:
         BSONElement specElement = specObject.firstElement();
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
+        intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
+        expression->injectExpressionContext(expCtx);
         intrusive_ptr<Expression> optimized = expression->optimize();
         ASSERT_EQUALS(constify(expectedOptimized()), expressionToBson(optimized));
     }
@@ -1606,7 +1608,9 @@ public:
         BSONElement specElement = specObject.firstElement();
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
+        intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
+        expression->injectExpressionContext(expCtx);
         // Check expression spec round trip.
         ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
         // Check evaluation result.
@@ -1849,7 +1853,9 @@ public:
         BSONElement specElement = specObject.firstElement();
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
+        intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
+        expression->injectExpressionContext(expCtx);
         ASSERT_VALUE_EQ(expression->evaluate(Document()), Value(true));
     }
 };

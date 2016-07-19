@@ -51,7 +51,7 @@ void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     // nullish values should have no impact on result
     if (!input.nullish()) {
         /* compare with the current value; swap if appropriate */
-        int cmp = Value::compare(_val, input) * _sense;
+        int cmp = getExpressionContext()->getValueComparator().compare(_val, input) * _sense;
         if (cmp > 0 || _val.missing()) {  // missing is lower than all other values
             _val = input;
             _memUsageBytes = sizeof(*this) + input.getApproximateSize() - sizeof(Value);

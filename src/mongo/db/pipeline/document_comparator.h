@@ -52,6 +52,14 @@ public:
      */
     bool evaluate(Document::DeferredComparison deferredComparison) const;
 
+    /**
+     * Returns <0 if 'lhs' is less than 'rhs', 0 if 'lhs' is equal to 'rhs', and >0 if 'lhs' is
+     * greater than 'rhs'.
+     */
+    int compare(const Document& lhs, const Document& rhs) const {
+        return Document::compare(lhs, rhs, _stringComparator);
+    }
+
 private:
     const StringData::ComparatorInterface* _stringComparator = nullptr;
 };

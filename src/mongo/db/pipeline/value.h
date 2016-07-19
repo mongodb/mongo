@@ -246,7 +246,7 @@ public:
      */
     static int compare(const Value& lhs,
                        const Value& rhs,
-                       const StringData::ComparatorInterface* stringComparator = nullptr);
+                       const StringData::ComparatorInterface* stringComparator);
 
     friend DeferredComparison operator==(const Value& lhs, const Value& rhs) {
         return DeferredComparison(DeferredComparison::Type::kEQ, lhs, rhs);

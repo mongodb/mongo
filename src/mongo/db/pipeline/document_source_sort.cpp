@@ -325,14 +325,14 @@ int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
     const size_t n = vSortKey.size();
     if (n == 1) {  // simple fast case
         if (vAscending[0])
-            return Value::compare(lhs, rhs);
+            return pExpCtx->getValueComparator().compare(lhs, rhs);
         else
-            return -Value::compare(lhs, rhs);
+            return -pExpCtx->getValueComparator().compare(lhs, rhs);
     }
 
     // compound sort
     for (size_t i = 0; i < n; i++) {
-        int cmp = Value::compare(lhs[i], rhs[i]);
+        int cmp = pExpCtx->getValueComparator().compare(lhs[i], rhs[i]);
         if (cmp) {
             /* if necessary, adjust the return value by the key ordering */
             if (!vAscending[i])

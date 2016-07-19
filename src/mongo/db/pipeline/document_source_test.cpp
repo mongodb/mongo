@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/storage_options.h"
@@ -726,7 +727,7 @@ class AggregateOperatorExpression : public ExpressionBase {
 
 struct ValueCmp {
     bool operator()(const Value& a, const Value& b) const {
-        return Value::compare(a, b) < 0;
+        return ValueComparator().evaluate(a < b);
     }
 };
 typedef map<Value, Document, ValueCmp> IdMap;
@@ -3728,7 +3729,11 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
 class InvalidBucketSpec : public Mock::Base, public unittest::Test {
 public:
     vector<intrusive_ptr<DocumentSource>> createBucket(BSONObj bucketSpec) {
-        return DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), ctx());
+        auto sources = DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), ctx());
+        for (auto&& source : sources) {
+            source->injectExpressionContext(ctx());
+        }
+        return sources;
     }
 };
 

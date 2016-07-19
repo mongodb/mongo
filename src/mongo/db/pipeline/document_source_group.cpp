@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/pipeline/value_comparator.h"
 
 namespace mongo {
 
@@ -365,16 +366,27 @@ using GroupsMap = DocumentSourceGroup::GroupsMap;
 class SorterComparator {
 public:
     typedef pair<Value, Value> Data;
+
+    SorterComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
+
     int operator()(const Data& lhs, const Data& rhs) const {
-        return Value::compare(lhs.first, rhs.first);
+        return _valueComparator.compare(lhs.first, rhs.first);
     }
+
+private:
+    ValueComparator _valueComparator;
 };
 
 class SpillSTLComparator {
 public:
+    SpillSTLComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
+
     bool operator()(const GroupsMap::value_type* lhs, const GroupsMap::value_type* rhs) const {
-        return Value::compare(lhs->first, rhs->first) < 0;
+        return _valueComparator.evaluate(lhs->first < rhs->first);
     }
+
+private:
+    ValueComparator _valueComparator;
 };
 
 bool containsOnlyFieldPathsAndConstants(ExpressionObject* expressionObj) {
@@ -552,8 +564,8 @@ void DocumentSourceGroup::initialize() {
         // We won't be using groups again so free its memory.
         _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
 
-        _sorterIterator.reset(
-            Sorter<Value, Value>::Iterator::merge(sortedFiles, SortOptions(), SorterComparator()));
+        _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
+            sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
 
         // prepare current to accumulate data
         _currentAccumulators.reserve(numAccumulators);
@@ -577,7 +589,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
         ptrs.push_back(&*it);
     }
 
-    stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator());
+    stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(pExpCtx->getValueComparator()));
 
     SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir));
     switch (vpAccumulatorFactory.size()) {  // same as ptrs[i]->second.size() for all i.

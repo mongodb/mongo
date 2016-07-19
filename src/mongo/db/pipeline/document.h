@@ -176,7 +176,7 @@ public:
      */
     static int compare(const Document& lhs,
                        const Document& rhs,
-                       const StringData::ComparatorInterface* stringComparator = nullptr);
+                       const StringData::ComparatorInterface* stringComparator);
 
     std::string toString() const;
 
