@@ -295,7 +295,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         inShutdown = _inShutdown;
     }
     if (inShutdown) {
-        _work(Status(ErrorCodes::ShutdownInProgress, "fetcher shutting down"), nullptr, nullptr);
+        _work(Status(ErrorCodes::CallbackCanceled, "fetcher shutting down"), nullptr, nullptr);
         _finishCallback();
         return;
     }
