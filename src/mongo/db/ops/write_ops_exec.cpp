@@ -69,6 +69,7 @@
 #include "mongo/rpc/command_request_builder.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -77,6 +78,10 @@ namespace mongo {
 // Convention in this file: generic helpers go in the anonymous namespace. Helpers that are for a
 // single type of operation are static functions defined above their caller.
 namespace {
+
+MONGO_FP_DECLARE(failAllInserts);
+MONGO_FP_DECLARE(failAllUpdates);
+MONGO_FP_DECLARE(failAllRemoves);
 
 void finishCurOp(OperationContext* txn, CurOp* curOp) {
     try {
@@ -412,6 +417,10 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
         curOp.debug().ninserted = 0;
     }
 
+    if (MONGO_FAIL_POINT(failAllInserts)) {
+        uassertStatusOK(Status(ErrorCodes::InternalError, "failAllInserts failpoint active!"));
+    }
+
     uassertStatusOK(userAllowedWriteNS(wholeOp.ns));
 
     if (wholeOp.ns.isSystemDotIndexes()) {
@@ -466,6 +475,11 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
 static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
                                                        const NamespaceString& ns,
                                                        const UpdateOp::SingleUpdate& op) {
+
+    if (MONGO_FAIL_POINT(failAllUpdates)) {
+        uassertStatusOK(Status(ErrorCodes::InternalError, "failAllUpdates failpoint active!"));
+    }
+
     globalOpCounters.gotUpdate();
     auto& curOp = *CurOp::get(txn);
     {
@@ -596,6 +610,10 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
     curOp.debug().ndeleted = 0;
 
     txn->checkForInterrupt();
+
+    if (MONGO_FAIL_POINT(failAllRemoves)) {
+        uassertStatusOK(Status(ErrorCodes::InternalError, "failAllRemoves failpoint active!"));
+    }
 
     DeleteRequest request(ns);
     request.setQuery(op.query);

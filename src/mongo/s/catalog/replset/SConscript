@@ -107,6 +107,7 @@ env.Library(
 env.CppUnitTest(
     target='config_server_catalog_test',
     source=[
+        'sharding_catalog_add_shard_test.cpp',
         'sharding_catalog_add_shard_to_zone_test.cpp',
         'sharding_catalog_assign_key_range_to_zone_test.cpp',
         'sharding_catalog_remove_shard_from_zone_test.cpp',
@@ -121,7 +122,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_catalog_test',
     source=[
-        'sharding_catalog_add_shard_test.cpp',
         'sharding_catalog_append_db_stats_test.cpp',
         'sharding_catalog_drop_coll_test.cpp',
         'sharding_catalog_log_change_test.cpp',
