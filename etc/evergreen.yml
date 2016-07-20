@@ -7132,27 +7132,27 @@ buildvariants:
   - name: jstestfuzz_sharded_WT
   - name: unittests
 
-- name: debian81-debug-ubsan
-  display_name: ~ UBSAN Enterprise Debian 8.1 DEBUG
+- name: ubuntu1604-debug-ubsan
+  display_name: ~ UBSAN Enterprise Ubuntu 16.04 DEBUG
   modules:
   - enterprise
   - mongo-tools
   run_on:
-  - debian81-test
+  - ubuntu1604-test
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for UBSAN.
-    path_prefix: PATH=$PATH:/usr/lib/llvm-3.5/bin
+    path_prefix: PATH=$PATH:/usr/lib/llvm-3.8/bin
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     san_options: UBSAN_OPTIONS="print_stacktrace=1"
-    compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip CXXFLAGS="-nostdlib -nostdinc++" LIBPATH=/opt/mongodbtoolchain/v2/lib/gcc/x86_64-mongodb-linux/5.3.0 CPPPATH="/opt/mongodbtoolchain/v2/include/c++/5.3.0/ /opt/mongodbtoolchain/v2/include/c++/5.3.0/x86_64-mongodb-linux" CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" VARIANT_DIR=build
+    compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip CXXFLAGS="-nostdlib -nostdinc++" LIBPATH=/opt/mongodbtoolchain/v2/lib/gcc/x86_64-mongodb-linux/5.3.0 CPPPATH="/opt/mongodbtoolchain/v2/include/c++/5.3.0/ /opt/mongodbtoolchain/v2/include/c++/5.3.0/x86_64-mongodb-linux" CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" VARIANT_DIR=build
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
   tasks:
   - name: compile
     distros:
-    - debian81-build
+    - ubuntu1604-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
