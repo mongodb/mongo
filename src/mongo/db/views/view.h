@@ -79,6 +79,13 @@ public:
         return _pipeline;
     }
 
+    void setViewOn(const NamespaceString& viewOnNss);
+
+    /**
+     * Pipeline must be of type array.
+     */
+    void setPipeline(const BSONElement& pipeline);
+
 private:
     NamespaceString _viewNss;
     NamespaceString _viewOnNss;

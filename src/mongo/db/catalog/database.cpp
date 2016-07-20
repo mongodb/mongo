@@ -204,7 +204,8 @@ Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry*
       _profileName(_name + ".system.profile"),
       _indexesName(_name + ".system.indexes"),
       _viewsName(_name + ".system.views"),
-      _views(txn, this) {
+      _durableViews(DurableViewCatalogImpl(this)),
+      _views(txn, &_durableViews) {
     Status status = validateDBName(_name);
     if (!status.isOK()) {
         warning() << "tried to open invalid db: " << _name << endl;
@@ -347,6 +348,10 @@ void Database::getStats(OperationContext* opCtx, BSONObjBuilder* output, double 
     output->appendNumber("indexSize", indexSize / scale);
 
     _dbEntry->appendExtraStats(opCtx, output, scale);
+}
+
+void Database::dropView(OperationContext* txn, StringData fullns) {
+    _views.dropView(txn, NamespaceString(fullns));
 }
 
 Status Database::dropCollection(OperationContext* txn, StringData fullns) {

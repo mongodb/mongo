@@ -144,16 +144,21 @@ public:
         if (cmdObj.hasElement("validate"))
             compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
-
         ScopedTransaction transaction(txn, MODE_IX);
         AutoGetDb autoDb(txn, db, MODE_X);
         Database* const collDB = autoDb.getDb();
-        Collection* collection = collDB ? collDB->getCollection(nss) : NULL;
+
+        Collection* collection = collDB ? collDB->getCollection(nss) : nullptr;
+        auto view = collDB ? collDB->getViewCatalog()->lookup(nss.ns()) : nullptr;
 
         // If db/collection does not exist, short circuit and return.
         if (!collDB || !collection) {
-            errmsg = "namespace does not exist";
-            return false;
+            if (view)
+                return appendCommandStatus(
+                    result, {ErrorCodes::CommandNotSupportedOnView, "can't compact a view"});
+            else
+                return appendCommandStatus(
+                    result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
         }
 
         OldClientContext ctx(txn, nss.ns());

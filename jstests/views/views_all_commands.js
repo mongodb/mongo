@@ -99,10 +99,9 @@
             expectFailure: true,
             skip: needsToFailWithViewsErrorCode
         },
-        collMod: {command: {collMod: "view", viewOn: "other"}, skip: "TODO(SERVER-24766)"},
+        collMod: {command: {collMod: "view", viewOn: "other", pipeline: []}},
         collStats: {command: {collStats: "view"}, skip: "TODO(SERVER-24823)"},
-        compact:
-            {command: {compact: "view"}, expectFailure: true, skip: needsToFailWithViewsErrorCode},
+        compact: {command: {compact: "view"}, expectFailure: true},
         configureFailPoint: {skip: isUnrelated},
         connPoolStats: {skip: isUnrelated},
         connPoolSync: {skip: isUnrelated},
@@ -116,7 +115,6 @@
         createIndexes: {
             command: {createIndexes: "view", indexes: [{key: {x: 1}, name: "x_1"}]},
             expectFailure: true,
-            skip: "TODO(SERVER-24823)"
         },
         createRole: {
             command: {createRole: "testrole", privileges: [], roles: []},
@@ -148,11 +146,11 @@
         diagLogging: {skip: isUnrelated},
         distinct: {command: {distinct: "view", key: "_id"}},
         driverOIDTest: {skip: isUnrelated},
-        drop: {command: {drop: "view"}, skip: "TODO(SERVER-24766)"},
+        drop: {command: {drop: "view"}},
         dropAllRolesFromDatabase: {skip: isUnrelated},
         dropAllUsersFromDatabase: {skip: isUnrelated},
         dropDatabase: {command: {dropDatabase: 1}},
-        dropIndexes: {command: {dropIndexes: "view"}, skip: "TODO(SERVER-24823)"},
+        dropIndexes: {command: {dropIndexes: "view"}, expectFailure: true},
         dropRole: {
             command: {dropRole: "testrole"},
             setup: function(conn) {
@@ -169,17 +167,31 @@
             expectFailure: true,
             skip: needsToFailWithViewsErrorCode
         },
-        eval: {skip: "TODO(SERVER-24823)"},
+        eval: {skip: isUnrelated},
         explain: {command: {explain: {count: "view"}}},
         features: {skip: isUnrelated},
         filemd5: {skip: isUnrelated},
-        find: {command: {find: "view"}},
-        findAndModify: {skip: "TODO(SERVER-24766)"},
+        find: {skip: "tested in views/views_find.js"},
+        findAndModify: {
+            command: {findAndModify: "view", query: {a: 1}, update: {$set: {a: 2}}},
+            expectFailure: true
+        },
         forceerror: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
-        geoNear: {skip: "TODO(SERVER-24766)"},
-        geoSearch: {skip: "TODO(SERVER-24766)"},
+        geoNear: {
+            command:
+                {geoNear: "view", near: {type: "Point", coordinates: [-50, 37]}, spherical: true},
+            expectFailure: true
+        },
+        geoSearch: {
+            command: {
+                geoSearch: "view",
+                search: {},
+                near: [-50, 37],
+            },
+            expectFailure: true
+        },
         getCmdLineOpts: {skip: isUnrelated},
         getDiagnosticData: {skip: isUnrelated},
         getLastError: {skip: isUnrelated},
@@ -236,7 +248,7 @@
         },
         handshake: {skip: isUnrelated},
         hostInfo: {skip: isUnrelated},
-        insert: {skip: "tested in views/views_disallowed_crud_commands.js"},
+        insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
         invalidateUserCache: {skip: isUnrelated},
         isMaster: {skip: isUnrelated},
         journalLatencyTest: {skip: isUnrelated},
@@ -245,13 +257,17 @@
         listCollections: {skip: "tested in views/views_creation.js"},
         listCommands: {skip: isUnrelated},
         listDatabases: {skip: isUnrelated},
-        listIndexes: {command: {listIndexes: "view"}, skip: "TODO(SERVER-24823)"},
+        listIndexes: {command: {listIndexes: "view"}, expectFailure: true},
         lockInfo: {skip: isUnrelated},
         logApplicationMessage: {skip: isUnrelated},
         logRotate: {skip: isUnrelated},
         logout: {skip: isUnrelated},
         makeSnapshot: {skip: isAnInternalCommand},
-        mapReduce: {skip: "tested in views/disallowed_crud_commands.js"},
+        mapReduce: {
+            command:
+                {mapReduce: "view", map: function() {}, reduce: function(key, vals) {}, out: "out"},
+            expectFailure: true
+        },
         "mapreduce.shardedfinish": {skip: isAnInternalCommand},
         mergeChunks: {
             command: {mergeChunks: "view", bounds: [{x: 0}, {x: 10}]},
@@ -269,7 +285,7 @@
             {command: {planCacheListQueryShapes: "view"}, expectFailure: true},
         planCacheSetFilter: {command: {planCacheSetFilter: "view"}, expectFailure: true},
         profile: {skip: isUnrelated},
-        reIndex: {command: {reIndex: "view"}, expectFailure: true, skip: "TODO(SERVER-24823)"},
+        reIndex: {command: {reIndex: "view"}, expectFailure: true},
         renameCollection: {
             command: {renameCollection: "test.view", to: "test.otherview"},
             runOnDb: "admin",
@@ -313,7 +329,7 @@
         rolesInfo: {skip: isUnrelated},
         saslContinue: {skip: isUnrelated},
         saslStart: {skip: isUnrelated},
-        serverStatus: {command: {serverStatus: 1}, skip: "TODO(SERVER-24568)"},
+        serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
         setCommittedSnapshot: {skip: isAnInternalCommand},
         setParameter: {skip: isUnrelated},
         setShardVersion: {skip: isUnrelated},
@@ -330,7 +346,6 @@
         touch: {
             command: {touch: "view", data: true},
             expectFailure: true,
-            skip: needsToFailWithViewsErrorCode
         },
         unsetSharding: {skip: isAnInternalCommand},
         update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},

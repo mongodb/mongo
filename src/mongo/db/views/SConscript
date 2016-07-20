@@ -3,6 +3,18 @@
 Import("env")
 
 env.Library(
+    target='views_mongod',
+    source=[
+        'durable_view_catalog.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/views/views',
+        '$BUILD_DIR/mongo/db/catalog/catalog',
+    ]
+)
+
+env.Library(
     target='views',
     source=[
         'view.cpp',

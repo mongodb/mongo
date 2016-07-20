@@ -48,6 +48,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/scopeguard.h"
 
@@ -186,6 +187,13 @@ public:
         }
 
         Database* db = dbHolder().get(txn, ns.db());
+
+        if (db && db->getViewCatalog()->lookup(ns.ns())) {
+            errmsg = "cannot create indexes on a view";
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::CommandNotSupportedOnView, errmsg));
+        }
+
         if (!db) {
             db = dbHolder().openDb(txn, ns.db());
         }

@@ -43,4 +43,18 @@ ViewDefinition::ViewDefinition(StringData dbName,
         _pipeline.push_back(e.Obj().getOwned());
     }
 }
+
+void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
+    invariant(_viewNss.db() == viewOnNss.db());
+    _viewOnNss = viewOnNss;
+}
+
+void ViewDefinition::setPipeline(const BSONElement& pipeline) {
+    invariant(pipeline.type() == Array);
+    _pipeline.clear();
+    for (BSONElement e : pipeline.Obj()) {
+        BSONObj value = e.Obj();
+        _pipeline.push_back(value.copy());
+    }
+}
 }  // namespace mongo

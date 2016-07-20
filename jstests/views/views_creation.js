@@ -6,20 +6,39 @@
     // For arrayEq.
     load("jstests/aggregation/extras/utils.js");
 
-    var viewsDB = db.getSiblingDB("views_creation");
+    let viewsDB = db.getSiblingDB("views_creation");
     assert.commandWorked(viewsDB.dropDatabase());
 
-    var collNames = viewsDB.getCollectionNames();
+    let collNames = viewsDB.getCollectionNames();
     assert.eq(0, collNames.length, tojson(collNames));
 
     // Create a collection for test purposes.
     assert.commandWorked(viewsDB.runCommand({create: "collection"}));
 
-    var pipe = [{$match: {}}];
+    let pipe = [{$match: {}}];
 
     // Create a "regular" view on a collection.
     assert.commandWorked(
         viewsDB.runCommand({create: "view", viewOn: "collection", pipeline: pipe}));
+
+    collNames = viewsDB.getCollectionNames().filter((function(coll) {
+        return !coll.startsWith("system.");
+    }));
+    assert.eq(2, collNames.length, collNames);
+    let res = viewsDB.runCommand({listCollections: 1, filter: {type: "view"}});
+    assert.commandWorked(res);
+
+    // Ensure that the output of listCollections has all the expected options for a view.
+    let expectedListCollectionsOutput = [{
+        name: "view",
+        type: "view",
+        options: {viewOn: "collection", pipeline: pipe},
+        info: {readOnly: true}
+    }];
+    assert(arrayEq(res.cursor.firstBatch, expectedListCollectionsOutput), tojson({
+               expectedListCollectionsOutput: expectedListCollectionsOutput,
+               got: res.cursor.firstBatch
+           }));
 
     // Create a view on a non-existent collection.
     assert.commandWorked(

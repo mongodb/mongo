@@ -124,22 +124,27 @@ public:
              BSONObjBuilder& result) {
         DBDirectClient db(txn);
 
-        const NamespaceString toDeleteNs = parseNsCollectionRequired(dbname, jsobj);
+        const NamespaceString toReIndexNs = parseNsCollectionRequired(dbname, jsobj);
 
-        LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
+        LOG(0) << "CMD: reIndex " << toReIndexNs << endl;
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-        OldClientContext ctx(txn, toDeleteNs.ns());
+        OldClientContext ctx(txn, toReIndexNs.ns());
 
-        Collection* collection = ctx.db()->getCollection(toDeleteNs.ns());
+        Collection* collection = ctx.db()->getCollection(toReIndexNs.ns());
+        auto view = ctx.db()->getViewCatalog()->lookup(toReIndexNs.ns());
 
         if (!collection) {
-            errmsg = "ns not found";
-            return false;
+            if (view)
+                return appendCommandStatus(
+                    result, {ErrorCodes::CommandNotSupportedOnView, "can't re-index a view"});
+            else
+                return appendCommandStatus(
+                    result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs.ns());
+        BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNs.ns());
 
         vector<BSONObj> all;
         {

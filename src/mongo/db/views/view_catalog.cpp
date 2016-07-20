@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/views/view_catalog.h"
@@ -34,10 +36,15 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view.h"
 
 namespace {
@@ -83,7 +90,14 @@ BSONObj ResolvedViewDefinition::asExpandedViewAggregation(const AggregationReque
     return aggregationBuilder.obj();
 }
 
-ViewCatalog::ViewCatalog(OperationContext* txn, Database* database) {}
+ViewCatalog::ViewCatalog(OperationContext* txn, DurableViewCatalog* durable) : _durable(durable) {
+    durable->iterate(txn, [&](const BSONObj& view) {
+        NamespaceString viewName(view["_id"].str());
+        ViewDefinition def(
+            viewName.db(), viewName.coll(), view["viewOn"].str(), view["pipeline"].Obj());
+        _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(def);
+    });
+}
 
 Status ViewCatalog::createView(OperationContext* txn,
                                const NamespaceString& viewName,
@@ -92,19 +106,39 @@ Status ViewCatalog::createView(OperationContext* txn,
     if (!enableViews)
         return Status(ErrorCodes::CommandNotSupported, "View support not enabled");
 
-    if (lookup(StringData(viewName.ns())))
-        return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
+    if (lookup(StringData(viewName.ns())))
+        return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
+
+    if (!NamespaceString::validCollectionName(viewOn.coll()))
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
+
+    // TODO(SERVER-24768): Need to ensure view is correct and doesn't introduce a cycle.
+
+    BSONObj viewDef =
+        BSON("_id" << viewName.ns() << "viewOn" << viewOn.coll() << "pipeline" << pipeline);
+    _durable->insert(txn, viewDef);
+
     BSONObj ownedPipeline = pipeline.getOwned();
-    txn->recoveryUnit()->onCommit([this, viewName, viewOn, ownedPipeline]() {
-        _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(
-            viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline);
-    });
+    _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(
+        viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline);
+    txn->recoveryUnit()->onRollback([this, viewName]() { this->_viewMap.erase(viewName.ns()); });
     return Status::OK();
+}
+
+void ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewName) {
+    _durable->remove(txn, viewName);
+    // Save a copy of the view definition in case we need to roll back.
+    ViewDefinition savedDefinition = *lookup(viewName.ns());
+    _viewMap.erase(viewName.ns());
+    txn->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
+        this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
+    });
 }
 
 ViewDefinition* ViewCatalog::lookup(StringData ns) {

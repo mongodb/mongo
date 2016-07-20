@@ -151,6 +151,8 @@ public:
 
     Status dropCollection(OperationContext* txn, StringData fullns);
 
+    void dropView(OperationContext* txn, StringData fullns);
+
     Collection* createCollection(OperationContext* txn,
                                  StringData ns,
                                  const CollectionOptions& options = CollectionOptions(),
@@ -245,7 +247,9 @@ private:
     int _profile;  // 0=off.
 
     CollectionMap _collections;
-    ViewCatalog _views;
+
+    DurableViewCatalogImpl _durableViews;  // interface for system.views operations
+    ViewCatalog _views;                    // in-memory representation of _durableViews
 
     friend class Collection;
     friend class NamespaceDetails;

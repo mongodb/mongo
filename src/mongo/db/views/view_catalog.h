@@ -28,17 +28,24 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 class AggregationRequest;
 class Database;
-class NamespaceString;
 class OperationContext;
-class Status;
-class StringData;
 
 /**
  * Represents a fully-resolved view: a non-view namespace with a corresponding aggregation pipeline.
@@ -67,7 +74,7 @@ public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
     static const std::uint32_t kMaxViewDepth;
 
-    ViewCatalog(OperationContext* txn, Database* database);
+    ViewCatalog(OperationContext* txn, DurableViewCatalog* durable);
 
     ViewMap::const_iterator begin() const {
         return _viewMap.begin();
@@ -78,17 +85,25 @@ public:
     }
 
     /**
-     * Create a new view.
+     * Create a new view 'viewName' with contents defined by running the specified aggregation
+     * 'pipeline' on a collection or view 'viewOn'. This method will check correctness with
+     * respect to the view catalog, but will not check for conflicts with the database's catalog,
+     * so the check for an existing collection with the same name must be done before calling
+     * createView.
      *
-     * @param viewName The name of the view being created.
-     * @param viewOn The name of the view or collection upon which this view is defined.
-     * @param pipeline The aggregation pipeline that defines the aggregation on the backing
-     * namespace.
+     * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
      */
     Status createView(OperationContext* txn,
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONObj& pipeline);
+
+    /**
+     * Drop the view named 'viewName'.
+     *
+     * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
+     */
+    void dropView(OperationContext* txn, const NamespaceString& viewName);
 
     /**
      * Look up the namespace in the view catalog, returning a pointer to a View definition, or
@@ -111,5 +126,6 @@ public:
 
 private:
     ViewMap _viewMap;
+    DurableViewCatalog* _durable;
 };
 }  // namespace mongo

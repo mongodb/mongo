@@ -395,6 +395,11 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
+                if (autoDb.getDb()->getViewCatalog()->lookup(nsString.ns())) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::CommandNotSupportedOnView,
+                                                "findAndModify not supported on views"});
+                }
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
@@ -467,6 +472,12 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
+                if (autoDb.getDb()->getViewCatalog()->lookup(nsString.ns())) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::CommandNotSupportedOnView,
+                                                "findAndModify not supported on views"});
+                }
+
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.

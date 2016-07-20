@@ -5,7 +5,7 @@
     // For arrayEq and orderedArrayEq.
     load("jstests/aggregation/extras/utils.js");
 
-    var viewsDB = db.getSiblingDB("views_find");
+    let viewsDB = db.getSiblingDB("views_find");
     assert.commandWorked(viewsDB.dropDatabase());
 
     // Helper functions.

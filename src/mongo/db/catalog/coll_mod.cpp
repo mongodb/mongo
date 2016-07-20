@@ -30,6 +30,8 @@
 
 #include "mongo/db/catalog/coll_mod.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -39,6 +41,8 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/views/view_catalog.h"
 
 namespace mongo {
 Status collMod(OperationContext* txn,
@@ -49,14 +53,20 @@ Status collMod(OperationContext* txn,
     ScopedTransaction transaction(txn, MODE_IX);
     AutoGetDb autoDb(txn, dbName, MODE_X);
     Database* const db = autoDb.getDb();
-    Collection* coll = db ? db->getCollection(nss) : NULL;
+    Collection* coll = db ? db->getCollection(nss) : nullptr;
+
+    // May also modify a view instead of a collection.
+    const ViewDefinition* view = db ? db->getViewCatalog()->lookup(nss.ns()) : nullptr;
+    boost::optional<ViewDefinition> newView;
+    if (view)
+        newView = {*view};
 
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
     BackgroundOperation::assertNoBgOpInProgForNs(nss);
 
-    // If db/collection does not exist, short circuit and return.
-    if (!db || !coll) {
+    // If db/collection/view does not exist, short circuit and return.
+    if (!db || (!coll && !view)) {
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 
@@ -75,6 +85,7 @@ Status collMod(OperationContext* txn,
 
     Status errorStatus = Status::OK();
 
+    // TODO(SERVER-25004): Separate parsing and catalog modification
     BSONForEach(e, cmdObj) {
         if (str::equals("collMod", e.fieldName())) {
             // no-op
@@ -83,6 +94,11 @@ Status collMod(OperationContext* txn,
         } else if (QueryRequest::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
             // no-op
         } else if (str::equals("index", e.fieldName())) {
+            if (view) {
+                errorStatus = Status(ErrorCodes::InvalidOptions, "cannot modify indexes on a view");
+                continue;
+            }
+
             BSONObj indexObj = e.Obj();
             BSONObj keyPattern = indexObj.getObjectField("keyPattern");
 
@@ -132,17 +148,60 @@ Status collMod(OperationContext* txn,
                 result->appendAs(newExpireSecs, "expireAfterSeconds_new");
             }
         } else if (str::equals("validator", e.fieldName())) {
+            if (view) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     "cannot modify validation options on a view");
+                continue;
+            }
+
             auto status = coll->setValidator(txn, e.Obj());
             if (!status.isOK())
                 errorStatus = std::move(status);
         } else if (str::equals("validationLevel", e.fieldName())) {
+            if (view) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     "cannot modify validation options on a view");
+                continue;
+            }
+
             auto status = coll->setValidationLevel(txn, e.String());
             if (!status.isOK())
                 errorStatus = std::move(status);
         } else if (str::equals("validationAction", e.fieldName())) {
+            if (view) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     "cannot modify validation options on a view");
+                continue;
+            }
+
             auto status = coll->setValidationAction(txn, e.String());
             if (!status.isOK())
                 errorStatus = std::move(status);
+        } else if (str::equals("pipeline", e.fieldName())) {
+            if (!view) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     "'pipeline' option only supported on a view");
+                continue;
+            }
+            if (!e.isABSONObj()) {
+                errorStatus =
+                    Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
+                continue;
+            }
+            newView->setPipeline(e);
+        } else if (str::equals("viewOn", e.fieldName())) {
+            if (!view) {
+                errorStatus =
+                    Status(ErrorCodes::InvalidOptions, "'viewOn' option only supported on a view");
+                continue;
+            }
+            if (e.type() != mongo::String) {
+                errorStatus =
+                    Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
+                continue;
+            }
+            NamespaceString nss(dbName, e.str());
+            newView->setViewOn(NamespaceString(dbName, e.str()));
         } else {
             // As of SERVER-17312 we only support these two options. When SERVER-17320 is
             // resolved this will need to be enhanced to handle other options.
@@ -154,6 +213,12 @@ Status collMod(OperationContext* txn,
             if (!flag) {
                 errorStatus = Status(ErrorCodes::InvalidOptions,
                                      str::stream() << "unknown option to collMod: " << name);
+                continue;
+            }
+
+            if (view) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     str::stream() << "option not supported on a view: " << name);
                 continue;
             }
 
@@ -177,6 +242,18 @@ Status collMod(OperationContext* txn,
             invariant(newOptions.flags == newFlags);
             invariant(newOptions.flagsSet);
         }
+    }
+
+    // Actually update the view if it was parsed successfully.
+    if (view && errorStatus.isOK()) {
+        ViewCatalog* catalog = db->getViewCatalog();
+        catalog->dropView(txn, nss);
+
+        BSONArrayBuilder pipeline;
+        for (auto& item : newView->pipeline()) {
+            pipeline.append(item);
+        }
+        errorStatus = catalog->createView(txn, nss, newView->viewOn(), pipeline.obj());
     }
 
     if (!errorStatus.isOK()) {
