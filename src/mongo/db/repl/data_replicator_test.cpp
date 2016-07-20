@@ -533,33 +533,40 @@ protected:
         const int expectedResponses(_responses.size());
 
         Date_t lastLog{Date_t::now()};
-        // counter for oplog entries
-        int c(1);
         while (true) {
             if (_isbr && _isbr->isDone()) {
-                log() << "There are responses left which were unprocessed.";
+                log() << "There are " << (expectedResponses - processedRequests)
+                      << " responses left which were unprocessed.";
                 return;
             }
 
             NetworkGuard guard(net);
-            if (!net->hasReadyRequests() && processedRequests < expectedResponses) {
+
+            if (!net->hasReadyRequests()) {
                 net->runReadyNetworkOperations();
-                guard.dismiss();
                 continue;
             }
 
             auto noi = net->getNextReadyRequest();
             if (isOplogGetMore(noi)) {
                 // process getmore requests from the oplog fetcher
+                int c = int(numGetMoreOplogEntries + 2);
+                lastGetMoreOplogEntry = BSON("ts" << Timestamp(Seconds(c), 1) << "h" << 1LL << "ns"
+                                                  << "test.a"
+                                                  << "v"
+                                                  << OplogEntry::kOplogVersion
+                                                  << "op"
+                                                  << "i"
+                                                  << "o"
+                                                  << BSON("_id" << c));
+                ++numGetMoreOplogEntries;
+                mongo::CursorId cursorId =
+                    numGetMoreOplogEntries == numGetMoreOplogEntriesMax ? 0 : 1LL;
                 auto respBSON =
-                    fromjson(str::stream() << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs'"
-                                              " , nextBatch:[{ts:Timestamp("
-                                           << ++c
-                                           << ",1), h:NumberLong(1), ns:'test.a', v:"
-                                           << OplogEntry::kOplogVersion
-                                           << ", op:'i', o:{_id:"
-                                           << c
-                                           << "}}]}}");
+                    BSON("ok" << 1 << "cursor" << BSON("id" << cursorId << "ns"
+                                                            << "local.oplog.rs"
+                                                            << "nextBatch"
+                                                            << BSON_ARRAY(lastGetMoreOplogEntry)));
                 net->scheduleResponse(
                     noi,
                     net->now(),
@@ -571,7 +578,6 @@ protected:
                     net->logQueues();
                 }
                 net->runReadyNetworkOperations();
-                guard.dismiss();
                 continue;
             } else if (isOplogKillCursor(noi)) {
                 auto respBSON = BSON("ok" << 1.0);
@@ -581,7 +587,6 @@ protected:
                     net->now(),
                     ResponseStatus(RemoteCommandResponse(respBSON, BSONObj(), Milliseconds(10))));
                 net->runReadyNetworkOperations();
-                guard.dismiss();
                 continue;
             }
 
@@ -629,7 +634,8 @@ protected:
             while (net->hasReadyRequests()) {
                 auto noi = net->getNextReadyRequest();
                 if (isOplogGetMore(noi)) {
-                    net->blackHole(noi);
+                    net->scheduleErrorResponse(
+                        noi, {ErrorCodes::CallbackCanceled, "canceled by playResponses"});
                     continue;
                 }
 
@@ -647,6 +653,11 @@ protected:
         // Check result
         ASSERT_EQ(_isbr->getResult(net).getStatus().code(), code) << "status codes differ";
     }
+
+    // Generate at least one getMore response.
+    std::size_t numGetMoreOplogEntries = 0;
+    std::size_t numGetMoreOplogEntriesMax = 1;
+    BSONObj lastGetMoreOplogEntry;
 
 private:
     Responses _responses;
@@ -710,17 +721,100 @@ TEST_F(InitialSyncTest, Complete) {
             {"find",
              fromjson(str::stream()
                       << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
-                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'b.c', v:"
+                         "{ts:Timestamp(7,1), h:NumberLong(1), ns:'a.a', v:"
                       << OplogEntry::kOplogVersion
-                      << ", op:'i', o:{_id:1, c:1}}]}}")},
+                      << ", op:'i', o:{_id:5, a:2}}]}}")},
             {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // Applier starts ...
+        };
+
+    // Initial sync flag should not be set before starting.
+    auto txn = makeOpCtx();
+    ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
+
+    startSync();
+
+    // Play first response to ensure data replicator has entered initial sync state.
+    setResponses({responses.begin(), responses.begin() + 1});
+    numGetMoreOplogEntriesMax = 6;
+    playResponses(false);
+
+    // Initial sync flag should be set.
+    ASSERT_TRUE(getStorage().getInitialSyncFlag(txn.get()));
+
+    // Play rest of the responses after checking initial sync flag.
+    setResponses({responses.begin() + 1, responses.end()});
+    playResponses(true);
+    log() << "done playing last responses";
+
+    log() << "waiting for initial sync to verify it completed OK";
+    verifySync(getNet());
+
+    log() << "doing asserts";
+    {
+        LockGuard lock(_storageInterfaceWorkDoneMutex);
+        ASSERT_TRUE(_storageInterfaceWorkDone.droppedUserDBs);
+        ASSERT_TRUE(_storageInterfaceWorkDone.createOplogCalled);
+        ASSERT_EQ(1, _storageInterfaceWorkDone.oplogEntriesInserted);
+    }
+
+    log() << "checking initial sync flag isn't set.";
+    // Initial sync flag should not be set after completion.
+    ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
+
+    // getMore responses are generated by playResponses().
+    ASSERT_EQUALS(OpTime(Timestamp(7, 1), OpTime::kUninitializedTerm),
+                  OplogEntry(lastGetMoreOplogEntry).getOpTime());
+    ASSERT_EQUALS(OplogEntry(lastGetMoreOplogEntry).getOpTime(), _myLastOpTime);
+}
+
+TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCloning) {
+    const Responses responses =
+        {
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // get latest oplog ts
             {"find",
              fromjson(str::stream()
                       << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
                          "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
                       << OplogEntry::kOplogVersion
                       << ", op:'i', o:{_id:1, a:1}}]}}")},
-            // Applier starts ...
+            // oplog fetcher find
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // Clone Start
+            // listDatabases
+            {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
+            // listCollections for "a"
+            {"listCollections",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
+                      "{name:'a', options:{}} "
+                      "]}}")},
+            // listIndexes:a
+            {"listIndexes",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
+                         "{v:"
+                      << OplogEntry::kOplogVersion
+                      << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+            // find:a
+            {"find",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                      "{_id:1, a:1} "
+                      "]}}")},
+            // Clone Done
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'b.c', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, c:1}}]}}")},
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
         };
 
     // Initial sync flag should not be set before starting.
@@ -755,8 +849,9 @@ TEST_F(InitialSyncTest, Complete) {
     log() << "checking initial sync flag isn't set.";
     // Initial sync flag should not be set after completion.
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
-}
 
+    ASSERT_EQUALS(OpTime(Timestamp(1, 1), OpTime::kUninitializedTerm), _myLastOpTime);
+}
 
 TEST_F(InitialSyncTest, Failpoint) {
     mongo::getGlobalFailPointRegistry()
@@ -875,6 +970,7 @@ TEST_F(InitialSyncTest, FailOnRollback) {
         };
 
     startSync();
+    numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponsesNTimees(repl::kInitialSyncMaxRetries);
     verifySync(getNet(), ErrorCodes::InitialSyncFailure);
