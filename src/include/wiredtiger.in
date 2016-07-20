@@ -3739,7 +3739,7 @@ struct __wt_file_system {
 	 * @param[out] dirlist the method returns an allocated array of
 	 *    individually allocated strings, one for each entry in the
 	 *    directory.
-	 * @param[out] countp the method the number of entries returned
+	 * @param[out] countp the number of entries returned
 	 */
 	int (*fs_directory_list)(WT_FILE_SYSTEM *file_system,
 	    WT_SESSION *session, const char *directory, const char *prefix,
