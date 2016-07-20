@@ -62,8 +62,8 @@ public:
                         uint64_t maxSizeMB,
                         uint64_t currSizeMB,
                         bool isDraining,
-                        const std::set<std::string> shardTags,
-                        const std::string mongoVersion);
+                        std::set<std::string> shardTags,
+                        std::string mongoVersion);
 
         /**
          * Returns if a shard cannot receive any new chunks because it has reached the per-shard

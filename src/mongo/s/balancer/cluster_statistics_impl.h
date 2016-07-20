@@ -28,19 +28,14 @@
 
 #pragma once
 
-#include <map>
-
 #include "mongo/s/balancer/cluster_statistics.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class OperationContext;
-class Status;
-
 /**
  * Default implementation for the cluster statistics gathering utility. Uses a blocking method to
- * fetch the statistics and does not perform any caching.
+ * fetch the statistics and does not perform any caching. If any of the shards fails to report
+ * statistics fails the entire refresh.
  */
 class ClusterStatisticsImpl final : public ClusterStatistics {
 public:
@@ -48,24 +43,6 @@ public:
     ~ClusterStatisticsImpl();
 
     StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* txn) override;
-
-private:
-    typedef std::map<ShardId, ShardStatistics> ShardStatisticsMap;
-
-    /**
-     * Refreshes the list of available shards and loops through them in order to collect usage
-     * statistics. If any of the shards fails to report statistics, skips it and continues with the
-     * next.
-     *
-     * If the list of shards cannot be retrieved throws an exception.
-     */
-    void _refreshShardStats(OperationContext* txn);
-
-    // Mutex to protect the mutable state below
-    stdx::mutex _mutex;
-
-    // The most up-to-date shard statistics
-    ShardStatisticsMap _shardStatsMap;
 };
 
 }  // namespace mongo

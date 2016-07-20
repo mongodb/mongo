@@ -45,8 +45,8 @@ ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inMaxSizeMB,
                                                     uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
-                                                    const std::set<std::string> inShardTags,
-                                                    const std::string inMongoVersion)
+                                                    std::set<std::string> inShardTags,
+                                                    std::string inMongoVersion)
     : shardId(std::move(inShardId)),
       maxSizeMB(std::move(inMaxSizeMB)),
       currSizeMB(std::move(inCurrSizeMB)),
