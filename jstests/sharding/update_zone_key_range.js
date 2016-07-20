@@ -1,5 +1,5 @@
 /**
- * Basic integration tests for assignKeyRangeToZone command. More detailed tests can be found
+ * Basic integration tests for updateZoneKeyRange command. More detailed tests can be found
  * in sharding_catalog_assign_key_range_to_zone_test.cpp.
  */
 (function() {
@@ -13,8 +13,8 @@
     assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
     // Testing basic assign.
-    assert.commandWorked(st.s.adminCommand(
-        {assignKeyRangeToZone: 'test.user', min: {x: 0}, max: {x: 10}, zone: 'x'}));
+    assert.commandWorked(
+        st.s.adminCommand({updateZoneKeyRange: 'test.user', min: {x: 0}, max: {x: 10}, zone: 'x'}));
 
     var tagDoc = configDB.tags.findOne();
 
@@ -26,7 +26,7 @@
     // Cannot assign overlapping ranges
     assert.commandFailedWithCode(
         st.s.adminCommand(
-            {assignKeyRangeToZone: 'test.user', min: {x: -10}, max: {x: 20}, zone: 'x'}),
+            {updateZoneKeyRange: 'test.user', min: {x: -10}, max: {x: 20}, zone: 'x'}),
         ErrorCodes.RangeOverlapConflict);
 
     tagDoc = configDB.tags.findOne();
@@ -37,7 +37,7 @@
 
     // Testing basic remove.
     assert.commandWorked(st.s.adminCommand(
-        {assignKeyRangeToZone: 'test.user', min: {x: 0}, max: {x: 10}, zone: null}));
+        {updateZoneKeyRange: 'test.user', min: {x: 0}, max: {x: 10}, zone: null}));
 
     assert.eq(null, configDB.tags.findOne());
 

@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/assign_key_range_to_zone_request_type.h"
+#include "mongo/s/request_types/update_zone_key_range_request_type.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -51,16 +51,16 @@ using std::string;
  *
  * Format:
  * {
- *   _configsvrAssignKeyRangeToZone: <string namespace>,
+ *   _configsvrUpdateZoneKeyRange: <string namespace>,
  *   min: <BSONObj min>,
  *   max: <BSONObj max>,
  *   zone: <string zone|null>,
  *   writeConcern: <BSONObj>
  * }
  */
-class ConfigSvrAssignKeyRangeToZoneCommand : public Command {
+class ConfigsvrUpdateZoneKeyRangeCommand : public Command {
 public:
-    ConfigSvrAssignKeyRangeToZoneCommand() : Command("_configsvrAssignKeyRangeToZone") {}
+    ConfigsvrUpdateZoneKeyRangeCommand() : Command("_configsvrUpdateZoneKeyRange") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is exported by the sharding config server. Do not call "
@@ -101,7 +101,7 @@ public:
         }
 
         auto parsedRequest =
-            uassertStatusOK(AssignKeyRangeToZoneRequest::parseFromConfigCommand(cmdObj));
+            uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromConfigCommand(cmdObj));
 
         std::string zoneName;
         if (!parsedRequest.isRemove()) {
@@ -119,7 +119,7 @@ public:
         return true;
     }
 
-} configsvrAssignKeyRangeToZoneCmd;
+} configsvrUpdateZoneKeyRangeCmd;
 
 }  // namespace
 }  // namespace mongo

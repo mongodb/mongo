@@ -2764,13 +2764,13 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "assignKeyRangeToZone",
-          command: {assignKeyRangeToZone: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
+          testname: "updateZoneKeyRange",
+          command: {updateZoneKeyRange: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
           skipStandalone: true,
           testcases: [
               {
                 runOnDb: adminDbName,
-                // assignKeyRangeToZone only checks that you can write on config.tags,
+                // updateZoneKeyRange only checks that you can write on config.tags,
                 // that's why readWriteAnyDatabase passes.
                 roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
                 privileges: [
@@ -2785,9 +2785,8 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrAssignKeyRangeToZone",
-          command:
-              {_configsvrAssignKeyRangeToZone: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
+          testname: "_configsvrUpdateZoneKeyRange",
+          command: {_configsvrUpdateZoneKeyRange: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
           skipSharded: true,
           testcases: [
               {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},

@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/request_types/assign_key_range_to_zone_request_type.h"
+#include "mongo/s/request_types/update_zone_key_range_request_type.h"
 
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -40,24 +40,24 @@ using std::string;
 
 namespace {
 
-const char kMongosAssignKeyRangeToZone[] = "assignKeyRangeToZone";
-const char kConfigsvrAssignKeyRangeToZone[] = "_configsvrAssignKeyRangeToZone";
+const char kMongosUpdateZoneKeyRange[] = "updateZoneKeyRange";
+const char kConfigsvrUpdateZoneKeyRange[] = "_configsvrUpdateZoneKeyRange";
 const char kZoneName[] = "zone";
 
 }  // unnamed namespace
 
-StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::parseFromMongosCommand(
+StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::parseFromMongosCommand(
     const BSONObj& cmdObj) {
     return _parseFromCommand(cmdObj, true);
 }
 
-StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::parseFromConfigCommand(
+StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::parseFromConfigCommand(
     const BSONObj& cmdObj) {
     return _parseFromCommand(cmdObj, false);
 }
 
-void AssignKeyRangeToZoneRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append(kConfigsvrAssignKeyRangeToZone, _ns.ns());
+void UpdateZoneKeyRangeRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
+    cmdBuilder->append(kConfigsvrUpdateZoneKeyRange, _ns.ns());
     _range.append(cmdBuilder);
 
     if (_isRemove) {
@@ -67,11 +67,11 @@ void AssignKeyRangeToZoneRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuild
     }
 }
 
-StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::_parseFromCommand(
+StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromCommand(
     const BSONObj& cmdObj, bool forMongos) {
     string rawNS;
     auto parseNamespaceStatus = bsonExtractStringField(
-        cmdObj, (forMongos ? kMongosAssignKeyRangeToZone : kConfigsvrAssignKeyRangeToZone), &rawNS);
+        cmdObj, (forMongos ? kMongosUpdateZoneKeyRange : kConfigsvrUpdateZoneKeyRange), &rawNS);
 
     if (!parseNamespaceStatus.isOK()) {
         return parseNamespaceStatus;
@@ -114,36 +114,36 @@ StatusWith<AssignKeyRangeToZoneRequest> AssignKeyRangeToZoneRequest::_parseFromC
     }
 
     if (isRemove) {
-        return AssignKeyRangeToZoneRequest(std::move(ns), std::move(parseRangeStatus.getValue()));
+        return UpdateZoneKeyRangeRequest(std::move(ns), std::move(parseRangeStatus.getValue()));
     }
 
-    return AssignKeyRangeToZoneRequest(
+    return UpdateZoneKeyRangeRequest(
         std::move(ns), std::move(parseRangeStatus.getValue()), std::move(zoneName));
 }
 
-const NamespaceString& AssignKeyRangeToZoneRequest::getNS() const {
+const NamespaceString& UpdateZoneKeyRangeRequest::getNS() const {
     return _ns;
 }
 
-const ChunkRange& AssignKeyRangeToZoneRequest::getRange() const {
+const ChunkRange& UpdateZoneKeyRangeRequest::getRange() const {
     return _range;
 }
 
-bool AssignKeyRangeToZoneRequest::isRemove() const {
+bool UpdateZoneKeyRangeRequest::isRemove() const {
     return _isRemove;
 }
 
-const string& AssignKeyRangeToZoneRequest::getZoneName() const {
+const string& UpdateZoneKeyRangeRequest::getZoneName() const {
     invariant(!_isRemove);
     return _zoneName;
 }
 
-AssignKeyRangeToZoneRequest::AssignKeyRangeToZoneRequest(NamespaceString ns, ChunkRange range)
+UpdateZoneKeyRangeRequest::UpdateZoneKeyRangeRequest(NamespaceString ns, ChunkRange range)
     : _ns(std::move(ns)), _range(std::move(range)), _isRemove(true) {}
 
-AssignKeyRangeToZoneRequest::AssignKeyRangeToZoneRequest(NamespaceString ns,
-                                                         ChunkRange range,
-                                                         std::string zoneName)
+UpdateZoneKeyRangeRequest::UpdateZoneKeyRangeRequest(NamespaceString ns,
+                                                     ChunkRange range,
+                                                     std::string zoneName)
     : _ns(std::move(ns)),
       _range(std::move(range)),
       _isRemove(false),

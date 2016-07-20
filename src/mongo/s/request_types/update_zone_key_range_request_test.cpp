@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/request_types/assign_key_range_to_zone_request_type.h"
+#include "mongo/s/request_types/update_zone_key_range_request_type.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/jsobj.h"
@@ -38,9 +38,9 @@ namespace mongo {
 
 namespace {
 
-TEST(AssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, BasicValidMongosAssignCommand) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -55,9 +55,9 @@ TEST(AssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
     ASSERT_EQ("z", request.getZoneName());
 }
 
-TEST(AssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, BasicValidMongosRemoveCommand) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: null
@@ -71,9 +71,9 @@ TEST(AssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
     ASSERT_TRUE(request.isRemove());
 }
 
-TEST(AssignKeyRangeToZoneRequest, InvalidNSMongosAssignCommand) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo",
+TEST(UpdateZoneKeyRangeRequest, InvalidNSMongosAssignCommand) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -81,9 +81,9 @@ TEST(AssignKeyRangeToZoneRequest, InvalidNSMongosAssignCommand) {
     ASSERT_EQ(ErrorCodes::InvalidNamespace, requestStatus.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForAssignType) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-                assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForAssignType) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+                updateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: { x: 100 },
                 zone: "z"
@@ -97,7 +97,7 @@ TEST(AssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandF
     auto configCmdObj = builder.obj();
 
     auto expectedObj = fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -105,9 +105,9 @@ TEST(AssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandF
     ASSERT_EQ(expectedObj, configCmdObj);
 }
 
-TEST(AssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-                assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+                updateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: { x: 100 },
                 zone: null
@@ -121,7 +121,7 @@ TEST(AssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandF
     auto configCmdObj = builder.obj();
 
     auto expectedObj = fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: null
@@ -130,35 +130,35 @@ TEST(AssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandF
 }
 
 
-TEST(AssignKeyRangeToZoneRequest, MissingMinErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, MissingMinErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             max: { x: 100 },
             zone: "z"
         })BSON"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, MissingMaxErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, MissingMaxErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             zone: "z"
         })BSON"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, MissingZoneErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, MissingZoneErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 }
         })BSON"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, MissingShardNameErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
+TEST(UpdateZoneKeyRangeRequest, MissingShardNameErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -166,9 +166,9 @@ TEST(AssignKeyRangeToZoneRequest, MissingShardNameErrors) {
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, WrongShardNameTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-                assignKeyRangeToZone: 1234,
+TEST(UpdateZoneKeyRangeRequest, WrongShardNameTypeErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+                updateZoneKeyRange: 1234,
                 min: { x: 1 },
                 max: { x: 100 },
                 zone: "z"
@@ -176,9 +176,9 @@ TEST(AssignKeyRangeToZoneRequest, WrongShardNameTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, WrongMinRangeTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-                assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, WrongMinRangeTypeErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+                updateZoneKeyRange: "foo.bar",
                 min: "1",
                 max: { x: 100 },
                 zone: "z"
@@ -186,9 +186,9 @@ TEST(AssignKeyRangeToZoneRequest, WrongMinRangeTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, WrongMaxRangeTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-                assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, WrongMaxRangeTypeErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+                updateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: "x",
                 zone: "z"
@@ -196,9 +196,9 @@ TEST(AssignKeyRangeToZoneRequest, WrongMaxRangeTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, WrongZoneNameTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, WrongZoneNameTypeErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: 123
@@ -206,9 +206,9 @@ TEST(AssignKeyRangeToZoneRequest, WrongZoneNameTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(AssignKeyRangeToZoneRequest, CannotUseMongosToParseConfigCommand) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromMongosCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+TEST(UpdateZoneKeyRangeRequest, CannotUseMongosToParseConfigCommand) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -217,8 +217,8 @@ TEST(AssignKeyRangeToZoneRequest, CannotUseMongosToParseConfigCommand) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -234,8 +234,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: null
@@ -250,8 +250,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, InvalidNSConfigAssignCommand) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo",
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -260,8 +260,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, InvalidNSConfigAssignCommand) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForAssignType) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+                _configsvrUpdateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: { x: 100 },
                 zone: "z"
@@ -275,7 +275,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigComma
     auto configCmdObj = builder.obj();
 
     auto expectedObj = fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -284,8 +284,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigComma
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
-    auto requestStatus = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+                _configsvrUpdateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: { x: 100 },
                 zone: null
@@ -299,7 +299,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigComma
     auto configCmdObj = builder.obj();
 
     auto expectedObj = fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: null
@@ -309,8 +309,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigComma
 
 
 TEST(CfgAssignKeyRangeToZoneRequest, MissingMinErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             max: { x: 100 },
             zone: "z"
         })BSON"));
@@ -318,8 +318,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, MissingMinErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, MissingMaxErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             zone: "z"
         })BSON"));
@@ -327,8 +327,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, MissingMaxErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, MissingZoneErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 }
         })BSON"));
@@ -336,7 +336,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, MissingZoneErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, MissingShardNameErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -345,8 +345,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, MissingShardNameErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, WrongShardNameTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrAssignKeyRangeToZone: 1234,
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+                _configsvrUpdateZoneKeyRange: 1234,
                 min: { x: 1 },
                 max: { x: 100 },
                 zone: "z"
@@ -355,8 +355,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, WrongShardNameTypeErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, WrongMinRangeTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+                _configsvrUpdateZoneKeyRange: "foo.bar",
                 min: "1",
                 max: { x: 100 },
                 zone: "z"
@@ -365,8 +365,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, WrongMinRangeTypeErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, WrongMaxRangeTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-                _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+                _configsvrUpdateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: "x",
                 zone: "z"
@@ -375,8 +375,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, WrongMaxRangeTypeErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, WrongZoneNameTypeErrors) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            _configsvrAssignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: 123
@@ -385,8 +385,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, WrongZoneNameTypeErrors) {
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, CannotUseConfigToParseMongosCommand) {
-    auto request = AssignKeyRangeToZoneRequest::parseFromConfigCommand(fromjson(R"BSON({
-            assignKeyRangeToZone: "foo.bar",
+    auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"

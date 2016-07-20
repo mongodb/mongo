@@ -21,7 +21,6 @@ env.Library(
     source=[
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
-        'cluster_assign_key_range_to_zone_cmd.cpp',
         'cluster_commands_common.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_count_cmd.cpp',
@@ -63,6 +62,7 @@ env.Library(
         'cluster_shard_collection_cmd.cpp',
         'cluster_shutdown_cmd.cpp',
         'cluster_split_cmd.cpp',
+        'cluster_update_zone_key_range_cmd.cpp',
         'cluster_user_management_commands.cpp',
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',

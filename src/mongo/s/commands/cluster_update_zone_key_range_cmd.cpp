@@ -41,7 +41,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/assign_key_range_to_zone_request_type.h"
+#include "mongo/s/request_types/update_zone_key_range_request_type.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -62,15 +62,15 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 
 /**
  * {
- *   assignKeyRangeToZone: <string namespace>,
+ *   updateZoneKeyRange: <string namespace>,
  *   min: <BSONObj min>,
  *   max: <BSONObj max>,
  *   zone: <string zone|null>,
  * }
  */
-class AssignKeyRangeToZoneCmd : public Command {
+class UpdateZoneKeyRangeCmd : public Command {
 public:
-    AssignKeyRangeToZoneCmd() : Command("assignKeyRangeToZone", false, "assignkeyrangetozone") {}
+    UpdateZoneKeyRangeCmd() : Command("updateZoneKeyRange", false, "updatezonekeyRange") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -125,7 +125,7 @@ public:
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         auto parsedRequest =
-            uassertStatusOK(AssignKeyRangeToZoneRequest::parseFromMongosCommand(cmdObj));
+            uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromMongosCommand(cmdObj));
 
         BSONObjBuilder cmdBuilder;
         parsedRequest.appendAsConfigCommand(&cmdBuilder);
@@ -142,7 +142,7 @@ public:
         return true;
     }
 
-} assignKeyRangeToZoneCmd;
+} updateZoneKeyRangeCmd;
 
 }  // namespace
 }  // namespace mongo

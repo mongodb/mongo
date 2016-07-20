@@ -37,38 +37,38 @@ namespace mongo {
 
 class BSONObjBuilder;
 
-class AssignKeyRangeToZoneRequest {
+class UpdateZoneKeyRangeRequest {
 public:
     /**
-     * Parses the provided BSON content as the external assignKeyRangeToZone command, and if it is
-     * correct, constructs an AssignKeyRangeToZoneRequest object from it.
+     * Parses the provided BSON content as the external updateZoneKeyRange command, and if it is
+     * correct, constructs an UpdateZoneKeyRangeRequest object from it.
      *
      * {
-     *   assignKeyRangeToZone: <string namespace>,
+     *   updateZoneKeyRange: <string namespace>,
      *   min: <BSONObj min>,
      *   max: <BSONObj max>,
      *   zone: <string zoneName>
      * }
      */
-    static StatusWith<AssignKeyRangeToZoneRequest> parseFromMongosCommand(const BSONObj& cmdObj);
+    static StatusWith<UpdateZoneKeyRangeRequest> parseFromMongosCommand(const BSONObj& cmdObj);
 
     /**
-     * Parses the provided BSON content as the internal _configsvrAssignKeyRangeToZone command, and
-     * if it contains the correct types, constructs an AssignKeyRangeToZoneRequest object from it.
+     * Parses the provided BSON content as the internal _configsvrUpdateZoneKeyRange command, and
+     * if it contains the correct types, constructs an UpdateZoneKeyRangeRequest object from it.
      *
      * {
-     *   _configsvrAssignKeyRangeToZone: <string namespace>,
+     *   _configsvrUpdateZoneKeyRange: <string namespace>,
      *   min: <BSONObj min>,
      *   max: <BSONObj max>,
      *   zone: <string zone|null>,
      *   writeConcern: <BSONObj>
      * }
      */
-    static StatusWith<AssignKeyRangeToZoneRequest> parseFromConfigCommand(const BSONObj& cmdObj);
+    static StatusWith<UpdateZoneKeyRangeRequest> parseFromConfigCommand(const BSONObj& cmdObj);
 
     /**
      * Creates a serialized BSONObj of the internal _configsvrRemoveShardFromZone command from this
-     * AssignKeyRangeToZoneRequest instance.
+     * UpdateZoneKeyRangeRequest instance.
      */
     void appendAsConfigCommand(BSONObjBuilder* cmdBuilder);
 
@@ -84,17 +84,17 @@ public:
 
 private:
     /**
-     * Constructor for remove type AssignKeyRangeToZoneRequest.
+     * Constructor for remove type UpdateZoneKeyRangeRequest.
      */
-    AssignKeyRangeToZoneRequest(NamespaceString ns, ChunkRange range);
+    UpdateZoneKeyRangeRequest(NamespaceString ns, ChunkRange range);
 
     /**
-     * Constructor for assign type AssignKeyRangeToZoneRequest.
+     * Constructor for assign type UpdateZoneKeyRangeRequest.
      */
-    AssignKeyRangeToZoneRequest(NamespaceString ns, ChunkRange range, std::string zoneName);
+    UpdateZoneKeyRangeRequest(NamespaceString ns, ChunkRange range, std::string zoneName);
 
-    static StatusWith<AssignKeyRangeToZoneRequest> _parseFromCommand(const BSONObj& cmdObj,
-                                                                     bool forMongos);
+    static StatusWith<UpdateZoneKeyRangeRequest> _parseFromCommand(const BSONObj& cmdObj,
+                                                                   bool forMongos);
     NamespaceString _ns;
     ChunkRange _range;
     bool _isRemove;
