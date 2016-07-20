@@ -526,8 +526,8 @@ tasks:
 
 - name: initialsync_MMAPv1
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: initialsync_WT
+      status : "*"
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
@@ -542,16 +542,15 @@ tasks:
     - func: "upload log file"
       vars:
         test: "initialsync_MMAPv1"
-    - func: "destroy cluster"
     - func: "analyze"
 
 - name: initialsync_WT_dr
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: initialsync_MMAPv1
+      status : "*"
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
@@ -564,6 +563,7 @@ tasks:
     - func: "upload log file"
       vars:
         test: "initialsync_WT"
+    - func: "destroy cluster"
     - func: "analyze"
 
 - name: initialsync_MMAPv1_dr
@@ -572,7 +572,7 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
