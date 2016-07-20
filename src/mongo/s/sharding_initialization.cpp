@@ -201,16 +201,8 @@ Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
         }
 
         try {
-            auto status = ClusterIdentityLoader::get(txn)->loadClusterId(
-                txn, repl::ReadConcernLevel::kMajorityReadConcern);
-            if (!status.isOK()) {
-                warning()
-                    << "Error initializing sharding state, sleeping for 2 seconds and trying again"
-                    << causedBy(status);
-                sleepmillis(2000);
-                continue;
-            }
-
+            uassertStatusOK(ClusterIdentityLoader::get(txn)->loadClusterId(
+                txn, repl::ReadConcernLevel::kMajorityReadConcern));
             grid.shardRegistry()->reload(txn);
             return Status::OK();
         } catch (const DBException& ex) {
