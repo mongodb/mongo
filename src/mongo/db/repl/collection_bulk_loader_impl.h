@@ -53,6 +53,14 @@ class CollectionBulkLoaderImpl : public CollectionBulkLoader {
     MONGO_DISALLOW_COPYING(CollectionBulkLoaderImpl);
 
 public:
+    struct Stats {
+        Date_t startBuildingIndexes;
+        Date_t endBuildingIndexes;
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+    };
+
     CollectionBulkLoaderImpl(OperationContext* txn,
                              TaskRunner* runner,
                              Collection* coll,
@@ -69,6 +77,8 @@ public:
                                    const std::vector<BSONObj>::const_iterator end) override;
     virtual Status commit() override;
 
+    CollectionBulkLoaderImpl::Stats getStats() const;
+
     virtual std::string toString() const override;
     virtual BSONObj toBSON() const override;
 
@@ -83,6 +93,7 @@ private:
     MultiIndexBlock _secondaryIndexesBlock;
     bool _hasSecondaryIndexes = false;
     BSONObj _idIndexSpec;
+    Stats _stats;
 };
 
 }  // namespace repl
