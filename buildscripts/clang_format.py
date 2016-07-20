@@ -23,7 +23,7 @@ import tarfile
 import tempfile
 import threading
 import time
-import urllib
+import urllib2
 from distutils import spawn
 from optparse import OptionParser
 from multiprocessing import cpu_count
@@ -149,7 +149,19 @@ def get_clang_format_from_cache_and_extract(url, tarball_ext):
     # Download from file
     print("Downloading clang-format %s from %s, saving to %s" % (CLANG_FORMAT_VERSION,
             url, temp_tar_file))
-    urllib.urlretrieve(url, temp_tar_file)
+
+    # Retry download up to 5 times.
+    num_tries = 5
+    for attempt in range(num_tries):
+        try:
+            resp = urllib2.urlopen(url)
+            with open(temp_tar_file, 'wb') as f:
+              f.write(resp.read())
+            break
+        except urllib2.URLError:
+            if attempt == num_tries - 1:
+                raise
+            continue
 
     extract_clang_format(temp_tar_file)
 
