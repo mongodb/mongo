@@ -1036,6 +1036,8 @@ const char kIndexTable[] =
     "999\0";
 }  // namespace
 
+constexpr size_t ItoA::kBufSize;
+
 ItoA::ItoA(std::uint32_t val) {
     if (val < 10u) {
         _str = kIndexTable + (2 * val);
@@ -1052,12 +1054,11 @@ ItoA::ItoA(std::uint32_t val) {
         auto pos = len;
 
         while (val > 0) {
+            dassert(pos > 0);
             --pos;
             _buf[pos] = static_cast<char>((val % 10) + static_cast<std::uint32_t>('0'));
             val /= 10;
         }
-
-        invariant(pos >= 0);
 
         _str = _buf + pos;
         _len = len - pos;

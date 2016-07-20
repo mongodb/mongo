@@ -40,6 +40,8 @@ namespace {
 using namespace mongo;
 
 TEST(ItoA, StringDataEquality) {
+    ASSERT_EQ(ItoA::kBufSize - 1, std::to_string(std::numeric_limits<std::uint32_t>::max()).size());
+
     for (auto testCase : {1u,
                           12u,
                           133u,

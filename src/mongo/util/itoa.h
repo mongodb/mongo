@@ -41,6 +41,8 @@ class ItoA {
     MONGO_DISALLOW_COPYING(ItoA);
 
 public:
+    static constexpr size_t kBufSize = 11;
+
     explicit ItoA(std::uint32_t i);
 
     operator StringData() {
@@ -50,8 +52,8 @@ public:
 private:
     const char* _str{nullptr};
     std::size_t _len{0};
-    // 11 is provably the max size we need as int32_t max has 10 digits.
-    char _buf[11];
+    // 11 is provably the max size we need as uint32_t max has 10 digits.
+    char _buf[kBufSize];
 };
 
 }  // namespace mongo
