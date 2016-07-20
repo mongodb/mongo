@@ -160,12 +160,12 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
         // Executor cannot run multiApply callback while we are on the network thread.
-        ASSERT_OK(multiApplier.start());
-        multiApplier.cancel();
+        ASSERT_OK(multiApplier.startup());
+        multiApplier.shutdown();
 
         net->runReadyNetworkOperations();
     }
-    multiApplier.wait();
+    multiApplier.join();
 
     ASSERT_FALSE(multiApplyInvoked);
 
@@ -196,13 +196,13 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
-    ASSERT_OK(multiApplier.start());
+    ASSERT_OK(multiApplier.startup());
     {
         auto net = getNet();
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
         net->runReadyNetworkOperations();
     }
-    multiApplier.wait();
+    multiApplier.join();
 
     ASSERT_TRUE(multiApplyInvoked);
 
@@ -234,13 +234,13 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
     };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
-    ASSERT_OK(multiApplier.start());
+    ASSERT_OK(multiApplier.startup());
     {
         auto net = getNet();
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
         net->runReadyNetworkOperations();
     }
-    multiApplier.wait();
+    multiApplier.join();
 
     ASSERT_TRUE(multiApplyInvoked);
 
@@ -276,13 +276,13 @@ TEST_F(
     };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
-    ASSERT_OK(multiApplier.start());
+    ASSERT_OK(multiApplier.startup());
     {
         auto net = getNet();
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
         net->runReadyNetworkOperations();
     }
-    multiApplier.wait();
+    multiApplier.join();
 
     ASSERT_TRUE(multiApplyTxn);
     ASSERT_EQUALS(1U, operationsToApply.size());
