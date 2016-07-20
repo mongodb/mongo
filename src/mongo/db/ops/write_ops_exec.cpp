@@ -327,6 +327,11 @@ static bool insertBatchAndHandleErrors(OperationContext* txn,
     auto acquireCollection = [&] {
         while (true) {
             txn->checkForInterrupt();
+
+            if (MONGO_FAIL_POINT(failAllInserts)) {
+                uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
+            }
+
             collection.emplace(txn, wholeOp.ns, MODE_IX);
             if (collection->getCollection())
                 break;
@@ -417,10 +422,6 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
         curOp.debug().ninserted = 0;
     }
 
-    if (MONGO_FAIL_POINT(failAllInserts)) {
-        uassertStatusOK(Status(ErrorCodes::InternalError, "failAllInserts failpoint active!"));
-    }
-
     uassertStatusOK(userAllowedWriteNS(wholeOp.ns));
 
     if (wholeOp.ns.isSystemDotIndexes()) {
@@ -475,11 +476,6 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
 static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
                                                        const NamespaceString& ns,
                                                        const UpdateOp::SingleUpdate& op) {
-
-    if (MONGO_FAIL_POINT(failAllUpdates)) {
-        uassertStatusOK(Status(ErrorCodes::InternalError, "failAllUpdates failpoint active!"));
-    }
-
     globalOpCounters.gotUpdate();
     auto& curOp = *CurOp::get(txn);
     {
@@ -509,6 +505,10 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
     boost::optional<AutoGetCollection> collection;
     while (true) {
         txn->checkForInterrupt();
+        if (MONGO_FAIL_POINT(failAllUpdates)) {
+            uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
+        }
+
         collection.emplace(txn,
                            ns,
                            MODE_IX,  // DB is always IX, even if collection is X.
@@ -611,12 +611,6 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
 
     curOp.debug().ndeleted = 0;
 
-    txn->checkForInterrupt();
-
-    if (MONGO_FAIL_POINT(failAllRemoves)) {
-        uassertStatusOK(Status(ErrorCodes::InternalError, "failAllRemoves failpoint active!"));
-    }
-
     DeleteRequest request(ns);
     request.setQuery(op.query);
     request.setCollation(op.collation);
@@ -625,6 +619,12 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
 
     ParsedDelete parsedDelete(txn, &request);
     uassertStatusOK(parsedDelete.parseRequest());
+
+    txn->checkForInterrupt();
+
+    if (MONGO_FAIL_POINT(failAllRemoves)) {
+        uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
+    }
 
     ScopedTransaction scopedXact(txn, MODE_IX);
     AutoGetCollection collection(txn,
