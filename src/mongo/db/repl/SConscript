@@ -926,27 +926,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='applier',
-    source=[
-        'applier.cpp',
-    ],
-    LIBDEPS=[
-        'oplog_entry',
-        'replication_executor',
-    ],
-)
-
-env.CppUnitTest(
-    target='applier_test',
-    source='applier_test.cpp',
-    LIBDEPS=[
-        'applier',
-        'replication_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/concurrency',
-    ],
-)
-
-env.Library(
     target='data_replicator_external_state_impl',
     source=[
         'data_replicator_external_state_impl.cpp',
@@ -978,7 +957,6 @@ env.Library(
         'data_replicator.cpp',
     ],
     LIBDEPS=[
-        'applier',
         'collection_cloner',
         'database_cloner',
         'databases_cloner',
