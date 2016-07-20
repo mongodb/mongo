@@ -162,7 +162,7 @@ StatusWith<BSONObj> getLatestOplogEntry(executor::TaskExecutor* exec,
     }
 
     // wait for fetcher to get the oplog position.
-    fetcher.wait();
+    fetcher.join();
     if (statusToReturn.isOK()) {
         LOG(2) << "returning last oplog entry: " << entry << ", from: " << source
                << ", ns: " << oplogNS;
@@ -855,7 +855,7 @@ void DataReplicator::_cancelAllHandles_inlock() {
 }
 
 void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
-    swapAndWait_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
+    swapAndJoin_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
     swapAndJoin_inlock(lk, _oplogFetcher, "Waiting on oplog fetcher: ");
     swapAndWait_inlock(lk, _applier, "Waiting on applier: ");
     swapAndJoin_inlock(lk, _reporter, "Waiting on reporter: ");

@@ -310,12 +310,12 @@ TEST_F(FetcherTest, ScheduleWhenActive) {
 
 TEST_F(FetcherTest, CancelWithoutSchedule) {
     ASSERT_FALSE(fetcher->isActive());
-    fetcher->cancel();
+    fetcher->shutdown();
 }
 
 TEST_F(FetcherTest, WaitWithoutSchedule) {
     ASSERT_FALSE(fetcher->isActive());
-    fetcher->wait();
+    fetcher->join();
 }
 
 TEST_F(FetcherTest, ShutdownBeforeSchedule) {
@@ -333,7 +333,7 @@ TEST_F(FetcherTest, ScheduleAndCancel) {
         assertRemoteCommandNameEquals("find", net->scheduleSuccessfulResponse(BSON("ok" << 1)));
     }
 
-    fetcher->cancel();
+    fetcher->shutdown();
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
@@ -702,7 +702,7 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
     ASSERT_EQUALS(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
-    fetcher->cancel();
+    fetcher->shutdown();
 
     {
         auto net = getNet();

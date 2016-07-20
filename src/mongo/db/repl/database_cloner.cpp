@@ -186,7 +186,7 @@ void DatabaseCloner::cancel() {
         }
     }
 
-    _listCollectionsFetcher.cancel();
+    _listCollectionsFetcher.shutdown();
 }
 
 DatabaseCloner::Stats DatabaseCloner::getStats() const {

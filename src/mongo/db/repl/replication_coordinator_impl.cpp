@@ -2992,7 +2992,7 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
                                 rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                                 Milliseconds(30000));
         candidateProber.schedule();
-        candidateProber.wait();
+        candidateProber.join();
 
         if (!queryStatus.isOK()) {
             // We got an error.

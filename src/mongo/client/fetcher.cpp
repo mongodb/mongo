@@ -186,7 +186,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
 }
 
 Fetcher::~Fetcher() {
-    DESTRUCTOR_GUARD(cancel(); wait(););
+    DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
 HostAndPort Fetcher::getSource() const {
@@ -243,7 +243,7 @@ Status Fetcher::schedule() {
     return Status::OK();
 }
 
-void Fetcher::cancel() {
+void Fetcher::shutdown() {
     executor::TaskExecutor::CallbackHandle handle;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -265,7 +265,7 @@ void Fetcher::cancel() {
     _executor->cancel(handle);
 }
 
-void Fetcher::wait() {
+void Fetcher::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _condition.wait(lk, [this]() { return !_active; });
 }

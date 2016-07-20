@@ -182,8 +182,8 @@ void CollectionCloner::cancel() {
         return;
     }
 
-    _listIndexesFetcher.cancel();
-    _findFetcher.cancel();
+    _listIndexesFetcher.shutdown();
+    _findFetcher.shutdown();
     _dbWorkTaskRunner.cancel();
 }
 

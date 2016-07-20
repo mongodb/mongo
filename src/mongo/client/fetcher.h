@@ -180,13 +180,13 @@ public:
      * Cancels remote command request.
      * Returns immediately if fetcher is not active.
      */
-    void cancel();
+    void shutdown();
 
     /**
      * Waits for remote command requests to complete.
      * Returns immediately if fetcher is not active.
      */
-    void wait();
+    void join();
 
 private:
     /**

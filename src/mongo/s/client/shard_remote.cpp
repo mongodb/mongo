@@ -359,7 +359,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         return scheduleStatus;
     }
 
-    fetcher.wait();
+    fetcher.join();
 
     updateReplSetMonitor(host.getValue(), status);
 

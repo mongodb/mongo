@@ -264,11 +264,11 @@ Status OplogFetcher::startup() {
 }
 
 void OplogFetcher::shutdown() {
-    _fetcher.cancel();
+    _fetcher.shutdown();
 }
 
 void OplogFetcher::join() {
-    _fetcher.wait();
+    _fetcher.join();
 }
 
 OpTimeWithHash OplogFetcher::getLastOpTimeWithHashFetched() const {
