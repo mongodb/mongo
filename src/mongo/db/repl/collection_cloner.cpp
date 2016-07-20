@@ -131,7 +131,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
 }
 
 CollectionCloner::~CollectionCloner() {
-    DESTRUCTOR_GUARD(cancel(); wait(););
+    DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
 const NamespaceString& CollectionCloner::getSourceNamespace() const {
@@ -158,7 +158,7 @@ bool CollectionCloner::isActive() const {
     return _active;
 }
 
-Status CollectionCloner::start() {
+Status CollectionCloner::startup() {
     LockGuard lk(_mutex);
     LOG(0) << "CollectionCloner::start called, on ns:" << _destNss;
 
@@ -177,7 +177,7 @@ Status CollectionCloner::start() {
     return Status::OK();
 }
 
-void CollectionCloner::cancel() {
+void CollectionCloner::shutdown() {
     if (!isActive()) {
         return;
     }
@@ -192,7 +192,7 @@ CollectionCloner::Stats CollectionCloner::getStats() const {
     return _stats;
 }
 
-void CollectionCloner::wait() {
+void CollectionCloner::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _condition.wait(lk, [this]() { return !_active; });
 }

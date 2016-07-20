@@ -114,7 +114,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                                   numListCollectionsRetries,
                                   executor::RemoteCommandRequest::kNoTimeout,
                                   RemoteCommandRetryScheduler::kAllRetriableErrors)),
-      _startCollectionCloner([](CollectionCloner& cloner) { return cloner.start(); }) {
+      _startCollectionCloner([](CollectionCloner& cloner) { return cloner.startup(); }) {
     // Fetcher throws an exception on null executor.
     invariant(executor);
     uassert(ErrorCodes::BadValue, "db worker thread pool cannot be null", dbWorkThreadPool);
@@ -125,7 +125,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
 }
 
 DatabaseCloner::~DatabaseCloner() {
-    DESTRUCTOR_GUARD(cancel(); wait(););
+    DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
 const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos() const {
@@ -156,7 +156,7 @@ bool DatabaseCloner::isActive() const {
     return _active;
 }
 
-Status DatabaseCloner::start() {
+Status DatabaseCloner::startup() {
     LockGuard lk(_mutex);
 
     if (_active) {
@@ -177,7 +177,7 @@ Status DatabaseCloner::start() {
     return Status::OK();
 }
 
-void DatabaseCloner::cancel() {
+void DatabaseCloner::shutdown() {
     {
         LockGuard lk(_mutex);
 
@@ -194,7 +194,7 @@ DatabaseCloner::Stats DatabaseCloner::getStats() const {
     return _stats;
 }
 
-void DatabaseCloner::wait() {
+void DatabaseCloner::join() {
     UniqueLock lk(_mutex);
     _condition.wait(lk, [this]() { return !_active; });
 }

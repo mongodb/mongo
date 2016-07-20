@@ -190,47 +190,47 @@ void BaseClonerTest::testLifeCycle() {
 
     // IsActiveAfterStart
     ASSERT_FALSE(getCloner()->isActive());
-    ASSERT_OK(getCloner()->start());
+    ASSERT_OK(getCloner()->startup());
     ASSERT_TRUE(getCloner()->isActive());
     tearDown();
 
     // StartWhenActive
     setUp();
-    ASSERT_OK(getCloner()->start());
+    ASSERT_OK(getCloner()->startup());
     ASSERT_TRUE(getCloner()->isActive());
-    ASSERT_NOT_OK(getCloner()->start());
+    ASSERT_NOT_OK(getCloner()->startup());
     ASSERT_TRUE(getCloner()->isActive());
     tearDown();
 
     // CancelWithoutStart
     setUp();
     ASSERT_FALSE(getCloner()->isActive());
-    getCloner()->cancel();
+    getCloner()->shutdown();
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
     // WaitWithoutStart
     setUp();
     ASSERT_FALSE(getCloner()->isActive());
-    getCloner()->wait();
+    getCloner()->join();
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
     // ShutdownBeforeStart
     setUp();
     getExecutor().shutdown();
-    ASSERT_NOT_OK(getCloner()->start());
+    ASSERT_NOT_OK(getCloner()->startup());
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
     // StartAndCancel
     setUp();
-    ASSERT_OK(getCloner()->start());
+    ASSERT_OK(getCloner()->startup());
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         scheduleNetworkResponse(BSON("ok" << 1));
     }
-    getCloner()->cancel();
+    getCloner()->shutdown();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         finishProcessingNetworkResponse();
@@ -241,7 +241,7 @@ void BaseClonerTest::testLifeCycle() {
 
     // StartButShutdown
     setUp();
-    ASSERT_OK(getCloner()->start());
+    ASSERT_OK(getCloner()->startup());
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         scheduleNetworkResponse(BSON("ok" << 1));

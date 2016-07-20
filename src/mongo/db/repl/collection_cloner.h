@@ -103,11 +103,11 @@ public:
 
     bool isActive() const override;
 
-    Status start() override;
+    Status startup() override;
 
-    void cancel() override;
+    void shutdown() override;
 
-    void wait() override;
+    void join() override;
 
     CollectionCloner::Stats getStats() const;
 

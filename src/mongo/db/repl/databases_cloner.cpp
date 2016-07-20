@@ -107,7 +107,7 @@ void DatabasesCloner::join() {
 
     lk.unlock();
     for (auto&& cloner : clonersToWaitOn) {
-        cloner->wait();
+        cloner->join();
     }
     lk.lock();
 }
@@ -131,7 +131,7 @@ void DatabasesCloner::_cancelCloners_inlock(UniqueLock& lk) {
 
     lk.unlock();
     for (auto&& cloner : clonersToCancel) {
-        cloner->cancel();
+        cloner->shutdown();
     }
     lk.lock();
 }
@@ -260,7 +260,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
                 dbCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
             }
             // Start database cloner.
-            startStatus = dbCloner->start();
+            startStatus = dbCloner->startup();
         } catch (...) {
             startStatus = exceptionToStatus();
         }

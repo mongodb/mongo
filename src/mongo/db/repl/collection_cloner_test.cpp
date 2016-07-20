@@ -170,7 +170,7 @@ TEST_F(CollectionClonerTest, ClonerLifeCycle) {
 }
 
 TEST_F(CollectionClonerTest, FirstRemoteCommand) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     auto net = getNet();
     executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -213,7 +213,7 @@ TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
             return std::unique_ptr<CollectionBulkLoader>(loader);
         };
 
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(createListIndexesResponse(0, BSONArray()));
@@ -229,7 +229,7 @@ TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(createCursorResponse(0, BSON_ARRAY(doc)));
     }
-    collectionCloner->wait();
+    collectionCloner->join();
     ASSERT_EQUALS(1, collectionStats.insertCount);
     ASSERT_TRUE(collectionStats.commitCalled);
 
@@ -243,7 +243,7 @@ TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
 // A collection may have no indexes. The cloner will produce a warning but
 // will still proceed with cloning.
 TEST_F(CollectionClonerTest, ListIndexesReturnedNoIndexes) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     // Using a non-zero cursor to ensure that
     // the cloner stops the fetcher from retrieving more results.
@@ -262,7 +262,7 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNoIndexes) {
 }
 
 TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     bool collectionCreated = false;
     NamespaceString collNss;
@@ -279,7 +279,7 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
         processNetworkResponse(ErrorCodes::NamespaceNotFound, "The collection doesn't exist.");
     }
 
-    collectionCloner->wait();
+    collectionCloner->join();
     ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());
     ASSERT_TRUE(collectionCreated);
@@ -287,7 +287,7 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
 }
 
 TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     // Replace scheduleDbWork function so that cloner will fail to schedule DB work after
     // getting index specs.
@@ -306,7 +306,7 @@ TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {
 }
 
 TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     // Replace scheduleDbWork function so that the callback runs with a cancelled status.
     auto&& executor = getExecutor();
@@ -332,7 +332,7 @@ TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
 }
 
 TEST_F(CollectionClonerTest, BeginCollectionFailed) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
                                                       const CollectionOptions& theOptions,
@@ -353,7 +353,7 @@ TEST_F(CollectionClonerTest, BeginCollectionFailed) {
 }
 
 TEST_F(CollectionClonerTest, BeginCollection) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     CollectionMockStats stats;
     CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
@@ -416,7 +416,7 @@ TEST_F(CollectionClonerTest, BeginCollection) {
 }
 
 TEST_F(CollectionClonerTest, FindFetcherScheduleFailed) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     // Shut down executor while in beginCollection callback.
     // This will cause the fetcher to fail to schedule the find command.
@@ -446,7 +446,7 @@ TEST_F(CollectionClonerTest, FindFetcherScheduleFailed) {
 }
 
 TEST_F(CollectionClonerTest, FindCommandAfterBeginCollection) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     CollectionMockStats stats;
     CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
@@ -482,7 +482,7 @@ TEST_F(CollectionClonerTest, FindCommandAfterBeginCollection) {
 }
 
 TEST_F(CollectionClonerTest, FindCommandFailed) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -505,7 +505,7 @@ TEST_F(CollectionClonerTest, FindCommandFailed) {
 }
 
 TEST_F(CollectionClonerTest, FindCommandCanceled) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     ASSERT_TRUE(collectionCloner->isActive());
     {
@@ -530,7 +530,7 @@ TEST_F(CollectionClonerTest, FindCommandCanceled) {
     }
     ASSERT_TRUE(collectionCloner->isActive());
 
-    collectionCloner->cancel();
+    collectionCloner->shutdown();
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -543,7 +543,7 @@ TEST_F(CollectionClonerTest, FindCommandCanceled) {
 }
 
 TEST_F(CollectionClonerTest, InsertDocumentsScheduleDbWorkFailed) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -570,7 +570,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsScheduleDbWorkFailed) {
 }
 
 TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -602,7 +602,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
 }
 
 TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());
 
     {
@@ -627,7 +627,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
         processNetworkResponse(createCursorResponse(0, BSON_ARRAY(BSON("_id" << 1))));
     }
 
-    collectionCloner->wait();
+    collectionCloner->join();
     ASSERT_FALSE(collectionCloner->isActive());
     ASSERT_EQUALS(0, collectionStats.insertCount);
 
@@ -635,7 +635,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
 }
 
 TEST_F(CollectionClonerTest, InsertDocumentsSingleBatch) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());
 
     {
@@ -665,7 +665,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsSingleBatch) {
 }
 
 TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());
 
     {
@@ -709,7 +709,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
 }
 
 TEST_F(CollectionClonerTest, LastBatchContainsNoDocuments) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());
 
     {
@@ -761,7 +761,7 @@ TEST_F(CollectionClonerTest, LastBatchContainsNoDocuments) {
 }
 
 TEST_F(CollectionClonerTest, MiddleBatchContainsNoDocuments) {
-    ASSERT_OK(collectionCloner->start());
+    ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());
 
     {
