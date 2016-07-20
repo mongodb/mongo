@@ -9,6 +9,19 @@ post:
       params:
         file_location: work/report.json
     - command: shell.cleanup
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          if [ ! -f "test.success" ]; then
+            yes yes | ./terraform destroy
+            if [ $? != 0 ]; then yes yes | ./terraform destroy; fi
+            echo "Cluster DESTROYED."
+          fi
 
 functions:
   "prepare environment":
@@ -66,40 +79,15 @@ functions:
       params:
         working_dir: work
         script: |
-          set -v
-          ./terraform get --update
+           set -v
+           ./terraform get --update
+  "bring up cluster":
     - command: shell.exec
-      # set up $HOME/provisioning to keep track of provisioned resources, and allow Evergreen to release resources from there
-      params:
-        script: |
-          set -o verbose
-          if [ ! -d "$HOME/provisioning" ]; then
-            echo "copying terraform to Evergreen host"
-            mkdir $HOME/provisioning
-            cp -r terraform $HOME/provisioning/.
-            cp -r modules $HOME/provisioning/.
-            echo "copying teardown.sh to Evergreen host"
-            cp src/dsi/dsi/bin/destroy_cluster.sh $HOME/provisioning/terraform/teardown.sh
-          fi
-          ls -l $HOME/provisioning
-
-  "provision resource":
-    - command: shell.exec
-      # if $HOME/provision exists, get info about provisioned resources from there
+      # bring up the cluster
       params:
         working_dir: work
         script: |
-          set -e
-          set -o verbose
-          if [ -f "$HOME/provisioning/provisioning_data.tgz" ]; then
-            cp -r $HOME/provisioning/provisioning_data.tgz .
-            tar -xvf provisioning_data.tgz
-          fi
-    - command: shell.exec
-      # get resources from cloud provider
-      params:
-        working_dir: work
-        script: |
+          # to create a mongod EC2 cluster
           set -e
           set -o verbose
           pwd
@@ -108,20 +96,40 @@ functions:
           source ./dsienv.sh
           # create all resources and instances
           $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
-    - command: shell.exec
-      # Update the provisioned resource info in $HOME/provisioning
+    - command: shell.exec # End on setup-cluster.sh so it's error code is scripts error code
+      # After cluster up
       params:
         working_dir: work
         script: |
+          echo "EC2 Cluster CREATED."
+          tar -czvf cluster_config.tgz infrastructure_provisioning.out.yml ips.sh ips.py terraform.tfstate cluster.tf terraform.tfvars variables.tf
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "work/cluster_config.tgz"
+        remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: ${cluster}-cluster-config
+
+  "restore cluster":
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
+        bucket: mciuploads
+        local_file: "work/cluster_config.tgz"
+    - command: shell.exec
+      params:
+        working_dir: work
+        silent: true
+        script: |
           set -e
           set -o verbose
-          echo "Resource provisioned."
-          tar -czvf provisioning_data.tgz infrastructure_provisioning.out.yml ips.sh ips.py terraform.tfstate cluster.tf terraform.tfvars security.tf variables.tf
-          cp provisioning_data.tgz $HOME/provisioning/terraform/.
-          rsync -vr ../modules $HOME/provisioning/modules
-          cd $HOME/provisioning/terraform
-          tar -xvf provisioning_data.tgz
-          ./terraform get
+          tar -xf cluster_config.tgz
 
   "configure mongodb cluster":
     - command: shell.exec
@@ -159,6 +167,21 @@ functions:
           set -e
           set -v
           touch test.success
+
+  "destroy cluster":
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          # destroy the EC2 cluster
+          yes yes | ./terraform destroy; true
+          # make sure we destroy the cluster in case of AWS API timing issue
+          yes yes | ./terraform destroy; true
+          echo "Cluster DESTROYED."
 
   "make test log artifact":
     - command: shell.exec
@@ -322,13 +345,21 @@ tasks:
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb.tar.gz
 
+
+# The industry_benchmarks_WT task runs the "bring up cluster" task and is
+# the only one to do so - all other tasks run "restore cluster".  As such,
+# all buildvariants must run industry_benchmarks_WT and run it first.
+
+# When adding or removing tasks, you also must ensure that the final task
+# and only the final task runs the "destroy cluster" function.
+
 - name: industry_benchmarks_WT
   depends_on:
     - name: compile
       variant: linux-standalone
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "bring up cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
@@ -344,11 +375,11 @@ tasks:
 
 - name: industry_benchmarks_MMAPv1
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: core_workloads_WT
+      status : "*"
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
@@ -364,11 +395,11 @@ tasks:
 
 - name: core_workloads_WT
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: industry_benchmarks_WT
+      status : "*"
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
@@ -384,11 +415,11 @@ tasks:
 
 - name: core_workloads_MMAPv1
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: industry_benchmarks_MMAPv1
+      status : "*"
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
@@ -400,6 +431,7 @@ tasks:
     - func: "upload log file"
       vars:
         test: "core_workloads_MMAPv1"
+    - func: "destroy cluster"
     - func: "analyze"
 
 - name: industry_benchmarks_WT_oplog_comp
@@ -478,7 +510,7 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "bring up cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
@@ -498,7 +530,7 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
-    - func: "provision resource"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
@@ -510,6 +542,7 @@ tasks:
     - func: "upload log file"
       vars:
         test: "initialsync_MMAPv1"
+    - func: "destroy cluster"
     - func: "analyze"
 
 - name: initialsync_WT_dr
@@ -595,7 +628,7 @@ buildvariants:
     cluster: single
     platform: linux
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -612,7 +645,7 @@ buildvariants:
     cluster: single
     platform: linux
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: compile
       distros:
@@ -632,7 +665,7 @@ buildvariants:
     cluster: single-c3-4xlarge
     platform: linux
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -649,7 +682,7 @@ buildvariants:
     cluster: single-c3-2xlarge
     platform: linux
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -666,7 +699,7 @@ buildvariants:
     cluster: shard
     platform: linux
   run_on:
-      - "rhel70-perf-shard"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -683,7 +716,7 @@ buildvariants:
     cluster: replica
     platform: linux
   run_on:
-      - "rhel70-perf-replset"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
@@ -700,7 +733,7 @@ buildvariants:
     cluster: replica
     platform: linux
   run_on:
-      - "rhel70-perf-replset"
+      - "rhel70-perf-standalone"
   tasks:
     - name: initialsync_WT
     - name: initialsync_MMAPv1
@@ -711,7 +744,7 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: *modules
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT_oplog_comp
     - name: core_workloads_WT_oplog_comp
@@ -735,7 +768,7 @@ buildvariants:
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus VARIANT_DIR=win32
     platform: windows
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: compile
       distros:
@@ -759,7 +792,7 @@ buildvariants:
     extension: ".exe"
     platform: windows
   run_on:
-      - "rhel70-perf-single"
+      - "rhel70-perf-standalone"
   tasks:
     - name: industry_benchmarks_WT
       depends_on:
