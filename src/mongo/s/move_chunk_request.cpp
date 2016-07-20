@@ -37,6 +37,7 @@ namespace mongo {
 namespace {
 
 const char kMoveChunk[] = "moveChunk";
+const char kEpoch[] = "epoch";
 const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardId[] = "fromShard";
 const char kToShardId[] = "toShard";
@@ -148,6 +149,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
 
     builder->append(kMoveChunk, nss.ns());
     shardVersion.appendForCommands(builder);
+    builder->append(kEpoch, shardVersion.epoch());
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());
