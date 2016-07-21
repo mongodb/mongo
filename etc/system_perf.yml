@@ -154,6 +154,11 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
+          # Copy over the proper test control file
+          cp $DSI_PATH/test_control/test_control.${test}.yml test_control.yml
+          # Specify the test list to use. Change the testList parameter
+          # if you want to run a non-default list.
+          $DSI_PATH/bin/update_test_list.py ${testList}
           $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           echo "Done test for ${test}-${storageEngine} with setup ${setup}!"
     - command: "json.send"
@@ -367,6 +372,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -387,6 +393,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -407,6 +414,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "benchRun"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -427,6 +435,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "benchRun"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -518,6 +527,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialSync"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -538,6 +548,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "initialSync"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -559,6 +570,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialSync"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
@@ -581,6 +593,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "initialSync"
+        testList: "default"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
