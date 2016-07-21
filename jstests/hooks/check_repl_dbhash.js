@@ -76,29 +76,6 @@ function dumpCollectionDiff(primary, secondary, dbName, collName) {
 }
 
 function checkDBHashes(rst, dbBlacklist, phase) {
-    function generateUniqueDbName(dbNameSet, prefix) {
-        var uniqueDbName;
-        Random.setRandomSeed();
-        do {
-            uniqueDbName = prefix + Random.randInt(100000);
-        } while (dbNameSet.has(uniqueDbName));
-        return uniqueDbName;
-    }
-
-    // Since we cannot determine if there is a background index in progress (SERVER-25176), we flush
-    // indexing as follows:
-    //  1. Drop a dummy collection
-    //  2. Create a foreground index on the dummy collection
-    //  3. Insert a document into the dummy collection with a writeConcern for all nodes
-    var dbNames = new Set(primary.getDBNames());
-    var uniqueDbName = generateUniqueDbName(dbNames, "flush_all_background_indexes_");
-
-    var dummyColl = primary.getDB(uniqueDbName).dummy;
-    dummyColl.drop();
-    assert.commandWorked(dummyColl.createIndex({x: 1}));
-    assert.writeOK(
-        dummyColl.insert({x: 1}, {writeConcern: {w: rst.nodes.length, wtimeout: 5 * 60 * 1000}}));
-
     // We don't expect the local database to match because some of its collections are not
     // replicated.
     dbBlacklist.push('local');
