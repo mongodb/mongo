@@ -251,7 +251,7 @@ Array.stdDev = function(arr) {
 Object.extend = function(dst, src, deep) {
     for (var k in src) {
         var v = src[k];
-        if (deep && typeof(v) == "object") {
+        if (deep && typeof(v) == "object" && v !== null) {
             if (v.constructor === ObjectId) {  // convert ObjectId properly
                 eval("v = " + tojson(v));
             } else if ("floatApprox" in v) {  // convert NumberLong properly
