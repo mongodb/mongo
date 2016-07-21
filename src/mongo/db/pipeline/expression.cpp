@@ -1596,6 +1596,9 @@ void ExpressionLet::addDependencies(DepsTracker* deps) const {
 
 void ExpressionLet::doInjectExpressionContext() {
     _subExpression->injectExpressionContext(getExpressionContext());
+    for (auto&& variable : _variables) {
+        variable.second.expression->injectExpressionContext(getExpressionContext());
+    }
 }
 
 
