@@ -745,12 +745,10 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             LOG(5) << "About to build solntree from tagged tree:" << endl
                    << rawTree->toString();
 
-            // The tagged tree produced by the plan enumerator is not guaranteed
-            // to be canonically sorted. In order to be compatible with the cached
-            // data, sort the tagged tree according to CanonicalQuery ordering.
+            // Store the plan cache index tree before sorting using index tags, so that the
+            // PlanCacheIndexTree has the same sort as the MatchExpression used to generate the plan
+            // cache key.
             std::unique_ptr<MatchExpression> clone(rawTree->shallowClone());
-            CanonicalQuery::sortTree(clone.get());
-
             PlanCacheIndexTree* cacheData;
             Status indexTreeStatus =
                 cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
@@ -758,6 +756,8 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                 LOG(5) << "Query is not cachable: " << indexTreeStatus.reason() << endl;
             }
             unique_ptr<PlanCacheIndexTree> autoData(cacheData);
+
+            sortUsingTags(rawTree);
 
             // This can fail if enumeration makes a mistake.
             QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
