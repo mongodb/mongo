@@ -976,7 +976,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${scons|scons} ${compile_flags|} lint
+          ${scons|scons} ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
   name: burn_in_tests_WT
