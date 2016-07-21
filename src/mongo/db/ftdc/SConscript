@@ -38,6 +38,7 @@ if env.TargetOSIs('linux'):
 env.Library(
     target='ftdc_mongod',
     source=[
+        'ftdc_commands.cpp',
         'ftdc_mongod.cpp',
         'ftdc_system_stats.cpp',
     ],

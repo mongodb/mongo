@@ -181,6 +181,7 @@
         geoNear: {skip: "TODO(SERVER-24766)"},
         geoSearch: {skip: "TODO(SERVER-24766)"},
         getCmdLineOpts: {skip: isUnrelated},
+        getDiagnosticData: {skip: isUnrelated},
         getLastError: {skip: isUnrelated},
         getLog: {skip: isUnrelated},
         getMore: {skip: "TODO(SERVER-24724)"},

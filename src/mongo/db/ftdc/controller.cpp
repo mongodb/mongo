@@ -99,6 +99,13 @@ void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface
     }
 }
 
+BSONObj FTDCController::getMostRecentPeriodicDocument() {
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _mostRecentPeriodicDocument.getOwned();
+    }
+}
+
 void FTDCController::start() {
     log() << "Initializing full-time diagnostic data capture with directory '"
           << _path.generic_string() << "'";
@@ -211,6 +218,12 @@ void FTDCController::doLoop() {
                     client, std::get<0>(collectSample), std::get<1>(collectSample));
 
                 uassertStatusOK(s);
+
+                // Store a reference to the most recent document from the periodic collectors
+                {
+                    stdx::lock_guard<stdx::mutex> lock(_mutex);
+                    _mostRecentPeriodicDocument = std::get<0>(collectSample);
+                }
             }
         }
     } catch (...) {

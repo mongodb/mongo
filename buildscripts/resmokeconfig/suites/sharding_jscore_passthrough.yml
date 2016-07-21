@@ -17,6 +17,7 @@ selector:
     - jstests/core/dbadmin.js  # "local" database.
     - jstests/core/dbhash.js  # dbhash.
     - jstests/core/dbhash2.js  # dbhash.
+    - jstests/core/diagdata.js # Command not supported in mongos
     - jstests/core/dropdb_race.js  # syncdelay.
     - jstests/core/evalb.js  # profiling.
     - jstests/core/fsync.js  # fsync.

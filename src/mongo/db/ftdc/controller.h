@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 /**
  * Responsible for periodic collection of samples, writing them to disk,
  * and rotation.
@@ -118,6 +120,16 @@ public:
      */
     void stop();
 
+    /**
+     * Get the FTDCController from ServiceContext.
+     */
+    static FTDCController* get(ServiceContext* serviceContext);
+
+    /**
+     * Get a reference to most recent document from the periodic collectors.
+     */
+    BSONObj getMostRecentPeriodicDocument();
+
 private:
     /**
      * Do periodic statistics collection, and all other work on the background thread.
@@ -162,7 +174,7 @@ private:
     // Directory to store files
     const boost::filesystem::path _path;
 
-    // Mutex to protect the condvar, and configuration changes.
+    // Mutex to protect the condvar, configuration changes, and most recent periodic document.
     stdx::mutex _mutex;
     stdx::condition_variable _condvar;
 
@@ -175,6 +187,10 @@ private:
 
     // Set of periodic collectors
     FTDCCollectorCollection _periodicCollectors;
+
+    // Last seen sample document from periodic collectors
+    // Owned
+    BSONObj _mostRecentPeriodicDocument;
 
     // Set of file rotation collectors
     FTDCCollectorCollection _rotateCollectors;

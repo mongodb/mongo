@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/ftdc/ftdc_mongod.h"
+
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <memory>
@@ -304,6 +306,8 @@ void startFTDC() {
 
     // Install periodic collectors
     // These are collected on the period interval in FTDCConfig.
+    // NOTE: For each command here, there must be an equivalent privilege check in
+    // GetDiagnosticDataCommand
 
     // CmdServerStatus
     controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
@@ -357,6 +361,10 @@ void stopFTDC() {
     if (controller) {
         controller->stop();
     }
+}
+
+FTDCController* FTDCController::get(ServiceContext* serviceContext) {
+    return getFTDCController(serviceContext).get();
 }
 
 }  // namespace mongo
