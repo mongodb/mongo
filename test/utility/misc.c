@@ -192,3 +192,18 @@ dstrdup(const void *str)
 		return (p);
 	testutil_die(errno, "strdup");
 }
+
+/*
+ * dstrndup --
+ *      Call emulating strndup, dying on failure. Don't use actual strndup here
+ *	as it is not supported within MSVC.
+ */
+void *
+dstrndup(const char *str, size_t len)
+{
+	char *p;
+
+	p = dcalloc(len + 1, sizeof(char));
+	memcpy(p, str, len);
+	return (p);
+}

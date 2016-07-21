@@ -1150,19 +1150,13 @@ __wt_page_can_evict(
 	WT_PAGE_MODIFY *mod;
 	bool modified;
 
-	if (evict_flagsp != NULL)
-		*evict_flagsp = WT_EVICTING;
-
 	btree = S2BT(session);
 	page = ref->page;
 	mod = page->modify;
 
 	/* Pages that have never been modified can always be evicted. */
-	if (mod == NULL) {
-		if (evict_flagsp != NULL)
-			FLD_SET(*evict_flagsp, WT_EVICT_CLEAN);
+	if (mod == NULL)
 		return (true);
-	}
 
 	/*
 	 * Check for in-memory splits before other eviction tests. If the page

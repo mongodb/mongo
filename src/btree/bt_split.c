@@ -1476,7 +1476,7 @@ err:	if (parent != NULL)
  */
 static int
 __split_multi_inmem(
-    WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref, WT_MULTI *multi)
+    WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT_REF *ref)
 {
 	WT_CURSOR_BTREE cbt;
 	WT_DECL_ITEM(key);
@@ -1561,6 +1561,15 @@ __split_multi_inmem(
 		}
 
 	/*
+	 * Put the re-instantiated page in the same LRU queue location as the
+	 * original page, unless this was a forced eviction, in which case we
+	 * leave the new page with the read generation unset.  Eviction will
+	 * set the read generation next time it visits this page.
+	 */
+	if (orig->read_gen != WT_READGEN_OLDEST)
+		page->read_gen = orig->read_gen;
+
+	/*
 	 * If we modified the page above, it will have set the first dirty
 	 * transaction to the last transaction currently running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty
@@ -1639,19 +1648,17 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
  */
 int
 __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
+    WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp, bool closing)
 {
 	WT_ADDR *addr;
 	WT_IKEY *ikey;
 	WT_REF *ref;
-	size_t incr;
-
-	incr = 0;
 
 	/* Allocate an underlying WT_REF. */
 	WT_RET(__wt_calloc_one(session, refp));
 	ref = *refp;
-	incr += sizeof(WT_REF);
+	if (incrp)
+		*incrp += sizeof(WT_REF);
 
 	/*
 	 * Set the WT_REF key before (optionally) building the page, underlying
@@ -1663,21 +1670,34 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		ikey = multi->key.ikey;
 		WT_RET(__wt_row_ikey(
 		    session, 0, WT_IKEY_DATA(ikey), ikey->size, ref));
-		incr += sizeof(WT_IKEY) + ikey->size;
+		if (incrp)
+			*incrp += sizeof(WT_IKEY) + ikey->size;
 		break;
 	default:
 		ref->ref_recno = multi->key.recno;
 		break;
 	}
 
-	/* If there's a disk image, build a page, otherwise set the address. */
-	if (multi->disk_image == NULL) {
-		/*
-		 * Copy the address: we could simply take the buffer, but that
-		 * would complicate error handling, freeing the reference array
-		 * would have to avoid freeing the memory, and it's not worth
-		 * the confusion.
-		 */
+	/* There should be an address or a disk image (or both). */
+	WT_ASSERT(session,
+	    multi->addr.addr != NULL || multi->disk_image != NULL);
+
+	/* If we're closing the file, there better be an address. */
+	WT_ASSERT(session, multi->addr.addr != NULL || !closing);
+
+	/* Verify any disk image we have. */
+	WT_ASSERT(session, multi->disk_image == NULL ||
+	    __wt_verify_dsk_image(session,
+	    "[page instantiate]", multi->disk_image, 0, false) == 0);
+
+	/*
+	 * If there's an address, the page was written, set it.
+	 *
+	 * Copy the address: we could simply take the buffer, but that would
+	 * complicate error handling, freeing the reference array would have
+	 * to avoid freeing the memory, and it's not worth the confusion.
+	 */
+	if (multi->addr.addr != NULL) {
 		WT_RET(__wt_calloc_one(session, &addr));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
@@ -1685,14 +1705,20 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
 		ref->state = WT_REF_DISK;
-	} else {
-		WT_RET(__split_multi_inmem(session, page, ref, multi));
-		ref->state = WT_REF_MEM;
 	}
 
-	/* Optionally return changes in the memory footprint. */
-	if (incrp != NULL)
-		*incrp += incr;
+	/*
+	 * If we have a disk image and we're not closing the file,
+	 * re-instantiate the page.
+	 *
+	 * Discard any page image we don't use.
+	 */
+	if (multi->disk_image != NULL && !closing) {
+		WT_RET(__split_multi_inmem(session, page, multi, ref));
+		ref->state = WT_REF_MEM;
+	}
+	__wt_free(session, multi->disk_image);
+
 	return (0);
 }
 
@@ -2096,8 +2122,8 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 */
 	WT_RET(__wt_calloc_def(session, new_entries, &ref_new));
 	for (i = 0; i < new_entries; ++i)
-		WT_ERR(__wt_multi_to_ref(session,
-		    page, &mod->mod_multi[i], &ref_new[i], &parent_incr));
+		WT_ERR(__wt_multi_to_ref(session, page,
+		    &mod->mod_multi[i], &ref_new[i], &parent_incr, closing));
 
 	/*
 	 * Split into the parent; if we're closing the file, we hold it
@@ -2215,7 +2241,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__wt_calloc_one(session, &new));
 	new->ref_recno = ref->ref_recno;
 
-	WT_ERR(__split_multi_inmem(session, page, new, &mod->mod_multi[0]));
+	WT_ERR(__split_multi_inmem(session, page, &mod->mod_multi[0], new));
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.

@@ -18,14 +18,15 @@ ext/extractors/csv
 ext/test/kvs_bdb HAVE_BERKELEY_DB
 .
 api/leveldb LEVELDB
-bench/wtperf
 examples/c
 lang/java JAVA
 examples/java JAVA
 lang/python PYTHON
 
-# Make the tests
+# Test/Benchmark support library.
 test/utility
+
+# Test programs.
 test/bloom
 test/checkpoint
 test/csuite
@@ -39,3 +40,6 @@ test/readonly
 test/recovery
 test/salvage
 test/thread
+
+# Benchmark programs.
+bench/wtperf
