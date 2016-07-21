@@ -813,4 +813,93 @@ TEST_F(CollectionClonerTest, MiddleBatchContainsNoDocuments) {
     ASSERT_FALSE(collectionCloner->isActive());
 }
 
+/**
+ * Start cloning.
+ * Make it fail while copying collection.
+ * Restart cloning.
+ * Run to completion.
+ */
+TEST_F(CollectionClonerTest, CollectionClonerCanBeRestartedAfterPreviousFailure) {
+    // First cloning attempt - fails while reading documents from source collection.
+    unittest::log() << "Starting first collection cloning attempt";
+    ASSERT_OK(collectionCloner->startup());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    }
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCursorResponse(1, BSON_ARRAY(BSON("_id" << 1))));
+    }
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+
+    // Check that the status hasn't changed from the initial value.
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(ErrorCodes::OperationFailed,
+                               "failed to read remaining documents from source collection");
+    }
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+
+    // Second cloning attempt - run to completion.
+    unittest::log() << "Starting second collection cloning attempt";
+    collectionStats = CollectionMockStats();
+    setStatus(getDetectableErrorStatus());
+
+    ASSERT_OK(collectionCloner->startup());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+    }
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_TRUE(collectionCloner->isActive());
+    ASSERT_TRUE(collectionStats.initCalled);
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCursorResponse(1, BSON_ARRAY(BSON("_id" << 1))));
+    }
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(1, collectionStats.insertCount);
+
+    // Check that the status hasn't changed from the initial value.
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCursorResponse(0, BSON_ARRAY(BSON("_id" << 2)), "nextBatch"));
+    }
+
+    collectionCloner->waitForDbWorker();
+    ASSERT_EQUALS(2, collectionStats.insertCount);
+    ASSERT_TRUE(collectionStats.commitCalled);
+
+    ASSERT_OK(getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+}
+
 }  // namespace
