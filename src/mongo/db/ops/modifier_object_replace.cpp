@@ -148,7 +148,7 @@ Status ModifierObjectReplace::apply() const {
 
             // Do not duplicate _id field
             if (srcIdElement.ok()) {
-                if (srcIdElement.compareWithBSONElement(dstIdElement, true) != 0) {
+                if (srcIdElement.compareWithBSONElement(dstIdElement, nullptr, true) != 0) {
                     return Status(ErrorCodes::ImmutableField,
                                   str::stream() << "The _id field cannot be changed from {"
                                                 << srcIdElement.toString()

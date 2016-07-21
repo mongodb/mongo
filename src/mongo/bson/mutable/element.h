@@ -351,8 +351,8 @@ public:
      *   Returns 1 if this > other according to BSONElement::woCompare
      */
     int compareWithElement(const ConstElement& other,
-                           bool considerFieldName = true,
-                           const StringData::ComparatorInterface* comparator = nullptr) const;
+                           const StringData::ComparatorInterface* comparator,
+                           bool considerFieldName = true) const;
 
     /** Compare this Element with BSONElement 'other'. You should not call this on the root
      *  Element of the Document because the root Element does not have a field name. Use
@@ -363,8 +363,8 @@ public:
      *   Returns 1 if this > other according to BSONElement::woCompare
      */
     int compareWithBSONElement(const BSONElement& other,
-                               bool considerFieldName = true,
-                               const StringData::ComparatorInterface* comparator = nullptr) const;
+                               const StringData::ComparatorInterface* comparator,
+                               bool considerFieldName = true) const;
 
     /** Compare this Element, which must be an Object or an Array, with 'other'.
      *
@@ -373,8 +373,8 @@ public:
      *   Returns 1 if this object > other according to BSONElement::woCompare
      */
     int compareWithBSONObj(const BSONObj& other,
-                           bool considerFieldName = true,
-                           const StringData::ComparatorInterface* comparator = nullptr) const;
+                           const StringData::ComparatorInterface* comparator,
+                           bool considerFieldName = true) const;
 
 
     //

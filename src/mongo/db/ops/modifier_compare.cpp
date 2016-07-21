@@ -130,7 +130,7 @@ Status ModifierCompare::prepare(mutablebson::Element root,
         execInfo->noOp = false;
     } else {
         const int compareVal =
-            _preparedState->elemFound.compareWithBSONElement(_val, false, _collator);
+            _preparedState->elemFound.compareWithBSONElement(_val, _collator, false);
         execInfo->noOp = (compareVal == 0) ||
             ((_mode == ModifierCompare::MAX) ? (compareVal > 0) : (compareVal < 0));
     }

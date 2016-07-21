@@ -151,7 +151,7 @@ TEST_F(SimpleDoc, SimplePath) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
 }
 
 TEST_F(SimpleDoc, LongerPath) {
@@ -163,7 +163,7 @@ TEST_F(SimpleDoc, LongerPath) {
     ASSERT_EQUALS(status, ErrorCodes::PathNotViable);
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
 }
 
 TEST_F(SimpleDoc, NotCommonPrefix) {
@@ -239,7 +239,7 @@ TEST_F(NestedDoc, SimplePath) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
 }
 
 TEST_F(NestedDoc, ShorterPath) {
@@ -249,7 +249,7 @@ TEST_F(NestedDoc, ShorterPath) {
     Element elemFound = root();
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_EQUALS(idxFound, 1U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"], nullptr), 0);
 }
 
 TEST_F(NestedDoc, ExactPath) {
@@ -260,7 +260,7 @@ TEST_F(NestedDoc, ExactPath) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 2U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
 }
 
 TEST_F(NestedDoc, LongerPath) {
@@ -273,7 +273,7 @@ TEST_F(NestedDoc, LongerPath) {
     ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 2U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
 }
 
 TEST_F(NestedDoc, NewFieldNested) {
@@ -283,7 +283,7 @@ TEST_F(NestedDoc, NewFieldNested) {
     Element elemFound = root();
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_EQUALS(idxFound, 1U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"], nullptr), 0);
 
     // From this point on, handles the creation of the '.d' part that wasn't found.
     Element newElem = doc().makeElementInt("d", 1);
@@ -301,7 +301,7 @@ TEST_F(NestedDoc, NotStartingFromRoot) {
     Element elemFound = root();
     ASSERT_OK(findLongestPrefix(field(), root()["a"], &idxFound, &elemFound));
     ASSERT_EQUALS(idxFound, 1U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]["b"]["c"], nullptr), 0);
 }
 
 class ArrayDoc : public mongo::unittest::Test {
@@ -353,7 +353,7 @@ TEST_F(ArrayDoc, PathOnEmptyArray) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["a"], nullptr), 0);
 }
 
 TEST_F(ArrayDoc, PathOnPopulatedArray) {
@@ -364,7 +364,7 @@ TEST_F(ArrayDoc, PathOnPopulatedArray) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 1U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0], nullptr), 0);
 }
 
 TEST_F(ArrayDoc, MixedArrayAndObjectPath) {
@@ -375,7 +375,7 @@ TEST_F(ArrayDoc, MixedArrayAndObjectPath) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 2U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]["c"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]["c"], nullptr), 0);
 }
 
 TEST_F(ArrayDoc, ExtendingExistingObject) {
@@ -386,7 +386,7 @@ TEST_F(ArrayDoc, ExtendingExistingObject) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 1U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"][0], nullptr), 0);
 
     // From this point on, handles the creation of the '.0.d' part that wasn't found.
     Element newElem = doc().makeElementInt("d", 1);
@@ -405,7 +405,7 @@ TEST_F(ArrayDoc, NewObjectInsideArray) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
 
     // From this point on, handles the creation of the '.1.c' part that wasn't found.
     Element newElem = doc().makeElementInt("c", 2);
@@ -424,7 +424,7 @@ TEST_F(ArrayDoc, NewNestedObjectInsideArray) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
 
     // From this point on, handles the creation of the '.1.c.d' part that wasn't found.
     Element newElem = doc().makeElementInt("d", 2);
@@ -443,7 +443,7 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
     ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
 
     // From this point on, handles the creation of the '.5' part that wasn't found.
     Element newElem = doc().makeElementInt("", 1);
@@ -512,7 +512,7 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
     ASSERT_EQUALS(status.code(), ErrorCodes::PathNotViable);
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
-    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"]), 0);
+    ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
 }
 
 //

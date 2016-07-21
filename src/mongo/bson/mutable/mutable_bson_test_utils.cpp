@@ -142,7 +142,7 @@ bool checkDocNoOrderingImpl(ConstElement lhs, ConstElement rhs) {
     } else {
         // This is some leaf type. We've already checked or ignored field names, so
         // don't recheck it here.
-        return lhs.compareWithElement(rhs, false) == 0;
+        return lhs.compareWithElement(rhs, nullptr, false) == 0;
     }
 }
 
@@ -158,30 +158,30 @@ bool checkDoc(const Document& lhs, const BSONObj& rhs) {
     const int primaryResult = fromLhs.woCompare(rhs);
 
     // Validate primary result via other comparison paths.
-    const int secondaryResult = lhs.compareWithBSONObj(rhs);
+    const int secondaryResult = lhs.compareWithBSONObj(rhs, nullptr);
 
     assertSameSign(primaryResult, secondaryResult);
 
     // Check that mutables serialized result matches against its origin.
-    ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs));
+    ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs, nullptr));
 
     return (primaryResult == 0);
 }
 
 bool checkDoc(const Document& lhs, const Document& rhs) {
-    const int primaryResult = lhs.compareWith(rhs);
+    const int primaryResult = lhs.compareWith(rhs, nullptr);
 
     const BSONObj fromLhs = lhs.getObject();
     const BSONObj fromRhs = rhs.getObject();
 
-    const int result_d_o = lhs.compareWithBSONObj(fromRhs);
-    const int result_o_d = rhs.compareWithBSONObj(fromLhs);
+    const int result_d_o = lhs.compareWithBSONObj(fromRhs, nullptr);
+    const int result_o_d = rhs.compareWithBSONObj(fromLhs, nullptr);
 
     assertSameSign(primaryResult, result_d_o);
     assertOppositeSign(primaryResult, result_o_d);
 
-    ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs));
-    ASSERT_EQUALS(0, rhs.compareWithBSONObj(fromRhs));
+    ASSERT_EQUALS(0, lhs.compareWithBSONObj(fromLhs, nullptr));
+    ASSERT_EQUALS(0, rhs.compareWithBSONObj(fromRhs, nullptr));
 
     return (primaryResult == 0);
 }

@@ -3186,10 +3186,10 @@ TEST(DocumentComparison, SimpleComparison) {
         mongo::fromjson("{ a : 'a', b : ['b', 'b', 'b'], c : { one : 1.0 } }");
 
     const mmb::Document doc1(obj.getOwned());
-    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
+    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj, nullptr));
     const mmb::Document doc2(obj.getOwned());
-    ASSERT_EQUALS(0, doc1.compareWith(doc2));
-    ASSERT_EQUALS(0, doc2.compareWith(doc1));
+    ASSERT_EQUALS(0, doc1.compareWith(doc2, nullptr));
+    ASSERT_EQUALS(0, doc2.compareWith(doc1, nullptr));
 }
 
 TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
@@ -3207,10 +3207,10 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
     ASSERT_OK(b0.remove());
     ASSERT_OK(b.pushBack(b0));
     // Ensure that it compares correctly against the source object.
-    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
+    ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj, nullptr));
     // Ensure that it compares correctly against a pristine document.
-    ASSERT_EQUALS(0, doc1.compareWith(doc1Copy));
-    ASSERT_EQUALS(0, doc1Copy.compareWith(doc1));
+    ASSERT_EQUALS(0, doc1.compareWith(doc1Copy, nullptr));
+    ASSERT_EQUALS(0, doc1Copy.compareWith(doc1, nullptr));
 
     // Perform an operation on 'c' that doesn't change the serialized value, but
     // deserializeds the node.
@@ -3223,14 +3223,14 @@ TEST(DocumentComparison, SimpleComparisonWithDeserializedElements) {
     ASSERT_OK(c1.remove());
     ASSERT_OK(c.pushBack(c1));
     // Ensure that it compares correctly against the source object
-    ASSERT_EQUALS(0, doc2.compareWithBSONObj(obj));
+    ASSERT_EQUALS(0, doc2.compareWithBSONObj(obj, nullptr));
     // Ensure that it compares correctly against a pristine document.
-    ASSERT_EQUALS(0, doc2.compareWith(doc2Copy));
-    ASSERT_EQUALS(0, doc2Copy.compareWith(doc2));
+    ASSERT_EQUALS(0, doc2.compareWith(doc2Copy, nullptr));
+    ASSERT_EQUALS(0, doc2Copy.compareWith(doc2, nullptr));
 
     // Ensure that the two deserialized documents compare with each other correctly.
-    ASSERT_EQUALS(0, doc1.compareWith(doc2));
-    ASSERT_EQUALS(0, doc2.compareWith(doc1));
+    ASSERT_EQUALS(0, doc1.compareWith(doc2, nullptr));
+    ASSERT_EQUALS(0, doc2.compareWith(doc1, nullptr));
 }
 
 TEST(DocumentComparison, DocumentCompareWithRespectsCollation) {
@@ -3239,8 +3239,8 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollation) {
     const mmb::Document doc2(mongo::fromjson("{a: 'bar'}"));
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
-    ASSERT_NE(0, doc1.compareWith(doc2, true));
-    ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+    ASSERT_NE(0, doc1.compareWith(doc2, nullptr, true));
+    ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
 }
 
 TEST(DocumentComparison, DocumentCompareWithBSONObjRespectsCollation) {
@@ -3249,8 +3249,8 @@ TEST(DocumentComparison, DocumentCompareWithBSONObjRespectsCollation) {
     const mongo::BSONObj doc2 = mongo::fromjson("{a: 'bar'}");
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
-    ASSERT_NE(0, doc1.compareWithBSONObj(doc2, true));
-    ASSERT_EQ(0, doc1.compareWithBSONObj(doc2, true, &collator));
+    ASSERT_NE(0, doc1.compareWithBSONObj(doc2, nullptr, true));
+    ASSERT_EQ(0, doc1.compareWithBSONObj(doc2, &collator, true));
 }
 
 TEST(DocumentComparison, ElementCompareWithElementRespectsCollator) {
@@ -3261,8 +3261,8 @@ TEST(DocumentComparison, ElementCompareWithElementRespectsCollator) {
     const mmb::ConstElement element2 = doc2.root().leftChild();
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
-    ASSERT_NE(0, element1.compareWithElement(element2, true));
-    ASSERT_EQ(0, element1.compareWithElement(element2, true, &collator));
+    ASSERT_NE(0, element1.compareWithElement(element2, nullptr, true));
+    ASSERT_EQ(0, element1.compareWithElement(element2, &collator, true));
 }
 
 TEST(DocumentComparison, ElementCompareWithBSONElementRespectsCollator) {
@@ -3273,8 +3273,8 @@ TEST(DocumentComparison, ElementCompareWithBSONElementRespectsCollator) {
     const mongo::BSONElement element2 = doc2["a"];
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
-    ASSERT_NE(0, element1.compareWithBSONElement(element2, true));
-    ASSERT_EQ(0, element1.compareWithBSONElement(element2, true, &collator));
+    ASSERT_NE(0, element1.compareWithBSONElement(element2, nullptr, true));
+    ASSERT_EQ(0, element1.compareWithBSONElement(element2, &collator, true));
 }
 
 TEST(DocumentComparison, ElementCompareWithBSONObjRespectsCollator) {
@@ -3284,8 +3284,8 @@ TEST(DocumentComparison, ElementCompareWithBSONObjRespectsCollator) {
     const mmb::ConstElement element1 = doc1.root().leftChild();
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
-    ASSERT_NE(0, element1.compareWithBSONObj(doc2, true));
-    ASSERT_EQ(0, element1.compareWithBSONObj(doc2, true, &collator));
+    ASSERT_NE(0, element1.compareWithBSONObj(doc2, nullptr, true));
+    ASSERT_EQ(0, element1.compareWithBSONObj(doc2, &collator, true));
 }
 
 TEST(DocumentComparison, DocumentCompareWithRespectsCollationRecursively) {
@@ -3294,8 +3294,8 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollationRecursively) {
     const mmb::Document doc2(mongo::fromjson("{a: [{b: 'notFoo'}, {b: 'notBar'}]}"));
     // Pass true to indicate that we should compare field names. The two documents should be unequal
     // without the collator, but equal when using the "always equal" collator.
-    ASSERT_NE(0, doc1.compareWith(doc2, true));
-    ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
+    ASSERT_NE(0, doc1.compareWith(doc2, nullptr, true));
+    ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
 }
 
 TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedElement) {
@@ -3304,8 +3304,8 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedEle
     mmb::Document doc2(mongo::fromjson("{a: ['bar', 'bar']}"));
 
     // With the always equal collator, the documents should start out comparing equal.
-    ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
-    ASSERT_EQ(0, doc2.compareWith(doc1, true, &collator));
+    ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+    ASSERT_EQ(0, doc2.compareWith(doc1, &collator, true));
 
     // They should still be equal after causing deserialization of one of the leaf elements of
     // 'doc1'.
@@ -3316,8 +3316,8 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedEle
         ASSERT_TRUE(elementA0.ok());
         ASSERT_OK(elementA0.remove());
         ASSERT_OK(elementA.pushBack(elementA0));
-        ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
-        ASSERT_EQ(0, doc2.compareWith(doc1, true, &collator));
+        ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+        ASSERT_EQ(0, doc2.compareWith(doc1, &collator, true));
     }
 
     // And they should remain equal after doing the same to 'doc2'.
@@ -3328,8 +3328,8 @@ TEST(DocumentComparison, DocumentCompareWithRespectsCollationWithDeserializedEle
         ASSERT_TRUE(elementA0.ok());
         ASSERT_OK(elementA0.remove());
         ASSERT_OK(elementA.pushBack(elementA0));
-        ASSERT_EQ(0, doc1.compareWith(doc2, true, &collator));
-        ASSERT_EQ(0, doc2.compareWith(doc1, true, &collator));
+        ASSERT_EQ(0, doc1.compareWith(doc2, &collator, true));
+        ASSERT_EQ(0, doc2.compareWith(doc1, &collator, true));
     }
 }
 

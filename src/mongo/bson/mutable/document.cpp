@@ -1487,8 +1487,8 @@ SafeNum Element::getValueSafeNum() const {
 }
 
 int Element::compareWithElement(const ConstElement& other,
-                                bool considerFieldName,
-                                const StringData::ComparatorInterface* comparator) const {
+                                const StringData::ComparatorInterface* comparator,
+                                bool considerFieldName) const {
     invariant(ok());
     invariant(other.ok());
 
@@ -1511,14 +1511,14 @@ int Element::compareWithElement(const ConstElement& other,
     // in all cases.
     if (impl.hasValue(thisRep))
         return -other.compareWithBSONElement(
-            impl.getSerializedElement(thisRep), considerFieldName, comparator);
+            impl.getSerializedElement(thisRep), comparator, considerFieldName);
 
     const Document::Impl& oimpl = other.getDocument().getImpl();
     const ElementRep& otherRep = oimpl.getElementRep(other.getIdx());
 
     if (oimpl.hasValue(otherRep))
         return compareWithBSONElement(
-            oimpl.getSerializedElement(otherRep), considerFieldName, comparator);
+            oimpl.getSerializedElement(otherRep), comparator, considerFieldName);
 
     // Leaf elements should always have a value, so we should only be dealing with Objects
     // or Arrays here.
@@ -1560,7 +1560,7 @@ int Element::compareWithElement(const ConstElement& other,
             return 1;
 
         const int result =
-            thisIter.compareWithElement(otherIter, considerChildFieldNames, comparator);
+            thisIter.compareWithElement(otherIter, comparator, considerChildFieldNames);
         if (result != 0)
             return result;
 
@@ -1570,8 +1570,8 @@ int Element::compareWithElement(const ConstElement& other,
 }
 
 int Element::compareWithBSONElement(const BSONElement& other,
-                                    bool considerFieldName,
-                                    const StringData::ComparatorInterface* comparator) const {
+                                    const StringData::ComparatorInterface* comparator,
+                                    bool considerFieldName) const {
     invariant(ok());
 
     const Document::Impl& impl = getDocument().getImpl();
@@ -1607,12 +1607,12 @@ int Element::compareWithBSONElement(const BSONElement& other,
     const bool considerChildFieldNames =
         (impl.getType(thisRep) != mongo::Array) && (other.type() != mongo::Array);
 
-    return compareWithBSONObj(other.Obj(), considerChildFieldNames, comparator);
+    return compareWithBSONObj(other.Obj(), comparator, considerChildFieldNames);
 }
 
 int Element::compareWithBSONObj(const BSONObj& other,
-                                bool considerFieldName,
-                                const StringData::ComparatorInterface* comparator) const {
+                                const StringData::ComparatorInterface* comparator,
+                                bool considerFieldName) const {
     invariant(ok());
 
     const Document::Impl& impl = getDocument().getImpl();
@@ -1634,7 +1634,7 @@ int Element::compareWithBSONObj(const BSONObj& other,
         if (otherVal.eoo())
             return 1;
 
-        const int result = thisIter.compareWithBSONElement(otherVal, considerFieldName, comparator);
+        const int result = thisIter.compareWithBSONElement(otherVal, comparator, considerFieldName);
         if (result != 0)
             return result;
 

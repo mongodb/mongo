@@ -74,7 +74,7 @@ struct mutableElementEqualsBSONElement : std::unary_function<BSONElement, bool> 
                                     const CollatorInterface* collator)
         : _what(elem), _collator(collator) {}
     bool operator()(const BSONElement& elem) const {
-        return _what.compareWithBSONElement(elem, false, _collator) == 0;
+        return _what.compareWithBSONElement(elem, _collator, false) == 0;
     }
     const mutablebson::Element& _what;
     const CollatorInterface* _collator = nullptr;

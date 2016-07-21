@@ -278,14 +278,13 @@ public:
 
     /** Compare this Document to 'other' with the semantics of BSONObj::woCompare. */
     inline int compareWith(const Document& other,
-                           bool considerFieldName = true,
-                           const StringData::ComparatorInterface* comparator = nullptr) const;
+                           const StringData::ComparatorInterface* comparator,
+                           bool considerFieldName = true) const;
 
     /** Compare this Document to 'other' with the semantics of BSONObj::woCompare. */
-    inline int compareWithBSONObj(
-        const BSONObj& other,
-        bool considerFieldName = true,
-        const StringData::ComparatorInterface* comparator = nullptr) const;
+    inline int compareWithBSONObj(const BSONObj& other,
+                                  const StringData::ComparatorInterface* comparator,
+                                  bool considerFieldName = true) const;
 
 
     //

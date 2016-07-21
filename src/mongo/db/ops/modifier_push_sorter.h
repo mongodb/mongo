@@ -47,7 +47,7 @@ struct PatternElementCmp {
     bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
         namespace dps = ::mongo::dotted_path_support;
         if (useWholeValue) {
-            const int comparedValue = lhs.compareWithElement(rhs, false, collator);
+            const int comparedValue = lhs.compareWithElement(rhs, collator, false);
 
             const bool reversed = (sortPattern.firstElement().number() < 0);
 

@@ -272,7 +272,7 @@ bool ModifierPull::isMatch(mutablebson::ConstElement element) {
     dassert(element.hasValue());
 
     if (!_matchExpr)
-        return (element.compareWithBSONElement(_exprElt, false, _collator) == 0);
+        return (element.compareWithBSONElement(_exprElt, _collator, false) == 0);
 
     if (_matcherOnPrimitive) {
         // TODO: This is kinda slow.

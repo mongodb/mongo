@@ -375,7 +375,7 @@ inline Status validate(const BSONObj& original,
             }
 
             // If we have both (old and new), compare them. If we just have new we are good
-            if (oldElem.ok() && newElem.compareWithBSONElement(oldElem, false) != 0) {
+            if (oldElem.ok() && newElem.compareWithBSONElement(oldElem, nullptr, false) != 0) {
                 return Status(ErrorCodes::ImmutableField,
                               mongoutils::str::stream()
                                   << "After applying the update to the document {"

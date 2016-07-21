@@ -311,7 +311,7 @@ TEST_F(CountTest, CountSiblingsMany) {
 
 TEST(DeduplicateTest, ManyDuplicates) {
     Document doc(mongo::fromjson("{ x : [ 1, 2, 2, 3, 3, 3, 4, 4, 4 ] }"));
-    deduplicateChildren(doc.root().leftChild(), woEqual(false));
+    deduplicateChildren(doc.root().leftChild(), woEqual(nullptr, false));
     ASSERT_TRUE(checkDoc(doc, mongo::fromjson("{x : [ 1, 2, 3, 4 ]}")));
 }
 
@@ -336,7 +336,7 @@ TEST(WoLessTest, CollationAware) {
     Document less(mongo::fromjson("{ x: 'cbc' }"));
     Document greater(mongo::fromjson("{ x: 'abd' }"));
 
-    woLess comp(true, &collator);
+    woLess comp(&collator, true);
     ASSERT_TRUE(comp(less.root(), greater.root()));
     ASSERT_FALSE(comp(greater.root(), less.root()));
 }
@@ -346,7 +346,7 @@ TEST(WoGreaterTest, CollationAware) {
     Document less(mongo::fromjson("{ x: 'cbc' }"));
     Document greater(mongo::fromjson("{ x: 'abd' }"));
 
-    woGreater comp(true, &collator);
+    woGreater comp(&collator, true);
     ASSERT_TRUE(comp(greater.root(), less.root()));
     ASSERT_FALSE(comp(less.root(), greater.root()));
 }
@@ -356,7 +356,7 @@ TEST(WoEqualTest, CollationAware) {
     Document docA(mongo::fromjson("{ x: 'not' }"));
     Document docB(mongo::fromjson("{ x: 'equal' }"));
 
-    woEqual comp(true, &collator);
+    woEqual comp(&collator, true);
     ASSERT_TRUE(comp(docA.root(), docB.root()));
     ASSERT_TRUE(comp(docB.root(), docA.root()));
 }
@@ -366,7 +366,7 @@ TEST(WoEqualToTest, CollationAware) {
     Document docA(mongo::fromjson("{ x: 'not' }"));
     Document docB(mongo::fromjson("{ x: 'equal' }"));
 
-    woEqualTo comp(docA.root(), true, &collator);
+    woEqualTo comp(docA.root(), &collator, true);
     ASSERT_TRUE(comp(docB.root()));
 }
 

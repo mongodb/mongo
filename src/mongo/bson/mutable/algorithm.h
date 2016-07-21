@@ -167,51 +167,48 @@ void deduplicateChildren(Element parent, EqualityComparator equal) {
 class woLess {
     // TODO: This should possibly derive from std::binary_function.
 public:
-    woLess(bool considerFieldName = true,
-           const StringData::ComparatorInterface* comparator = nullptr)
-        : _considerFieldName(considerFieldName), _comp(comparator) {}
+    woLess(const StringData::ComparatorInterface* comparator, bool considerFieldName = true)
+        : _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& left, const ConstElement& right) const {
-        return left.compareWithElement(right, _considerFieldName, _comp) < 0;
+        return left.compareWithElement(right, _comp, _considerFieldName) < 0;
     }
 
 private:
-    const bool _considerFieldName;
     const StringData::ComparatorInterface* _comp = nullptr;
+    const bool _considerFieldName;
 };
 
 /** A greater-than ordering for Elements that compares based on woCompare */
 class woGreater {
     // TODO: This should possibly derive from std::binary_function.
 public:
-    woGreater(bool considerFieldName = true,
-              const StringData::ComparatorInterface* comparator = nullptr)
-        : _considerFieldName(considerFieldName), _comp(comparator) {}
+    woGreater(const StringData::ComparatorInterface* comparator, bool considerFieldName = true)
+        : _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& left, const ConstElement& right) const {
-        return left.compareWithElement(right, _considerFieldName, _comp) > 0;
+        return left.compareWithElement(right, _comp, _considerFieldName) > 0;
     }
 
 private:
-    const bool _considerFieldName;
     const StringData::ComparatorInterface* _comp = nullptr;
+    const bool _considerFieldName;
 };
 
 /** An equality predicate for elements that compares based on woCompare */
 class woEqual {
     // TODO: This should possibly derive from std::binary_function.
 public:
-    woEqual(bool considerFieldName = true,
-            const StringData::ComparatorInterface* comparator = nullptr)
-        : _considerFieldName(considerFieldName), _comp(comparator) {}
+    woEqual(const StringData::ComparatorInterface* comparator, bool considerFieldName = true)
+        : _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& left, const ConstElement& right) const {
-        return left.compareWithElement(right, _considerFieldName, _comp) == 0;
+        return left.compareWithElement(right, _comp, _considerFieldName) == 0;
     }
 
 private:
-    const bool _considerFieldName;
     const StringData::ComparatorInterface* _comp = nullptr;
+    const bool _considerFieldName;
 };
 
 /** An equality predicate for elements that compares based on woCompare */
@@ -219,18 +216,18 @@ class woEqualTo {
     // TODO: This should possibly derive from std::binary_function.
 public:
     woEqualTo(const ConstElement& value,
-              bool considerFieldName = true,
-              const StringData::ComparatorInterface* comparator = nullptr)
-        : _value(value), _considerFieldName(considerFieldName), _comp(comparator) {}
+              const StringData::ComparatorInterface* comparator,
+              bool considerFieldName = true)
+        : _value(value), _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& elt) const {
-        return _value.compareWithElement(elt, _considerFieldName, _comp) == 0;
+        return _value.compareWithElement(elt, _comp, _considerFieldName) == 0;
     }
 
 private:
     const ConstElement _value;
-    const bool _considerFieldName;
     const StringData::ComparatorInterface* _comp = nullptr;
+    const bool _considerFieldName;
 };
 
 // NOTE: Originally, these truly were algorithms, in that they executed the loop over a
