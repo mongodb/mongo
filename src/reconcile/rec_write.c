@@ -3298,7 +3298,7 @@ supd_check_complete:
 				multi->disk_image = NULL;
 
 				WT_STAT_FAST_DATA_INCR(session, rec_page_match);
-				goto copy_image;
+				goto done;
 			}
 		}
 	}
@@ -3333,10 +3333,11 @@ copy_image:
 	 * Optionally keep the disk image in cache (raw compression has already
 	 * made a copy).
 	 */
-	if (F_ISSET(r, WT_EVICT_SCRUB) && !bnd->disk_image)
+	if (F_ISSET(r, WT_EVICT_SCRUB) && bnd->disk_image == NULL)
 		WT_ERR(__wt_strndup(
 		    session, buf->data, buf->size, &bnd->disk_image));
 
+done:
 err:	__wt_scr_free(session, &key);
 	return (ret);
 }
