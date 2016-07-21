@@ -873,6 +873,23 @@ TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
         "{fetch: {node: {ixscan: {pattern: {b: '2dsphere'}}}}}]}}");
 }
 
+// Regression test for SERVER-24320. Tests that the PlanCacheIndexTree has the same sort order as
+// the MatchExpression used to generate the plan cache key.
+TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
+    addIndex(BSON("a"
+                  << "2dsphere"
+                  << "b"
+                  << 1));
+
+    BSONObj query = fromjson(
+        "{$and: [{b: 1}, {a: {$within: {$polygon: [[0, 0], [0, 0], [0, 0], [0, 0]]}}}, {a: "
+        "{$within: {$centerSphere: [[0, 0], 0]}}}]}");
+
+    runQuery(query);
+    assertPlanCacheRecoversSolution(query,
+                                    "{fetch: {node: {ixscan: {pattern: {a: '2dsphere', b: 1}}}}}");
+}
+
 //
 // tree operations
 //

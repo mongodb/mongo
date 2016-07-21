@@ -329,7 +329,6 @@ bool PlanEnumerator::getNext(MatchExpression** tree) {
 
     *tree = _root->shallowClone().release();
     tagForSort(*tree);
-    sortUsingTags(*tree);
 
     _root->resetTag();
     LOG(5) << "Enumerator: memo just before moving:" << endl << dumpMemo();
