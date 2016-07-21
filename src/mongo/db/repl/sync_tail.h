@@ -174,12 +174,13 @@ public:
      */
     OldThreadPool* getWriterPool();
 
+    static std::atomic<int> replBatchLimitOperations;  // NOLINT (sever params must use std::atomic)
+
 protected:
     // Cap the batches using the limit on journal commits.
     // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
     static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
     static const int replBatchLimitSeconds = 1;
-    static const unsigned int replBatchLimitOperations = 5000;
 
     // Apply a batch of operations, using multiple threads.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.

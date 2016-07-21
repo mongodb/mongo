@@ -81,6 +81,8 @@ using std::endl;
 
 namespace repl {
 
+std::atomic<int> SyncTail::replBatchLimitOperations{5000};  // NOLINT
+
 /**
  * This variable determines the number of writer threads SyncTail will have. It has a default
  * value, which varies based on architecture and can be overridden using the
@@ -94,7 +96,6 @@ int replWriterThreadCount = 2;
 #else
 #error need to include something that defines MONGO_PLATFORM_XX
 #endif
-}  // namespace
 
 class ExportedWriterThreadCountParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupOnly> {
@@ -113,6 +114,25 @@ public:
 
 } exportedWriterThreadCountParam;
 
+class ExportedBatchLimitOperationsParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedBatchLimitOperationsParameter()
+        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "replBatchLimitOperations",
+              &SyncTail::replBatchLimitOperations) {}
+
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < 1 || potentialNewValue > (1000 * 1000)) {
+            return Status(ErrorCodes::BadValue,
+                          "replBatchLimitOperations must be between 1 and 1 million, inclusive");
+        }
+
+        return Status::OK();
+    }
+} exportedBatchLimitOperationsParam;
+}  // namespace
 
 static Counter64 opsAppliedStats;
 
@@ -714,7 +734,7 @@ private:
                     const auto batchDuration = fastClockSource->now() - batchStartTime;
                     if (durationCount<Seconds>(batchDuration) >= replBatchLimitSeconds)
                         break;
-                    if (ops.getCount() >= replBatchLimitOperations)
+                    if (ops.getCount() >= size_t(replBatchLimitOperations))
                         break;
                     if (ops.getBytes() >= replBatchLimitBytes)
                         break;

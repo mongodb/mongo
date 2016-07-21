@@ -97,7 +97,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
             // apply replication batch limits
             if (ops.getBytes() > replBatchLimitBytes)
                 break;
-            if (ops.getCount() > replBatchLimitOperations)
+            if (ops.getCount() > size_t(replBatchLimitOperations))
                 break;
         };
 
