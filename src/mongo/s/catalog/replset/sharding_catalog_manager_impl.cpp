@@ -121,7 +121,7 @@ Status checkForOveralappedZonedKeyRange(OperationContext* txn,
                                         const ChunkRange& range,
                                         const string& zoneName,
                                         const KeyPattern& shardKeyPattern) {
-    DistributionStatus chunkDist(ns, {});
+    DistributionStatus chunkDist(ns, ShardToChunksMap{});
 
     auto tagStatus = configServer->exhaustiveFindOnConfig(txn,
                                                           kConfigPrimarySelector,

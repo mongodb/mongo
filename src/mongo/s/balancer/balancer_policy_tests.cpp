@@ -450,7 +450,7 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParalle
 }
 
 TEST(DistributionStatus, AddTagRangeOverlap) {
-    DistributionStatus d(kNamespace, {});
+    DistributionStatus d(kNamespace, ShardToChunksMap{});
 
     // Note that there is gap between 10 and 20 for which there is no tag
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
@@ -473,7 +473,7 @@ TEST(DistributionStatus, AddTagRangeOverlap) {
 }
 
 TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
-    DistributionStatus d(kNamespace, {});
+    DistributionStatus d(kNamespace, ShardToChunksMap{});
 
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 10), "a")));
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << 10), BSON("x" << 20), "b")));
@@ -537,7 +537,7 @@ TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
 }
 
 TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
-    DistributionStatus d(kNamespace, {});
+    DistributionStatus d(kNamespace, ShardToChunksMap{});
 
     ASSERT_OK(d.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << -100), "a")));
     ASSERT_OK(d.addRangeToZone(ZoneRange(BSON("x" << -10), BSON("x" << 10), "b")));
