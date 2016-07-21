@@ -30,7 +30,7 @@ import os, time
 import wiredtiger, wttest
 from helper import confirm_does_not_exist, complex_populate, \
     complex_populate_index_name, simple_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_drop.py
 #    session level drop operation
@@ -38,7 +38,7 @@ class test_drop(wttest.WiredTigerTestCase):
     name = 'test_drop'
     extra_config = ''
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
         ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),

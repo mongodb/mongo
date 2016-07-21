@@ -32,7 +32,6 @@
 
 import os, run, string, codecs
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
 import test_salvage
 
 # Run the regular salvage test, but with encryption on

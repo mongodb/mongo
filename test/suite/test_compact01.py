@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from helper import complex_populate, simple_populate, key_populate
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_compact.py
 #    session level compact operation
@@ -53,7 +53,7 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         ('method_reopen', dict(utility=0,reopen=1)),
         ('utility', dict(utility=1,reopen=0)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, compact))
+    scenarios = make_scenarios(types, compact)
     # We want a large cache so that eviction doesn't happen
     # (which could skew our compaction results).
     conn_config = 'cache_size=250MB,statistics=(all)'

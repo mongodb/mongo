@@ -28,7 +28,7 @@
 
 import os
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 import wiredtiger, wttest
 
 # test_huffman01.py
@@ -52,7 +52,7 @@ class test_huffman01(wttest.WiredTigerTestCase, suite_subprocess):
         ('utf8', dict(huffval=',huffman_value=utf8t8file',vfile='t8file')),
         ('utf16', dict(huffval=',huffman_value=utf16t16file',vfile='t16file')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', huffkey, huffval))
+    scenarios = make_scenarios(huffkey, huffval)
 
     def test_huffman(self):
         dir = self.conn.get_home()

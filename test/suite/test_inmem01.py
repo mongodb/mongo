@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from time import sleep
 from helper import simple_populate, simple_populate_check
 from helper import key_populate, value_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_inmem01.py
 #    Test in-memory configuration.
@@ -40,7 +40,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         'cache_size=5MB,file_manager=(close_idle_time=0),in_memory=true'
     table_config = ',memory_page_max=32k,leaf_page_max=4k'
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('col', dict(fmt='key_format=r,value_format=S')),
         ('fix', dict(fmt='key_format=r,value_format=8t')),
         ('row', dict(fmt='key_format=S,value_format=S'))

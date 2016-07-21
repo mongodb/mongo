@@ -31,7 +31,7 @@
 #
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 class PackTester:
     def __init__(self, formatcode, validlow, validhigh, equals):
@@ -129,7 +129,7 @@ class test_intpack(wttest.WiredTigerTestCase):
     # We have to be a bit verbose here with naming, as there can be problems with
     # case insensitive test names:w
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('int8_t_b', dict(formatcode='b', low=-128, high=127, nbits=8)),
         ('uint8_t_B', dict(formatcode='B', low=0, high=255, nbits=8)),
         ('fix_len_8t', dict(formatcode='8t', low=0, high=255, nbits=8)),
@@ -147,7 +147,6 @@ class test_intpack(wttest.WiredTigerTestCase):
         ('uint64_t_Q', dict(formatcode='Q', low=0, high=18446744073709551615,
                    nbits=64)),
     ])
-    scenarios = check_scenarios(number_scenarios(scenarios))
 
     def test_packing(self):
         pt = PackTester(self.formatcode, self.low, self.high, self.assertEquals)

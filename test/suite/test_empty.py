@@ -29,14 +29,14 @@
 import os
 import wiredtiger, wttest
 from helper import key_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_empty.py
 #       Test that empty objects don't write anything other than a single sector.
 class test_empty(wttest.WiredTigerTestCase):
     name = 'test_empty'
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-r', dict(type='file:', fmt='r')),
         ('file-S', dict(type='file:', fmt='S')),
         ('table-r', dict(type='table:', fmt='r')),

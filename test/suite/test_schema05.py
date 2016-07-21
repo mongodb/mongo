@@ -28,7 +28,7 @@
 
 import os
 import wiredtiger, wttest, run
-from wtscenario import check_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_schema05.py
 #    Test indices using a custom extractor.
@@ -51,7 +51,7 @@ class test_schema05(wttest.WiredTigerTestCase):
     nentries = 1000
     nindices = 6
 
-    scenarios = number_scenarios([
+    scenarios = make_scenarios([
         ('index-before', { 'create_index' : 0 }),
         ('index-during', { 'create_index' : 1 }),
         ('index-after', { 'create_index' : 2 }),

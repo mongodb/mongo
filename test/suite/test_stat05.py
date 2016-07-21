@@ -28,7 +28,7 @@
 
 import itertools, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 from wiredtiger import stat
 from helper import complex_populate, complex_populate_lsm, simple_populate
 from helper import complex_value_populate, key_populate, value_populate
@@ -52,7 +52,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             cfg=',lsm=(chunk_size=1MB,merge_min=2)')),
     ]
 
-    scenarios = number_scenarios(uri)
+    scenarios = make_scenarios(uri)
 
     def openAndWalkStatCursor(self):
         c = self.session.open_cursor(

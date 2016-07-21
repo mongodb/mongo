@@ -32,7 +32,7 @@
 
 import os, run, random
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Test raw compression with encryption
 class test_encrypt05(wttest.WiredTigerTestCase):
@@ -44,8 +44,7 @@ class test_encrypt05(wttest.WiredTigerTestCase):
     compress = [
         ('zlib', dict(log_compress='zlib', block_compress='zlib')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.',
-                                                    encrypt, compress))
+    scenarios = make_scenarios(encrypt, compress)
 
     nrecords = 500
     bigvalue = 'a' * 500 # we use values that will definitely give compression

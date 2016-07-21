@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest, suite_random
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_join02.py
 #    Join operations
@@ -48,7 +48,7 @@ class test_join02(wttest.WiredTigerTestCase):
         ('nobloom', dict(usebloom=False))
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', keyscen, bloomscen))
+    scenarios = make_scenarios(keyscen, bloomscen)
 
     # Start our range from 1, since WT record numbers start at 1,
     # it makes things work out nicer.

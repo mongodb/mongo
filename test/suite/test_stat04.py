@@ -28,7 +28,7 @@
 
 import os, struct
 from suite_subprocess import suite_subprocess
-from wtscenario import number_scenarios, multiply_scenarios
+from wtscenario import make_scenarios
 import wiredtiger, wttest
 from wiredtiger import stat
 
@@ -49,7 +49,7 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
         ('large', dict(nentries=100000, valuesize=1)),
         ('jumboval', dict(nentries=100, valuesize=4200000)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', keyfmt, nentries))
+    scenarios = make_scenarios(keyfmt, nentries)
     conn_config = 'statistics=(all)'
 
     def init_test(self):

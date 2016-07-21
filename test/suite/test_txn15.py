@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
@@ -71,7 +71,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         ('c_none', dict(commit_sync=None)),
         ('c_off', dict(commit_sync='sync=off')),
     ]
-    scenarios = multiply_scenarios('.', conn_sync_enabled, conn_sync_method,
+    scenarios = make_scenarios(conn_sync_enabled, conn_sync_method,
         begin_sync, commit_sync)
 
     # Given the different configuration settings determine if this group

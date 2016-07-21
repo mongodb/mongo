@@ -28,13 +28,13 @@
 
 import wiredtiger, wttest
 from helper import key_populate, simple_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_overwrite.py
 #    cursor overwrite configuration method
 class test_overwrite(wttest.WiredTigerTestCase):
     name = 'overwrite'
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-r', dict(type='file:',keyfmt='r')),
         ('file-S', dict(type='file:',keyfmt='S')),
         ('lsm-S', dict(type='lsm:',keyfmt='S')),

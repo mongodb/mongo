@@ -34,7 +34,7 @@ from helper import \
     simple_index_populate, simple_index_populate_check, \
     simple_index_populate_check_cursor, compare_files
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # A 'fake' cursor based on a set of rows.
 # It emulates a WT cursor well enough for the *_check_cursor methods.
@@ -108,8 +108,7 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
           populate_check=complex_populate_check,
           populate_check_cursor=complex_populate_check_cursor))
     ]
-    scenarios = number_scenarios(
-        multiply_scenarios('.', types, keyfmt))
+    scenarios = make_scenarios(types, keyfmt)
 
     # Dump using util, re-load using python's JSON, and do a content comparison.
     def test_jsondump_util(self):

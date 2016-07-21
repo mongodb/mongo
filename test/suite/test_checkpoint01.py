@@ -28,7 +28,7 @@
 
 import wiredtiger, wttest
 from helper import key_populate, complex_populate_lsm, simple_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_checkpoint01.py
 #    Checkpoint tests
@@ -36,7 +36,7 @@ from wtscenario import check_scenarios
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.
 class test_checkpoint(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
     ])
@@ -139,7 +139,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
     ])
@@ -205,7 +205,7 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 
 # Check that you can checkpoint targets.
 class test_checkpoint_target(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
     ])
@@ -252,7 +252,7 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 
 # Check that you can't write checkpoint cursors.
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-r', dict(uri='file:checkpoint',fmt='r')),
         ('file-S', dict(uri='file:checkpoint',fmt='S')),
         ('table-r', dict(uri='table:checkpoint',fmt='r')),
@@ -277,7 +277,7 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
 
 # Check that WiredTigerCheckpoint works as a checkpoint specifier.
 class test_checkpoint_last(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
     ])
@@ -343,7 +343,7 @@ class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
 
 
 class test_checkpoint_empty(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint')),
         ('table', dict(uri='table:checkpoint')),
     ])
