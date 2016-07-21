@@ -334,6 +334,11 @@ protected:
         try {
             _dr.reset(new DataReplicator(
                 options, std::move(dataReplicatorExternalState), _storageInterface.get()));
+            _dr->setScheduleDbWorkFn_forTest(
+                [this](const executor::TaskExecutor::CallbackFn& work) {
+                    return getExecutor().scheduleWork(work);
+                });
+
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }

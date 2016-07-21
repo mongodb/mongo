@@ -402,6 +402,11 @@ void DataReplicator::_resetState_inlock(OperationContext* txn, OpTimeWithHash la
     _oplogBuffer->clear(txn);
 }
 
+void DataReplicator::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
+    LockGuard lk(_mutex);
+    _scheduleDbWorkFn = work;
+}
+
 void DataReplicator::slavesHaveProgressed() {
     if (_reporter) {
         _reporter->trigger();
@@ -559,6 +564,9 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
                                                                stdx::placeholders::_2));
     _scheduleFetch_inlock();
     DatabasesCloner* cloner = _initialSyncState->dbsCloner.get();
+    if (_scheduleDbWorkFn) {
+        cloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+    }
     lk.unlock();
 
     if (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {

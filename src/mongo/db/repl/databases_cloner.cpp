@@ -179,6 +179,11 @@ Status DatabasesCloner::startup() {
     return _status;
 }
 
+void DatabasesCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
+    LockGuard lk(_mutex);
+    _scheduleDbWorkFn = work;
+}
+
 void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
     Status respStatus = cbd.response.getStatus();
     if (respStatus.isOK()) {
@@ -250,6 +255,9 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
                 _storage,  // use storage provided.
                 onCollectionFinish,
                 onDbFinish));
+            if (_scheduleDbWorkFn) {
+                dbCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+            }
             // Start database cloner.
             startStatus = dbCloner->start();
         } catch (...) {

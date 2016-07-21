@@ -85,6 +85,13 @@ public:
     Status getStatus();
     std::string toString() const;
 
+    /**
+     * Overrides how executor schedules database work.
+     *
+     * For testing only.
+     */
+    void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
+
 private:
     /**
      *  Setting the status to not-OK will stop the process
@@ -122,6 +129,7 @@ private:
     std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;  // (M) database cloners by name
     int _clonersActive = 0;  // (M) Number of active cloners left.
     std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
+    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;            // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.
     const OnFinishFn _finishFn;            // (R) function called when finished.

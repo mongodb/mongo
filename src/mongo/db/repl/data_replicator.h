@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -243,6 +244,13 @@ public:
 
     void _resetState_inlock(OperationContext* txn, OpTimeWithHash lastAppliedOpTime);
 
+    /**
+     * Overrides how executor schedules database work.
+     *
+     * For testing only.
+     */
+    void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
+
 private:
     // Runs a single initial sync attempt.
     Status _runInitialSyncAttempt_inlock(OperationContext* txn,
@@ -338,6 +346,7 @@ private:
     std::unique_ptr<OplogBuffer> _oplogBuffer;                                  // (M)
     Event _onShutdown;                                                          // (M)
     Timestamp _rollbackCommonOptime;                                            // (MX)
+    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;                       // (M)
 };
 
 }  // namespace repl

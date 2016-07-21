@@ -85,6 +85,10 @@ void DatabaseClonerTest::setUp() {
                    stdx::placeholders::_1,
                    stdx::placeholders::_2),
         stdx::bind(&DatabaseClonerTest::setStatus, this, stdx::placeholders::_1)));
+    _databaseCloner->setScheduleDbWorkFn_forTest(
+        [this](const executor::TaskExecutor::CallbackFn& work) {
+            return getExecutor().scheduleWork(work);
+        });
 
     storageInterface->createCollectionForBulkFn =
         [this](const NamespaceString& nss,

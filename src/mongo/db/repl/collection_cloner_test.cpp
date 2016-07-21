@@ -291,9 +291,10 @@ TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {
 
     // Replace scheduleDbWork function so that cloner will fail to schedule DB work after
     // getting index specs.
-    collectionCloner->setScheduleDbWorkFn([](const executor::TaskExecutor::CallbackFn& workFn) {
-        return StatusWith<executor::TaskExecutor::CallbackHandle>(ErrorCodes::UnknownError, "");
-    });
+    collectionCloner->setScheduleDbWorkFn_forTest(
+        [](const executor::TaskExecutor::CallbackFn& workFn) {
+            return StatusWith<executor::TaskExecutor::CallbackHandle>(ErrorCodes::UnknownError, "");
+        });
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -309,15 +310,16 @@ TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
 
     // Replace scheduleDbWork function so that the callback runs with a cancelled status.
     auto&& executor = getExecutor();
-    collectionCloner->setScheduleDbWorkFn([&](const executor::TaskExecutor::CallbackFn& workFn) {
-        executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
-        mongo::executor::TaskExecutor::CallbackArgs args{
-            &executor,
-            handle,
-            {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
-        workFn(args);
-        return StatusWith<executor::TaskExecutor::CallbackHandle>(handle);
-    });
+    collectionCloner->setScheduleDbWorkFn_forTest(
+        [&](const executor::TaskExecutor::CallbackFn& workFn) {
+            executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
+            mongo::executor::TaskExecutor::CallbackArgs args{
+                &executor,
+                handle,
+                {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
+            workFn(args);
+            return StatusWith<executor::TaskExecutor::CallbackHandle>(handle);
+        });
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -552,9 +554,10 @@ TEST_F(CollectionClonerTest, InsertDocumentsScheduleDbWorkFailed) {
 
     // Replace scheduleDbWork function so that cloner will fail to schedule DB work after
     // getting documents.
-    collectionCloner->setScheduleDbWorkFn([](const executor::TaskExecutor::CallbackFn& workFn) {
-        return StatusWith<executor::TaskExecutor::CallbackHandle>(ErrorCodes::UnknownError, "");
-    });
+    collectionCloner->setScheduleDbWorkFn_forTest(
+        [](const executor::TaskExecutor::CallbackFn& workFn) {
+            return StatusWith<executor::TaskExecutor::CallbackHandle>(ErrorCodes::UnknownError, "");
+        });
 
     const BSONObj doc = BSON("_id" << 1);
     {
@@ -578,15 +581,16 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
 
     // Replace scheduleDbWork function so that the callback runs with a cancelled status.
     auto&& executor = getExecutor();
-    collectionCloner->setScheduleDbWorkFn([&](const executor::TaskExecutor::CallbackFn& workFn) {
-        executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
-        mongo::executor::TaskExecutor::CallbackArgs args{
-            &executor,
-            handle,
-            {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
-        workFn(args);
-        return StatusWith<executor::TaskExecutor::CallbackHandle>(handle);
-    });
+    collectionCloner->setScheduleDbWorkFn_forTest(
+        [&](const executor::TaskExecutor::CallbackFn& workFn) {
+            executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
+            mongo::executor::TaskExecutor::CallbackArgs args{
+                &executor,
+                handle,
+                {ErrorCodes::CallbackCanceled, "Never run, but treat like cancelled."}};
+            workFn(args);
+            return StatusWith<executor::TaskExecutor::CallbackHandle>(handle);
+        });
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());

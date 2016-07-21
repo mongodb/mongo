@@ -202,7 +202,7 @@ void DatabaseCloner::wait() {
     _condition.wait(lk, [this]() { return !_active; });
 }
 
-void DatabaseCloner::setScheduleDbWorkFn(const CollectionCloner::ScheduleDbWorkFn& work) {
+void DatabaseCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
     LockGuard lk(_mutex);
 
     _scheduleDbWorkFn = work;
@@ -333,7 +333,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     }
 
     for (auto&& collectionCloner : _collectionCloners) {
-        collectionCloner.setScheduleDbWorkFn(_scheduleDbWorkFn);
+        collectionCloner.setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
     }
 
     // Start first collection cloner.
