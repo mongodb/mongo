@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace AccumulatorTests {
@@ -47,9 +48,9 @@ using std::string;
  */
 static void assertExpectedResults(
     std::string accumulator,
+    const intrusive_ptr<ExpressionContext>& expCtx,
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
     auto factory = Accumulator::getFactory(accumulator);
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     for (auto&& op : operations) {
         try {
             // Asserts that result equals expected result when not sharded.
@@ -101,8 +102,10 @@ static void assertExpectedResults(
 }
 
 TEST(Accumulators, Avg) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     assertExpectedResults(
         "$avg",
+        expCtx,
         {
             // No documents evaluated.
             {{}, Value(BSONNULL)},
@@ -155,8 +158,10 @@ TEST(Accumulators, Avg) {
 }
 
 TEST(Accumulators, First) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     assertExpectedResults(
         "$first",
+        expCtx,
         {// No documents evaluated.
          {{}, Value()},
 
@@ -172,8 +177,10 @@ TEST(Accumulators, First) {
 }
 
 TEST(Accumulators, Last) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     assertExpectedResults(
         "$last",
+        expCtx,
         {// No documents evaluated.
          {{}, Value()},
 
@@ -189,8 +196,10 @@ TEST(Accumulators, Last) {
 }
 
 TEST(Accumulators, Min) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     assertExpectedResults(
         "$min",
+        expCtx,
         {// No documents evaluated.
          {{}, Value(BSONNULL)},
 
@@ -205,9 +214,18 @@ TEST(Accumulators, Min) {
          {{Value(7), Value()}, Value(7)}});
 }
 
+TEST(Accumulators, MinRespectsCollation) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    expCtx->setCollator(
+        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    assertExpectedResults("$min", expCtx, {{{Value("abc"), Value("cba")}, Value("cba")}});
+}
+
 TEST(Accumulators, Max) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     assertExpectedResults(
         "$max",
+        expCtx,
         {// No documents evaluated.
          {{}, Value(BSONNULL)},
 
@@ -222,9 +240,18 @@ TEST(Accumulators, Max) {
          {{Value(7), Value()}, Value(7)}});
 }
 
+TEST(Accumulators, MaxRespectsCollation) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    expCtx->setCollator(
+        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+    assertExpectedResults("$max", expCtx, {{{Value("abc"), Value("cba")}, Value("abc")}});
+}
+
 TEST(Accumulators, Sum) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     assertExpectedResults(
         "$sum",
+        expCtx,
         {// No documents evaluated.
          {{}, Value(0)},
 
@@ -299,6 +326,16 @@ TEST(Accumulators, Sum) {
          {{Value(5), Value(BSONNULL)}, Value(5)},
          // Missing values are ignored.
          {{Value(9), Value()}, Value(9)}});
+}
+
+TEST(Accumulators, AddToSetRespectsCollation) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    expCtx->setCollator(
+        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
+    assertExpectedResults(
+        "$addToSet",
+        expCtx,
+        {{{Value("a"), Value("b"), Value("c")}, Value(std::vector<Value>{Value("a")})}});
 }
 
 }  // namespace AccumulatorTests

@@ -293,6 +293,7 @@ env.CppUnitTest(
     target='accumulator_test',
     source='accumulator_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         'accumulator',
         'document_value_test_util',
         ],
