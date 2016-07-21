@@ -31,7 +31,7 @@
 /*
  * Put the initial config together for running a throttled workload.
  */
-int
+void
 setup_throttle(CONFIG_THREAD *thread)
 {
 	THROTTLE_CONFIG *throttle_cfg;
@@ -70,15 +70,14 @@ setup_throttle(CONFIG_THREAD *thread)
 	throttle_cfg->ops_count = throttle_cfg->ops_per_increment;
 
 	/* Set the first timestamp of when we incremented */
-	WT_RET(__wt_epoch(NULL, &throttle_cfg->last_increment));
-	return (0);
+	testutil_check(__wt_epoch(NULL, &throttle_cfg->last_increment));
 }
 
 /*
  * Run the throttle function.  We will sleep if needed and then reload the
  * counter to perform more operations.
  */
-int
+void
 worker_throttle(CONFIG_THREAD *thread)
 {
 	THROTTLE_CONFIG *throttle_cfg;
@@ -87,7 +86,7 @@ worker_throttle(CONFIG_THREAD *thread)
 
 	throttle_cfg = &thread->throttle_cfg;
 
-	WT_RET(__wt_epoch(NULL, &now));
+	testutil_check(__wt_epoch(NULL, &now));
 
 	/*
 	 * If we did enough operations in the current interval, sleep for
@@ -102,7 +101,7 @@ worker_throttle(CONFIG_THREAD *thread)
 		/*
 		 * After sleeping, set the interval to the current time.
 		 */
-		WT_RET(__wt_epoch(NULL, &throttle_cfg->last_increment));
+		testutil_check(__wt_epoch(NULL, &throttle_cfg->last_increment));
 	} else {
 		throttle_cfg->ops_count = (usecs_delta *
 		    throttle_cfg->ops_per_increment) /
@@ -115,6 +114,4 @@ worker_throttle(CONFIG_THREAD *thread)
 	 */
 	throttle_cfg->ops_count =
 	    WT_MIN(throttle_cfg->ops_count, thread->workload->throttle);
-
-	return (0);
 }

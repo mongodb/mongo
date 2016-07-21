@@ -79,7 +79,7 @@ static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
 static void	 randomize_value(CONFIG_THREAD *, char *);
-static int	 recreate_dir(const char *);
+static void	 recreate_dir(const char *);
 static int	 start_all_runs(CONFIG *);
 static int	 start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
@@ -478,7 +478,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 	range_key_buf = &buf[0];
 
 	/* Save where the first key is for comparisons. */
-	cursor->get_key(cursor, &range_key_buf);
+	testutil_check(cursor->get_key(cursor, &range_key_buf));
 	extract_key(range_key_buf, &next_val);
 
 	for (range = 0; range < cfg->read_range; ++range) {
@@ -489,7 +489,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 			break;
 
 		/* Retrieve and decode the key */
-		cursor->get_key(cursor, &range_key_buf);
+		testutil_check(cursor->get_key(cursor, &range_key_buf));
 		extract_key(range_key_buf, &next_val);
 		if (next_val < prev_val) {
 			lprintf(cfg, EINVAL, 0,
@@ -559,9 +559,8 @@ worker(void *arg)
 		}
 	}
 	/* Setup the timer for throttling. */
-	if (thread->workload->throttle != 0 &&
-	    (ret = setup_throttle(thread)) != 0)
-		goto err;
+	if (thread->workload->throttle != 0)
+		setup_throttle(thread);
 
 	/* Setup for truncate */
 	if (thread->workload->truncate != 0)
@@ -2413,10 +2412,8 @@ main(int argc, char *argv[])
 		goto err;
 
 	/* If creating, remove and re-create the home directory. */
-	if (cfg->create != 0 && (ret = recreate_dir(cfg->home)) != 0) {
-		lprintf(cfg, ret, 0, "Error re-creating home directory");
-		goto err;
-	}
+	if (cfg->create != 0)
+		recreate_dir(cfg->home);
 
 	/* Write a copy of the config. */
 	config_to_file(cfg);
@@ -2532,7 +2529,7 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	return (0);
 }
 
-static int
+static void
 recreate_dir(const char *name)
 {
 	char *buf;
@@ -2540,12 +2537,9 @@ recreate_dir(const char *name)
 
 	len = strlen(name) * 2 + 100;
 	buf = dmalloc(len);
-	(void)snprintf(
-	    buf, len, "rm -rf %s && mkdir %s", name, name);
+	(void)snprintf(buf, len, "rm -rf %s && mkdir %s", name, name);
 	testutil_checkfmt(system(buf), "system: %s", buf);
 	free(buf);
-
-	return (0);
 }
 
 static int
