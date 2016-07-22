@@ -255,7 +255,7 @@ private:
     // Runs a single initial sync attempt.
     Status _runInitialSyncAttempt_inlock(OperationContext* txn,
                                          UniqueLock& lk,
-                                         const HostAndPort& syncSource,
+                                         HostAndPort syncSource,
                                          RollbackChecker& rollbackChecker);
 
     void _setState(const DataReplicatorState& newState);
@@ -293,7 +293,7 @@ private:
                              const size_t numApplied);
 
     // Called when the DatabasesCloner finishes.
-    void _onDataClonerFinish(const Status& status);
+    void _onDataClonerFinish(const Status& status, HostAndPort syncSource);
     // Called after _onDataClonerFinish when the new Timestamp is avail, to use for minvalid.
     void _onApplierReadyStart(const QueryResponseStatus& fetchResult);
 

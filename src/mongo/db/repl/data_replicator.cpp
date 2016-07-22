@@ -436,7 +436,7 @@ StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn) {
 
 Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
                                                      UniqueLock& lk,
-                                                     const HostAndPort& syncSource,
+                                                     HostAndPort syncSource,
                                                      RollbackChecker& rollbackChecker) {
     invariant(lk.owns_lock());
     Status statusFromWrites(ErrorCodes::NotYetInitialized, "About to run Initial Sync Attempt.");
@@ -517,7 +517,8 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
                 const std::string name = dbInfo["name"].str();
                 return (name != "local");
             },
-            stdx::bind(&DataReplicator::_onDataClonerFinish, this, stdx::placeholders::_1)),
+            stdx::bind(
+                &DataReplicator::_onDataClonerFinish, this, stdx::placeholders::_1, syncSource)),
         initialSyncFinishEvent));
 
     const NamespaceString ns(_opts.remoteOplogNS);
@@ -764,7 +765,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
     return _lastApplied;
 }
 
-void DataReplicator::_onDataClonerFinish(const Status& status) {
+void DataReplicator::_onDataClonerFinish(const Status& status, HostAndPort syncSource) {
     log() << "data clone finished, status: " << status.toString();
     if (!status.isOK()) {
         // Initial sync failed during cloning of databases
@@ -780,7 +781,7 @@ void DataReplicator::_onDataClonerFinish(const Status& status) {
     LockGuard lk(_mutex);
     _lastOplogEntryFetcher = stdx::make_unique<Fetcher>(
         _exec,
-        _syncSource,
+        syncSource,
         _opts.remoteOplogNS.db().toString(),
         query,
         stdx::bind(&DataReplicator::_onApplierReadyStart, this, stdx::placeholders::_1),
