@@ -446,6 +446,11 @@ public:
     virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
     /**
+     * Does an initial sync of data, after dropping existing data.
+     */
+    virtual Status resyncData(OperationContext* txn, bool waitUntilCompleted) = 0;
+
+    /**
      * Handles an incoming isMaster command for a replica set node.  Should not be
      * called on a master-slave or standalone node.
      */
@@ -778,10 +783,6 @@ public:
      */
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) = 0;
-
-    virtual bool getInitialSyncRequestedFlag() const = 0;
-    virtual void setInitialSyncRequestedFlag(bool value) = 0;
-
     virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const = 0;
     virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) = 0;
 

@@ -40,6 +40,13 @@ using std::stringstream;
 
 namespace repl {
 
+namespace {
+
+constexpr StringData kResyncFieldName = "resync"_sd;
+constexpr StringData kWaitFieldName = "wait"_sd;
+
+}  // namespace
+
 // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}
 class CmdResync : public Command {
 public:
@@ -64,16 +71,16 @@ public:
         h << "resync (from scratch) a stale slave or replica set secondary node.\n";
     }
 
-    CmdResync() : Command("resync") {}
+    CmdResync() : Command(kResyncFieldName) {}
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        ScopedTransaction transaction(txn, MODE_X);
-        Lock::GlobalWrite globalWriteLock(txn->lockState());
+        bool waitForResync = !cmdObj.hasField(kWaitFieldName) || cmdObj[kWaitFieldName].trueValue();
 
+        // Replica set resync.
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
             const MemberState memberState = replCoord->getMemberState();
@@ -85,10 +92,13 @@ public:
                 return appendCommandStatus(
                     result, Status(ErrorCodes::NotSecondary, "primaries cannot resync"));
             }
-            replCoord->setInitialSyncRequestedFlag(true);
+            uassertStatusOKWithLocation(replCoord->resyncData(txn, waitForResync), "resync", 0);
             return true;
         }
 
+        // Master/Slave resync.
+        ScopedTransaction transaction(txn, MODE_X);
+        Lock::GlobalWrite globalWriteLock(txn->lockState());
         // below this comment pertains only to master/slave replication
         if (cmdObj.getBoolField("force")) {
             if (!waitForSyncToFinish(txn, errmsg))

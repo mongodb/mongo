@@ -91,6 +91,9 @@ namespace mongo {
 namespace repl {
 
 namespace {
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+
 const char configCollectionName[] = "local.system.replset";
 const char configDatabaseName[] = "local";
 const char lastVoteCollectionName[] = "local.replset.election";
@@ -156,6 +159,8 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 }
 
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
+    LockGuard lk(_threadMutex);
+
     _initialSyncThread.reset(new stdx::thread{[finished, this]() {
         Client::initThreadIfNotAlready("initial sync");
         // Do initial sync.
@@ -166,6 +171,8 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
 
 void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
     stdx::function<void(OperationContext* txn)> run) {
+
+    LockGuard lk(_threadMutex);
     _initialSyncThread.reset(new stdx::thread{[run, this]() {
         Client::initThreadIfNotAlready("initial sync");
         auto txn = cc().makeOperationContext();
@@ -175,7 +182,11 @@ void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
     }});
 }
 
-void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(OperationContext* txn) {
+void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
+    OperationContext* txn, ReplicationCoordinator* replCoord) {
+
+    LockGuard lk(_threadMutex);
+    invariant(replCoord);
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
     _bgSync = stdx::make_unique<BackgroundSync>(this, makeSteadyStateOplogBuffer(txn));
@@ -183,13 +194,54 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(Operat
 
     log() << "Starting replication applier thread";
     invariant(!_applierThread);
-    _applierThread.reset(new RSDataSync{_bgSync.get(), ReplicationCoordinator::get(txn)});
+    _applierThread.reset(new RSDataSync{_bgSync.get(), replCoord});
     _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
     _syncSourceFeedbackThread.reset(new stdx::thread(stdx::bind(
         &SyncSourceFeedback::run, &_syncSourceFeedback, _taskExecutor.get(), _bgSync.get())));
 }
+
+void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationContext* txn) {
+    UniqueLock lk(_threadMutex);
+    _stopDataReplication_inlock(txn, &lk);
+}
+
+void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(OperationContext* txn,
+                                                                          UniqueLock* lock) {
+    auto oldSSF = std::move(_syncSourceFeedbackThread);
+    auto oldBgSync = std::move(_bgSync);
+    auto oldApplier = std::move(_applierThread);
+    auto oldInitSyncThread = std::move(_initialSyncThread);
+    if (oldSSF) {
+        _syncSourceFeedback.shutdown();
+    }
+    lock->unlock();
+
+    log() << "stopping data replication threads";
+    if (oldSSF) {
+        oldSSF->join();
+    }
+
+    if (oldBgSync) {
+        oldBgSync->shutdown(txn);
+    }
+
+    if (oldApplier) {
+        oldApplier->shutdown();
+        oldApplier->join();
+    }
+
+    if (oldBgSync) {
+        oldBgSync->join(txn);
+    }
+
+    if (oldInitSyncThread) {
+        oldInitSyncThread->join();
+    }
+    lock->lock();
+}
+
 
 void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& settings) {
     stdx::lock_guard<stdx::mutex> lk(_threadMutex);
@@ -221,29 +273,14 @@ void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext*
 }
 
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
-    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
+    UniqueLock lk(_threadMutex);
     if (_startedThreads) {
-        if (_syncSourceFeedbackThread) {
-            log() << "Stopping replication reporter thread";
-            _syncSourceFeedback.shutdown();
-            _syncSourceFeedbackThread->join();
-        }
-        if (_applierThread) {
-            log() << "Stopping replication applier thread";
-            _applierThread->shutdown();
-            _applierThread->join();
-            _applierThread.reset();
-        }
+        _stopDataReplication_inlock(txn, &lk);
 
-        if (_bgSync) {
-            log() << "Stopping replication fetcher thread";
-            _bgSync->shutdown(txn);
-            _bgSync->join(txn);
-        }
         if (_snapshotThread) {
-            log() << "Stopping replication snapshot thread";
             _snapshotThread->shutdown();
         }
+
         log() << "Stopping replication storage threads";
         _taskExecutor->shutdown();
         _taskExecutor->join();
@@ -568,12 +605,14 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(Operat
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
+    LockGuard lk(_threadMutex);
     if (_bgSync) {
         _bgSync->clearSyncTarget();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
+    LockGuard lk(_threadMutex);
     invariant(_bgSync);
     _bgSync->cancelFetcher();
 }

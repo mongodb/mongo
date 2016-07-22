@@ -70,13 +70,20 @@ void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& s
     _threadsStarted = true;
 }
 
-bool ReplicationCoordinatorExternalStateMock::isInitialSyncFlagSet(OperationContext* txn) {
+bool ReplicationCoordinatorExternalStateMock::isInitialSyncFlagSet(OperationContext*) {
     return false;
 }
-void ReplicationCoordinatorExternalStateMock::startInitialSync(OnInitialSyncFinishedFn finished) {}
-void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication(OperationContext* txn) {}
+
+void ReplicationCoordinatorExternalStateMock::startInitialSync(OnInitialSyncFinishedFn) {}
+
+void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication(OperationContext*,
+                                                                          ReplicationCoordinator*) {
+}
+
+void ReplicationCoordinatorExternalStateMock::stopDataReplication(OperationContext*) {}
 
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
+
 Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* txn,
                                                                          const BSONObj& config) {
     return storeLocalConfigDocument(txn, config);

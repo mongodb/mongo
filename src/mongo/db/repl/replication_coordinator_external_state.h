@@ -56,6 +56,7 @@ namespace repl {
 
 class LastVote;
 class ReplSettings;
+class ReplicationCoordinator;
 
 using OnInitialSyncFinishedFn = stdx::function<void()>;
 using StartInitialSyncFn = stdx::function<void(OnInitialSyncFinishedFn callback)>;
@@ -98,9 +99,15 @@ public:
      *
      * NOTE: Use either this or the Master/Slave version, but not both.
      */
-    virtual void startSteadyStateReplication(OperationContext* txn) = 0;
+    virtual void startSteadyStateReplication(OperationContext* txn,
+                                             ReplicationCoordinator* replCoord) = 0;
 
     virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) = 0;
+
+    /**
+     * Stops the data replication threads = bgsync, applier, reporter.
+     */
+    virtual void stopDataReplication(OperationContext* txn) = 0;
 
     /**
      * Starts the Master/Slave threads and sets up logOp

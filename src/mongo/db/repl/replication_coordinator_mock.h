@@ -138,6 +138,8 @@ public:
 
     virtual void signalUpstreamUpdater();
 
+    virtual Status resyncData(OperationContext* txn, bool waitUntilCompleted) override;
+
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
@@ -252,9 +254,6 @@ public:
 
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
-
-    virtual bool getInitialSyncRequestedFlag() const override;
-    virtual void setInitialSyncRequestedFlag(bool value) override;
 
     virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
     virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) override;

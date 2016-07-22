@@ -46,6 +46,9 @@ namespace mongo {
 class ServiceContext;
 
 namespace repl {
+namespace {
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
+}  // namespace
 
 class SnapshotThread;
 class StorageInterface;
@@ -59,7 +62,9 @@ public:
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
-    virtual void startSteadyStateReplication(OperationContext* txn) override;
+    virtual void startSteadyStateReplication(OperationContext* txn,
+                                             ReplicationCoordinator* replCoord) override;
+    virtual void stopDataReplication(OperationContext* txn) override;
     virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) override;
 
     virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
@@ -114,6 +119,11 @@ public:
     virtual void onDurable(const JournalListener::Token& token);
 
 private:
+    /**
+     * Stops data replication and returns with 'lock' locked.
+     */
+    void _stopDataReplication_inlock(OperationContext* txn, UniqueLock* lock);
+
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;
 

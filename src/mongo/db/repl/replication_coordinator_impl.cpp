@@ -537,10 +537,14 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-    _setMyLastAppliedOpTime_inlock(lastOpTime, false);
-    _setMyLastDurableOpTime_inlock(lastOpTime, false);
-    _reportUpstream_inlock(std::move(lock));
-    // Unlocked below.
+    if (!lastOpTime.isNull()) {
+        _setMyLastAppliedOpTime_inlock(lastOpTime, false);
+        _setMyLastDurableOpTime_inlock(lastOpTime, false);
+        _reportUpstream_inlock(std::move(lock));
+        // Unlocked below.
+    } else {
+        lock.unlock();
+    }
 
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     // Step down is impossible, so we don't need to wait for the returned event.
@@ -554,11 +558,22 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
 }
 
-void ReplicationCoordinatorImpl::_stopDataReplication() {
-    // TODO: Stop replication threads (bgsync, synctail, reporter)
+void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* txn) {
+    if (_dr && _dr->getState() == DataReplicatorState::InitialSync) {
+        LOG(1)
+            << "ReplicationCoordinatorImpl::_stopDataReplication calling DataReplicator::shutdown.";
+        _dr->shutdown(txn);
+        LockGuard lk(_mutex);  // Must take the lock to set/reset _dr, but not needed to call it.
+        _dr.reset();
+        // Do not return here, fall through.
+    }
+    LOG(1) << "ReplicationCoordinatorImpl::_stopDataReplication calling "
+              "ReplCoordExtState::stopDataReplication.";
+    _externalState->stopDataReplication(txn);
 }
 
-void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
+void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
+                                                       stdx::function<void()> startCompleted) {
     // Check to see if we need to do an initial sync.
     const auto lastOpTime = getMyLastAppliedOpTime();
     const auto needsInitialSync = lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(txn);
@@ -566,33 +581,47 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_inShutdown) {
             // Start steady replication, since we already have data.
-            _externalState->startSteadyStateReplication(txn);
+            _externalState->startSteadyStateReplication(txn, this);
         }
         return;
     }
 
     // Do initial sync.
     if (_externalState->shouldUseDataReplicatorInitialSync()) {
-        _externalState->runOnInitialSyncThread([this](OperationContext* txn) {
-            DataReplicator dr(
+        _externalState->runOnInitialSyncThread([this, startCompleted](OperationContext* txn) {
+            UniqueLock lk(_mutex);  // Must take the lock to set _dr, but not call it.
+            _dr = stdx::make_unique<DataReplicator>(
                 createDataReplicatorOptions(this, _externalState.get()),
                 stdx::make_unique<DataReplicatorExternalStateImpl>(this, _externalState.get()),
                 _storage);
-            const auto status = dr.doInitialSync(txn);
+            lk.unlock();
+
+            const auto status = _dr->doInitialSync(txn);
+            // If it is interrupted by resync, we do not need to cleanup the DataReplicator.
+            if (status == ErrorCodes::ShutdownInProgress) {
+                return;
+            }
+
+            lk.lock();
+            _dr.reset();
             fassertStatusOK(40088, status);
             const auto lastApplied = status.getValue();
             _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
-            _externalState->startSteadyStateReplication(txn);
-
+            if (startCompleted) {
+                startCompleted();
+            }
+            _externalState->startSteadyStateReplication(txn, this);
         });
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
     } else {
-        _externalState->startInitialSync([this]() {
+        _externalState->startInitialSync([this, startCompleted]() {
             auto txn = cc().makeOperationContext();
-            invariant(txn);
-            invariant(txn->getClient());
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (!_inShutdown) {
-                _externalState->startSteadyStateReplication(txn.get());
+                if (startCompleted) {
+                    startCompleted();
+                }
+                _externalState->startSteadyStateReplication(txn.get(), this);
             }
         });
     }
@@ -1067,10 +1096,15 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTime(const OpTime& opTime) {
 
 void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _resetMyLastOpTimes_inlock();
+    _reportUpstream_inlock(std::move(lock));
+}
+
+void ReplicationCoordinatorImpl::_resetMyLastOpTimes_inlock() {
+    LOG(1) << "resetting durable/applied optimes.";
     // Reset to uninitialized OpTime
     _setMyLastAppliedOpTime_inlock(OpTime(), true);
     _setMyLastDurableOpTime_inlock(OpTime(), true);
-    _reportUpstream_inlock(std::move(lock));
 }
 
 void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::mutex> lock) {
@@ -1960,6 +1994,23 @@ int ReplicationCoordinatorImpl::_getMyId_inlock() const {
     return self.getId();
 }
 
+Status ReplicationCoordinatorImpl::resyncData(OperationContext* txn, bool waitUntilCompleted) {
+    _stopDataReplication(txn);
+    auto finishedEvent = uassertStatusOK(_replExecutor.makeEvent());
+    stdx::function<void()> f;
+    if (waitUntilCompleted)
+        f = [&finishedEvent, this]() { _replExecutor.signalEvent(finishedEvent); };
+
+    UniqueLock lk(_mutex);
+    _resetMyLastOpTimes_inlock();
+    lk.unlock();  // unlock before calling into replCoordExtState.
+    _startDataReplication(txn, f);
+    if (waitUntilCompleted) {
+        _replExecutor.waitForEvent(finishedEvent);
+    }
+    return Status::OK();
+}
+
 StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
     ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
     BSONObjBuilder cmdBuilder;
@@ -2165,6 +2216,7 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
 
 Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
+    // TODO: Do resync if _inInitialSync.
     Status result(ErrorCodes::InternalError, "didn't set status in prepareSyncFromResponse");
     LockGuard topoLock(_topoMutex);
     LockGuard lk(_mutex);
@@ -2605,7 +2657,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             break;
         case kActionFollowerModeStateChange:
             // In follower mode, or sub-mode so ensure replication is active
-            // TODO: _dr.resume();
+            // TODO: _dr->resume();
             _externalState->signalApplierToChooseNewSyncSource();
             break;
         case kActionCloseAllConnections:
@@ -2851,7 +2903,7 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
         lock.unlock();
         // Must do this outside _mutex
         // TODO: enable _dr, remove _externalState when DataReplicator is used excl.
-        //_dr.slavesHaveProgressed();
+        //_dr->slavesHaveProgressed();
         _externalState->forwardSlaveProgress();
     }
     return status;
@@ -2876,7 +2928,7 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
         lock.unlock();
         // Must do this outside _mutex
         // TODO: enable _dr, remove _externalState when DataReplicator is used excl.
-        //_dr.slavesHaveProgressed();
+        //_dr->slavesHaveProgressed();
         _externalState->forwardSlaveProgress();
     }
     return status;
@@ -3702,16 +3754,6 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible() {
         return Status::OK();
     }
     return Status(ErrorCodes::CommandFailed, "Election failed.");
-}
-
-bool ReplicationCoordinatorImpl::getInitialSyncRequestedFlag() const {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
-    return _initialSyncRequestedFlag;
-}
-
-void ReplicationCoordinatorImpl::setInitialSyncRequestedFlag(bool value) {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
-    _initialSyncRequestedFlag = value;
 }
 
 ReplSettings::IndexPrefetchConfig ReplicationCoordinatorImpl::getIndexPrefetchConfig() const {

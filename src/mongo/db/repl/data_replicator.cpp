@@ -639,14 +639,21 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         if (!lk.owns_lock()) {
             lk.lock();
         }
-        if (_oplogBuffer) {
-            _oplogBuffer->shutdown(txn);
-            _oplogBuffer.reset();
-        }
+
+        auto oldBuffer = std::move(_oplogBuffer);
         lk.unlock();
+
+        if (oldBuffer) {
+            LOG(1) << "shutting down _oplogBuffer in doInitialSync.";
+            oldBuffer->shutdown(txn);
+            oldBuffer.reset();
+        }
     });
 
+    lk.unlock();
+    // This will call through to the storageInterfaceImpl to ReplicationCoordinatorImpl.
     _storage->setInitialSyncFlag(txn);
+    lk.lock();
 
     const auto maxFailedAttempts = maxRetries + 1;
     std::size_t failedAttempts = 0;
@@ -836,6 +843,7 @@ void DataReplicator::_doNextActions() {
     LockGuard lk(_mutex);
     if (_onShutdown.isValid()) {
         if (!_anyActiveHandles_inlock()) {
+            LOG(1) << "Signaling shutdown event for DataReplicator.";
             _exec->signalEvent(_onShutdown);
             _setState_inlock(DataReplicatorState::Uninitialized);
         }
@@ -903,6 +911,7 @@ void DataReplicator::_doNextActions_Steady_inlock() {
             _opts.syncSourceSelector->chooseNewSyncSource(_lastFetched.opTime.getTimestamp());
     }
     if (_syncSource.empty()) {
+        log() << "_syncSource is empty so scheduling a retry in  " << _opts.syncSourceRetryWait;
         // No sync source, reschedule check
         Date_t when = _exec->now() + _opts.syncSourceRetryWait;
         // schedule self-callback w/executor
@@ -933,7 +942,7 @@ void DataReplicator::_doNextActions_Steady_inlock() {
 
     // Check if no active apply and ops to apply
     if (!_applierActive) {
-        if (_oplogBuffer->getSize() > 0) {
+        if (_oplogBuffer && _oplogBuffer->getSize() > 0) {
             const auto scheduleStatus = _scheduleApplyBatch_inlock();
             if (!scheduleStatus.isOK()) {
                 _applierActive = false;
@@ -1250,6 +1259,7 @@ void DataReplicator::_changeStateIfNeeded() {
 }
 
 Status DataReplicator::scheduleShutdown(OperationContext* txn) {
+    log() << "Scheduling shutdown in the future, creating shutdownEvent.";
     auto eventStatus = _exec->makeEvent();
     if (!eventStatus.isOK()) {
         return eventStatus.getStatus();
@@ -1259,6 +1269,10 @@ Status DataReplicator::scheduleShutdown(OperationContext* txn) {
         LockGuard lk(_mutex);
         invariant(!_onShutdown.isValid());
         _onShutdown = eventStatus.getValue();
+        if (_initialSyncState) {
+            _initialSyncState->status = {ErrorCodes::ShutdownInProgress,
+                                         "Shutdown issued for the operation."};
+        }
         _cancelAllHandles_inlock();
         _oplogBuffer->shutdown(txn);
         _oplogBuffer.reset();
@@ -1278,15 +1292,17 @@ void DataReplicator::waitForShutdown() {
     _exec->waitForEvent(onShutdown);
     {
         LockGuard lk(_mutex);
-        invariant(!_oplogFetcher->isActive());
+        invariant(!_lastOplogEntryFetcher || !_lastOplogEntryFetcher->isActive());
+        invariant(!_oplogFetcher || !_oplogFetcher->isActive());
         invariant(!_applierActive);
-        invariant(!_reporter->isActive());
+        invariant(!_reporter || !_reporter->isActive());
     }
 }
 
 Status DataReplicator::_shutdown(OperationContext* txn) {
     auto status = scheduleShutdown(txn);
     if (status.isOK()) {
+        log() << "Waiting for shutdown of DataReplicator.";
         waitForShutdown();
     }
     return status;

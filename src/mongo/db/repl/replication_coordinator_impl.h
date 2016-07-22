@@ -207,6 +207,8 @@ public:
 
     virtual void signalUpstreamUpdater() override;
 
+    virtual Status resyncData(OperationContext* txn, bool waitUntilCompleted) override;
+
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
@@ -329,10 +331,6 @@ public:
 
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) override;
-
-
-    virtual bool getInitialSyncRequestedFlag() const override;
-    virtual void setInitialSyncRequestedFlag(bool value) override;
 
     virtual ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
     virtual void setIndexPrefetchConfig(const ReplSettings::IndexPrefetchConfig cfg) override;
@@ -591,6 +589,8 @@ private:
      */
     size_t _getMyIndexInSlaveInfo_inlock() const;
 
+    void _resetMyLastOpTimes_inlock();
+
     /**
      * Returns the _writeConcernMajorityJournalDefault of our current _rsConfig.
      */
@@ -828,12 +828,13 @@ private:
     /**
      * Start replicating data, and does an initial sync if needed first.
      */
-    void _startDataReplication(OperationContext* txn);
+    void _startDataReplication(OperationContext* txn,
+                               stdx::function<void()> startCompleted = nullptr);
 
     /**
      * Stops replicating data by stopping the applier, fetcher and such.
      */
-    void _stopDataReplication();
+    void _stopDataReplication(OperationContext* txn);
 
     /**
      * Finishes the work of processReplSetInitiate() while holding _topoMutex, in the event of
@@ -1320,6 +1321,8 @@ private:
 
     // Storage interface used by data replicator.
     StorageInterface* _storage;  // (PS)
+    // Data Replicator used to replicate data
+    std::unique_ptr<DataReplicator> _dr;  // (S)
 
     // Hands out the next snapshot name.
     AtomicUInt64 _snapshotNameGenerator;  // (S)
@@ -1377,11 +1380,6 @@ private:
 
     // Lambda indicating durability of storageEngine.
     stdx::function<bool()> _isDurableStorageEngine;  // (R)
-
-    // bool for indicating resync need on this node and the mutex that protects it
-    // The resync command sets this flag; the Applier thread observes and clears it.
-    mutable stdx::mutex _initialSyncMutex;
-    bool _initialSyncRequestedFlag = false;  // (I)
 
     // This setting affects the Applier prefetcher behavior.
     mutable stdx::mutex _indexPrefetchMutex;

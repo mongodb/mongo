@@ -435,7 +435,6 @@ Status _initialSync(BackgroundSync* bgsync) {
 
         // Initial sync is now complete.  Flag this by setting minValid to the last thing we synced.
         StorageInterface::get(&txn)->setMinValid(&txn, lastOpTimeWritten, DurableRequirement::None);
-        getGlobalReplicationCoordinator()->setInitialSyncRequestedFlag(false);
     }
 
     // Clear the initial sync flag -- cannot be done under a db lock, or recursive.

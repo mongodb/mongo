@@ -222,6 +222,10 @@ Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
+Status ReplicationCoordinatorMock::resyncData(OperationContext* txn, bool waitUntilCompleted) {
+    return Status::OK();
+}
+
 StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
     ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
     BSONObjBuilder cmdBuilder;
@@ -449,12 +453,6 @@ WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptions
     }
     return wc;
 }
-
-bool ReplicationCoordinatorMock::getInitialSyncRequestedFlag() const {
-    return false;
-}
-
-void ReplicationCoordinatorMock::setInitialSyncRequestedFlag(bool value) {}
 
 ReplSettings::IndexPrefetchConfig ReplicationCoordinatorMock::getIndexPrefetchConfig() const {
     return ReplSettings::IndexPrefetchConfig();

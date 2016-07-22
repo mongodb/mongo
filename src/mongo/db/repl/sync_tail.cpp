@@ -802,10 +802,6 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
     OpTime originalEndOpTime(minValidBoundaries.end);
     OpTime lastWriteOpTime{replCoord->getMyLastAppliedOpTime()};
     while (!shouldShutdown()) {
-        if (replCoord->getInitialSyncRequestedFlag()) {
-            // got a resync command
-            return;
-        }
 
         tryToGoLiveAsASecondary(&txn, replCoord, minValidBoundaries, lastWriteOpTime);
 
