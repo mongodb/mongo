@@ -35,19 +35,20 @@ namespace mongo {
 namespace executor {
 
 /**
- * Holds connection information for a specific remote host. These objects are maintained by
+ * Holds connection information for a specific pool or remote host. These objects are maintained by
  * a parent ConnectionPoolStats object and should not need to be created directly.
  */
-struct ConnectionStatsPerHost {
-    ConnectionStatsPerHost(size_t nInUse, size_t nAvailable, size_t nCreated);
+struct ConnectionStatsPer {
+    ConnectionStatsPer(size_t nInUse, size_t nAvailable, size_t nCreated, size_t nRefreshing);
 
-    ConnectionStatsPerHost();
+    ConnectionStatsPer();
 
-    ConnectionStatsPerHost& operator+=(const ConnectionStatsPerHost& other);
+    ConnectionStatsPer& operator+=(const ConnectionStatsPer& other);
 
     size_t inUse = 0u;
     size_t available = 0u;
     size_t created = 0u;
+    size_t refreshing = 0u;
 };
 
 /**
@@ -56,15 +57,19 @@ struct ConnectionStatsPerHost {
  * Total connection counts will then be updated accordingly.
  */
 struct ConnectionPoolStats {
-    void updateStatsForHost(HostAndPort host, ConnectionStatsPerHost newStats);
+    void updateStatsForHost(std::string pool, HostAndPort host, ConnectionStatsPer newStats);
 
     void appendToBSON(mongo::BSONObjBuilder& result);
 
     size_t totalInUse = 0u;
     size_t totalAvailable = 0u;
     size_t totalCreated = 0u;
+    size_t totalRefreshing = 0u;
 
-    stdx::unordered_map<HostAndPort, ConnectionStatsPerHost> statsByHost;
+    stdx::unordered_map<std::string, ConnectionStatsPer> statsByPool;
+    stdx::unordered_map<HostAndPort, ConnectionStatsPer> statsByHost;
+    stdx::unordered_map<std::string, stdx::unordered_map<HostAndPort, ConnectionStatsPer>>
+        statsByPoolHost;
 };
 
 }  // namespace executor

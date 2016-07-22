@@ -361,11 +361,11 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
             invariant(uri.isOK());
             HostAndPort host = uri.getValue().getServers().front();
 
-            executor::ConnectionStatsPerHost hostStats{
-                static_cast<size_t>(i->second.numInUse()),
-                static_cast<size_t>(i->second.numAvailable()),
-                static_cast<size_t>(i->second.numCreated())};
-            stats->updateStatsForHost(host, hostStats);
+            executor::ConnectionStatsPer hostStats{static_cast<size_t>(i->second.numInUse()),
+                                                   static_cast<size_t>(i->second.numAvailable()),
+                                                   static_cast<size_t>(i->second.numCreated()),
+                                                   0};
+            stats->updateStatsForHost("global", host, hostStats);
         }
     }
 }

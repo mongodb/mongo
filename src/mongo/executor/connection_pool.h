@@ -110,6 +110,7 @@ public:
     };
 
     explicit ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl,
+                            std::string name,
                             Options options = Options{});
 
     ~ConnectionPool();
@@ -122,6 +123,8 @@ public:
 
 private:
     void returnConnection(ConnectionInterface* connection);
+
+    std::string _name;
 
     // Options are set at startup and never changed at run time, so these are
     // accessed outside the lock

@@ -71,6 +71,7 @@ NetworkInterfaceASIO::NetworkInterfaceASIO(Options options)
       _timerFactory(std::move(_options.timerFactory)),
       _streamFactory(std::move(_options.streamFactory)),
       _connectionPool(stdx::make_unique<connection_pool_asio::ASIOImpl>(this),
+                      _options.instanceName,
                       _options.connectionPoolOptions),
       _isExecutorRunnable(false),
       _strand(_io_service) {}

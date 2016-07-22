@@ -95,6 +95,11 @@ public:
     size_t availableConnections(const stdx::unique_lock<stdx::mutex>& lk);
 
     /**
+     * Returns the number of in progress connections in the pool.
+     */
+    size_t refreshingConnections(const stdx::unique_lock<stdx::mutex>& lk);
+
+    /**
      * Returns the total number of connections ever created in this pool.
      */
     size_t createdConnections(const stdx::unique_lock<stdx::mutex>& lk);
@@ -174,8 +179,10 @@ Milliseconds const ConnectionPool::kDefaultHostTimeout = Minutes(5);
 const Status ConnectionPool::kConnectionStateUnknown =
     Status(ErrorCodes::InternalError, "Connection is in an unknown state");
 
-ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl, Options options)
-    : _options(std::move(options)), _factory(std::move(impl)) {}
+ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl,
+                               std::string name,
+                               Options options)
+    : _name(std::move(name)), _options(std::move(options)), _factory(std::move(impl)) {}
 
 ConnectionPool::~ConnectionPool() = default;
 
@@ -220,10 +227,11 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
         HostAndPort host = kv.first;
 
         auto& pool = kv.second;
-        ConnectionStatsPerHost hostStats{pool->inUseConnections(lk),
-                                         pool->availableConnections(lk),
-                                         pool->createdConnections(lk)};
-        stats->updateStatsForHost(host, hostStats);
+        ConnectionStatsPer hostStats{pool->inUseConnections(lk),
+                                     pool->availableConnections(lk),
+                                     pool->createdConnections(lk),
+                                     pool->refreshingConnections(lk)};
+        stats->updateStatsForHost(_name, host, hostStats);
     }
 }
 
@@ -257,6 +265,11 @@ size_t ConnectionPool::SpecificPool::inUseConnections(const stdx::unique_lock<st
 size_t ConnectionPool::SpecificPool::availableConnections(
     const stdx::unique_lock<stdx::mutex>& lk) {
     return _readyPool.size();
+}
+
+size_t ConnectionPool::SpecificPool::refreshingConnections(
+    const stdx::unique_lock<stdx::mutex>& lk) {
+    return _processingPool.size();
 }
 
 size_t ConnectionPool::SpecificPool::createdConnections(const stdx::unique_lock<stdx::mutex>& lk) {
