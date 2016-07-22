@@ -783,8 +783,12 @@ public:
         AutoGetCollectionForRead ctx(txn, ns);
 
         Collection* collection = ctx.getCollection();
+        long long numRecords = 0;
+        if (collection) {
+            numRecords = collection->numRecords(txn);
+        }
 
-        if (!collection || collection->numRecords(txn) == 0) {
+        if (numRecords == 0) {
             result.appendNumber("size", 0);
             result.appendNumber("numObjects", 0);
             result.append("millis", timer.millis());
@@ -797,8 +801,7 @@ public:
         if (min.isEmpty() && max.isEmpty()) {
             if (estimate) {
                 result.appendNumber("size", static_cast<long long>(collection->dataSize(txn)));
-                result.appendNumber("numObjects",
-                                    static_cast<long long>(collection->numRecords(txn)));
+                result.appendNumber("numObjects", numRecords);
                 result.append("millis", timer.millis());
                 return 1;
             }
@@ -835,7 +838,7 @@ public:
                                               PlanExecutor::YIELD_MANUAL);
         }
 
-        long long avgObjSize = collection->dataSize(txn) / collection->numRecords(txn);
+        long long avgObjSize = collection->dataSize(txn) / numRecords;
 
         long long maxSize = jsobj["maxSize"].numberLong();
         long long maxObjects = jsobj["maxObjects"].numberLong();
