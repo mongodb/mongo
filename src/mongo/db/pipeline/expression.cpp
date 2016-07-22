@@ -3541,9 +3541,6 @@ const char* ExpressionSubtract::getOpName() const {
 /* ------------------------- ExpressionSwitch ------------------------------ */
 
 REGISTER_EXPRESSION(switch, ExpressionSwitch::parse);
-const char* ExpressionSwitch::getOpName() const {
-    return "$switch";
-}
 
 Value ExpressionSwitch::evaluateInternal(Variables* vars) const {
     for (auto&& branch : _branches) {
@@ -4115,7 +4112,4 @@ void ExpressionZip::doInjectExpressionContext() {
     }
 }
 
-const char* ExpressionZip::getOpName() const {
-    return "$zip";
-}
-}
+}  // namespace mongo

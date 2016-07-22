@@ -346,10 +346,7 @@ public:
 
     static ExpressionVector parseArguments(BSONElement bsonExpr, const VariablesParseState& vps);
 
-    // TODO SERVER-23349: Currently there are subclasses which derive from this base class that
-    // require custom logic for expression context injection. Consider making those classes inherit
-    // directly from Expression so that this method can be marked 'final' rather than 'override'.
-    void doInjectExpressionContext() override;
+    void doInjectExpressionContext() final;
 
 protected:
     ExpressionNary() {}
@@ -1279,7 +1276,7 @@ public:
 };
 
 
-class ExpressionSwitch final : public ExpressionFixedArity<ExpressionSwitch, 1> {
+class ExpressionSwitch final : public Expression {
 public:
     void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
@@ -1287,7 +1284,6 @@ public:
     static boost::intrusive_ptr<Expression> parse(BSONElement expr,
                                                   const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
-    const char* getOpName() const final;
 
     void doInjectExpressionContext() final;
 
@@ -1376,7 +1372,7 @@ public:
 };
 
 
-class ExpressionZip final : public ExpressionFixedArity<ExpressionZip, 1> {
+class ExpressionZip final : public Expression {
 public:
     void addDependencies(DepsTracker* deps) const final;
     Value evaluateInternal(Variables* vars) const final;
@@ -1384,7 +1380,6 @@ public:
     static boost::intrusive_ptr<Expression> parse(BSONElement expr,
                                                   const VariablesParseState& vpsIn);
     Value serialize(bool explain) const final;
-    const char* getOpName() const final;
 
     void doInjectExpressionContext() final;
 
