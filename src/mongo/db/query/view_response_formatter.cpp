@@ -42,7 +42,7 @@ const char ViewResponseFormatter::kDistinctField[] = "values";
 const char ViewResponseFormatter::kOkField[] = "ok";
 
 ViewResponseFormatter::ViewResponseFormatter(BSONObj aggregationResponse)
-    : _response(aggregationResponse) {}
+    : _response(std::move(aggregationResponse)) {}
 
 Status ViewResponseFormatter::appendAsCountResponse(BSONObjBuilder* resultBuilder) {
     auto cursorResponse = CursorResponse::parseFromBSON(_response);
