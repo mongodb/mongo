@@ -28,8 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
-#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,7 +50,9 @@ private:
 
 public:
     AllowedIndices(const std::vector<BSONObj>& indexKeyPatterns);
-    ~AllowedIndices();
+    AllowedIndices(AllowedIndices&& other) = default;
+
+    AllowedIndices& operator=(AllowedIndices&& other) = default;
 
     // These are the index key patterns that
     // we will use to override the indexes retrieved from
@@ -65,17 +67,12 @@ public:
  *     vector of index specs
  */
 class AllowedIndexEntry {
-private:
-    MONGO_DISALLOW_COPYING(AllowedIndexEntry);
-
 public:
     AllowedIndexEntry(const BSONObj& query,
                       const BSONObj& sort,
                       const BSONObj& projection,
                       const BSONObj& collation,
                       const std::vector<BSONObj>& indexKeyPatterns);
-    ~AllowedIndexEntry();
-    AllowedIndexEntry* clone() const;
 
     // query, sort, projection, and collation collectively represent the query shape that we are
     // storing hint overrides for.
@@ -98,28 +95,21 @@ private:
     MONGO_DISALLOW_COPYING(QuerySettings);
 
 public:
-    QuerySettings();
-
-    ~QuerySettings();
+    QuerySettings() = default;
 
     /**
-     * Returns true and fills out allowedIndicesOut if a hint is set in the query settings
-     * for the query.
-     * Returns false and sets allowedIndicesOut to NULL otherwise.
-     * Caller owns AllowedIndices.
+     * Returns AllowedIndices for the query if it is set in the query settings, or boost::none.
      */
-    bool getAllowedIndices(const PlanCacheKey& query, AllowedIndices** allowedIndicesOut) const;
+    boost::optional<AllowedIndices> getAllowedIndices(const PlanCacheKey& query) const;
 
     /**
-     * Returns copies all overrides for the collection..
-     * Caller owns overrides in vector.
+     * Returns copies of all overrides for the collection.
      */
-    std::vector<AllowedIndexEntry*> getAllAllowedIndices() const;
+    std::vector<AllowedIndexEntry> getAllAllowedIndices() const;
 
     /**
      * Adds or replaces entry in query settings.
-     * If existing entry is found for the same key,
-     * frees resources for existing entry before replacing.
+     * If existing entry is found for the same key, replaces it.
      */
     void setAllowedIndices(const CanonicalQuery& canonicalQuery,
                            const PlanCacheKey& key,
@@ -136,12 +126,8 @@ public:
     void clearAllowedIndices();
 
 private:
-    /**
-     * Clears entries without acquiring mutex.
-     */
-    void _clear();
-
-    typedef unordered_map<PlanCacheKey, AllowedIndexEntry*> AllowedIndexEntryMap;
+    // Allowed index entries owned here.
+    using AllowedIndexEntryMap = unordered_map<PlanCacheKey, AllowedIndexEntry>;
     AllowedIndexEntryMap _allowedIndexEntryMap;
 
     /**

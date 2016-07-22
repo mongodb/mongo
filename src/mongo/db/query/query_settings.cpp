@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/query/query_settings.h"
+
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
 
@@ -35,7 +36,7 @@ namespace mongo {
 using std::vector;
 
 //
-// HintOverride
+// AllowedIndices
 //
 
 AllowedIndices::AllowedIndices(const std::vector<BSONObj>& indexKeyPatterns) {
@@ -46,8 +47,6 @@ AllowedIndices::AllowedIndices(const std::vector<BSONObj>& indexKeyPatterns) {
         this->indexKeyPatterns.push_back(indexKeyPattern.getOwned());
     }
 }
-
-AllowedIndices::~AllowedIndices() {}
 
 //
 // AllowedIndexEntry
@@ -70,53 +69,27 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
     }
 }
 
-AllowedIndexEntry::~AllowedIndexEntry() {}
-
-AllowedIndexEntry* AllowedIndexEntry::clone() const {
-    AllowedIndexEntry* entry =
-        new AllowedIndexEntry(query, sort, projection, collation, indexKeyPatterns);
-    return entry;
-}
-
 //
 // QuerySettings
 //
 
-QuerySettings::QuerySettings() {}
-
-QuerySettings::~QuerySettings() {
-    _clear();
-}
-
-bool QuerySettings::getAllowedIndices(const PlanCacheKey& key,
-                                      AllowedIndices** allowedIndicesOut) const {
-    invariant(allowedIndicesOut);
-
+boost::optional<AllowedIndices> QuerySettings::getAllowedIndices(const PlanCacheKey& key) const {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
     AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
     // Nothing to do if key does not exist in query settings.
     if (cacheIter == _allowedIndexEntryMap.end()) {
-        *allowedIndicesOut = NULL;
-        return false;
+        return {};
     }
 
-    AllowedIndexEntry* entry = cacheIter->second;
-
-    // Create a AllowedIndices from entry.
-    *allowedIndicesOut = new AllowedIndices(entry->indexKeyPatterns);
-
-    return true;
+    return AllowedIndices(cacheIter->second.indexKeyPatterns);
 }
 
-std::vector<AllowedIndexEntry*> QuerySettings::getAllAllowedIndices() const {
+std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
-    vector<AllowedIndexEntry*> entries;
-    for (AllowedIndexEntryMap::const_iterator i = _allowedIndexEntryMap.begin();
-         i != _allowedIndexEntryMap.end();
-         ++i) {
-        AllowedIndexEntry* entry = i->second;
-        entries.push_back(entry->clone());
+    vector<AllowedIndexEntry> entries;
+    for (const auto& entryPair : _allowedIndexEntryMap) {
+        entries.push_back(entryPair.second);
     }
     return entries;
 }
@@ -130,16 +103,12 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
     const BSONObj& projection = qr.getProj();
     const BSONObj collation =
         canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();
-    AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, collation, indexes);
 
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
-    AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
-    // Replace existing entry.
-    if (i != _allowedIndexEntryMap.end()) {
-        AllowedIndexEntry* entry = i->second;
-        delete entry;
-    }
-    _allowedIndexEntryMap[key] = entry;
+    _allowedIndexEntryMap.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(key),
+        std::forward_as_tuple(query, sort, projection, collation, indexes));
 }
 
 void QuerySettings::removeAllowedIndices(const PlanCacheKey& key) {
@@ -151,24 +120,11 @@ void QuerySettings::removeAllowedIndices(const PlanCacheKey& key) {
         return;
     }
 
-    // Free up resources and delete entry.
-    AllowedIndexEntry* entry = i->second;
     _allowedIndexEntryMap.erase(i);
-    delete entry;
 }
 
 void QuerySettings::clearAllowedIndices() {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
-    _clear();
-}
-
-void QuerySettings::_clear() {
-    for (AllowedIndexEntryMap::const_iterator i = _allowedIndexEntryMap.begin();
-         i != _allowedIndexEntryMap.end();
-         ++i) {
-        AllowedIndexEntry* entry = i->second;
-        delete entry;
-    }
     _allowedIndexEntryMap.clear();
 }
 

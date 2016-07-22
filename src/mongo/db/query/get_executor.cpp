@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/get_executor.h"
 
+#include <boost/optional.hpp>
 #include <limits>
 #include <memory>
 
@@ -149,14 +150,13 @@ void fillOutPlannerParams(OperationContext* txn,
 
     // If query supports index filters, filter params.indices by indices in query settings.
     QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
-    AllowedIndices* allowedIndicesRaw;
     PlanCacheKey planCacheKey =
         collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
 
     // Filter index catalog if index filters are specified for query.
     // Also, signal to planner that application hint should be ignored.
-    if (querySettings->getAllowedIndices(planCacheKey, &allowedIndicesRaw)) {
-        unique_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+    if (boost::optional<AllowedIndices> allowedIndices =
+            querySettings->getAllowedIndices(planCacheKey)) {
         filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
         plannerParams->indexFiltersApplied = true;
     }

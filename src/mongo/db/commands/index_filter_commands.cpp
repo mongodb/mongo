@@ -32,9 +32,9 @@
 
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "mongo/base/init.h"
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -214,22 +214,20 @@ Status ListFilters::list(const QuerySettings& querySettings, BSONObjBuilder* bob
     //         }
     //  }
     BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
-    OwnedPointerVector<AllowedIndexEntry> entries;
-    entries.mutableVector() = querySettings.getAllAllowedIndices();
-    for (vector<AllowedIndexEntry*>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
-        AllowedIndexEntry* entry = *i;
-        invariant(entry);
+    std::vector<AllowedIndexEntry> entries = querySettings.getAllAllowedIndices();
+    for (vector<AllowedIndexEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
+        AllowedIndexEntry entry = *i;
 
         BSONObjBuilder hintBob(hintsBuilder.subobjStart());
-        hintBob.append("query", entry->query);
-        hintBob.append("sort", entry->sort);
-        hintBob.append("projection", entry->projection);
-        if (!entry->collation.isEmpty()) {
-            hintBob.append("collation", entry->collation);
+        hintBob.append("query", entry.query);
+        hintBob.append("sort", entry.sort);
+        hintBob.append("projection", entry.projection);
+        if (!entry.collation.isEmpty()) {
+            hintBob.append("collation", entry.collation);
         }
         BSONArrayBuilder indexesBuilder(hintBob.subarrayStart("indexes"));
-        for (vector<BSONObj>::const_iterator j = entry->indexKeyPatterns.begin();
-             j != entry->indexKeyPatterns.end();
+        for (vector<BSONObj>::const_iterator j = entry.indexKeyPatterns.begin();
+             j != entry.indexKeyPatterns.end();
              ++j) {
             const BSONObj& index = *j;
             indexesBuilder.append(index);
@@ -302,8 +300,7 @@ Status ClearFilters::clear(OperationContext* txn,
 
     // Get entries from query settings. We need to remove corresponding entries from the plan
     // cache shortly.
-    OwnedPointerVector<AllowedIndexEntry> entries;
-    entries.mutableVector() = querySettings->getAllAllowedIndices();
+    std::vector<AllowedIndexEntry> entries = querySettings->getAllAllowedIndices();
 
     // OK to proceed with clearing entire cache.
     querySettings->clearAllowedIndices();
@@ -321,16 +318,15 @@ Status ClearFilters::clear(OperationContext* txn,
     // Only way that PlanCache::remove() can fail is when the query shape has been removed from
     // the cache by some other means (re-index, collection info reset, ...). This is OK since
     // that's the intended effect of calling the remove() function with the key from the hint entry.
-    for (vector<AllowedIndexEntry*>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
-        AllowedIndexEntry* entry = *i;
-        invariant(entry);
+    for (vector<AllowedIndexEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
+        AllowedIndexEntry entry = *i;
 
         // Create canonical query.
         auto qr = stdx::make_unique<QueryRequest>(nss);
-        qr->setFilter(entry->query);
-        qr->setSort(entry->sort);
-        qr->setProj(entry->projection);
-        qr->setCollation(entry->collation);
+        qr->setFilter(entry.query);
+        qr->setSort(entry.sort);
+        qr->setProj(entry.projection);
+        qr->setCollation(entry.collation);
         auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
         invariantOK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());

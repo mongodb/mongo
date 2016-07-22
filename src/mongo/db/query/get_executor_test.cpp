@@ -32,6 +32,8 @@
 
 #include "mongo/db/query/get_executor.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_settings.h"
@@ -82,12 +84,11 @@ void testAllowedIndices(const char* hintKeyPatterns[],
                         const char* expectedFilteredKeyPatterns[]) {
     PlanCache planCache;
     QuerySettings querySettings;
-    AllowedIndices* allowedIndicesRaw;
 
     // getAllowedIndices should return false when query shape is not yet in query settings.
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
     PlanCacheKey key = planCache.computeKey(*cq);
-    ASSERT_FALSE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
+    ASSERT_FALSE(querySettings.getAllowedIndices(key));
 
     // Add entry to query settings.
     std::vector<BSONObj> indexKeyPatterns;
@@ -97,10 +98,9 @@ void testAllowedIndices(const char* hintKeyPatterns[],
     querySettings.setAllowedIndices(*cq, key, indexKeyPatterns);
 
     // Index entry vector should contain 1 entry after filtering.
-    ASSERT_TRUE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
+    boost::optional<AllowedIndices> allowedIndices = querySettings.getAllowedIndices(key);
+    ASSERT_TRUE(allowedIndices);
     ASSERT_FALSE(key.empty());
-    ASSERT(NULL != allowedIndicesRaw);
-    unique_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
 
     // Indexes from index catalog.
     std::vector<IndexEntry> indexEntries;
