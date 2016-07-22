@@ -1,8 +1,8 @@
 // shard6.js
 
-summary = "";
+var summary = "";
 
-s = new ShardingTest({name: "shard6", shards: 2});
+var s = new ShardingTest({name: "shard6", shards: 2});
 
 s.config.settings.update({_id: "balancer"}, {$set: {stopped: true}}, true);
 
@@ -10,29 +10,33 @@ s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand({shardcollection: "test.data", key: {num: 1}});
 
-db = s.getDB("test");
+var db = s.getDB("test");
 
 function poolStats(where) {
     var total = 0;
     var msg = "poolStats " + where + " ";
-    var x = db.runCommand("connPoolStats").hosts;
-    for (var h in x) {
-        var z = x[h];
-        msg += z.created + " ";
-        total += z.created;
+    var stats = db.runCommand("connPoolStats");
+    for (var h in stats.hosts) {
+        if (!stats.hosts.hasOwnProperty(h)) {
+            continue;
+        }
+        var host = stats.hosts[h];
+        msg += host.created + " ";
+        total += host.created;
     }
-    printjson(x);
+    printjson(stats.hosts);
     print("****\n" + msg + "\n*****");
     summary += msg + "\n";
+
+    assert.eq(total, stats.totalCreated, "mismatched number of total connections created");
+
     return total;
 }
 
 poolStats("at start");
 
 // we want a lot of data, so lets make a 50k string to cheat :)
-bigString = "";
-while (bigString.length < 50000)
-    bigString += "this is a big string. ";
+var bigString = "this is a big string. ".repeat(50000);
 
 // ok, now lets insert a some data
 var num = 0;
@@ -42,7 +46,7 @@ for (; num < 100; num++) {
 
 assert.eq(100, db.data.find().toArray().length, "basic find after setup");
 
-connBefore = poolStats("setup done");
+poolStats("setup done");
 
 // limit
 
@@ -54,7 +58,7 @@ for (var i = 1; i < 10; i++) {
     poolStats("after loop : " + i);
 }
 
-assert.eq(connBefore, poolStats("limit test done"), "limit test conns");
+poolStats("limit test done");
 
 function assertOrder(start, num) {
     var a = db.data.find().skip(start).limit(num).sort({num: 1}).map(function(z) {
@@ -99,7 +103,7 @@ poolStats("after checking itcount");
 
 // --- test save support ---
 
-o = db.data.findOne();
+var o = db.data.findOne();
 o.x = 16;
 db.data.save(o);
 o = db.data.findOne({_id: o._id});
