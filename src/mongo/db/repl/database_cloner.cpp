@@ -114,9 +114,6 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                                   numListCollectionsRetries,
                                   executor::RemoteCommandRequest::kNoTimeout,
                                   RemoteCommandRetryScheduler::kAllRetriableErrors)),
-      _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
-          return _executor->scheduleWork(work);
-      }),
       _startCollectionCloner([](CollectionCloner& cloner) { return cloner.start(); }) {
     // Fetcher throws an exception on null executor.
     invariant(executor);
@@ -332,8 +329,10 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         }
     }
 
-    for (auto&& collectionCloner : _collectionCloners) {
-        collectionCloner.setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+    if (_scheduleDbWorkFn) {
+        for (auto&& collectionCloner : _collectionCloners) {
+            collectionCloner.setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+        }
     }
 
     // Start first collection cloner.
