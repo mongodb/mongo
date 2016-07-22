@@ -37,7 +37,10 @@
 
         this.getPrimary = function() {
             slave.setSlaveOk();
-            this.liveNodes = {master: master, slaves: [slave]};
+            this.liveNodes = {
+                master: master,
+                slaves: [slave]
+            };
 
             return master;
         };
