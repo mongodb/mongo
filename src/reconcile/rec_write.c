@@ -382,6 +382,15 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
 	mod->last_oldest_id = oldest_id;
 
+	/*
+	 * Evicting in-memory uses the update/restore mechanisms.
+	 * The update/restore mechanisms use disk images.
+	 */
+	if (LF_ISSET(WT_EVICT_IN_MEMORY))
+		LF_SET(WT_EVICT_UPDATE_RESTORE);
+	if (LF_ISSET(WT_EVICT_UPDATE_RESTORE))
+		LF_SET(WT_EVICT_SCRUB);
+
 	/* Initialize the reconciliation structure for each new run. */
 	if ((ret = __rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile)) != 0) {
@@ -2783,7 +2792,7 @@ no_slots:
 
 		/*
 		 * Optionally keep the disk image in cache. Update the initial
-		 * fields to reflect the actual disk image that was compressed.
+		 * page-header fields to reflect the actual data being written.
 		 */
 		if (F_ISSET(r, WT_EVICT_SCRUB)) {
 			WT_RET(__wt_strndup(session, dsk,
@@ -3327,17 +3336,12 @@ supd_check_complete:
 
 copy_image:
 	/*
-	 * Optionally keep the disk image in cache (raw compression has already
-	 * made a copy).
+	 * Optionally keep the disk image in cache (raw compression may have
+	 * already made a copy).
 	 */
-	if (F_ISSET(r, WT_EVICT_SCRUB)) {
-		WT_ASSERT(session,
-		    (bnd->already_compressed && bnd->disk_image != NULL) ||
-		    (!bnd->already_compressed && bnd->disk_image == NULL));
-		if (bnd->disk_image == NULL)
-			WT_ERR(__wt_strndup(
-			    session, buf->data, buf->size, &bnd->disk_image));
-	}
+	if (F_ISSET(r, WT_EVICT_SCRUB) && bnd->disk_image == NULL)
+		WT_ERR(__wt_strndup(
+		    session, buf->data, buf->size, &bnd->disk_image));
 
 err:	__wt_scr_free(session, &key);
 	return (ret);

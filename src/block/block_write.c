@@ -254,12 +254,6 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	memset(blk, 0, sizeof(*blk));
 
-	/*
-	 * Swap the page-header as needed; this doesn't belong here, but it's
-	 * the best place to catch all callers.
-	 */
-	__wt_page_header_byteswap(buf->mem);
-
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
 		WT_ASSERT(session, F_ISSET(buf, WT_ITEM_ALIGNED));
@@ -345,9 +339,16 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		__wt_spin_unlock(session, &block->live_lock);
 	WT_RET(ret);
 
-	/* Write the block. */
-	if ((ret =
-	    __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
+	/*
+	 * Ensure the page header is in little endian order; this doesn't belong
+	 * here, but it's the best place to catch all callers. After the write,
+	 * swap values back to native order so callers never see anything other
+	 * than their original content.
+	 */
+	__wt_page_header_byteswap(buf->mem);
+	ret = __wt_write(session, fh, offset, align_size, buf->mem);
+	__wt_page_header_byteswap(buf->mem);
+	if (ret != 0) {
 		if (!caller_locked)
 			__wt_spin_lock(session, &block->live_lock);
 		WT_TRET(__wt_block_off_free(

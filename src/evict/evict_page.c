@@ -504,8 +504,7 @@ __evict_review(
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
 		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-			LF_SET(WT_EVICT_IN_MEMORY |
-			    WT_EVICT_UPDATE_RESTORE | WT_EVICT_SCRUB);
+			LF_SET(WT_EVICT_IN_MEMORY);
 		else if (page->read_gen == WT_READGEN_OLDEST ||
 		    page->memory_footprint > S2BT(session)->splitmempage)
 			LF_SET(WT_EVICT_UPDATE_RESTORE);
