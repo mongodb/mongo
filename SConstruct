@@ -1983,8 +1983,8 @@ def doConfigure(myenv):
         elif get_option('cxx-std') == "14":
             if not AddToCXXFLAGSIfSupported(myenv, '-std=c++14'):
                 myenv.ConfError('Compiler does not honor -std=c++14')
-        if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
-            myenv.ConfError("C++11 mode selected for C++ files, but can't enable C99 for C files")
+        if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
+            myenv.ConfError("C++11 mode selected for C++ files, but can't enable C11 for C files")
 
     if using_system_version_of_cxx_libraries():
         print( 'WARNING: System versions of C++ libraries must be compiled with C++11/14 support' )
