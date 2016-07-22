@@ -51,12 +51,12 @@ namespace mongo {
 namespace repl {
 
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
-                                                   TaskRunner* runner,
                                                    Collection* coll,
                                                    const BSONObj idIndexSpec,
+                                                   std::unique_ptr<TaskRunner> runner,
                                                    std::unique_ptr<AutoGetOrCreateDb> autoDb,
                                                    std::unique_ptr<AutoGetCollection> autoColl)
-    : _runner(runner),
+    : _runner(std::move(runner)),
       _autoColl(std::move(autoColl)),
       _autoDB(std::move(autoDb)),
       _txn(txn),
@@ -67,7 +67,7 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
       _idIndexSpec(idIndexSpec) {
     invariant(txn);
     invariant(coll);
-    invariant(runner);
+    invariant(_runner);
     invariant(_autoDB);
     invariant(_autoColl);
     invariant(_autoDB->getDb());

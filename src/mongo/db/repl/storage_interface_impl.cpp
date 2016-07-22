@@ -245,21 +245,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     const BSONObj idIndexSpec,
     const std::vector<BSONObj>& secondaryIndexSpecs) {
 
-    UniqueLock lk(_runnersMutex);
-    // Check to make sure we don't already have a runner.
-    for (auto&& item : _runners) {
-        if (item.first == nss) {
-            return {ErrorCodes::IllegalOperation,
-                    str::stream() << "There is already an active collection cloner for: "
-                                  << nss.ns()};
-        }
-    }
-    // Create the runner, and schedule the collection creation.
-    _runners.emplace_back(
-        std::make_pair(nss, stdx::make_unique<TaskRunner>(_bulkLoaderThreads.get())));
-    auto&& inserter = _runners.back();
-    TaskRunner* runner = inserter.second.get();
-    lk.unlock();
+    LOG(2) << "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: " << nss.ns();
+    std::unique_ptr<TaskRunner> runner = stdx::make_unique<TaskRunner>(_bulkLoaderThreads.get());
 
     // Setup cond_var for signalling when done.
     std::unique_ptr<CollectionBulkLoader> loaderToReturn;
@@ -290,7 +277,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
             // Move locks into loader, so it now controls their lifetime.
             auto loader = stdx::make_unique<CollectionBulkLoaderImpl>(
-                txn, runner, collection, idIndexSpec, std::move(db), std::move(coll));
+                txn, collection, idIndexSpec, std::move(runner), std::move(db), std::move(coll));
             invariant(collection);
             auto status = loader->init(txn, collection, secondaryIndexSpecs);
             if (!status.isOK()) {
