@@ -64,8 +64,9 @@
 
 namespace mongo {
 namespace repl {
-const int kInitialSyncMaxRetries = 9;
-const int kInitialSyncMaxConnectRetries = 10;
+
+const std::size_t kInitialSyncMaxRetries = 9;
+const std::size_t kInitialSyncMaxConnectRetries = 10;
 
 // Failpoint for initial sync
 MONGO_FP_DECLARE(failInitialSyncWithBadHost);
@@ -612,7 +613,8 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     return Status::OK();  // success
 }
 
-StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) {
+StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
+                                                         std::size_t maxRetries) {
     Timer t;
     if (!txn) {
         std::string msg = "Initial Sync attempted but no OperationContext*, so aborting.";
@@ -650,8 +652,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     _storage->setInitialSyncFlag(txn);
 
-    const int maxFailedAttempts = kInitialSyncMaxRetries + 1;
-    int failedAttempts = 0;
+    const auto maxFailedAttempts = maxRetries + 1;
+    std::size_t failedAttempts = 0;
     while (failedAttempts < maxFailedAttempts) {
         Status attemptErrorStatus(Status::OK());
         _initialSyncState.reset();
@@ -679,7 +681,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
         if (attemptErrorStatus.isOK()) {
             if (_syncSource.empty()) {
-                for (auto i = 0; i < kInitialSyncMaxConnectRetries; ++i) {
+                for (std::size_t i = 0; i < kInitialSyncMaxConnectRetries; ++i) {
                     attemptErrorStatus = _ensureGoodSyncSource_inlock();
                     if (attemptErrorStatus.isOK()) {
                         break;

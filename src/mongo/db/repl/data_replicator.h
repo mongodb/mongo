@@ -67,8 +67,8 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 }  // namespace
 
 
-extern const int kInitialSyncMaxRetries;
-extern const int kInitialSyncMaxConnectRetries;
+extern const std::size_t kInitialSyncMaxRetries;
+extern const std::size_t kInitialSyncMaxConnectRetries;
 
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
@@ -221,7 +221,8 @@ public:
      *
      *  This should be the first method called after construction (see class comment).
      */
-    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn);
+    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn,
+                                             std::size_t maxRetries = kInitialSyncMaxRetries);
 
     DataReplicatorState getState() const;
 

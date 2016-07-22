@@ -268,7 +268,7 @@ Status _initialSync(BackgroundSync* bgsync) {
 
     OplogReader r;
 
-    auto currentRetry = 0;
+    std::size_t currentRetry = 0;
     while (r.getHost().empty()) {
         // We must prime the sync source selector so that it considers all candidates regardless
         // of oplog position, by passing in null OpTime as the last op fetched time.

@@ -415,7 +415,8 @@ TEST_F(DataReplicatorTest, CannotInitialSyncAfterStart) {
 // Used to run a Initial Sync in a separate thread, to avoid blocking test execution.
 class InitialSyncBackgroundRunner {
 public:
-    InitialSyncBackgroundRunner(DataReplicator* dr) : _dr(dr) {}
+    InitialSyncBackgroundRunner(DataReplicator* dr, std::size_t maxRetries)
+        : _dr(dr), _maxRetries(maxRetries) {}
 
     ~InitialSyncBackgroundRunner() {
         if (_thread) {
@@ -464,7 +465,7 @@ private:
         _condVar.notify_all();
         lk.unlock();
 
-        auto result = _dr->doInitialSync(txn.get());  // blocking
+        auto result = _dr->doInitialSync(txn.get(), _maxRetries);  // blocking
 
         lk.lock();
         _result = result;
@@ -474,6 +475,7 @@ private:
     StatusWith<OpTimeWithHash> _result{ErrorCodes::NotYetInitialized, "InitialSync not started."};
 
     DataReplicator* _dr;
+    const std::size_t _maxRetries;
     std::unique_ptr<stdx::thread> _thread;
     stdx::condition_variable _condVar;
 };
@@ -518,9 +520,9 @@ protected:
         _responses = resps;
     }
 
-    void startSync() {
+    void startSync(std::size_t maxRetries) {
         DataReplicator* dr = &(getDR());
-        _isbr.reset(new InitialSyncBackgroundRunner(dr));
+        _isbr.reset(new InitialSyncBackgroundRunner(dr, maxRetries));
         _isbr->run();
     }
 
@@ -737,7 +739,7 @@ TEST_F(InitialSyncTest, Complete) {
     auto txn = makeOpCtx();
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
-    startSync();
+    startSync(repl::kInitialSyncMaxRetries);
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
@@ -826,7 +828,7 @@ TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCl
     auto txn = makeOpCtx();
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
-    startSync();
+    startSync(repl::kInitialSyncMaxRetries);
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
@@ -881,7 +883,7 @@ TEST_F(InitialSyncTest, Failpoint) {
     _memberState = MemberState::RS_SECONDARY;
 
     DataReplicator* dr = &(getDR());
-    InitialSyncBackgroundRunner isbr(dr);
+    InitialSyncBackgroundRunner isbr(dr, repl::kInitialSyncMaxRetries);
     isbr.run();
 
     ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InitialSyncFailure);
@@ -916,7 +918,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
         {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
 
     };
-    startSync();
+    startSync(repl::kInitialSyncMaxRetries);
     setResponses(responses);
     playResponsesNTimees(repl::kInitialSyncMaxRetries);
     verifySync(getNet(), ErrorCodes::InitialSyncFailure);
@@ -974,7 +976,7 @@ TEST_F(InitialSyncTest, FailOnRollback) {
             {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:2}")},
         };
 
-    startSync();
+    startSync(repl::kInitialSyncMaxRetries);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponsesNTimees(repl::kInitialSyncMaxRetries);
