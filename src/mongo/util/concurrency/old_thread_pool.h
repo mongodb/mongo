@@ -55,6 +55,7 @@ public:
                            const std::string& threadNamePrefix = "");
 
     std::size_t getNumThreads() const;
+    ThreadPool::Stats getStats() const;
 
     // Launches the worker threads; call exactly once, if and only if
     // you used the DoNotStartThreadsTag form of the constructor.

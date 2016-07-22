@@ -64,6 +64,10 @@ std::size_t OldThreadPool::getNumThreads() const {
     return _pool.getStats().numThreads;
 }
 
+ThreadPool::Stats OldThreadPool::getStats() const {
+    return _pool.getStats();
+}
+
 void OldThreadPool::startThreads() {
     _pool.startup();
 }
