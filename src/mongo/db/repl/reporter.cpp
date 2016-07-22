@@ -113,6 +113,10 @@ Reporter::~Reporter() {
     DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
+std::string Reporter::toString() const {
+    return getTarget().toString();
+}
+
 HostAndPort Reporter::getTarget() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _target;

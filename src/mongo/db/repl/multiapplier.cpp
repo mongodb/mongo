@@ -66,6 +66,10 @@ MultiApplier::~MultiApplier() {
     DESTRUCTOR_GUARD(cancel(); wait(););
 }
 
+std::string MultiApplier::toString() const {
+    return getDiagnosticString();
+}
+
 std::string MultiApplier::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     str::stream output;

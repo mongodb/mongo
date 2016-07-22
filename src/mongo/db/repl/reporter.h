@@ -87,6 +87,11 @@ public:
     HostAndPort getTarget() const;
 
     /**
+     * Returns an informational string.
+     */
+    std::string toString() const;
+
+    /**
      * Returns keep alive interval.
      * Reporter will periodically send replication status to sync source every "_keepAliveInterval"
      * until an error occurs.

@@ -197,25 +197,25 @@ Timestamp findCommonPoint(HostAndPort host, Timestamp start) {
 }
 
 template <typename T>
-void swapAndJoin_inlock(UniqueLock* lock, T& uniquePtrToReset) {
+void swapAndJoin_inlock(UniqueLock* lock, T& uniquePtrToReset, const char* msg) {
     if (!uniquePtrToReset) {
         return;
     }
-    T tempPtr;
-    uniquePtrToReset.swap(tempPtr);
+    T tempPtr = std::move(uniquePtrToReset);
     lock->unlock();
+    LOG(1) << msg << tempPtr->toString();
     tempPtr->join();
     lock->lock();
 }
 
 template <typename T>
-void swapAndWait_inlock(UniqueLock* lock, T& uniquePtrToReset) {
+void swapAndWait_inlock(UniqueLock* lock, T& uniquePtrToReset, const char* msg) {
     if (!uniquePtrToReset) {
         return;
     }
-    T tempPtr;
-    uniquePtrToReset.swap(tempPtr);
+    T tempPtr = std::move(uniquePtrToReset);
     lock->unlock();
+    LOG(1) << msg << tempPtr->toString();
     tempPtr->wait();
     lock->lock();
 }
@@ -846,12 +846,12 @@ void DataReplicator::_cancelAllHandles_inlock() {
 }
 
 void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
-    swapAndWait_inlock(lk, _lastOplogEntryFetcher);
-    swapAndJoin_inlock(lk, _oplogFetcher);
-    swapAndWait_inlock(lk, _applier);
-    swapAndJoin_inlock(lk, _reporter);
+    swapAndWait_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
+    swapAndJoin_inlock(lk, _oplogFetcher, "Waiting on oplog fetcher: ");
+    swapAndWait_inlock(lk, _applier, "Waiting on applier: ");
+    swapAndJoin_inlock(lk, _reporter, "Waiting on reporter: ");
     if (_initialSyncState) {
-        swapAndJoin_inlock(lk, _initialSyncState->dbsCloner);
+        swapAndJoin_inlock(lk, _initialSyncState->dbsCloner, "Waiting on databases cloner: ");
     }
 }
 

@@ -205,6 +205,10 @@ Milliseconds Fetcher::getTimeout() const {
     return _timeout;
 }
 
+std::string Fetcher::toString() const {
+    return getDiagnosticString();
+}
+
 std::string Fetcher::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     str::stream output;

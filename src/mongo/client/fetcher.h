@@ -161,6 +161,11 @@ public:
     std::string getDiagnosticString() const;
 
     /**
+     * Returns an informational string.
+     */
+    std::string toString() const;
+
+    /**
      * Returns true if a remote command has been scheduled (but not completed)
      * with the executor.
      */
