@@ -132,6 +132,8 @@ void ThreadPool::join() {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _join_inlock(&lk);
     } catch (...) {
+        severe() << "Exception escaped join in thread pool " << _options.poolName << ": "
+                 << exceptionToStatus();
         std::terminate();
     }
 }
@@ -225,7 +227,8 @@ void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadNa
     try {
         pool->_consumeTasks();
     } catch (...) {
-        severe() << "Exception reached top of stack in thread pool " << poolName;
+        severe() << "Exception reached top of stack in thread pool " << poolName << ": "
+                 << exceptionToStatus();
         std::terminate();
     }
 
@@ -327,7 +330,8 @@ void ThreadPool::_doOneTask(stdx::unique_lock<stdx::mutex>* lk) {
             _poolIsIdle.notify_all();
         }
     } catch (...) {
-        severe() << "Exception escaped task in thread pool " << _options.poolName;
+        severe() << "Exception escaped task in thread pool " << _options.poolName << ": "
+                 << exceptionToStatus();
         std::terminate();
     }
 }
