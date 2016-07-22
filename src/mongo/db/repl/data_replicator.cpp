@@ -595,14 +595,23 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
         return _initialSyncState->status;
     }
 
-    auto oplogSeedDoc = _initialSyncState->oplogSeedDoc;
-    lk.unlock();
-    // Store the first oplog entry, after initial sync completes.
-    const auto insertStatus = _storage->insertDocuments(txn, _opts.localOplogNS, {oplogSeedDoc});
-    lk.lock();
+    // If no oplog entries were applied, then we need to store the document that we fetched before
+    // we began cloning.
+    if (_initialSyncState->appliedOps == 0) {
+        auto oplogSeedDoc = _initialSyncState->oplogSeedDoc;
+        lk.unlock();
 
-    if (!insertStatus.isOK()) {
-        return insertStatus;
+        LOG(1) << "inserting oplog seed document: " << _initialSyncState->oplogSeedDoc;
+
+        // Store the first oplog entry, after initial sync completes.
+        const auto insertStatus =
+            _storage->insertDocuments(txn, _opts.localOplogNS, {oplogSeedDoc});
+        lk.lock();
+
+        if (!insertStatus.isOK()) {
+            _initialSyncState->status = insertStatus;
+            return _initialSyncState->status;
+        }
     }
 
     return Status::OK();  // success
@@ -1074,8 +1083,6 @@ void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
 
     if (_initialSyncState) {
         _initialSyncState->appliedOps += numApplied;
-        // When initial sync is done we need to record this seed document in the oplog.
-        _initialSyncState->oplogSeedDoc = ops.back().raw.getOwned();
     }
 
     // TODO: Change OplogFetcher to pass in a OpTimeWithHash, and wire up here instead of arsing.

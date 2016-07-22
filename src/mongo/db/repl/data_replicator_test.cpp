@@ -760,7 +760,7 @@ TEST_F(InitialSyncTest, Complete) {
         LockGuard lock(_storageInterfaceWorkDoneMutex);
         ASSERT_TRUE(_storageInterfaceWorkDone.droppedUserDBs);
         ASSERT_TRUE(_storageInterfaceWorkDone.createOplogCalled);
-        ASSERT_EQ(1, _storageInterfaceWorkDone.oplogEntriesInserted);
+        ASSERT_EQ(0, _storageInterfaceWorkDone.oplogEntriesInserted);
     }
 
     log() << "checking initial sync flag isn't set.";
