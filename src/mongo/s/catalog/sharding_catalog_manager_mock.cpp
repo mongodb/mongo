@@ -36,6 +36,7 @@
 namespace mongo {
 
 using std::string;
+using std::vector;
 
 ShardingCatalogManagerMock::ShardingCatalogManagerMock() = default;
 
@@ -77,6 +78,15 @@ Status ShardingCatalogManagerMock::assignKeyRangeToZone(OperationContext* txn,
 Status ShardingCatalogManagerMock::removeKeyRangeFromZone(OperationContext* txn,
                                                           const NamespaceString& ns,
                                                           const ChunkRange& range) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+Status ShardingCatalogManagerMock::commitChunkSplit(OperationContext* txn,
+                                                    const NamespaceString& ns,
+                                                    const OID& requestEpoch,
+                                                    const ChunkRange& range,
+                                                    const std::vector<BSONObj>& splitPoints,
+                                                    const std::string& shardName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

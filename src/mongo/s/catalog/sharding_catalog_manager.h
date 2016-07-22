@@ -138,6 +138,17 @@ public:
                                           const ChunkRange& range) = 0;
 
     /**
+     * Updates chunk metadata in config.chunks collection to reflect the given chunk being split
+     * into multiple smaller chunks based on the specified split points.
+     */
+    virtual Status commitChunkSplit(OperationContext* txn,
+                                    const NamespaceString& ns,
+                                    const OID& requestEpoch,
+                                    const ChunkRange& range,
+                                    const std::vector<BSONObj>& splitPoints,
+                                    const std::string& shardName) = 0;
+
+    /**
      * Append information about the connection pools owned by the CatalogManager.
      */
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;

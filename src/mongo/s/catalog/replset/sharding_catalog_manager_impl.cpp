@@ -43,10 +43,12 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
@@ -54,7 +56,6 @@
 #include "mongo/s/balancer/balancer_policy.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
@@ -103,12 +104,16 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
 Lock::ResourceMutex kShardMembershipLock;
 
 /**
- * Lock for shard zoning operations. This should be acquired when doing any operations that
- * can affect the config.tags collection or the tags field of the config.shards collection.
- * No other locks should be held when locking this.  If an operation needs to take database locks
- * (for example to write to a local collection) those locks should be taken after taking this.
- */
-Lock::ResourceMutex kZoneOpLock;
+ * Append min, max and version information from chunk to the buffer for logChange purposes.
+*/
+void appendShortVersion(BufBuilder* b, const ChunkType& chunk) {
+    BSONObjBuilder bb(*b);
+    bb.append(ChunkType::min(), chunk.getMin());
+    bb.append(ChunkType::max(), chunk.getMax());
+    if (chunk.isVersionSet())
+        chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
+    bb.done();
+}
 
 /**
  * Checks if the given key range for the given namespace conflicts with an existing key range.
@@ -636,7 +641,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     }
 
     // Only one addShard operation can be in progress at a time.
-    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
+    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
 
     // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shard{
@@ -777,7 +782,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
                                                   const std::string& shardName,
                                                   const std::string& zoneName) {
-    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
+    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
 
     auto updateStatus = _catalogClient->updateConfigDocument(
         txn,
@@ -802,7 +807,7 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
 Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
                                                        const std::string& shardName,
                                                        const std::string& zoneName) {
-    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
+    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     const NamespaceString shardNS(ShardType::ConfigNS);
@@ -915,7 +920,7 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
                                                         const NamespaceString& ns,
                                                         const ChunkRange& givenRange,
                                                         const string& zoneName) {
-    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
+    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
 
     auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
 
@@ -977,7 +982,7 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
 Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* txn,
                                                           const NamespaceString& ns,
                                                           const ChunkRange& range) {
-    Lock::ExclusiveLock lk(txn->lockState(), kZoneOpLock);
+    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
 
     auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
 
@@ -994,6 +999,163 @@ Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* txn,
 
     return _catalogClient->removeConfigDocuments(
         txn, TagsType::ConfigNS, removeBuilder.obj(), kNoWaitWriteConcern);
+}
+
+Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
+                                                    const NamespaceString& ns,
+                                                    const OID& requestEpoch,
+                                                    const ChunkRange& range,
+                                                    const std::vector<BSONObj>& splitPoints,
+                                                    const std::string& shardName) {
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations
+    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
+    // move chunks on different collections to proceed in parallel
+    Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
+
+    // Acquire GlobalLock in MODE_X twice to prevent yielding.
+    // GlobalLock and the following lock on config.chunks are only needed to support
+    // mixed-mode operation with mongoses from 3.2
+    // TODO(SERVER-25337): Remove GlobalLock and config.chunks lock after 3.4
+    Lock::GlobalLock firstGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
+    Lock::GlobalLock secondGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
+
+    // Acquire lock on config.chunks in MODE_X
+    AutoGetCollection autoColl(txn, NamespaceString(ChunkType::ConfigNS), MODE_X);
+
+    // Get the chunk with highest version for this namespace
+    auto findStatus = grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString(ChunkType::ConfigNS),
+        BSON("ns" << ns.ns()),
+        BSON(ChunkType::DEPRECATED_lastmod << -1),
+        1);
+
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    const auto& chunksVector = findStatus.getValue().docs;
+    if (chunksVector.empty())
+        return {ErrorCodes::IllegalOperation,
+                "collection does not exist, isn't sharded, or has no chunks"};
+
+    ChunkVersion collVersion =
+        ChunkVersion::fromBSON(chunksVector.front(), ChunkType::DEPRECATED_lastmod());
+
+    // Return an error if epoch of chunk does not match epoch of request
+    if (collVersion.epoch() != requestEpoch) {
+        return {ErrorCodes::StaleEpoch,
+                "epoch of chunk does not match epoch of request. This most likely means "
+                "that the collection was dropped and re-created."};
+    }
+
+    std::vector<ChunkType> newChunks;
+
+    auto newChunkBounds(splitPoints);
+    ChunkVersion currentMaxVersion = collVersion;
+    auto startKey = range.getMin();
+    newChunkBounds.push_back(
+        range.getMax());  // makes it easier to have 'max' in the next loop. remove later.
+
+    BSONArrayBuilder updates;
+
+    for (const auto& endKey : newChunkBounds) {
+        // splits only update the 'minor' portion of version
+        currentMaxVersion.incMinor();
+
+        // build an update operation against the chunks collection of the config database
+        // with
+        // upsert true
+        BSONObjBuilder op;
+        op.append("op", "u");
+        op.appendBool("b", true);
+        op.append("ns", ChunkType::ConfigNS);
+
+        // add the modified (new) chunk information as the update object
+        BSONObjBuilder n(op.subobjStart("o"));
+        n.append(ChunkType::name(), ChunkType::genID(ns.ns(), startKey));
+        currentMaxVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
+        n.append(ChunkType::ns(), ns.ns());
+        n.append(ChunkType::min(), startKey);
+        n.append(ChunkType::max(), endKey);
+        n.append(ChunkType::shard(), shardName);
+        n.done();
+
+        // add the chunk's _id as the query part of the update statement
+        BSONObjBuilder q(op.subobjStart("o2"));
+        q.append(ChunkType::name(), ChunkType::genID(ns.ns(), startKey));
+        q.done();
+
+        updates.append(op.obj());
+
+        // remember this chunk info for logging later
+        ChunkType chunk;
+        chunk.setMin(startKey);
+        chunk.setMax(endKey);
+        chunk.setVersion(currentMaxVersion);
+
+        newChunks.push_back(std::move(chunk));
+
+        startKey = endKey;
+    }
+
+    newChunkBounds.pop_back();  // 'max' was used as sentinel
+
+    BSONArrayBuilder preCond;
+    {
+        BSONObjBuilder b;
+        b.append("ns", ChunkType::ConfigNS);
+        b.append("q",
+                 BSON("query" << BSON(ChunkType::ns(ns.ns())) << "orderby"
+                              << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+        {
+            BSONObjBuilder bb(b.subobjStart("res"));
+            collVersion.addToBSON(bb, ChunkType::DEPRECATED_lastmod());
+        }
+        preCond.append(b.obj());
+    }
+
+    // apply the batch of updates to remote and local metadata
+    Status applyOpsStatus = grid.catalogClient(txn)->applyChunkOpsDeprecated(
+        txn, updates.arr(), preCond.arr(), ns.ns(), currentMaxVersion);
+    if (!applyOpsStatus.isOK()) {
+        return applyOpsStatus;
+    }
+
+    // log changes
+    BSONObjBuilder logDetail;
+    {
+        BSONObjBuilder b(logDetail.subobjStart("before"));
+        b.append(ChunkType::min(), range.getMin());
+        b.append(ChunkType::max(), range.getMax());
+        collVersion.addToBSON(b, ChunkType::DEPRECATED_lastmod());
+    }
+
+    if (newChunks.size() == 2) {
+        appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
+        appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
+
+        grid.catalogClient(txn)->logChange(txn, "split", ns.ns(), logDetail.obj());
+    } else {
+        BSONObj beforeDetailObj = logDetail.obj();
+        BSONObj firstDetailObj = beforeDetailObj.getOwned();
+        const int newChunksSize = newChunks.size();
+
+        for (int i = 0; i < newChunksSize; i++) {
+            BSONObjBuilder chunkDetail;
+            chunkDetail.appendElements(beforeDetailObj);
+            chunkDetail.append("number", i + 1);
+            chunkDetail.append("of", newChunksSize);
+            appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
+
+            grid.catalogClient(txn)->logChange(txn, "multi-split", ns.ns(), chunkDetail.obj());
+        }
+    }
+
+    return applyOpsStatus;
 }
 
 void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) {
@@ -1252,7 +1414,8 @@ void ShardingCatalogManagerImpl::cancelAddShardTaskIfNeeded(const ShardId& shard
         auto cbHandle = _getAddShardHandle_inlock(shardId);
         _executorForAddShard->cancel(cbHandle);
         // Untrack the handle here so that if this shard is re-added before the CallbackCanceled
-        // status is delivered to the callback, a new addShard task for the shard will be created.
+        // status is delivered to the callback, a new addShard task for the shard will be
+        // created.
         _untrackAddShardHandle_inlock(shardId);
     }
 }
@@ -1290,8 +1453,8 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
     auto swHost = targeter->findHost(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                      Milliseconds(kDefaultFindHostMaxWaitTime));
     if (!swHost.isOK()) {
-        // A 3.2 mongos must have previously successfully communicated with hosts in this shard, so
-        // a failure to find a host here is probably transient, and it is safe to retry.
+        // A 3.2 mongos must have previously successfully communicated with hosts in this shard,
+        // so a failure to find a host here is probably transient, and it is safe to retry.
         warning() << "Failed to find host for shard " << shardType
                   << " when trying to upsert a shardIdentity document, "
                   << causedBy(swHost.getStatus());
@@ -1408,7 +1571,8 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
 
     // If the command succeeded, update config.shards to mark the shard as shardAware.
 
-    // Release the _addShardHandlesMutex before updating config.shards, since it involves disk I/O.
+    // Release the _addShardHandlesMutex before updating config.shards, since it involves disk
+    // I/O.
     // At worst, a redundant addShard task will be scheduled by a new primary if the current
     // primary fails during that write.
     lk.unlock();
@@ -1425,12 +1589,12 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
     // scope at the end of this code block.
     auto txnPtr = cc().makeOperationContext();
 
-    // Use kNoWaitWriteConcern to prevent waiting in this callback, since we don't handle a failed
-    // response anyway. If the write is rolled back, the new config primary will attempt to
-    // initialize sharding awareness on this shard again, and this update to config.shards will be
-    // automatically retried then. If it fails because the shard was removed through the normal
-    // removeShard path (so the entry in config.shards was deleted), no new addShard task will get
-    // scheduled on the next transition to primary.
+    // Use kNoWaitWriteConcern to prevent waiting in this callback, since we don't handle a
+    // failed response anyway. If the write is rolled back, the new config primary will attempt to
+    // initialize sharding awareness on this shard again, and this update to config.shards will
+    // be automatically retried then. If it fails because the shard was removed through the normal
+    // removeShard path (so the entry in config.shards was deleted), no new addShard task will
+    // get scheduled on the next transition to primary.
     auto updateStatus = _catalogClient->updateConfigDocument(
         txnPtr.get(),
         ShardType::ConfigNS,

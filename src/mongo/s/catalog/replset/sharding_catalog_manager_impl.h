@@ -30,8 +30,10 @@
 
 #include <vector>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 
@@ -84,6 +86,13 @@ public:
     Status removeKeyRangeFromZone(OperationContext* txn,
                                   const NamespaceString& ns,
                                   const ChunkRange& range) override;
+
+    Status commitChunkSplit(OperationContext* txn,
+                            const NamespaceString& ns,
+                            const OID& requestEpoch,
+                            const ChunkRange& range,
+                            const std::vector<BSONObj>& splitPoints,
+                            const std::string& shardName) override;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
@@ -281,6 +290,24 @@ private:
 
     // Protects the _addShardHandles map.
     stdx::mutex _addShardHandlesMutex;
+
+    /**
+     * Lock for shard zoning operations. This should be acquired when doing any operations that
+     * can affect the config.tags collection or the tags field of the config.shards collection.
+     * No other locks should be held when locking this. If an operation needs to take database
+     * locks (for example to write to a local collection) those locks should be taken after
+     * taking this.
+     */
+    Lock::ResourceMutex _kZoneOpLock;
+
+    /**
+     * Lock for chunk split/merge/move operations. This should be acquired when doing split/merge/
+     * move operations that can affect the config.chunks collection.
+     * No other locks should be held when locking this. If an operation needs to take database
+     * locks (for example to write to a local collection) those locks should be taken after
+     * taking this.
+     */
+    Lock::ResourceMutex _kChunkOpLock;
 };
 
 }  // namespace mongo

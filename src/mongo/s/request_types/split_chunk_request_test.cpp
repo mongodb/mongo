@@ -50,11 +50,14 @@ TEST(SplitChunkRequest, BasicValidConfigCommand) {
                                                                  << "max"
                                                                  << BSON("a" << 10)
                                                                  << "splitPoints"
-                                                                 << BSON_ARRAY(BSON("a" << 5)))));
+                                                                 << BSON_ARRAY(BSON("a" << 5))
+                                                                 << "shard"
+                                                                 << "shard0000")));
     ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT(ChunkRange(BSON("a" << 1), BSON("a" << 10)) == request.getChunkRange());
     ASSERT_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
+    ASSERT_EQ("shard0000", request.getShardName());
 }
 
 TEST(SplitChunkRequest, ValidWithMultipleSplits) {
@@ -68,12 +71,15 @@ TEST(SplitChunkRequest, ValidWithMultipleSplits) {
              << "max"
              << BSON("a" << 10)
              << "splitPoints"
-             << BSON_ARRAY(BSON("a" << 5) << BSON("a" << 7)))));
+             << BSON_ARRAY(BSON("a" << 5) << BSON("a" << 7))
+             << "shard"
+             << "shard0000")));
     ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT(ChunkRange(BSON("a" << 1), BSON("a" << 10)) == request.getChunkRange());
     ASSERT_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
     ASSERT_EQ(BSON("a" << 7), request.getSplitPoints().at(1));
+    ASSERT_EQ("shard0000", request.getShardName());
 }
 
 TEST(SplitChunkRequest, ConfigCommandtoBSON) {
@@ -86,7 +92,9 @@ TEST(SplitChunkRequest, ConfigCommandtoBSON) {
                                      << "max"
                                      << BSON("a" << 10)
                                      << "splitPoints"
-                                     << BSON_ARRAY(BSON("a" << 5)));
+                                     << BSON_ARRAY(BSON("a" << 5))
+                                     << "shard"
+                                     << "shard0000");
     BSONObj writeConcernObj = BSON("writeConcern" << BSON("w"
                                                           << "majority"));
 
@@ -107,7 +115,9 @@ TEST(SplitChunkRequest, MissingNamespaceErrors) {
         BSON("collEpoch" << OID("7fffffff0000000000000001") << "min" << BSON("a" << 1) << "max"
                          << BSON("a" << 10)
                          << "splitPoints"
-                         << BSON_ARRAY(BSON("a" << 5))));
+                         << BSON_ARRAY(BSON("a" << 5))
+                         << "shard"
+                         << "shard0000"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -119,7 +129,9 @@ TEST(SplitChunkRequest, MissingCollEpochErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSON_ARRAY(BSON("a" << 5))));
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -131,7 +143,9 @@ TEST(SplitChunkRequest, MissingChunkToSplitErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSON_ARRAY(BSON("a" << 5))));
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -143,7 +157,23 @@ TEST(SplitChunkRequest, MissingSplitPointErrors) {
                                                                   << "min"
                                                                   << BSON("a" << 1)
                                                                   << "max"
-                                                                  << BSON("a" << 10)));
+                                                                  << BSON("a" << 10)
+                                                                  << "shard"
+                                                                  << "shard0000"));
+    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+}
+
+TEST(SplitChunkRequest, MissingShardNameErrors) {
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+                                                                  << "TestDB.TestColl"
+                                                                  << "collEpoch"
+                                                                  << OID("7fffffff0000000000000001")
+                                                                  << "min"
+                                                                  << BSON("a" << 1)
+                                                                  << "max"
+                                                                  << BSON("a" << 10)
+                                                                  << "splitPoints"
+                                                                  << BSON_ARRAY(BSON("a" << 5))));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -154,7 +184,9 @@ TEST(SplitChunkRequest, WrongNamespaceTypeErrors) {
                                << "max"
                                << BSON("a" << 10)
                                << "splitPoints"
-                               << BSON_ARRAY(BSON("a" << 5))));
+                               << BSON_ARRAY(BSON("a" << 5))
+                               << "shard"
+                               << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -168,7 +200,9 @@ TEST(SplitChunkRequest, WrongCollEpochTypeErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSON_ARRAY(BSON("a" << 5))));
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -182,7 +216,9 @@ TEST(SplitChunkRequest, WrongChunkToSplitTypeErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSON_ARRAY(BSON("a" << 5))));
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -196,6 +232,24 @@ TEST(SplitChunkRequest, WrongSplitPointTypeErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
+                                                                  << 1234
+                                                                  << "shard"
+                                                                  << "shard0000"));
+    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+}
+
+TEST(SplitChunkRequest, WrongShardNameTypeErrors) {
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+                                                                  << "TestDB.TestColl"
+                                                                  << "collEpoch"
+                                                                  << OID("7fffffff0000000000000001")
+                                                                  << "min"
+                                                                  << BSON("a" << 1)
+                                                                  << "max"
+                                                                  << BSON("a" << 10)
+                                                                  << "splitPoints"
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
                                                                   << 1234));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
@@ -210,7 +264,9 @@ TEST(SplitChunkRequest, InvalidNamespaceErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSON_ARRAY(BSON("a" << 5))));
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::InvalidNamespace, request.getStatus());
 }
 
@@ -224,7 +280,9 @@ TEST(SplitChunkRequest, EmptyChunkToSplitErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSON_ARRAY(BSON("a" << 5))));
+                                                                  << BSON_ARRAY(BSON("a" << 5))
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::BadValue, request.getStatus());
 }
 
@@ -238,7 +296,9 @@ TEST(SplitChunkRequest, EmptySplitPointsErrors) {
                                                                   << "max"
                                                                   << BSON("a" << 10)
                                                                   << "splitPoints"
-                                                                  << BSONArray()));
+                                                                  << BSONArray()
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::InvalidOptions, request.getStatus());
 }
 }

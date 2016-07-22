@@ -69,6 +69,13 @@ public:
                                   const NamespaceString& ns,
                                   const ChunkRange& range) override;
 
+    Status commitChunkSplit(OperationContext* txn,
+                            const NamespaceString& ns,
+                            const OID& requestEpoch,
+                            const ChunkRange& range,
+                            const std::vector<BSONObj>& splitPoints,
+                            const std::string& shardName) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;

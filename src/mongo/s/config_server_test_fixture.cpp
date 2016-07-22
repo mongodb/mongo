@@ -411,6 +411,29 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn
     return ShardType::fromBSON(doc.getValue());
 }
 
+Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks) {
+    const NamespaceString chunkNS(ChunkType::ConfigNS);
+    for (const auto& chunk : chunks) {
+        auto insertStatus = insertToConfigCollection(operationContext(), chunkNS, chunk.toBSON());
+        if (!insertStatus.isOK()) {
+            return insertStatus;
+        }
+    }
+
+    return Status::OK();
+}
+
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* txn,
+                                                           const BSONObj& minKey) {
+    auto doc =
+        findOneOnConfigCollection(txn, NamespaceString(ChunkType::ConfigNS), BSON("min" << minKey));
+    if (!doc.isOK()) {
+        return doc.getStatus();
+    }
+
+    return ChunkType::fromBSON(doc.getValue());
+}
+
 StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* txn,
                                                                      const NamespaceString& ns) {
     auto configShard = getConfigShard();

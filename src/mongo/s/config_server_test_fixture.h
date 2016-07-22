@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message_port_mock.h"
 
@@ -145,6 +146,16 @@ public:
      * Returns {ErrorCodes::ShardNotFound} if the given shard does not exists.
      */
     StatusWith<ShardType> getShardDoc(OperationContext* txn, const std::string& shardId);
+
+    /**
+     * Setup the config.chunks collection to contain the given chunks.
+     */
+    Status setupChunks(const std::vector<ChunkType>& chunks);
+
+    /**
+     * Retrieves the chunk document from the config server.
+     */
+    StatusWith<ChunkType> getChunkDoc(OperationContext* txn, const BSONObj& minKey);
 
     /**
      * Returns the indexes definitions defined on a given collection.

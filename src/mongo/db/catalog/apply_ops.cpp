@@ -212,18 +212,20 @@ Status _applyOps(OperationContext* txn,
 
         const BSONObj cmdRewritten = cmdBuilder.done();
 
+        auto opObserver = getGlobalServiceContext()->getOpObserver();
+        invariant(opObserver);
         if (haveWrappingWUOW) {
-            getGlobalServiceContext()->getOpObserver()->onApplyOps(txn, tempNS, cmdRewritten);
+            opObserver->onApplyOps(txn, tempNS, cmdRewritten);
         } else {
             // When executing applyOps outside of a wrapping WriteUnitOfWOrk, always logOp the
-            // command regardless of whether the individial ops succeeded and rely on any failures
-            // to also on secondaries. This isn't perfect, but it's what the command has always done
-            // and is part of its "correct" behavior.
+            // command regardless of whether the individial ops succeeded and rely on any
+            // failures to also on secondaries. This isn't perfect, but it's what the command
+            // has always done and is part of its "correct" behavior.
             while (true) {
                 try {
                     WriteUnitOfWork wunit(txn);
-                    getGlobalServiceContext()->getOpObserver()->onApplyOps(
-                        txn, tempNS, cmdRewritten);
+                    opObserver->onApplyOps(txn, tempNS, cmdRewritten);
+
                     wunit.commit();
                     break;
                 } catch (const WriteConflictException& wce) {
