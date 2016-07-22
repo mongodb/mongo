@@ -108,6 +108,19 @@ function checkDBHashesFsyncLocked(rst, dbBlacklist = [], phase = 'after test hoo
     var activeException = false;
 
     try {
+        // dbHash values for collections in the "config" database are cached and may be stale due to
+        // SERVER-22156. We insert a document into each of these collections to invalidate
+        // the potentially stale cache entries.
+        var primaryConfigDb = rst.liveNodes.master.getDB('config');
+        for (var collName of primaryConfigDb.getCollectionNames()) {
+            // Invalidate the dbhash cache for non-system collections and user-writable system
+            // collections.
+            if (!collName.startsWith('system.') || collName === 'system.js' ||
+                collName === 'system.users')
+                assert.writeOK(
+                    primaryConfigDb.getCollection(collName).insert({invalidate: 'cache'}));
+        }
+
         // Lock the primary to prevent the TTL monitor from deleting expired documents in
         // the background while we are getting the dbhashes of the replica set members.
         assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
