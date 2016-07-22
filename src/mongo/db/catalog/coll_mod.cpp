@@ -100,11 +100,39 @@ Status collMod(OperationContext* txn,
             }
 
             BSONObj indexObj = e.Obj();
-            BSONObj keyPattern = indexObj.getObjectField("keyPattern");
+            StringData indexName;
+            BSONObj keyPattern;
 
-            if (keyPattern.isEmpty()) {
-                errorStatus = Status(ErrorCodes::InvalidOptions, "no keyPattern specified");
+            BSONElement nameElem = indexObj["name"];
+            BSONElement keyPatternElem = indexObj["keyPattern"];
+            if (nameElem && keyPatternElem) {
+                errorStatus =
+                    Status(ErrorCodes::InvalidOptions, "Cannot specify both key pattern and name.");
                 continue;
+            }
+
+            if (!nameElem && !keyPatternElem) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     "Must specify either index name or key pattern.");
+                continue;
+            }
+
+            if (nameElem) {
+                if (nameElem.type() != BSONType::String) {
+                    errorStatus =
+                        Status(ErrorCodes::InvalidOptions, "Index name must be a string.");
+                    continue;
+                }
+                indexName = nameElem.valueStringData();
+            }
+
+            if (keyPatternElem) {
+                if (keyPatternElem.type() != BSONType::Object) {
+                    errorStatus =
+                        Status(ErrorCodes::InvalidOptions, "Key pattern must be an object.");
+                    continue;
+                }
+                keyPattern = keyPatternElem.embeddedObject();
             }
 
             BSONElement newExpireSecs = indexObj["expireAfterSeconds"];
@@ -118,29 +146,43 @@ Status collMod(OperationContext* txn,
                 continue;
             }
 
-            std::vector<IndexDescriptor*> indexes;
-            coll->getIndexCatalog()->findIndexesByKeyPattern(txn, keyPattern, false, &indexes);
+            const IndexDescriptor* idx = nullptr;
+            if (!indexName.empty()) {
+                idx = coll->getIndexCatalog()->findIndexByName(txn, indexName);
+                if (!idx) {
+                    errorStatus =
+                        Status(ErrorCodes::IndexNotFound,
+                               str::stream() << "cannot find index " << indexName << " for ns "
+                                             << nss.ns());
+                    continue;
+                }
+            } else {
+                std::vector<IndexDescriptor*> indexes;
+                coll->getIndexCatalog()->findIndexesByKeyPattern(txn, keyPattern, false, &indexes);
 
-            if (indexes.size() > 1) {
-                errorStatus =
-                    Status(ErrorCodes::AmbiguousIndexKeyPattern,
-                           str::stream() << "index keyPattern " << keyPattern << " matches "
-                                         << indexes.size()
-                                         << " indexes,"
-                                         << " must use index name. "
-                                         << "Conflicting indexes:"
-                                         << indexes[0]->infoObj()
-                                         << ", "
-                                         << indexes[1]->infoObj());
-                continue;
-            } else if (indexes.empty()) {
-                errorStatus = Status(
-                    ErrorCodes::IndexNotFound,
-                    str::stream() << "cannot find index " << keyPattern << " for ns " << nss.ns());
-                continue;
+                if (indexes.size() > 1) {
+                    errorStatus =
+                        Status(ErrorCodes::AmbiguousIndexKeyPattern,
+                               str::stream() << "index keyPattern " << keyPattern << " matches "
+                                             << indexes.size()
+                                             << " indexes,"
+                                             << " must use index name. "
+                                             << "Conflicting indexes:"
+                                             << indexes[0]->infoObj()
+                                             << ", "
+                                             << indexes[1]->infoObj());
+                    continue;
+                } else if (indexes.empty()) {
+                    errorStatus =
+                        Status(ErrorCodes::IndexNotFound,
+                               str::stream() << "cannot find index " << keyPattern << " for ns "
+                                             << nss.ns());
+                    continue;
+                }
+
+                idx = indexes[0];
             }
 
-            const IndexDescriptor* idx = indexes[0];
             BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
             if (oldExpireSecs.eoo()) {
                 errorStatus =
