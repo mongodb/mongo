@@ -24,6 +24,25 @@
     // Ensure that equality of groups respects an explicit collation.
     assert.eq(2, coll.aggregate([{$group: {_id: "$str2"}}], diacriticInsensitive).itcount());
 
+    // Ensure that equality of groups created by $sortByCount respects the inherited collation.
+    assert.eq(2, coll.aggregate([{$sortByCount: "$str"}]).itcount());
+    assert.eq(4, coll.aggregate([{$sortByCount: "$str2"}]).itcount());
+
+    // Ensure that equality of groups created by $sortByCount respects an explicit collation.
+    assert.eq(4, coll.aggregate([{$sortByCount: "$str"}], diacriticInsensitive).itcount());
+    assert.eq(2, coll.aggregate([{$sortByCount: "$str2"}], diacriticInsensitive).itcount());
+
+    // Ensure that equality of groups inside $facet stage respects the inherited collation.
+    results =
+        coll.aggregate([{
+                $facet:
+                    {facetStr: [{$group: {_id: "$str"}}], facetStr2: [{$group: {_id: "$str2"}}]}
+            }])
+            .toArray();
+    assert.eq(1, results.length);
+    assert.eq(2, results[0].facetStr.length);
+    assert.eq(4, results[0].facetStr2.length);
+
     // Test that the $addToSet accumulator respects the inherited collation.
     results = coll.aggregate([{$group: {_id: null, set: {$addToSet: "$str"}}}]).toArray();
     assert.eq(1, results.length);

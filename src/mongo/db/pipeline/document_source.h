@@ -1257,7 +1257,6 @@ private:
     long long count;
 };
 
-// TODO SERVER-23349: Make aggregation sort respect the collation.
 class DocumentSourceSort final : public DocumentSource, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
