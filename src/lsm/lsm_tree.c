@@ -771,6 +771,11 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	++lsm_tree->dsk_gen;
 
 	lsm_tree->modified = true;
+	/*
+	 * Ensure the updated disk generation is visible to all other threads
+	 * before updating the transaction ID.
+	 */
+	WT_FULL_BARRIER();
 
 	/*
 	 * Set the switch transaction in the previous chunk unless this is
@@ -1187,8 +1192,15 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 	 */
 	if (lsm_tree->nchunks > 0 &&
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL) {
-		if (chunk->switch_txn == WT_TXN_NONE)
+		if (chunk->switch_txn == WT_TXN_NONE) {
+			/*
+			 * Make sure any cursors open on the tree see the
+			 * new switch generation before updating.
+			 */
+			++lsm_tree->dsk_gen;
+			WT_FULL_BARRIER();
 			chunk->switch_txn = __wt_txn_id_alloc(session, false);
+		}
 		/*
 		 * If we have a chunk, we want to look for it to be on-disk.
 		 * So we need to add a reference to keep it available.
