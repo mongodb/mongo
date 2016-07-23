@@ -504,10 +504,11 @@ __evict_review(
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
 		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-			LF_SET(WT_EVICT_IN_MEMORY);
+			LF_SET(WT_EVICT_IN_MEMORY |
+			    WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
 		else if (page->read_gen == WT_READGEN_OLDEST ||
 		    page->memory_footprint > S2BT(session)->splitmempage)
-			LF_SET(WT_EVICT_UPDATE_RESTORE);
+			LF_SET(WT_EVICT_UPDATE_RESTORE | WT_EVICT_SCRUB);
 		else if (F_ISSET(cache, WT_CACHE_STUCK))
 			LF_SET(WT_EVICT_LOOKASIDE);
 		/*
@@ -523,14 +524,13 @@ __evict_review(
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured
-	 * for in-memory or update/restore. If the page is clean, assert that
-	 * reconciliation was configured for a lookaside table, or it's not a
-	 * durable object (currently the lookaside table), or all page updates
-	 * were globally visible.
+	 * for update/restore. If the page is clean, assert that reconciliation
+	 * was configured for a lookaside table, or it's not a durable object
+	 * (currently the lookaside table), or all page updates were globally
+	 * visible.
 	 */
 	WT_ASSERT(session,
-	    !__wt_page_is_modified(page) ||
-	    LF_ISSET(WT_EVICT_IN_MEMORY | WT_EVICT_UPDATE_RESTORE));
+	    !__wt_page_is_modified(page) || LF_ISSET(WT_EVICT_UPDATE_RESTORE));
 	WT_ASSERT(session,
 	    __wt_page_is_modified(page) ||
 	    LF_ISSET(WT_EVICT_LOOKASIDE) ||

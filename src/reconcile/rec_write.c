@@ -382,15 +382,6 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
 	mod->last_oldest_id = oldest_id;
 
-	/*
-	 * Evicting in-memory uses the update/restore mechanisms.
-	 * The update/restore mechanisms use disk images.
-	 */
-	if (LF_ISSET(WT_EVICT_IN_MEMORY))
-		LF_SET(WT_EVICT_UPDATE_RESTORE);
-	if (LF_ISSET(WT_EVICT_UPDATE_RESTORE))
-		LF_SET(WT_EVICT_SCRUB);
-
 	/* Initialize the reconciliation structure for each new run. */
 	if ((ret = __rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile)) != 0) {
@@ -2793,8 +2784,15 @@ no_slots:
 		/*
 		 * Optionally keep the disk image in cache. Update the initial
 		 * page-header fields to reflect the actual data being written.
+		 *
+		 * If updates are saved and need to be restored, we have to keep
+		 * a copy of the disk image. Unfortunately, we don't yet know if
+		 * there are updates to restore for the key range covered by the
+		 * disk image just created. If there are any saved updates, take
+		 * a copy of the disk image, it's freed later if not needed.
 		 */
-		if (F_ISSET(r, WT_EVICT_SCRUB)) {
+		if (F_ISSET(r, WT_EVICT_SCRUB) ||
+		    (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && r->supd_next > 0)) {
 			WT_RET(__wt_strndup(session, dsk,
 			    dsk_dst->mem_size, &last->disk_image));
 			disk_image = last->disk_image;
@@ -3146,6 +3144,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	uint32_t bnd_slot, i, j;
 	int cmp;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
+	bool need_image;
 
 	btree = S2BT(session);
 	dsk = buf->mem;
@@ -3336,12 +3335,24 @@ supd_check_complete:
 
 copy_image:
 	/*
-	 * Optionally keep the disk image in cache (raw compression may have
-	 * already made a copy).
+	 * If re-instantiating this page in memory (either because eviction
+	 * wants to, or because we skipped updates to build the disk image),
+	 * save a copy of the disk image.
+	 *
+	 * Raw compression might have already saved a copy of the disk image
+	 * before we could know if we skipped updates to create it, and now
+	 * we know if we're going to need it.
+	 *
+	 * Copy the disk image if we need a copy and don't already have one,
+	 * discard any already saved copy we don't need.
 	 */
-	if (F_ISSET(r, WT_EVICT_SCRUB) && bnd->disk_image == NULL)
+	need_image = F_ISSET(r, WT_EVICT_SCRUB) ||
+	    (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL);
+	if (need_image && bnd->disk_image == NULL)
 		WT_ERR(__wt_strndup(
 		    session, buf->data, buf->size, &bnd->disk_image));
+	if (!need_image)
+		__wt_free(session, bnd->disk_image);
 
 err:	__wt_scr_free(session, &key);
 	return (ret);
