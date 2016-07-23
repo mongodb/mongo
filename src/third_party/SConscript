@@ -326,10 +326,10 @@ if wiredtiger:
         ])
 
 if use_system_version_of_library("asio"):
-    asioEnv = env.Clone(
-        SYSLIBDEPS=[
-            env['LIBDEPS_ASIO_SYSLIBDEP'],
-        ])
+    # Normally, we would request LIBDEPS_ASIO_SYSLIBDEP here, but on most systems, the system asio
+    # will be header only so there is no library required. In the rare case where one is, it can be
+    # injected via LIBS= on the command line.
+    asioEnv = env.Clone()
 else:
     asioEnv = env.Clone()
     asioEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
