@@ -141,7 +141,7 @@ public:
      * Updates the ShardRegistry's stored notion of the config server optime based on the
      * ConfigServerMetadata decoration attached to the OperationContext.
      */
-    void updateConfigServerOpTimeFromMetadata(OperationContext* txn);
+    Status updateConfigServerOpTimeFromMetadata(OperationContext* txn);
 
     /**
      * Assigns a shard name to this MongoD instance.

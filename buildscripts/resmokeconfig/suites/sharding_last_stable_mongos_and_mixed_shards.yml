@@ -40,6 +40,8 @@ selector:
     # TODO Requires mongos to have the 'clientCursorMonitorFrequencySecs' server parameter; enable
     # when 3.4 becomes 'last-stable'.
     - jstests/sharding/cursor_timeout.js
+    # Bug in v3.2 shards, fixed in v3.4.
+    - jstests/sharding/auth_sharding_cmd_metadata.js
 
     # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js

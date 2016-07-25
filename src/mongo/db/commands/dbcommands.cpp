@@ -1376,7 +1376,7 @@ void Command::execCommand(OperationContext* txn,
             if (shardingState->enabled()) {
                 // TODO(spencer): Do this unconditionally once all nodes are sharding aware
                 // by default.
-                shardingState->updateConfigServerOpTimeFromMetadata(txn);
+                uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(txn));
             } else {
                 massert(
                     34422,
