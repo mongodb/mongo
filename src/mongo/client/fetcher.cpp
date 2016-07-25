@@ -247,6 +247,7 @@ void Fetcher::cancel() {
     executor::TaskExecutor::CallbackHandle handle;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _inShutdown = true;
 
         if (!_active) {
             return;
@@ -259,7 +260,6 @@ void Fetcher::cancel() {
         }
 
         handle = _getMoreCallbackHandle;
-        _inShutdown = true;
     }
 
     _executor->cancel(handle);
@@ -271,6 +271,13 @@ void Fetcher::wait() {
 }
 
 Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (_inShutdown) {
+            return Status(ErrorCodes::CallbackCanceled,
+                          "fetcher was shut down after previous batch was processed");
+        }
+    }
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
             RemoteCommandRequest(_source, _dbname, cmdObj, _metadata, _timeout),
