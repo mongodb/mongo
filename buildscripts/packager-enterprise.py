@@ -121,6 +121,8 @@ class EnterpriseDistro(packager.Distro):
                 return [ "rhel72" ]
             if self.n == 'suse':
                 return [ "suse12" ]
+            if self.n == 'ubuntu':
+                return [ "ubuntu1604" ]
             else:
                 return []
         if arch == "arm64":

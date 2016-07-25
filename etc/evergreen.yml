@@ -109,6 +109,7 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-72-s390x
+  - enterprise-ubuntu1604-s390x
   - enterprise-suse11-64
   - enterprise-suse12-64
   - enterprise-ubuntu1204-64
@@ -144,6 +145,7 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-72-s390x
+  - enterprise-ubuntu1604-s390x
   - enterprise-suse11-64
   - enterprise-suse12-64
   - enterprise-ubuntu1204-64
@@ -3711,6 +3713,98 @@ buildvariants:
   - name: slow1_WT
   - name: serial_run_WT
   - name: sharding_jscore_passthrough_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+  - name: unittests
+  - name: push
+    distros:
+    - ubuntu1604-test
+
+- name: enterprise-ubuntu1604-s390x
+  display_name: Enterprise Ubuntu 16.04 s390x
+  modules:
+  - enterprise
+  - mongo-tools
+  run_on:
+  - ubuntu1604-zseries-large
+  - ubuntu1604-zseries-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: s390x-enterprise-ubuntu1604
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    num_jobs_available: 2
+    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: s390x
+    packager_distro: ubuntu1604
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-zseries-large
+  - name: aggregation_WT
+  - name: aggregation_WT_ese
+  - name: aggregation_auth
+  - name: aggregation_read_concern_majority_passthrough_WT
+  - name: audit_WT
+  - name: auth_WT
+  - name: auth_audit_WT
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous_WT
+  - name: dbtest_WT
+  - name: ese_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd_WT
+  - name: httpinterface
+  - name: integration_tests_replset
+  - name: integration_tests_standalone
+  - name: jsCore_WT
+  - name: jsCore_WT_ese
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
+  - name: jsCore_op_query_WT
+  - name: jsCore_small_oplog_WT
+  - name: jsCore_small_oplog_rs_WT
+  - name: mongosTest
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel_WT
+  - name: parallel_compatibility_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: replicasets_WT
+  - name: replicasets_WT_ese
+  - name: replicasets_auth
+  - name: replicasets_legacy
+  - name: replication_WT
+  - name: replication_auth
+  - name: sasl
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding_WT
+  - name: sharding_WT_ese
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: sharding_csrs_continuous_config_stepdown_WT
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_op_query_WT
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: snmp_WT
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
