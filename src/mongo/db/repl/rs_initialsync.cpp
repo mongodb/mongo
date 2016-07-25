@@ -229,9 +229,6 @@ bool _initialSyncApplyOplog(OperationContext* txn,
 }
 
 
-// Number of connection retries allowed during initial sync.
-const auto kConnectRetryLimit = 10;
-
 /**
  * Do the initial sync for this member.  There are several steps to this process:
  *
@@ -280,10 +277,10 @@ Status _initialSync(BackgroundSync* bgsync) {
         if (r.getHost().empty()) {
             std::string msg =
                 "No valid sync source found in current replica set to do an initial sync.";
-            if (++currentRetry >= kConnectRetryLimit) {
+            if (++currentRetry >= kInitialSyncMaxConnectRetries) {
                 return Status(ErrorCodes::InitialSyncOplogSourceMissing, msg);
             }
-            LOG(1) << msg << ", retry " << currentRetry << " of " << kConnectRetryLimit;
+            LOG(1) << msg << ", retry " << currentRetry << " of " << kInitialSyncMaxConnectRetries;
             sleepsecs(1);
         }
 

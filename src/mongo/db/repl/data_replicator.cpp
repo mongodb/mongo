@@ -65,6 +65,7 @@
 namespace mongo {
 namespace repl {
 const int kInitialSyncMaxRetries = 9;
+const int kInitialSyncMaxConnectRetries = 10;
 
 // Failpoint for initial sync
 MONGO_FP_DECLARE(failInitialSyncWithBadHost);
@@ -436,8 +437,8 @@ StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn) {
 
 Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
                                                      UniqueLock& lk,
-                                                     HostAndPort syncSource,
-                                                     RollbackChecker& rollbackChecker) {
+                                                     HostAndPort syncSource) {
+    RollbackChecker rollbackChecker(_exec, syncSource);
     invariant(lk.owns_lock());
     Status statusFromWrites(ErrorCodes::NotYetInitialized, "About to run Initial Sync Attempt.");
 
@@ -643,16 +644,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
     _setState_inlock(DataReplicatorState::InitialSync);
 
-    // TODO: match existing behavior.
-    while (true) {
-        const auto status = _ensureGoodSyncSource_inlock();
-        if (status.isOK()) {
-            break;
-        }
-        LOG(1) << "Error getting sync source: " << status.toString() << ", trying again in 1 sec.";
-        sleepsecs(1);
-    }
 
+    LOG(1) << "Creating oplogBuffer.";
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
     _oplogBuffer->startup(txn);
     ON_BLOCK_EXIT([this, txn, &lk]() {
@@ -697,15 +690,26 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn) 
 
         if (attemptErrorStatus.isOK()) {
             if (_syncSource.empty()) {
-                // TODO: Handle no sync source better.
-                auto sourceStatus = _ensureGoodSyncSource_inlock();
-                if (!sourceStatus.isOK())
-                    return sourceStatus;
+                for (auto i = 0; i < kInitialSyncMaxConnectRetries; ++i) {
+                    attemptErrorStatus = _ensureGoodSyncSource_inlock();
+                    if (attemptErrorStatus.isOK()) {
+                        break;
+                    }
+                    LOG(1) << "Error getting sync source: '" << attemptErrorStatus.toString()
+                           << "', trying again in " << _opts.syncSourceRetryWait << ". Attempt "
+                           << i + 1 << " of " << kInitialSyncMaxConnectRetries;
+                    sleepmillis(durationCount<Milliseconds>(_opts.syncSourceRetryWait));
+                }
             }
 
-            RollbackChecker rollbackChecker(_exec, _syncSource);
-            attemptErrorStatus =
-                _runInitialSyncAttempt_inlock(txn, lk, _syncSource, rollbackChecker);
+            if (_syncSource.empty()) {
+                attemptErrorStatus = Status(
+                    ErrorCodes::InitialSyncOplogSourceMissing,
+                    "No valid sync source found in current replica set to do an initial sync.");
+            } else {
+                attemptErrorStatus = _runInitialSyncAttempt_inlock(txn, lk, _syncSource);
+                LOG(1) << "initial sync attempt returned with status: " << attemptErrorStatus;
+            }
         }
         if (attemptErrorStatus.isOK()) {
             break;

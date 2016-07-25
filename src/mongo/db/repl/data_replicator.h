@@ -68,6 +68,7 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 
 extern const int kInitialSyncMaxRetries;
+extern const int kInitialSyncMaxConnectRetries;
 
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
@@ -255,8 +256,7 @@ private:
     // Runs a single initial sync attempt.
     Status _runInitialSyncAttempt_inlock(OperationContext* txn,
                                          UniqueLock& lk,
-                                         HostAndPort syncSource,
-                                         RollbackChecker& rollbackChecker);
+                                         HostAndPort syncSource);
 
     void _setState(const DataReplicatorState& newState);
     void _setState_inlock(const DataReplicatorState& newState);
