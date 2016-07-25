@@ -71,6 +71,7 @@ selector:
     - jstests/core/eval0.js
     - jstests/core/eval7.js
     - jstests/core/eval9.js
+    - jstests/core/diagdata.js # SERVER-25226
 
 executor:
   js_test:

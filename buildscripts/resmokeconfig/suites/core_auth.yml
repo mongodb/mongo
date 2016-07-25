@@ -12,6 +12,7 @@ selector:
     - jstests/core/*[aA]uth*.js
     # Skip these additional tests when running with auth enabled.
     - jstests/core/bench_test*.js
+    - jstests/core/diagdata.js # SERVER-25226
 
 executor:
   js_test:

@@ -7,6 +7,7 @@ selector:
     - jstests/core/dbadmin.js
     - jstests/core/opcounters_write_cmd.js
     - jstests/core/capped_update.js
+    - jstests/core/diagdata.js # SERVER-25226
 
 executor:
   js_test:

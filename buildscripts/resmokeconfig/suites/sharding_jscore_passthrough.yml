@@ -44,6 +44,7 @@ selector:
     # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos.
     - jstests/core/invalid_db_name.js
     - jstests/core/validate_cmd_ns.js
+    - jstests/core/diagdata.js # SERVER-25226
 
 executor:
   js_test:

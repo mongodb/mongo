@@ -8,6 +8,7 @@ selector:
     - jstests/core/opcounters_write_cmd.js
     - jstests/core/read_after_optime.js
     - jstests/core/capped_update.js
+    - jstests/core/diagdata.js # SERVER-25226
 
 executor:
   js_test:
