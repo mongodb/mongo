@@ -96,6 +96,9 @@ bool legalClientSystemNS(StringData ns, bool write) {
     return false;
 }
 
+const StringData NamespaceString::kAdminDb = "admin"_sd;
+const StringData NamespaceString::kLocalDb = "local"_sd;
+
 const NamespaceString NamespaceString::kConfigCollectionNamespace(kConfigCollection);
 
 bool NamespaceString::isListCollectionsCursorNS() const {

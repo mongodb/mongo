@@ -83,7 +83,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
         }
     } else if (supportsWriteConcern) {
         // If it supports writeConcern and does not use the default, validate the writeConcern.
-        Status wcStatus = validateWriteConcern(txn, writeConcern);
+        Status wcStatus = validateWriteConcern(txn, writeConcern, dbName);
         if (!wcStatus.isOK()) {
             return wcStatus;
         }
@@ -96,7 +96,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
     return writeConcern;
 }
 
-Status validateWriteConcern(OperationContext* txn, const WriteConcernOptions& writeConcern) {
+Status validateWriteConcern(OperationContext* txn,
+                            const WriteConcernOptions& writeConcern,
+                            StringData dbName) {
     if (writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL &&
         !txn->getServiceContext()->getGlobalStorageEngine()->isDurable()) {
         return Status(ErrorCodes::BadValue,
@@ -107,7 +109,7 @@ Status validateWriteConcern(OperationContext* txn, const WriteConcernOptions& wr
     // logic) should never be making non-majority writes against the config server, because sharding
     // is not resilient against rollbacks of metadata writes.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        !writeConcern.validForConfigServers()) {
+        dbName != NamespaceString::kLocalDb && !writeConcern.validForConfigServers()) {
         // The only cases where we allow non-majority writes are from within the config servers
         // themselves, because these wait for write concern explicitly.
         if (!txn->getClient()->isInDirectClient()) {
@@ -176,9 +178,6 @@ Status waitForWriteConcern(OperationContext* txn,
                            const OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result) {
-    // We assume all options have been validated earlier, if not, programming error
-    dassertOK(validateWriteConcern(txn, writeConcern));
-
     auto replCoord = repl::ReplicationCoordinator::get(txn);
 
     // Next handle blocking on disk

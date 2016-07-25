@@ -221,8 +221,10 @@ public:
         // Validate write concern no matter what, this matches 2.4 behavior
         //
         if (status.isOK()) {
-            // Ensure options are valid for this host
-            status = validateWriteConcern(txn, writeConcern);
+            // Ensure options are valid for this host. Since getLastError doesn't do writes itself,
+            // treat it as if these are admin database writes, which need to be replicated so we do
+            // the strictest checks write concern checks.
+            status = validateWriteConcern(txn, writeConcern, NamespaceString::kAdminDb);
         }
 
         if (!status.isOK()) {

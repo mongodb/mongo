@@ -52,9 +52,11 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const bool supportsWriteConcern);
 
 /**
- * Verifies that a WriteConcern is valid for this particular host.
+ * Verifies that a WriteConcern is valid for this particular host and database.
  */
-Status validateWriteConcern(OperationContext* txn, const WriteConcernOptions& writeConcern);
+Status validateWriteConcern(OperationContext* txn,
+                            const WriteConcernOptions& writeConcern,
+                            StringData dbName);
 
 struct WriteConcernResult {
     WriteConcernResult() {
