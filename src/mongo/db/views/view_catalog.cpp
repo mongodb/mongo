@@ -36,13 +36,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view.h"
@@ -56,39 +51,6 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableViewsPara
     ServerParameterSet::getGlobal(), "enableViews", &enableViews);
 
 const std::uint32_t ViewCatalog::kMaxViewDepth = 20;
-
-BSONObj ResolvedViewDefinition::asExpandedViewAggregation(const AggregationRequest& request) {
-    BSONObjBuilder aggregationBuilder;
-
-    // Perform the aggregation on the resolved namespace.
-    aggregationBuilder.append("aggregate", collectionNss.coll());
-
-    // The new pipeline consists of two parts: first, 'pipeline' in this ResolvedViewDefinition;
-    // then, the pipeline in 'request'.
-    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
-    for (auto&& item : pipeline) {
-        pipelineBuilder.append(item);
-    }
-
-    for (auto&& item : request.getPipeline()) {
-        pipelineBuilder.append(item);
-    }
-    pipelineBuilder.doneFast();
-
-    // The cursor option is always specified regardless of the presence of batchSize.
-    if (request.getBatchSize()) {
-        BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
-        batchSizeBuilder.append(AggregationRequest::kBatchSizeName, *request.getBatchSize());
-        batchSizeBuilder.doneFast();
-    } else {
-        aggregationBuilder.append("cursor", BSONObj());
-    }
-
-    if (request.isExplain())
-        aggregationBuilder.append("explain", true);
-
-    return aggregationBuilder.obj();
-}
 
 ViewCatalog::ViewCatalog(OperationContext* txn, DurableViewCatalog* durable) : _durable(durable) {
     durable->iterate(txn, [&](const BSONObj& view) {
@@ -149,15 +111,15 @@ ViewDefinition* ViewCatalog::lookup(StringData ns) {
     return nullptr;
 }
 
-StatusWith<ResolvedViewDefinition> ViewCatalog::resolveView(OperationContext* txn,
-                                                            const NamespaceString& nss) {
+StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* txn,
+                                                  const NamespaceString& nss) {
     const NamespaceString* resolvedNss = &nss;
     std::vector<BSONObj> resolvedPipeline;
 
     for (std::uint32_t i = 0; i < ViewCatalog::kMaxViewDepth; i++) {
         ViewDefinition* view = lookup(resolvedNss->ns());
         if (!view)
-            return StatusWith<ResolvedViewDefinition>({*resolvedNss, resolvedPipeline});
+            return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
 
         resolvedNss = &(view->viewOn());
 

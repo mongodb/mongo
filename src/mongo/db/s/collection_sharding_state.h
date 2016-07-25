@@ -130,6 +130,12 @@ public:
      */
     void checkShardVersionOrThrow(OperationContext* txn);
 
+    /**
+     * Returns whether this collection is sharded. Valid only if mongoD is primary.
+     * TODO SERVER-24960: This method may return a false positive until SERVER-24960 is fixed.
+     */
+    bool collectionIsSharded();
+
     // Replication subsystem hooks. If this collection is serving as a source for migration, these
     // methods inform it of any changes to its contents.
 

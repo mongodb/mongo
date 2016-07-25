@@ -59,6 +59,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/db/views/view_sharding_check.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -283,7 +284,18 @@ public:
             // recursively calling run, which will re-acquire locks on the underlying collection.
             // (The lock must be released because recursively acquiring locks on the database will
             // prohibit yielding.)
-            if (ctx.getView()) {
+            if (auto view = ctx.getView()) {
+                auto viewDefinition =
+                    ViewShardingCheck::getResolvedViewIfSharded(txn, ctx.getDb(), view);
+                if (!viewDefinition.isOK()) {
+                    return appendCommandStatus(result, viewDefinition.getStatus());
+                }
+
+                if (!viewDefinition.getValue().isEmpty()) {
+                    ViewShardingCheck::appendShardedViewStatus(viewDefinition.getValue(), &result);
+                    return false;
+                }
+
                 auto resolvedView = ctx.getDb()->getViewCatalog()->resolveView(txn, nss);
                 if (!resolvedView.isOK()) {
                     return appendCommandStatus(result, resolvedView.getStatus());
@@ -293,10 +305,13 @@ public:
                 ctx.releaseLocksForView();
 
                 // Parse the resolved view into a new aggregation request.
-                BSONObj viewCmd =
+                auto viewCmd =
                     resolvedView.getValue().asExpandedViewAggregation(request.getValue());
+                if (!viewCmd.isOK()) {
+                    return appendCommandStatus(result, viewCmd.getStatus());
+                }
 
-                return this->run(txn, db, viewCmd, options, errmsg, result);
+                return this->run(txn, db, viewCmd.getValue(), options, errmsg, result);
             }
 
             // If the pipeline does not have a user-specified collation, set it from the collection

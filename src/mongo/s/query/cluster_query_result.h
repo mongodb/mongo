@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,49 +26,47 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
 
-#include "mongo/s/query/router_stage_limit.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
-RouterStageLimit::RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit)
-    : RouterExecStage(std::move(child)), _limit(limit) {
-    invariant(limit > 0);
-}
+/**
+ * Holds a single result from a mongoS find command shard request. This result can represent one of
+ * several states:
+ * - Contains collection data, stored in '_resultObj'.
+ * - Contains a view definition, stored in '_viewDefinition'.
+ * - EOF. Both '_resultObj' and '_viewDefinition' are isEOF() returns true.
+ */
+class ClusterQueryResult {
+public:
+    ClusterQueryResult() = default;
 
-StatusWith<ClusterQueryResult> RouterStageLimit::next() {
-    if (_returnedSoFar >= _limit) {
-        return {ClusterQueryResult()};
+    ClusterQueryResult(BSONObj resObj) : _resultObj(resObj) {}
+
+    bool isEOF() const {
+        return !_resultObj && !_viewDefinition;
     }
 
-    auto childResult = getChildStage()->next();
-    if (!childResult.isOK()) {
-        return childResult;
+    boost::optional<BSONObj> getResult() const {
+        return _resultObj;
     }
 
-    if (!childResult.getValue().isEOF()) {
-        ++_returnedSoFar;
+    boost::optional<BSONObj> getViewDefinition() const {
+        return _viewDefinition;
     }
-    return childResult;
-}
 
-void RouterStageLimit::kill() {
-    getChildStage()->kill();
-}
+    void setViewDefinition(BSONObj viewDef) {
+        invariant(isEOF());
+        _viewDefinition = viewDef;
+    }
 
-bool RouterStageLimit::remotesExhausted() {
-    return getChildStage()->remotesExhausted();
-}
-
-Status RouterStageLimit::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
-}
-
-void RouterStageLimit::setOperationContext(OperationContext* txn) {
-    return getChildStage()->setOperationContext(txn);
-}
+private:
+    boost::optional<BSONObj> _resultObj;
+    boost::optional<BSONObj> _viewDefinition;
+};
 
 }  // namespace mongo

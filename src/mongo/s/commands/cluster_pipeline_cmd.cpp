@@ -43,6 +43,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/db/views/view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -115,7 +117,7 @@ public:
         shared_ptr<DBConfig> conf = status.getValue();
 
         if (!conf->isShardingEnabled()) {
-            return aggPassthrough(txn, conf, cmdObj, result, options);
+            return aggPassthrough(txn, dbname, conf, cmdObj, result, options, errmsg);
         }
 
         auto request = AggregationRequest::parseFromBSON(NamespaceString(fullns), cmdObj);
@@ -140,7 +142,7 @@ public:
         }
 
         if (!conf->isSharded(fullns)) {
-            return aggPassthrough(txn, conf, cmdObj, result, options);
+            return aggPassthrough(txn, dbname, conf, cmdObj, result, options, errmsg);
         }
 
         // If the first $match stage is an exact match on the shard key, we only have to send it
@@ -287,10 +289,12 @@ private:
     BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd, int queryOptions);
 
     bool aggPassthrough(OperationContext* txn,
+                        const std::string& dbname,
                         shared_ptr<DBConfig> conf,
                         BSONObj cmd,
                         BSONObjBuilder& result,
-                        int queryOptions);
+                        int queryOptions,
+                        std::string& errmsg);
 } clusterPipelineCmd;
 
 std::vector<DocumentSourceMergeCursors::CursorDescriptor> PipelineCommand::parseCursors(
@@ -432,14 +436,16 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
 }
 
 bool PipelineCommand::aggPassthrough(OperationContext* txn,
+                                     const std::string& dbname,
                                      shared_ptr<DBConfig> conf,
-                                     BSONObj cmd,
+                                     BSONObj cmdObj,
                                      BSONObjBuilder& out,
-                                     int queryOptions) {
+                                     int queryOptions,
+                                     std::string& errmsg) {
     // Temporary hack. See comment on declaration for details.
     const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
     ShardConnection conn(shard->getConnString(), "");
-    BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
+    BSONObj result = aggRunCommand(conn.get(), conf->name(), cmdObj, queryOptions);
     conn.done();
 
     // First append the properly constructed writeConcernError. It will then be skipped
@@ -449,6 +455,28 @@ bool PipelineCommand::aggPassthrough(OperationContext* txn,
     }
 
     out.appendElementsUnique(result);
+
+    BSONObj responseObj = out.asTempObj();
+    if (ResolvedView::isResolvedViewErrorResponse(responseObj)) {
+        auto resolvedView = ResolvedView::fromBSON(responseObj);
+
+        auto request = AggregationRequest::parseFromBSON(resolvedView.getNamespace(), cmdObj);
+        if (!request.isOK()) {
+            out.resetToEmpty();
+            return appendCommandStatus(out, request.getStatus());
+        }
+
+        auto aggCmd = resolvedView.asExpandedViewAggregation(request.getValue());
+        if (!aggCmd.isOK()) {
+            out.resetToEmpty();
+            return appendCommandStatus(out, aggCmd.getStatus());
+        }
+
+        out.resetToEmpty();
+        return Command::findCommand("aggregate")
+            ->run(txn, dbname, aggCmd.getValue(), queryOptions, errmsg, out);
+    }
+
     return result["ok"].trueValue();
 }
 

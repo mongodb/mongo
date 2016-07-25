@@ -72,17 +72,17 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executo
 ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root)
     : _root(std::move(root)) {}
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
-        BSONObj front = std::move(_stash.front());
+        auto front = std::move(_stash.front());
         _stash.pop();
         ++_numReturnedSoFar;
         return {front};
     }
 
     auto next = _root->next();
-    if (next.isOK() && next.getValue()) {
+    if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
     return next;
@@ -100,9 +100,18 @@ long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
 
-void ClusterClientCursorImpl::queueResult(const BSONObj& obj) {
-    invariant(obj.isOwned());
-    _stash.push(obj);
+void ClusterClientCursorImpl::queueResult(const ClusterQueryResult& result) {
+    auto resultObj = result.getResult();
+    if (resultObj) {
+        invariant(resultObj->isOwned());
+    }
+
+    auto viewDef = result.getViewDefinition();
+    if (viewDef) {
+        invariant(viewDef->isOwned());
+    }
+
+    _stash.push(result);
 }
 
 bool ClusterClientCursorImpl::remotesExhausted() {

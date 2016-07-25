@@ -34,6 +34,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -91,7 +92,7 @@ public:
      */
     ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root);
 
-    StatusWith<boost::optional<BSONObj>> next() final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill() final;
 
@@ -99,7 +100,7 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
-    void queueResult(const BSONObj& obj) final;
+    void queueResult(const ClusterQueryResult& result) final;
 
     bool remotesExhausted() final;
 
@@ -127,8 +128,8 @@ private:
     // The root stage of the pipeline used to return the result set, merged from the remote nodes.
     std::unique_ptr<RouterExecStage> _root;
 
-    // Stores documents queued by queueResult(). Stashed BSONObjs must be owned.
-    std::queue<BSONObj> _stash;
+    // Stores documents queued by queueResult(). BSONObjs within the stashed results must be owned.
+    std::queue<ClusterQueryResult> _stash;
 };
 
 }  // namespace mongo

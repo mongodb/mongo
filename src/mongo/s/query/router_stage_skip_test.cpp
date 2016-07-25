@@ -50,22 +50,22 @@ TEST(RouterStageSkipTest, SkipIsOne) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 2));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 2));
 
     auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 3));
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
 
     // Once end-of-stream is reached, the skip stage should keep returning boost::none.
     auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
+    ASSERT(thirdResult.getValue().isEOF());
 
     auto fourthResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
+    ASSERT(thirdResult.getValue().isEOF());
 }
 
 TEST(RouterStageSkipTest, SkipIsThree) {
@@ -79,12 +79,12 @@ TEST(RouterStageSkipTest, SkipIsThree) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 4));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 4));
 
     auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(!secondResult.getValue());
+    ASSERT(secondResult.getValue().isEOF());
 }
 
 TEST(RouterStageSkipTest, SkipEqualToResultSetSize) {
@@ -97,7 +97,7 @@ TEST(RouterStageSkipTest, SkipEqualToResultSetSize) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(!firstResult.getValue());
+    ASSERT(firstResult.getValue().isEOF());
 }
 
 TEST(RouterStageSkipTest, SkipExceedsResultSetSize) {
@@ -110,7 +110,7 @@ TEST(RouterStageSkipTest, SkipExceedsResultSetSize) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(!firstResult.getValue());
+    ASSERT(firstResult.getValue().isEOF());
 }
 
 TEST(RouterStageSkipTest, ErrorWhileSkippingResults) {
@@ -139,13 +139,36 @@ TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 3));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 3));
 
     auto secondResult = skipStage->next();
     ASSERT_NOT_OK(secondResult.getStatus());
     ASSERT_EQ(secondResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
+}
+
+TEST(RouterStageSkipTest, SkipStagePropagatesViewDefinition) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+
+    ClusterQueryResult cqResult;
+    cqResult.setViewDefinition(BSON("ns"
+                                    << "view_ns"
+                                    << "pipeline"
+                                    << BSON_ARRAY(BSON("$match" << BSONNULL))));
+    mockStage->queueResult(cqResult);
+
+    auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 3);
+
+    auto result = skipStage->next();
+    ASSERT_OK(result.getStatus());
+    ASSERT(!result.getValue().getResult());
+    ASSERT(result.getValue().getViewDefinition());
+    ASSERT_EQ(*result.getValue().getViewDefinition(),
+              BSON("ns"
+                   << "view_ns"
+                   << "pipeline"
+                   << BSON_ARRAY(BSON("$match" << BSONNULL))));
 }
 
 TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
@@ -160,16 +183,16 @@ TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(!firstResult.getValue());
+    ASSERT(firstResult.getValue().isEOF());
 
     auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 3));
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
 
     auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
+    ASSERT(thirdResult.getValue().isEOF());
 }
 
 TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
@@ -184,19 +207,19 @@ TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
 
     auto firstResult = skipStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 2));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(skipStage->remotesExhausted());
 
     auto secondResult = skipStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 3));
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 3));
     ASSERT_TRUE(skipStage->remotesExhausted());
 
     auto thirdResult = skipStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
+    ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(skipStage->remotesExhausted());
 }
 

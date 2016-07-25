@@ -43,12 +43,12 @@ ClusterClientCursorMock::~ClusterClientCursorMock() {
     invariant(_exhausted || _killed);
 }
 
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorMock::next() {
+StatusWith<ClusterQueryResult> ClusterClientCursorMock::next() {
     invariant(!_killed);
 
     if (_resultsQueue.empty()) {
         _exhausted = true;
-        return {boost::none};
+        return {ClusterQueryResult()};
     }
 
     auto out = _resultsQueue.front();
@@ -59,7 +59,7 @@ StatusWith<boost::optional<BSONObj>> ClusterClientCursorMock::next() {
     }
 
     ++_numReturnedSoFar;
-    return boost::optional<BSONObj>(out.getValue());
+    return out.getValue();
 }
 
 long long ClusterClientCursorMock::getNumReturnedSoFar() const {
@@ -77,8 +77,8 @@ bool ClusterClientCursorMock::isTailable() const {
     return false;
 }
 
-void ClusterClientCursorMock::queueResult(const BSONObj& obj) {
-    _resultsQueue.push({obj});
+void ClusterClientCursorMock::queueResult(const ClusterQueryResult& result) {
+    _resultsQueue.push({result});
 }
 
 bool ClusterClientCursorMock::remotesExhausted() {

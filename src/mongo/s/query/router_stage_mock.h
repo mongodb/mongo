@@ -31,6 +31,7 @@
 #include <boost/optional.hpp>
 #include <queue>
 
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
 
 namespace mongo {
@@ -43,7 +44,7 @@ class RouterStageMock final : public RouterExecStage {
 public:
     ~RouterStageMock() final {}
 
-    StatusWith<boost::optional<BSONObj>> next() final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill() final;
 
@@ -56,7 +57,7 @@ public:
     /**
      * Queues a BSONObj to be returned.
      */
-    void queueResult(BSONObj obj);
+    void queueResult(const ClusterQueryResult& result);
 
     /**
      * Queues an error response.
@@ -80,7 +81,7 @@ public:
     StatusWith<Milliseconds> getAwaitDataTimeout();
 
 private:
-    std::queue<StatusWith<boost::optional<BSONObj>>> _resultsQueue;
+    std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;
     bool _remotesExhausted = false;
     boost::optional<Milliseconds> _awaitDataTimeout;
 };

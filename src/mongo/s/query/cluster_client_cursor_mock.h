@@ -43,7 +43,7 @@ public:
 
     ~ClusterClientCursorMock();
 
-    StatusWith<boost::optional<BSONObj>> next() final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill() final;
 
@@ -51,7 +51,7 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
-    void queueResult(const BSONObj& obj) final;
+    void queueResult(const ClusterQueryResult& result) final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
@@ -73,7 +73,7 @@ public:
 private:
     bool _killed = false;
     bool _exhausted = false;
-    std::queue<StatusWith<BSONObj>> _resultsQueue;
+    std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;
     stdx::function<void(void)> _killCallback;
 
     // Number of returned documents.

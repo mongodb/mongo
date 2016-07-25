@@ -203,6 +203,18 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* txn) {
     }
 }
 
+bool CollectionShardingState::collectionIsSharded() {
+    auto metadata = getMetadata().getMetadata();
+    if (metadata && (metadata->getCollVersion().isStrictlyEqualTo(ChunkVersion::UNSHARDED()))) {
+        return false;
+    }
+
+    // If 'metadata' is null, then the shard doesn't know if this collection is sharded or not. In
+    // this scenario we will assume this collection is sharded. We will know sharding state
+    // definitively once SERVER-24960 has been fixed.
+    return true;
+}
+
 bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
                                                          const BSONObj& doc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));

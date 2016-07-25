@@ -36,6 +36,8 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_find.h"
 
@@ -118,8 +120,36 @@ public:
             return qr.getStatus();
         }
 
-        return Strategy::explainFind(
+        auto result = Strategy::explainFind(
             txn, cmdObj, *qr.getValue(), verbosity, serverSelectionMetadata, out);
+
+        if (result == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+            auto resolvedView = ResolvedView::fromBSON(out->asTempObj());
+            out->resetToEmpty();
+
+            auto aggCmdOnView = qr.getValue().get()->asAggregationCommand();
+            if (!aggCmdOnView.isOK()) {
+                return aggCmdOnView.getStatus();
+            }
+
+            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
+            if (!aggCmd.isOK()) {
+                return aggCmd.getStatus();
+            }
+
+            Command* c = Command::findCommand("aggregate");
+            int queryOptions = 0;
+            std::string errMsg;
+
+            if (c->run(txn, dbname, aggCmd.getValue(), queryOptions, errMsg, *out)) {
+                return Status::OK();
+            }
+
+            BSONObj tmp = out->asTempObj();
+            return getStatusFromCommandResult(out->asTempObj());
+        }
+
+        return result;
     }
 
     bool run(OperationContext* txn,
@@ -161,8 +191,26 @@ public:
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
-        auto cursorId = ClusterFind::runQuery(txn, *cq.getValue(), readPref.getValue(), &batch);
+        BSONObj viewDefinition;
+        auto cursorId = ClusterFind::runQuery(
+            txn, *cq.getValue(), readPref.getValue(), &batch, &viewDefinition);
         if (!cursorId.isOK()) {
+            if (cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+                auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();
+                if (!aggCmdOnView.isOK()) {
+                    return appendCommandStatus(result, aggCmdOnView.getStatus());
+                }
+
+                auto resolvedView = ResolvedView::fromBSON(viewDefinition);
+                auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
+                if (!aggCmd.isOK()) {
+                    return appendCommandStatus(result, aggCmd.getStatus());
+                }
+
+                return Command::findCommand("aggregate")
+                    ->run(txn, dbname, aggCmd.getValue(), options, errmsg, result);
+            }
+
             return appendCommandStatus(result, cursorId.getStatus());
         }
 

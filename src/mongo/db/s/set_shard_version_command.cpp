@@ -183,9 +183,16 @@ public:
         connectionVersion.addToBSON(result, "oldVersion");
 
         {
-            // Use a stable collection metadata while performing the checks
-            boost::optional<AutoGetCollection> autoColl;
-            autoColl.emplace(txn, nss, MODE_IS);
+            boost::optional<AutoGetDb> autoDb;
+            autoDb.emplace(txn, nss.db(), MODE_IS);
+
+            // Views do not require a shard version check.
+            if (autoDb->getDb() && autoDb->getDb()->getViewCatalog()->lookup(nss.ns())) {
+                return true;
+            }
+
+            boost::optional<Lock::CollectionLock> collLock;
+            collLock.emplace(txn->lockState(), nss.ns(), MODE_IS);
 
             auto css = CollectionShardingState::get(txn, nss);
             const ChunkVersion collectionShardVersion =
@@ -248,7 +255,8 @@ public:
                         auto critSecSignal =
                             css->getMigrationSourceManager()->getMigrationCriticalSectionSignal();
                         if (critSecSignal) {
-                            autoColl.reset();
+                            collLock.reset();
+                            autoDb.reset();
                             log() << "waiting till out of critical section";
                             critSecSignal->waitFor(txn, Seconds(10));
                         }
@@ -270,7 +278,8 @@ public:
                         auto critSecSignal =
                             css->getMigrationSourceManager()->getMigrationCriticalSectionSignal();
                         if (critSecSignal) {
-                            autoColl.reset();
+                            collLock.reset();
+                            autoDb.reset();
                             log() << "waiting till out of critical section";
                             critSecSignal->waitFor(txn, Seconds(10));
                         }

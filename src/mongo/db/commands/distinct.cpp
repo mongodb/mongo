@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 #include <vector>
 
@@ -56,6 +58,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -177,6 +180,11 @@ public:
 
             (void)Command::findCommand("aggregate")
                 ->run(txn, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+
+            if (ResolvedView::isResolvedViewErrorResponse(aggResult.asTempObj())) {
+                result.appendElements(aggResult.obj());
+                return false;
+            }
 
             ViewResponseFormatter formatter(aggResult.obj());
             Status formatStatus = formatter.appendAsDistinctResponse(&result);

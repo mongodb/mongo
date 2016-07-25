@@ -41,7 +41,7 @@ class RouterStageRemoveSortKey final : public RouterExecStage {
 public:
     RouterStageRemoveSortKey(std::unique_ptr<RouterExecStage> child);
 
-    StatusWith<boost::optional<BSONObj>> next() final;
+    StatusWith<ClusterQueryResult> next() final;
 
     void kill() final;
 

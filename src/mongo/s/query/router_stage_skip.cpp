@@ -39,14 +39,18 @@ RouterStageSkip::RouterStageSkip(std::unique_ptr<RouterExecStage> child, long lo
     invariant(skip > 0);
 }
 
-StatusWith<boost::optional<BSONObj>> RouterStageSkip::next() {
+StatusWith<ClusterQueryResult> RouterStageSkip::next() {
     while (_skippedSoFar < _skip) {
         auto next = getChildStage()->next();
         if (!next.isOK()) {
             return next;
         }
 
-        if (!next.getValue()) {
+        if (next.getValue().isEOF()) {
+            return next;
+        }
+
+        if (next.getValue().getViewDefinition()) {
             return next;
         }
 

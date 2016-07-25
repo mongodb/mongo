@@ -42,6 +42,10 @@
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/parsed_distinct.h"
+#include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -1124,7 +1128,45 @@ public:
 
         shared_ptr<DBConfig> conf = status.getValue();
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            return passthrough(txn, conf.get(), cmdObj, options, result);
+
+            if (passthrough(txn, conf.get(), cmdObj, options, result)) {
+                return true;
+            }
+
+            BSONObj resultObj = result.asTempObj();
+            if (ResolvedView::isResolvedViewErrorResponse(resultObj)) {
+                auto resolvedView = ResolvedView::fromBSON(resultObj);
+                result.resetToEmpty();
+
+                auto parsedDistinct = ParsedDistinct::parse(
+                    txn, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), false);
+                if (!parsedDistinct.isOK()) {
+                    return appendCommandStatus(result, parsedDistinct.getStatus());
+                }
+
+                auto aggCmdOnView = parsedDistinct.getValue().asAggregationCommand();
+                if (!aggCmdOnView.isOK()) {
+                    return appendCommandStatus(result, aggCmdOnView.getStatus());
+                }
+
+                auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
+                if (!aggCmd.isOK()) {
+                    return appendCommandStatus(result, aggCmd.getStatus());
+                }
+
+                BSONObjBuilder aggResult;
+                Command::findCommand("aggregate")
+                    ->run(txn, dbName, aggCmd.getValue(), options, errmsg, aggResult);
+
+                ViewResponseFormatter formatter(aggResult.obj());
+                auto formatStatus = formatter.appendAsDistinctResponse(&result);
+                if (!formatStatus.isOK()) {
+                    return appendCommandStatus(result, formatStatus);
+                }
+                return true;
+            }
+
+            return false;
         }
 
         shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
@@ -1209,6 +1251,34 @@ public:
             txn, dbname, explainCmdBob.obj(), options, fullns, targetingQuery, &shardResults);
 
         long long millisElapsed = timer.millis();
+
+        if (shardResults.size() == 1 &&
+            ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
+            auto resolvedView = ResolvedView::fromBSON(shardResults[0].result);
+            auto parsedDistinct = ParsedDistinct::parse(
+                txn, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
+            if (!parsedDistinct.isOK()) {
+                return parsedDistinct.getStatus();
+            }
+
+            auto aggCmdOnView = parsedDistinct.getValue().asAggregationCommand();
+            if (!aggCmdOnView.isOK()) {
+                return aggCmdOnView.getStatus();
+            }
+
+            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
+            if (!aggCmd.isOK()) {
+                return aggCmd.getStatus();
+            }
+
+            std::string errMsg;
+            if (Command::findCommand("aggregate")
+                    ->run(txn, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
+                return Status::OK();
+            }
+
+            return getStatusFromCommandResult(out->asTempObj());
+        }
 
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
 

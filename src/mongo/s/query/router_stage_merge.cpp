@@ -40,7 +40,7 @@ RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
                                    ClusterClientCursorParams&& params)
     : _executor(executor), _arm(executor, std::move(params)) {}
 
-StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
+StatusWith<ClusterQueryResult> RouterStageMerge::next() {
     while (!_arm.ready()) {
         auto nextEventStatus = _arm.nextEvent();
         if (!nextEventStatus.isOK()) {

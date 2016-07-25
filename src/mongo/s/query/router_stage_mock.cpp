@@ -34,8 +34,8 @@
 
 namespace mongo {
 
-void RouterStageMock::queueResult(BSONObj obj) {
-    _resultsQueue.push({obj});
+void RouterStageMock::queueResult(const ClusterQueryResult& result) {
+    _resultsQueue.push({result});
 }
 
 void RouterStageMock::queueError(Status status) {
@@ -43,16 +43,16 @@ void RouterStageMock::queueError(Status status) {
 }
 
 void RouterStageMock::queueEOF() {
-    _resultsQueue.push({boost::none});
+    _resultsQueue.push({ClusterQueryResult()});
 }
 
 void RouterStageMock::markRemotesExhausted() {
     _remotesExhausted = true;
 }
 
-StatusWith<boost::optional<BSONObj>> RouterStageMock::next() {
+StatusWith<ClusterQueryResult> RouterStageMock::next() {
     if (_resultsQueue.empty()) {
-        return {boost::none};
+        return {ClusterQueryResult()};
     }
 
     auto out = _resultsQueue.front();

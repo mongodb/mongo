@@ -33,6 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -59,13 +60,13 @@ public:
     /**
      * Returns the next query result, or an error.
      *
-     * If there are no more results, returns boost::none.
+     * If there are no more results, returns an EOF ClusterQueryResult.
      *
      * All returned BSONObjs are owned. They may own a buffer larger than the object. If you are
      * holding on to a subset of the returned results and need to minimize memory usage, call copy()
      * on the BSONObjs.
      */
-    virtual StatusWith<boost::optional<BSONObj>> next() = 0;
+    virtual StatusWith<ClusterQueryResult> next() = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for

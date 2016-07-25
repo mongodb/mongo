@@ -28,67 +28,54 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/status_with.h"
-#include "mongo/db/query/canonical_query.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 
-class BSONObj;
-class ExtensionsCallback;
+class Database;
 class NamespaceString;
 class OperationContext;
+class ViewDefinition;
 
 /**
- * The parsed form of the distinct command request.
+ * When a read against a view is forwarded from mongoS, it is done so without any awareness as to
+ * whether the underlying collection is sharded. If it is found that the underlying collection is
+ * sharded(*) we return an error to mongos with the view definition requesting
+ * that the resolved read operation be executed there.
+ *
+ * (*) We have incomplete sharding state on secondaries. If we are a secondary, then we have to
+ * assume that the collection backing the view could be sharded.
  */
-class ParsedDistinct {
+class ViewShardingCheck {
 public:
-    static const char kKeyField[];
-    static const char kQueryField[];
-    static const char kCollationField[];
-
-    ParsedDistinct(std::unique_ptr<CanonicalQuery> query, const std::string key)
-        : _query(std::move(query)), _key(std::move(key)) {}
-
-    const CanonicalQuery* getQuery() const {
-        return _query.get();
-    }
+    /**
+     * If it is determined that a view's underlying collection may be sharded this method returns
+     * a BSONObj containing the resolved view definition. If the underlying collection is not
+     * sharded an empty BSONObj is returned.
+     *
+     * Will return an error if the ViewCatalog is unable to generate a resolved view.
+     */
+    static StatusWith<BSONObj> getResolvedViewIfSharded(OperationContext* opCtx,
+                                                        Database* db,
+                                                        const ViewDefinition* view);
 
     /**
-     * Releases ownership of the canonical query to the caller.
+     * Appends the resolved view definition and CommandOnShardedViewNotSupportedOnMongod status to
+     * 'result'.
      */
-    std::unique_ptr<CanonicalQuery> releaseQuery() {
-        invariant(_query.get());
-        return std::move(_query);
-    }
-
-    const std::string& getKey() const {
-        return _key;
-    }
-
-    /**
-     * Convert this ParsedDistinct into an aggregation command object.
-     */
-    StatusWith<BSONObj> asAggregationCommand() const;
-
-    /**
-     * 'extensionsCallback' allows for additional mongod parsing. If called from mongos, an
-     * ExtensionsCallbackNoop object should be passed to skip this parsing.
-     */
-    static StatusWith<ParsedDistinct> parse(OperationContext* txn,
-                                            const NamespaceString& nss,
-                                            const BSONObj& cmdObj,
-                                            const ExtensionsCallback& extensionsCallback,
-                                            bool isExplain);
+    static void appendShardedViewStatus(const BSONObj& resolvedView, BSONObjBuilder* result);
 
 private:
-    std::unique_ptr<CanonicalQuery> _query;
-
-    // The field for which we are getting distinct values.
-    const std::string _key;
+    /**
+     * Confirms whether 'ns' represents a sharded collection. Only valid if the calling
+     * member is primary.
+     */
+    static bool collectionIsSharded(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 }  // namespace mongo

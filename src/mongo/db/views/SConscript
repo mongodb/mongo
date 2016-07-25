@@ -6,11 +6,13 @@ env.Library(
     target='views_mongod',
     source=[
         'durable_view_catalog.cpp',
+        'view_sharding_check.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/catalog/catalog',
+        '$BUILD_DIR/mongo/db/s/sharding',
     ]
 )
 
@@ -19,10 +21,12 @@ env.Library(
     source=[
         'view.cpp',
         'view_catalog.cpp',
+        'resolved_view.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_parameters',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation'
+        '$BUILD_DIR/mongo/db/pipeline/aggregation',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
     ]
 )

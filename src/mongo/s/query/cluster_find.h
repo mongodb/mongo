@@ -63,11 +63,14 @@ public:
      * On success, fills out 'results' with the first batch of query results and returns the cursor
      * id which the caller can use on subsequent getMore operations. If no cursor needed to be saved
      * (e.g. the cursor was exhausted without need for a getMore), returns a cursor id of 0.
+     * If a CommandOnShardedViewNotSupportedOnMongod error is returned, then 'viewDefinition', if
+     * not null, will contain a view definition.
      */
     static StatusWith<CursorId> runQuery(OperationContext* txn,
                                          const CanonicalQuery& query,
                                          const ReadPreferenceSetting& readPref,
-                                         std::vector<BSONObj>* results);
+                                         std::vector<BSONObj>* results,
+                                         BSONObj* viewDefinition);
 
     /**
      * Executes the getMore request 'request', and on success returns a CursorResponse.

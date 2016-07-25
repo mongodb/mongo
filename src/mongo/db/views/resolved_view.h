@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,49 +26,53 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <vector>
 
-#include "mongo/s/query/router_stage_limit.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-RouterStageLimit::RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit)
-    : RouterExecStage(std::move(child)), _limit(limit) {
-    invariant(limit > 0);
-}
+class AggregationRequest;
 
-StatusWith<ClusterQueryResult> RouterStageLimit::next() {
-    if (_returnedSoFar >= _limit) {
-        return {ClusterQueryResult()};
+/**
+ * Represents a resolved definition, composed of a base collection namespace and a pipeline
+ * built from one or more views.
+ */
+class ResolvedView {
+public:
+    ResolvedView(const NamespaceString& collectionNs, const std::vector<BSONObj>& pipeline)
+        : _namespace(std::move(collectionNs)), _pipeline(std::move(pipeline)) {}
+
+    /**
+     * Returns whether 'commandResponseObj' contains a CommandOnShardedViewNotSupportedOnMongod
+     * error and resolved view definition.
+     */
+    static bool isResolvedViewErrorResponse(BSONObj commandResponseObj);
+
+    static ResolvedView fromBSON(BSONObj commandResponseObj);
+
+    /**
+     * Convert an aggregation command on a view to the equivalent command against the views
+     * underlying collection.
+     */
+    StatusWith<BSONObj> asExpandedViewAggregation(const BSONObj& aggCommand) const;
+    StatusWith<BSONObj> asExpandedViewAggregation(const AggregationRequest& aggRequest) const;
+
+    const NamespaceString& getNamespace() const {
+        return _namespace;
     }
 
-    auto childResult = getChildStage()->next();
-    if (!childResult.isOK()) {
-        return childResult;
+    const std::vector<BSONObj>& getPipeline() const {
+        return _pipeline;
     }
 
-    if (!childResult.getValue().isEOF()) {
-        ++_returnedSoFar;
-    }
-    return childResult;
-}
-
-void RouterStageLimit::kill() {
-    getChildStage()->kill();
-}
-
-bool RouterStageLimit::remotesExhausted() {
-    return getChildStage()->remotesExhausted();
-}
-
-Status RouterStageLimit::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
-}
-
-void RouterStageLimit::setOperationContext(OperationContext* txn) {
-    return getChildStage()->setOperationContext(txn);
-}
+private:
+    NamespaceString _namespace;
+    std::vector<BSONObj> _pipeline;
+};
 
 }  // namespace mongo

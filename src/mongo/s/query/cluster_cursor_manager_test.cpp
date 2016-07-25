@@ -117,11 +117,11 @@ TEST_F(ClusterCursorManagerTest, RegisterCursor) {
     ASSERT_OK(pinnedCursor.getStatus());
     auto nextResult = pinnedCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
-    ASSERT(nextResult.getValue());
-    ASSERT_EQ(BSON("a" << 1), *nextResult.getValue());
+    ASSERT(nextResult.getValue().getResult());
+    ASSERT_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
     nextResult = pinnedCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
-    ASSERT_FALSE(nextResult.getValue());
+    ASSERT_TRUE(nextResult.getValue().isEOF());
 }
 
 // Test that registering a cursor returns a non-zero cursor id.
@@ -148,11 +148,11 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorBasic) {
     ASSERT_EQ(cursorId, checkedOutCursor.getValue().getCursorId());
     auto nextResult = checkedOutCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
-    ASSERT(nextResult.getValue());
-    ASSERT_EQ(BSON("a" << 1), *nextResult.getValue());
+    ASSERT(nextResult.getValue().getResult());
+    ASSERT_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
     nextResult = checkedOutCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
-    ASSERT_FALSE(nextResult.getValue());
+    ASSERT_TRUE(nextResult.getValue().isEOF());
 }
 
 // Test that checking out a cursor returns a pin to the correct cursor, when multiple cursors are
@@ -174,11 +174,11 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorMultipleCursors) {
         ASSERT_OK(pinnedCursor.getStatus());
         auto nextResult = pinnedCursor.getValue().next();
         ASSERT_OK(nextResult.getStatus());
-        ASSERT(nextResult.getValue());
-        ASSERT_EQ(BSON("a" << i), *nextResult.getValue());
+        ASSERT(nextResult.getValue().getResult());
+        ASSERT_EQ(BSON("a" << i), *nextResult.getValue().getResult());
         nextResult = pinnedCursor.getValue().next();
         ASSERT_OK(nextResult.getStatus());
-        ASSERT_FALSE(nextResult.getValue());
+        ASSERT_TRUE(nextResult.getValue().isEOF());
     }
 }
 

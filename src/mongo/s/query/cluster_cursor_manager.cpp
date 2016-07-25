@@ -110,7 +110,7 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
     return *this;
 }
 
-StatusWith<boost::optional<BSONObj>> ClusterCursorManager::PinnedCursor::next() {
+StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next() {
     invariant(_cursor);
     return _cursor->next();
 }
@@ -137,9 +137,9 @@ long long ClusterCursorManager::PinnedCursor::getNumReturnedSoFar() const {
     return _cursor->getNumReturnedSoFar();
 }
 
-void ClusterCursorManager::PinnedCursor::queueResult(const BSONObj& obj) {
+void ClusterCursorManager::PinnedCursor::queueResult(const ClusterQueryResult& result) {
     invariant(_cursor);
-    _cursor->queueResult(obj);
+    _cursor->queueResult(result);
 }
 
 bool ClusterCursorManager::PinnedCursor::remotesExhausted() {

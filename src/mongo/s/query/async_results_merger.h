@@ -38,6 +38,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -128,10 +129,10 @@ public:
      * status.
      *
      * If this AsyncResultsMerger is fetching results from a remote cursor tailing a capped
-     * collection, may return boost::none before end-of-stream. (Tailable cursors remain open even
-     * when there are no further results, and may subsequently return more results when they become
-     * available.) The calling code is responsible for handling multiple boost::none return values,
-     * keeping the cursor open in the tailable case.
+     * collection, may return an empty ClusterQueryResult before end-of-stream. (Tailable cursors
+     * remain open even when there are no further results, and may subsequently return more results
+     * when they become available.) The calling code is responsible for handling multiple empty,
+     * ClusterQueryResult return values, keeping the cursor open in the tailable case.
      *
      * If there has been an error received from one of the shards, or there is an error in
      * processing results from a shard, then a non-ok status is returned.
@@ -139,7 +140,7 @@ public:
      * Invalid to call unless ready() has returned true (i.e., invalid to call if getting the next
      * result requires scheduling remote work).
      */
-    StatusWith<boost::optional<BSONObj>> nextReady();
+    StatusWith<ClusterQueryResult> nextReady();
 
     /**
      * Schedules remote work as required in order to make further results available. If there is an
@@ -234,7 +235,7 @@ private:
         // established but is now exhausted, this member will be set to zero.
         boost::optional<CursorId> cursorId;
 
-        std::queue<BSONObj> docBuffer;
+        std::queue<ClusterQueryResult> docBuffer;
         executor::TaskExecutor::CallbackHandle cbHandle;
         Status status = Status::OK();
 
@@ -309,8 +310,8 @@ private:
     // Helpers for nextReady().
     //
 
-    boost::optional<BSONObj> nextReadySorted();
-    boost::optional<BSONObj> nextReadyUnsorted();
+    ClusterQueryResult nextReadySorted();
+    ClusterQueryResult nextReadyUnsorted();
 
     /**
      * When nextEvent() schedules remote work, it passes this method as a callback. The TaskExecutor

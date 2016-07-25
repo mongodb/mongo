@@ -53,13 +53,13 @@ TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
     for (int i = 1; i < 10; ++i) {
         auto result = cursor.next();
         ASSERT(result.isOK());
-        ASSERT_EQ(*result.getValue(), BSON("a" << i));
+        ASSERT_EQ(*result.getValue().getResult(), BSON("a" << i));
         ASSERT_EQ(cursor.getNumReturnedSoFar(), i);
     }
     // Now check that if nothing is fetched the getNumReturnedSoFar stays the same.
     auto result = cursor.next();
     ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue());
+    ASSERT_TRUE(result.getValue().isEOF());
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 9LL);
 }
 
@@ -72,32 +72,53 @@ TEST(ClusterClientCursorImpl, QueueResult) {
 
     auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
     cursor.queueResult(BSON("a" << 2));
     cursor.queueResult(BSON("a" << 3));
 
     auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 2));
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
 
     auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(thirdResult.getValue());
-    ASSERT_EQ(*thirdResult.getValue(), BSON("a" << 3));
+    ASSERT(thirdResult.getValue().getResult());
+    ASSERT_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
     auto fourthResult = cursor.next();
     ASSERT_OK(fourthResult.getStatus());
-    ASSERT(fourthResult.getValue());
-    ASSERT_EQ(*fourthResult.getValue(), BSON("a" << 4));
+    ASSERT(fourthResult.getValue().getResult());
+    ASSERT_EQ(*fourthResult.getValue().getResult(), BSON("a" << 4));
 
     auto fifthResult = cursor.next();
     ASSERT_OK(fifthResult.getStatus());
-    ASSERT(!fifthResult.getValue());
+    ASSERT(fifthResult.getValue().isEOF());
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 4LL);
+}
+
+TEST(ClusterClientCursorImpl, CursorPropagatesViewDefinition) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+
+    auto viewDef = BSON("ns"
+                        << "view_ns"
+                        << "pipeline"
+                        << BSON_ARRAY(BSON("$match" << BSONNULL)));
+
+    ClusterQueryResult cqResult;
+    cqResult.setViewDefinition(viewDef);
+    mockStage->queueResult(cqResult);
+
+    ClusterClientCursorImpl cursor(std::move(mockStage));
+
+    auto result = cursor.next();
+    ASSERT_OK(result.getStatus());
+    ASSERT(!result.getValue().getResult());
+    ASSERT(result.getValue().getViewDefinition());
+    ASSERT_EQ(*result.getValue().getViewDefinition(), viewDef);
 }
 
 TEST(ClusterClientCursorImpl, RemotesExhausted) {
@@ -111,19 +132,19 @@ TEST(ClusterClientCursorImpl, RemotesExhausted) {
 
     auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 2));
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
+    ASSERT_TRUE(thirdResult.getValue().isEOF());
     ASSERT_TRUE(cursor.remotesExhausted());
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 2LL);

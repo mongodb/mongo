@@ -36,13 +36,13 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
-#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -115,6 +115,7 @@ public:
         // Acquire the db read lock.
         AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
+
         if (ctx.getView()) {
             ctx.releaseLocksForView();
 
@@ -162,6 +163,7 @@ public:
 
         AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
+
         if (ctx.getView()) {
             ctx.releaseLocksForView();
 
@@ -173,6 +175,11 @@ public:
             BSONObjBuilder aggResult;
             (void)Command::findCommand("aggregate")
                 ->run(txn, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+
+            if (ResolvedView::isResolvedViewErrorResponse(aggResult.asTempObj())) {
+                result.appendElements(aggResult.obj());
+                return false;
+            }
 
             ViewResponseFormatter formatter(aggResult.obj());
             Status formatStatus = formatter.appendAsCountResponse(&result);

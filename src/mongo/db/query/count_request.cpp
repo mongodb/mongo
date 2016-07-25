@@ -149,12 +149,6 @@ StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
                 str::stream() << "Option " << kHintField << " not supported in aggregation."};
     }
 
-    // TODO(SERVER-25186): Views may not override the collation of the underlying collection.
-    if (_collation) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << kCollationField << " not supported on a view."};
-    }
-
     BSONObjBuilder aggregationBuilder;
     aggregationBuilder.append("aggregate", _nss.coll());
 
@@ -176,6 +170,7 @@ StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
         limitBuilder.append("$limit", *_limit);
         limitBuilder.doneFast();
     }
+
     BSONObjBuilder countBuilder(pipelineBuilder.subobjStart());
     countBuilder.append("$count", "count");
     countBuilder.doneFast();
@@ -184,6 +179,10 @@ StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
     // Complete the command by appending the other options to count.
     if (_explain) {
         aggregationBuilder.append(kExplainField, _explain);
+    }
+
+    if (_collation) {
+        aggregationBuilder.append(kCollationField, *_collation);
     }
 
     // The 'cursor' option is always specified so that aggregation uses the cursor interface.

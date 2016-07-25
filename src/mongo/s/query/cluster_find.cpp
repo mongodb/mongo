@@ -150,7 +150,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                              const ReadPreferenceSetting& readPref,
                                              ChunkManager* chunkManager,
                                              std::shared_ptr<Shard> primary,
-                                             std::vector<BSONObj>* results) {
+                                             std::vector<BSONObj>* results,
+                                             BSONObj* viewDefinition) {
     auto shardRegistry = grid.shardRegistry();
 
     // Get the set of shards on which we will run the query.
@@ -235,7 +236,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             return next.getStatus();
         }
 
-        if (!next.getValue()) {
+        if (next.getValue().isEOF()) {
             // We reached end-of-stream. If the cursor is not tailable, then we mark it as
             // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even
             // when we reach end-of-stream. However, if all the remote cursors are exhausted, there
@@ -246,17 +247,27 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             break;
         }
 
+        if (next.getValue().getViewDefinition()) {
+            if (viewDefinition) {
+                *viewDefinition = BSON("resolvedView" << *next.getValue().getViewDefinition());
+            }
+            return {ErrorCodes::CommandOnShardedViewNotSupportedOnMongod,
+                    "Find must be transformed for view and run against base collection"};
+        }
+
+        auto nextObj = *next.getValue().getResult();
+
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
-        if (!FindCommon::haveSpaceForNext(*next.getValue(), results->size(), bytesBuffered)) {
-            ccc->queueResult(*next.getValue());
+        if (!FindCommon::haveSpaceForNext(nextObj, results->size(), bytesBuffered)) {
+            ccc->queueResult(nextObj);
             break;
         }
 
         // Add doc to the batch. Account for the space overhead associated with returning this doc
         // inside a BSON array.
-        bytesBuffered += (next.getValue()->objsize() + kPerDocumentOverheadBytesUpperBound);
-        results->push_back(std::move(*next.getValue()));
+        bytesBuffered += (nextObj.objsize() + kPerDocumentOverheadBytesUpperBound);
+        results->push_back(std::move(nextObj));
     }
 
     if (!query.getQueryRequest().wantMore() && !ccc->isTailable()) {
@@ -287,7 +298,8 @@ const size_t ClusterFind::kMaxStaleConfigRetries = 10;
 StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                                            const CanonicalQuery& query,
                                            const ReadPreferenceSetting& readPref,
-                                           std::vector<BSONObj>* results) {
+                                           std::vector<BSONObj>* results,
+                                           BSONObj* viewDefinition) {
     invariant(results);
 
     // Projection on the reserved sort key field is illegal in mongos.
@@ -316,7 +328,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
     // shard version.
     for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
         auto cursorId = runQueryWithoutRetrying(
-            txn, query, readPref, chunkManager.get(), std::move(primary), results);
+            txn, query, readPref, chunkManager.get(), std::move(primary), results, viewDefinition);
         if (cursorId.isOK()) {
             return cursorId;
         }
@@ -387,7 +399,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
             return next.getStatus();
         }
 
-        if (!next.getValue()) {
+        if (next.getValue().isEOF()) {
             // We reached end-of-stream.
             if (!pinnedCursor.getValue().isTailable()) {
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
@@ -395,15 +407,17 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
             break;
         }
 
-        if (!FindCommon::haveSpaceForNext(*next.getValue(), batch.size(), bytesBuffered)) {
-            pinnedCursor.getValue().queueResult(*next.getValue());
+        if (!FindCommon::haveSpaceForNext(
+                *next.getValue().getResult(), batch.size(), bytesBuffered)) {
+            pinnedCursor.getValue().queueResult(*next.getValue().getResult());
             break;
         }
 
         // Add doc to the batch. Account for the space overhead associated with returning this doc
         // inside a BSON array.
-        bytesBuffered += (next.getValue()->objsize() + kPerDocumentOverheadBytesUpperBound);
-        batch.push_back(std::move(*next.getValue()));
+        bytesBuffered +=
+            (next.getValue().getResult()->objsize() + kPerDocumentOverheadBytesUpperBound);
+        batch.push_back(std::move(*next.getValue().getResult()));
     }
 
     // Transfer ownership of the cursor back to the cursor manager.

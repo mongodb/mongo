@@ -154,7 +154,7 @@ public:
          *
          * Can block.
          */
-        StatusWith<boost::optional<BSONObj>> next();
+        StatusWith<ClusterQueryResult> next();
 
         /**
          * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
@@ -185,7 +185,7 @@ public:
         /**
          * Stashes 'obj' to be returned later by this cursor. A cursor must be owned.
          */
-        void queueResult(const BSONObj& obj);
+        void queueResult(const ClusterQueryResult& result);
 
         /**
          * Returns whether or not all the remote cursors underlying this cursor have been

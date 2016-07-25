@@ -31,6 +31,10 @@
 #include <vector>
 
 #include "mongo/db/commands.h"
+#include "mongo/db/query/count_request.h"
+#include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
@@ -156,6 +160,40 @@ public:
         Strategy::commandOp(
             txn, dbname, countCmdBuilder.done(), options, nss.ns(), filter, &countResult);
 
+        if (countResult.size() == 1 &&
+            ResolvedView::isResolvedViewErrorResponse(countResult[0].result)) {
+            auto countRequest = CountRequest::parseFromBSON(dbname, cmdObj, false);
+            if (!countRequest.isOK()) {
+                return appendCommandStatus(result, countRequest.getStatus());
+            }
+
+            auto aggCmdOnView = countRequest.getValue().asAggregationCommand();
+            if (!aggCmdOnView.isOK()) {
+                return appendCommandStatus(result, aggCmdOnView.getStatus());
+            }
+
+            auto resolvedView = ResolvedView::fromBSON(countResult[0].result);
+            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
+            if (!aggCmd.isOK()) {
+                return appendCommandStatus(result, aggCmd.getStatus());
+            }
+
+
+            BSONObjBuilder aggResult;
+            Command::findCommand("aggregate")
+                ->run(txn, dbname, aggCmd.getValue(), options, errmsg, aggResult);
+
+            result.resetToEmpty();
+            ViewResponseFormatter formatter(aggResult.obj());
+            auto formatStatus = formatter.appendAsCountResponse(&result);
+            if (!formatStatus.isOK()) {
+                return appendCommandStatus(result, formatStatus);
+            }
+
+            return true;
+        }
+
+
         long long total = 0;
         BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
 
@@ -223,6 +261,33 @@ public:
             txn, dbname, explainCmdBob.obj(), options, nss.ns(), targetingQuery, &shardResults);
 
         long long millisElapsed = timer.millis();
+
+        if (shardResults.size() == 1 &&
+            ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
+            auto countRequest = CountRequest::parseFromBSON(dbname, cmdObj, true);
+            if (!countRequest.isOK()) {
+                return countRequest.getStatus();
+            }
+
+            auto aggCmdOnView = countRequest.getValue().asAggregationCommand();
+            if (!aggCmdOnView.isOK()) {
+                return aggCmdOnView.getStatus();
+            }
+
+            auto resolvedView = ResolvedView::fromBSON(shardResults[0].result);
+            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
+            if (!aggCmd.isOK()) {
+                return aggCmd.getStatus();
+            }
+
+            std::string errMsg;
+            if (Command::findCommand("aggregate")
+                    ->run(txn, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
+                return Status::OK();
+            }
+
+            return getStatusFromCommandResult(out->asTempObj());
+        }
 
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
 

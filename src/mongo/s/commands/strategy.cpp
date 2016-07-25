@@ -52,6 +52,8 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -192,7 +194,18 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 
     // 0 means the cursor is exhausted. Otherwise we assume that a cursor with the returned id can
     // be retrieved via the ClusterCursorManager.
-    auto cursorId = ClusterFind::runQuery(txn, *canonicalQuery.getValue(), readPreference, &batch);
+    auto cursorId =
+        ClusterFind::runQuery(txn,
+                              *canonicalQuery.getValue(),
+                              readPreference,
+                              &batch,
+                              nullptr /*Argument is for views which OP_QUERY doesn't support*/);
+
+    if (!cursorId.isOK() &&
+        cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+        uasserted(40247, "OP_QUERY not supported on views");
+    }
+
     uassertStatusOK(cursorId.getStatus());
 
     // Fill out the response buffer.
@@ -529,6 +542,12 @@ Status Strategy::explainFind(OperationContext* txn,
                         &shardResults);
 
     long long millisElapsed = timer.millis();
+
+    if (shardResults.size() == 1 &&
+        ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
+        out->append("resolvedView", shardResults[0].result.getObjectField("resolvedView"));
+        return getStatusFromCommandResult(shardResults[0].result);
+    }
 
     const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, findCommand);
 

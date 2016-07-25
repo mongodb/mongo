@@ -52,29 +52,29 @@ TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 4 << "b" << 3));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 4 << "b" << 3));
 
     auto secondResult = sortKeyStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(),
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(),
               BSON("c" << BSON("d"
                                << "foo")));
 
     auto thirdResult = sortKeyStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(thirdResult.getValue());
-    ASSERT_EQ(*thirdResult.getValue(), BSON("a" << 3));
+    ASSERT(thirdResult.getValue().getResult());
+    ASSERT_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
     auto fourthResult = sortKeyStage->next();
     ASSERT_OK(fourthResult.getStatus());
-    ASSERT(fourthResult.getValue());
-    ASSERT_EQ(*fourthResult.getValue(), BSONObj());
+    ASSERT(fourthResult.getValue().getResult());
+    ASSERT_EQ(*fourthResult.getValue().getResult(), BSONObj());
 
     auto fifthResult = sortKeyStage->next();
     ASSERT_OK(fifthResult.getStatus());
-    ASSERT(!fifthResult.getValue());
+    ASSERT(fifthResult.getValue().isEOF());
 }
 
 TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
@@ -86,8 +86,8 @@ TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSONObj());
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSONObj());
 
     auto secondResult = sortKeyStage->next();
     ASSERT_NOT_OK(secondResult.getStatus());
@@ -105,21 +105,21 @@ TEST(RouterStageRemoveSortKeyTest, ToleratesMidStreamEOF) {
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1 << "b" << 1));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1 << "b" << 1));
 
     auto secondResult = sortKeyStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(!secondResult.getValue());
+    ASSERT(secondResult.getValue().isEOF());
 
     auto thirdResult = sortKeyStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(thirdResult.getValue());
-    ASSERT_EQ(*thirdResult.getValue(), BSON("a" << 2 << "b" << 2));
+    ASSERT(thirdResult.getValue().getResult());
+    ASSERT_EQ(*thirdResult.getValue().getResult(), BSON("a" << 2 << "b" << 2));
 
     auto fourthResult = sortKeyStage->next();
     ASSERT_OK(fourthResult.getStatus());
-    ASSERT(!fourthResult.getValue());
+    ASSERT(fourthResult.getValue().isEOF());
 }
 
 TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
@@ -133,19 +133,19 @@ TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1 << "b" << 1));
+    ASSERT(firstResult.getValue().getResult());
+    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1 << "b" << 1));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
     auto secondResult = sortKeyStage->next();
     ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 2 << "b" << 2));
+    ASSERT(secondResult.getValue().getResult());
+    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2 << "b" << 2));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
     auto thirdResult = sortKeyStage->next();
     ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
+    ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 }
 
