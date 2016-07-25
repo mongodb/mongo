@@ -144,6 +144,15 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
         geoNear.append("minDistance", minDistance);
 
     geoNear.append("query", query);
+    if (pExpCtx->getCollator()) {
+        geoNear.append("collation", pExpCtx->getCollator()->getSpec().toBSON());
+    } else {
+        BSONObjBuilder collationBuilder(geoNear.subobjStart("collation"));
+        collationBuilder.append(CollationSpec::kLocaleField,
+                                CollationSpec::kSimpleBinaryComparison);
+        collationBuilder.doneFast();
+    }
+
     geoNear.append("spherical", spherical);
     geoNear.append("distanceMultiplier", distanceMultiplier);
 
@@ -222,6 +231,13 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
 
     if (options.hasField("uniqueDocs"))
         warning() << "ignoring deprecated uniqueDocs option in $geoNear aggregation stage";
+
+    // The collation field is disallowed, even though it is accepted by the geoNear command, since
+    // the $geoNear operation should respect the collation associated with the entire pipeline.
+    uassert(40227,
+            "$geoNear does not accept the 'collation' parameter. Instead, specify a collation "
+            "for the entire aggregation command.",
+            !options["collation"]);
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)

@@ -1542,7 +1542,6 @@ private:
     std::unique_ptr<Unwinder> _unwinder;
 };
 
-// TODO SERVER-23349: Make geoNear agg stage respect the collation.
 class DocumentSourceGeoNear : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     static const long long kDefaultLimit;
