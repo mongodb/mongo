@@ -113,6 +113,8 @@ functions:
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           source ./dsienv.sh
           source ./venv/bin/activate
+          # Copy over the proper test control file
+          cp $DSI_PATH/test_control/test_control.${test}.longevity.yml test_control.yml
           $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           echo "Complete test for ${test} with setup ${setup}!"
     - command: "json.send"
