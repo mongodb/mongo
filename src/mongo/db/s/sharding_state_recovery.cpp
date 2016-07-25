@@ -58,10 +58,10 @@ namespace mongo {
 namespace {
 
 const char kRecoveryDocumentId[] = "minOpTimeRecovery";
-const char kConfigsvrConnString[] = "configsvrConnectionString";
-const char kShardName[] = "shardName";
 const char kMinOpTime[] = "minOpTime";
 const char kMinOpTimeUpdaters[] = "minOpTimeUpdaters";
+const char kConfigsvrConnString[] = "configsvrConnectionString";  // TODO(SERVER-25276): Remove
+const char kShardName[] = "shardName";                            // TODO(SERVER-25276): Remove
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -71,10 +71,13 @@ const WriteConcernOptions kLocalWriteConcern(1,
                                              WriteConcernOptions::SyncMode::UNSET,
                                              Milliseconds(0));
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverShardingState, bool, true);
-
 /**
  * Encapsulates the parsing and construction of the config server min opTime recovery document.
+ * TODO(SERVER-25276): Currently this still parses the 'shardName' and
+ * 'configsvrConnectionString' fields for backwards compatibility during 3.2->3.4 upgrade
+ * when the 3.4 shard may have a minOpTimeRecovery document but no shardIdenity document.  After
+ * 3.4 ships this should be removed so that the only fields in a minOpTimeRecovery document
+ * are the _id, 'minOpTime', and 'minOpTimeUpdaters'
  */
 class RecoveryDocument {
 public:
@@ -176,7 +179,7 @@ private:
 
 /**
  * This method is the main entry point for updating the sharding state recovery document. The goal
- * it has is to always move the opTime foward for a currently running server. It achieves this by
+ * it has is to always move the opTime forward for a currently running server. It achieves this by
  * serializing the modify calls and reading the current opTime under X-lock on the admin database.
  */
 Status modifyRecoveryDocument(OperationContext* txn,
@@ -247,13 +250,6 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
         return Status::OK();
     }
 
-    if (!recoverShardingState) {
-        warning()
-            << "Not checking for ShardingState recovery document because the recoverShardingState "
-               "server parameter is set to false";
-        return Status::OK();
-    }
-
     BSONObj recoveryDocBSON;
 
     try {
@@ -279,6 +275,8 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     // For backwards compatibility. Shards added by v3.4 cluster should have been initialized by
     // the shard identity document.
+    // TODO(SERER-25276): Remove this after 3.4 since 3.4 shards should always have ShardingState
+    // initialized by this point.
     if (!shardingState->enabled()) {
         shardingState->initializeFromConfigConnString(txn, recoveryDoc.getConfigsvr().toString());
         shardingState->setShardName(recoveryDoc.getShardName());

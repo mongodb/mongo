@@ -44,6 +44,7 @@ class Status;
  *   shardName: "shard0000",
  *   minOpTime: { ts: Timestamp 1443820968000|1, t: 11 },
  *   minOptimeUpdaters: 1 }
+ *   TODO(SERVER-25276): Remove 'shardName' and 'configsvrConnectionString' fields after 3.4 ships.
  */
 class ShardingStateRecovery {
 public:
