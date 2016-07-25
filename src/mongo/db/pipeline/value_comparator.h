@@ -43,7 +43,7 @@ public:
     /**
      * Functor compatible for use with unordered STL containers.
      *
-     * TODO SERVER-23349: Remove the no-arguments constructor.
+     * TODO SERVER-25139: Remove the no-arguments constructor.
      */
     class EqualTo {
     public:
@@ -78,7 +78,7 @@ public:
     /**
      * Functor for computing the hash of a Value, compatible for use with unordered STL containers.
      *
-     * TODO SERVER-23349: Remove the no-arguments constructor.
+     * TODO SERVER-25139: Remove the no-arguments constructor.
      */
     class Hasher {
     public:

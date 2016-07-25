@@ -58,7 +58,7 @@ using boost::multi_index::indexed_by;
  * a specific amount of memory. Memory usage includes only the size of the elements in the cache at
  * the time of insertion, not the overhead incurred by the data structures in use.
  *
- * TODO SERVER-23349: This class must make all comparisons of user data using the aggregation
+ * TODO SERVER-25139: This class must make all comparisons of user data using the aggregation
  * operation's collation.
  */
 class LookupSetCache {
