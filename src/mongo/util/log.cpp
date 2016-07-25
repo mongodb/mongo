@@ -76,6 +76,7 @@ Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
 bool rotateLogs(bool renameFiles) {
     using logger::RotatableFileManager;
     RotatableFileManager* manager = logger::globalRotatableFileManager();
+    log() << "Log rotation initiated";
     RotatableFileManager::FileNameStatusPairVector result(
         manager->rotateAll(renameFiles, "." + terseCurrentTime(false)));
     for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
