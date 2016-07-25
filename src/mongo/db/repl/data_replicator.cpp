@@ -531,8 +531,10 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
 
     lk.lock();
 
-    if (!lastOplogEntryOpTimeWithHashStatus.isOK())
-        return lastOplogEntryOpTimeWithHashStatus.getStatus();
+    if (!lastOplogEntryOpTimeWithHashStatus.isOK()) {
+        _initialSyncState->status = lastOplogEntryOpTimeWithHashStatus.getStatus();
+        return _initialSyncState->status;
+    }
 
     _initialSyncState->oplogSeedDoc = lastOplogEntry.getValue().getOwned();
     const auto lastOpTimeWithHash = lastOplogEntryOpTimeWithHashStatus.getValue();
@@ -581,6 +583,8 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
 
     cloner->startup();  // When the cloner is done applier starts.
     _exec->waitForEvent(initialSyncFinishEvent);
+
+    log() << "Initial sync finished applying oplog entries.";
 
     // Check for roll back, and fail if so.
     if (rollbackChecker.hasHadRollback()) {
@@ -808,15 +812,16 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
         // Check if applied to/past our stopTimestamp.
         if (_initialSyncState->beginTimestamp < _initialSyncState->stopTimestamp) {
             invariant(_applierPaused);
-            log() << "Applying operations until "
-                  << _initialSyncState->stopTimestamp.toStringPretty()
+            log() << "Applying operations until " << _initialSyncState->stopTimestamp.toBSON()
                   << " before initial sync can complete. (starting at "
-                  << _initialSyncState->beginTimestamp.toStringPretty() << ")";
+                  << _initialSyncState->beginTimestamp.toBSON() << ")";
             _applierPaused = false;
-        } else if (_lastApplied.opTime.getTimestamp() < _initialSyncState->stopTimestamp) {
+        } else {
             log() << "No need to apply operations. (currently at "
-                  << _initialSyncState->stopTimestamp.toStringPretty() << ")";
-            _lastApplied = optimeWithHash;
+                  << _initialSyncState->stopTimestamp.toBSON() << ")";
+            if (_lastApplied.opTime.getTimestamp() < _initialSyncState->stopTimestamp) {
+                _lastApplied = optimeWithHash;
+            }
         }
         _doNextActions_InitialSync_inlock();
     } else {
@@ -1086,7 +1091,7 @@ void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
         _initialSyncState->appliedOps += numApplied;
     }
 
-    // TODO: Change OplogFetcher to pass in a OpTimeWithHash, and wire up here instead of arsing.
+    // TODO: Change OplogFetcher to pass in a OpTimeWithHash, and wire up here instead of parsing.
     const auto lastEntry = ops.back().raw;
     const auto opTimeWithHashStatus = parseOpTimeWithHash(lastEntry);
     _lastApplied = uassertStatusOK(opTimeWithHashStatus);
