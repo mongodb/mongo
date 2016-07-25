@@ -111,7 +111,8 @@ public:
                        str::stream() << "shard " << shardIdent << " does not exist"));
         }
 
-        auto opId = std::stoi(opToKill.substr(opSepPos + 1));
+        int opId;
+        uassertStatusOK(parseNumberFromStringWithBase(opToKill.substr(opSepPos + 1), 10, &opId));
 
         // shardid is actually the opid - keeping for backwards compatibility.
         result.append("shard", shardIdent);
