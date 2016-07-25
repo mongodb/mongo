@@ -564,15 +564,20 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     invariant(shard);
     auto targeter = shard->getTargeter();
 
+    auto stopMonitoringGuard = MakeGuard([&] {
+        if (shardConnectionString.type() == ConnectionString::SET) {
+            // This is a workaround for the case were we could have some bad shard being
+            // requested to be added and we put that bad connection string on the global replica set
+            // monitor registry. It needs to be cleaned up so that when a correct replica set is
+            // added, it will be recreated.
+            ReplicaSetMonitor::remove(shardConnectionString.getSetName());
+        }
+    });
+
     // Validate the specified connection string may serve as shard at all
     auto shardStatus =
         _validateHostAsShard(txn, targeter, shardProposedName, shardConnectionString);
     if (!shardStatus.isOK()) {
-        // TODO: This is a workaround for the case were we could have some bad shard being
-        // requested to be added and we put that bad connection string on the global replica set
-        // monitor registry. It needs to be cleaned up so that when a correct replica set is added,
-        // it will be recreated.
-        ReplicaSetMonitor::remove(shardConnectionString.getSetName());
         return shardStatus.getStatus();
     }
 
@@ -683,6 +688,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
                 "Could not find shard metadata for shard after adding it. This most likely "
                 "indicates that the shard was removed immediately after it was added."};
     }
+    stopMonitoringGuard.Dismiss();
 
     return shardType.getName();
 }
