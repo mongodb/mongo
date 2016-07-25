@@ -29,7 +29,8 @@ var $config = (function() {
         query: function query(db, collName) {
             var cursor = db[this.collName].find({$or: [{a: 0}, {b: 0}]});
             try {
-                assert.eq(0, cursor.itcount());
+                // No documents are ever inserted into the collection.
+                assertAlways.eq(0, cursor.itcount());
             } catch (e) {
                 // Ignore errors due to the plan executor being killed.
             }

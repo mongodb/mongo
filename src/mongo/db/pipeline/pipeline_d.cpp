@@ -173,13 +173,14 @@ private:
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
  * percentage of the collection.
  */
-shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
-                                                    OperationContext* txn,
-                                                    long long sampleSize,
-                                                    long long numRecords) {
+StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* collection,
+                                                                OperationContext* txn,
+                                                                long long sampleSize,
+                                                                long long numRecords) {
     double kMaxSampleRatioForRandCursor = 0.05;
-    if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100)
-        return {};
+    if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
+        return {nullptr};
+    }
 
     // Attempt to get a random cursor from the RecordStore. If the RecordStore does not support
     // random cursors, attempt to get one from the _id index.
@@ -198,7 +199,7 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
 
         if (!indexDescriptor) {
             // There was no _id index.
-            return {};
+            return {nullptr};
         }
 
         IndexAccessMethod* idIam = indexCatalog->getIndex(indexDescriptor);
@@ -206,7 +207,7 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
 
         if (!idxRandCursor) {
             // Storage engine does not support any type of random cursor.
-            return {};
+            return {nullptr};
         }
 
         auto idxIterator = stdx::make_unique<IndexIteratorStage>(txn,
@@ -229,16 +230,16 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
                 CollectionShardingState::get(txn, collection->ns())->getMetadata(),
                 ws.get(),
                 stage.release());
-            return uassertStatusOK(PlanExecutor::make(txn,
-                                                      std::move(ws),
-                                                      std::move(shardFilterStage),
-                                                      collection,
-                                                      PlanExecutor::YIELD_AUTO));
+            return PlanExecutor::make(txn,
+                                      std::move(ws),
+                                      std::move(shardFilterStage),
+                                      collection,
+                                      PlanExecutor::YIELD_AUTO);
         }
     }
 
-    return uassertStatusOK(PlanExecutor::make(
-        txn, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO));
+    return PlanExecutor::make(
+        txn, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
@@ -316,7 +317,8 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
         if (collection && sampleStage) {
             const long long sampleSize = sampleStage->getSampleSize();
             const long long numRecords = collection->getRecordStore()->numRecords(txn);
-            auto exec = createRandomCursorExecutor(collection, txn, sampleSize, numRecords);
+            auto exec = uassertStatusOK(
+                createRandomCursorExecutor(collection, txn, sampleSize, numRecords));
             if (exec) {
                 // Replace $sample stage with $sampleFromRandomCursor stage.
                 sources.pop_front();
@@ -327,7 +329,7 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
                 return addCursorSource(
                     pPipeline,
                     pExpCtx,
-                    exec,
+                    std::move(exec),
                     pPipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata));
             }
         }
@@ -373,21 +375,22 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     }
 
     // Create the PlanExecutor.
-    auto exec = prepareExecutor(txn,
-                                collection,
-                                nss,
-                                pPipeline,
-                                pExpCtx,
-                                sortStage,
-                                deps,
-                                queryObj,
-                                &sortObj,
-                                &projForQuery);
+    auto exec = uassertStatusOK(prepareExecutor(txn,
+                                                collection,
+                                                nss,
+                                                pPipeline,
+                                                pExpCtx,
+                                                sortStage,
+                                                deps,
+                                                queryObj,
+                                                &sortObj,
+                                                &projForQuery));
 
-    return addCursorSource(pPipeline, pExpCtx, exec, deps, queryObj, sortObj, projForQuery);
+    return addCursorSource(
+        pPipeline, pExpCtx, std::move(exec), deps, queryObj, sortObj, projForQuery);
 }
 
-std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
+StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
     OperationContext* txn,
     Collection* collection,
     const NamespaceString& nss,
@@ -437,8 +440,6 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
-    std::shared_ptr<PlanExecutor> exec;
-
     BSONObj emptyProjection;
     if (sortStage) {
         // See if the query system can provide a non-blocking sort.
@@ -450,9 +451,15 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
             auto swExecutorSortAndProj = attemptToGetExecutor(
                 txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
 
+            std::unique_ptr<PlanExecutor> exec;
             if (swExecutorSortAndProj.isOK()) {
                 // Success! We have a non-blocking sort and a covered projection.
                 exec = std::move(swExecutorSortAndProj.getValue());
+            } else if (swExecutorSortAndProj == ErrorCodes::QueryPlanKilled) {
+                return {ErrorCodes::OperationFailed,
+                        str::stream() << "Failed to determine whether query system can provide a "
+                                         "covered projection in addition to a non-blocking sort: "
+                                      << swExecutorSortAndProj.getStatus().toString()};
             } else {
                 // The query system couldn't cover the projection.
                 *projectionObj = BSONObj();
@@ -466,7 +473,13 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
                 // We need to reinsert the coalesced $limit after removing the $sort.
                 pipeline->_sources.push_front(sortStage->getLimitSrc());
             }
-            return exec;
+            return std::move(exec);
+        } else if (swExecutorSort == ErrorCodes::QueryPlanKilled) {
+            return {
+                ErrorCodes::OperationFailed,
+                str::stream()
+                    << "Failed to determine whether query system can provide a non-blocking sort: "
+                    << swExecutorSort.getStatus().toString()};
         }
         // The query system can't provide a non-blocking sort.
         *sortObj = BSONObj();
@@ -482,18 +495,23 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
     if (swExecutorProj.isOK()) {
         // Success! We have a covered projection.
         return std::move(swExecutorProj.getValue());
+    } else if (swExecutorProj == ErrorCodes::QueryPlanKilled) {
+        return {ErrorCodes::OperationFailed,
+                str::stream()
+                    << "Failed to determine whether query system can provide a covered projection: "
+                    << swExecutorProj.getStatus().toString()};
     }
 
     // The query system couldn't provide a covered projection.
     *projectionObj = BSONObj();
     // If this doesn't work, nothing will.
-    return uassertStatusOK(attemptToGetExecutor(
-        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts));
+    return attemptToGetExecutor(
+        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
 }
 
 shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline>& pipeline,
                                                     const intrusive_ptr<ExpressionContext>& expCtx,
-                                                    shared_ptr<PlanExecutor> exec,
+                                                    unique_ptr<PlanExecutor> exec,
                                                     DepsTracker deps,
                                                     const BSONObj& queryObj,
                                                     const BSONObj& sortObj,
@@ -501,9 +519,13 @@ shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline
     // Get the full "namespace" name.
     const string& fullName = expCtx->ns.ns();
 
+    // We convert the unique_ptr to a shared_ptr because both the PipelineProxyStage and the
+    // DocumentSourceCursor need to reference the PlanExecutor.
+    std::shared_ptr<PlanExecutor> sharedExec(std::move(exec));
+
     // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
     intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(fullName, exec, expCtx);
+        DocumentSourceCursor::create(fullName, sharedExec, expCtx);
 
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);
@@ -533,10 +555,10 @@ shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline
 
     // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved. We
     // deregister the PlanExecutor so that it can be registered with ClientCursor.
-    exec->deregisterExec();
-    exec->saveState();
+    sharedExec->deregisterExec();
+    sharedExec->saveState();
 
-    return exec;
+    return sharedExec;
 }
 
 std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline) {
