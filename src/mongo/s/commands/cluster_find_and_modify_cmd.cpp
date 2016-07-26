@@ -32,9 +32,12 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/find_and_modify.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -101,13 +104,38 @@ public:
 
             const BSONObj query = cmdObj.getObjectField("query");
 
+            BSONObj collation;
+            BSONElement collationElement;
+            auto collationElementStatus =
+                bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
+            if (collationElementStatus.isOK()) {
+                collation = collationElement.Obj();
+            } else if (collationElementStatus != ErrorCodes::NoSuchKey) {
+                return collationElementStatus;
+            }
+
             StatusWith<BSONObj> status = _getShardKey(txn, chunkMgr, query);
             if (!status.isOK()) {
                 return status.getStatus();
             }
 
             BSONObj shardKey = status.getValue();
-            shared_ptr<Chunk> chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
+
+            // Construct collator for targeting.
+            std::unique_ptr<CollatorInterface> collator;
+            if (!collation.isEmpty()) {
+                auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                              ->makeFromBSON(collation);
+                if (!statusWithCollator.isOK()) {
+                    return statusWithCollator.getStatus();
+                }
+                collator = std::move(statusWithCollator.getValue());
+            }
+
+            auto chunk = chunkMgr->findIntersectingChunk(
+                txn,
+                shardKey,
+                !collation.isEmpty() ? collator.get() : chunkMgr->getDefaultCollator());
 
             shard = Grid::get(txn)->shardRegistry()->getShard(txn, chunk->getShardId());
         }
@@ -163,6 +191,16 @@ public:
 
         const BSONObj query = cmdObj.getObjectField("query");
 
+        BSONObj collation;
+        BSONElement collationElement;
+        auto collationElementStatus =
+            bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
+        if (collationElementStatus.isOK()) {
+            collation = collationElement.Obj();
+        } else if (collationElementStatus != ErrorCodes::NoSuchKey) {
+            return appendCommandStatus(result, collationElementStatus);
+        }
+
         StatusWith<BSONObj> status = _getShardKey(txn, chunkMgr, query);
         if (!status.isOK()) {
             // Bad query
@@ -170,7 +208,20 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
-        shared_ptr<Chunk> chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
+
+        // Construct collator for targeting.
+        std::unique_ptr<CollatorInterface> collator;
+        if (!collation.isEmpty()) {
+            auto statusWithCollator =
+                CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collation);
+            if (!statusWithCollator.isOK()) {
+                return appendCommandStatus(result, statusWithCollator.getStatus());
+            }
+            collator = std::move(statusWithCollator.getValue());
+        }
+
+        auto chunk = chunkMgr->findIntersectingChunk(
+            txn, shardKey, !collation.isEmpty() ? collator.get() : chunkMgr->getDefaultCollator());
 
         bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
         if (ok) {

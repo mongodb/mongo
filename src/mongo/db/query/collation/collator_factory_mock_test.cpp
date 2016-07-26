@@ -29,12 +29,21 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using namespace mongo;
+
+TEST(CollatorFactoryMockTest, CollatorFactoryMockReturnsNullCollatorIfLocaleSimple) {
+    CollatorFactoryMock factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "simple"));
+    ASSERT_OK(collator.getStatus());
+    ASSERT_FALSE(collator.getValue());
+}
 
 TEST(CollatorFactoryMockTest, CollatorFactoryMockConstructsReverseStringCollator) {
     CollatorFactoryMock factory;

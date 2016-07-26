@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
@@ -60,12 +61,12 @@ public:
     typedef std::map<ShardId, ChunkVersion> ShardVersionMap;
 
     // Loads a new chunk manager from a collection document
-    explicit ChunkManager(const CollectionType& coll);
+    explicit ChunkManager(OperationContext* txn, const CollectionType& coll);
 
     // Creates an empty chunk manager for the namespace
     ChunkManager(const std::string& ns,
                  const ShardKeyPattern& pattern,
-                 const BSONObj& defaultCollation,
+                 std::unique_ptr<CollatorInterface> defaultCollator,
                  bool unique);
 
     const std::string& getns() const {
@@ -74,8 +75,8 @@ public:
     const ShardKeyPattern& getShardKeyPattern() const {
         return _keyPattern;
     }
-    const BSONObj& getDefaultCollation() const {
-        return _defaultCollation;
+    const CollatorInterface* getDefaultCollator() const {
+        return _defaultCollator.get();
     }
     bool isUnique() const {
         return _unique;
@@ -129,10 +130,22 @@ public:
      *  findIntersectingChunk() on {a : hash("foo") }
      */
     std::shared_ptr<Chunk> findIntersectingChunk(OperationContext* txn,
-                                                 const BSONObj& shardKey) const;
+                                                 const BSONObj& shardKey,
+                                                 const CollatorInterface* collator) const;
 
+    /*
+     * Finds the intersecting chunk, assuming the simple collation.
+     */
+    std::shared_ptr<Chunk> findIntersectingChunkWithSimpleCollation(OperationContext* txn,
+                                                                    const BSONObj& shardKey) const;
+
+    /**
+     * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
+     * collection default collation for targeting.
+     */
     void getShardIdsForQuery(OperationContext* txn,
                              const BSONObj& query,
+                             const BSONObj& collation,
                              std::set<ShardId>* shardIds) const;
 
     void getAllShardIds(std::set<ShardId>* all) const;
@@ -240,7 +253,7 @@ private:
     // All members should be const for thread-safety
     const std::string _ns;
     const ShardKeyPattern _keyPattern;
-    const BSONObj _defaultCollation;
+    std::unique_ptr<CollatorInterface> _defaultCollator;
     const bool _unique;
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload

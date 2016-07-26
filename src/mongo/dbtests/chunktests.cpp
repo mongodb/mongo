@@ -29,7 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/stdx/memory.h"
@@ -42,8 +43,11 @@ using std::vector;
 
 class TestableChunkManager : public ChunkManager {
 public:
-    TestableChunkManager(const string& ns, const ShardKeyPattern& keyPattern, bool unique)
-        : ChunkManager(ns, keyPattern, BSONObj(), unique) {}
+    TestableChunkManager(const string& ns,
+                         const ShardKeyPattern& keyPattern,
+                         std::unique_ptr<CollatorInterface> defaultCollator,
+                         bool unique)
+        : ChunkManager(ns, keyPattern, std::move(defaultCollator), unique) {}
 
     void setSingleChunkForShards(const vector<BSONObj>& splitPoints) {
         vector<BSONObj> mySplitPoints(splitPoints);
@@ -76,14 +80,15 @@ public:
     virtual ~Base() = default;
 
     void run() {
-        auto opCtx = stdx::make_unique<OperationContextNoop>();
+        QueryTestServiceContext serviceContext;
+        auto opCtx = serviceContext.makeOperationContext();
 
         ShardKeyPattern shardKeyPattern(shardKey());
-        TestableChunkManager chunkManager("", shardKeyPattern, false);
+        TestableChunkManager chunkManager("", shardKeyPattern, defaultCollator(), false);
         chunkManager.setSingleChunkForShards(splitPointsVector());
 
         set<ShardId> shardIds;
-        chunkManager.getShardIdsForQuery(opCtx.get(), query(), &shardIds);
+        chunkManager.getShardIdsForQuery(opCtx.get(), query(), queryCollation(), &shardIds);
 
         BSONArrayBuilder b;
         for (const ShardId& shardId : shardIds) {
@@ -97,11 +102,19 @@ protected:
         return BSON("a" << 1);
     }
 
+    virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
+        return {nullptr};
+    }
+
     virtual BSONArray splitPoints() const {
         return BSONArray();
     }
 
     virtual BSONObj query() const {
+        return BSONObj();
+    }
+
+    virtual BSONObj queryCollation() const {
         return BSONObj();
     }
 
@@ -132,7 +145,6 @@ class MultiShardBase : public Base {
                                   << "z"));
     }
 };
-
 class EmptyQueryMultiShard : public MultiShardBase {
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
@@ -337,6 +349,105 @@ class InMultiShard : public CompoundKeyBase {
     }
 };
 
+class CollationStringsMultiShard : public MultiShardBase {
+    virtual BSONObj query() const {
+        return BSON("a"
+                    << "y");
+    }
+    virtual BSONObj queryCollation() const {
+        return BSON("locale"
+                    << "mock_reverse_string");
+    }
+    virtual BSONArray expectedShardNames() const {
+        return BSON_ARRAY("0"
+                          << "1"
+                          << "2"
+                          << "3");
+    }
+};
+
+class DefaultCollationStringsMultiShard : public MultiShardBase {
+    virtual BSONObj query() const {
+        return BSON("a"
+                    << "y");
+    }
+    virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
+        auto collator = stdx::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kReverseString);
+        return {std::move(collator)};
+    }
+    virtual BSONArray expectedShardNames() const {
+        return BSON_ARRAY("0"
+                          << "1"
+                          << "2"
+                          << "3");
+    }
+};
+
+class SimpleCollationStringsMultiShard : public MultiShardBase {
+    virtual BSONObj query() const {
+        return BSON("a"
+                    << "y");
+    }
+    virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
+        auto collator = stdx::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kReverseString);
+        return {std::move(collator)};
+    }
+    virtual BSONObj queryCollation() const {
+        return BSON("locale"
+                    << "simple");
+    }
+    virtual BSONArray expectedShardNames() const {
+        return BSON_ARRAY("2");
+    }
+};
+
+class CollationNumbersMultiShard : public MultiShardBase {
+    virtual BSONObj query() const {
+        return BSON("a" << 5);
+    }
+    virtual BSONObj queryCollation() const {
+        return BSON("locale"
+                    << "mock_reverse_string");
+    }
+    virtual BSONArray expectedShardNames() const {
+        return BSON_ARRAY("0");
+    }
+};
+
+class DefaultCollationNumbersMultiShard : public MultiShardBase {
+    virtual BSONObj query() const {
+        return BSON("a" << 5);
+    }
+    virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
+        auto collator = stdx::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kReverseString);
+        return {std::move(collator)};
+    }
+    virtual BSONArray expectedShardNames() const {
+        return BSON_ARRAY("0");
+    }
+};
+
+class SimpleCollationNumbersMultiShard : public MultiShardBase {
+    virtual BSONObj query() const {
+        return BSON("a" << 5);
+    }
+    virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
+        auto collator = stdx::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kReverseString);
+        return {std::move(collator)};
+    }
+    virtual BSONObj queryCollation() const {
+        return BSON("locale"
+                    << "simple");
+    }
+    virtual BSONArray expectedShardNames() const {
+        return BSON_ARRAY("0");
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("chunk") {}
@@ -361,6 +472,12 @@ public:
         add<InequalityThenUnsatisfiable>();
         add<OrEqualityUnsatisfiableInequality>();
         add<InMultiShard>();
+        add<CollationStringsMultiShard>();
+        add<DefaultCollationStringsMultiShard>();
+        add<SimpleCollationStringsMultiShard>();
+        add<CollationNumbersMultiShard>();
+        add<DefaultCollationNumbersMultiShard>();
+        add<SimpleCollationNumbersMultiShard>();
     }
 };
 

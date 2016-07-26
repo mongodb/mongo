@@ -162,7 +162,10 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         invariant(chunkManager);
 
         std::set<ShardId> shardIds;
-        chunkManager->getShardIdsForQuery(txn, query.getQueryRequest().getFilter(), &shardIds);
+        chunkManager->getShardIdsForQuery(txn,
+                                          query.getQueryRequest().getFilter(),
+                                          query.getQueryRequest().getCollation(),
+                                          &shardIds);
 
         for (auto id : shardIds) {
             auto shard = shardRegistry->getShard(txn, id);

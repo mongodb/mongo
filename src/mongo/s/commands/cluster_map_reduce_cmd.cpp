@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -313,6 +314,11 @@ public:
             q = cmdObj["query"].embeddedObjectUserCheck();
         }
 
+        BSONObj collation;
+        if (cmdObj["collation"].type() == Object) {
+            collation = cmdObj["collation"].embeddedObjectUserCheck();
+        }
+
         set<string> servers;
         vector<Strategy::CommandResult> mrCommandResults;
 
@@ -327,7 +333,8 @@ public:
             // TODO: take distributed lock to prevent split / migration?
 
             try {
-                Strategy::commandOp(txn, dbname, shardedCommand, 0, nss.ns(), q, &mrCommandResults);
+                Strategy::commandOp(
+                    txn, dbname, shardedCommand, 0, nss.ns(), q, collation, &mrCommandResults);
             } catch (DBException& e) {
                 e.addContext(str::stream() << "could not run map command on all shards for ns "
                                            << nss.ns()
@@ -516,12 +523,16 @@ public:
                 mrCommandResults.clear();
 
                 try {
+                    const BSONObj query;
+                    const BSONObj simpleCollation =
+                        BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
                     Strategy::commandOp(txn,
                                         outDB,
                                         finalCmdObj,
                                         0,
                                         outputCollNss.ns(),
-                                        BSONObj(),
+                                        query,
+                                        simpleCollation,
                                         &mrCommandResults);
                     ok = true;
                 } catch (DBException& e) {
@@ -586,7 +597,7 @@ public:
                 invariant(size < std::numeric_limits<int>::max());
 
                 // key reported should be the chunk's minimum
-                shared_ptr<Chunk> c = cm->findIntersectingChunk(txn, key);
+                shared_ptr<Chunk> c = cm->findIntersectingChunkWithSimpleCollation(txn, key);
                 if (!c) {
                     warning() << "Mongod reported " << size << " bytes inserted for key " << key
                               << " but can't find chunk";

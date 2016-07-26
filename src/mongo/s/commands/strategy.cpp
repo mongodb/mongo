@@ -359,10 +359,12 @@ void Strategy::commandOp(OperationContext* txn,
                          int options,
                          const string& versionedNS,
                          const BSONObj& targetingQuery,
+                         const BSONObj& targetingCollation,
                          vector<CommandResult>* results) {
     QuerySpec qSpec(db + ".$cmd", command, BSONObj(), 0, 1, options);
 
-    ParallelSortClusteredCursor cursor(qSpec, CommandInfo(versionedNS, targetingQuery));
+    ParallelSortClusteredCursor cursor(
+        qSpec, CommandInfo(versionedNS, targetingQuery, targetingCollation));
 
     // Initialize the cursor
     cursor.init(txn);
@@ -550,6 +552,7 @@ Status Strategy::explainFind(OperationContext* txn,
                         options,
                         qr.nss().toString(),
                         qr.getFilter(),
+                        qr.getCollation(),
                         &shardResults);
 
     long long millisElapsed = timer.millis();

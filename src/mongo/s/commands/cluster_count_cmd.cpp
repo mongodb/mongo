@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/count_request.h"
 #include "mongo/db/query/view_response_formatter.h"
@@ -131,6 +132,16 @@ public:
             filter = cmdObj["query"].Obj();
         }
 
+        BSONObj collation;
+        BSONElement collationElement;
+        auto status =
+            bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
+        if (status.isOK()) {
+            collation = collationElement.Obj();
+        } else if (status != ErrorCodes::NoSuchKey) {
+            return appendCommandStatus(result, status);
+        }
+
         if (cmdObj["limit"].isNumber()) {
             long long limit = cmdObj["limit"].numberLong();
 
@@ -157,8 +168,14 @@ public:
         }
 
         vector<Strategy::CommandResult> countResult;
-        Strategy::commandOp(
-            txn, dbname, countCmdBuilder.done(), options, nss.ns(), filter, &countResult);
+        Strategy::commandOp(txn,
+                            dbname,
+                            countCmdBuilder.done(),
+                            options,
+                            nss.ns(),
+                            filter,
+                            collation,
+                            &countResult);
 
         if (countResult.size() == 1 &&
             ResolvedView::isResolvedViewErrorResponse(countResult[0].result)) {
@@ -248,6 +265,17 @@ public:
             targetingQuery = cmdObj["query"].Obj();
         }
 
+        // Extract the targeting collation.
+        BSONObj targetingCollation;
+        BSONElement targetingCollationElement;
+        auto status = bsonExtractTypedField(
+            cmdObj, "collation", BSONType::Object, &targetingCollationElement);
+        if (status.isOK()) {
+            targetingCollation = targetingCollationElement.Obj();
+        } else if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+
         BSONObjBuilder explainCmdBob;
         int options = 0;
         ClusterExplain::wrapAsExplain(
@@ -257,8 +285,14 @@ public:
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(
-            txn, dbname, explainCmdBob.obj(), options, nss.ns(), targetingQuery, &shardResults);
+        Strategy::commandOp(txn,
+                            dbname,
+                            explainCmdBob.obj(),
+                            options,
+                            nss.ns(),
+                            targetingQuery,
+                            targetingCollation,
+                            &shardResults);
 
         long long millisElapsed = timer.millis();
 

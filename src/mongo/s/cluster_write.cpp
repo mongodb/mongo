@@ -133,7 +133,7 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
          ++it) {
         shared_ptr<Chunk> chunk;
         try {
-            chunk = chunkManager->findIntersectingChunk(txn, it->first);
+            chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, it->first);
         } catch (const AssertionException& ex) {
             warning() << "could not find chunk while checking for auto-split: "
                       << causedBy(redact(ex));

@@ -44,6 +44,12 @@ selector:
     - jstests/sharding/auth_sharding_cmd_metadata.js
     # TODO Requires mongos to have fix for SERVER-25258. Enable when v3.2.9+ is 'last-stable'.
     - jstests/sharding/kill_op_overflow.js
+    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
+    # 'last-stable'.
+    - jstests/sharding/collation_targeting.js
+    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
+    # 'last-stable'.
+    - jstests/sharding/collation_targeting_inherited.js
 
     # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js

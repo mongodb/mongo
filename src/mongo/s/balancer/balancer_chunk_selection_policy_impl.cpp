@@ -323,7 +323,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
             continue;
         }
 
-        shared_ptr<Chunk> chunk = cm->findIntersectingChunk(txn, tagRange.min);
+        shared_ptr<Chunk> chunk = cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.min);
 
         if (!currentChunk) {
             currentChunk = chunk;

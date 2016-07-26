@@ -37,9 +37,10 @@
 namespace mongo {
 
 class ChunkManager;
-struct ChunkVersion;
+class CollatorInterface;
 class OperationContext;
 class Shard;
+struct ChunkVersion;
 
 struct TargeterStats {
     // Map of chunk shard minKey -> approximate delta. This is used for deciding
@@ -125,6 +126,7 @@ private:
      */
     Status targetDoc(OperationContext* txn,
                      const BSONObj& doc,
+                     const BSONObj& collation,
                      std::vector<ShardEndpoint*>* endpoints) const;
 
     /**
@@ -134,6 +136,7 @@ private:
      */
     Status targetQuery(OperationContext* txn,
                        const BSONObj& query,
+                       const BSONObj& collation,
                        std::vector<ShardEndpoint*>* endpoints) const;
 
     /**
@@ -144,6 +147,7 @@ private:
      */
     Status targetShardKey(OperationContext* txn,
                           const BSONObj& doc,
+                          const CollatorInterface* collator,
                           long long estDataSize,
                           ShardEndpoint** endpoint) const;
 

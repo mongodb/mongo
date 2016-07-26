@@ -241,7 +241,7 @@ public:
             auto status = bsonExtractTypedField(
                 collectionOptions, "collation", BSONType::Object, &collationElement);
             if (status.isOK()) {
-                defaultCollation = collationElement.Obj();
+                defaultCollation = collationElement.Obj().getOwned();
                 if (defaultCollation.isEmpty()) {
                     conn.done();
                     return appendCommandStatus(
@@ -549,7 +549,8 @@ public:
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
-            shared_ptr<Chunk> currentChunk = chunkManager->findIntersectingChunk(txn, allSplits[0]);
+            shared_ptr<Chunk> currentChunk =
+                chunkManager->findIntersectingChunkWithSimpleCollation(txn, allSplits[0]);
 
             vector<BSONObj> subSplits;
             for (unsigned i = 0; i <= allSplits.size(); i++) {
@@ -574,7 +575,8 @@ public:
                     }
 
                     if (i < allSplits.size()) {
-                        currentChunk = chunkManager->findIntersectingChunk(txn, allSplits[i]);
+                        currentChunk = chunkManager->findIntersectingChunkWithSimpleCollation(
+                            txn, allSplits[i]);
                     }
                 } else {
                     BSONObj splitPoint(allSplits[i]);

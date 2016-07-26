@@ -135,7 +135,8 @@ void MigrationManager::_executeMigrations(OperationContext* txn,
 
         ChunkManager* const chunkManager = scopedCMStatus.getValue().cm();
 
-        auto chunk = chunkManager->findIntersectingChunk(txn, migrateInfo.minKey);
+        auto chunk =
+            chunkManager->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
         invariant(chunk);
 
         // If the chunk is not found exactly as requested, the caller must have stale data

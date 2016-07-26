@@ -169,7 +169,8 @@ public:
         minKey = manager->getShardKeyPattern().normalizeShardKey(minKey);
         maxKey = manager->getShardKeyPattern().normalizeShardKey(maxKey);
 
-        shared_ptr<Chunk> firstChunk = manager->findIntersectingChunk(txn, minKey);
+        shared_ptr<Chunk> firstChunk =
+            manager->findIntersectingChunkWithSimpleCollation(txn, minKey);
         verify(firstChunk);
 
         BSONObjBuilder remoteCmdObjB;

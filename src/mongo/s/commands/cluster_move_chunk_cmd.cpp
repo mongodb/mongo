@@ -180,7 +180,7 @@ public:
                 return false;
             }
 
-            chunk = info->findIntersectingChunk(txn, shardKey);
+            chunk = info->findIntersectingChunkWithSimpleCollation(txn, shardKey);
         } else {
             // Bounds
             if (!info->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
@@ -195,7 +195,7 @@ public:
             BSONObj minKey = info->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
             BSONObj maxKey = info->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
-            chunk = info->findIntersectingChunk(txn, minKey);
+            chunk = info->findIntersectingChunkWithSimpleCollation(txn, minKey);
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
                 errmsg = str::stream() << "no chunk found with the shard key bounds "

@@ -45,20 +45,23 @@ class ParallelConnectionMetadata;
 
 class CommandInfo {
 public:
-    std::string versionedNS;
-    BSONObj cmdFilter;
-
     CommandInfo() {}
-    CommandInfo(const std::string& vns, const BSONObj& filter)
-        : versionedNS(vns), cmdFilter(filter) {}
+    CommandInfo(const std::string& vns, const BSONObj& filter, const BSONObj& collation)
+        : versionedNS(vns), cmdFilter(filter), cmdCollation(collation) {}
 
     bool isEmpty() {
         return versionedNS.size() == 0;
     }
 
     std::string toString() const {
-        return str::stream() << "CInfo " << BSON("v_ns" << versionedNS << "filter" << cmdFilter);
+        return str::stream() << "CInfo "
+                             << BSON("v_ns" << versionedNS << "filter" << cmdFilter << "collation"
+                                            << cmdCollation);
     }
+
+    std::string versionedNS;
+    BSONObj cmdFilter;
+    BSONObj cmdCollation;
 };
 
 class DBClientCursor;

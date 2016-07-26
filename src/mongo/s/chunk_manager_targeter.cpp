@@ -34,6 +34,9 @@
 
 #include <boost/thread/tss.hpp>
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
@@ -105,18 +108,33 @@ UpdateType getUpdateExprType(const BSONObj& updateExpr) {
  * This returns "does the query have an _id field" and "is the _id field querying for a direct
  * value like _id : 3 and not _id : { $gt : 3 }"
  *
+ * If the query does not use the collection default collation, the _id field cannot contain strings,
+ * objects, or arrays.
+ *
  * Ex: { _id : 1 } => true
  *     { foo : <anything>, _id : 1 } => true
  *     { _id : { $lt : 30 } } => false
  *     { foo : <anything> } => false
  */
-bool isExactIdQuery(OperationContext* txn, const BSONObj& query) {
+bool isExactIdQuery(OperationContext* txn,
+                    const BSONObj& query,
+                    const CollatorInterface* collator,
+                    ChunkManager* manager) {
     StatusWith<BSONObj> status = virtualIdShardKey.extractShardKeyFromQuery(txn, query);
     if (!status.isOK()) {
         return false;
     }
 
-    return !status.getValue()["_id"].eoo();
+    BSONElement idElt = status.getValue()["_id"];
+
+    bool hasCollectionDefaultCollation = true;
+    if (manager) {
+        hasCollectionDefaultCollation =
+            CollatorInterface::collatorsMatch(collator, manager->getDefaultCollator());
+    }
+
+    return idElt &&
+        (hasCollectionDefaultCollation || !CollationIndexKey::isCollatableType(idElt.type()));
 }
 
 void refreshBackoff() {
@@ -316,7 +334,10 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
 
     // Target the shard key or database primary
     if (!shardKey.isEmpty()) {
-        return targetShardKey(txn, shardKey, doc.objsize(), endpoint);
+
+        // Use the simple binary comparison collation.
+        const CollatorInterface* collator = nullptr;
+        return targetShardKey(txn, shardKey, collator, doc.objsize(), endpoint);
     } else {
         if (!_primary) {
             return Status(ErrorCodes::NamespaceNotFound,
@@ -385,47 +406,65 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
             shardKey = _manager->getShardKeyPattern().extractShardKeyFromDoc(updateExpr);
         }
 
-        //
-        // Extra sharded update validation
-        //
-
+        // Check shard key size on upsert.
         if (updateDoc.getUpsert()) {
-            // Sharded upserts *always* need to be exactly targeted by shard key
-            if (shardKey.isEmpty()) {
-                return Status(ErrorCodes::ShardKeyNotFound,
-                              stream() << "upsert " << updateDoc.toBSON()
-                                       << " does not contain shard key for pattern "
-                                       << _manager->getShardKeyPattern().toString());
-            }
-
-            // Also check shard key size on upsert
             Status status = ShardKeyPattern::checkShardKeySize(shardKey);
             if (!status.isOK())
                 return status;
         }
-
-        // Validate that single (non-multi) sharded updates are targeted by shard key or _id
-        if (!updateDoc.getMulti() && shardKey.isEmpty() &&
-            !isExactIdQuery(txn, updateDoc.getQuery())) {
-            return Status(ErrorCodes::ShardKeyNotFound,
-                          stream() << "update " << updateDoc.toBSON()
-                                   << " does not contain _id or shard key for pattern "
-                                   << _manager->getShardKeyPattern().toString());
-        }
     }
+
+    // Construct the collator for the update. Use the collation from the update if specified, and
+    // the collection default collation otherwise.
+    BSONObj updateCollation = updateDoc.isCollationSet() ? updateDoc.getCollation() : BSONObj();
+    std::unique_ptr<CollatorInterface> updateCollator;
+    if (!updateCollation.isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                      ->makeFromBSON(updateDoc.getCollation());
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
+        }
+        updateCollator = std::move(statusWithCollator.getValue());
+    }
+    const CollatorInterface* collator = !updateCollation.isEmpty()
+        ? updateCollator.get()
+        : (_manager ? _manager->getDefaultCollator() : nullptr);
 
     // Target the shard key, query, or replacement doc
     if (!shardKey.isEmpty()) {
         // We can't rely on our query targeting to be exact
         ShardEndpoint* endpoint = NULL;
-        Status result =
-            targetShardKey(txn, shardKey, (query.objsize() + updateExpr.objsize()), &endpoint);
-        endpoints->push_back(endpoint);
-        return result;
-    } else if (updateType == UpdateType_OpStyle) {
-        return targetQuery(txn, query, endpoints);
+        Status result = targetShardKey(
+            txn, shardKey, collator, (query.objsize() + updateExpr.objsize()), &endpoint);
+        if (result.isOK()) {
+            endpoints->push_back(endpoint);
+            return result;
+        }
+    }
+
+    // We failed to target a single shard.
+
+    // Upserts are required to target a single shard.
+    if (_manager && updateDoc.getUpsert()) {
+        return Status(ErrorCodes::ShardKeyNotFound,
+                      stream() << "upsert " << updateDoc.toBSON()
+                               << " does not contain shard key for pattern "
+                               << _manager->getShardKeyPattern().toString());
+    }
+
+    // Single (non-multi) updates must target a single shard or be exact-ID.
+    if (_manager && !updateDoc.getMulti() &&
+        !isExactIdQuery(txn, updateDoc.getQuery(), collator, _manager.get())) {
+        return Status(ErrorCodes::ShardKeyNotFound,
+                      stream() << "update " << updateDoc.toBSON()
+                               << " does not contain _id or shard key for pattern "
+                               << _manager->getShardKeyPattern().toString());
+    }
+
+    if (updateType == UpdateType_OpStyle) {
+        return targetQuery(txn, query, updateCollation, endpoints);
     } else {
-        return targetDoc(txn, updateExpr, endpoints);
+        return targetDoc(txn, updateExpr, updateCollation, endpoints);
     }
 }
 
@@ -450,39 +489,62 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
             return status.getStatus();
 
         shardKey = status.getValue();
-
-        // Validate that single (limit-1) sharded deletes are targeted by shard key or _id
-        if (deleteDoc.getLimit() == 1 && shardKey.isEmpty() &&
-            !isExactIdQuery(txn, deleteDoc.getQuery())) {
-            return Status(ErrorCodes::ShardKeyNotFound,
-                          stream() << "delete " << deleteDoc.toBSON()
-                                   << " does not contain _id or shard key for pattern "
-                                   << _manager->getShardKeyPattern().toString());
-        }
     }
+
+    // Construct the collator for the delete. Use the collation from the delete if specified, and
+    // the collection default collation otherwise.
+    BSONObj deleteCollation = deleteDoc.isCollationSet() ? deleteDoc.getCollation() : BSONObj();
+    std::unique_ptr<CollatorInterface> deleteCollator;
+    if (!deleteCollation.isEmpty()) {
+        auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                      ->makeFromBSON(deleteDoc.getCollation());
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
+        }
+        deleteCollator = std::move(statusWithCollator.getValue());
+    }
+    const CollatorInterface* collator = !deleteCollation.isEmpty()
+        ? deleteCollator.get()
+        : (_manager ? _manager->getDefaultCollator() : nullptr);
+
 
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
         // We can't rely on our query targeting to be exact
         ShardEndpoint* endpoint = NULL;
-        Status result = targetShardKey(txn, shardKey, 0, &endpoint);
-        endpoints->push_back(endpoint);
-        return result;
-    } else {
-        return targetQuery(txn, deleteDoc.getQuery(), endpoints);
+        Status result = targetShardKey(txn, shardKey, collator, 0, &endpoint);
+        if (result.isOK()) {
+            endpoints->push_back(endpoint);
+            return result;
+        }
     }
+
+    // We failed to target a single shard.
+
+    // Single deletes must target a single shard or be exact-ID.
+    if (_manager && deleteDoc.getLimit() == 1 &&
+        !isExactIdQuery(txn, deleteDoc.getQuery(), collator, _manager.get())) {
+        return Status(ErrorCodes::ShardKeyNotFound,
+                      stream() << "delete " << deleteDoc.toBSON()
+                               << " does not contain _id or shard key for pattern "
+                               << _manager->getShardKeyPattern().toString());
+    }
+
+    return targetQuery(txn, deleteDoc.getQuery(), deleteCollation, endpoints);
 }
 
 Status ChunkManagerTargeter::targetDoc(OperationContext* txn,
                                        const BSONObj& doc,
+                                       const BSONObj& collation,
                                        vector<ShardEndpoint*>* endpoints) const {
     // NOTE: This is weird and fragile, but it's the way our language works right now -
     // documents are either A) invalid or B) valid equality queries over themselves.
-    return targetQuery(txn, doc, endpoints);
+    return targetQuery(txn, doc, collation, endpoints);
 }
 
 Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
                                          const BSONObj& query,
+                                         const BSONObj& collation,
                                          vector<ShardEndpoint*>* endpoints) const {
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
@@ -493,7 +555,7 @@ Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
     set<ShardId> shardIds;
     if (_manager) {
         try {
-            _manager->getShardIdsForQuery(txn, query, &shardIds);
+            _manager->getShardIdsForQuery(txn, query, collation, &shardIds);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -511,21 +573,33 @@ Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
 
 Status ChunkManagerTargeter::targetShardKey(OperationContext* txn,
                                             const BSONObj& shardKey,
+                                            const CollatorInterface* collator,
                                             long long estDataSize,
                                             ShardEndpoint** endpoint) const {
     invariant(NULL != _manager);
 
-    shared_ptr<Chunk> chunk = _manager->findIntersectingChunk(txn, shardKey);
+    try {
+        auto chunk = _manager->findIntersectingChunk(txn, shardKey, collator);
 
-    // Track autosplit stats for sharded collections
-    // Note: this is only best effort accounting and is not accurate.
-    if (estDataSize > 0) {
-        _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
+        // Track autosplit stats for sharded collections
+        // Note: this is only best effort accounting and is not accurate.
+        if (estDataSize > 0) {
+            _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
+        }
+
+        *endpoint =
+            new ShardEndpoint(chunk->getShardId(), _manager->getVersion(chunk->getShardId()));
+
+        return Status::OK();
+    } catch (const MsgAssertionException& msg) {
+        if (msg.getCode() == ErrorCodes::ShardKeyNotFound) {
+            return msg.toStatus();
+        }
+
+        // If we failed to find the intersecting chunk for a reason other than inability to target a
+        // single shard.
+        throw msg;
     }
-
-    *endpoint = new ShardEndpoint(chunk->getShardId(), _manager->getVersion(chunk->getShardId()));
-
-    return Status::OK();
 }
 
 Status ChunkManagerTargeter::targetCollection(vector<ShardEndpoint*>* endpoints) const {

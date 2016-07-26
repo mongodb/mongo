@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -156,11 +157,12 @@ typedef ChunkManagerFixture ChunkManagerTests;
  * Tests loading chunks into a ChunkManager with or without an old ChunkManager.
  */
 TEST_F(ChunkManagerTests, Basic) {
+    OperationContextNoop txn;
     string keyName = "_id";
     vector<BSONObj> splitKeys;
     genUniqueRandomSplitKeys(keyName, &splitKeys);
     ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
-    BSONObj defaultCollation;
+    std::unique_ptr<CollatorInterface> defaultCollator;
 
     std::vector<BSONObj> shards{
         BSON(ShardType::name() << _shardId << ShardType::host()
@@ -170,7 +172,7 @@ TEST_F(ChunkManagerTests, Basic) {
 
     std::vector<BSONObj> chunks;
     auto future = launchAsync([&] {
-        ChunkManager manager(_collName, shardKeyPattern, defaultCollation, false);
+        ChunkManager manager(_collName, shardKeyPattern, std::move(defaultCollator), false);
         auto status = manager.createFirstChunks(operationContext(), _shardId, &splitKeys, NULL);
         ASSERT_OK(status);
     });
@@ -196,7 +198,7 @@ TEST_F(ChunkManagerTests, Basic) {
     collType.setUnique(false);
     collType.setDropped(false);
 
-    ChunkManager manager(collType);
+    ChunkManager manager(&txn, collType);
     future = launchAsync([&] {
         manager.loadExistingRanges(operationContext(), nullptr);
 
@@ -226,7 +228,8 @@ TEST_F(ChunkManagerTests, Basic) {
     future = launchAsync([&] {
         ChunkManager newManager(manager.getns(),
                                 manager.getShardKeyPattern(),
-                                manager.getDefaultCollation(),
+                                manager.getDefaultCollator() ? manager.getDefaultCollator()->clone()
+                                                             : nullptr,
                                 manager.isUnique());
         newManager.loadExistingRanges(operationContext(), &manager);
 
@@ -250,10 +253,10 @@ TEST_F(ChunkManagerTests, FullTest) {
     vector<BSONObj> splitKeys;
     genUniqueRandomSplitKeys(keyName, &splitKeys);
     ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
-    BSONObj defaultCollation;
+    std::unique_ptr<CollatorInterface> defaultCollator;
 
     auto future = launchAsync([&] {
-        ChunkManager manager(_collName, shardKeyPattern, defaultCollation, false);
+        ChunkManager manager(_collName, shardKeyPattern, std::move(defaultCollator), false);
         auto status = manager.createFirstChunks(operationContext(), _shardId, &splitKeys, NULL);
         ASSERT_OK(status);
     });

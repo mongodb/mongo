@@ -81,7 +81,8 @@ public:
 
     /**
      * Executes a command against a particular database, and targets the command based on a
-     * collection in that database.
+     * collection in that database, according to 'targetingQuery' and 'targetingCollation'. If
+     * 'targetingCollation' is empty, the collection default collation is used for targeting.
      *
      * This version should be used by internal commands when possible.
      *
@@ -94,6 +95,7 @@ public:
                           int options,
                           const std::string& versionedNS,
                           const BSONObj& targetingQuery,
+                          const BSONObj& targetingCollation,
                           std::vector<CommandResult>* results);
 
     /**

@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context_noop.h"
@@ -97,6 +98,7 @@ void ShardingTestFixture::setUp() {
     auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
     _transportLayer = tlMock.get();
     _service->addAndStartTransportLayer(std::move(tlMock));
+    CollatorFactoryInterface::set(_service.get(), stdx::make_unique<CollatorFactoryMock>());
     _transportSession =
         stdx::make_unique<transport::Session>(HostAndPort{}, HostAndPort{}, _transportLayer);
     _client = _service->makeClient("ShardingTestFixture", _transportSession.get());

@@ -31,6 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -123,7 +124,10 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
     // Targeted shard commands are generally data-dependent but plan cache
     // commands are tied to query shape (data has no effect on query shape).
     vector<Strategy::CommandResult> results;
-    Strategy::commandOp(txn, dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
+    const BSONObj query;
+    const BSONObj collation =
+        BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
+    Strategy::commandOp(txn, dbName, cmdObj, options, nss.ns(), query, collation, &results);
 
     // Set value of first shard result's "ok" field.
     bool clusterCmdResult = true;

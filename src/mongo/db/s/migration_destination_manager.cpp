@@ -521,7 +521,23 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                 return;
             }
 
-            Status status = indexer.init(indexSpecs);
+            // Attach simple collation if the index does not specify a collation. Otherwise, this
+            // will be back-filled with the collection default collation.
+            std::vector<BSONObj> indexSpecsWithCollation;
+            for (const BSONObj& spec : indexSpecs) {
+                if (spec["collation"]) {
+                    indexSpecsWithCollation.push_back(spec.getOwned());
+                } else {
+                    indexSpecsWithCollation.emplace_back(BSONObjBuilder()
+                                                             .appendElements(spec)
+                                                             .append("collation",
+                                                                     BSON("locale"
+                                                                          << "simple"))
+                                                             .obj());
+                }
+            }
+
+            Status status = indexer.init(indexSpecsWithCollation);
             if (!status.isOK()) {
                 errmsg = str::stream() << "failed to create index before migrating data. "
                                        << " error: " << status.toString();
@@ -542,10 +558,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             WriteUnitOfWork wunit(txn);
             indexer.commit();
 
-            for (size_t i = 0; i < indexSpecs.size(); i++) {
+            for (size_t i = 0; i < indexSpecsWithCollation.size(); i++) {
                 // make sure to create index on secondaries as well
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    txn, db->getSystemIndexesName(), indexSpecs[i], true /* fromMigrate */);
+                    txn,
+                    db->getSystemIndexesName(),
+                    indexSpecsWithCollation[i],
+                    true /* fromMigrate */);
             }
 
             wunit.commit();

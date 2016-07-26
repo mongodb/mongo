@@ -493,8 +493,10 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                                   << manager->getVersion().toString() << "]";
         }
 
-        manager->getShardIdsForQuery(
-            txn, !_cInfo.isEmpty() ? _cInfo.cmdFilter : _qSpec.filter(), &shardIds);
+        manager->getShardIdsForQuery(txn,
+                                     !_cInfo.isEmpty() ? _cInfo.cmdFilter : _qSpec.filter(),
+                                     !_cInfo.isEmpty() ? _cInfo.cmdCollation : BSONObj(),
+                                     &shardIds);
     } else if (primary) {
         if (MONGO_unlikely(shouldLog(pc))) {
             vinfo = str::stream() << "[unsharded @ " << primary->toString() << "]";

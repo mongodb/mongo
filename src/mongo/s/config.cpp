@@ -66,7 +66,7 @@ CollectionInfo::CollectionInfo(OperationContext* txn,
     _dropped = coll.getDropped();
 
     // Do this *first* so we're invisible to everyone else
-    std::unique_ptr<ChunkManager> manager(stdx::make_unique<ChunkManager>(coll));
+    std::unique_ptr<ChunkManager> manager(stdx::make_unique<ChunkManager>(txn, coll));
     manager->loadExistingRanges(txn, nullptr);
 
     // Collections with no chunks are unsharded, no matter what the collections entry says. This
@@ -117,7 +117,8 @@ void CollectionInfo::save(OperationContext* txn, const string& ns) {
         // in config.collections, as a historical oddity.
         coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(_cm->getVersion().toLong()));
         coll.setKeyPattern(_cm->getShardKeyPattern().toBSON());
-        coll.setDefaultCollation(_cm->getDefaultCollation());
+        coll.setDefaultCollation(
+            _cm->getDefaultCollator() ? _cm->getDefaultCollator()->getSpec().toBSON() : BSONObj());
         coll.setUnique(_cm->isUnique());
     } else {
         invariant(_dropped);
@@ -361,10 +362,11 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             }
         }
 
-        tempChunkManager.reset(new ChunkManager(oldManager->getns(),
-                                                oldManager->getShardKeyPattern(),
-                                                oldManager->getDefaultCollation(),
-                                                oldManager->isUnique()));
+        tempChunkManager.reset(new ChunkManager(
+            oldManager->getns(),
+            oldManager->getShardKeyPattern(),
+            oldManager->getDefaultCollator() ? oldManager->getDefaultCollator()->clone() : nullptr,
+            oldManager->isUnique()));
         tempChunkManager->loadExistingRanges(txn, oldManager.get());
 
         if (tempChunkManager->numChunks() == 0) {

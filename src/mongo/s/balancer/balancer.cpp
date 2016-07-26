@@ -609,7 +609,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* txn,
     auto scopedChunkManager = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
     ChunkManager* const chunkManager = scopedChunkManager.cm();
 
-    auto chunk = chunkManager->findIntersectingChunk(txn, minKey);
+    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, minKey);
 
     auto splitStatus = chunk->split(txn, Chunk::normal, nullptr);
     if (!splitStatus.isOK()) {

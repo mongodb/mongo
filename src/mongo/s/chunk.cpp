@@ -382,8 +382,8 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             // We need to use the latest chunk manager (after the split) in order to have the most
             // up-to-date view of the chunk we are about to move
             auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
-            auto suggestedChunk =
-                scopedCM.cm()->findIntersectingChunk(txn, suggestedMigrateChunk->getMin());
+            auto suggestedChunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(
+                txn, suggestedMigrateChunk->getMin());
 
             ChunkType chunkToMove;
             chunkToMove.setNS(nss.ns());

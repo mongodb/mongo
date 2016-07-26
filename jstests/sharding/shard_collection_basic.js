@@ -181,22 +181,25 @@
         mongos.getDB(kDbName).createCollection('foo', {collation: {locale: 'en_US'}}));
     assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
 
-    // shardCollection should succeed when it specifies the simple collation and the collection has
-    // a non-simple default collation.
-    mongos.getDB(kDbName).foo.drop();
-    assert.commandWorked(
-        mongos.getDB(kDbName).createCollection('foo', {collation: {locale: 'en_US'}}));
-    assert.commandWorked(mongos.adminCommand(
-        {shardCollection: kDbName + '.foo', key: {_id: 1}, collation: {locale: 'simple'}}));
+    // TODO SERVER-24239:
+    // Test that shardCollection for the key pattern {_id: 1} fails if there is a non-simple
+    // collection default collation.
+    // Test that shardCollection for the key pattern {a: 1} fails if there is already an index 'a_1'
+    // but it has a non-simple collation.
+    // Test that shardCollection for the key pattern {a: 1} and collation {locale: 'simple'}
+    // succeeds if there is no index 'a_1', but there is a non-simple collection default collation.
+    // Test that shardCollection for the key pattern {a: 1} and collation {locale: 'simple'}
+    // succeeds if there are two indexes on {a: 1} and one has the simple collation.
 
-    // shardCollection should fail when the only index available with the shard key as a prefix has
-    // a non-simple collation.
+    // shardCollection should fail on a non-empty collection when the only index available with the
+    // shard key as a prefix has a non-simple collation.
     mongos.getDB(kDbName).foo.drop();
     assert.commandWorked(
         mongos.getDB(kDbName).createCollection('foo', {collation: {locale: 'en_US'}}));
+    assert.writeOK(mongos.getDB(kDbName).foo.insert({a: 'foo'}));
     // This index will inherit the collection's default collation.
     assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({a: 1}));
-    assert.commandWorked(mongos.adminCommand(
+    assert.commandFailed(mongos.adminCommand(
         {shardCollection: kDbName + '.foo', key: {a: 1}, collation: {locale: 'simple'}}));
 
     mongos.getDB(kDbName).dropDatabase();

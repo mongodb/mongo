@@ -43,6 +43,8 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
@@ -131,6 +133,18 @@ BSONObj getQuery(const BSONObj& cmdObj) {
         return cmdObj["query"].embeddedObject();
     if (cmdObj["q"].type() == Object)
         return cmdObj["q"].embeddedObject();
+    return BSONObj();
+}
+
+StatusWith<BSONObj> getCollation(const BSONObj& cmdObj) {
+    BSONElement collationElement;
+    auto status = bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
+    if (status.isOK()) {
+        return collationElement.Obj();
+    }
+    if (status != ErrorCodes::NoSuchKey) {
+        return status;
+    }
     return BSONObj();
 }
 
@@ -445,7 +459,10 @@ public:
         massert(40051, "chunk manager should not be null", cm);
 
         vector<Strategy::CommandResult> results;
-        Strategy::commandOp(txn, dbName, cmdObj, options, cm->getns(), BSONObj(), &results);
+        const BSONObj query;
+        const BSONObj collation =
+            BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
+        Strategy::commandOp(txn, dbName, cmdObj, options, cm->getns(), query, collation, &results);
 
         BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
         bool isValid = true;
@@ -1173,11 +1190,28 @@ public:
         massert(10420, "how could chunk manager be null!", cm);
 
         BSONObj query = getQuery(cmdObj);
-        set<ShardId> shardIds;
-        cm->getShardIdsForQuery(txn, query, &shardIds);
+        auto queryCollation = getCollation(cmdObj);
+        if (!queryCollation.isOK()) {
+            return appendEmptyResultSet(result, queryCollation.getStatus(), fullns);
+        }
 
-        set<BSONObj, BSONObjCmp> all;
-        int size = 32;
+        // Construct collator for deduping.
+        std::unique_ptr<CollatorInterface> collator;
+        if (!queryCollation.getValue().isEmpty()) {
+            auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(queryCollation.getValue());
+            if (!statusWithCollator.isOK()) {
+                return appendEmptyResultSet(result, statusWithCollator.getStatus(), fullns);
+            }
+            collator = std::move(statusWithCollator.getValue());
+        }
+
+        set<ShardId> shardIds;
+        cm->getShardIdsForQuery(txn, query, queryCollation.getValue(), &shardIds);
+
+        BSONObjSet all(BSONObjCmp(BSONObj(),
+                                  !queryCollation.getValue().isEmpty() ? collator.get()
+                                                                       : cm->getDefaultCollator()));
 
         for (const ShardId& shardId : shardIds) {
             const auto shard = grid.shardRegistry()->getShard(txn, shardId);
@@ -1204,7 +1238,7 @@ public:
             }
         }
 
-        BSONObjBuilder b(size);
+        BSONObjBuilder b(32);
         int n = 0;
         for (set<BSONObj, BSONObjCmp>::iterator i = all.begin(); i != all.end(); i++) {
             b.appendAs(i->firstElement(), b.numStr(n++));
@@ -1238,6 +1272,12 @@ public:
             }
         }
 
+        // Extract the targeting collation.
+        auto targetingCollation = getCollation(cmdObj);
+        if (!targetingCollation.isOK()) {
+            return targetingCollation.getStatus();
+        }
+
         BSONObjBuilder explainCmdBob;
         int options = 0;
         ClusterExplain::wrapAsExplain(
@@ -1247,8 +1287,14 @@ public:
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(
-            txn, dbname, explainCmdBob.obj(), options, fullns, targetingQuery, &shardResults);
+        Strategy::commandOp(txn,
+                            dbname,
+                            explainCmdBob.obj(),
+                            options,
+                            fullns,
+                            targetingQuery,
+                            targetingCollation.getValue(),
+                            &shardResults);
 
         long long millisElapsed = timer.millis();
 
@@ -1331,7 +1377,9 @@ public:
             BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
             vector<Strategy::CommandResult> results;
-            Strategy::commandOp(txn, dbName, cmdObj, 0, fullns, finder, &results);
+            const BSONObj collation =
+                BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
+            Strategy::commandOp(txn, dbName, cmdObj, 0, fullns, finder, collation, &results);
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
@@ -1362,8 +1410,11 @@ public:
                 BSONObj finder = BSON("files_id" << cmdObj.firstElement() << "n" << n);
 
                 vector<Strategy::CommandResult> results;
+                const BSONObj collation =
+                    BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
                 try {
-                    Strategy::commandOp(txn, dbName, shardCmd, 0, fullns, finder, &results);
+                    Strategy::commandOp(
+                        txn, dbName, shardCmd, 0, fullns, finder, collation, &results);
                 } catch (DBException& e) {
                     // This is handled below and logged
                     Strategy::CommandResult errResult;
@@ -1460,8 +1511,12 @@ public:
         massert(13500, "how could chunk manager be null!", cm);
 
         BSONObj query = getQuery(cmdObj);
+        auto collation = getCollation(cmdObj);
+        if (!collation.isOK()) {
+            return appendEmptyResultSet(result, collation.getStatus(), fullns);
+        }
         set<ShardId> shardIds;
-        cm->getShardIdsForQuery(txn, query, &shardIds);
+        cm->getShardIdsForQuery(txn, query, collation.getValue(), &shardIds);
 
         // We support both "num" and "limit" options to control limit
         int limit = 100;

@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -448,8 +449,19 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
         logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
     }
 
+    // Construct the collection default collator.
+    std::unique_ptr<CollatorInterface> defaultCollator;
+    if (!defaultCollation.isEmpty()) {
+        auto statusWithCollator =
+            CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(defaultCollation);
+        if (!statusWithCollator.isOK()) {
+            return statusWithCollator.getStatus();
+        }
+        defaultCollator = std::move(statusWithCollator.getValue());
+    }
+
     shared_ptr<ChunkManager> manager(
-        new ChunkManager(ns, fieldsAndOrder, defaultCollation, unique));
+        new ChunkManager(ns, fieldsAndOrder, std::move(defaultCollator), unique));
     Status createFirstChunksStatus =
         manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
     if (!createFirstChunksStatus.isOK()) {

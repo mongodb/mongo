@@ -332,7 +332,25 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
         Status::OK());
 
     BSONObj defaultCollation = BSON("locale"
-                                    << "fr_CA");
+                                    << "mock_reverse_string"
+                                    << "caseLevel"
+                                    << false
+                                    << "caseFirst"
+                                    << "off"
+                                    << "strength"
+                                    << 3
+                                    << "numericOrdering"
+                                    << false
+                                    << "alternate"
+                                    << "non-ignorable"
+                                    << "maxVariable"
+                                    << "punct"
+                                    << "normalization"
+                                    << false
+                                    << "backwards"
+                                    << false
+                                    << "version"
+                                    << "mock_version");
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
@@ -509,7 +527,25 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         Status::OK());
 
     BSONObj defaultCollation = BSON("locale"
-                                    << "fr_CA");
+                                    << "mock_reverse_string"
+                                    << "caseLevel"
+                                    << false
+                                    << "caseFirst"
+                                    << "off"
+                                    << "strength"
+                                    << 3
+                                    << "numericOrdering"
+                                    << false
+                                    << "alternate"
+                                    << "non-ignorable"
+                                    << "maxVariable"
+                                    << "punct"
+                                    << "normalization"
+                                    << false
+                                    << "backwards"
+                                    << false
+                                    << "version"
+                                    << "mock_version");
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
@@ -666,7 +702,25 @@ TEST_F(ShardCollectionTest, withInitialData) {
         Status::OK());
 
     BSONObj defaultCollation = BSON("locale"
-                                    << "fr_CA");
+                                    << "mock_reverse_string"
+                                    << "caseLevel"
+                                    << false
+                                    << "caseFirst"
+                                    << "off"
+                                    << "strength"
+                                    << 3
+                                    << "numericOrdering"
+                                    << false
+                                    << "alternate"
+                                    << "non-ignorable"
+                                    << "maxVariable"
+                                    << "punct"
+                                    << "normalization"
+                                    << false
+                                    << "backwards"
+                                    << false
+                                    << "version"
+                                    << "mock_version");
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
