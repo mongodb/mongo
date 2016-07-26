@@ -3,7 +3,7 @@
 /**
  * Represents a MongoDB cluster.
  */
-load('jstests/hooks/check_repl_dbhash.js');     // Loads the checkDBHashes function.
+load('jstests/hooks/check_repl_dbhash.js');     // Loads the checkDBHashesFsyncLocked function.
 load('jstests/hooks/validate_collections.js');  // Loads the validateCollections function.
 
 var Cluster = function(options) {
@@ -416,8 +416,7 @@ var Cluster = function(options) {
         jsTest.log('Finished validating collections in ' + totalTime + ' ms, ' + phase);
     };
 
-    this.checkReplicationConsistency = function checkReplicationConsistency(
-        dbBlacklist, phase, ttlIndexExists) {
+    this.checkReplicationConsistency = function checkReplicationConsistency(dbBlacklist, phase) {
         assert(initialized, 'cluster must be initialized first');
 
         if (!this.isReplication()) {
@@ -432,20 +431,21 @@ var Cluster = function(options) {
 
             // Use liveNodes.master instead of getPrimary() to avoid the detection of a new primary.
             var primary = rst.liveNodes.master;
-            jsTest.log('Starting consistency checks for replica set with ' + primary.host +
-                       ' assumed to still be primary, ' + phase);
 
-            if (shouldCheckDBHashes && ttlIndexExists) {
-                // Lock the primary to prevent the TTL monitor from deleting expired documents in
-                // the background while we are getting the dbhashes of the replica set members.
-                assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
-                                     phase + ', failed to lock the primary');
-            }
+            if (shouldCheckDBHashes) {
+                jsTest.log('Starting consistency checks for replica set with ' + primary.host +
+                           ' assumed to still be primary, ' + phase);
 
-            var activeException = false;
-            var msg;
+                // Compare the dbhashes of the primary and secondaries.
+                checkDBHashesFsyncLocked(rst, dbBlacklist, phase);
+                var totalTime = Date.now() - startTime;
+                jsTest.log('Finished consistency checks of replica set with ' + primary.host +
+                           ' as primary in ' + totalTime + ' ms, ' + phase);
+            } else {
+                jsTest.log('Skipping consistency checks when the balancer is enabled, ' +
+                           'for replica set with ' + primary.host +
+                           ' assumed to still be primary, ' + phase);
 
-            try {
                 // Get the latest optime from the primary.
                 var replSetStatus = primary.adminCommand({replSetGetStatus: 1});
                 assert.commandWorked(replSetStatus, phase + ', error getting replication status');
@@ -455,9 +455,7 @@ var Cluster = function(options) {
                        phase + ', failed to find self in replication status: ' +
                            tojson(replSetStatus));
 
-                // Wait for all previous workload operations to complete. We use the "getLastError"
-                // command rather than a replicated write because the primary is currently
-                // fsyncLock()ed to prevent the TTL monitor from running.
+                // Wait for all previous workload operations to complete, with "getLastError".
                 res = primary.getDB('test').runCommand({
                     getLastError: 1,
                     w: replSetNodes,
@@ -465,35 +463,8 @@ var Cluster = function(options) {
                     wOpTime: primaryInfo.optime
                 });
                 assert.commandWorked(res, phase + ', error awaiting replication');
-
-                if (shouldCheckDBHashes) {
-                    // Compare the dbhashes of the primary and secondaries.
-                    checkDBHashes(rst, dbBlacklist, phase);
-                }
-            } catch (e) {
-                activeException = true;
-                throw e;
-            } finally {
-                if (shouldCheckDBHashes && ttlIndexExists) {
-                    // Allow writes on the primary.
-                    res = primary.adminCommand({fsyncUnlock: 1});
-
-                    // Returning early would suppress the exception rethrown in the catch block.
-                    if (!res.ok) {
-                        msg = phase + ', failed to unlock the primary, which may cause this' +
-                            ' test to hang: ' + tojson(res);
-                        if (activeException) {
-                            jsTest.log(msg);
-                        } else {
-                            throw new Error(msg);
-                        }
-                    }
-                }
             }
 
-            var totalTime = Date.now() - startTime;
-            jsTest.log('Finished consistency checks of replica set with ' + primary.host +
-                       ' as primary in ' + totalTime + ' ms, ' + phase);
         });
     };
 

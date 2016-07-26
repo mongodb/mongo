@@ -55,7 +55,7 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        data: {ttlSeconds: 5, ttlIndexExists: true},
+        data: {ttlSeconds: 5},
         teardown: teardown
     };
 })();
