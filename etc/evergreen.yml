@@ -221,6 +221,10 @@ post:
       script: |
         ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 buildlogger.py; pkill -9 smoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
         exit 0
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf ~/.aws
 
 timeout:
   - command: shell.exec
@@ -1934,13 +1938,35 @@ tasks:
         silent: true
         script: |
           set -o errexit
+
+          mkdir ~/.aws
+
+          cat <<EOF > ~/.aws/config
+          [default]
+          region = us-east-1
+          EOF
+
+          cat <<EOF > ~/.aws/credentials
+          [default]
+          aws_access_key_id = ${aws_key}
+          aws_secret_access_key = ${aws_secret}
+          EOF
+
+          cat <<EOF > notary_env.sh
+          export NOTARY_TOKEN=${signing_auth_token_30}
+          EOF
+
           echo "${signing_auth_token_30}" > signing_auth_token
+
     - command: shell.exec
       params:
         working_dir: src
         script: |
+          . notary_env.sh
+
           set -o errexit
           set -o verbose
+
           mv mongo-binaries.tgz mongodb-binaries.${ext|tgz}
           mv mongo-debugsymbols.tgz debugsymbols-*.${ext|tgz} || true
           cp mongodb-*.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
@@ -1950,24 +1976,12 @@ tasks:
 
           notary-client.py --key-name "server-3.0" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
 
-          if [ "${has_packages|}" = "true" ] ; then
-            for rpm in $(find repo/ -name \*.rpm) ; do
-              cd $(dirname $rpm)
-              # Use --package-file-suffix "" to overwrite existing RPM's instead of saving new "-signed.rpm" RPM files
-              #
-              notary-client.py --key-name "server-3.0" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
-
-              cd ${workdir}/src
-            done
-            for release_file in $(find repo/ -name Release) ; do
-              cd $(dirname $release_file)
-              notary-client.py --key-name "server-3.0" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
-
-              cd ${workdir}/src
-            done
+          if [ "${has_packages|}" = "true" ]; then
+             CURATOR_RELEASE="90080e97b430c197ec487f52de569b2adc028b4e"
+             curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
+             tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
+             ./curator repo --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages $(find repo \(-name "*.deb" -o -name "*.rpm"\) -printf "%h\n" | head -n 1)/\*
           fi
-          tar zcvf repo-${push_arch}.tgz repo || true
-          rm signing_auth_token
 
     # Put the binaries tarball/zipfile
     - command: s3.put
@@ -2587,6 +2601,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: ubuntu1204
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -2664,6 +2679,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: ubuntu1404
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -2742,6 +2758,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: amazon
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -2789,6 +2806,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: amazon
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -3462,6 +3480,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: rhel57
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3499,6 +3518,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: rhel62
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3537,6 +3557,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: rhel70
+    repo_edition: enterprise
   tasks:
   - name: compile
   - name: audit
@@ -3570,6 +3591,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: rhel55
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -3648,6 +3670,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: rhel62
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -3728,6 +3751,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: rhel70
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -3811,6 +3835,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: ubuntu1204
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3847,6 +3872,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: ubuntu1404
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3887,6 +3913,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: suse11
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3922,6 +3949,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: suse11
+    repo_edition: org
   tasks:
   - name: compile
     distros:
@@ -4054,6 +4082,7 @@ buildvariants:
     has_packages: true
     packager_script: packager-enterprise.py
     packager_distro: debian71
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -4089,6 +4118,7 @@ buildvariants:
     has_packages: true
     packager_script: packager.py
     packager_distro: debian71
+    repo_edition: org
   tasks:
   - name: compile
     distros:
