@@ -201,6 +201,7 @@ void Top::appendLatencyStats(StringData ns, BSONObjBuilder* builder) {
     stdx::lock_guard<SimpleMutex> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(&latencyStatsBuilder);
+    builder->append("ns", ns);
     builder->append("latencyStats", latencyStatsBuilder.obj());
 }
 

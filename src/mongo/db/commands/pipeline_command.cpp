@@ -279,12 +279,21 @@ public:
             AutoGetCollectionOrViewForRead ctx(txn, nss);
             Collection* collection = ctx.getCollection();
 
+            // If running $collStats on a view, we do not resolve the view since we want stats
+            // on this view namespace.
+            auto startsWithCollStats = [&pipeline]() {
+                const Pipeline::SourceContainer& sources = pipeline->getSources();
+                return !sources.empty() &&
+                    dynamic_cast<DocumentSourceCollStats*>(sources.front().get());
+            };
+
             // If this is a view, resolve it by finding the underlying collection and stitching view
             // pipelines and this request's pipeline together. We then release our locks before
             // recursively calling run, which will re-acquire locks on the underlying collection.
             // (The lock must be released because recursively acquiring locks on the database will
             // prohibit yielding.)
-            if (auto view = ctx.getView()) {
+            auto view = ctx.getView();
+            if (view && !startsWithCollStats()) {
                 auto viewDefinition =
                     ViewShardingCheck::getResolvedViewIfSharded(txn, ctx.getDb(), view);
                 if (!viewDefinition.isOK()) {
@@ -311,7 +320,14 @@ public:
                     return appendCommandStatus(result, viewCmd.getStatus());
                 }
 
-                return this->run(txn, db, viewCmd.getValue(), options, errmsg, result);
+                bool status = this->run(txn, db, viewCmd.getValue(), options, errmsg, result);
+                {
+                    // Set the namespace of the curop back to the view namespace so ctx records
+                    // stats on this view namespace on destruction.
+                    stdx::lock_guard<Client>(*txn->getClient());
+                    curOp->setNS_inlock(nss.ns());
+                }
+                return status;
             }
 
             // If the pipeline does not have a user-specified collation, set it from the collection

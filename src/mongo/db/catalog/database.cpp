@@ -356,7 +356,9 @@ void Database::getStats(OperationContext* opCtx, BSONObjBuilder* output, double 
 }
 
 Status Database::dropView(OperationContext* txn, StringData fullns) {
-    return (_views.dropView(txn, NamespaceString(fullns)));
+    Status status = _views.dropView(txn, NamespaceString(fullns));
+    Top::get(txn->getClient()->getServiceContext()).collectionDropped(fullns);
+    return status;
 }
 
 Status Database::dropCollection(OperationContext* txn, StringData fullns) {

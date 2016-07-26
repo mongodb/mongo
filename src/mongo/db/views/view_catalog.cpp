@@ -198,6 +198,11 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* txn,
         // Prepend the underlying view's pipeline to the current working pipeline.
         const std::vector<BSONObj>& toPrepend = view->pipeline();
         resolvedPipeline.insert(resolvedPipeline.begin(), toPrepend.begin(), toPrepend.end());
+
+        // If the first stage is a $collStats, then we return early with the viewOn namespace.
+        if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
+            return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
+        }
     }
 
     return {ErrorCodes::ViewDepthLimitExceeded,
