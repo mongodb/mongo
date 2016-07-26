@@ -11,7 +11,6 @@
 #
 # Jenkins runs for perf testing:
 # - Config as-is
-# - Config + "-o "value_sz=1000" to test larger values and log records
 # - Config + "-C "log=(enabled,file_max=1M)": small log files and switching
 # - Config + "-C "log=(enabled,zero_fill=true,file_max=1M)": zero-filling
 # - Config + "-C "checkpoint=(wait=0)": no checkpoints
