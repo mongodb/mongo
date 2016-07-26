@@ -63,7 +63,7 @@ MultiApplier::MultiApplier(executor::TaskExecutor* executor,
 }
 
 MultiApplier::~MultiApplier() {
-    DESTRUCTOR_GUARD(cancel(); wait(););
+    DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
 std::string MultiApplier::toString() const {
@@ -86,7 +86,7 @@ bool MultiApplier::isActive() const {
     return _active;
 }
 
-Status MultiApplier::start() {
+Status MultiApplier::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_active) {
@@ -105,7 +105,7 @@ Status MultiApplier::start() {
     return Status::OK();
 }
 
-void MultiApplier::cancel() {
+void MultiApplier::shutdown() {
     executor::TaskExecutor::CallbackHandle dbWorkCallbackHandle;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -122,7 +122,7 @@ void MultiApplier::cancel() {
     }
 }
 
-void MultiApplier::wait() {
+void MultiApplier::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     while (_active) {
