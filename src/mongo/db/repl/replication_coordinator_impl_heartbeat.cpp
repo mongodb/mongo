@@ -95,7 +95,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::Callbac
     }
 
     const RemoteCommandRequest request(
-        target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), timeout);
+        target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);
     const ReplicationExecutor::RemoteCommandCallbackFn callback =
         stdx::bind(&ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                    this,
@@ -304,7 +304,7 @@ void remoteStepdownCallback(const ReplicationExecutor::RemoteCommandCallbackArgs
 }  // namespace
 
 void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort& target) {
-    RemoteCommandRequest request(target, "admin", BSON("replSetStepDown" << 20));
+    RemoteCommandRequest request(target, "admin", BSON("replSetStepDown" << 20), nullptr);
 
     log() << "Requesting " << target << " step down from primary";
     CBHStatus cbh = _replExecutor.scheduleRemoteCommand(request, remoteStepdownCallback);

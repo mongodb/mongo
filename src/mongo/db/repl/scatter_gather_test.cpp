@@ -61,7 +61,7 @@ public:
         std::vector<RemoteCommandRequest> requests;
         for (int i = 0; i < kTotalRequests; i++) {
             requests.push_back(RemoteCommandRequest(
-                HostAndPort("hostname", i), "admin", BSONObj(), Milliseconds(30 * 1000)));
+                HostAndPort("hostname", i), "admin", BSONObj(), nullptr, Milliseconds(30 * 1000)));
         }
         return requests;
     }

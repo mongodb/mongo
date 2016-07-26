@@ -112,7 +112,7 @@ std::string NetworkInterfaceMock::getHostName() {
 }
 
 Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
-                                          const RemoteCommandRequest& request,
+                                          RemoteCommandRequest& request,
                                           const RemoteCommandCompletionFn& onFinish) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};

@@ -51,6 +51,8 @@ public:
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
+    void setOperationContext(OperationContext* txn) final;
+
     /**
      * Queues a BSONObj to be returned.
      */

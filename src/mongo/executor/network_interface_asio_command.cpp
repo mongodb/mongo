@@ -246,7 +246,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 
     LOG(3) << "Initiating asynchronous command: " << redact(op->request().toString());
 
-    auto beginStatus = op->beginCommand(op->request(), _metadataHook.get());
+    auto beginStatus = op->beginCommand(op->request());
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }
@@ -444,7 +444,7 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
         return _beginCommunication(op);
     }
 
-    auto beginStatus = op->beginCommand(*optionalRequest, _metadataHook.get());
+    auto beginStatus = op->beginCommand(*optionalRequest);
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }

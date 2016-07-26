@@ -152,6 +152,11 @@ Status ClusterCursorManager::PinnedCursor::setAwaitDataTimeout(Milliseconds awai
     return _cursor->setAwaitDataTimeout(awaitDataTimeout);
 }
 
+void ClusterCursorManager::PinnedCursor::setOperationContext(OperationContext* txn) {
+    return _cursor->setOperationContext(txn);
+}
+
+
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     invariant(_cursor);
 
@@ -245,7 +250,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
 }
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor(
-    const NamespaceString& nss, CursorId cursorId) {
+    const NamespaceString& nss, CursorId cursorId, OperationContext* txn) {
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
@@ -269,6 +274,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     }
 
     entry->setLastActive(now);
+    cursor->setOperationContext(txn);
 
     // Note that pinning a cursor transfers ownership of the underlying ClusterClientCursor object
     // to the pin; the CursorEntry is left with a null ClusterClientCursor.
@@ -283,10 +289,14 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 
     invariant(cursor);
 
+    // Reset OperationContext so that non-user initiated operations do not try to use an invalid
+    // operation context
+    cursor->setOperationContext(nullptr);
     const bool remotesExhausted = cursor->remotesExhausted();
 
     CursorEntry* entry = getEntry_inlock(nss, cursorId);
     invariant(entry);
+
 
     entry->returnCursor(std::move(cursor));
 
@@ -390,6 +400,7 @@ std::size_t ClusterCursorManager::reapZombieCursors() {
         }
 
         lk.unlock();
+        zombieCursor.getValue()->setOperationContext(nullptr);
         zombieCursor.getValue()->kill();
         zombieCursor.getValue().reset();
         lk.lock();

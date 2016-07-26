@@ -33,6 +33,7 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 struct HostAndPort;
+class OperationContext;
 class Status;
 
 namespace rpc {
@@ -52,8 +53,12 @@ public:
     /**
      * Writes to an outgoing request metadata object. This method must not throw or block on
      * database or network operations and can be called by multiple concurrent threads.
+     *
+     * txn may be null as writeRequestMetadata may be called on ASIO background threads, and may not
+     * have an OperationContext as a result.
      */
-    virtual Status writeRequestMetadata(const HostAndPort& requestDestination,
+    virtual Status writeRequestMetadata(OperationContext* txn,
+                                        const HostAndPort& requestDestination,
                                         BSONObjBuilder* metadataBob) = 0;
 
     /**

@@ -69,4 +69,8 @@ Status RouterStageRemoveSortKey::setAwaitDataTimeout(Milliseconds awaitDataTimeo
     return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
 }
 
+void RouterStageRemoveSortKey::setOperationContext(OperationContext* txn) {
+    return getChildStage()->setOperationContext(txn);
+}
+
 }  // namespace mongo

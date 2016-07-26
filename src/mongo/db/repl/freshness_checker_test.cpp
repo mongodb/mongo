@@ -947,6 +947,7 @@ protected:
         return RemoteCommandRequest(HostAndPort(hostname),
                                     "",  // the non-hostname fields do not matter in Freshness
                                     BSONObj(),
+                                    nullptr,
                                     Milliseconds(0));
     }
 

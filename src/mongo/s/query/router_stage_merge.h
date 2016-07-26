@@ -53,6 +53,8 @@ public:
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
+    void setOperationContext(OperationContext* txn) final;
+
 private:
     // Not owned here.
     executor::TaskExecutor* _executor;

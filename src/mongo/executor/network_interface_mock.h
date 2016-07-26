@@ -105,7 +105,7 @@ public:
     virtual Date_t now();
     virtual std::string getHostName();
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                const RemoteCommandRequest& request,
+                                RemoteCommandRequest& request,
                                 const RemoteCommandCompletionFn& onFinish);
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
     /**

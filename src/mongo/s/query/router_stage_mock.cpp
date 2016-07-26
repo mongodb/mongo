@@ -73,6 +73,10 @@ Status RouterStageMock::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return Status::OK();
 }
 
+void RouterStageMock::setOperationContext(OperationContext* txn) {
+    // Do nothing
+}
+
 StatusWith<Milliseconds> RouterStageMock::getAwaitDataTimeout() {
     if (!_awaitDataTimeout) {
         return Status(ErrorCodes::BadValue, "no awaitData timeout set");

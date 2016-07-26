@@ -287,6 +287,7 @@ protected:
         return RemoteCommandRequest(HostAndPort(hostname),
                                     "",  // the non-hostname fields do not matter for Elect
                                     BSONObj(),
+                                    nullptr,
                                     Milliseconds(0));
     }
 

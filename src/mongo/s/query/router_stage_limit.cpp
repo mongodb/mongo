@@ -67,4 +67,8 @@ Status RouterStageLimit::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
 }
 
+void RouterStageLimit::setOperationContext(OperationContext* txn) {
+    return getChildStage()->setOperationContext(txn);
+}
+
 }  // namespace mongo

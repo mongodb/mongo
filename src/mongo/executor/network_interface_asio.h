@@ -127,7 +127,7 @@ public:
     void signalWorkAvailable() override;
     Date_t now() override;
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        const RemoteCommandRequest& request,
+                        RemoteCommandRequest& request,
                         const RemoteCommandCompletionFn& onFinish) override;
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
     void cancelAllCommands() override;
@@ -292,8 +292,7 @@ private:
         // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
         // command, the command provided to the NetworkInterface via startCommand(), etc.)
         // Calling beginCommand() resets internal state to prepare to run newCommand.
-        Status beginCommand(const RemoteCommandRequest& request,
-                            rpc::EgressMetadataHook* metadataHook = nullptr);
+        Status beginCommand(const RemoteCommandRequest& request);
 
         // This form of beginCommand takes a raw message. It is needed if the caller
         // has to form the command manually (e.g. to use a specific requestBuilder).

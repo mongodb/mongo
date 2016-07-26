@@ -98,6 +98,7 @@ std::vector<RemoteCommandRequest> FreshnessChecker::Algorithm::getRequests() con
             *it,
             "admin",
             replSetFreshCmd,
+            nullptr,
             Milliseconds(30 * 1000)));  // trying to match current Socket timeout
     }
 

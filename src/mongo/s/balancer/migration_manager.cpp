@@ -178,7 +178,7 @@ void MigrationManager::_executeMigrations(OperationContext* txn,
             continue;
         }
 
-        RemoteCommandRequest remoteRequest(host.getValue(), "admin", moveChunkRequestObj);
+        RemoteCommandRequest remoteRequest(host.getValue(), "admin", moveChunkRequestObj, txn);
 
         StatusWith<RemoteCommandResponse> remoteCommandResponse(
             Status{ErrorCodes::InternalError, "Uninitialized value"});

@@ -60,28 +60,33 @@ struct RemoteCommandRequest {
                          const std::string& theDbName,
                          const BSONObj& theCmdObj,
                          const BSONObj& metadataObj,
+                         OperationContext* txn,
                          Milliseconds timeoutMillis);
 
     RemoteCommandRequest(const HostAndPort& theTarget,
                          const std::string& theDbName,
                          const BSONObj& theCmdObj,
                          const BSONObj& metadataObj,
+                         OperationContext* txn,
                          Milliseconds timeoutMillis = kNoTimeout);
 
     RemoteCommandRequest(const HostAndPort& theTarget,
                          const std::string& theDbName,
                          const BSONObj& theCmdObj,
+                         OperationContext* txn,
                          Milliseconds timeoutMillis = kNoTimeout)
         : RemoteCommandRequest(
-              theTarget, theDbName, theCmdObj, rpc::makeEmptyMetadata(), timeoutMillis) {}
+              theTarget, theDbName, theCmdObj, rpc::makeEmptyMetadata(), txn, timeoutMillis) {}
 
     RemoteCommandRequest(const HostAndPort& theTarget,
                          const rpc::RequestInterface& request,
+                         OperationContext* txn,
                          Milliseconds timeoutMillis = kNoTimeout)
         : RemoteCommandRequest(theTarget,
                                request.getDatabase().toString(),
                                request.getCommandArgs(),
                                request.getMetadata(),
+                               txn,
                                timeoutMillis) {}
 
     std::string toString() const;
@@ -89,13 +94,23 @@ struct RemoteCommandRequest {
     bool operator==(const RemoteCommandRequest& rhs) const;
     bool operator!=(const RemoteCommandRequest& rhs) const;
 
-    // Internal id of this request. Not interpereted and used for tracing purposes only.
+    // Internal id of this request. Not interpreted and used for tracing purposes only.
     RequestId id;
 
     HostAndPort target;
     std::string dbname;
     BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
+
+    // OperationContext is added to each request to allow OP_Command metadata attachment access to
+    // the Client object. The OperationContext is only accessed on the thread that calls
+    // NetworkInterface::startCommand. It is not safe to access from a thread that does not own the
+    // OperationContext in the general case. OperationContext should be non-null on
+    // NetworkInterfaces that do user work (i.e. reads, and writes) so that audit and client
+    // metadata is propagated. It is allowed to be null if used on NetworkInterfaces without
+    // metadata attachment (i.e., replication).
+    OperationContext* txn{nullptr};
+
     Milliseconds timeout = kNoTimeout;
 
     // Deadline by when the request must be completed

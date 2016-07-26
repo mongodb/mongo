@@ -178,7 +178,8 @@ void logAuthentication(ClientBasic* client,
                             const BSONObj& keyPattern,
                             bool unique) MONGO_AUDIT_STUB
 
-    void writeImpersonatedUsersToMetadata(BSONObjBuilder* metadata) MONGO_AUDIT_STUB
+    void writeImpersonatedUsersToMetadata(OperationContext* txn,
+                                          BSONObjBuilder* metadata) MONGO_AUDIT_STUB
 
     void parseAndRemoveImpersonatedUsersField(BSONObj cmdObj,
                                               std::vector<UserName>* parsedUserNames,

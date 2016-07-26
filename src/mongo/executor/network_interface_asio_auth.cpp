@@ -172,7 +172,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
 
         // SERVER-14170: Set the metadataHook to nullptr explicitly as we cannot write metadata
         // here.
-        auto beginStatus = op->beginCommand(request, nullptr);
+        auto beginStatus = op->beginCommand(request);
         if (!beginStatus.isOK()) {
             return handler(beginStatus);
         }

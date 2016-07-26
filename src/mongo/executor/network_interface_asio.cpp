@@ -211,8 +211,36 @@ Date_t NetworkInterfaceASIO::now() {
     return Date_t::now();
 }
 
+namespace {
+
+Status attachMetadataIfNeeded(RemoteCommandRequest& request,
+                              rpc::EgressMetadataHook* metadataHook) {
+
+    // Append the metadata of the request with metadata from the metadata hook
+    // if a hook is installed
+    if (metadataHook) {
+        BSONObjBuilder augmentedBob;
+        augmentedBob.appendElements(request.metadata);
+
+        auto writeStatus = callNoexcept(*metadataHook,
+                                        &rpc::EgressMetadataHook::writeRequestMetadata,
+                                        request.txn,
+                                        request.target,
+                                        &augmentedBob);
+        if (!writeStatus.isOK()) {
+            return writeStatus;
+        }
+
+        request.metadata = augmentedBob.obj();
+    }
+
+    return Status::OK();
+}
+
+}  // namespace
+
 Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                          const RemoteCommandRequest& request,
+                                          RemoteCommandRequest& request,
                                           const RemoteCommandCompletionFn& onFinish) {
     MONGO_ASIO_INVARIANT(onFinish, "Invalid completion function");
     {
@@ -229,6 +257,11 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
     LOG(2) << "startCommand: " << redact(request.toString());
 
     auto getConnectionStartTime = now();
+
+    auto statusMetadata = attachMetadataIfNeeded(request, _metadataHook.get());
+    if (!statusMetadata.isOK()) {
+        return statusMetadata;
+    }
 
     auto nextStep = [this, getConnectionStartTime, cbHandle, request, onFinish](
         StatusWith<ConnectionPool::ConnectionHandle> swConn) {

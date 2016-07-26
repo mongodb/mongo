@@ -378,7 +378,8 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
     const RemoteCommandRequest request(HostAndPort("localhost", 27017),
                                        "mydb",
                                        BSON("whatsUp"
-                                            << "doc"));
+                                            << "doc"),
+                                       nullptr);
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
         request,
         stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status1)));
@@ -402,7 +403,8 @@ COMMON_EXECUTOR_TEST(ScheduleAndCancelRemoteCommand) {
     const RemoteCommandRequest request(HostAndPort("localhost", 27017),
                                        "mydb",
                                        BSON("whatsUp"
-                                            << "doc"));
+                                            << "doc"),
+                                       nullptr);
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
         request,
         stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status1)));
@@ -424,7 +426,7 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     Status status(ErrorCodes::InternalError, "");
     launchExecutorThread();
     const RemoteCommandRequest request(
-        HostAndPort("lazy", 27017), "admin", BSON("sleep" << 1), Milliseconds(1));
+        HostAndPort("lazy", 27017), "admin", BSON("sleep" << 1), nullptr, Milliseconds(1));
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
         request,
         stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status)));
@@ -445,7 +447,8 @@ COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
     TaskExecutor& executor = getExecutor();
     auto status1 = getDetectableErrorStatus();
     auto status2 = getDetectableErrorStatus();
-    const RemoteCommandRequest request(HostAndPort("lazy", 27017), "admin", BSON("cmd" << 1));
+    const RemoteCommandRequest request(
+        HostAndPort("lazy", 27017), "admin", BSON("cmd" << 1), nullptr);
     TaskExecutor::CallbackHandle cbHandle1 = unittest::assertGet(executor.scheduleRemoteCommand(
         request,
         stdx::bind(setStatusOnRemoteCommandCompletion, stdx::placeholders::_1, request, &status1)));

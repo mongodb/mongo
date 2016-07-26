@@ -161,7 +161,8 @@ Status DatabasesCloner::startup() {
     Request listDBsReq(_source,
                        "admin",
                        BSON("listDatabases" << true),
-                       rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+                       rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                       nullptr);
     _listDBsScheduler = stdx::make_unique<RemoteCommandRetryScheduler>(
         _exec,
         listDBsReq,

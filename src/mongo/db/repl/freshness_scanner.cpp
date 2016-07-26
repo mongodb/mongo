@@ -64,7 +64,7 @@ std::vector<RemoteCommandRequest> FreshnessScanner::Algorithm::getRequests() con
 
     std::vector<RemoteCommandRequest> requests;
     for (auto& target : _targets) {
-        requests.push_back(RemoteCommandRequest(target, "admin", getStatusCmd, _timeout));
+        requests.push_back(RemoteCommandRequest(target, "admin", getStatusCmd, nullptr, _timeout));
     }
     return requests;
 }

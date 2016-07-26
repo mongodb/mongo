@@ -80,6 +80,7 @@ std::vector<RemoteCommandRequest> ElectCmdRunner::Algorithm::getRequests() const
             *it,
             "admin",
             replSetElectCmd,
+            nullptr,
             Milliseconds(30 * 1000)));  // trying to match current Socket timeout
     }
 

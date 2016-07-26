@@ -472,7 +472,7 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
 
     auto executor = grid.getExecutorPool()->getArbitraryExecutor();
     auto scheduleStatus = executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_recipientHost, "admin", cmdObj),
+        executor::RemoteCommandRequest(_recipientHost, "admin", cmdObj, nullptr),
         [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
             responseStatus = args.response;
         });

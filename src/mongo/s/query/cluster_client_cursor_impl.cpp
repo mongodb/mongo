@@ -113,6 +113,10 @@ Status ClusterClientCursorImpl::setAwaitDataTimeout(Milliseconds awaitDataTimeou
     return _root->setAwaitDataTimeout(awaitDataTimeout);
 }
 
+void ClusterClientCursorImpl::setOperationContext(OperationContext* txn) {
+    return _root->setOperationContext(txn);
+}
+
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     executor::TaskExecutor* executor, ClusterClientCursorParams&& params) {
     const auto skip = params.skip;

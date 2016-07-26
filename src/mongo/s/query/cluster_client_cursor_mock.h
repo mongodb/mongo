@@ -55,6 +55,8 @@ public:
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
+    void setOperationContext(OperationContext* txn) final;
+
     /**
      * Returns true unless marked as having non-exhausted remote cursors via
      * markRemotesNotExhausted().

@@ -105,6 +105,8 @@ public:
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
+    void setOperationContext(OperationContext* txn) final;
+
 private:
     /**
      * Constructs a cluster client cursor.

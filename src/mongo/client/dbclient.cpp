@@ -44,6 +44,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -182,7 +183,8 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     metadataBob.appendElements(metadata);
 
     if (_metadataWriter) {
-        uassertStatusOK(_metadataWriter(&metadataBob, host));
+        uassertStatusOK(_metadataWriter(
+            (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob, host));
     }
 
     auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());

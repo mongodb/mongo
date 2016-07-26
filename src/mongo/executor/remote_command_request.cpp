@@ -55,24 +55,28 @@ RemoteCommandRequest::RemoteCommandRequest(RequestId requestId,
                                            const std::string& theDbName,
                                            const BSONObj& theCmdObj,
                                            const BSONObj& metadataObj,
+                                           OperationContext* txn,
                                            Milliseconds timeoutMillis)
     : id(requestId),
       target(theTarget),
       dbname(theDbName),
       metadata(metadataObj),
       cmdObj(theCmdObj),
+      txn(txn),
       timeout(timeoutMillis) {}
 
 RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& theTarget,
                                            const std::string& theDbName,
                                            const BSONObj& theCmdObj,
                                            const BSONObj& metadataObj,
+                                           OperationContext* txn,
                                            Milliseconds timeoutMillis)
     : RemoteCommandRequest(requestIdCounter.addAndFetch(1),
                            theTarget,
                            theDbName,
                            theCmdObj,
                            metadataObj,
+                           txn,
                            timeoutMillis) {}
 
 std::string RemoteCommandRequest::toString() const {

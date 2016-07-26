@@ -95,13 +95,13 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
 
 std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
     std::unique_ptr<NetworkInterface> fixedNet,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+    rpc::ShardingEgressMetadataHookBuilder metadataHookBuilder) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
         auto net = executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
-            std::move(metadataHook));
+            metadataHookBuilder());
         auto netPtr = net.get();
         auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
@@ -148,7 +148,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
                                        hookBuilder());
     auto networkPtr = network.get();
-    auto executorPool = makeTaskExecutorPool(std::move(network), hookBuilder());
+    auto executorPool = makeTaskExecutorPool(std::move(network), hookBuilder);
     executorPool->startup();
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));

@@ -107,7 +107,7 @@ public:
     }
 
     void pushRequest(StringData dbname, const BSONObj& cmd) {
-        _requests.emplace(_mockHost, dbname.toString(), cmd);
+        _requests.emplace(_mockHost, dbname.toString(), cmd, nullptr);
     }
 
     BSONObj loadMongoCRConversation() {

@@ -110,7 +110,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
                                          "test",
                                          BSON("1" << 2),
                                          BSON("some"
-                                              << "stuff")};
+                                              << "stuff"),
+                                         nullptr};
 
     RemoteCommandResponse expectedResponse{BSON("foo"
                                                 << "bar"
@@ -159,7 +160,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     bool gotCorrectCommandReply = false;
 
     RemoteCommandRequest actualCommandExpected{
-        testHost(), "testDB", BSON("test" << 1), rpc::makeEmptyMetadata()};
+        testHost(), "testDB", BSON("test" << 1), rpc::makeEmptyMetadata(), nullptr};
     RemoteCommandResponse actualResponseExpected{BSON("1212121212"
                                                       << "12121212121212"),
                                                  BSONObj(),
@@ -237,14 +238,12 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     bool commandFinished = false;
     bool statusPropagated = false;
 
-    ASSERT_OK(net().startCommand(cb,
-                                 RemoteCommandRequest{},
-                                 [&](StatusWith<RemoteCommandResponse> resp) {
-                                     commandFinished = true;
+    RemoteCommandRequest request;
+    ASSERT_OK(net().startCommand(cb, request, [&](StatusWith<RemoteCommandResponse> resp) {
+        commandFinished = true;
 
-                                     statusPropagated = resp.getStatus().code() ==
-                                         ErrorCodes::ConflictingOperationInProgress;
-                                 }));
+        statusPropagated = resp.getStatus().code() == ErrorCodes::ConflictingOperationInProgress;
+    }));
 
     {
         net().enterNetwork();
@@ -279,10 +278,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
 
     bool commandFinished = false;
 
+    RemoteCommandRequest request;
     ASSERT_OK(net().startCommand(
-        cb,
-        RemoteCommandRequest{},
-        [&](StatusWith<RemoteCommandResponse> resp) { commandFinished = true; }));
+        cb, request, [&](StatusWith<RemoteCommandResponse> resp) { commandFinished = true; }));
 
     {
         net().enterNetwork();
@@ -317,13 +315,11 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
     bool commandFinished = false;
     bool errorPropagated = false;
 
-    ASSERT_OK(net().startCommand(cb,
-                                 RemoteCommandRequest{},
-                                 [&](StatusWith<RemoteCommandResponse> resp) {
-                                     commandFinished = true;
-                                     errorPropagated =
-                                         resp.getStatus().code() == ErrorCodes::InvalidSyncSource;
-                                 }));
+    RemoteCommandRequest request;
+    ASSERT_OK(net().startCommand(cb, request, [&](StatusWith<RemoteCommandResponse> resp) {
+        commandFinished = true;
+        errorPropagated = resp.getStatus().code() == ErrorCodes::InvalidSyncSource;
+    }));
 
     {
         net().enterNetwork();
@@ -356,13 +352,11 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     bool commandFinished = false;
     bool errorPropagated = false;
 
-    ASSERT_OK(net().startCommand(cb,
-                                 RemoteCommandRequest{},
-                                 [&](StatusWith<RemoteCommandResponse> resp) {
-                                     commandFinished = true;
-                                     errorPropagated =
-                                         resp.getStatus().code() == ErrorCodes::CappedPositionLost;
-                                 }));
+    RemoteCommandRequest request;
+    ASSERT_OK(net().startCommand(cb, request, [&](StatusWith<RemoteCommandResponse> resp) {
+        commandFinished = true;
+        errorPropagated = resp.getStatus().code() == ErrorCodes::CappedPositionLost;
+    }));
 
     ASSERT(!handleReplyCalled);
 
@@ -392,8 +386,8 @@ TEST_F(NetworkInterfaceMockTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
     tearDown();
 
     TaskExecutor::CallbackHandle cb{};
-    ASSERT_NOT_OK(net().startCommand(
-        cb, RemoteCommandRequest{}, [](StatusWith<RemoteCommandResponse> resp) {}));
+    RemoteCommandRequest request;
+    ASSERT_NOT_OK(net().startCommand(cb, request, [](StatusWith<RemoteCommandResponse> resp) {}));
 }
 
 TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {

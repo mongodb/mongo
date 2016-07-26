@@ -68,4 +68,8 @@ Status RouterStageMerge::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _arm.setAwaitDataTimeout(awaitDataTimeout);
 }
 
+void RouterStageMerge::setOperationContext(OperationContext* txn) {
+    return _arm.setOperationContext(txn);
+}
+
 }  // namespace mongo

@@ -180,6 +180,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.isTailable = query.getQueryRequest().isTailable();
     params.isAwaitData = query.getQueryRequest().isAwaitData();
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
+    params.txn = txn;
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
@@ -358,7 +359,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
                                                    const GetMoreRequest& request) {
     auto cursorManager = grid.getCursorManager();
 
-    auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid);
+    auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid, txn);
     if (!pinnedCursor.isOK()) {
         return pinnedCursor.getStatus();
     }

@@ -103,6 +103,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
                                                 "admin",
                                                 hbRequest,
                                                 BSON(rpc::kReplSetMetadataFieldName << 1),
+                                                nullptr,
                                                 _rsConfig->getHeartbeatTimeoutPeriodMillis()));
     }
 

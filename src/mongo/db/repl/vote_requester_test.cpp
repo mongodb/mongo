@@ -124,6 +124,7 @@ protected:
         return RemoteCommandRequest(HostAndPort(hostname),
                                     "",  // fields do not matter in VoteRequester
                                     BSONObj(),
+                                    nullptr,
                                     Milliseconds(0));
     }
 

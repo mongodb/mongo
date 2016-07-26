@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /**
  * This is the lightweight mongoS analogue of the PlanStage abstraction used to execute queries on
  * mongoD (see mongo/db/plan_stage.h).
@@ -84,6 +86,13 @@ public:
      * the cursor is not tailable + awaitData).
      */
     virtual Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) = 0;
+
+    /**
+     * Update the operation context for remote requests.
+     *
+     * Network requests depend on having a valid operation context for user initiated actions.
+     */
+    virtual void setOperationContext(OperationContext* txn) = 0;
 
 protected:
     /**

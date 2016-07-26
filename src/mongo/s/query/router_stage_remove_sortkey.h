@@ -48,6 +48,8 @@ public:
     bool remotesExhausted() final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
+    void setOperationContext(OperationContext* txn) final;
 };
 
 }  // namespace mongo

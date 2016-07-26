@@ -286,7 +286,7 @@ void AsyncMockStreamFactory::MockStream::simulateServer(
         auto parsedRequest = rpc::makeRequest(&msg);
         ASSERT(parsedRequest->getProtocol() == proto);
 
-        RemoteCommandRequest rcr(target(), *parsedRequest);
+        RemoteCommandRequest rcr(target(), *parsedRequest, nullptr);
 
         messageId = msg.header().getId();
 

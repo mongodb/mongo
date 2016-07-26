@@ -31,6 +31,7 @@
 #include "mongo/s/client/dbclient_multi_command.h"
 
 #include "mongo/db/audit.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/factory.h"
@@ -88,7 +89,9 @@ static void sayAsCmd(DBClientBase* conn, StringData dbName, const BSONObj& cmdOb
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);
     if (conn->getRequestMetadataWriter()) {
-        conn->getRequestMetadataWriter()(&metadataBob, conn->getServerAddress());
+        conn->getRequestMetadataWriter()((haveClient() ? cc().getOperationContext() : nullptr),
+                                         &metadataBob,
+                                         conn->getServerAddress());
     }
 
     requestBuilder->setDatabase(dbName);

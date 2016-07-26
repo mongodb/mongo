@@ -63,37 +63,16 @@ namespace {
 // be used to run multiple distinct requests.
 AtomicUInt64 kAsyncOpIdCounter(0);
 
-// Metadata listener can be nullptr.
 StatusWith<Message> messageFromRequest(const RemoteCommandRequest& request,
-                                       rpc::Protocol protocol,
-                                       rpc::EgressMetadataHook* metadataHook) {
+                                       rpc::Protocol protocol) {
     BSONObj query = request.cmdObj;
     auto requestBuilder = rpc::makeRequestBuilder(protocol);
-
-    BSONObj maybeAugmented;
-    // Handle outgoing request metadata.
-    if (metadataHook) {
-        BSONObjBuilder augmentedBob;
-        augmentedBob.appendElements(request.metadata);
-
-        auto writeStatus = callNoexcept(*metadataHook,
-                                        &rpc::EgressMetadataHook::writeRequestMetadata,
-                                        request.target,
-                                        &augmentedBob);
-        if (!writeStatus.isOK()) {
-            return writeStatus;
-        }
-
-        maybeAugmented = augmentedBob.obj();
-    } else {
-        maybeAugmented = request.metadata;
-    }
 
     auto toSend = rpc::makeRequestBuilder(protocol)
                       ->setDatabase(request.dbname)
                       .setCommandName(request.cmdObj.firstElementFieldName())
                       .setCommandArgs(request.cmdObj)
-                      .setMetadata(maybeAugmented)
+                      .setMetadata(request.metadata)
                       .done();
     return std::move(toSend);
 }
@@ -197,8 +176,7 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
     return Status::OK();
 }
 
-Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request,
-                                                   rpc::EgressMetadataHook* metadataHook) {
+Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request) {
     // Check if we need to downconvert find or getMore commands.
     StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
     const auto isFindCmd = commandName == QueryRequest::kFindCommandName;
@@ -208,7 +186,7 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& r
     // If we aren't sending a find or getMore, or the server supports OP_COMMAND we don't have
     // to worry about downconversion.
     if (!isFindOrGetMoreCmd || connection().serverProtocols() == rpc::supports::kAll) {
-        auto newCommand = messageFromRequest(request, operationProtocol(), metadataHook);
+        auto newCommand = messageFromRequest(request, operationProtocol());
         if (!newCommand.isOK()) {
             return newCommand.getStatus();
         }

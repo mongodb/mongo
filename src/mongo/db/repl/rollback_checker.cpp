@@ -140,7 +140,7 @@ bool RollbackChecker::_checkForRollback_inlock(int remoteRBID) {
 RollbackChecker::CallbackHandle RollbackChecker::_scheduleGetRollbackId(
     const RemoteCommandCallbackFn& nextAction, const CallbackFn& errorFn) {
     executor::RemoteCommandRequest getRollbackIDReq(
-        _syncSource, "admin", BSON("replSetGetRBID" << 1));
+        _syncSource, "admin", BSON("replSetGetRBID" << 1), nullptr);
     auto cbh = _executor->scheduleRemoteCommand(getRollbackIDReq, nextAction);
 
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {

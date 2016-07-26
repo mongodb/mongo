@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+class OperationContext;
 template <typename T>
 class StatusWith;
 
@@ -105,6 +106,13 @@ public:
      * the cursor is not tailable + awaitData).
      */
     virtual Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) = 0;
+
+    /**
+     * Update the operation context for remote requests.
+     *
+     * Network requests depend on having a valid operation context for user initiated actions.
+     */
+    virtual void setOperationContext(OperationContext* txn) = 0;
 };
 
 }  // namespace mongo

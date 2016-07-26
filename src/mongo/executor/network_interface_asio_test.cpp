@@ -102,7 +102,7 @@ public:
     }
 
     Deferred<StatusWith<RemoteCommandResponse>> startCommand(
-        const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
+        const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest& request) {
         Deferred<StatusWith<RemoteCommandResponse>> deferredResponse;
         ASSERT_OK(net().startCommand(
             cbHandle,
@@ -114,7 +114,7 @@ public:
     }
 
     // Helper to run startCommand and wait for it
-    StatusWith<RemoteCommandResponse> startCommandSync(const RemoteCommandRequest& request) {
+    StatusWith<RemoteCommandResponse> startCommandSync(RemoteCommandRequest& request) {
         auto deferred = startCommand(makeCallbackHandle(), request);
 
         // wait for the operation to complete
@@ -157,8 +157,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
     auto cbh = makeCallbackHandle();
 
     // Kick off our operation
-    auto deferred =
-        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+    RemoteCommandRequest request{testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(cbh, request);
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -187,8 +187,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
 TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
     auto cbh = makeCallbackHandle();
 
-    auto deferred =
-        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+    RemoteCommandRequest request{testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(cbh, request);
 
     // Cancel immediately
     net().cancelCommand(cbh);
@@ -209,8 +209,8 @@ TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
 
 TEST_F(NetworkInterfaceASIOTest, LateCancel) {
     auto cbh = makeCallbackHandle();
-    auto deferred =
-        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+    RemoteCommandRequest request{testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(cbh, request);
 
     // Allow stream to connect so operation can return
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -238,8 +238,8 @@ TEST_F(NetworkInterfaceASIOTest, LateCancel) {
 
 TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
     auto cbh = makeCallbackHandle();
-    auto deferred =
-        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+    RemoteCommandRequest request{testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(cbh, request);
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -268,8 +268,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
 
 TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
     auto cbh = makeCallbackHandle();
-    auto deferred =
-        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+    RemoteCommandRequest request{testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(cbh, request);
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -296,9 +296,9 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
 
 TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
     auto cbh = makeCallbackHandle();
-    auto deferred = startCommand(
-        cbh,
-        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(1000)));
+    RemoteCommandRequest request{
+        testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr, Milliseconds(1000)};
+    auto deferred = startCommand(cbh, request);
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -325,9 +325,9 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
 
 TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
     auto cbh = makeCallbackHandle();
-    auto deferred = startCommand(
-        cbh,
-        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(1000)));
+    RemoteCommandRequest request{
+        testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr, Milliseconds(1000)};
+    auto deferred = startCommand(cbh, request);
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -357,7 +357,8 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
     // Kick off operation
     auto cb = makeCallbackHandle();
     Milliseconds timeout(1000);
-    auto deferred = startCommand(cb, {testHost, "testDB", BSON("a" << 1), BSONObj(), timeout});
+    RemoteCommandRequest request{testHost, "testDB", BSON("a" << 1), BSONObj(), nullptr, timeout};
+    auto deferred = startCommand(cb, request);
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -390,9 +391,8 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
 }
 
 TEST_F(NetworkInterfaceASIOTest, StartCommand) {
-    auto deferred =
-        startCommand(makeCallbackHandle(),
-                     RemoteCommandRequest(testHost, "testDB", BSON("foo" << 1), BSON("bar" << 1)));
+    RemoteCommandRequest request{testHost, "testDB", BSON("foo" << 1), BSON("bar" << 1), nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
@@ -440,9 +440,9 @@ TEST_F(NetworkInterfaceASIOTest, InShutdown) {
 
 TEST_F(NetworkInterfaceASIOTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
     net().shutdown();
-    ASSERT_NOT_OK(net().startCommand(makeCallbackHandle(),
-                                     RemoteCommandRequest{},
-                                     [&](StatusWith<RemoteCommandResponse> resp) {}));
+    RemoteCommandRequest request;
+    ASSERT_NOT_OK(net().startCommand(
+        makeCallbackHandle(), request, [&](StatusWith<RemoteCommandResponse> resp) {}));
 }
 
 class MalformedMessageTest : public NetworkInterfaceASIOTest {
@@ -451,9 +451,8 @@ public:
 
     void runMessageTest(ErrorCodes::Error code, bool loadBody, MessageHook hook) {
         // Kick off our operation
-        auto deferred =
-            startCommand(makeCallbackHandle(),
-                         RemoteCommandRequest(testHost, "testDB", BSON("ping" << 1), BSONObj()));
+        RemoteCommandRequest request{testHost, "testDB", BSON("ping" << 1), BSONObj(), nullptr};
+        auto deferred = startCommand(makeCallbackHandle(), request);
 
         // Wait for it to block waiting for a write
         auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -591,11 +590,12 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, InvalidIsMaster) {
             return Status::OK();
         }));
 
-    auto deferred = startCommand(makeCallbackHandle(),
-                                 {testHost,
-                                  "blah",
-                                  BSON("foo"
-                                       << "bar")});
+    RemoteCommandRequest request{testHost,
+                                 "blah",
+                                 BSON("foo"
+                                      << "bar"),
+                                 nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
@@ -645,11 +645,12 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
             return Status::OK();
         }));
 
-    auto deferred = startCommand(makeCallbackHandle(),
-                                 {testHost,
-                                  "blah",
-                                  BSON("foo"
-                                       << "bar")});
+    RemoteCommandRequest request{testHost,
+                                 "blah",
+                                 BSON("foo"
+                                      << "bar"),
+                                 nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
@@ -701,11 +702,12 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
             return Status::OK();
         }));
 
-    auto deferred = startCommand(makeCallbackHandle(),
-                                 {testHost,
-                                  "blah",
-                                  BSON("foo"
-                                       << "bar")});
+    RemoteCommandRequest request{testHost,
+                                 "blah",
+                                 BSON("foo"
+                                      << "bar"),
+                                 nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -753,7 +755,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto metadata = BSON("aaa"
                          << "bbb");
 
-    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", commandRequest});
+    RemoteCommandRequest request{testHost, "blah", commandRequest, nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -809,7 +812,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {boost::make_optional<RemoteCommandRequest>(
-                {testHost, "foo", hookCommandRequest, hookRequestMetadata})};
+                {testHost, "foo", hookCommandRequest, hookRequestMetadata, nullptr})};
 
         },
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
@@ -821,7 +824,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
 
     auto commandRequest = BSON("foo"
                                << "bar");
-    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", commandRequest});
+    RemoteCommandRequest request{testHost, "blah", commandRequest, nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -904,7 +908,8 @@ public:
     TestMetadataHook(bool* wroteRequestMetadata, bool* gotReplyMetadata)
         : _wroteRequestMetadata(wroteRequestMetadata), _gotReplyMetadata(gotReplyMetadata) {}
 
-    Status writeRequestMetadata(const HostAndPort& requestDestination,
+    Status writeRequestMetadata(OperationContext* txn,
+                                const HostAndPort& requestDestination,
                                 BSONObjBuilder* metadataBob) override {
         metadataBob->append("foo", "bar");
         *_wroteRequestMetadata = true;
@@ -926,7 +931,8 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     bool gotReplyMetadata = false;
     start(stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
 
-    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", BSON("ping" << 1)});
+    RemoteCommandRequest request{testHost, "blah", BSON("ping" << 1), nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();

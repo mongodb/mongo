@@ -229,7 +229,7 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest) {
            << commandRequest;
 
     auto scheduleResult = _executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_target, "admin", commandRequest),
+        executor::RemoteCommandRequest(_target, "admin", commandRequest, nullptr),
         stdx::bind(&Reporter::_processResponseCallback, this, stdx::placeholders::_1));
 
     _status = scheduleResult.getStatus();

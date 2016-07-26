@@ -47,6 +47,8 @@ public:
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
+    void setOperationContext(OperationContext* txn) final;
+
 private:
     long long _skip;
 

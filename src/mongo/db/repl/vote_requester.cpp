@@ -82,7 +82,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     std::vector<RemoteCommandRequest> requests;
     for (const auto& target : _targets) {
         requests.push_back(RemoteCommandRequest(
-            target, "admin", requestVotesCmd, _rsConfig.getElectionTimeoutPeriod()));
+            target, "admin", requestVotesCmd, nullptr, _rsConfig.getElectionTimeoutPeriod()));
     }
 
     return requests;

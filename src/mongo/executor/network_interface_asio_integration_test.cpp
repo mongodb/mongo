@@ -88,7 +88,7 @@ public:
     }
 
     Deferred<StatusWith<RemoteCommandResponse>> runCommand(
-        const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
+        const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest& request) {
         Deferred<StatusWith<RemoteCommandResponse>> deferred;
         net().startCommand(
             cbHandle, request, [deferred](StatusWith<RemoteCommandResponse> resp) mutable {
@@ -97,7 +97,7 @@ public:
         return deferred;
     }
 
-    StatusWith<RemoteCommandResponse> runCommandSync(const RemoteCommandRequest& request) {
+    StatusWith<RemoteCommandResponse> runCommandSync(RemoteCommandRequest& request) {
         auto deferred = runCommand(makeCallbackHandle(), request);
         auto& res = deferred.get();
         if (res.isOK()) {
@@ -111,8 +111,9 @@ public:
     void assertCommandOK(StringData db,
                          const BSONObj& cmd,
                          Milliseconds timeoutMillis = Milliseconds(-1)) {
-        auto res = unittest::assertGet(runCommandSync(
-            {fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
+        RemoteCommandRequest request{
+            fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        auto res = unittest::assertGet(runCommandSync(request));
         ASSERT_OK(getStatusFromCommandResult(res.data));
     }
 
@@ -120,8 +121,9 @@ public:
                                     const BSONObj& cmd,
                                     Milliseconds timeoutMillis,
                                     ErrorCodes::Error reason) {
-        auto clientStatus = runCommandSync(
-            {fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis});
+        RemoteCommandRequest request{
+            fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        auto clientStatus = runCommandSync(request);
         ASSERT_TRUE(clientStatus == reason);
     }
 
@@ -129,8 +131,9 @@ public:
                                     const BSONObj& cmd,
                                     Milliseconds timeoutMillis,
                                     ErrorCodes::Error reason) {
-        auto res = unittest::assertGet(runCommandSync(
-            {fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
+        RemoteCommandRequest request{
+            fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        auto res = unittest::assertGet(runCommandSync(request));
         auto serverStatus = getStatusFromCommandResult(res.data);
         ASSERT_TRUE(serverStatus == reason);
     }
@@ -176,12 +179,12 @@ public:
                          Milliseconds timeout = RemoteCommandRequest::kNoTimeout) {
         auto cb = makeCallbackHandle();
         auto self = *this;
-        auto out = fixture
-                       ->runCommand(cb,
-                                    {unittest::getFixtureConnectionString().getServers()[0],
+        RemoteCommandRequest request{unittest::getFixtureConnectionString().getServers()[0],
                                      "admin",
                                      _command,
-                                     timeout})
+                                     nullptr,
+                                     timeout};
+        auto out = fixture->runCommand(cb, request)
                        .then(pool, [self](StatusWith<RemoteCommandResponse> resp) -> Status {
                            auto status = resp.isOK()
                                ? getStatusFromCommandResult(resp.getValue().data)
@@ -324,7 +327,8 @@ class HangingHook : public executor::NetworkConnectionHook {
                                                                        << "none"
                                                                        << "secs"
                                                                        << 100000000),
-                                                          BSONObj()))};
+                                                          BSONObj(),
+                                                          nullptr))};
     }
 
     Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) final {

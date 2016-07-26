@@ -168,7 +168,10 @@ std::vector<StatusWith<executor::RemoteCommandResponse>> CallbackResponseSaver::
     return _responses;
 }
 
-const executor::RemoteCommandRequest request(HostAndPort("h1:12345"), "db1", BSON("ping" << 1));
+const executor::RemoteCommandRequest request(HostAndPort("h1:12345"),
+                                             "db1",
+                                             BSON("ping" << 1),
+                                             nullptr);
 
 TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryPolicy) {
     auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
@@ -217,7 +220,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         RemoteCommandRetryScheduler(
             &getExecutor(),
-            executor::RemoteCommandRequest(HostAndPort(), request.dbname, request.cmdObj),
+            executor::RemoteCommandRequest(HostAndPort(), request.dbname, request.cmdObj, nullptr),
             callback,
             makeRetryPolicy()),
         UserException,
@@ -225,20 +228,21 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
         "source in remote command request cannot be empty");
 
     // Empty source in remote command request.
-    ASSERT_THROWS_CODE_AND_WHAT(RemoteCommandRetryScheduler(&getExecutor(),
-                                                            executor::RemoteCommandRequest(
-                                                                request.target, "", request.cmdObj),
-                                                            callback,
-                                                            makeRetryPolicy()),
-                                UserException,
-                                ErrorCodes::BadValue,
-                                "database name in remote command request cannot be empty");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        RemoteCommandRetryScheduler(
+            &getExecutor(),
+            executor::RemoteCommandRequest(request.target, "", request.cmdObj, nullptr),
+            callback,
+            makeRetryPolicy()),
+        UserException,
+        ErrorCodes::BadValue,
+        "database name in remote command request cannot be empty");
 
     // Empty command object in remote command request.
     ASSERT_THROWS_CODE_AND_WHAT(
         RemoteCommandRetryScheduler(
             &getExecutor(),
-            executor::RemoteCommandRequest(request.target, request.dbname, BSONObj()),
+            executor::RemoteCommandRequest(request.target, request.dbname, BSONObj(), nullptr),
             callback,
             makeRetryPolicy()),
         UserException,

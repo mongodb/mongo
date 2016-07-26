@@ -97,4 +97,9 @@ Status ClusterClientCursorMock::setAwaitDataTimeout(Milliseconds awaitDataTimeou
     MONGO_UNREACHABLE;
 }
 
+
+void ClusterClientCursorMock::setOperationContext(OperationContext* txn) {
+    // Do nothing
+}
+
 }  // namespace mongo

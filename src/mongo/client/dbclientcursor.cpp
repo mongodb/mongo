@@ -34,6 +34,7 @@
 #include "mongo/client/dbclientcursor.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/factory.h"
@@ -79,7 +80,10 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);
     if (cli->getRequestMetadataWriter()) {
-        uassertStatusOK(cli->getRequestMetadataWriter()(&metadataBob, cli->getServerAddress()));
+        uassertStatusOK(
+            cli->getRequestMetadataWriter()((haveClient() ? cc().getOperationContext() : nullptr),
+                                            &metadataBob,
+                                            cli->getServerAddress()));
     }
 
     requestBuilder->setDatabase(database);

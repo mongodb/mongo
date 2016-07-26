@@ -212,6 +212,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
                                  dbName,
                                  cmdWithMaxTimeMS,
                                  _getMetadataForCommand(readPref),
+                                 txn,
                                  isConfig() ? kConfigCommandTimeout
                                             : executor::RemoteCommandRequest::kNoTimeout);
     StatusWith<RemoteCommandResponse> swResponse =

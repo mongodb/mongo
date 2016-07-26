@@ -179,7 +179,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _timeout(timeout),
       _firstRemoteCommandScheduler(
           _executor,
-          RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, _timeout),
+          RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, nullptr, _timeout),
           stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kFirstBatchFieldName),
           std::move(firstCommandRetryPolicy)) {
     uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
@@ -280,7 +280,7 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
     }
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(_source, _dbname, cmdObj, _metadata, _timeout),
+            RemoteCommandRequest(_source, _dbname, cmdObj, _metadata, nullptr, _timeout),
             stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kNextBatchFieldName));
 
     if (!scheduleResult.isOK()) {
@@ -389,7 +389,7 @@ void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
         };
         auto cmdObj = BSON("killCursors" << nss.coll() << "cursors" << BSON_ARRAY(id));
         auto scheduleResult = _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(_source, _dbname, cmdObj), logKillCursorsResult);
+            RemoteCommandRequest(_source, _dbname, cmdObj, nullptr), logKillCursorsResult);
         if (!scheduleResult.isOK()) {
             warning() << "failed to schedule killCursors command: " << scheduleResult.getStatus();
         }

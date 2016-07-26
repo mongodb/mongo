@@ -155,8 +155,11 @@ std::unique_ptr<NetworkInterfaceASIO::AsyncOp> ASIOConnection::makeAsyncOp(ASIOC
     return stdx::make_unique<NetworkInterfaceASIO::AsyncOp>(
         conn->_global->_impl,
         TaskExecutor::CallbackHandle(),
-        RemoteCommandRequest{
-            conn->getHostAndPort(), std::string("admin"), BSON("isMaster" << 1), BSONObj()},
+        RemoteCommandRequest{conn->getHostAndPort(),
+                             std::string("admin"),
+                             BSON("isMaster" << 1),
+                             BSONObj(),
+                             nullptr},
         [conn](const TaskExecutor::ResponseStatus& status) {
             auto cb = std::move(conn->_setupCallback);
             cb(conn, status.isOK() ? Status::OK() : status.getStatus());

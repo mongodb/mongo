@@ -269,7 +269,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
     }
 
     executor::RemoteCommandRequest request(
-        host.getValue(), dbName, cmdObj, rpc::makeEmptyMetadata(), Seconds(30));
+        host.getValue(), dbName, cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
     StatusWith<executor::RemoteCommandResponse> swResponse =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
@@ -1167,7 +1167,7 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
     }
 
     executor::RemoteCommandRequest request(
-        swHost.getValue(), "admin", commandRequest, rpc::makeEmptyMetadata(), Seconds(30));
+        swHost.getValue(), "admin", commandRequest, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
 
     const RemoteCommandCallbackFn callback =
         stdx::bind(&ShardingCatalogManagerImpl::_handleAddShardTaskResponse,

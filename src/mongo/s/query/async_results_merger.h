@@ -101,6 +101,13 @@ public:
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
     /**
+     * Update the operation context for remote requests.
+     *
+     * Network requests depend on having a valid operation context for user initiated actions.
+     */
+    void setOperationContext(OperationContext* txn);
+
+    /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
      * This means that either
      *   --there is a buffered result which we can return,
