@@ -34,6 +34,10 @@ if env.TargetOSIs('linux'):
     platform_libs = [
         '$BUILD_DIR/mongo/util/procparser'
     ]
+elif env.TargetOSIs('windows'):
+    platform_libs = [
+        '$BUILD_DIR/mongo/util/perfctr_collect'
+    ]
 
 env.Library(
     target='ftdc_mongod',

@@ -26,12 +26,134 @@
  * then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kFTDC
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ftdc/ftdc_system_stats.h"
 
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/ftdc/collector.h"
+#include "mongo/db/ftdc/controller.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
+#include "mongo/util/perfctr_collect.h"
+
 namespace mongo {
 
-void installSystemMetricsCollector(FTDCController* controller) {}
+namespace {
+
+const std::vector<StringData> kCpuCounters = {
+    "\\Processor(_Total)\\% Idle Time"_sd,
+    "\\Processor(_Total)\\% Interrupt Time"_sd,
+    "\\Processor(_Total)\\% Privileged Time"_sd,
+    "\\Processor(_Total)\\% Processor Time"_sd,
+    "\\Processor(_Total)\\% User Time"_sd,
+    "\\Processor(_Total)\\Interrupts/sec"_sd,
+    "\\System\\Context Switches/sec"_sd,
+    "\\System\\Processes"_sd,
+    "\\System\\Processor Queue Length"_sd,
+    "\\System\\System Up Time"_sd,
+    "\\System\\Threads"_sd,
+};
+
+const std::vector<StringData> kMemoryCounters = {
+    "\\Memory\\Available Bytes"_sd,
+    "\\Memory\\Cache Bytes"_sd,
+    "\\Memory\\Cache Faults/sec"_sd,
+    "\\Memory\\Committed Bytes"_sd,
+    "\\Memory\\Commit Limit"_sd,
+    "\\Memory\\Page Reads/sec"_sd,
+    "\\Memory\\Page Writes/sec"_sd,
+    "\\Memory\\Pages Input/sec"_sd,
+    "\\Memory\\Pages Output/sec"_sd,
+    "\\Memory\\Pool Nonpaged Bytes"_sd,
+    "\\Memory\\Pool Paged Bytes"_sd,
+    "\\Memory\\Pool Paged Resident Bytes"_sd,
+    "\\Memory\\System Cache Resident Bytes"_sd,
+    "\\Memory\\System Code Total Bytes"_sd,
+
+};
+
+const std::vector<StringData> kDiskCounters = {
+    "\\PhysicalDisk(*)\\% Disk Read Time"_sd,
+    "\\PhysicalDisk(*)\\% Disk Write Time"_sd,
+    "\\PhysicalDisk(*)\\Avg. Disk Bytes/Read"_sd,
+    "\\PhysicalDisk(*)\\Avg. Disk Bytes/Write"_sd,
+    "\\PhysicalDisk(*)\\Avg. Disk Read Queue Length"_sd,
+    "\\PhysicalDisk(*)\\Avg. Disk Write Queue Length"_sd,
+    "\\PhysicalDisk(*)\\Avg. Disk sec/Read"_sd,
+    "\\PhysicalDisk(*)\\Avg. Disk sec/Write"_sd,
+    "\\PhysicalDisk(*)\\Disk Read Bytes/sec"_sd,
+    "\\PhysicalDisk(*)\\Disk Write Bytes/sec"_sd,
+    "\\PhysicalDisk(*)\\Disk Reads/sec"_sd,
+    "\\PhysicalDisk(*)\\Disk Writes/sec"_sd,
+    "\\PhysicalDisk(*)\\Current Disk Queue Length"_sd,
+};
+
+
+/**
+ *  Collect metrics from Windows Performance Counters.
+ */
+class WindowsSystemMetricsCollector final : public SystemMetricsCollector {
+public:
+    WindowsSystemMetricsCollector(std::unique_ptr<PerfCounterCollector> collector)
+        : _collector(std::move(collector)) {}
+
+    void collect(OperationContext* txn, BSONObjBuilder& builder) override {
+        processStatusErrors(_collector->collect(&builder), &builder);
+    }
+
+private:
+    std::unique_ptr<PerfCounterCollector> _collector;
+};
+
+
+StatusWith<std::unique_ptr<PerfCounterCollector>> createCollector() {
+    PerfCounterCollection collection;
+
+    Status s = collection.addCountersGroup("cpu", kCpuCounters);
+    if (!s.isOK()) {
+        return s;
+    }
+
+    // TODO: Should we capture the Heap Counters for the current process?
+    s = collection.addCountersGroup("memory", kMemoryCounters);
+    if (!s.isOK()) {
+        return s;
+    }
+
+    s = collection.addCountersGroupedByInstanceName("disks", kDiskCounters);
+    if (!s.isOK()) {
+        return s;
+    }
+
+    auto swCollector = PerfCounterCollector::create(std::move(collection));
+    if (!swCollector.getStatus().isOK()) {
+        return swCollector.getStatus();
+    }
+
+    return {std::move(swCollector.getValue())};
+}
+
+}  // namespace
+
+void installSystemMetricsCollector(FTDCController* controller) {
+
+    auto swCollector = createCollector();
+    if (!swCollector.getStatus().isOK()) {
+        warning() << "Failed to initialize Performance Counters for FTDC: "
+                  << swCollector.getStatus();
+        return;
+    }
+
+    controller->addPeriodicCollector(
+        stdx::make_unique<WindowsSystemMetricsCollector>(std::move(swCollector.getValue())));
+}
 
 }  // namespace mongo
