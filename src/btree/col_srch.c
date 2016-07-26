@@ -30,7 +30,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 	 * Check if the search key is smaller than the parent's starting key for
 	 * this page.
 	 */
-	if (recno < leaf->key.recno) {
+	if (recno < leaf->ref_recno) {
 		cbt->compare = 1;		/* page keys > search key */
 		return (0);
 	}
@@ -48,7 +48,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 	WT_INTL_INDEX_GET(session, leaf->home, pindex);
 	indx = leaf->pindex_hint;
 	if (indx + 1 < pindex->entries && pindex->index[indx] == leaf)
-		if (recno >= pindex->index[indx + 1]->key.recno) {
+		if (recno >= pindex->index[indx + 1]->ref_recno) {
 			cbt->compare = -1;	/* page keys < search key */
 			return (0);
 		}
@@ -133,14 +133,12 @@ restart:	/*
 		if (page->type != WT_PAGE_COL_INT)
 			break;
 
-		WT_ASSERT(session, current->key.recno == page->pg_intl_recno);
-
 		WT_INTL_INDEX_GET(session, page, pindex);
 		base = pindex->entries;
 		descent = pindex->index[base - 1];
 
 		/* Fast path appends. */
-		if (recno >= descent->key.recno) {
+		if (recno >= descent->ref_recno) {
 			/*
 			 * If on the last slot (the key is larger than any key
 			 * on the page), check for an internal page split race.
@@ -158,9 +156,9 @@ restart:	/*
 			indx = base + (limit >> 1);
 			descent = pindex->index[indx];
 
-			if (recno == descent->key.recno)
+			if (recno == descent->ref_recno)
 				break;
-			if (recno < descent->key.recno)
+			if (recno < descent->ref_recno)
 				continue;
 			base = indx + 1;
 			--limit;
@@ -172,7 +170,7 @@ descend:	/*
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != descent->key.recno) {
+		if (recno != descent->ref_recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's
@@ -237,13 +235,13 @@ leaf_only:
 	 * do in that case, the record may be appended to the page.
 	 */
 	if (page->type == WT_PAGE_COL_FIX) {
-		if (recno < page->pg_fix_recno) {
-			cbt->recno = page->pg_fix_recno;
+		if (recno < current->ref_recno) {
+			cbt->recno = current->ref_recno;
 			cbt->compare = 1;
 			return (0);
 		}
-		if (recno >= page->pg_fix_recno + page->pg_fix_entries) {
-			cbt->recno = page->pg_fix_recno + page->pg_fix_entries;
+		if (recno >= current->ref_recno + page->pg_fix_entries) {
+			cbt->recno = current->ref_recno + page->pg_fix_entries;
 			goto past_end;
 		} else {
 			cbt->recno = recno;
@@ -251,14 +249,14 @@ leaf_only:
 			ins_head = WT_COL_UPDATE_SINGLE(page);
 		}
 	} else {
-		if (recno < page->pg_var_recno) {
-			cbt->recno = page->pg_var_recno;
+		if (recno < current->ref_recno) {
+			cbt->recno = current->ref_recno;
 			cbt->slot = 0;
 			cbt->compare = 1;
 			return (0);
 		}
-		if ((cip = __col_var_search(page, recno, NULL)) == NULL) {
-			cbt->recno = __col_var_last_recno(page);
+		if ((cip = __col_var_search(current, recno, NULL)) == NULL) {
+			cbt->recno = __col_var_last_recno(current);
 			cbt->slot = page->pg_var_entries == 0 ?
 			    0 : page->pg_var_entries - 1;
 			goto past_end;

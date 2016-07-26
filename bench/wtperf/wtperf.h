@@ -30,33 +30,8 @@
 #define	HAVE_WTPERF_H
 
 #include <wt_internal.h>
-
-#ifndef _WIN32
-#include <sys/time.h>
-#endif
-#include <sys/types.h>
-#include <sys/stat.h>
-
 #include <assert.h>
-#include <ctype.h>
-#ifndef _WIN32
-#include <dirent.h>
-#endif
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <limits.h>
 #include <math.h>
-#ifndef _WIN32
-#include <pthread.h>
-#endif
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
 
 #ifdef _WIN32
 #include "windows_shim.h"
@@ -344,6 +319,9 @@ extract_key(char *key_buf, uint64_t *keynop)
  * die --
  *      Print message and exit on failure.
  */
+static inline void
+die(int, const char *)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static inline void
 die(int e, const char *str)
 {

@@ -117,13 +117,12 @@ class suite_subprocess:
             print 'ERROR: ' + filename + ' should not be empty (this command expected error output)'
         self.assertNotEqual(filesize, 0, filename + ': expected to not be empty')
 
-    def runWt(self, args, infilename=None, outfilename=None, errfilename=None, reopensession=True):
-        """
-        Run the 'wt' process
-        """
+    # Run the wt utility.
+    def runWt(self, args, infilename=None,
+        outfilename=None, errfilename=None, reopensession=True, failure=False):
 
-        # we close the connection to guarantee everything is
-        # flushed, and that we can open it from another process
+        # Close the connection to guarantee everything is flushed, and that
+        # we can open it from another process.
         self.close_conn()
 
         wtoutname = outfilename or "wt.out"
@@ -141,14 +140,26 @@ class suite_subprocess:
                         infilepart = "<" + infilename + " "
                     print str(procargs)
                     print "*********************************************"
-                    print "**** Run 'wt' via: run " + " ".join(procargs[3:]) + infilepart + ">" + wtoutname + " 2>" + wterrname
+                    print "**** Run 'wt' via: run " + \
+                        " ".join(procargs[3:]) + infilepart + \
+                        ">" + wtoutname + " 2>" + wterrname
                     print "*********************************************"
-                    subprocess.call(procargs)
+                    returncode = subprocess.call(procargs)
                 elif infilename:
                     with open(infilename, "r") as wtin:
-                        subprocess.call(procargs, stdin=wtin, stdout=wtout, stderr=wterr)
+                        returncode = subprocess.call(
+                            procargs, stdin=wtin, stdout=wtout, stderr=wterr)
                 else:
-                    subprocess.call(procargs, stdout=wtout, stderr=wterr)
+                    returncode = subprocess.call(
+                        procargs, stdout=wtout, stderr=wterr)
+        if failure:
+            self.assertNotEqual(returncode, 0,
+                'expected failure: "' + \
+                str(procargs) + '": exited ' + str(returncode))
+        else:
+            self.assertEqual(returncode, 0,
+                'expected success: "' + \
+                str(procargs) + '": exited ' + str(returncode))
         if errfilename == None:
             self.check_empty_file(wterrname)
         if outfilename == None:

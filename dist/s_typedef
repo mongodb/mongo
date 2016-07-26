@@ -44,7 +44,7 @@ build() {
 check() {
 	# Complain about unused #typedefs.
 	# List of files to search.
-	l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
+	l=`sed -e '/^[a-z]/!d' -e 's/[	 ].*$//' -e 's,^,../,' filelist`
 	l="$l `echo ../src/utilities/*.c`"
 
 	(

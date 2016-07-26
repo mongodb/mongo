@@ -51,7 +51,7 @@ elif os.path.isfile(os.path.join(wt_disttop, 'wt.exe')):
     wt_builddir = wt_disttop
 else:
     print 'Unable to find useable WiredTiger build'
-    sys.exit(False)
+    sys.exit(1)
 
 # Cannot import wiredtiger and supporting utils until we set up paths
 # We want our local tree in front of any installed versions of WiredTiger.
@@ -241,7 +241,7 @@ if __name__ == '__main__':
             if option == '-dir' or option == 'D':
                 if dirarg != None or len(args) == 0:
                     usage()
-                    sys.exit(False)
+                    sys.exit(2)
                 dirarg = args.pop(0)
                 continue
             if option == '-debug' or option == 'd':
@@ -252,14 +252,14 @@ if __name__ == '__main__':
                 continue
             if option == '-help' or option == 'h':
                 usage()
-                sys.exit(True)
+                sys.exit(0)
             if option == '-long' or option == 'l':
                 longtest = True
                 continue
             if option == '-parallel' or option == 'j':
                 if parallel != 0 or len(args) == 0:
                     usage()
-                    sys.exit(False)
+                    sys.exit(2)
                 parallel = int(args.pop(0))
                 continue
             if option == '-preserve' or option == 'p':
@@ -271,7 +271,7 @@ if __name__ == '__main__':
             if option == '-verbose' or option == 'v':
                 if len(args) == 0:
                     usage()
-                    sys.exit(False)
+                    sys.exit(2)
                 verbose = int(args.pop(0))
                 if verbose > 3:
                         verbose = 3
@@ -281,19 +281,19 @@ if __name__ == '__main__':
             if option == '-config' or option == 'c':
                 if configfile != None or len(args) == 0:
                     usage()
-                    sys.exit(False)
+                    sys.exit(2)
                 configfile = args.pop(0)
                 continue
             if option == '-configcreate' or option == 'C':
                 if configfile != None or len(args) == 0:
                     usage()
-                    sys.exit(False)
+                    sys.exit(2)
                 configfile = args.pop(0)
                 configwrite = True
                 continue
             print 'unknown arg: ' + arg
             usage()
-            sys.exit(False)
+            sys.exit(2)
         testargs.append(arg)
 
     # All global variables should be set before any test classes are loaded.
@@ -318,4 +318,4 @@ if __name__ == '__main__':
         pdb.set_trace()
 
     result = wttest.runsuite(tests, parallel)
-    sys.exit(not result.wasSuccessful())
+    sys.exit(0 if result.wasSuccessful() else 1)

@@ -63,6 +63,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	*root_addr_sizep = 0;
 
+#ifdef HAVE_VERBOSE
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 		if (addr != NULL) {
 			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
@@ -72,6 +73,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    "%s: load-checkpoint: %s", block->name,
 		    addr == NULL ? "[Empty]" : (const char *)tmp->data));
 	}
+#endif
 
 	/*
 	 * There's a single checkpoint in the file that can be written, all of
@@ -140,12 +142,10 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * will unnecessarily allocate buffer space.
 	 */
 	if (!checkpoint && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
-		/*
-		 * The truncate might fail if there's a file mapping (if there's
-		 * an open checkpoint on the file), that's OK.
-		 */
 		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
+
+		/* The truncate might fail, and that's OK. */
 		WT_ERR_BUSY_OK(
 		    __wt_block_truncate(session, block, ci->file_size));
 	}
@@ -190,10 +190,7 @@ __wt_block_checkpoint_unload(
 	 * checkpoints.
 	 */
 	if (!checkpoint) {
-		/*
-		 * The truncate might fail if there's a file mapping (if there's
-		 * an open checkpoint on the file), that's OK.
-		 */
+		/* The truncate might fail, and that's OK. */
 		WT_TRET_BUSY_OK(
 		    __wt_block_truncate(session, block, block->size));
 
@@ -512,6 +509,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 		    !F_ISSET(ckpt, WT_CKPT_DELETE))
 			continue;
 
+#ifdef HAVE_VERBOSE
 		if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
@@ -521,7 +519,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 			    "%s: delete-checkpoint: %s: %s",
 			    block->name, ckpt->name, (const char *)tmp->data));
 		}
-
+#endif
 		/*
 		 * Find the checkpoint into which we'll roll this checkpoint's
 		 * blocks: it's the next real checkpoint in the list, and it

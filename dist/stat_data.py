@@ -81,6 +81,10 @@ class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionStat.prefix, desc, flags)
+class ThreadState(Stat):
+    prefix = 'thread-state'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, ThreadState.prefix, desc, flags)
 class TxnStat(Stat):
     prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
@@ -97,10 +101,20 @@ class YieldStat(Stat):
 ##########################################
 groups = {}
 groups['cursor'] = [CursorStat.prefix, SessionStat.prefix]
-groups['evict'] = [CacheStat.prefix, ConnStat.prefix, BlockStat.prefix]
+groups['evict'] = [
+    BlockStat.prefix,
+    CacheStat.prefix,
+    ConnStat.prefix,
+    ThreadState.prefix
+]
 groups['lsm'] = [LSMStat.prefix, TxnStat.prefix]
 groups['memory'] = [CacheStat.prefix, ConnStat.prefix, RecStat.prefix]
-groups['system'] = [ConnStat.prefix, DhandleStat.prefix, SessionStat.prefix]
+groups['system'] = [
+    ConnStat.prefix,
+    DhandleStat.prefix,
+    SessionStat.prefix,
+    ThreadState.prefix
+]
 
 ##########################################
 # CONNECTION statistics
@@ -113,6 +127,7 @@ connection_stats = [
     ConnStat('cond_auto_wait_reset', 'auto adjusting condition resets'),
     ConnStat('cond_wait', 'pthread mutex condition wait calls'),
     ConnStat('file_open', 'files currently open', 'no_clear,no_scale'),
+    ConnStat('fsync_io', 'total fsync I/Os'),
     ConnStat('memory_allocation', 'memory allocations'),
     ConnStat('memory_free', 'memory frees'),
     ConnStat('memory_grow', 'memory re-allocations'),
@@ -171,6 +186,9 @@ connection_stats = [
     CacheStat('cache_eviction_force', 'pages evicted because they exceeded the in-memory maximum'),
     CacheStat('cache_eviction_force_delete', 'pages evicted because they had chains of deleted items'),
     CacheStat('cache_eviction_force_fail', 'failed eviction of pages that exceeded the in-memory maximum'),
+    CacheStat('cache_eviction_get_ref', 'eviction calls to get a page'),
+    CacheStat('cache_eviction_get_ref_empty', 'eviction calls to get a page found queue empty'),
+    CacheStat('cache_eviction_get_ref_empty2', 'eviction calls to get a page found queue empty after locking'),
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
     CacheStat('cache_eviction_maximum_page_size', 'maximum page size at eviction', 'no_clear,no_scale,size'),
@@ -181,6 +199,8 @@ connection_stats = [
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
     CacheStat('cache_eviction_server_not_evicting', 'eviction server populating queue, but not evicting pages'),
+    CacheStat('cache_eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
+    CacheStat('cache_eviction_server_toobig', 'eviction server skipped very large page'),
     CacheStat('cache_eviction_slow', 'eviction server unable to reach eviction goal'),
     CacheStat('cache_eviction_split_internal', 'internal pages split during eviction'),
     CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
@@ -188,6 +208,9 @@ connection_stats = [
     CacheStat('cache_eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_walks_started', 'files with new eviction walks started'),
     CacheStat('cache_eviction_worker_evicting', 'eviction worker thread evicting pages'),
+    CacheStat('cache_hazard_checks', 'hazard pointer check calls'),
+    CacheStat('cache_hazard_max', 'hazard pointer maximum array length', 'max_aggregate,no_scale'),
+    CacheStat('cache_hazard_walks', 'hazard pointer check entries walked'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_lookaside_insert', 'lookaside table insert calls'),
@@ -195,6 +218,7 @@ connection_stats = [
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty', 'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
+    CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_lookaside', 'pages read into cache requiring lookaside entries'),
     CacheStat('cache_write', 'pages written from cache'),
@@ -247,6 +271,8 @@ connection_stats = [
     LogStat('log_slot_unbuffered', 'consolidated slot unbuffered writes'),
     LogStat('log_sync', 'log sync operations'),
     LogStat('log_sync_dir', 'log sync_dir operations'),
+    LogStat('log_sync_dir_duration', 'log sync_dir time duration (usecs)'),
+    LogStat('log_sync_duration', 'log sync time duration (usecs)'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
     LogStat('log_write_lsn_skip', 'log server thread write LSN walk skipped'),
     LogStat('log_writes', 'log write operations'),
@@ -267,6 +293,10 @@ connection_stats = [
     ##########################################
     TxnStat('txn_begin', 'transaction begins'),
     TxnStat('txn_checkpoint', 'transaction checkpoints'),
+    TxnStat('txn_checkpoint_fsync_post', 'transaction fsync calls for checkpoint after allocating the transaction ID'),
+    TxnStat('txn_checkpoint_fsync_post_duration', 'transaction fsync duration for checkpoint after allocating the transaction ID (usecs)'),
+    TxnStat('txn_checkpoint_fsync_pre', 'transaction fsync calls for checkpoint before allocating the transaction ID'),
+    TxnStat('txn_checkpoint_fsync_pre_duration', 'transaction fsync duration for checkpoint before allocating the transaction ID (usecs)'),
     TxnStat('txn_checkpoint_generation', 'transaction checkpoint generation', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_running', 'transaction checkpoint currently running', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_max', 'transaction checkpoint max time (msecs)', 'no_clear,no_scale'),
@@ -317,6 +347,13 @@ connection_stats = [
     CursorStat('cursor_search_near', 'cursor search near calls'),
     CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'cursor update calls'),
+
+    ##########################################
+    # Thread State statistics
+    ##########################################
+    ThreadState('fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
+    ThreadState('read_active', 'active filesystem read calls','no_clear,no_scale'),
+    ThreadState('write_active', 'active filesystem write calls','no_clear,no_scale'),
 
     ##########################################
     # Yield statistics
@@ -414,7 +451,6 @@ dsrc_stats = [
     ##########################################
     # Cache and eviction statistics
     ##########################################
-    CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
     CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
     CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
@@ -429,6 +465,7 @@ dsrc_stats = [
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_overflow_value', 'overflow values cached in memory', 'no_scale'),
+    CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_lookaside', 'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),
@@ -477,9 +514,11 @@ dsrc_stats = sorted(dsrc_stats, key=attrgetter('desc'))
 # Cursor Join statistics
 ##########################################
 join_stats = [
-    JoinStat('accesses', 'accesses'),
-    JoinStat('actual_count', 'actual count of items'),
     JoinStat('bloom_false_positive', 'bloom filter false positives'),
+    JoinStat('bloom_insert', 'items inserted into a bloom filter'),
+    JoinStat('iterated', 'items iterated'),
+    JoinStat('main_access', 'accesses to the main table'),
+    JoinStat('membership_check', 'checks that conditions of membership are satisfied'),
 ]
 
 join_stats = sorted(join_stats, key=attrgetter('desc'))

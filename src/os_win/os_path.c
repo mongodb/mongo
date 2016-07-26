@@ -19,7 +19,7 @@ __wt_absolute_path(const char *path)
 	 * Check for a drive name (for example, "D:"), allow both forward and
 	 * backward slashes.
 	 */
-	if (strlen(path) >= 3 && isalpha(path[0]) && path[1] == ':')
+	if (strlen(path) >= 3 && __wt_isalpha(path[0]) && path[1] == ':')
 		path += 2;
 	return (path[0] == '/' || path[0] == '\\');
 }

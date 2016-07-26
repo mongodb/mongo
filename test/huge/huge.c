@@ -26,15 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-#include "test_util.i"
+#include "test_util.h"
 
 static char home[512];				/* Program working dir */
 static const char *progname;			/* Program name */
@@ -73,13 +65,13 @@ static size_t lengths[] = {
     0
 };
 
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-s]\n", progname);
-	fprintf(stderr, "%s",
-	    "\t-s small run, only test up to 1GB\n");
-
+	fprintf(stderr, "%s", "\t-s small run, only test up to 1GB\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -205,8 +197,7 @@ main(int argc, char *argv[])
 
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
-	if ((big = malloc(len)) == NULL)
-		testutil_die(errno, "");
+	big = dmalloc(len);
 	memset(big, 'a', len);
 
 	/* Make sure the configurations all work. */

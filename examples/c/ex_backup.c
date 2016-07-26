@@ -273,12 +273,12 @@ main(void)
 	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir %s", home, home);
 	if ((ret = system(cmd_buf)) != 0) {
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	if ((ret = wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 
 	ret = setup_directories();
@@ -320,7 +320,9 @@ main(void)
 	 * comparison between the incremental and original.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
+
 	printf("Final comparison: dumping and comparing data\n");
 	ret = compare_backups(0);
-	return (ret);
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

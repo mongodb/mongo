@@ -25,37 +25,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "wt_internal.h"			/* For __wt_XXX */
-
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
-#ifdef _WIN32
-	#define DIR_DELIM '\\'
-	#define RM_COMMAND "rd /s /q "
-#else
-	#define	DIR_DELIM '/'
-	#define RM_COMMAND "rm -rf "
-#endif
-
-#define	DEFAULT_DIR "WT_TEST"
-#define	MKDIR_COMMAND "mkdir "
-
-/* Allow tests to add their own death handling. */
-extern void (*custom_die)(void);
-
-static void	 testutil_die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;
+#include "test_util.h"
 
 /*
  * die --
  *	Report an error and quit.
  */
-static void
+void
 testutil_die(int e, const char *fmt, ...)
 {
 	va_list ap;
@@ -64,9 +40,11 @@ testutil_die(int e, const char *fmt, ...)
 	if (custom_die != NULL)
 		(*custom_die)();
 
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
+	if (fmt != NULL) {
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+	}
 	if (e != 0)
 		fprintf(stderr, ": %s", wiredtiger_strerror(e));
 	fprintf(stderr, "\n");
@@ -75,32 +53,11 @@ testutil_die(int e, const char *fmt, ...)
 }
 
 /*
- * testutil_check --
- *	Complain and quit if a function call fails.
- */
-#define	testutil_check(call) do {					\
-	int __r;							\
-	if ((__r = (call)) != 0)					\
-		testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call);\
-} while (0)
-
-/*
- * testutil_checkfmt --
- *	Complain and quit if a function call fails, with additional arguments.
- */
-#define	testutil_checkfmt(call, fmt, ...) do {				\
-	int __r;							\
-	if ((__r = (call)) != 0)					\
-		testutil_die(__r, "%s/%d: %s: " fmt,			\
-		    __func__, __LINE__, #call, __VA_ARGS__);		\
-} while (0)
-
-/*
  * testutil_work_dir_from_path --
  *	Takes a buffer, its size and the intended work directory.
  *	Creates the full intended work directory in buffer.
  */
-static inline void
+void
 testutil_work_dir_from_path(char *buffer, size_t len, const char *dir)
 {
 	/* If no directory is provided, use the default. */
@@ -118,7 +75,7 @@ testutil_work_dir_from_path(char *buffer, size_t len, const char *dir)
  * testutil_clean_work_dir --
  *	Remove the work directory.
  */
-static inline void
+void
 testutil_clean_work_dir(char *dir)
 {
 	size_t len;
@@ -141,7 +98,7 @@ testutil_clean_work_dir(char *dir)
  * testutil_make_work_dir --
  *	Delete the existing work directory, then create a new one.
  */
-static inline void
+void
 testutil_make_work_dir(char *dir)
 {
 	size_t len;
@@ -160,4 +117,78 @@ testutil_make_work_dir(char *dir)
 	if ((ret = system(buf)) != 0)
 		testutil_die(ret, "%s", buf);
 	free(buf);
+}
+
+/*
+ * testutil_cleanup --
+ *	Delete the existing work directory and free the options structure.
+ */
+void
+testutil_cleanup(TEST_OPTS *opts)
+{
+	if (opts->conn != NULL)
+		testutil_check(opts->conn->close(opts->conn, NULL));
+
+	if (!opts->preserve)
+		testutil_clean_work_dir(opts->home);
+
+	free(opts->conn_config);
+	free(opts->table_config);
+	free(opts->uri);
+	free(opts->home);
+}
+
+/*
+ * dcalloc --
+ *	Call calloc, dying on failure.
+ */
+void *
+dcalloc(size_t number, size_t size)
+{
+	void *p;
+
+	if ((p = calloc(number, size)) != NULL)
+		return (p);
+	testutil_die(errno, "calloc: %" WT_SIZET_FMT "B", number * size);
+}
+
+/*
+ * dmalloc --
+ *	Call malloc, dying on failure.
+ */
+void *
+dmalloc(size_t len)
+{
+	void *p;
+
+	if ((p = malloc(len)) != NULL)
+		return (p);
+	testutil_die(errno, "malloc: %" WT_SIZET_FMT "B", len);
+}
+
+/*
+ * drealloc --
+ *	Call realloc, dying on failure.
+ */
+void *
+drealloc(void *p, size_t len)
+{
+	void *t;
+	if ((t = realloc(p, len)) != NULL)
+		return (t);
+	testutil_die(errno, "realloc: %" WT_SIZET_FMT "B", len);
+}
+
+/*
+ * dstrdup --
+ *	Call strdup, dying on failure.
+ */
+void *
+dstrdup(const void *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) != NULL)
+		return (p);
+	testutil_die(errno, "strdup");
 }

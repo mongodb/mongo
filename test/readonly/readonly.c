@@ -26,19 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "test_util.h"
+
 #include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-#include <wiredtiger.h>
-
-#include "test_util.i"
 
 #define	HOME_SIZE	512
 static char home[HOME_SIZE];		/* Program working dir lock file */
@@ -67,6 +57,8 @@ static const char * const uri = "table:main";
 #define	OP_READ		0
 #define	OP_WRITE	1
 
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
@@ -128,6 +120,9 @@ run_child(const char *homedir, int op, int expect)
 /*
  * Child process opens both databases readonly.
  */
+static void
+open_dbs(int, const char *, const char *,
+    const char *, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 open_dbs(int op, const char *dir,
     const char *dir_wr, const char *dir_rd, const char *dir_rd2)

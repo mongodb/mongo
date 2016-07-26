@@ -164,12 +164,12 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * column-store pages don't have slots, but map one-to-one to
 		 * keys, check for retrieval past the end of the page.
 		 */
-		if (cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
+		if (cbt->recno >= cbt->ref->ref_recno + page->pg_fix_entries)
 			return (false);
 
 		/*
-		 * Updates aren't stored on the page, an update would have
-		 * appeared as an "insert" object; no further checks to do.
+		 * An update would have appeared as an "insert" object; no
+		 * further checks to do.
 		 */
 		break;
 	case BTREE_COL_VAR:
@@ -179,19 +179,18 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		WT_ASSERT(session, cbt->slot < page->pg_var_entries);
 
 		/*
-		 * Column-store updates aren't stored on the page, instead they
-		 * are stored as "insert" objects. If search returned an insert
-		 * object we can't return, the returned on-page object must be
-		 * checked for a match.
+		 * Column-store updates are stored as "insert" objects. If
+		 * search returned an insert object we can't return, the
+		 * returned on-page object must be checked for a match.
 		 */
 		if (cbt->ins != NULL && !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH))
 			return (false);
 
 		/*
-		 * Updates aren't stored on the page, an update would have
-		 * appeared as an "insert" object; however, variable-length
-		 * column store deletes are written into the backing store,
-		 * check the cell for a record already deleted when read.
+		 * Although updates would have appeared as an "insert" objects,
+		 * variable-length column store deletes are written into the
+		 * backing store; check the cell for a record already deleted
+		 * when read.
 		 */
 		cip = &page->pg_var_d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
@@ -211,9 +210,11 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		if (cbt->ins != NULL)
 			return (false);
 
-		/* Updates are stored on the page, check for a delete. */
-		if (page->pg_row_upd != NULL && (upd = __wt_txn_read(
-		    session, page->pg_row_upd[cbt->slot])) != NULL) {
+		/* Check for an update. */
+		if (page->modify != NULL &&
+		    page->modify->mod_row_update != NULL &&
+		    (upd = __wt_txn_read(session,
+		    page->modify->mod_row_update[cbt->slot])) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				return (false);
 			if (updp != NULL)
@@ -558,7 +559,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 
 		ret = __cursor_row_modify(session, cbt, false);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -596,9 +596,12 @@ __curfile_update_check(WT_CURSOR_BTREE *cbt)
 		return (0);
 	if (cbt->ins != NULL)
 		return (__wt_txn_update_check(session, cbt->ins->upd));
-	if (btree->type == BTREE_ROW && cbt->ref->page->pg_row_upd != NULL)
-		return (__wt_txn_update_check(
-		    session, cbt->ref->page->pg_row_upd[cbt->slot]));
+
+	if (btree->type == BTREE_ROW &&
+	    cbt->ref->page->modify != NULL &&
+	    cbt->ref->page->modify->mod_row_update != NULL)
+		return (__wt_txn_update_check(session,
+		    cbt->ref->page->modify->mod_row_update[cbt->slot]));
 	return (0);
 }
 
@@ -636,7 +639,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		break;
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-	WT_ILLEGAL_VALUE_ERR(session);
+		WT_ERR(__wt_illegal_value(session, NULL));
+		break;
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -714,7 +718,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 
 		ret = __cursor_row_modify(session, cbt, true);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -805,7 +808,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		}
 		ret = __cursor_row_modify(session, cbt, false);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -972,7 +974,6 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 		WT_RET(__wt_compare(
 		    session, a_arg->btree->collator, &a->key, &b->key, cmpp));
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 	return (0);
 }
@@ -1023,6 +1024,7 @@ __wt_btcur_equals(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
 
 	a = (WT_CURSOR *)a_arg;
 	b = (WT_CURSOR *)b_arg;
+	cmp = 0;
 	session = (WT_SESSION_IMPL *)a->session;
 
 	/* Confirm both cursors reference the same object. */
@@ -1110,7 +1112,7 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
     int (*rmfunc)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, bool))
 {
 	WT_DECL_RET;
-	uint8_t *value;
+	const uint8_t *value;
 
 	/*
 	 * Handle fixed-length column-store objects separately: for row-store
@@ -1139,7 +1141,7 @@ retry:	WT_RET(__wt_btcur_remove(start));
 		if ((ret = __wt_btcur_next(start, true)) != 0)
 			break;
 		start->compare = 0;	/* Exact match */
-		value = (uint8_t *)start->iface.value.data;
+		value = (const uint8_t *)start->iface.value.data;
 		if (*value != 0 &&
 		    (ret = rmfunc(session, start, 1)) != 0)
 			break;

@@ -133,10 +133,10 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
  *	Check for a Huffman configuration file and return the file name.
  */
 static int
-__huffman_confchk_file(
-    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v, bool *is_utf8p, WT_FH **fhp)
+__huffman_confchk_file(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *v, bool *is_utf8p, WT_FSTREAM **fsp)
 {
-	WT_FH *fh;
+	WT_FSTREAM *fs;
 	WT_DECL_RET;
 	size_t len;
 	char *fname;
@@ -157,14 +157,13 @@ __huffman_confchk_file(
 
 	/* Check the file exists. */
 	WT_RET(__wt_strndup(session, v->str + len, v->len - len, &fname));
-	WT_ERR(__wt_open(session, fname, WT_FILE_TYPE_REGULAR,
-	    WT_OPEN_FIXED | WT_OPEN_READONLY | WT_STREAM_READ, &fh));
+	WT_ERR(__wt_fopen(session, fname, WT_OPEN_FIXED, WT_STREAM_READ, &fs));
 
 	/* Optionally return the file handle. */
-	if (fhp == NULL)
-		(void)__wt_close(session, &fh);
+	if (fsp == NULL)
+		(void)__wt_fclose(session, &fs);
 	else
-		*fhp = fh;
+		*fsp = fs;
 
 err:	__wt_free(session, fname);
 
@@ -300,7 +299,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	struct __wt_huffman_table *table, *tp;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_FH *fh;
+	WT_FSTREAM *fs;
 	int64_t symbol, frequency;
 	u_int entries, lineno;
 	int n;
@@ -309,13 +308,13 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	*tablep = NULL;
 	*entriesp = *numbytesp = 0;
 
-	fh = NULL;
+	fs = NULL;
 	table = NULL;
 
 	/*
 	 * Try and open the backing file.
 	 */
-	WT_RET(__huffman_confchk_file(session, ip, &is_utf8, &fh));
+	WT_RET(__huffman_confchk_file(session, ip, &is_utf8, &fs));
 
 	/*
 	 * UTF-8 table is 256 bytes, with a range of 0-255.
@@ -333,7 +332,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	for (tp = table, lineno = 1;; ++tp, ++lineno) {
-		WT_ERR(__wt_getline(session, tmp, fh));
+		WT_ERR(__wt_getline(session, fs, tmp));
 		if (tmp->size == 0)
 			break;
 		n = sscanf(
@@ -378,7 +377,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (0) {
 err:		__wt_free(session, table);
 	}
-	(void)__wt_close(session, &fh);
+	(void)__wt_fclose(session, &fs);
 
 	__wt_scr_free(session, &tmp);
 	return (ret);

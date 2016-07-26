@@ -37,9 +37,13 @@ from helper import complex_value_populate, key_populate, value_populate
 #    Statistics cursor using size only
 class test_stat_cursor_config(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_size'
+    conn_config = 'statistics=(fast)'
+
     uri = [
         ('file',  dict(uri='file:' + pfx, pop=simple_populate, cfg='')),
         ('table', dict(uri='table:' + pfx, pop=simple_populate, cfg='')),
+        ('inmem', dict(uri='table:' + pfx, pop=simple_populate, cfg='',
+            conn_config='in_memory,statistics=(fast)')),
         ('table-lsm', dict(uri='table:' + pfx, pop=simple_populate,
             cfg=',type=lsm,lsm=(chunk_size=1MB,merge_min=2)')),
         ('complex', dict(uri='table:' + pfx, pop=complex_populate, cfg='')),
@@ -49,7 +53,6 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(uri)
-    conn_config = 'statistics=(fast)'
 
     def openAndWalkStatCursor(self):
         c = self.session.open_cursor(

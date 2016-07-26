@@ -46,10 +46,12 @@ union __wt_lsn {
  */
 #define	WT_IS_INIT_LSN(l)	((l)->file_offset == ((uint64_t)1 << 32))
 /*
- * XXX Original tested INT32_MAX.
+ * Original tested INT32_MAX.  But if we read one from an older
+ * release we may see UINT32_MAX.
  */
 #define	WT_IS_MAX_LSN(lsn)						\
-	((lsn)->l.file == UINT32_MAX && (lsn)->l.offset == INT32_MAX)
+	((lsn)->l.file == UINT32_MAX &&					\
+	 ((lsn)->l.offset == INT32_MAX || (lsn)->l.offset == UINT32_MAX))
 
 /*
  * Both of the macros below need to change if the content of __wt_lsn
@@ -254,7 +256,6 @@ struct __wt_log {
 #ifdef HAVE_DIAGNOSTIC
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
-
 #define	WT_LOG_OPENED	0x01		/* Log subsystem successfully open */
 	uint32_t	flags;
 };

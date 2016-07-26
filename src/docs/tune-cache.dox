@@ -11,9 +11,9 @@ The cache size for the database is normally configured by setting the
 function.  The cache size can be adjusted after the open call with
 WT_CONNECTION::reconfigure.
 
-An example of setting a cache size to 500MB:
+An example of setting a cache size to 5GB:
 
-@snippet ex_config.c configure cache size
+@snippet ex_all.c Open a connection
 
 The effectiveness of the chosen cache size can be measured by reviewing
 the page eviction statistics for the database.

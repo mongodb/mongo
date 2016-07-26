@@ -26,22 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "test_util.h"
+
 #include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#else
+
+#ifdef _WIN32
 /* snprintf is not supported on <= VS2013 */
 #define	snprintf _snprintf
 #endif
-
-#include <wiredtiger.h>
-
-#include "test_util.i"
 
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
@@ -58,6 +50,8 @@ static const char * const uri = "table:main";
 #define	K_SIZE	16
 #define	V_SIZE	256
 
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
@@ -69,6 +63,7 @@ usage(void)
  * Child process creates the database and table, and then writes data into
  * the table until it is killed by the parent.
  */
+static void fill_db(void)WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 fill_db(void)
 {

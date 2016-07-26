@@ -7,6 +7,7 @@
  */
 
 #include "util.h"
+#include "util_dump.h"
 #include "util_load.h"
 
 /*
@@ -186,9 +187,8 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 	}
 	*resultp = result;
 	resultcpy = result;
-	if ((ret = __wt_json_strncpy(&resultcpy, (size_t)resultlen, src,
-	    srclen))
-	    != 0) {
+	if ((ret = __wt_json_strncpy(
+	    session, &resultcpy, (size_t)resultlen, src, srclen)) != 0) {
 		ret = util_err(session, ret, NULL);
 		goto err;
 	}
@@ -248,7 +248,7 @@ json_data(WT_SESSION *session,
 	keyformat = cursor->key_format;
 	isrec = strcmp(keyformat, "r") == 0;
 	for (nkeys = 0; *keyformat; keyformat++)
-		if (!isdigit(*keyformat))
+		if (!__wt_isdigit((u_char)*keyformat))
 			nkeys++;
 
 	recno = 0;
@@ -344,13 +344,16 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 {
 	CONFIG_LIST cl;
 	WT_DECL_RET;
-	int toktype;
 	static const char *json_markers[] = {
 	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
 	char *config, *tableuri;
+	int curversion, toktype;
+	bool hasversion;
 
 	memset(&cl, 0, sizeof(cl));
 	tableuri = NULL;
+	hasversion = false;
+
 	JSON_EXPECT(session, ins, '{');
 	while (json_peek(session, ins) == 's') {
 		JSON_EXPECT(session, ins, 's');
@@ -358,6 +361,24 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 		snprintf(tableuri, ins->toklen, "%.*s",
 		    (int)(ins->toklen - 2), ins->tokstart + 1);
 		JSON_EXPECT(session, ins, ':');
+		if (!hasversion) {
+			if (strcmp(tableuri, DUMP_JSON_VERSION_MARKER) != 0) {
+				ret = util_err(session, ENOTSUP,
+				    "missing \"%s\"", DUMP_JSON_VERSION_MARKER);
+				goto err;
+			}
+			hasversion = true;
+			JSON_EXPECT(session, ins, 's');
+			if ((curversion = atoi(ins->tokstart + 1)) <= 0 ||
+			    curversion > DUMP_JSON_SUPPORTED_VERSION) {
+				ret = util_err(session, ENOTSUP,
+				    "unsupported JSON dump version \"%.*s\"",
+				    (int)(ins->toklen - 1), ins->tokstart + 1);
+				goto err;
+			}
+			JSON_EXPECT(session, ins, ',');
+			continue;
+		}
 
 		/*
 		 * Allow any ordering of 'config', 'colgroups',
@@ -406,6 +427,9 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 				    flags)) != 0)
 					goto err;
 				config_list_free(&cl);
+				free(ins->kvraw);
+				ins->kvraw = NULL;
+				config_list_free(&cl);
 				break;
 			}
 			else
@@ -447,7 +471,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 
 	if (!ins->peeking) {
 		while (!ins->ateof) {
-			while (isspace(*ins->p))
+			while (__wt_isspace((u_char)*ins->p))
 				ins->p++;
 			if (*ins->p)
 				break;
@@ -523,15 +547,14 @@ json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 	const char *hit;
 	const char **match;
 
-	if (ins->kvraw != NULL)
-		return (1);
-
+	WT_ASSERT((WT_SESSION_IMPL *)session, ins->kvraw == NULL);
 	hit = NULL;
 	while (!ins->ateof) {
 		for (match = matches; *match != NULL; match++)
 			if ((hit = strstr(ins->p, *match)) != NULL)
 				goto out;
-		if (util_read_line(session, &ins->line, true, &ins->ateof)) {
+		if (util_read_line(session, &ins->line, true, &ins->ateof)
+		    != 0) {
 			ins->toktype = -1;
 			return (1);
 		}

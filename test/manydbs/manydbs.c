@@ -26,22 +26,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/wait.h>
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-#include <wiredtiger.h>
-
-#include "test_util.i"
+#include "test_util.h"
 
 #define	HOME_SIZE	512
-#define	HOME_BASE	"WT_HOME"
+#define	HOME_BASE	"WT_TEST"
 static char home[HOME_SIZE];		/* Base home directory */
 static char hometmp[HOME_SIZE];		/* Each conn home directory */
 static const char *progname;		/* Program name */
@@ -67,6 +55,8 @@ static const char * const uri = "table:main";
 #define	MAX_KV		100
 #define	MAX_VAL		128
 
+static void usage(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 usage(void)
 {
@@ -80,10 +70,10 @@ extern char *__wt_optarg;
 
 void (*custom_die)(void) = NULL;
 
-WT_CONNECTION **connections = NULL;
-WT_CURSOR **cursors = NULL;
-WT_RAND_STATE rnd;
-WT_SESSION **sessions = NULL;
+static WT_CONNECTION **connections = NULL;
+static WT_CURSOR **cursors = NULL;
+static WT_RAND_STATE rnd;
+static WT_SESSION **sessions = NULL;
 
 static int
 get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
@@ -172,17 +162,10 @@ main(int argc, char *argv[])
 	 * Allocate arrays for connection handles, sessions, statistics
 	 * cursors and, if needed, data cursors.
 	 */
-	if ((connections = calloc(
-	    (size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
-		testutil_die(ENOMEM, "connection array malloc");
-	if ((sessions = calloc(
-	    (size_t)dbs, sizeof(WT_SESSION *))) == NULL)
-		testutil_die(ENOMEM, "session array malloc");
-	if ((cond_reset_orig = calloc((size_t)dbs, sizeof(uint64_t))) == NULL)
-		testutil_die(ENOMEM, "orig stat malloc");
-	if (!idle && ((cursors = calloc(
-	    (size_t)dbs, sizeof(WT_CURSOR *))) == NULL))
-		testutil_die(ENOMEM, "cursor array malloc");
+	connections = dcalloc((size_t)dbs, sizeof(WT_CONNECTION *));
+	sessions = dcalloc((size_t)dbs, sizeof(WT_SESSION *));
+	cond_reset_orig = dcalloc((size_t)dbs, sizeof(uint64_t));
+	cursors = idle ? NULL : dcalloc((size_t)dbs, sizeof(WT_CURSOR *));
 	memset(cmd, 0, sizeof(cmd));
 	/*
 	 * Set up all the directory names.
@@ -257,8 +240,7 @@ main(int argc, char *argv[])
 	free(connections);
 	free(sessions);
 	free(cond_reset_orig);
-	if (!idle)
-		free(cursors);
+	free(cursors);
 
 	return (EXIT_SUCCESS);
 }
