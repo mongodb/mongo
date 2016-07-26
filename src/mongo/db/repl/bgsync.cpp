@@ -50,6 +50,7 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_resolver.h"
+#include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
@@ -578,6 +579,25 @@ void BackgroundSync::_rollback(OperationContext* txn,
             if (inShutdown()) {
                 return;
             }
+        }
+
+        // At this point we are about to leave rollback.  Before we do, wait for any writes done
+        // as part of rollback to be durable, and then do any necessary checks that we didn't
+        // wind up rolling back something illegal.  We must wait for the rollback to be durable
+        // so that if we wind up shutting down uncleanly in response to something we rolled back
+        // we know that we won't wind up right back in the same situation when we start back up
+        // because the rollback wasn't durable.
+        txn->recoveryUnit()->waitUntilDurable();
+
+        // If we detected that we rolled back the shardIdentity document as part of this rollback
+        // then we must shut down to clear the in-memory ShardingState associated with the
+        // shardIdentity document.
+        if (ShardIdentityRollbackNotifier::get(txn)->didRollbackHappen()) {
+            severe()
+                << "shardIdentity document rollback detected.  Shutting down to clear "
+                   "in-memory sharding state.  Restarting this process should safely return it "
+                   "to a healthy state";
+            fassertFailedNoTrace(40276);
         }
 
         // It is now safe to clear the ROLLBACK state, which may result in the applier thread

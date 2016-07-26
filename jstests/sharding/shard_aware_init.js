@@ -69,6 +69,9 @@
         assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
         assert.eq(shardIdentityDoc.shardName, res.shardName);
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+        // Should not be allowed to remove the shardIdentity document
+        assert.writeErrorWithCode(
+            mongodConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}), 40070);
 
         //
         // Test normal startup

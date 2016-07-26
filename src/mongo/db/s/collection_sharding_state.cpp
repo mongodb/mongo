@@ -40,6 +40,7 @@
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -50,6 +51,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -273,12 +275,23 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn,
                                          const CollectionShardingState::DeleteState& deleteState) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    if (txn->writesAreReplicated() && serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
         _nss == NamespaceString::kConfigCollectionNamespace) {
+
         if (auto idElem = deleteState.idDoc["_id"]) {
-            uassert(40070,
-                    "cannot delete shardIdentity document while in --shardsvr mode",
-                    idElem.str() != ShardIdentityType::IdName);
+            auto idStr = idElem.str();
+            if (idStr == ShardIdentityType::IdName) {
+                if (txn->writesAreReplicated()) {
+                    uasserted(40070,
+                              "cannot delete shardIdentity document while in --shardsvr mode");
+                } else {
+                    if (repl::ReplicationCoordinator::get(txn)->getMemberState().rollback()) {
+                        warning() << "Shard identity document rolled back.  Will shut down after "
+                                     "finishing rollback.";
+                        ShardIdentityRollbackNotifier::get(txn)->recordThatRollbackHappened();
+                    }
+                }
+            }
         }
     }
 

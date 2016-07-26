@@ -42,7 +42,7 @@ const OperationContext::Decoration<OperationShardingState> shardingMetadataDecor
 // Max time to wait for the migration critical section to complete
 const Microseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
 
-}  // namespace mongo
+}  // namespace
 
 OperationShardingState::OperationShardingState() = default;
 
