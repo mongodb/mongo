@@ -733,8 +733,8 @@ __wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		F_SET(session, WT_SESSION_LOCK_NO_WAIT);
 
 	/*
-	 * The checkpoint lock only is needed to avoid a spurious EBUSY error
-	 * return.
+	 * Take the checkpoint lock if there is a need to prevent the drop
+	 * operation from failing with EBUSY due to an ongoing checkpoint.
 	 */
 	if (checkpoint_wait)
 		WT_WITH_CHECKPOINT_LOCK(session, ret,

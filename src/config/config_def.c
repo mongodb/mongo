@@ -317,6 +317,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
 	{ "append", "boolean", NULL, NULL, NULL, 0 },
 	{ "bulk", "string", NULL, NULL, NULL, 0 },
 	{ "checkpoint", "string", NULL, NULL, NULL, 0 },
+	{ "checkpoint_wait", "boolean", NULL, NULL, NULL, 0 },
 	{ "dump", "string",
 	    NULL, "choices=[\"hex\",\"json\",\"print\"]",
 	    NULL, 0 },
@@ -1066,10 +1067,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.open_cursor",
-	  "append=0,bulk=0,checkpoint=,dump=,next_random=0,"
-	  "next_random_sample_size=0,overwrite=,raw=0,readonly=0,"
+	  "append=0,bulk=0,checkpoint=,checkpoint_wait=,dump=,next_random=0"
+	  ",next_random_sample_size=0,overwrite=,raw=0,readonly=0,"
 	  "skip_sort_check=0,statistics=,target=",
-	  confchk_WT_SESSION_open_cursor, 12
+	  confchk_WT_SESSION_open_cursor, 13
 	},
 	{ "WT_SESSION.rebalance",
 	  "",
