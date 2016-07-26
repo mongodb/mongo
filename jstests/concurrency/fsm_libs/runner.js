@@ -432,8 +432,7 @@ var runner = (function() {
         jsTest.log('End of schedule');
     }
 
-    function cleanupWorkload(
-        workload, context, cluster, errors, header, dbHashBlacklist, ttlIndexExists) {
+    function cleanupWorkload(workload, context, cluster, errors, header, dbHashBlacklist) {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
@@ -441,7 +440,7 @@ var runner = (function() {
             // Ensure that all data has replicated correctly to the secondaries before calling the
             // workload's teardown method.
             var phase = 'before workload ' + workload + ' teardown';
-            cluster.checkReplicationConsistency(dbHashBlacklist, phase, ttlIndexExists);
+            cluster.checkReplicationConsistency(dbHashBlacklist, phase);
         } catch (e) {
             errors.push(new WorkloadFailure(
                 e.toString(), e.stack, 'main', header + ' checking consistency on secondaries'));
@@ -497,7 +496,6 @@ var runner = (function() {
         var teardownFailed = false;
         var startTime = Date.now();  // Initialize in case setupWorkload fails below.
         var totalTime;
-        var ttlIndexExists;
 
         jsTest.log('Workload(s) started: ' + workloads.join(' '));
 
@@ -535,23 +533,11 @@ var runner = (function() {
                         e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
             }
         } finally {
-            // Checking that the data is consistent across the primary and secondaries requires
-            // additional complexity to prevent writes from occurring in the background on the
-            // primary due to the TTL monitor. If none of the workloads actually created any TTL
-            // indexes (and we dropped the data of any previous workloads), then don't expend any
-            // additional effort in trying to handle that case.
-            ttlIndexExists =
-                workloads.some(workload => context[workload].config.data.ttlIndexExists);
-
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
-            var cleanupResults = cleanup.map(workload => cleanupWorkload(workload,
-                                                                         context,
-                                                                         cluster,
-                                                                         errors,
-                                                                         'Foreground',
-                                                                         dbHashBlacklist,
-                                                                         ttlIndexExists));
+            var cleanupResults =
+                cleanup.map(workload => cleanupWorkload(
+                                workload, context, cluster, errors, 'Foreground', dbHashBlacklist));
             teardownFailed = cleanupResults.some(success => (success === false));
 
             totalTime = Date.now() - startTime;
@@ -568,13 +554,9 @@ var runner = (function() {
         // Throw any existing errors so that the schedule aborts.
         throwError(errors);
 
-        // All workload data should have been dropped at this point, so there shouldn't be any TTL
-        // indexes.
-        ttlIndexExists = false;
-
         // Ensure that all operations replicated correctly to the secondaries.
-        cluster.checkReplicationConsistency(
-            dbHashBlacklist, 'after workload-group teardown and data clean-up', ttlIndexExists);
+        cluster.checkReplicationConsistency(dbHashBlacklist,
+                                            'after workload-group teardown and data clean-up');
     }
 
     function runWorkloads(
@@ -714,22 +696,10 @@ var runner = (function() {
             }
         } finally {
             try {
-                // Checking that the data is consistent across the primary and secondaries requires
-                // additional complexity to prevent writes from occurring in the background on the
-                // primary due to the TTL monitor. If none of the workloads actually created any TTL
-                // indexes (and we dropped the data of any previous workloads), then don't expend
-                // any additional effort in trying to handle that case.
-                var ttlIndexExists = bgWorkloads.some(
-                    bgWorkload => bgContext[bgWorkload].config.data.ttlIndexExists);
-
                 // Call each background workload's teardown function.
-                bgCleanup.forEach(bgWorkload => cleanupWorkload(bgWorkload,
-                                                                bgContext,
-                                                                cluster,
-                                                                errors,
-                                                                'Background',
-                                                                dbHashBlacklist,
-                                                                ttlIndexExists));
+                bgCleanup.forEach(
+                    bgWorkload => cleanupWorkload(
+                        bgWorkload, bgContext, cluster, errors, 'Background', dbHashBlacklist));
                 // TODO: Call cleanupWorkloadData() on background workloads here if no background
                 // workload teardown functions fail.
 

@@ -75,7 +75,7 @@ function dumpCollectionDiff(primary, secondary, dbName, collName) {
     }
 }
 
-function checkDBHashesFsyncLocked(rst) {
+function checkDBHashesFsyncLocked(rst, dbBlacklist = [], phase = 'after test hook') {
     // Call getPrimary to populate rst with information about the nodes.
     var primary = rst.getPrimary();
     assert(primary, 'calling getPrimary() failed');
@@ -113,10 +113,7 @@ function checkDBHashesFsyncLocked(rst) {
         assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
                              'failed to lock the primary');
         rst.awaitReplication(60 * 1000 * 5);
-
-        var phaseName = 'after test hook';
-        var blacklist = [];
-        checkDBHashes(rst, blacklist, phaseName);
+        checkDBHashes(rst, dbBlacklist, phase);
     } catch (e) {
         activeException = true;
         throw e;
