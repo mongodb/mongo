@@ -91,17 +91,19 @@ function checkDBHashesFsyncLocked(rst) {
 
     // Since we cannot determine if there is a background index in progress (SERVER-25176),
     // we flush indexing as follows:
-    //  1. Drop a dummy collection
-    //  2. Create a foreground index on the dummy collection
-    //  3. Insert a document into the dummy collection with a writeConcern for all nodes
+    //  1. Create a foreground index on a dummy collection/database
+    //  2. Insert a document into the dummy collection with a writeConcern for all nodes
+    //  3. Drop the dummy database
     var dbNames = new Set(primary.getDBNames());
     var uniqueDbName = generateUniqueDbName(dbNames, "flush_all_background_indexes_");
 
-    var dummyColl = primary.getDB(uniqueDbName).dummy;
+    var dummyDB = primary.getDB(uniqueDbName);
+    var dummyColl = dummyDB.dummy;
     dummyColl.drop();
     assert.commandWorked(dummyColl.createIndex({x: 1}));
     assert.writeOK(dummyColl.insert(
         {x: 1}, {writeConcern: {w: rst.nodeList().length, wtimeout: 5 * 60 * 1000}}));
+    assert.commandWorked(dummyDB.dropDatabase());
 
     var activeException = false;
 
