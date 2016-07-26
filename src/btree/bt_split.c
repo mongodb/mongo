@@ -1472,7 +1472,7 @@ err:	if (parent != NULL)
 
 /*
  * __split_multi_inmem --
- *	Instantiate a page in a multi-block set.
+ *	Instantiate a page from a disk image.
  */
 static int
 __split_multi_inmem(
@@ -1497,13 +1497,12 @@ __split_multi_inmem(
 	    orig->type != WT_PAGE_COL_VAR || ref->ref_recno != 0);
 
 	/*
-	 * This code re-creates an in-memory page that is part of a set created
-	 * while evicting a large page, and adds references to any unresolved
-	 * update chains to the new page. We get here due to choosing to keep
-	 * the results of a split in memory or because an update could not be
-	 * written when attempting to evict a page.
+	 * This code re-creates an in-memory page from a disk image, and adds
+	 * references to any unresolved update chains to the new page. We get
+	 * here either because an update could not be written when evicting a
+	 * page, or eviction chose to keep a page in memory.
 	 *
-	 * Clear the disk image and link the page into the passed-in WT_REF to
+	 * Steal the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
 	 * when discarding the original page, and our caller will discard the
 	 * allocated page on error, when discarding the allocated WT_REF.
@@ -1512,6 +1511,19 @@ __split_multi_inmem(
 	    multi->disk_image, ((WT_PAGE_HEADER *)multi->disk_image)->mem_size,
 	    WT_PAGE_DISK_ALLOC, &page));
 	multi->disk_image = NULL;
+
+	/*
+	 * Put the re-instantiated page in the same LRU queue location as the
+	 * original page, unless this was a forced eviction, in which case we
+	 * leave the new page with the read generation unset.  Eviction will
+	 * set the read generation next time it visits this page.
+	 */
+	if (orig->read_gen != WT_READGEN_OLDEST)
+		page->read_gen = orig->read_gen;
+
+	/* If there are no updates to apply to the page, we're done. */
+	if (multi->supd_entries == 0)
+		return (0);
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -1561,23 +1573,12 @@ __split_multi_inmem(
 		}
 
 	/*
-	 * Put the re-instantiated page in the same LRU queue location as the
-	 * original page, unless this was a forced eviction, in which case we
-	 * leave the new page with the read generation unset.  Eviction will
-	 * set the read generation next time it visits this page.
+	 * When modifying the page we set the first dirty transaction to the
+	 * last transaction currently running.  However, the updates we made
+	 * might be older than that. Set the first dirty transaction to an
+	 * impossibly old value so this page is never skipped in a checkpoint.
 	 */
-	if (orig->read_gen != WT_READGEN_OLDEST)
-		page->read_gen = orig->read_gen;
-
-	/*
-	 * If we modified the page above, it will have set the first dirty
-	 * transaction to the last transaction currently running.  However, the
-	 * updates we installed may be older than that.  Set the first dirty
-	 * transaction to an impossibly old value so this page is never skipped
-	 * in a checkpoint.
-	 */
-	if (page->modify != NULL)
-		page->modify->first_dirty_txn = WT_TXN_FIRST;
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
@@ -2211,15 +2212,13 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Rewrite an in-memory page with a new version.
  */
 int
-__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	WT_REF *new;
 
 	page = ref->page;
-	mod = page->modify;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_SPLIT, "%p: split-rewrite", ref->page));
@@ -2241,7 +2240,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__wt_calloc_one(session, &new));
 	new->ref_recno = ref->ref_recno;
 
-	WT_ERR(__split_multi_inmem(session, page, &mod->mod_multi[0], new));
+	WT_ERR(__split_multi_inmem(session, page, multi, new));
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.
@@ -2249,7 +2248,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Finalize the move, discarding moved update lists from the original
 	 * page.
 	 */
-	__split_multi_inmem_final(page, &mod->mod_multi[0]);
+	__split_multi_inmem_final(page, multi);
 
 	/*
 	 * Discard the original page.

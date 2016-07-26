@@ -165,7 +165,7 @@ extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *
 extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref);
-extern int __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst);
 extern int __wt_cache_op(WT_SESSION_IMPL *session, WT_CACHE_OP op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);

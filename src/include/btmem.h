@@ -250,9 +250,19 @@ struct __wt_page_modify {
 	 * a replace address and multiple replacement blocks.
 	 */
 	union {
-	WT_ADDR	 replace;		/* Single, written replacement block */
+	struct {			/* Single, written replacement block */
+		WT_ADDR	 replace;
+
+		/*
+		 * A disk image that may or may not have been written, used to
+		 * re-instantiate the page in memory.
+		 */
+		void	*disk_image;
+	} r;
 #undef	mod_replace
-#define	mod_replace	u1.replace
+#define	mod_replace	u1.r.replace
+#undef	mod_disk_image
+#define	mod_disk_image	u1.r.disk_image
 
 	struct {			/* Multiple replacement blocks */
 	struct __wt_multi {
@@ -267,7 +277,6 @@ struct __wt_page_modify {
 
 		/*
 		 * A disk image that may or may not have been written, used to
-		 * check for matching blocks to avoid re-writing a page, and to
 		 * re-instantiate the page in memory.
 		 */
 		void	*disk_image;

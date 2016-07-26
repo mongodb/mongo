@@ -5599,9 +5599,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_btree_block_free(session,
 			    mod->mod_replace.addr, mod->mod_replace.size));
 
-		/* Discard the replacement page's address. */
+		/* Discard the replacement page's address and disk image. */
 		__wt_free(session, mod->mod_replace.addr);
 		mod->mod_replace.size = 0;
+		__wt_free(session, mod->mod_disk_image);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -5652,16 +5653,19 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * If in-memory, or saving/restoring changes for this page and
 		 * there's only one block, there's nothing to write. Set up
 		 * a single block as if to split, then use that disk image to
-		 * rewrite the page in memory.
+		 * rewrite the page in memory. This is separate from simple
+		 * replacements where eviction has decided to retain the page
+		 * in memory because the latter can't handle update lists and
+		 * splits can.
 		 */
 		if (F_ISSET(r, WT_EVICT_IN_MEMORY) ||
 		    (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL))
 			goto split;
 
 		/*
-		 * If this is a root page, then we don't have an address and we
-		 * have to create a sync point.  The address was cleared when
-		 * we were about to write the buffer so we know what to do here.
+		 * A root page, we don't have an address and we have to create
+		 * a sync point. The address was cleared when we were about to
+		 * write the buffer so we know what to do here.
 		 */
 		if (bnd->addr.addr == NULL)
 			WT_RET(__wt_bt_write(session, &r->disk_image,
@@ -5670,6 +5674,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		else {
 			mod->mod_replace = bnd->addr;
 			bnd->addr.addr = NULL;
+
+			mod->mod_disk_image = bnd->disk_image;
+			bnd->disk_image = NULL;
 		}
 
 		mod->rec_result = WT_PM_REC_REPLACE;
