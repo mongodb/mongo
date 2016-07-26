@@ -42,6 +42,8 @@ selector:
     - jstests/sharding/cursor_timeout.js
     # Bug in v3.2 shards, fixed in v3.4.
     - jstests/sharding/auth_sharding_cmd_metadata.js
+    # TODO Requires mongos to have fix for SERVER-25258. Enable when v3.2.9+ is 'last-stable'.
+    - jstests/sharding/kill_op_overflow.js
 
     # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
