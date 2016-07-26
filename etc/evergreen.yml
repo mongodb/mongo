@@ -2317,6 +2317,9 @@ tasks:
           cat <<EOF > notary_env.sh
           export NOTARY_TOKEN=${signing_auth_token_34}
           EOF
+
+          echo "${signing_auth_token_34}" > signing_auth_token
+
     - command: shell.exec
       params:
         working_dir: src
