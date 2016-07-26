@@ -209,6 +209,18 @@ void swapAndJoin_inlock(UniqueLock* lock, T& uniquePtrToReset, const char* msg) 
     lock->lock();
 }
 
+template <typename T>
+void swapAndWait_inlock(UniqueLock* lock, T& uniquePtrToReset, const char* msg) {
+    if (!uniquePtrToReset) {
+        return;
+    }
+    T tempPtr = std::move(uniquePtrToReset);
+    lock->unlock();
+    LOG(1) << msg << tempPtr->toString();
+    tempPtr->wait();
+    lock->lock();
+}
+
 }  // namespace
 
 std::string toString(DataReplicatorState s) {
@@ -358,7 +370,7 @@ void DataReplicator::_resumeFinish(CallbackArgs cbData) {
 void DataReplicator::_pauseApplier() {
     LockGuard lk(_mutex);
     if (_applier)
-        _applier->join();
+        _applier->wait();
     _applierPaused = true;
     _applier.reset();
 }
@@ -379,7 +391,7 @@ StatusWith<Timestamp> DataReplicator::flushAndPause() {
     if (_applierActive) {
         _applierPaused = true;
         lk.unlock();
-        _applier->join();
+        _applier->wait();
         lk.lock();
     }
     return StatusWith<Timestamp>(_lastApplied.opTime.getTimestamp());
@@ -833,7 +845,7 @@ void DataReplicator::_cancelAllHandles_inlock() {
     if (_oplogFetcher)
         _oplogFetcher->shutdown();
     if (_applier)
-        _applier->shutdown();
+        _applier->cancel();
     if (_reporter)
         _reporter->shutdown();
     if (_initialSyncState && _initialSyncState->dbsCloner &&
@@ -845,7 +857,7 @@ void DataReplicator::_cancelAllHandles_inlock() {
 void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
     swapAndJoin_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
     swapAndJoin_inlock(lk, _oplogFetcher, "Waiting on oplog fetcher: ");
-    swapAndJoin_inlock(lk, _applier, "Waiting on applier: ");
+    swapAndWait_inlock(lk, _applier, "Waiting on applier: ");
     swapAndJoin_inlock(lk, _reporter, "Waiting on reporter: ");
     if (_initialSyncState) {
         swapAndJoin_inlock(lk, _initialSyncState->dbsCloner, "Waiting on databases cloner: ");
@@ -1178,7 +1190,7 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
     invariant(!(_applier && _applier->isActive()));
     _applier = stdx::make_unique<MultiApplier>(_exec, ops, applierFn, multiApplyFn, lambda);
     _applierActive = true;
-    return _applier->startup();
+    return _applier->start();
 }
 
 Status DataReplicator::_scheduleFetch() {

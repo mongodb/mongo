@@ -120,7 +120,7 @@ public:
     /**
      * Starts applier by scheduling initial db work to be run by the executor.
      */
-    Status startup();
+    Status start();
 
     /**
      * Cancels current db work request.
@@ -128,13 +128,13 @@ public:
      *
      * Callback function may be invoked with an ErrorCodes::CallbackCanceled status.
      */
-    void shutdown();
+    void cancel();
 
     /**
      * Waits for active database worker to complete.
      * Returns immediately if applier is not active.
      */
-    void join();
+    void wait();
 
 private:
     /**
