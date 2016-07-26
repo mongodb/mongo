@@ -48,8 +48,22 @@ namespace {
 static const std::vector<StringData> kCpuKeys{
     "btime"_sd, "cpu"_sd, "ctxt"_sd, "processes"_sd, "procs_blocked"_sd, "procs_running"_sd};
 
-// Collect all the memory keys by specifying an empty set.
-static const std::vector<StringData> kMemKeys{};
+static const std::vector<StringData> kMemKeys{
+    "MemTotal"_sd,
+    "MemFree"_sd,
+    "Cached"_sd,
+    "Dirty"_sd,
+    "Buffers"_sd,
+    "SwapTotal"_sd,
+    "SwapCached"_sd,
+    "SwapFree"_sd,
+    "Active"_sd,
+    "Inactive"_sd,
+    "Active(anon)"_sd,
+    "Inactive(anon)"_sd,
+    "Active(file)"_sd,
+    "Inactive(file)"_sd,
+};
 
 /**
  *  Collect metrics from the Linux /proc file system.
