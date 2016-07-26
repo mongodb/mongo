@@ -306,49 +306,13 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
               Treat as a projection field with the additional ability to
               add aggregation operators.
             */
-            uassert(
-                16414,
-                str::stream() << "the group aggregate field name '" << pFieldName
-                              << "' cannot be used because $group's field names cannot contain '.'",
-                !str::contains(pFieldName, '.'));
+            auto parsedAccumulator = Accumulator::parseAccumulator(groupField, vps);
+            auto fieldName = parsedAccumulator.first.toString();
+            auto accExpression = parsedAccumulator.second;
+            auto factory =
+                Accumulator::getFactory(groupField.embeddedObject().firstElementFieldName());
 
-            uassert(15950,
-                    str::stream() << "the group aggregate field name '" << pFieldName
-                                  << "' cannot be an operator name",
-                    pFieldName[0] != '$');
-
-            uassert(15951,
-                    str::stream() << "the group aggregate field '" << pFieldName
-                                  << "' must be defined as an expression inside an object",
-                    groupField.type() == Object);
-
-            BSONObj subField(groupField.Obj());
-            BSONObjIterator subIterator(subField);
-            size_t subCount = 0;
-            for (; subIterator.more(); ++subCount) {
-                BSONElement subElement(subIterator.next());
-
-                auto name = subElement.fieldNameStringData();
-                Accumulator::Factory factory = Accumulator::getFactory(name);
-                intrusive_ptr<Expression> pGroupExpr;
-                BSONType elementType = subElement.type();
-                if (elementType == Object) {
-                    pGroupExpr = Expression::parseObject(subElement.Obj(), vps);
-                } else if (elementType == Array) {
-                    uasserted(15953,
-                              str::stream() << "aggregating group operators are unary (" << name
-                                            << ")");
-                } else { /* assume its an atomic single operand */
-                    pGroupExpr = Expression::parseOperand(subElement, vps);
-                }
-
-                pGroup->addAccumulator(pFieldName, factory, pGroupExpr);
-            }
-
-            uassert(15954,
-                    str::stream() << "the computed aggregate '" << pFieldName
-                                  << "' must specify exactly one operator",
-                    subCount == 1);
+            pGroup->addAccumulator(fieldName, factory, accExpression);
         }
     }
 

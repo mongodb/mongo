@@ -37,6 +37,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
@@ -102,6 +103,13 @@ public:
      * there is no such Accumulator registered.
      */
     static Factory getFactory(StringData name);
+
+    /**
+     * Parses a BSONElement that is an accumulator field, and returns a pair containing (field name,
+     * accumulator expression).
+     */
+    static std::pair<StringData, boost::intrusive_ptr<Expression>> parseAccumulator(
+        const BSONElement& elem, const VariablesParseState& vps);
 
     virtual bool isAssociative() const {
         return false;

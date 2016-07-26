@@ -55,42 +55,39 @@
         //
 
         // First compute each separately, to make sure we have the correct results.
-        const manufacturerPipe =
-            [{$group: {_id: "$manufacturer", count: {$sum: 1}}}, {$sort: {count: -1}}];
-        const mostCommonManufacturers = coll.aggregate(manufacturerPipe).toArray();
-
-        const pricePipe = [
+        const manufacturerPipe = [{$sortByCount: "$manufacturer"}];
+        const bucketedPricePipe = [
             {
-              $project: {
-                  priceBucket: {
-                      $switch: {
-                          branches: [
-                              {case: {$lt: ["$price", 500]}, then: "< 500"},
-                              {case: {$lt: ["$price", 1000]}, then: "500-1000"},
-                              {case: {$lt: ["$price", 1500]}, then: "1000-1500"},
-                              {case: {$lt: ["$price", 2000]}, then: "1500-2000"}
-                          ],
-                          default: "> 2000"
-                      }
-                  }
-              }
+              $bucket: {groupBy: "$price", boundaries: [0, 500, 1000, 1500, 2000], default: 2000},
             },
-            {$group: {_id: "$priceBucket", count: {$sum: 1}}},
             {$sort: {count: -1}}
         ];
-        const numTVsByPriceRange = coll.aggregate(pricePipe).toArray();
+        const automaticallyBucketedPricePipe = [{$bucketAuto: {groupBy: "$price", buckets: 5}}];
+
+        const mostCommonManufacturers = coll.aggregate(manufacturerPipe).toArray();
+        const numTVsBucketedByPriceRange = coll.aggregate(bucketedPricePipe).toArray();
+        const numTVsAutomaticallyBucketedByPriceRange =
+            coll.aggregate(automaticallyBucketedPricePipe).toArray();
+
+        const facetPipe = [{
+            $facet: {
+                manufacturers: manufacturerPipe,
+                bucketedPrices: bucketedPricePipe,
+                autoBucketedPrices: automaticallyBucketedPricePipe
+            }
+        }];
 
         // Then compute the results using $facet.
-        const facetResult =
-            coll.aggregate([{$facet: {manufacturers: manufacturerPipe, prices: pricePipe}}])
-                .toArray();
+        const facetResult = coll.aggregate(facetPipe).toArray();
         assert.eq(facetResult.length, 1);
         const facetManufacturers = facetResult[0].manufacturers;
-        const facetPrices = facetResult[0].prices;
+        const facetBucketedPrices = facetResult[0].bucketedPrices;
+        const facetAutoBucketedPrices = facetResult[0].autoBucketedPrices;
 
         // Then assert they are the same.
         assert.eq(facetManufacturers, mostCommonManufacturers);
-        assert.eq(facetPrices, numTVsByPriceRange);
+        assert.eq(facetBucketedPrices, numTVsBucketedByPriceRange);
+        assert.eq(facetAutoBucketedPrices, numTVsAutomaticallyBucketedByPriceRange);
     }
 
     // Test against the standalone started by resmoke.py.

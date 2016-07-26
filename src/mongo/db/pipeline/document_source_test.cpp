@@ -3834,12 +3834,12 @@ TEST_F(InvalidBucketSpec, GroupFailsForBucketWithInvalidOutputField) {
 
     spec = fromjson(
         "{$bucket : {groupBy : '$x', boundaries : [1, 2, 3], output : {number : 'test'}}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 15951);
+    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40234);
 
     spec = fromjson(
         "{$bucket : {groupBy : '$x', boundaries : [1, 2, 3], output : {'test.test' : {$sum : "
         "1}}}}");
-    ASSERT_THROWS_CODE(createBucket(spec), UserException, 16414);
+    ASSERT_THROWS_CODE(createBucket(spec), UserException, 40235);
 }
 
 TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
@@ -3860,6 +3860,471 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     ASSERT_THROWS_CODE(groupStage->getNext(), UserException, 40066);
 }
 }  // namespace DocumentSourceBucket
+
+namespace DocumentSourceBucketAuto {
+using mongo::DocumentSourceBucketAuto;
+using mongo::DocumentSourceMock;
+using std::vector;
+using std::deque;
+using boost::intrusive_ptr;
+
+class BucketAutoTests : public Mock::Base, public unittest::Test {
+public:
+    intrusive_ptr<DocumentSource> createBucketAuto(BSONObj bucketAutoSpec) {
+        return DocumentSourceBucketAuto::createFromBson(bucketAutoSpec.firstElement(), ctx());
+    }
+
+    vector<Document> getResults(BSONObj bucketAutoSpec, deque<Document> docs) {
+        auto bucketAutoStage = createBucketAuto(bucketAutoSpec);
+        assertBucketAutoType(bucketAutoStage);
+
+        auto source = DocumentSourceMock::create(docs);
+        bucketAutoStage->setSource(source.get());
+
+        vector<Document> results;
+        while (boost::optional<Document> next = bucketAutoStage->getNext()) {
+            results.push_back(*next);
+        }
+
+        return results;
+    }
+
+    void testSerialize(BSONObj bucketAutoSpec, BSONObj expectedObj) {
+        auto bucketAutoStage = createBucketAuto(bucketAutoSpec);
+        assertBucketAutoType(bucketAutoStage);
+
+        const bool explain = true;
+        vector<Value> explainedStages;
+        bucketAutoStage->serializeToArray(explainedStages, explain);
+        ASSERT_EQUALS(explainedStages.size(), 1UL);
+
+        Value expectedExplain = Value(expectedObj);
+
+        auto bucketAutoExplain = explainedStages[0];
+        ASSERT_VALUE_EQ(bucketAutoExplain["$bucketAuto"], expectedExplain);
+    }
+
+private:
+    void assertBucketAutoType(intrusive_ptr<DocumentSource> documentSource) {
+        const auto* bucketAutoStage = dynamic_cast<DocumentSourceBucketAuto*>(documentSource.get());
+        ASSERT(bucketAutoStage);
+    }
+};
+
+TEST_F(BucketAutoTests, ReturnsNoBucketsWhenSourceIsEmpty) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets: 1}}");
+    auto results = getResults(bucketAutoSpec, {});
+    ASSERT_EQUALS(results.size(), 0UL);
+}
+
+TEST_F(BucketAutoTests, Returns1Of1RequestedBucketWhenAllUniqueValues) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets: 1}}");
+
+    // Values are 1, 2, 3, 4
+    auto intDocs = {Document{{"x", 4}}, Document{{"x", 1}}, Document{{"x", 3}}, Document{{"x", 2}}};
+    auto results = getResults(bucketAutoSpec, intDocs);
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 1, max : 4}, count : 4}")));
+
+    // Values are 'a', 'b', 'c', 'd'
+    auto stringDocs = {
+        Document{{"x", "d"}}, Document{{"x", "b"}}, Document{{"x", "a"}}, Document{{"x", "c"}}};
+    results = getResults(bucketAutoSpec, stringDocs);
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 'a', max : 'd'}, count : 4}")));
+}
+
+TEST_F(BucketAutoTests, Returns1Of1RequestedBucketWithNonUniqueValues) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets: 1}}");
+
+    // Values are 1, 2, 7, 7, 7
+    auto docs = {Document{{"x", 7}},
+                 Document{{"x", 1}},
+                 Document{{"x", 7}},
+                 Document{{"x", 2}},
+                 Document{{"x", 7}}};
+    auto results = getResults(bucketAutoSpec, docs);
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 1, max : 7}, count : 5}")));
+}
+
+TEST_F(BucketAutoTests, Returns1Of1RequestedBucketWhen1ValueInSource) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets: 1}}");
+    auto intDocs = {Document{{"x", 1}}};
+    auto results = getResults(bucketAutoSpec, intDocs);
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 1, max : 1}, count : 1}")));
+
+    auto stringDocs = {Document{{"x", "a"}}};
+    results = getResults(bucketAutoSpec, stringDocs);
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 'a', max : 'a'}, count : 1}")));
+}
+
+TEST_F(BucketAutoTests, Returns2Of2RequestedBucketsWhenSmallestValueHasManyDuplicates) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
+
+    // Values are 1, 1, 1, 1, 2
+    auto docs = {Document{{"x", 1}},
+                 Document{{"x", 1}},
+                 Document{{"x", 1}},
+                 Document{{"x", 2}},
+                 Document{{"x", 1}}};
+    auto results = getResults(bucketAutoSpec, docs);
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 1, max : 2}, count : 4}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 2, max : 2}, count : 1}")));
+}
+
+TEST_F(BucketAutoTests, Returns2Of2RequestedBucketsWhenLargestValueHasManyDuplicates) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
+
+    // Values are 0, 1, 2, 3, 4, 5, 5, 5, 5
+    auto docs = {Document{{"x", 5}},
+                 Document{{"x", 0}},
+                 Document{{"x", 2}},
+                 Document{{"x", 3}},
+                 Document{{"x", 5}},
+                 Document{{"x", 1}},
+                 Document{{"x", 5}},
+                 Document{{"x", 4}},
+                 Document{{"x", 5}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 5}, count : 5}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 5, max : 5}, count : 4}")));
+}
+
+TEST_F(BucketAutoTests, Returns3Of3RequestedBucketsWhenAllUniqueValues) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 3}}");
+
+    // Values are 0, 1, 2, 3, 4, 5, 6, 7
+    auto docs = {Document{{"x", 2}},
+                 Document{{"x", 4}},
+                 Document{{"x", 1}},
+                 Document{{"x", 7}},
+                 Document{{"x", 0}},
+                 Document{{"x", 5}},
+                 Document{{"x", 3}},
+                 Document{{"x", 6}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 3UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 3}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 3, max : 6}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[2], Document(fromjson("{_id : {min : 6, max : 7}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, Returns2Of3RequestedBucketsWhenLargestValueHasManyDuplicates) {
+    // In this case, two buckets will be made because the approximate bucket size calculated will be
+    // 7/3, which rounds to 2. Therefore, the boundaries will be calculated so that values 0 and 1
+    // into the first bucket. All of the 2 values will then fall into a second bucket.
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 3}}");
+
+    // Values are 0, 1, 2, 2, 2, 2, 2
+    auto docs = {Document{{"x", 2}},
+                 Document{{"x", 0}},
+                 Document{{"x", 2}},
+                 Document{{"x", 2}},
+                 Document{{"x", 1}},
+                 Document{{"x", 2}},
+                 Document{{"x", 2}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 2}, count : 2}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 2, max : 2}, count : 5}")));
+}
+
+TEST_F(BucketAutoTests, Returns1Of3RequestedBucketsWhenLargestValueHasManyDuplicates) {
+    // In this case, one bucket will be made because the approximate bucket size calculated will be
+    // 8/3, which rounds to 3. Therefore, the boundaries will be calculated so that values 0, 1, and
+    // 2 fall into the first bucket. Since 2 is repeated many times, all of the 2 values will be
+    // pulled into the first bucket.
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 3}}");
+
+    // Values are 0, 1, 2, 2, 2, 2, 2, 2
+    auto docs = {Document{{"x", 2}},
+                 Document{{"x", 2}},
+                 Document{{"x", 0}},
+                 Document{{"x", 2}},
+                 Document{{"x", 2}},
+                 Document{{"x", 2}},
+                 Document{{"x", 1}},
+                 Document{{"x", 2}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 2}, count : 8}")));
+}
+
+TEST_F(BucketAutoTests, Returns3Of3RequestedBucketsWhen3ValuesInSource) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 3}}");
+    auto docs = {Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 2}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 3UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 1}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 1, max : 2}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[2], Document(fromjson("{_id : {min : 2, max : 2}, count : 1}")));
+}
+
+TEST_F(BucketAutoTests, Returns3Of10RequestedBucketsWhen3ValuesInSource) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 10}}");
+    auto docs = {Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 2}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 3UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 1}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 1, max : 2}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[2], Document(fromjson("{_id : {min : 2, max : 2}, count : 1}")));
+}
+
+TEST_F(BucketAutoTests, EvaluatesAccumulatorsInOutputField) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output : {avg : {$avg : '$x'}}}}");
+    auto docs = {Document{{"x", 0}}, Document{{"x", 2}}, Document{{"x", 4}}, Document{{"x", 6}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 4}, avg : 1}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 4, max : 6}, avg : 5}")));
+}
+
+TEST_F(BucketAutoTests, EvaluatesNonFieldPathExpressionInGroupByField) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : {$add : ['$x', 1]}, buckets : 2}}");
+    auto docs = {Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 2}}, Document{{"x", 3}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 1, max : 3}, count : 2}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 3, max : 4}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, RespectsCanonicalTypeOrderingOfValues) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
+    auto docs = {Document{{"x", "a"}},
+                 Document{{"x", 1}},
+                 Document{{"x", "b"}},
+                 Document{{"x", 2}},
+                 Document{{"x", 0.0}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0.0, max : 'a'}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 'a', max : 'b'}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, SourceNameIsBucketAuto) {
+    auto bucketAuto = createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}"));
+    ASSERT_EQUALS(bucketAuto->getSourceName(), "$bucketAuto");
+}
+
+TEST_F(BucketAutoTests, ShouldAddDependenciesOfGroupByFieldAndComputedFields) {
+    auto bucketAuto =
+        createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output: {field1 : "
+                                  "{$sum : '$a'}, field2 : {$avg : '$b'}}}}"));
+
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
+    ASSERT_EQUALS(3U, dependencies.fields.size());
+
+    // Dependency from 'groupBy'
+    ASSERT_EQUALS(1U, dependencies.fields.count("x"));
+
+    // Dependencies from 'output'
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("b"));
+
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+}
+
+TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromGroupByField) {
+    auto bucketAuto =
+        createBucketAuto(fromjson("{$bucketAuto : {groupBy : {$meta: 'textScore'}, buckets : 2}}"));
+
+    DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
+    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
+    ASSERT_EQUALS(0U, dependencies.fields.size());
+
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(true, dependencies.getNeedTextScore());
+}
+
+TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromOutputField) {
+    auto bucketAuto =
+        createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output: {avg : "
+                                  "{$avg : {$meta : 'textScore'}}}}}"));
+
+    DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
+    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
+    ASSERT_EQUALS(1U, dependencies.fields.size());
+
+    // Dependency from 'groupBy'
+    ASSERT_EQUALS(1U, dependencies.fields.count("x"));
+
+    ASSERT_EQUALS(false, dependencies.needWholeDocument);
+    ASSERT_EQUALS(true, dependencies.getNeedTextScore());
+}
+
+TEST_F(BucketAutoTests, SerializesDefaultAccumulatorIfOutputFieldIsNotSpecified) {
+    BSONObj spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
+    BSONObj expected =
+        fromjson("{groupBy : '$x', buckets : 2, output : {count : {$sum : {$const : 1}}}}");
+
+    testSerialize(spec, expected);
+}
+
+TEST_F(BucketAutoTests, SerializesOutputFieldIfSpecified) {
+    BSONObj spec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output : {field : {$avg : '$x'}}}}");
+    BSONObj expected = fromjson("{groupBy : '$x', buckets : 2, output : {field : {$avg : '$x'}}}");
+
+    testSerialize(spec, expected);
+}
+
+TEST_F(BucketAutoTests, ShouldBeAbleToReParseSerializedStage) {
+    auto bucketAuto = createBucketAuto(fromjson(
+        "{$bucketAuto : {groupBy : '$x', buckets : 2, output : {field : {$avg : '$x'}}}}"));
+    vector<Value> serialization;
+    bucketAuto->serializeToArray(serialization);
+    ASSERT_EQUALS(serialization.size(), 1UL);
+    ASSERT_EQUALS(serialization[0].getType(), BSONType::Object);
+
+    ASSERT_EQUALS(serialization[0].getDocument().size(), 1UL);
+    ASSERT_EQUALS(serialization[0].getDocument()["$bucketAuto"].getType(), BSONType::Object);
+
+    auto serializedBson = serialization[0].getDocument().toBson();
+    auto roundTripped = createBucketAuto(serializedBson);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization);
+
+    ASSERT_EQUALS(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+TEST_F(BucketAutoTests, ReturnsNoBucketsWhenNoBucketsAreSpecifiedInCreate) {
+    auto docs = {Document{{"x", 1}}};
+    auto mock = DocumentSourceMock::create(docs);
+    auto bucketAuto = DocumentSourceBucketAuto::create(ctx());
+
+    bucketAuto->setSource(mock.get());
+    auto result = bucketAuto->getNext();
+    ASSERT(!result);
+}
+
+TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
+    auto spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 'test'}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40241);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2147483648}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40242);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1.5}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40242);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 0}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40243);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : -1}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40243);
+}
+
+TEST_F(BucketAutoTests, FailsWithNonExpressionGroupBy) {
+    auto spec = fromjson("{$bucketAuto : {groupBy : 'test', buckets : 1}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40239);
+
+    spec = fromjson("{$bucketAuto : {groupBy : {test : 'test'}, buckets : 1}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40239);
+}
+
+TEST_F(BucketAutoTests, FailsWithNonObjectArgument) {
+    auto spec = fromjson("{$bucketAuto : 'test'}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40240);
+
+    spec = fromjson("{$bucketAuto : [1, 2, 3]}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40240);
+}
+
+TEST_F(BucketAutoTests, FailsWithNonObjectOutput) {
+    auto spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : 'test'}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40244);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : [1, 2, 3]}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40244);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : 1}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40244);
+}
+
+TEST_F(BucketAutoTests, FailsWhenGroupByMissing) {
+    auto spec = fromjson("{$bucketAuto : {buckets : 1}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40246);
+}
+
+TEST_F(BucketAutoTests, FailsWhenBucketsMissing) {
+    auto spec = fromjson("{$bucketAuto : {groupBy : '$x'}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40246);
+}
+
+TEST_F(BucketAutoTests, FailsWithUnknownField) {
+    auto spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, field : 'test'}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40245);
+}
+
+TEST_F(BucketAutoTests, FailsWithInvalidExpressionToAccumulator) {
+    auto spec = fromjson(
+        "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {avg : {$avg : ['$x', 1]}}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40237);
+
+    spec = fromjson(
+        "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {test : {$avg : '$x', $sum : "
+        "'$x'}}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40238);
+}
+
+TEST_F(BucketAutoTests, FailsWithNonAccumulatorObjectOutputField) {
+    auto spec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : {field : 'test'}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40234);
+
+    spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 1, output : {field : 1}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40234);
+
+    spec = fromjson(
+        "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {test : {field : 'test'}}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40234);
+}
+
+TEST_F(BucketAutoTests, FailsWithInvalidOutputFieldName) {
+    auto spec = fromjson(
+        "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {'field.test' : {$avg : '$x'}}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40235);
+
+    spec = fromjson(
+        "{$bucketAuto : {groupBy : '$x', buckets : 1, output : {'$field' : {$avg : '$x'}}}}");
+    ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40236);
+}
+
+TEST_F(BucketAutoTests, FailsWhenBufferingTooManyDocuments) {
+    std::deque<Document> inputs;
+    auto largeStr = std::string(1000, 'b');
+    auto inputDoc = Document{{"a", largeStr}};
+    ASSERT_GTE(inputDoc.getApproximateSize(), 1000UL);
+    inputs.push_back(inputDoc);
+    inputs.push_back(Document{{"a", largeStr}});
+    auto mock = DocumentSourceMock::create(inputs);
+
+    const uint64_t maxMemoryUsageBytes = 1000;
+    const int numBuckets = 1;
+    auto bucketAuto = DocumentSourceBucketAuto::create(ctx(), numBuckets, maxMemoryUsageBytes);
+    bucketAuto->setSource(mock.get());
+    ASSERT_THROWS_CODE(bucketAuto->getNext(), UserException, 16819);
+}
+}  // namespace DocumentSourceBucketAuto
 
 class All : public Suite {
 public:

@@ -37,6 +37,10 @@
 
 namespace mongo {
 
+using boost::intrusive_ptr;
+using std::string;
+using std::pair;
+
 using Factory = Accumulator::Factory;
 
 namespace {
@@ -59,4 +63,38 @@ Factory Accumulator::getFactory(StringData name) {
     return it->second;
 }
 
+pair<StringData, intrusive_ptr<Expression>> Accumulator::parseAccumulator(
+    const BSONElement& elem, const VariablesParseState& vps) {
+    auto fieldName = elem.fieldNameStringData();
+    uassert(40234,
+            str::stream() << "The field '" << fieldName << "' must be an accumulator object",
+            elem.type() == BSONType::Object &&
+                elem.embeddedObject().firstElementFieldName()[0] == '$');
+
+    uassert(40235,
+            str::stream() << "The field name '" << fieldName << "' cannot contain '.'",
+            fieldName.find('.') == string::npos);
+
+    uassert(40236,
+            str::stream() << "The field name '" << fieldName << "' cannot be an operator name",
+            fieldName[0] != '$');
+
+    intrusive_ptr<Expression> accExpression;
+    size_t accCount = 0;
+    for (auto&& acc : elem.embeddedObject()) {
+        accCount++;
+        auto accName = acc.fieldNameStringData();
+
+        uassert(40237,
+                str::stream() << "The " << accName << " accumulator is a unary operator",
+                acc.type() != BSONType::Array);
+
+        accExpression = Expression::parseOperand(acc, vps);
+    }
+    uassert(40238,
+            str::stream() << "The field '" << fieldName << "' must specify one accumulator",
+            accCount == 1);
+
+    return {fieldName, accExpression};
+}
 }  // namespace mongo

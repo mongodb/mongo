@@ -1834,7 +1834,6 @@ private:
     long long _outputIndex;
 };
 
-
 class DocumentSourceSortByCount final {
 public:
     static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
@@ -1885,5 +1884,102 @@ public:
 private:
     bool _latencySpecified = false;
     bool _finished = false;
+};
+
+/**
+ * The $bucketAuto stage takes a user-specified number of buckets and automatically determines
+ * boundaries such that the values are approximately equally distributed between those buckets.
+ */
+class DocumentSourceBucketAuto final : public DocumentSource {
+public:
+    Value serialize(bool explain = false) const final;
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    boost::optional<Document> getNext() final;
+    void dispose() final;
+    const char* getSourceName() const final;
+
+    static const uint64_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
+
+    static boost::intrusive_ptr<DocumentSourceBucketAuto> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        int numBuckets = 0,
+        uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes);
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    explicit DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                      int numBuckets,
+                                      uint64_t maxMemoryUsageBytes);
+
+    // struct for holding information about a bucket.
+    struct Bucket {
+        Bucket(Value min, Value max, std::vector<Accumulator::Factory> accumulatorFactories);
+        Value _min;
+        Value _max;
+        std::vector<boost::intrusive_ptr<Accumulator>> _accums;
+    };
+
+    /**
+     * Consumes all of the documents from the source in the pipeline and sorts them by their
+     * 'groupBy' value.
+     */
+    void populateSorter();
+
+    /**
+     * Computes the 'groupBy' expression value for 'doc'.
+     */
+    Value extractKey(const Document& doc);
+
+    /**
+     * Calculates the bucket boundaries for the input documents and places them into buckets.
+     */
+    void populateBuckets();
+
+    /**
+     * Adds an accumulator to this stage.
+     */
+    void addAccumulator(StringData fieldName,
+                        Accumulator::Factory accumulatorFactory,
+                        const boost::intrusive_ptr<Expression>& expression);
+
+    /**
+     * Adds the document in 'entry' to 'bucket' by updating the accumulators in 'bucket'.
+     */
+    void addDocumentToBucket(const std::pair<Value, Document>& entry, Bucket& bucket);
+
+    /**
+     * Adds 'newBucket' to _buckets and updates any boundaries if necessary.
+     */
+    void addBucket(const Bucket& newBucket);
+
+    /**
+     * Makes a document using the information from bucket. This is what is returned when getNext()
+     * is called.
+     */
+    Document makeDocument(const Bucket& bucket);
+
+    void parseGroupByExpression(const BSONElement& groupByField, const VariablesParseState& vps);
+
+    std::unique_ptr<Sorter<Value, Document>> _sorter;
+    std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
+
+    // _fieldNames contains the field names for the result documents, _accumulatorFactories contains
+    // the accumulator factories for the result documents, and _expressions contains the common
+    // expressions used by each instance of each accumulator in order to find the right-hand side of
+    // what gets added to the accumulator. These three vectors parallel each other.
+    std::vector<std::string> _fieldNames;
+    std::vector<Accumulator::Factory> _accumulatorFactories;
+    std::vector<boost::intrusive_ptr<Expression>> _expressions;
+
+    int _nBuckets;
+    uint64_t _maxMemoryUsageBytes;
+    bool _populated = false;
+    std::vector<Bucket> _buckets;
+    std::vector<Bucket>::iterator _bucketsIterator;
+    std::unique_ptr<Variables> _variables;
+    boost::intrusive_ptr<Expression> _groupByExpression;
+    long long _nDocuments = 0;
 };
 }  // namespace mongo
