@@ -61,13 +61,6 @@
 
 namespace mongo {
 
-using std::set;
-using std::endl;
-using std::list;
-using std::string;
-using std::vector;
-using std::unique_ptr;
-
 Counter64 ttlPasses;
 Counter64 ttlDeletedDocuments;
 
@@ -83,11 +76,11 @@ public:
     TTLMonitor() {}
     virtual ~TTLMonitor() {}
 
-    virtual string name() const {
+    virtual std::string name() const {
         return "TTLMonitor";
     }
 
-    static string secondsExpireField;
+    static std::string secondsExpireField;
 
     virtual void run() {
         Client::initThread(name().c_str());
@@ -96,35 +89,34 @@ public:
         while (!inShutdown()) {
             sleepsecs(ttlMonitorSleepSecs);
 
-            LOG(3) << "TTLMonitor thread awake" << endl;
+            LOG(3) << "thread awake";
 
             if (!ttlMonitorEnabled) {
-                LOG(1) << "TTLMonitor is disabled" << endl;
+                LOG(1) << "disabled";
                 continue;
             }
 
             if (lockedForWriting()) {
-                // note: this is not perfect as you can go into fsync+lock between
-                // this and actually doing the delete later
-                LOG(3) << " locked for writing" << endl;
+                // Note: this is not perfect as you can go into fsync+lock between this and actually
+                // doing the delete later.
+                LOG(3) << "locked for writing";
                 continue;
             }
 
             try {
                 doTTLPass();
             } catch (const WriteConflictException& e) {
-                LOG(1) << "Got WriteConflictException in TTL thread";
+                LOG(1) << "got WriteConflictException";
             }
         }
     }
 
 private:
     void doTTLPass() {
-        // Count it as active from the moment the TTL thread wakes up
         const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
         OperationContext& txn = *txnPtr;
 
-        // if part of replSet but not in a readable state (e.g. during initial sync), skip.
+        // If part of replSet but not in a readable state (e.g. during initial sync), skip.
         if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet &&
             !repl::getGlobalReplicationCoordinator()->getMemberState().readable())
@@ -169,9 +161,8 @@ private:
     }
 
     /**
-     * Remove documents from the collection using the specified TTL index
-     * after a sufficient amount of time has passed according to its expiry
-     * specification.
+     * Remove documents from the collection using the specified TTL index after a sufficient amount
+     * of time has passed according to its expiry specification.
      */
     void doTTLForIndex(OperationContext* txn, BSONObj idx) {
         const NamespaceString collectionNSS(idx["ns"].String());
@@ -188,7 +179,7 @@ private:
             return;
         }
 
-        LOG(1) << "TTL -- ns: " << collectionNSS << " key: " << key << " name: " << name;
+        LOG(1) << "ns: " << collectionNSS << " key: " << key << " name: " << name;
 
         AutoGetCollection autoGetCollection(txn, collectionNSS, MODE_IX);
         Collection* collection = autoGetCollection.getCollection();
@@ -198,8 +189,6 @@ private:
         }
 
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionNSS)) {
-            // We've stepped down since we started this function, so we should stop working
-            // as we only do deletes on the primary.
             return;
         }
 
@@ -210,8 +199,8 @@ private:
             return;
         }
 
-        // Re-read 'idx' from the descriptor, in case the collection or index definition
-        // changed before we re-acquired the collection lock.
+        // Re-read 'idx' from the descriptor, in case the collection or index definition changed
+        // before we re-acquired the collection lock.
         idx = desc->infoObj();
 
         if (IndexType::INDEX_BTREE != IndexNames::nameToType(desc->getAccessMethodName())) {
@@ -255,7 +244,7 @@ private:
         params.isMulti = true;
         params.canonicalQuery = canonicalQuery.getValue().get();
 
-        unique_ptr<PlanExecutor> exec =
+        std::unique_ptr<PlanExecutor> exec =
             InternalPlanner::deleteWithIndexScan(txn,
                                                  collection,
                                                  params,
@@ -275,7 +264,7 @@ private:
 
         const long long numDeleted = DeleteStage::getNumDeleted(*exec);
         ttlDeletedDocuments.increment(numDeleted);
-        LOG(1) << "\tTTL deleted: " << numDeleted << endl;
+        LOG(1) << "deleted: " << numDeleted;
     }
 };
 
@@ -291,5 +280,5 @@ void startTTLBackgroundJob() {
     ttlMonitor->go();
 }
 
-string TTLMonitor::secondsExpireField = "expireAfterSeconds";
-}
+std::string TTLMonitor::secondsExpireField = "expireAfterSeconds";
+}  // namespace mongo
