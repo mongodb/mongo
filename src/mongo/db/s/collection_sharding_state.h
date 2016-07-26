@@ -57,10 +57,9 @@ class CollectionShardingState {
 
 public:
     /**
-     * Instantiates a new per-collection sharding state with some initial metadata.
+     * Instantiates a new per-collection sharding state as unsharded.
      */
-    CollectionShardingState(NamespaceString nss,
-                            std::unique_ptr<CollectionMetadata> initialMetadata);
+    CollectionShardingState(NamespaceString nss);
     ~CollectionShardingState();
 
     /**

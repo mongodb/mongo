@@ -104,11 +104,8 @@ private:
 
 }  // unnamed namespace
 
-CollectionShardingState::CollectionShardingState(
-    NamespaceString nss, std::unique_ptr<CollectionMetadata> initialMetadata)
-    : _nss(std::move(nss)), _metadataManager{} {
-    _metadataManager.refreshActiveMetadata(std::move(initialMetadata));
-}
+CollectionShardingState::CollectionShardingState(NamespaceString nss)
+    : _nss(std::move(nss)), _metadataManager{} {}
 
 CollectionShardingState::~CollectionShardingState() {
     invariant(!_sourceMgr);

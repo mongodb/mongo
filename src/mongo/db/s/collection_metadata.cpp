@@ -424,7 +424,7 @@ void CollectionMetadata::toBSONPending(BSONArrayBuilder& bb) const {
 }
 
 string CollectionMetadata::toStringBasic() const {
-    return stream() << "Coll version: " << _collVersion.toString()
+    return stream() << "collection version: " << _collVersion.toString()
                     << ", shard version: " << _shardVersion.toString();
 }
 

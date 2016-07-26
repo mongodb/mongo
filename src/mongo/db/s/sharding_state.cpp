@@ -224,8 +224,8 @@ CollectionShardingState* ShardingState::getNS(const std::string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     CollectionShardingStateMap::iterator it = _collections.find(ns);
     if (it == _collections.end()) {
-        auto inserted = _collections.insert(make_pair(
-            ns, stdx::make_unique<CollectionShardingState>(NamespaceString(ns), nullptr)));
+        auto inserted = _collections.insert(
+            make_pair(ns, stdx::make_unique<CollectionShardingState>(NamespaceString(ns))));
         invariant(inserted.second);
         it = std::move(inserted.first);
     }

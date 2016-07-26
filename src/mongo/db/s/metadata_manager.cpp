@@ -78,7 +78,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
 
     // Collection is not sharded currently
     if (!_activeMetadataTracker->metadata) {
-        log() << "Marking collection as sharded with version " << remoteMetadata->toStringBasic();
+        log() << "Marking collection as sharded with " << remoteMetadata->toStringBasic();
 
         invariant(_receivingChunks.empty());
         invariant(_rangesToClean.empty());
@@ -103,7 +103,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     // We already have newer version
     if (_activeMetadataTracker->metadata->getCollVersion() >= remoteMetadata->getCollVersion()) {
         LOG(1) << "Attempted to refresh active metadata "
-               << _activeMetadataTracker->metadata->toStringBasic() << " with an older version "
+               << _activeMetadataTracker->metadata->toStringBasic() << " with an older "
                << remoteMetadata->toStringBasic();
 
         return;
