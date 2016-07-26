@@ -39,6 +39,7 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/procparser.h"
 
 namespace mongo {
@@ -79,6 +80,11 @@ public:
     void collect(OperationContext* txn, BSONObjBuilder& builder) override {
         {
             BSONObjBuilder subObjBuilder(builder.subobjStart("cpu"_sd));
+
+            // Include the number of cpus to simplify client calculations
+            ProcessInfo p;
+            subObjBuilder.append("num_cpus", p.getNumCores());
+
             processStatusErrors(
                 procparser::parseProcStatFile("/proc/stat"_sd, kCpuKeys, &subObjBuilder),
                 &subObjBuilder);
