@@ -366,6 +366,7 @@ private:
     std::string _error;
     unsigned int _opId;        // op id for this scope
     OperationContext* _opCtx;  // Op context for DbEval
+    std::size_t _inOp;
     std::atomic<bool> _pendingGC;
     ConnectState _connectState;
     Status _status;
