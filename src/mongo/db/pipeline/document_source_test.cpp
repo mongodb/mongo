@@ -4118,7 +4118,7 @@ TEST_F(BucketAutoTests, RespectsCanonicalTypeOrderingOfValues) {
 
 TEST_F(BucketAutoTests, SourceNameIsBucketAuto) {
     auto bucketAuto = createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}"));
-    ASSERT_EQUALS(bucketAuto->getSourceName(), "$bucketAuto");
+    ASSERT_EQUALS(std::string(bucketAuto->getSourceName()), "$bucketAuto");
 }
 
 TEST_F(BucketAutoTests, ShouldAddDependenciesOfGroupByFieldAndComputedFields) {
