@@ -1327,13 +1327,7 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
         return;
     }
 
-    // TODO(SH): Remove this once we fix waiting for the OplogFetcher before completing
-    // InitSync.
-    //           In "Complete" test this is called after Initial Sync completes sometimes.
-    if (!_oplogBuffer) {
-        error() << "No _oplogBuffer to add documents to; throwing away the batch.";
-        return;
-    }
+    invariant(_oplogBuffer);
 
     // Wait for enough space.
     // Gets unblocked on shutdown.
