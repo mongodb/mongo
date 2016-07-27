@@ -908,6 +908,7 @@ tasks:
           - "./**.pdb"
           - "./**.msi"
           - "./etc/*san.suppressions"
+          - "./etc/repo_config.yaml"
           - "./build/integration_tests/**"
           - "./build/integration_tests.txt"
           - "repo/**"
