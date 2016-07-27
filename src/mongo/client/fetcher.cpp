@@ -270,13 +270,19 @@ void Fetcher::join() {
     _condition.wait(lk, [this]() { return !_active; });
 }
 
+bool Fetcher::inShutdown_forTest() const {
+    return _isInShutdown();
+}
+
+bool Fetcher::_isInShutdown() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _inShutdown;
+}
+
 Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (_inShutdown) {
-            return Status(ErrorCodes::CallbackCanceled,
-                          "fetcher was shut down after previous batch was processed");
-        }
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::CallbackCanceled,
+                      "fetcher was shut down after previous batch was processed");
     }
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
@@ -300,12 +306,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         return;
     }
 
-    bool inShutdown = false;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        inShutdown = _inShutdown;
-    }
-    if (inShutdown) {
+    if (_isInShutdown()) {
         _work(Status(ErrorCodes::CallbackCanceled, "fetcher shutting down"), nullptr, nullptr);
         _finishCallback();
         return;

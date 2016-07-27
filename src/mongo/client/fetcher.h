@@ -188,6 +188,13 @@ public:
      */
     void join();
 
+    /**
+     * Returns whether the fetcher is in shutdown.
+     *
+     * For testing only.
+     */
+    bool inShutdown_forTest() const;
+
 private:
     /**
      * Schedules getMore command to be run by the executor
@@ -211,6 +218,11 @@ private:
      * Note: Errors are ignored and no retry is done
      */
     void _sendKillCursors(const CursorId id, const NamespaceString& nss);
+
+    /**
+     * Returns whether the fetcher is in shutdown.
+     */
+    bool _isInShutdown() const;
 
     // Not owned by us.
     executor::TaskExecutor* _executor;

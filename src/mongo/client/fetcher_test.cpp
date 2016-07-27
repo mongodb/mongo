@@ -311,17 +311,20 @@ TEST_F(FetcherTest, ScheduleWhenActive) {
 TEST_F(FetcherTest, CancelWithoutSchedule) {
     ASSERT_FALSE(fetcher->isActive());
     fetcher->shutdown();
+    ASSERT_TRUE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, WaitWithoutSchedule) {
     ASSERT_FALSE(fetcher->isActive());
     fetcher->join();
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, ShutdownBeforeSchedule) {
     getExecutor().shutdown();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, fetcher->schedule());
     ASSERT_FALSE(fetcher->isActive());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, ScheduleAndCancel) {
@@ -341,6 +344,7 @@ TEST_F(FetcherTest, ScheduleAndCancel) {
     }
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status.code());
+    ASSERT_TRUE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, ScheduleButShutdown) {
@@ -364,6 +368,7 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
     ASSERT_FALSE(fetcher->isActive());
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status.code());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FindCommandFailed1) {
@@ -372,6 +377,7 @@ TEST_F(FetcherTest, FindCommandFailed1) {
         ErrorCodes::BadValue, "bad hint", ReadyQueueState::kEmpty, FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
     ASSERT_EQUALS("bad hint", status.reason());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FindCommandFailed2) {
@@ -489,6 +495,7 @@ TEST_F(FetcherTest, FirstBatchFieldMissing) {
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "must contain 'cursor.firstBatch' field");
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FirstBatchNotAnArray) {
@@ -503,6 +510,7 @@ TEST_F(FetcherTest, FirstBatchNotAnArray) {
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "'cursor.firstBatch' field must be an array");
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FirstBatchArrayContainsNonObject) {
@@ -518,6 +526,7 @@ TEST_F(FetcherTest, FirstBatchArrayContainsNonObject) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "found non-object");
     ASSERT_STRING_CONTAINS(status.reason(), "in 'cursor.firstBatch' field");
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FirstBatchEmptyArray) {
@@ -534,6 +543,7 @@ TEST_F(FetcherTest, FirstBatchEmptyArray) {
     ASSERT_EQUALS(0, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_TRUE(documents.empty());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FetchOneDocument) {
@@ -552,6 +562,7 @@ TEST_F(FetcherTest, FetchOneDocument) {
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_EQUALS(doc, documents.front());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
@@ -580,6 +591,7 @@ TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_EQUALS(doc, documents.front());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 void appendGetMoreRequest(const StatusWith<Fetcher::QueryResponse>& fetchResult,
@@ -618,6 +630,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS(elapsedMillis, Milliseconds(100));
     ASSERT_TRUE(first);
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 
     const BSONObj doc2 = BSON("_id" << 2);
 
@@ -660,6 +673,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS(elapsedMillis, Milliseconds(300));
     ASSERT_FALSE(first);
     ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
@@ -711,6 +725,41 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
     }
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status);
+    ASSERT_TRUE(fetcher->inShutdown_forTest());
+}
+
+TEST_F(FetcherTest, CancelDuringCallbackPutsFetcherInShutdown) {
+    Status fetchStatus1 = Status(ErrorCodes::InternalError, "error");
+    Status fetchStatus2 = Status(ErrorCodes::InternalError, "error");
+    callbackHook = [&](const StatusWith<Fetcher::QueryResponse>& fetchResult,
+                       Fetcher::NextAction* nextAction,
+                       BSONObjBuilder* getMoreBob) {
+        if (!getMoreBob) {
+            fetchStatus2 = fetchResult.getStatus();
+            return;
+        }
+        const auto& batchData = fetchResult.getValue();
+        getMoreBob->append("getMore", batchData.cursorId);
+        getMoreBob->append("collection", batchData.nss.coll());
+
+        fetchStatus1 = fetchResult.getStatus();
+        fetcher->shutdown();
+    };
+    fetcher->schedule();
+    const BSONObj doc = BSON("_id" << 1);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch"
+                                                      << BSON_ARRAY(doc))
+                                         << "ok"
+                                         << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kInactive);
+
+    ASSERT_TRUE(fetcher->inShutdown_forTest());
+    ASSERT_FALSE(fetcher->isActive());
+    ASSERT_OK(fetchStatus1);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, fetchStatus2);
 }
 
 TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
@@ -763,6 +812,7 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
     }
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status);
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 
@@ -811,6 +861,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
     auto cursors = cmdObj["cursors"].Array();
     ASSERT_EQUALS(1U, cursors.size());
     ASSERT_EQUALS(cursorId, cursors.front().numberLong());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 
     // killCursors command request will be canceled by executor on shutdown.
     tearDown();
@@ -893,6 +944,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
     }
 
     ASSERT_EQUALS(1, countLogLinesContaining("killCursors command failed: UnknownError"));
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 /**
@@ -968,12 +1020,12 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
                            FetcherState::kInactive);
 
     // Fetcher should attempt (unsuccessfully) to schedule a killCursors command.
-    ASSERT_EQUALS(
-        1,
-        countLogLinesContaining(
-            "failed to schedule killCursors command: ShutdownInProgress: Shutdown in progress"));
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining("failed to schedule killCursors command: "
+                                          "ShutdownInProgress: Shutdown in progress"));
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreRequests) {
@@ -1024,6 +1076,7 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
                            ReadyQueueState::kEmpty,
                            FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+    ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
 }  // namespace
