@@ -1962,7 +1962,7 @@ tasks:
       params:
         working_dir: src
         script: |
-          . notary_env.sh
+          . ./notary_env.sh
 
           set -o errexit
           set -o verbose
