@@ -79,11 +79,17 @@ RollbackChecker::CallbackHandle RollbackChecker::checkForRollback(const Callback
         nextAction);
 }
 
-bool RollbackChecker::hasHadRollback() {
+StatusWith<bool> RollbackChecker::hasHadRollback() {
     // Default to true in case the callback is not called in an error case.
     bool hasHadRollback = true;
     auto cbh = checkForRollback(
         [&hasHadRollback](const Status& status) { hasHadRollback = !status.isOK(); });
+
+    if (!cbh.isValid()) {
+        return Status(ErrorCodes::CallbackCanceled,
+                      "Rollback check failed due to callback cancelation");
+    }
+
     _executor->wait(cbh);
     return hasHadRollback;
 }
@@ -118,6 +124,12 @@ Status RollbackChecker::reset_sync() {
     // Default to an error in case the callback is not called in an error case.
     Status resetStatus = Status(ErrorCodes::CommandFailed, "RollbackChecker reset failed");
     auto cbh = reset([&resetStatus](const Status& status) { resetStatus = status; });
+
+    if (!cbh.isValid()) {
+        return Status(ErrorCodes::CallbackCanceled,
+                      "RollbackChecker reset failed due to callback cancelation");
+    }
+
     _executor->wait(cbh);
     return resetStatus;
 }

@@ -576,7 +576,8 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     log() << "Initial sync finished applying oplog entries.";
 
     // Check for roll back, and fail if so.
-    if (rollbackChecker.hasHadRollback()) {
+    auto hasHadRollbackResponse = rollbackChecker.hasHadRollback();
+    if (!hasHadRollbackResponse.isOK() || hasHadRollbackResponse.getValue()) {
         lk.lock();
         _initialSyncState->status = {ErrorCodes::UnrecoverableRollbackError,
                                      "Rollback occurred during initial sync"};

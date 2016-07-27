@@ -30,12 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/util/log.h"
 
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -83,6 +83,16 @@ TEST_F(RollbackCheckerTest, ShutdownBeforeStart) {
     getReplExecutor().shutdown();
     ASSERT(!getRollbackChecker()->reset(callback));
     ASSERT(!getRollbackChecker()->checkForRollback(callback));
+}
+
+TEST_F(RollbackCheckerTest, ShutdownBeforeHasHadRollback) {
+    getReplExecutor().shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getRollbackChecker()->hasHadRollback());
+}
+
+TEST_F(RollbackCheckerTest, ShutdownBeforeResetSync) {
+    getReplExecutor().shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getRollbackChecker()->reset_sync());
 }
 
 TEST_F(RollbackCheckerTest, reset) {

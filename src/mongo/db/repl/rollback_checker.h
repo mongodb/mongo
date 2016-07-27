@@ -75,7 +75,7 @@ public:
 
     // Synchronously checks if there has been a rollback and returns a boolean specifying if one
     // has occurred. If any error occurs this will return true.
-    bool hasHadRollback();
+    StatusWith<bool> hasHadRollback();
 
     // Resets the state used to decide if a rollback occurs, and then calls the nextAction with a
     // status specifying what should occur next. The status will either be OK if there was no
