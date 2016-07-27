@@ -54,6 +54,11 @@
         var commandsToForceWriteConcern = [
             "applyOps",
             "authSchemaUpgrade",
+            "clone",
+            "cloneCollection",
+            "cloneCollectionAsCapped",
+            "convertToCapped",
+            "copydb",
             "createRole",
             "createUser",
             "delete",
