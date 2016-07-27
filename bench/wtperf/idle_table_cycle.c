@@ -129,7 +129,8 @@ cycle_idle_tables(void *arg)
 		 * Drop the table. Keep retrying on EBUSY failure - it is an
 		 * expected return when checkpoints are happening.
 		 */
-		while ((ret = session->drop(session, uri, "force")) == EBUSY)
+		while ((ret = session->drop(
+		    session, uri, "force,checkpoint_wait=false")) == EBUSY)
 			__wt_sleep(1, 0);
 
 		if (ret != 0 && ret != EBUSY) {
