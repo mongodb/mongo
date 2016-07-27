@@ -478,21 +478,22 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_id_check(session));
 
 	/*
-	 * Save the checkpoint session ID.  We never do checkpoints in the
-	 * default session (with id zero).
+	 * Save the checkpoint session ID.
+	 *
+	 * We never do checkpoints in the default session (with id zero).
 	 */
 	WT_ASSERT(session, session->id != 0 && txn_global->checkpoint_id == 0);
 	txn_global->checkpoint_id = session->id;
 
-	txn_global->checkpoint_pinned =
-	    WT_MIN(txn_state->id, txn_state->snap_min);
-
 	/*
-	 * We're about to clear the checkpoint transaction from the global
-	 * state table so the oldest ID can move forward.  Make sure everything
-	 * we've done above is scheduled.
+	 * Remove the checkpoint transaction from the global table.
+	 *
+	 * This allows ordinary visibility checks to move forward because
+	 * checkpoints often take a long time and only write to the metadata.
 	 */
-	WT_FULL_BARRIER();
+	WT_ERR(__wt_writelock(session, txn_global->scan_rwlock));
+	txn_global->checkpoint_txnid = txn->id;
+	txn_global->checkpoint_pinned = WT_MIN(txn->id, txn->snap_min);
 
 	/*
 	 * Sanity check that the oldest ID hasn't moved on before we have
@@ -510,6 +511,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * details).
 	 */
 	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
+	WT_ERR(__wt_writeunlock(session, txn_global->scan_rwlock));
 
 	/* Tell logging that we have started a database checkpoint. */
 	if (full && logging)
