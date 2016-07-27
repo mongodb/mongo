@@ -5779,6 +5779,7 @@ buildvariants:
   - mongo-tools
   run_on:
   - ubuntu1604-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
@@ -5821,6 +5822,7 @@ buildvariants:
   - mongo-tools
   run_on:
   - windows-64-vs2015-small
+  batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
