@@ -55,7 +55,7 @@ StatusWith<ScopedRegisterMigration> ActiveMigrationsRegistry::registerMigration(
 
     return {ErrorCodes::ConflictingOperationInProgress,
             str::stream()
-                << "Unable start new migration because this shard is currently donating chunk for "
+                << "Unable start new migration, because there is already an active migration for "
                 << _activeMoveChunkState->args.getNss().ns()};
 }
 

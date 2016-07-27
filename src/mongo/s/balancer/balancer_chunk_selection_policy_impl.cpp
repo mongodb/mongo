@@ -118,8 +118,9 @@ StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDist
 
 }  // namespace
 
-BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats)
-    : _clusterStats(clusterStats) {}
+BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(
+    std::unique_ptr<ClusterStatistics> clusterStats)
+    : _clusterStats(std::move(clusterStats)) {}
 
 BalancerChunkSelectionPolicyImpl::~BalancerChunkSelectionPolicyImpl() = default;
 

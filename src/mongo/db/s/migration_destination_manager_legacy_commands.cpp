@@ -95,9 +95,10 @@ public:
 
         // Active state of TO-side migrations (MigrateStatus) is serialized by distributed
         // collection lock.
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "Shard is already serving as a destination for migration",
-                !shardingState->migrationDestinationManager()->isActive());
+        if (shardingState->migrationDestinationManager()->isActive()) {
+            errmsg = "migrate already in progress";
+            return false;
+        }
 
         // Pending deletes (for migrations) are serialized by the distributed collection lock,
         // we are sure we registered a delete for a range *before* we can migrate-in a

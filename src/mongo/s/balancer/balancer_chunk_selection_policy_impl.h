@@ -36,7 +36,7 @@ class ClusterStatistics;
 
 class BalancerChunkSelectionPolicyImpl final : public BalancerChunkSelectionPolicy {
 public:
-    BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats);
+    BalancerChunkSelectionPolicyImpl(std::unique_ptr<ClusterStatistics> clusterStats);
     ~BalancerChunkSelectionPolicyImpl();
 
     StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* txn) override;
@@ -69,9 +69,8 @@ private:
         const ShardStatisticsVector& shardStats,
         bool aggressiveBalanceHint);
 
-    // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
-    // policy object is destroyed.
-    ClusterStatistics* const _clusterStats;
+    // Source for obtaining cluster statistics
+    std::unique_ptr<ClusterStatistics> _clusterStats;
 };
 
 }  // namespace mongo

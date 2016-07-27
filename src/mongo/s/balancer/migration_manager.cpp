@@ -121,42 +121,19 @@ void MigrationManager::_executeMigrations(OperationContext* txn,
     for (auto& migration : _activeMigrations) {
         const NamespaceString nss(migration.chunkInfo.migrateInfo.ns);
 
-        const auto& migrateInfo = migration.chunkInfo.migrateInfo;
-
         auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
         if (!scopedCMStatus.isOK()) {
             // Unable to find the ChunkManager for "nss" for whatever reason; abandon this
             // migration and proceed to the next.
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            migrationStatuses->emplace(migrateInfo.getName(),
-                                       std::move(scopedCMStatus.getStatus()));
+            migrationStatuses->insert(MigrationStatuses::value_type(
+                migration.chunkInfo.migrateInfo.getName(), std::move(scopedCMStatus.getStatus())));
             continue;
         }
 
         ChunkManager* const chunkManager = scopedCMStatus.getValue().cm();
-
-        auto chunk = chunkManager->findIntersectingChunk(txn, migrateInfo.minKey);
-        invariant(chunk);
-
-        // If the chunk is not found exactly as requested, the caller must have stale data
-        if (chunk->getMin() != migrateInfo.minKey || chunk->getMax() != migrateInfo.maxKey) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            migrationStatuses->emplace(
-                migrateInfo.getName(),
-                Status(ErrorCodes::IncompatibleShardingMetadata,
-                       str::stream()
-                           << "Chunk "
-                           << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
-                           << " does not exist."));
-            continue;
-        }
-
-        // If chunk is already on the correct shard, just treat the operation as success
-        if (chunk->getShardId() == migrateInfo.to) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            migrationStatuses->emplace(migrateInfo.getName(), Status::OK());
-            continue;
-        }
+        auto chunk =
+            chunkManager->findIntersectingChunk(txn, migration.chunkInfo.migrateInfo.minKey);
 
         {
             // No need to lock the mutex. Only this function and _takeDistLockForAMigration

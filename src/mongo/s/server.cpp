@@ -62,6 +62,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
@@ -300,6 +301,8 @@ static ExitCode runMongosServer() {
     // to ensure that it picks up the server port instead of reporting the default value.
     shardingUptimeReporter.emplace();
     shardingUptimeReporter->startPeriodicThread();
+
+    Balancer::create(getGlobalServiceContext());
 
     clusterCursorCleanupJob.go();
 

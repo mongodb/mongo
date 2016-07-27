@@ -210,12 +210,11 @@ private:
     // Number of moved chunks in last round
     int _balancedLastTime;
 
+    // Balancer policy
+    std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
+
     // Source for cluster statistics
     std::unique_ptr<ClusterStatistics> _clusterStats;
-
-    // Balancer policy. Depends on the cluster statistics instance above so it should be created
-    // after it and destroyed before it.
-    std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
 };
 
 }  // namespace mongo

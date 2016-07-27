@@ -38,15 +38,15 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
-#include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -159,10 +159,8 @@ public:
             return false;
         }
 
-        // This refreshes the chunk metadata if stale
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
-        ChunkManager* const info = scopedCM.cm();
-
+        // This refreshes the chunk metadata if stale.
+        shared_ptr<ChunkManager> info = config->getChunkManager(txn, nss.ns(), true);
         shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
@@ -204,25 +202,26 @@ public:
             }
         }
 
-        const auto secondaryThrottle =
-            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
+        const auto from = grid.shardRegistry()->getShard(txn, chunk->getShardId());
+        if (from->getId() != to->getId()) {
+            const auto secondaryThrottle =
+                uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
-        ChunkType chunkType;
-        chunkType.setNS(nss.ns());
-        chunkType.setMin(chunk->getMin());
-        chunkType.setMax(chunk->getMax());
-        chunkType.setShard(chunk->getShardId());
-        chunkType.setVersion(info->getVersion());
+            ChunkType chunkType;
+            chunkType.setNS(nss.ns());
+            chunkType.setMin(chunk->getMin());
+            chunkType.setMax(chunk->getMax());
+            chunkType.setShard(chunk->getShardId());
+            chunkType.setVersion(info->getVersion());
 
-        uassertStatusOK(configsvr_client::moveChunk(txn,
+            uassertStatusOK(
+                Balancer::get(txn)->moveSingleChunk(txn,
                                                     chunkType,
                                                     to->getId(),
                                                     maxChunkSizeBytes,
                                                     secondaryThrottle,
                                                     cmdObj["_waitForDelete"].trueValue()));
-
-        // Make sure the chunk manager is updated with the migrated chunk
-        info->reload(txn);
+        }
 
         result.append("millis", t.millis());
         return true;
