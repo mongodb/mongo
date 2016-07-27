@@ -5,7 +5,6 @@ selector:
     exclude_files:
     - jstests/core/repair*.js  # Fails on recovery.
     - jstests/core/shellkillop.js  # Takes forever and doesn't test anything new.
-    - jstests/core/diagdata.js # SERVER-25226
 
 executor:
   js_test:
