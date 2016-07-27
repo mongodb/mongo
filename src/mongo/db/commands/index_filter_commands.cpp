@@ -32,10 +32,12 @@
 
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -226,11 +228,14 @@ Status ListFilters::list(const QuerySettings& querySettings, BSONObjBuilder* bob
             hintBob.append("collation", entry.collation);
         }
         BSONArrayBuilder indexesBuilder(hintBob.subarrayStart("indexes"));
-        for (vector<BSONObj>::const_iterator j = entry.indexKeyPatterns.begin();
+        for (BSONObjSet::const_iterator j = entry.indexKeyPatterns.begin();
              j != entry.indexKeyPatterns.end();
              ++j) {
             const BSONObj& index = *j;
             indexesBuilder.append(index);
+        }
+        for (const auto& indexEntry : entry.indexNames) {
+            indexesBuilder.append(indexEntry);
         }
         indexesBuilder.doneFast();
     }
@@ -381,19 +386,23 @@ Status SetFilter::set(OperationContext* txn,
         return Status(ErrorCodes::BadValue,
                       "required field indexes must contain at least one index");
     }
-    vector<BSONObj> indexes;
+    BSONObjSet indexes;
+    std::unordered_set<std::string> indexNames;
     for (vector<BSONElement>::const_iterator i = indexesEltArray.begin();
          i != indexesEltArray.end();
          ++i) {
         const BSONElement& elt = *i;
-        if (!elt.isABSONObj()) {
-            return Status(ErrorCodes::BadValue, "each item in indexes must be an object");
+        if (elt.type() == BSONType::Object) {
+            BSONObj obj = elt.Obj();
+            if (obj.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "index specification cannot be empty");
+            }
+            indexes.insert(obj.getOwned());
+        } else if (elt.type() == BSONType::String) {
+            indexNames.insert(elt.String());
+        } else {
+            return Status(ErrorCodes::BadValue, "each item in indexes must be an object or string");
         }
-        BSONObj obj = elt.Obj();
-        if (obj.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "index specification cannot be empty");
-        }
-        indexes.push_back(obj.getOwned());
     }
 
     auto statusWithCQ = PlanCacheCommand::canonicalize(txn, ns, cmdObj);
@@ -403,7 +412,7 @@ Status SetFilter::set(OperationContext* txn,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // Add allowed indices to query settings, overriding any previous entries.
-    querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes);
+    querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes, indexNames);
 
     // Remove entry from plan cache.
     planCache->remove(*cq);

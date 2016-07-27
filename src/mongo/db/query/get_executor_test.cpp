@@ -33,7 +33,10 @@
 #include "mongo/db/query/get_executor.h"
 
 #include <boost/optional.hpp>
+#include <string>
+#include <unordered_set>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_settings.h"
@@ -77,74 +80,92 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
 //
 
 /**
- * Test function to check filterAllowedIndexEntries
+ * Test function to check filterAllowedIndexEntries.
+ *
+ * indexes: A vector of index entries to filter against.
+ * keyPatterns: A set of index key patterns to use in the filter.
+ * indexNames: A set of index names to use for the filter.
+ *
+ * expectedFilteredNames: The names of indexes that are expected to pass through the filter.
  */
-void testAllowedIndices(const char* hintKeyPatterns[],
-                        const char* indexCatalogKeyPatterns[],
-                        const char* expectedFilteredKeyPatterns[]) {
+void testAllowedIndices(std::vector<IndexEntry> indexes,
+                        BSONObjSet keyPatterns,
+                        std::unordered_set<std::string> indexNames,
+                        std::unordered_set<std::string> expectedFilteredNames) {
     PlanCache planCache;
     QuerySettings querySettings;
 
     // getAllowedIndices should return false when query shape is not yet in query settings.
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
     PlanCacheKey key = planCache.computeKey(*cq);
-    ASSERT_FALSE(querySettings.getAllowedIndices(key));
+    ASSERT_FALSE(querySettings.getAllowedIndicesFilter(key));
 
-    // Add entry to query settings.
-    std::vector<BSONObj> indexKeyPatterns;
-    for (int i = 0; hintKeyPatterns[i] != NULL; ++i) {
-        indexKeyPatterns.push_back(fromjson(hintKeyPatterns[i]));
-    }
-    querySettings.setAllowedIndices(*cq, key, indexKeyPatterns);
+    querySettings.setAllowedIndices(*cq, key, keyPatterns, indexNames);
 
     // Index entry vector should contain 1 entry after filtering.
-    boost::optional<AllowedIndices> allowedIndices = querySettings.getAllowedIndices(key);
-    ASSERT_TRUE(allowedIndices);
+    boost::optional<AllowedIndicesFilter> hasFilter = querySettings.getAllowedIndicesFilter(key);
+    ASSERT_TRUE(hasFilter);
     ASSERT_FALSE(key.empty());
-
-    // Indexes from index catalog.
-    std::vector<IndexEntry> indexEntries;
-    for (int i = 0; indexCatalogKeyPatterns[i] != NULL; ++i) {
-        indexEntries.push_back(IndexEntry(fromjson(indexCatalogKeyPatterns[i])));
-    }
+    auto& filter = *hasFilter;
 
     // Apply filter in allowed indices.
-    filterAllowedIndexEntries(*allowedIndices, &indexEntries);
-    size_t numExpected = 0;
-    while (expectedFilteredKeyPatterns[numExpected] != NULL) {
-        ASSERT_LESS_THAN(numExpected, indexEntries.size());
-        ASSERT_EQUALS(indexEntries[numExpected].keyPattern,
-                      fromjson(expectedFilteredKeyPatterns[numExpected]));
-        numExpected++;
+    filterAllowedIndexEntries(filter, &indexes);
+    size_t matchedIndexes = 0;
+    for (const auto& indexEntry : indexes) {
+        ASSERT_TRUE(expectedFilteredNames.find(indexEntry.name) != expectedFilteredNames.end());
+        matchedIndexes++;
     }
-    ASSERT_EQUALS(indexEntries.size(), numExpected);
+    ASSERT_EQ(matchedIndexes, indexes.size());
 }
 
 // Use of index filters to select compound index over single key index.
 TEST(GetExecutorTest, GetAllowedIndices) {
-    const char* hintKeyPatterns[] = {"{a: 1, b: 1}", NULL};
-    const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
-    const char* expectedFilteredKeyPatterns[] = {"{a: 1, b: 1}", NULL};
-    testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns, expectedFilteredKeyPatterns);
+    testAllowedIndices({IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                       {fromjson("{a: 1, b: 1}")},
+                       {},
+                       {"a_1_b_1"});
 }
 
 // Setting index filter referring to non-existent indexes
 // will effectively disregard the index catalog and
 // result in the planner generating a collection scan.
 TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
-    const char* hintKeyPatterns[] = {"{nosuchfield: 1}", NULL};
-    const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: 1, b: 1}", "{a: 1, c: 1}", NULL};
-    const char* expectedFilteredKeyPatterns[] = {NULL};
-    testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns, expectedFilteredKeyPatterns);
+    testAllowedIndices({IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                       {fromjson("{nosuchfield: 1}")},
+                       {},
+                       {});
 }
 
 // This test case shows how to force query execution to use
 // an index that orders items in descending order.
 TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
-    const char* hintKeyPatterns[] = {"{a: -1}", NULL};
-    const char* indexCatalogKeyPatterns[] = {"{a: 1}", "{a: -1}", NULL};
-    const char* expectedFilteredKeyPatterns[] = {"{a: -1}", NULL};
-    testAllowedIndices(hintKeyPatterns, indexCatalogKeyPatterns, expectedFilteredKeyPatterns);
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: -1}"), "a_-1")},
+        {fromjson("{a: -1}")},
+        {},
+        {"a_-1"});
+}
+
+TEST(GetExecutorTest, GetAllowedIndicesMatchesByName) {
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
+        // BSONObjSet default constructor is explicit, so we cannot copy-list-initialize until
+        // C++14.
+        BSONObjSet(),
+        {"a_1"},
+        {"a_1"});
+}
+
+TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
+        {fromjson("{a: 1}")},
+        {},
+        {"a_1", "a_1:en"});
 }
 
 }  // namespace

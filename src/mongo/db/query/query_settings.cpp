@@ -33,18 +33,17 @@
 
 namespace mongo {
 
-using std::vector;
-
 //
-// AllowedIndices
+// AllowedIndicesFilter
 //
 
-AllowedIndices::AllowedIndices(const std::vector<BSONObj>& indexKeyPatterns) {
-    for (std::vector<BSONObj>::const_iterator i = indexKeyPatterns.begin();
-         i != indexKeyPatterns.end();
+AllowedIndicesFilter::AllowedIndicesFilter(const BSONObjSet& indexKeyPatterns,
+                                           const std::unordered_set<std::string>& indexNames)
+    : indexNames(indexNames) {
+    for (BSONObjSet::const_iterator i = indexKeyPatterns.begin(); i != indexKeyPatterns.end();
          ++i) {
         const BSONObj& indexKeyPattern = *i;
-        this->indexKeyPatterns.push_back(indexKeyPattern.getOwned());
+        this->indexKeyPatterns.insert(indexKeyPattern.getOwned());
     }
 }
 
@@ -56,16 +55,17 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
                                      const BSONObj& sort,
                                      const BSONObj& projection,
                                      const BSONObj& collation,
-                                     const std::vector<BSONObj>& indexKeyPatterns)
+                                     const BSONObjSet& indexKeyPatterns,
+                                     const std::unordered_set<std::string>& indexNames)
     : query(query.getOwned()),
       sort(sort.getOwned()),
       projection(projection.getOwned()),
-      collation(collation.getOwned()) {
-    for (std::vector<BSONObj>::const_iterator i = indexKeyPatterns.begin();
-         i != indexKeyPatterns.end();
+      collation(collation.getOwned()),
+      indexNames(indexNames) {
+    for (BSONObjSet::const_iterator i = indexKeyPatterns.begin(); i != indexKeyPatterns.end();
          ++i) {
         const BSONObj& indexKeyPattern = *i;
-        this->indexKeyPatterns.push_back(indexKeyPattern.getOwned());
+        this->indexKeyPatterns.insert(indexKeyPattern.getOwned());
     }
 }
 
@@ -73,7 +73,8 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
 // QuerySettings
 //
 
-boost::optional<AllowedIndices> QuerySettings::getAllowedIndices(const PlanCacheKey& key) const {
+boost::optional<AllowedIndicesFilter> QuerySettings::getAllowedIndicesFilter(
+    const PlanCacheKey& key) const {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
     AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
@@ -82,12 +83,12 @@ boost::optional<AllowedIndices> QuerySettings::getAllowedIndices(const PlanCache
         return {};
     }
 
-    return AllowedIndices(cacheIter->second.indexKeyPatterns);
+    return AllowedIndicesFilter(cacheIter->second.indexKeyPatterns, cacheIter->second.indexNames);
 }
 
 std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
-    vector<AllowedIndexEntry> entries;
+    std::vector<AllowedIndexEntry> entries;
     for (const auto& entryPair : _allowedIndexEntryMap) {
         entries.push_back(entryPair.second);
     }
@@ -96,7 +97,8 @@ std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
 
 void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
                                       const PlanCacheKey& key,
-                                      const std::vector<BSONObj>& indexes) {
+                                      const BSONObjSet& indexKeyPatterns,
+                                      const std::unordered_set<std::string>& indexNames) {
     const QueryRequest& qr = canonicalQuery.getQueryRequest();
     const BSONObj& query = qr.getFilter();
     const BSONObj& sort = qr.getSort();
@@ -105,10 +107,11 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
         canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();
 
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
+    _allowedIndexEntryMap.erase(key);
     _allowedIndexEntryMap.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(key),
-        std::forward_as_tuple(query, sort, projection, collation, indexes));
+        std::forward_as_tuple(query, sort, projection, collation, indexKeyPatterns, indexNames));
 }
 
 void QuerySettings::removeAllowedIndices(const PlanCacheKey& key) {

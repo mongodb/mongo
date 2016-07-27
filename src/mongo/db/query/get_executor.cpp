@@ -93,7 +93,7 @@ using std::vector;
 using stdx::make_unique;
 
 // static
-void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
+void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
                                std::vector<IndexEntry>* indexEntries) {
     invariant(indexEntries);
 
@@ -105,15 +105,9 @@ void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
          i != indexEntries->end();
          ++i) {
         const IndexEntry& indexEntry = *i;
-        for (std::vector<BSONObj>::const_iterator j = allowedIndices.indexKeyPatterns.begin();
-             j != allowedIndices.indexKeyPatterns.end();
-             ++j) {
-            const BSONObj& index = *j;
-            // Copy index entry to temp vector if found in query settings.
-            if (0 == indexEntry.keyPattern.woCompare(index)) {
-                temp.push_back(indexEntry);
-                break;
-            }
+        if (allowedIndicesFilter.allows(indexEntry)) {
+            // Copy index entry into temp vector if found in query settings.
+            temp.push_back(indexEntry);
         }
     }
 
@@ -155,9 +149,9 @@ void fillOutPlannerParams(OperationContext* txn,
 
     // Filter index catalog if index filters are specified for query.
     // Also, signal to planner that application hint should be ignored.
-    if (boost::optional<AllowedIndices> allowedIndices =
-            querySettings->getAllowedIndices(planCacheKey)) {
-        filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
+    if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
+            querySettings->getAllowedIndicesFilter(planCacheKey)) {
+        filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
         plannerParams->indexFiltersApplied = true;
     }
 

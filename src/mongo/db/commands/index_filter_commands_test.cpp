@@ -36,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -364,6 +365,11 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
                                       "indexes: [{a: 1, b: 1}]}")));
     filters = getFilters(querySettings);
     ASSERT_EQUALS(filters.size(), 1U);
+    auto filterIndexes = filters[0]["indexes"];
+    ASSERT(filterIndexes.type() == BSONType::Array);
+    auto filterArray = filterIndexes.Array();
+    ASSERT_EQ(filterArray.size(), 1U);
+    ASSERT_EQUALS(filterArray[0].Obj(), fromjson("{a: 1, b: 1}"));
 
     // Add hint for different query shape.
     ASSERT_OK(SetFilter::set(txn.get(),
@@ -476,6 +482,38 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     ASSERT_FALSE(
         planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
     ASSERT_TRUE(planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{}"));
+}
+
+
+TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
+    CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
+    IndexEntry collatedIndex(
+        fromjson("{a: 1}"), false, false, false, "a_1:rev", nullptr, BSONObj());
+    collatedIndex.collator = &reverseCollator;
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+    QuerySettings querySettings;
+
+    PlanCache planCache;
+    planCache.notifyOfIndexEntries(
+        {IndexEntry(fromjson("{a: 1}"), false, false, false, "a_1", nullptr, BSONObj()),
+         collatedIndex});
+
+    addQueryShapeToPlanCache(txn.get(), &planCache, "{a: 2}", "{}", "{}", "{}");
+    ASSERT_TRUE(planCacheContains(planCache, "{a: 2}", "{}", "{}", "{}"));
+
+    ASSERT_OK(SetFilter::set(txn.get(),
+                             &querySettings,
+                             &planCache,
+                             nss.ns(),
+                             fromjson("{query: {a: 2}, sort: {}, projection: {},"
+                                      "indexes: [{a: 1}, 'a_1:rev']}")));
+    auto filters = getFilters(querySettings);
+    ASSERT_EQUALS(filters.size(), 1U);
+    auto indexes = filters[0]["indexes"].Array();
+
+    ASSERT_EQUALS(indexes[0].embeddedObject(), fromjson("{a: 1}"));
+    ASSERT_EQUALS(indexes[1].valueStringData(), "a_1:rev");
 }
 
 }  // namespace

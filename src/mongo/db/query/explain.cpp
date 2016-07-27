@@ -598,7 +598,7 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
         const QuerySettings* querySettings = infoCache->getQuerySettings();
         PlanCacheKey planCacheKey =
             infoCache->getPlanCache()->computeKey(*exec->getCanonicalQuery());
-        if (auto allowedIndices = querySettings->getAllowedIndices(planCacheKey)) {
+        if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(planCacheKey)) {
             // Found an index filter set on the query shape.
             indexFilterSet = true;
         }

@@ -22,6 +22,8 @@
  *
  */
 
+load("jstests/libs/analyze_plan.js");
+
 var t = db.jstests_index_filter_commands;
 
 t.drop();
@@ -43,6 +45,7 @@ t.ensureIndex(indexA1);
 t.ensureIndex(indexA1B1);
 t.ensureIndex(indexA1C1);
 
+var queryAA = {a: "A"};
 var queryA1 = {a: 1, b: 1};
 var projectionA1 = {_id: 0, a: 1};
 var sortA1 = {a: -1};
@@ -184,3 +187,37 @@ if (db.isMaster().msg !== "isdbgrid") {
                   .explain('queryPlanner')
                   .queryPlanner.indexFilterSet);
 }
+
+//
+// Tests for index filter commands and multiple indexes with the same key pattern.
+//
+
+t.drop();
+
+var collationEN = {locale: "en_US"};
+assert.commandWorked(t.createIndex(indexA1, {collation: collationEN, name: "a_1:en_US"}));
+assert.commandWorked(t.createIndex(indexA1, {name: "a_1"}));
+
+assert.writeOK(t.insert({a: "a"}));
+
+assert.commandWorked(t.runCommand('planCacheSetFilter', {query: queryAA, indexes: [indexA1]}));
+
+assert.commandWorked(t.runCommand('planCacheSetFilter',
+                                  {query: queryAA, collation: collationEN, indexes: [indexA1]}));
+
+// Ensure that index key patterns in planCacheSetFilter select any index with a matching key
+// pattern.
+
+var explain = t.find(queryAA).explain();
+assert(isIxscan(explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
+
+explain = t.find(queryAA).collation(collationEN).explain();
+assert(isIxscan(explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
+
+// Ensure that index names in planCacheSetFilter only select matching names.
+
+assert.commandWorked(
+    t.runCommand('planCacheSetFilter', {query: queryAA, collation: collationEN, indexes: ["a_1"]}));
+
+explain = t.find(queryAA).collation(collationEN).explain();
+assert(isCollscan(explain.queryPlanner.winningPlan), "Expected collscan: " + tojson(explain));

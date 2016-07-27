@@ -51,7 +51,7 @@ struct GroupRequest;
  * Used by getExecutor().
  * This function is public to facilitate testing.
  */
-void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
+void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
                                std::vector<IndexEntry>* indexEntries);
 
 /**
