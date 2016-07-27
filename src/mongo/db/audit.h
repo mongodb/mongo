@@ -299,6 +299,11 @@ void logRemoveShard(ClientBasic* client, StringData shardname);
  */
 void logShardCollection(ClientBasic* client, StringData ns, const BSONObj& keyPattern, bool unique);
 
+/**
+ * Logs the result of a setParameter command.
+ */
+void logSetParameter(ClientBasic* client,
+                     const std::map<std::string, BSONElement>& parametersToSet);
 
 /*
  * Appends an array of user/db pairs and an array of role/db pairs

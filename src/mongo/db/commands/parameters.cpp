@@ -37,6 +37,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/commands.h"
@@ -232,6 +233,7 @@ public:
             return false;
         }
 
+        audit::logSetParameter(ClientBasic::getCurrent(), parametersToSet);
         return true;
     }
 } cmdSet;
