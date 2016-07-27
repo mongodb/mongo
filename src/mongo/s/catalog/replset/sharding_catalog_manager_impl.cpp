@@ -1166,7 +1166,7 @@ Status ShardingCatalogManagerImpl::upsertShardIdentityOnShard(OperationContext* 
 }
 
 void ShardingCatalogManagerImpl::cancelAddShardTaskIfNeeded(const ShardId& shardId) {
-    stdx::lock_guard<std::mutex> lk(_addShardHandlesMutex);
+    stdx::lock_guard<stdx::mutex> lk(_addShardHandlesMutex);
     if (_hasAddShardHandle_inlock(shardId)) {
         auto cbHandle = _getAddShardHandle_inlock(shardId);
         _executorForAddShard->cancel(cbHandle);
