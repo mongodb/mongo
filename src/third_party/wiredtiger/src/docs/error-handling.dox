@@ -52,6 +52,9 @@ This error indicates an underlying problem that requires the application exit an
 @par <code>WT_RUN_RECOVERY</code>
 This error is generated when wiredtiger_open is configured to return an error if recovery is required to use the database.
 
+@par <code>WT_CACHE_FULL</code>
+This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or update operation requires more than the configured cache size to complete. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

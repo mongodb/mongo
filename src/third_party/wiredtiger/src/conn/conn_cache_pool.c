@@ -58,7 +58,6 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	created = updating = false;
 	pool_name = NULL;
 	cp = NULL;
-	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		updating = true;
@@ -310,6 +309,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
+	F_CLR(conn, WT_CONN_CACHE_POOL);
 
 	__wt_spin_lock(session, &cp->cache_pool_lock);
 	cp_locked = true;
@@ -572,6 +572,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	cp = __wt_process.cache_pool;
 	grow = false;
 	pool_full = cp->currently_used >= cp->size;
+	pct_full = 0;
 	/* Highest as a percentage, avoid 0 */
 	highest_percentile = (highest / 100) + 1;
 

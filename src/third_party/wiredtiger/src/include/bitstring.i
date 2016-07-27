@@ -261,10 +261,10 @@ __bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
  *	Return a record number's bit-field value.
  */
 static inline uint8_t
-__bit_getv_recno(WT_PAGE *page, uint64_t recno, uint8_t width)
+__bit_getv_recno(WT_REF *ref, uint64_t recno, uint8_t width)
 {
 	return (__bit_getv(
-	    page->pg_fix_bitf, recno - page->pg_fix_recno, width));
+	    ref->page->pg_fix_bitf, recno - ref->ref_recno, width));
 }
 
 /*
@@ -304,14 +304,4 @@ __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 	__BIT_SET(2, 0x02);
 	__BIT_SET(1, 0x01);
 	}
-}
-
-/*
- * __bit_setv_recno --
- *	Set a record number's bit-field value.
- */
-static inline void
-__bit_setv_recno(WT_PAGE *page, uint64_t recno, uint8_t width, uint8_t value)
-{
-	__bit_setv(page->pg_fix_bitf, recno - page->pg_fix_recno, width, value);
 }

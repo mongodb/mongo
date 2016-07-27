@@ -118,7 +118,7 @@
 
 #define	JOINABLE_CURSOR_CALL_CHECK(cur)					\
 	if (F_ISSET(cur, WT_CURSTD_JOINED))				\
-		WT_ERR(__wt_curindex_joined(cur))
+		WT_ERR(__wt_curjoin_joined(cur))
 
 #define	JOINABLE_CURSOR_API_CALL(cur, s, n, bt)				\
 	CURSOR_API_CALL(cur, s, n, bt);					\

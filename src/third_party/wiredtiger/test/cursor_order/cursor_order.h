@@ -28,7 +28,7 @@
 
 #include <signal.h>
 
-#include "test_util.i"
+#include "test_util.h"
 
 #define	FNAME		"file:cursor_order.%03d"	/* File name */
 

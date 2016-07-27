@@ -152,15 +152,12 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	u_int end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 	u_int oldest_gen, youngest_gen;
 
-	chunk_size = 0;
-	nchunks = 0;
-	record_count = 0;
-	chunk = youngest = NULL;
-
 	/* Clear the return parameters */
-	*start = 0;
-	*end = 0;
+	*start = *end = 0;
 	*records = 0;
+
+	chunk_size = 0;
+	chunk = youngest = NULL;
 
 	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > WT_LSM_AGGRESSIVE_THRESHOLD) ?
@@ -218,8 +215,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	 */
 retry_find:
 	oldest_gen = youngest_gen = lsm_tree->chunk[end_chunk]->generation;
-	for (start_chunk = end_chunk + 1, record_count = 0;
-	    start_chunk > 0; ) {
+	for (record_count = 0,
+	    start_chunk = end_chunk + 1; start_chunk > 0;) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
 		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk + 1) - start_chunk;
@@ -306,14 +303,12 @@ retry_find:
 	}
 #endif
 
-	WT_ASSERT(session,
-	    nchunks == 0 || (chunk != NULL && youngest != NULL));
+	WT_ASSERT(session, nchunks == 0 || (chunk != NULL && youngest != NULL));
+
 	/*
-	 * Don't do merges that are too small or across too many
-	 * generations.
+	 * Don't do merges that are too small or across too many generations.
 	 */
-	if (nchunks < merge_min ||
-	    oldest_gen - youngest_gen > max_gap) {
+	if (nchunks < merge_min || oldest_gen - youngest_gen > max_gap) {
 		for (i = 0; i < nchunks; i++) {
 			chunk = lsm_tree->chunk[start_chunk + i];
 			WT_ASSERT(session,
@@ -365,7 +360,6 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	bloom = NULL;
 	chunk = NULL;
 	dest = src = NULL;
-	start_id = 0;
 	created_chunk = create_bloom = locked = in_sync = false;
 
 	/* Fast path if it's obvious no merges could be done. */
@@ -485,7 +479,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	    lsm_rows_merged, insert_count % LSM_MERGE_CHECK_INTERVAL);
 	++lsm_tree->merge_progressing;
 	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
+	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted",
 	    record_count, insert_count));
 
 	/*

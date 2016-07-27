@@ -209,9 +209,12 @@ __col_insert_search(WT_INSERT_HEAD *ins_head,
  *	Return the last record number for a variable-length column-store page.
  */
 static inline uint64_t
-__col_var_last_recno(WT_PAGE *page)
+__col_var_last_recno(WT_REF *ref)
 {
 	WT_COL_RLE *repeat;
+	WT_PAGE *page;
+
+	page = ref->page;
 
 	/*
 	 * If there's an append list, there may be more records on the page.
@@ -220,7 +223,7 @@ __col_var_last_recno(WT_PAGE *page)
 	 */
 	if (page->pg_var_nrepeats == 0)
 		return (page->pg_var_entries == 0 ? 0 :
-		    page->pg_var_recno + (page->pg_var_entries - 1));
+		    ref->ref_recno + (page->pg_var_entries - 1));
 
 	repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
 	return ((repeat->recno + repeat->rle) - 1 +
@@ -232,15 +235,19 @@ __col_var_last_recno(WT_PAGE *page)
  *	Return the last record number for a fixed-length column-store page.
  */
 static inline uint64_t
-__col_fix_last_recno(WT_PAGE *page)
+__col_fix_last_recno(WT_REF *ref)
 {
+	WT_PAGE *page;
+
+	page = ref->page;
+
 	/*
 	 * If there's an append list, there may be more records on the page.
 	 * This function ignores those records, our callers must handle that
 	 * explicitly, if they care.
 	 */
-	return (page->pg_fix_entries == 0 ? 0 :
-	    page->pg_fix_recno + (page->pg_fix_entries - 1));
+	return (page->pg_fix_entries == 0 ?
+	    0 : ref->ref_recno + (page->pg_fix_entries - 1));
 }
 
 /*
@@ -248,11 +255,14 @@ __col_fix_last_recno(WT_PAGE *page)
  *	Search a variable-length column-store page for a record.
  */
 static inline WT_COL *
-__col_var_search(WT_PAGE *page, uint64_t recno, uint64_t *start_recnop)
+__col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
 {
 	WT_COL_RLE *repeat;
+	WT_PAGE *page;
 	uint64_t start_recno;
 	uint32_t base, indx, limit, start_indx;
+
+	page = ref->page;
 
 	/*
 	 * Find the matching slot.
@@ -285,7 +295,7 @@ __col_var_search(WT_PAGE *page, uint64_t recno, uint64_t *start_recnop)
 	 */
 	if (base == 0) {
 		start_indx = 0;
-		start_recno = page->pg_var_recno;
+		start_recno = ref->ref_recno;
 	} else {
 		repeat = page->pg_var_repeats + (base - 1);
 		start_indx = repeat->indx + 1;

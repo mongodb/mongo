@@ -35,7 +35,7 @@ __wt_direct_io_size_check(WT_SESSION_IMPL *session,
 	 * units of its happy place.
 	 */
 	if (FLD_ISSET(conn->direct_io,
-	   WT_FILE_TYPE_CHECKPOINT | WT_FILE_TYPE_DATA)) {
+	   WT_DIRECT_IO_CHECKPOINT | WT_DIRECT_IO_DATA)) {
 		align = (int64_t)conn->buffer_alignment;
 		if (align != 0 && (cval.val < align || cval.val % align != 0))
 			WT_RET_MSG(session, EINVAL,
@@ -578,7 +578,7 @@ __create_table(WT_SESSION_IMPL *session,
 			WT_ERR(EEXIST);
 		exists = true;
 	}
-	WT_RET_NOTFOUND_OK(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));
 	WT_ERR(__wt_config_subinit(session, &conf, &cval));

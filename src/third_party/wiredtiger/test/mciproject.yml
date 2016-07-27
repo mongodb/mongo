@@ -8,6 +8,14 @@ functions:
     command: git.get_project
     params:
       directory: wiredtiger
+  "fetch artifacts" : &fetch_artifacts
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        bucket: build_external
+        extract_to: wiredtiger
 
 pre:
   - command: shell.exec
@@ -21,7 +29,9 @@ post:
         rm -rf "wiredtiger"
 
 tasks:
-  - name: compile-posix
+## Base compile task on posix flavours
+  - name: compile
+    depends_on: []
     commands:
       - func: "fetch source"
       - command: git.apply_patch
@@ -33,36 +43,49 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-
-            ./build_posix/reconf
-            ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib
-            ${make_command|make} ${smp_command|}
-            ${make_command|make} check
-
-            ${test_env_vars|} python ./test/suite/run.py -v 2
-  - name: compile-windows
-    commands:
-      - func: "fetch source"
-      - command: git.apply_patch
+            if [ "Windows_NT" = "$OS" ]; then
+              scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic --enable-verbose ${smp_command|}
+            else
+              ./build_posix/reconf
+              ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-verbose
+              ${make_command|make} ${smp_command|} 2>&1
+              ${make_command|make} check 2>&1
+            fi
+      - command: archive.targz_pack
         params:
-          directory: wiredtiger
+          target: "wiredtiger.tgz"
+          source_dir: "wiredtiger"
+          include:
+             - "./**"
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger.tgz
+          bucket: build_external
+          permissions: public-read
+          content_type: application/tar
+          display_name: Artifacts
+          remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+
+  - name: unit-test
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
           script: |
             set -o errexit
             set -o verbose
-
-            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
-
-            ${test_env_vars|} python ./test/suite/run.py -v 2
+            ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
 
   - name: compile-windows-alt
+    depends_on:
+    - name: compile
     commands:
-      - func: "fetch source"
-      - command: git.apply_patch
-        params:
-          directory: wiredtiger
+      - func: "fetch artifacts"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
@@ -72,22 +95,22 @@ tasks:
 
             scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100" wiredtiger.dll libwiredtiger.lib
 
-  - name: fops-windows
+  - name: fops
+    depends_on:
+    - name: compile
     commands:
-      - func: "fetch source"
-      - command: git.apply_patch
-        params:
-          directory: wiredtiger
+      - func: "fetch artifacts"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
           script: |
             set -o errexit
             set -o verbose
-
-            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
-
-            cmd.exe /c t_fops.exe
+            if [ "Windows_NT" = "$OS" ]; then
+              cmd.exe /c t_fops.exe
+            else
+              ./test/fops/t
+            fi
 
 buildvariants:
 - name: ubuntu1404
@@ -95,11 +118,14 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    test_env_vars: LD_LIBRARY_PATH=.libs
-    smp_command: -j$(grep -c ^processor /proc/cpuinfo)
+    # It's ugly, but we need the absolute path here, not the relative
+    test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
   tasks:
-    - name: compile-posix
+    - name: compile
+    - name: unit-test
+    - name: fops
 
 - name: solaris
   display_name: Solaris
@@ -107,31 +133,34 @@ buildvariants:
   - solaris
   expansions:
     make_command: PATH=/opt/mongodbtoolchain/bin:$PATH gmake
-    test_env_vars: LD_LIBRARY_PATH=.libs
-    smp_command: -j$(kstat cpu | sort -u | grep -c "^module")
+    test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
+    smp_command: -j $(kstat cpu | sort -u | grep -c "^module")
     configure_env_vars: PATH=/opt/mongodbtoolchain/bin:$PATH CFLAGS="-m64"
   tasks:
-    - name: compile-posix
+    - name: compile
+    - name: unit-test
+    - name: fops
 
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
   - windows-64-vs2013-test
-  expansions:
-    smp_command: -j$(grep -c ^processor /proc/cpuinfo)
   tasks:
-    - name: compile-windows
+    - name: compile
     - name: compile-windows-alt
-    - name: fops-windows
+    - name: unit-test
+    - name: fops
 
 - name: osx-1010
   display_name: OS X 10.10
   run_on:
   - osx-1010
   expansions:
-    smp_command: -j$(sysctl -n hw.logicalcpu)
+    smp_command: -j $(sysctl -n hw.logicalcpu)
     configure_env_vars: PATH=/opt/local/bin:$PATH
     make_command: PATH=/opt/local/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
-    test_env_vars: DYLD_LIBRARY_PATH=.libs
+    test_env_vars: DYLD_LIBRARY_PATH=`pwd`/.libs
   tasks:
-    - name: compile-posix
+    - name: compile
+    - name: unit-test
+    - name: fops

@@ -23,7 +23,7 @@ file_parse()
 # where there's a jump to the error label after the error label.
 for f in `find bench examples ext src test -name '*.[ci]'`; do
 	file_parse $f |
-	egrep '(WT_ERR|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ILLEGAL_VALUE|WT_RET)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ILLEGAL_VALUE_ERR)\(' |
+	egrep '(WT_ERR[_A-Z]*|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ILLEGAL_VALUE|WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ILLEGAL_VALUE_ERR)\(' |
 	sed 's/:.*//' > $t
 
 	test -s $t && {
@@ -31,6 +31,14 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 		sed 's/^/function @ line:/' < $t
 	}
 done
+
+# Returns before jumps to an error label within the same loop.
+# Jumps before returns have already been detected above.
+for f in `find bench examples ext src test -name '*.[ci]'`; do
+	file_parse $f | sed "s=^=$f:="
+done | python dist/s_label_loop.py |
+    egrep '\{@[^@]*(WT_ILLEGAL_VALUE|WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*|WT_ILLEGAL_VALUE_ERR)\(.*err:' |
+    sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
 
 # Return of 0 in functions after a jump to the error label.
 for f in `find bench examples ext src test -name '*.[ci]'`; do

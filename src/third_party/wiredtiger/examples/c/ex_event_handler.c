@@ -68,7 +68,7 @@ handle_wiredtiger_error(WT_EVENT_HANDLER *handler,
 	/* Report the error on the console. */
 	fprintf(stderr,
 	    "app_id %s, thread context %p, error %d, message %s\n",
-	    custom_handler->app_id, session, error, message);
+	    custom_handler->app_id, (void *)session, error, message);
 
 	return (0);
 }
@@ -83,7 +83,8 @@ handle_wiredtiger_message(
 {
 	/* Cast the handler back to our custom handler. */
 	printf("app id %s, thread context %p, message %s\n",
-	    ((CUSTOM_EVENT_HANDLER *)handler)->app_id, session, message);
+	    ((CUSTOM_EVENT_HANDLER *)handler)->app_id,
+	    (void *)session, message);
 
 	return (0);
 }
@@ -111,10 +112,10 @@ config_event_handler(void)
 	/*! [Configure event_handler] */
 
 	/* Make an invalid API call, to ensure the event handler works. */
-	(void)conn->open_session(conn, NULL, "isolation=invalid", &session);
+	printf("ex_event_handler: expect an error message to follow\n");
+	ret = conn->open_session(conn, NULL, "isolation=invalid", &session);
 
-	if (ret == 0)
-		ret = conn->close(conn, NULL);
+	ret = conn->close(conn, NULL);
 
 	return (ret);
 }
@@ -122,6 +123,8 @@ config_event_handler(void)
 int
 main(void)
 {
+	int ret;
+
 	/*
 	 * Create a clean test directory for this run of the test program if the
 	 * environment variable isn't already set (as is done by make check).
@@ -132,5 +135,7 @@ main(void)
 	} else
 		home = NULL;
 
-	return (config_event_handler());
+	ret = config_event_handler();
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

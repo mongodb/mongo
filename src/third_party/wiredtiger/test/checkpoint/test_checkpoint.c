@@ -32,7 +32,8 @@ GLOBAL g;
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
-static void onint(int);
+static void onint(int)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static int  cleanup(void);
 static int  usage(void);
 static int  wt_connect(const char *);
@@ -61,8 +62,7 @@ main(int argc, char *argv[])
 	working_dir = NULL;
 	ttype = MIX;
 	g.checkpoint_name = "WiredTigerCheckpoint";
-	if ((g.home = malloc(512)) == NULL)
-		testutil_die(ENOMEM, "Unable to allocate memory");
+	g.home = dmalloc(512);
 	g.nkeys = 10000;
 	g.nops = 100000;
 	g.ntables = 3;

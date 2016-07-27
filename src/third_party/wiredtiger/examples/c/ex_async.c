@@ -31,7 +31,9 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -48,7 +50,6 @@
 #define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
 #endif
 
-static const char * const home = NULL;
 static int global_error = 0;
 
 /*! [async example callback implementation] */
@@ -120,7 +121,18 @@ main(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int i, ret;
+	const char *home;
 	char k[MAX_KEYS][16], v[MAX_KEYS][16];
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
 
 	/*! [async example connection] */
 	ret = wiredtiger_open(home, NULL,
@@ -148,7 +160,7 @@ main(void)
 			if (ret == EBUSY)
 				sleep(1);
 			else
-				return (ret);
+				return (EXIT_FAILURE);
 		}
 		/*! [async handle allocation] */
 
@@ -198,7 +210,7 @@ main(void)
 			if (ret == EBUSY)
 				sleep(1);
 			else
-				return (ret);
+				return (EXIT_FAILURE);
 		}
 
 		/*! [async search] */
@@ -220,5 +232,5 @@ main(void)
 
 	printf("Searched for %" PRIu32 " keys\n", ex_asynckeys.num_keys);
 
-	return (ret);
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

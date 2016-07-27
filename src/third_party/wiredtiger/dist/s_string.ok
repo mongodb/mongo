@@ -76,6 +76,7 @@ DECL
 DECR
 DESC
 DHANDLE
+DIRECTIO
 DNE
 DOI
 DONTNEED
@@ -86,6 +87,7 @@ Decrement
 Decrypt
 DeleteFileA
 EAGAIN
+EB
 EBUSY
 EEXIST
 EINTR
@@ -116,6 +118,7 @@ FNV
 FORALL
 FOREACH
 FULLFSYNC
+FindClose
 FindFirstFile
 Fixup
 Fk
@@ -130,6 +133,7 @@ GIDs
 Gcc
 Geoff
 GetEnvironmentVariableA
+GetFileAttributesA
 GetFileAttributesEx
 GetFileSizeEx
 GetLastError
@@ -145,6 +149,7 @@ IEC
 IEEE
 IKEY
 IMPL
+IMPL's
 INCR
 INIT
 INITIALIZER
@@ -211,6 +216,7 @@ Mewhort
 Mitzenmacher
 MongoDB
 MoveFile
+MoveFileA
 Multi
 Multithreaded
 Mutex
@@ -255,6 +261,7 @@ Qsort
 RCS
 RDNOLOCK
 RDONLY
+READONLY
 RECNO
 REF's
 REFs
@@ -468,6 +475,7 @@ ckptfrag
 ckptlist
 cksum
 cloexec
+closedir
 clsm
 cmd
 cmp
@@ -488,9 +496,11 @@ conn
 connectionp
 const
 constantp
+cookiep
 copydoc
 copyin
 copyout
+countp
 cp
 cpuid
 crc
@@ -602,6 +612,7 @@ evictserver
 exactp
 exe
 execop
+existp
 extern
 extlist
 fadvise
@@ -618,6 +629,7 @@ ffs
 fgetc
 fgetln
 fh
+fhandle
 filefrag
 filehandle
 fileid
@@ -637,11 +649,14 @@ fmterr
 fnv
 foc
 fopen
+formatmessage
 fp
 fprintf
 free'd
+fs
 fscanf
 fstat
+fstream
 fsync
 fsyncLock
 fsyncs
@@ -669,11 +684,13 @@ gostruct
 goutf
 gt
 handleops
+handlep
 hashval
 havesize
 hdr
 highjack
 hotbackup
+hselasky
 html
 huffman
 hval
@@ -684,11 +701,13 @@ ibackup
 icount
 idx
 ifdef's
+iiu
 ikey
 im
 impl
 incase
 incr
+incrementals
 incrementing
 indices
 indirects
@@ -697,6 +716,7 @@ infeasible
 inflateInit
 infmt
 init
+initializers
 initn
 initsize
 initval
@@ -715,8 +735,20 @@ intrin
 inuse
 io
 ip
+isalnum
+isalpha
+iscntrl
+isdigit
+isgraph
 islocked
+islower
 ispo
+isprint
+ispunct
+isrc
+isspace
+isupper
+isxdigit
 iter
 iteratively
 jnr
@@ -739,6 +771,7 @@ lbracket
 ld
 le
 len
+lengthp
 lenp
 level's
 leveldb
@@ -844,6 +877,7 @@ noraw
 notfound
 notsup
 notused
+nowait
 nset
 nsnap
 nul
@@ -866,6 +900,7 @@ os
 osfhandle
 ovfl
 ownp
+pR
 packv
 pagesize
 parens
@@ -911,6 +946,7 @@ pushms
 putK
 putV
 pv
+pvA
 pwrite
 py
 qdown
@@ -939,6 +975,7 @@ recsize
 rectype
 recurse
 refp
+regionp
 reinitialization
 relocked
 resize
@@ -1038,7 +1075,9 @@ toklen
 tokname
 tokstart
 toktype
+tolower
 totalsec
+toupper
 transactional
 transactionally
 trecno
@@ -1064,6 +1103,7 @@ uncompresssed
 undef
 unencrypted
 unesc
+unescape
 unescaped
 unicode
 uninstantiated

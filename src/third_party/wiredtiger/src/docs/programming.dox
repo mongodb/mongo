@@ -41,6 +41,7 @@ each of which is ordered by one or more columns.
 - @subpage compact
 - @subpage checkpoint
 - @subpage durability
+- @subpage in_memory
 - @subpage cursor_join
 - @subpage cursor_log
 - @ref transaction_named_snapshots
@@ -55,6 +56,7 @@ each of which is ordered by one or more columns.
 - @subpage custom_collators
 - @subpage custom_extractors
 - @subpage custom_data_sources
+- @subpage custom_file_systems
 - @subpage helium
 @m_endif
 

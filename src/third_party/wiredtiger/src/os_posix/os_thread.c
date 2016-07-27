@@ -34,7 +34,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 {
 	WT_DECL_RET;
 
-	WT_SYSCALL_RETRY(pthread_join(tid, NULL), ret);
+	WT_SYSCALL(pthread_join(tid, NULL), ret);
 	if (ret == 0)
 		return (0);
 

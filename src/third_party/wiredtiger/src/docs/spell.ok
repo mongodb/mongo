@@ -25,6 +25,7 @@ EBUSY
 ECMA
 EINVAL
 ENCRYPTOR
+ENOTSUP
 EmpId
 Encryptors
 Facebook
@@ -80,6 +81,7 @@ Seward's
 SiH
 TXT
 URIs
+WILLNEED
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
@@ -178,6 +180,8 @@ desc
 destructor
 destructors
 dev
+disjunction
+disjunctions
 distclean
 dl
 dll
@@ -208,6 +212,7 @@ errno
 exe
 fadvise
 failchk
+fallocate
 fd's
 fdatasync
 fieldname
@@ -331,6 +336,7 @@ nocase
 nocasecoll
 nodup
 noflush
+nolock
 nolocking
 nommap
 nop

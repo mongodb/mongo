@@ -42,6 +42,17 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(session, cstats, cache_lookaside_insert, v);
 	v = WT_STAT_READ(dstats, cursor_remove);
 	WT_STAT_SET(session, cstats, cache_lookaside_remove, v);
+	/*
+	 * If we're clearing stats we need to clear the cursor values we just
+	 * read.  This does not clear the rest of the statistics in the
+	 * lookaside data source stat cursor, but we own that namespace so we
+	 * don't have to worry about users seeing inconsistent data source
+	 * information.
+	 */
+	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR)) {
+		WT_STAT_SET(session, dstats, cursor_insert, 0);
+		WT_STAT_SET(session, dstats, cursor_remove, 0);
+	}
 }
 
 /*

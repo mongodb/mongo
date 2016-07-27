@@ -831,7 +831,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		goto err;
 	}
 	cursor->config_bitfield =
-	    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
+	    v.len == 2 && isdigit((u_char)v.str[0]) && v.str[1] == 't';
 
 	if ((ret = writelock(wtext, session, &ds->rwlock)) != 0)
 		goto err;

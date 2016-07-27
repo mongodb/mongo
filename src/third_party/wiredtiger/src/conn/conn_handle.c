@@ -149,14 +149,16 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_spin_destroy(session, &conn->page_lock[i]);
 	__wt_free(session, conn->page_lock);
 
+	/* Destroy the file-system configuration. */
+	if (conn->file_system != NULL && conn->file_system->terminate != NULL)
+		WT_TRET(conn->file_system->terminate(
+		    conn->file_system, (WT_SESSION *)session));
+
 	/* Free allocated memory. */
 	__wt_free(session, conn->cfg);
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->error_prefix);
 	__wt_free(session, conn->sessions);
-
-	/* Destroy the OS configuration. */
-	WT_TRET(__wt_os_cleanup(session));
 
 	__wt_free(NULL, conn);
 	return (ret);

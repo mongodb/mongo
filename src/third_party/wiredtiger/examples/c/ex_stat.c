@@ -235,9 +235,8 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->create(
-	    session, "table:access",
-	    "key_format=S,value_format=S,columns=(k,v)");
+	ret = session->create(session,
+	    "table:access", "key_format=S,value_format=S,columns=(k,v)");
 
 	ret = session->open_cursor(
 	    session, "table:access", NULL, NULL, &cursor);
@@ -258,5 +257,7 @@ main(void)
 
 	ret = print_derived_stats(session);
 
-	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
+	ret = conn->close(conn, NULL);
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

@@ -86,10 +86,10 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_fix_last_recno(page);
+		cbt->last_standard_recno = __col_fix_last_recno(cbt->ref);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, page->pg_fix_recno);
+		__cursor_set_recno(cbt, cbt->ref->ref_recno);
 		goto new_page;
 	}
 
@@ -107,7 +107,7 @@ new_page:
 		cbt->ins = NULL;
 	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
 	if (upd == NULL) {
-		cbt->v = __bit_getv_recno(page, cbt->recno, btree->bitcnt);
+		cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
 		val->data = &cbt->v;
 	} else
 		val->data = WT_UPDATE_DATA(upd);
@@ -179,10 +179,10 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage)
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_var_last_recno(page);
+		cbt->last_standard_recno = __col_var_last_recno(cbt->ref);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, page->pg_var_recno);
+		__cursor_set_recno(cbt, cbt->ref->ref_recno);
 		goto new_page;
 	}
 
@@ -194,7 +194,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage)
 
 new_page:	/* Find the matching WT_COL slot. */
 		if ((cip =
-		    __col_var_search(page, cbt->recno, &rle_start)) == NULL)
+		    __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
 			return (WT_NOTFOUND);
 		cbt->slot = WT_COL_SLOT(page, cip);
 
@@ -558,7 +558,8 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
 		 * page.
 		 */
 		cbt->last_standard_recno = page->type == WT_PAGE_COL_VAR ?
-		    __col_var_last_recno(page) : __col_fix_last_recno(page);
+		    __col_var_last_recno(cbt->ref) :
+		    __col_fix_last_recno(cbt->ref);
 
 		/* If we're traversing the append list, set the reference. */
 		if (cbt->ins_head != NULL &&

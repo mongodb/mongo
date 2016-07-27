@@ -55,7 +55,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 */
 		if (recno == WT_RECNO_OOB ||
 		    recno > (btree->type == BTREE_COL_VAR ?
-		    __col_var_last_recno(page) : __col_fix_last_recno(page)))
+		    __col_var_last_recno(cbt->ref) :
+		    __col_fix_last_recno(cbt->ref)))
 			append = true;
 	}
 
@@ -107,17 +108,17 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		/* Allocate the append/update list reference as necessary. */
 		if (append) {
 			WT_PAGE_ALLOC_AND_SWAP(session,
-			    page, mod->mod_append, ins_headp, 1);
-			ins_headp = &mod->mod_append[0];
+			    page, mod->mod_col_append, ins_headp, 1);
+			ins_headp = &mod->mod_col_append[0];
 		} else if (page->type == WT_PAGE_COL_FIX) {
 			WT_PAGE_ALLOC_AND_SWAP(session,
-			    page, mod->mod_update, ins_headp, 1);
-			ins_headp = &mod->mod_update[0];
+			    page, mod->mod_col_update, ins_headp, 1);
+			ins_headp = &mod->mod_col_update[0];
 		} else {
 			WT_PAGE_ALLOC_AND_SWAP(session,
-			    page, mod->mod_update, ins_headp,
+			    page, mod->mod_col_update, ins_headp,
 			    page->pg_var_entries);
-			ins_headp = &mod->mod_update[cbt->slot];
+			ins_headp = &mod->mod_col_update[cbt->slot];
 		}
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
@@ -142,8 +143,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * it's easy (as opposed to in row-store) and a difficult bug to
 		 * otherwise diagnose.
 		 */
-		WT_ASSERT(session, mod->mod_split_recno == WT_RECNO_OOB ||
-		    (recno != WT_RECNO_OOB && mod->mod_split_recno > recno));
+		WT_ASSERT(session, mod->mod_col_split_recno == WT_RECNO_OOB ||
+		    (recno != WT_RECNO_OOB &&
+		    mod->mod_col_split_recno > recno));
 
 		if (upd_arg == NULL) {
 			WT_ERR(

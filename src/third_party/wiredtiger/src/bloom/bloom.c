@@ -295,7 +295,7 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 err:	/* Don't return WT_NOTFOUND from a failed search. */
 	if (ret == WT_NOTFOUND)
 		ret = WT_ERROR;
-	__wt_err(bloom->session, ret, "Failed lookup in bloom filter.");
+	__wt_err(bloom->session, ret, "Failed lookup in bloom filter");
 	return (ret);
 }
 

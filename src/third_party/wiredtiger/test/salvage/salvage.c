@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_util.i"
+#include "test_util.h"
 
 #include <assert.h>
 
@@ -159,7 +159,7 @@ int
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-v] [-r run] [-t fix|rle|var|row]\n", progname);
+	    "usage: %s [-v] [-r run] [-t fix|var|row]\n", progname);
 	return (EXIT_FAILURE);
 }
 
@@ -170,7 +170,7 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	CHECK(system("rm -f WiredTiger* __slvg.* __schema.*") == 0);
+	CHECK(system("rm -f WiredTiger* __slvg.*") == 0);
 	CHECK((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*
@@ -701,7 +701,7 @@ print_res(int key, int value, int cnt)
 		switch (page_type) {			/* Print value */
 		case WT_PAGE_COL_FIX:
 			ch = value & 0x7f;
-			if (isprint(ch)) {
+			if (__wt_isprint((u_char)ch)) {
 				if (ch == '\\')
 					fputc('\\', res_fp);
 				fputc(ch, res_fp);

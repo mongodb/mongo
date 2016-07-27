@@ -39,12 +39,14 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Restore the original allocation plan. */
 	__wt_block_configure_first_fit(block, false);
 
+#ifdef HAVE_VERBOSE
 	/* Dump the results of the compaction pass. */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT)) {
 		__wt_spin_lock(session, &block->live_lock);
 		ret = __block_dump_avail(session, block, false);
 		__wt_spin_unlock(session, &block->live_lock);
 	}
+#endif
 
 	return (ret);
 }
@@ -188,6 +190,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	}
 	__wt_spin_unlock(session, &block->live_lock);
 
+#ifdef HAVE_VERBOSE
 	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT)) {
 		++block->compact_pages_reviewed;
 		if (*skipp)
@@ -195,6 +198,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 		else
 			++block->compact_pages_written;
 	}
+#endif
 
 	return (ret);
 }

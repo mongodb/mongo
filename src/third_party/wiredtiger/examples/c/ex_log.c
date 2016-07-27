@@ -295,12 +295,12 @@ main(void)
 	    home1, home2, home1, home2);
 	if ((ret = system(cmd_buf)) != 0) {
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
@@ -348,12 +348,13 @@ main(void)
 	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
-		return (ret);
+		return (EXIT_FAILURE);
 	}
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = simple_walk_log(session, count_min);
 	ret = walk_log(session);
 	ret = wt_conn->close(wt_conn, NULL);
-	return (ret);
+
+	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

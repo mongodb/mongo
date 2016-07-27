@@ -1,0 +1,47 @@
+/*! @page custom_file_systems Custom File Systems
+
+Applications can provide a custom file system implementation that will be
+used by WiredTiger to interact with the I/O subsystem using the
+WT_FILE_SYSTEM and WT_FILE_HANDLE interfaces.
+
+It is not necessary for all file system providers to implement all methods
+in the WT_FILE_SYSTEM and WT_FILE_HANDLE structures, and documentation for
+those structures indicate which methods are optional. Methods which are not
+provided should be set to NULL.
+
+Generally, function pointers should not be changed once a handle is
+created. An exception to this are the WT_FILE_HANDLE::fallocate and
+WT_FILE_HANDLE::fallocate_nolock methods, because a file system
+implementation may not know what support the system provides until file
+allocation is attempted. See the WiredTiger POSIX file system
+implementation for an example of how the fallocate method might be
+changed after initialization.
+
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods are expected to return POSIX
+1003.1 or ANSI C standard error codes on failure.  Custom file systems
+on Windows systems can use the WT_EXTENSION_API::map_windows_error
+method to translate Windows system errors into POSIX system errors for
+return to WiredTiger.
+
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail but not fatally
+(for example, a WT_FILE_HANDLE::truncate method call which fails because
+the file is currently mapped into memory), should return EBUSY.
+
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail fatally, but not
+in all cases (for example, a WT_FILE_HANDLE::fadvise method call which
+only supports ::WT_FILE_HANDLE_WILLNEED), should return ENOTSUP.
+
+Additionally, custom file system functions  may return ::WT_PANIC to
+shut down the system.
+
+Unless explicitly stated otherwise, WiredTiger may invoke methods on the
+WT_FILE_SYSTEM and WT_FILE_HANDLE interfaces from multiple threads
+concurrently. It is the responsibility of the implementation to protect
+any shared data.
+
+See @ex_ref{ex_file_system.c} for an example implementation of a custom
+file system; the WiredTiger code for a POSIX standard file system is in
+the public domain and may also be useful as a starting point for a custom
+file system implementation.
+
+*/

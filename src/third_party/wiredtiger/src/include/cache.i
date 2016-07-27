@@ -166,6 +166,13 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	cache = conn->cache;
 
 	/*
+	 * If the connection is closing we do not need eviction from an
+	 * application thread.  The eviction subsystem is already closed.
+	 */
+	if (F_ISSET(conn, WT_CONN_CLOSING))
+		return (false);
+
+	/*
 	 * Avoid division by zero if the cache size has not yet been set in a
 	 * shared cache.
 	 */
@@ -179,6 +186,15 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
 	if (pct_fullp != NULL)
 		*pct_fullp = pct_full;
+	/*
+	 * If the connection is closing we do not need eviction from an
+	 * application thread.  The eviction subsystem is already closed.
+	 * We return here because some callers depend on the percent full
+	 * having been filled in.
+	 */
+	if (F_ISSET(conn, WT_CONN_CLOSING))
+		return (false);
+
 	if (pct_full > cache->eviction_trigger)
 		return (true);
 
