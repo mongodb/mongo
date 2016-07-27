@@ -1922,4 +1922,90 @@
             {applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$set: {x: 8}}}]}));
         assert.eq(8, coll.findOne({_id: "foo"}).x);
     }
+
+    // Test that the collections created with the "copydb" command inherit the default collation of
+    // the corresponding collection.
+    {
+        const sourceDB = db.getSiblingDB("collation");
+        const destDB = db.getSiblingDB("collation_cloned");
+
+        sourceDB.dropDatabase();
+        destDB.dropDatabase();
+
+        // Create a collection with a non-simple default collation.
+        assert.commandWorked(
+            sourceDB.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
+        const sourceCollectionInfos = sourceDB.getCollectionInfos({name: coll.getName()});
+
+        assert.writeOK(sourceDB[coll.getName()].insert({_id: "FOO"}));
+        assert.writeOK(sourceDB[coll.getName()].insert({_id: "bar"}));
+        assert.eq([{_id: "FOO"}],
+                  sourceDB[coll.getName()].find({_id: "foo"}).toArray(),
+                  "query should have performed a case-insensitive match");
+
+        assert.commandWorked(
+            sourceDB.adminCommand({copydb: 1, fromdb: sourceDB.getName(), todb: destDB.getName()}));
+        const destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
+        assert.eq(sourceCollectionInfos, destCollectionInfos);
+        assert.eq([{_id: "FOO"}], destDB[coll.getName()].find({_id: "foo"}).toArray());
+    }
+
+    // Test that the collection created with the "cloneCollectionAsCapped" command inherits the
+    // default collation of the corresponding collection. We skip running this command in a sharded
+    // cluster because it isn't supported by mongos.
+    if (!isMongos) {
+        const clonedColl = db.collation_cloned;
+
+        coll.drop();
+        clonedColl.drop();
+
+        // Create a collection with a non-simple default collation.
+        assert.commandWorked(
+            db.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
+        const originalCollectionInfos = db.getCollectionInfos({name: coll.getName()});
+        assert.eq(originalCollectionInfos.length, 1, tojson(originalCollectionInfos));
+
+        assert.writeOK(coll.insert({_id: "FOO"}));
+        assert.writeOK(coll.insert({_id: "bar"}));
+        assert.eq([{_id: "FOO"}],
+                  coll.find({_id: "foo"}).toArray(),
+                  "query should have performed a case-insensitive match");
+
+        assert.commandWorked(db.runCommand({
+            cloneCollectionAsCapped: coll.getName(),
+            toCollection: clonedColl.getName(),
+            size: 4096
+        }));
+        const clonedCollectionInfos = db.getCollectionInfos({name: clonedColl.getName()});
+        assert.eq(clonedCollectionInfos.length, 1, tojson(clonedCollectionInfos));
+        assert.eq(originalCollectionInfos[0].options.collation,
+                  clonedCollectionInfos[0].options.collation);
+        assert.eq([{_id: "FOO"}], clonedColl.find({_id: "foo"}).toArray());
+    }
+
+    // Test that the collection created with the "convertToCapped" command inherits the default
+    // collation of the corresponding collection. We skip running this command in a sharded cluster
+    // because it isn't supported by mongos.
+    if (!isMongos) {
+        coll.drop();
+
+        // Create a collection with a non-simple default collation.
+        assert.commandWorked(
+            db.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
+        const originalCollectionInfos = db.getCollectionInfos({name: coll.getName()});
+        assert.eq(originalCollectionInfos.length, 1, tojson(originalCollectionInfos));
+
+        assert.writeOK(coll.insert({_id: "FOO"}));
+        assert.writeOK(coll.insert({_id: "bar"}));
+        assert.eq([{_id: "FOO"}],
+                  coll.find({_id: "foo"}).toArray(),
+                  "query should have performed a case-insensitive match");
+
+        assert.commandWorked(db.runCommand({convertToCapped: coll.getName(), size: 4096}));
+        const cappedCollectionInfos = db.getCollectionInfos({name: coll.getName()});
+        assert.eq(cappedCollectionInfos.length, 1, tojson(cappedCollectionInfos));
+        assert.eq(originalCollectionInfos[0].options.collation,
+                  cappedCollectionInfos[0].options.collation);
+        assert.eq([{_id: "FOO"}], coll.find({_id: "foo"}).toArray());
+    }
 })();
