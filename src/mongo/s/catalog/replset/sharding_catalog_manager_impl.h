@@ -97,6 +97,8 @@ public:
     BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,
                                                  const std::string& shardName) override;
 
+    void cancelAddShardTaskIfNeeded(const ShardId& shardId) override;
+
 private:
     /**
      * Generates a unique name to be given to a newly added shard.
@@ -194,6 +196,12 @@ private:
      * The caller must hold _addShardHandlesMutex.
      */
     bool _hasAddShardHandle_inlock(const ShardId& shardId);
+
+    /**
+   * Returns the CallbackHandle associated with the addShard task for the shard with id shardId.
+    * Invariants that there is a handle being tracked for that shard.
+    */
+    const executor::TaskExecutor::CallbackHandle& _getAddShardHandle_inlock(const ShardId& shardId);
 
     /**
      * Adds CallbackHandle handle for the shard with id shardId to the map of running or scheduled

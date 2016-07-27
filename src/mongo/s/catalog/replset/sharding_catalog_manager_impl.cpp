@@ -1165,6 +1165,14 @@ Status ShardingCatalogManagerImpl::upsertShardIdentityOnShard(OperationContext* 
     return Status::OK();
 }
 
+void ShardingCatalogManagerImpl::cancelAddShardTaskIfNeeded(const ShardId& shardId) {
+    stdx::lock_guard<std::mutex> lk(_addShardHandlesMutex);
+    if (_hasAddShardHandle_inlock(shardId)) {
+        auto cbHandle = _getAddShardHandle_inlock(shardId);
+        _executorForAddShard->cancel(cbHandle);
+    }
+}
+
 void ShardingCatalogManagerImpl::_scheduleAddShardTaskUnlessCanceled(
     const CallbackArgs& cbArgs,
     const ShardType shardType,
@@ -1393,6 +1401,12 @@ BSONObj ShardingCatalogManagerImpl::createShardIdentityUpsertForAddShard(
 
 bool ShardingCatalogManagerImpl::_hasAddShardHandle_inlock(const ShardId& shardId) {
     return _addShardHandles.find(shardId) != _addShardHandles.end();
+}
+
+const CallbackHandle& ShardingCatalogManagerImpl::_getAddShardHandle_inlock(
+    const ShardId& shardId) {
+    invariant(_hasAddShardHandle_inlock(shardId));
+    return _addShardHandles.find(shardId)->second;
 }
 
 void ShardingCatalogManagerImpl::_trackAddShardHandle_inlock(

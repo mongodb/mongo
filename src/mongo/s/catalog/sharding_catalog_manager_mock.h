@@ -79,6 +79,8 @@ public:
 
     BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,
                                                  const std::string& shardName) override;
+
+    void cancelAddShardTaskIfNeeded(const ShardId& shardId) override;
 };
 
 }  // namespace mongo

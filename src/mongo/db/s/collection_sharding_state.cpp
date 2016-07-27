@@ -102,6 +102,31 @@ private:
     const ShardType _shardType;
 };
 
+/**
+ * Used by the config server for backwards compatibility. Cancels a pending addShard task (if there
+ * is one) for the shard with id shardId that was initiated by catching the insert to config.shards
+ * from a 3.2 mongos doing addShard.
+ */
+class RemoveShardLogOpHandler final : public RecoveryUnit::Change {
+public:
+    RemoveShardLogOpHandler(OperationContext* txn, ShardId shardId)
+        : _txn(txn), _shardId(std::move(shardId)) {}
+
+    void commit() override {
+        // Only the primary needs to check for and cancel a pending addShard task, since addShard
+        // tasks are only run by the primary.
+        if (repl::getGlobalReplicationCoordinator()->getMemberState().primary()) {
+            Grid::get(_txn)->catalogManager()->cancelAddShardTaskIfNeeded(_shardId);
+        }
+    }
+
+    void rollback() override {}
+
+private:
+    OperationContext* _txn;
+    const ShardId _shardId;
+};
+
 }  // unnamed namespace
 
 CollectionShardingState::CollectionShardingState(NamespaceString nss)
@@ -242,6 +267,18 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& d
                     "cannot delete shardIdentity document while in --shardsvr mode",
                     idElem.str() != ShardIdentityType::IdName);
         }
+    }
+
+    // For backwards compatibility, cancel a pending asynchronous addShard task created on the
+    // primary config as a result of a 3.2 mongos doing addShard for the shard with id
+    // deletedDocId.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        _nss == ShardType::ConfigNS) {
+        BSONElement idElement = deletedDocId["_id"];
+        invariant(!idElement.eoo());
+        auto shardIdStr = idElement.valuestrsafe();
+        txn->recoveryUnit()->registerChange(
+            new RemoveShardLogOpHandler(txn, ShardId(std::move(shardIdStr))));
     }
 
     checkShardVersionOrThrow(txn);

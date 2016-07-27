@@ -101,4 +101,8 @@ BSONObj ShardingCatalogManagerMock::createShardIdentityUpsertForAddShard(
     MONGO_UNREACHABLE;
 }
 
+void ShardingCatalogManagerMock::cancelAddShardTaskIfNeeded(const ShardId& shardId) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

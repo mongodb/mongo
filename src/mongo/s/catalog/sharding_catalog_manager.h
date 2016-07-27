@@ -168,6 +168,12 @@ public:
     virtual BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,
                                                          const std::string& shardName) = 0;
 
+    /**
+     * For rolling upgrade and backwards compatibility, cancels a pending addShard task to upsert
+     * a shardIdentity document into the shard with id shardId (if there is such a task pending).
+     */
+    virtual void cancelAddShardTaskIfNeeded(const ShardId& shardId) = 0;
+
 protected:
     ShardingCatalogManager() = default;
 };
