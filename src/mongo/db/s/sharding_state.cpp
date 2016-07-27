@@ -35,6 +35,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbhelpers.h"
@@ -177,17 +178,24 @@ void ShardingState::shutDown(OperationContext* txn) {
     }
 }
 
-void ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) {
     if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::NONE) {
         // Nothing to do if we're a config server ourselves.
-        return;
+        return Status::OK();
     }
 
     boost::optional<repl::OpTime> opTime = rpc::ConfigServerMetadata::get(txn).getOpTime();
     if (opTime) {
+        if (!AuthorizationSession::get(txn->getClient())
+                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                    ActionType::internal)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized to update config opTime");
+        }
+
         grid.shardRegistry()->advanceConfigOpTime(*opTime);
     }
+
+    return Status::OK();
 }
 
 void ShardingState::setShardName(const string& name) {
@@ -520,8 +528,7 @@ void ShardingState::initialize(OperationContext* txn, const string& configSvr) {
     }
 
     uassertStatusOK(_waitForInitialization(txn));
-
-    updateConfigServerOpTimeFromMetadata(txn);
+    uassertStatusOK(updateConfigServerOpTimeFromMetadata(txn));
 }
 
 void ShardingState::_initializeImpl(ConnectionString configSvr) {
