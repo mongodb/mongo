@@ -120,9 +120,10 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
     MONGO_UNREACHABLE;
 }
 
-BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* txn,
-                                                   const BatchedCommandRequest& batchRequest,
-                                                   RetryPolicy retryPolicy) {
+BatchedCommandResponse Shard::runBatchWriteCommandOnConfig(
+    OperationContext* txn, const BatchedCommandRequest& batchRequest, RetryPolicy retryPolicy) {
+    invariant(isConfig());
+
     const std::string dbname = batchRequest.getNS().db().toString();
     invariant(batchRequest.sizeWriteOps() == 1);
 

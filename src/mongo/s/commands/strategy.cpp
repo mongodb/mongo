@@ -108,7 +108,45 @@ void runAgainstRegistered(OperationContext* txn,
         return;
     }
 
-    Command::execCommandClientBasic(txn, c, cc(), queryOptions, ns, jsobj, anObjBuilder);
+    Command::execCommandClientBasic(txn, c, queryOptions, ns, jsobj, anObjBuilder);
+}
+
+/**
+ * This code handles the $cmd.sys.inprog queries.
+ */
+bool handleSpecialNamespaces(OperationContext* txn, Request& request, const QueryMessage& q) {
+    const char* ns = strstr(request.getns(), ".$cmd.sys.");
+    if (!ns)
+        return false;
+
+    ns += 10;
+
+    BSONObjBuilder reply;
+
+    const auto upgradeToRealCommand = [txn, &q, &reply](StringData commandName) {
+        BSONObjBuilder cmdBob;
+        cmdBob.append(commandName, 1);
+        cmdBob.appendElements(q.query);  // fields are validated by Commands
+        auto interposedCmd = cmdBob.done();
+
+        // Rewrite upgraded pseudoCommands to run on the 'admin' database.
+        const NamespaceString interposedNss("admin", "$cmd");
+        runAgainstRegistered(txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
+    };
+
+    if (strcmp(ns, "inprog") == 0) {
+        upgradeToRealCommand("currentOp");
+    } else if (strcmp(ns, "killop") == 0) {
+        upgradeToRealCommand("killOp");
+    } else if (strcmp(ns, "unlock") == 0) {
+        reply.append("err", "can't do unlock through mongos");
+    } else {
+        warning() << "unknown sys command [" << ns << "]";
+        return false;
+    }
+
+    replyToQuery(0, request.session(), request.m(), reply.done());
+    return true;
 }
 
 }  // namespace
@@ -224,7 +262,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 }
 
 void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
-    QueryMessage q(request.d());
+    const QueryMessage q(request.d());
 
     LOG(3) << "command: " << q.ns << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
            << " options: " << q.queryOptions;
@@ -235,44 +273,40 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                       " " + q.query.toString());
     }
 
-    NamespaceString nss(request.getns());
-    // Regular queries are handled in strategy_shard.cpp
-    verify(nss.isCommand() || nss.isSpecialCommand());
+    const NamespaceString nss(request.getns());
+    invariant(nss.isCommand() || nss.isSpecialCommand());
 
     if (handleSpecialNamespaces(txn, request, q))
         return;
+
+    BSONObj cmdObj = q.query;
+
+    {
+        BSONElement e = cmdObj.firstElement();
+        if (e.type() == Object && (e.fieldName()[0] == '$' ? str::equals("query", e.fieldName() + 1)
+                                                           : str::equals("query", e.fieldName()))) {
+            // Extract the embedded query object.
+            if (cmdObj.hasField(Query::ReadPrefField.name())) {
+                // The command has a read preference setting. We don't want to lose this information
+                // so we copy this to a new field called $queryOptions.$readPreference
+                BSONObjBuilder finalCmdObjBuilder;
+                finalCmdObjBuilder.appendElements(e.embeddedObject());
+
+                BSONObjBuilder queryOptionsBuilder(finalCmdObjBuilder.subobjStart("$queryOptions"));
+                queryOptionsBuilder.append(cmdObj[Query::ReadPrefField.name()]);
+                queryOptionsBuilder.done();
+
+                cmdObj = finalCmdObjBuilder.obj();
+            } else {
+                cmdObj = e.embeddedObject();
+            }
+        }
+    }
 
     int loops = 5;
 
     while (true) {
         try {
-            BSONObj cmdObj = q.query;
-            {
-                BSONElement e = cmdObj.firstElement();
-                if (e.type() == Object &&
-                    (e.fieldName()[0] == '$' ? str::equals("query", e.fieldName() + 1)
-                                             : str::equals("query", e.fieldName()))) {
-                    // Extract the embedded query object.
-
-                    if (cmdObj.hasField(Query::ReadPrefField.name())) {
-                        // The command has a read preference setting. We don't want
-                        // to lose this information so we copy this to a new field
-                        // called $queryOptions.$readPreference
-                        BSONObjBuilder finalCmdObjBuilder;
-                        finalCmdObjBuilder.appendElements(e.embeddedObject());
-
-                        BSONObjBuilder queryOptionsBuilder(
-                            finalCmdObjBuilder.subobjStart("$queryOptions"));
-                        queryOptionsBuilder.append(cmdObj[Query::ReadPrefField.name()]);
-                        queryOptionsBuilder.done();
-
-                        cmdObj = finalCmdObjBuilder.obj();
-                    } else {
-                        cmdObj = e.embeddedObject();
-                    }
-                }
-            }
-
             OpQueryReplyBuilder reply;
             {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
@@ -305,41 +339,6 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
             return;
         }
     }
-}
-
-// TODO: remove after MongoDB 3.2
-bool Strategy::handleSpecialNamespaces(OperationContext* txn, Request& request, QueryMessage& q) {
-    const char* ns = strstr(request.getns(), ".$cmd.sys.");
-    if (!ns)
-        return false;
-    ns += 10;
-
-    BSONObjBuilder reply;
-
-    const auto upgradeToRealCommand = [txn, &q, &reply](StringData commandName) {
-        BSONObjBuilder cmdBob;
-        cmdBob.append(commandName, 1);
-        cmdBob.appendElements(q.query);  // fields are validated by Commands
-        auto interposedCmd = cmdBob.done();
-        // Rewrite upgraded pseudoCommands to run on the 'admin' database.
-        NamespaceString interposedNss("admin", "$cmd");
-        runAgainstRegistered(txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
-    };
-
-    if (strcmp(ns, "inprog") == 0) {
-        upgradeToRealCommand("currentOp");
-    } else if (strcmp(ns, "killop") == 0) {
-        upgradeToRealCommand("killOp");
-    } else if (strcmp(ns, "unlock") == 0) {
-        reply.append("err", "can't do unlock through mongos");
-    } else {
-        warning() << "unknown sys command [" << ns << "]";
-        return false;
-    }
-
-    BSONObj x = reply.done();
-    replyToQuery(0, request.session(), request.m(), x);
-    return true;
 }
 
 void Strategy::commandOp(OperationContext* txn,

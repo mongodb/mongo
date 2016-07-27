@@ -329,7 +329,6 @@ public:
     // of Client. This will happen as part of SERVER-18292
     static void execCommandClientBasic(OperationContext* txn,
                                        Command* c,
-                                       Client& client,
                                        int queryOptions,
                                        const char* ns,
                                        BSONObj& cmdObj,

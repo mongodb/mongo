@@ -102,9 +102,6 @@ public:
      * DEPRECATED: should not be used by new code.
      */
     static void clientCommandOp(OperationContext* txn, Request& request);
-
-protected:
-    static bool handleSpecialNamespaces(OperationContext* txn, Request& request, QueryMessage& q);
 };
 
 }  // namespace mongo

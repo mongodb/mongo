@@ -1316,8 +1316,8 @@ void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* txn,
     }
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-    *batchResponse =
-        configShard->runBatchWriteCommand(txn, batchRequest, Shard::RetryPolicy::kNotIdempotent);
+    *batchResponse = configShard->runBatchWriteCommandOnConfig(
+        txn, batchRequest, Shard::RetryPolicy::kNotIdempotent);
 }
 
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
@@ -1340,7 +1340,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         auto response =
-            configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kNoRetry);
+            configShard->runBatchWriteCommandOnConfig(txn, request, Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1422,7 +1422,7 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     auto response =
-        configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kIdempotent);
+        configShard->runBatchWriteCommandOnConfig(txn, request, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1454,7 +1454,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* txn,
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     auto response =
-        configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kIdempotent);
+        configShard->runBatchWriteCommandOnConfig(txn, request, Shard::RetryPolicy::kIdempotent);
 
     return response.toStatus();
 }

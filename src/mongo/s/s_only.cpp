@@ -1,6 +1,5 @@
-// s_only.cpp
-
-/*    Copyright 2009 10gen Inc.
+/**
+ *    Copyright (C) 2009-2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +17,13 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
@@ -83,20 +82,14 @@ void Command::execCommand(OperationContext* txn,
     std::string db = request.getDatabase().rawData();
     BSONObjBuilder result;
 
-    execCommandClientBasic(txn,
-                           command,
-                           *txn->getClient(),
-                           queryFlags,
-                           request.getDatabase().rawData(),
-                           cmdObj,
-                           result);
+    execCommandClientBasic(
+        txn, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
 
     replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
 }
 
 void Command::execCommandClientBasic(OperationContext* txn,
                                      Command* c,
-                                     Client& client,
                                      int queryOptions,
                                      const char* ns,
                                      BSONObj& cmdObj,
@@ -112,7 +105,7 @@ void Command::execCommandClientBasic(OperationContext* txn,
         return;
     }
 
-    Status status = _checkAuthorization(c, &client, dbname, cmdObj);
+    Status status = _checkAuthorization(c, txn->getClient(), dbname, cmdObj);
     if (!status.isOK()) {
         appendCommandStatus(result, status);
         return;
