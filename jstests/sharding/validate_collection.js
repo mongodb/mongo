@@ -53,6 +53,7 @@
 
     // 2. Sharded collection in a DB.
     assert.commandWorked(s.adminCommand({enableSharding: 'test'}));
+    st.ensurePrimaryShard('test', st.shard0.shardName);
     assert.commandWorked(s.adminCommand({shardCollection: 'test.test', key: {_id: 1}}));
     assert.commandWorked(s.adminCommand({shardCollection: 'test.dummy', key: {_id: 1}}));
     validate(true);
