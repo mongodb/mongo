@@ -2377,7 +2377,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: lint
   - name: aggregation
   - name: aggregation_WT
@@ -2451,7 +2451,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2517,7 +2517,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_auth
   - name: auth
@@ -2562,7 +2562,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation_WT
   - name: auth_WT
   - name: dbtest_WT
@@ -2885,7 +2885,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: auth
   - name: dbtest
@@ -2921,7 +2921,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: auth
   - name: dbtest
@@ -3485,7 +3485,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: lint
   - name: audit
   - name: audit_WT
@@ -3596,7 +3596,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
