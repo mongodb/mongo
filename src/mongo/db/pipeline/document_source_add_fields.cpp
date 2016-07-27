@@ -1,5 +1,5 @@
 /**
- * Copyright 2011 (c) 10gen Inc.
+ * Copyright 2016 (c) 10gen Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -33,27 +33,26 @@
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/db/pipeline/parsed_add_fields.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
-using parsed_aggregation_projection::ParsedAggregationProjection;
-using parsed_aggregation_projection::ProjectionType;
+using parsed_aggregation_projection::ParsedAddFields;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(project, DocumentSourceProject::createFromBson);
+REGISTER_DOCUMENT_SOURCE_ALIAS(addFields, DocumentSourceAddFields::createFromBson);
 
-intrusive_ptr<DocumentSource> DocumentSourceProject::create(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(15969, "$project specification must be an object", elem.type() == Object);
-
-    return new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAggregationProjection::create(elem.Obj()), "$project");
-}
-
-std::vector<intrusive_ptr<DocumentSource>> DocumentSourceProject::createFromBson(
+std::vector<intrusive_ptr<DocumentSource>> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    return {DocumentSourceProject::create(elem, expCtx)};
-}
 
-}  // namespace mongo
+    // Confirm that the stage was called with an object.
+    uassert(40269,
+            str::stream() << "$addFields specification stage must be an object, got "
+                          << typeName(elem.type()),
+            elem.type() == Object);
+
+    // Create the AddFields aggregation stage.
+    return {new DocumentSourceSingleDocumentTransformation(
+        expCtx, ParsedAddFields::create(elem.Obj()), "$addFields")};
+};
+}

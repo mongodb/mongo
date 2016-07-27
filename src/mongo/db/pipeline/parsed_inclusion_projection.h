@@ -209,8 +209,9 @@ public:
         _root->injectExpressionContext(expCtx);
     }
 
-    void addDependencies(DepsTracker* deps) const final {
+    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         _root->addDependencies(deps);
+        return DocumentSource::EXHAUSTIVE_FIELDS;
     }
 
     /**

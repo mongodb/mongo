@@ -28,11 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/parsed_aggregation_projection.h"
+
 #include <boost/optional.hpp>
 #include <string>
 #include <unordered_set>
-
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,60 +46,126 @@
 namespace mongo {
 namespace parsed_aggregation_projection {
 
+//
+// ProjectionSpecValidator
+//
+
+Status ProjectionSpecValidator::validate(const BSONObj& spec) {
+    return ProjectionSpecValidator(spec).validate();
+}
+
+Status ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(StringData path) {
+    for (auto&& seenPath : _seenPaths) {
+        if ((path == seenPath) || (expression::isPathPrefixOf(path, seenPath)) ||
+            (expression::isPathPrefixOf(seenPath, path))) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "specification contains two conflicting paths. "
+                                           "Cannot specify both '"
+                                        << path
+                                        << "' and '"
+                                        << seenPath
+                                        << "': "
+                                        << _rawObj.toString(),
+                          40176);
+        }
+    }
+    _seenPaths.emplace_back(path.toString());
+    return Status::OK();
+}
+
+Status ProjectionSpecValidator::validate() {
+    if (_rawObj.isEmpty()) {
+        return Status(
+            ErrorCodes::FailedToParse, "specification must have at least one field", 40177);
+    }
+    for (auto&& elem : _rawObj) {
+        Status status = parseElement(elem, FieldPath(elem.fieldName()));
+        if (!status.isOK())
+            return status;
+    }
+    return Status::OK();
+}
+
+Status ProjectionSpecValidator::parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
+    if (elem.type() == BSONType::Object) {
+        return parseNestedObject(elem.Obj(), pathToElem);
+    }
+    return ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
+}
+
+Status ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
+                                                  const FieldPath& prefix) {
+    if (thisLevelSpec.isEmpty()) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "an empty object is not a valid value. Found empty object at path "
+                          << prefix.fullPath(),
+                      40180);
+    }
+    for (auto&& elem : thisLevelSpec) {
+        auto fieldName = elem.fieldNameStringData();
+        if (fieldName[0] == '$') {
+            // This object is an expression specification like {$add: [...]}. It will be parsed
+            // into an Expression later, but for now, just track that the prefix has been
+            // specified and skip it.
+            if (thisLevelSpec.nFields() != 1) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "an expression specification must contain exactly "
+                                               "one field, the name of the expression. Found "
+                                            << thisLevelSpec.nFields()
+                                            << " fields in "
+                                            << thisLevelSpec.toString()
+                                            << ", while parsing object "
+                                            << _rawObj.toString(),
+                              40181);
+            }
+            Status status = ensurePathDoesNotConflictOrThrow(prefix.fullPath());
+            if (!status.isOK())
+                return status;
+            continue;
+        }
+        if (fieldName.find('.') != std::string::npos) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "cannot use dotted field name '" << fieldName
+                                        << "' in a sub object: "
+                                        << _rawObj.toString(),
+                          40183);
+        }
+        Status status =
+            parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
+        if (!status.isOK())
+            return status;
+    }
+    return Status::OK();
+}
+
 namespace {
 
 /**
- * This class is responsible for determining if the provided specification is valid, and determining
- * whether it specifies an inclusion projection or an exclusion projection.
+ * This class is responsible for determining what type of $project stage it specifies.
  */
-class ProjectSpecTypeParser {
+class ProjectTypeParser {
 public:
     /**
-     * Parses 'spec' to determine whether it is an inclusion or exclusion projection.
-     *
-     * Throws a UserException if the specification is invalid.
+     * Parses 'spec' to determine whether it is an inclusion or exclusion projection. 'Computed'
+     * fields (ones which are defined by an expression or a literal) are treated as inclusion
+     * projections for in this context of the$project stage.
      */
     static ProjectionType parse(const BSONObj& spec) {
-        ProjectSpecTypeParser parser(spec);
+        ProjectTypeParser parser(spec);
         parser.parse();
         invariant(parser._parsedType);
         return *(parser._parsedType);
     }
 
 private:
-    ProjectSpecTypeParser(const BSONObj& spec) : _rawObj(spec) {}
-
-    /**
-     * Uses '_seenPaths' to see if 'path' conflicts with any paths that have already been specified.
-     *
-     * For example, a user is not allowed to specify {'a': 1, 'a.b': 1}, or some similar conflicting
-     * paths.
-     */
-    void ensurePathDoesNotConflictOrThrow(StringData path) {
-        for (auto&& seenPath : _seenPaths) {
-            uassert(40176,
-                    str::stream() << "$project specification contains two conflicting paths. "
-                                     "Cannot specify both '"
-                                  << path
-                                  << "' and '"
-                                  << seenPath
-                                  << "': "
-                                  << _rawObj.toString(),
-                    path != seenPath && !expression::isPathPrefixOf(path, seenPath) &&
-                        !expression::isPathPrefixOf(seenPath, path));
-        }
-        _seenPaths.insert(path.toString());
-    }
+    ProjectTypeParser(const BSONObj& spec) : _rawObj(spec) {}
 
     /**
      * Traverses '_rawObj' to determine the type of projection, populating '_parsedType' in the
      * process.
-     *
-     * Throws a UserException if an invalid projection specification is detected.
      */
     void parse() {
-        uassert(40177, "$project specification must have at least one field", !_rawObj.isEmpty());
-
         size_t nFields = 0;
         for (auto&& elem : _rawObj) {
             parseElement(elem, FieldPath(elem.fieldName()));
@@ -124,11 +190,10 @@ private:
     /**
      * Parses a single BSONElement. 'pathToElem' should include the field name of 'elem'.
      *
-     * Delegates to parseSubObject() if 'elem' is an object. Otherwise adds the full path to 'elem'
-     * to '_seenPaths', and updates '_parsedType' if appropriate.
+     * Delegates to parseSubObject() if 'elem' is an object. Otherwise updates '_parsedType' if
+     * appropriate.
      *
-     * Throws a UserException if the path to 'elem' conflicts with a path that has already been
-     * specified, or if this element represents a mix of projection types.
+     * Throws a UserException if this element represents a mix of projection types.
      */
     void parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
         if (elem.type() == BSONType::Object) {
@@ -157,55 +222,29 @@ private:
                     !_parsedType || (*_parsedType == ProjectionType::kInclusion));
             _parsedType = ProjectionType::kInclusion;
         }
-        ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
     }
 
     /**
      * Traverses 'thisLevelSpec', parsing each element in turn.
      *
-     * Throws a UserException if any paths conflict with each other or existing paths,
-     * 'thisLevelSpec' contains a dotted path, or if 'thisLevelSpec' represents an invalid
-     * expression.
+     * Throws a UserException if 'thisLevelSpec' represents an invalid mix of projections.
      */
     void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix) {
-        uassert(40180,
-                str::stream() << "an empty object is not a valid value in a $project. Found "
-                                 "empty object at path "
-                              << prefix.fullPath(),
-                !thisLevelSpec.isEmpty());
 
-        for (auto elem : thisLevelSpec) {
+        for (auto&& elem : thisLevelSpec) {
             auto fieldName = elem.fieldNameStringData();
             if (fieldName[0] == '$') {
                 // This object is an expression specification like {$add: [...]}. It will be parsed
                 // into an Expression later, but for now, just track that the prefix has been
                 // specified and skip it.
-                uassert(40181,
-                        str::stream()
-                            << "Bad projection specification: An expression specification must "
-                               "contain exactly one field, the name of the expression. Found "
-                            << thisLevelSpec.nFields()
-                            << " fields in "
-                            << thisLevelSpec.toString()
-                            << ", while parsing $project object "
-                            << _rawObj.toString(),
-                        thisLevelSpec.nFields() == 1);
                 uassert(40182,
                         str::stream() << "Bad projection specification, cannot include fields or "
                                          "add computed fields during an exclusion projection: "
                                       << _rawObj.toString(),
                         !_parsedType || _parsedType == ProjectionType::kInclusion);
                 _parsedType = ProjectionType::kInclusion;
-                ensurePathDoesNotConflictOrThrow(prefix.fullPath());
                 continue;
             }
-
-            uassert(40183,
-                    str::stream() << "cannot use dotted field name '" << fieldName
-                                  << "' in a sub object of a $project stage: "
-                                  << _rawObj.toString(),
-                    fieldName.find('.') == std::string::npos);
-
             parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
         }
     }
@@ -215,17 +254,26 @@ private:
 
     // This will be populated during parse().
     boost::optional<ProjectionType> _parsedType;
-
-    // Tracks which paths we've seen to ensure no two paths conflict with each other.
-    std::unordered_set<std::string> _seenPaths;
 };
 
 }  // namespace
 
 std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create(
     const BSONObj& spec) {
+    // Check that the specification was valid. Status returned is unspecific because validate()
+    // is used by the $addFields stage as well as $project.
+    // If there was an error, uassert with a $project-specific message.
+    Status status = ProjectionSpecValidator::validate(spec);
+    if (!status.isOK()) {
+        uasserted(status.location(),
+                  str::stream() << "Invalid $project specification: " << status.reason());
+    }
+
     // Check for any conflicting specifications, and determine the type of the projection.
-    auto projectionType = ProjectSpecTypeParser::parse(spec);
+    auto projectionType = ProjectTypeParser::parse(spec);
+    // kComputed is a projection type reserved for $addFields, and should never be detected by the
+    // ProjectTypeParser.
+    invariant(projectionType != ProjectionType::kComputed);
 
     // We can't use make_unique() here, since the branches have different types.
     std::unique_ptr<ParsedAggregationProjection> parsedProject(

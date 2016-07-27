@@ -116,6 +116,10 @@ public:
      */
     Document applyProjection(Document inputDoc) const final;
 
+    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const {
+        return DocumentSource::SEE_NEXT;
+    }
+
 private:
     /**
      * Helper for parse() above.

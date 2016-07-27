@@ -51,7 +51,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/granularity_rounder.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
-#include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
@@ -989,6 +988,60 @@ public:
     BSONObjSet sorts;
 };
 
+/**
+ * This class is for DocumentSources that take in and return one document at a time, in a 1:1
+ * transformation. It should only be used via an alias that passes the transformation logic through
+ * a ParsedSingleDocumentTransformation. It is not a registered DocumentSource, and it cannot be
+ * created from BSON.
+ */
+class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
+public:
+    /**
+     * This class defines the minimal interface that every parser wishing to take advantage of
+     * DocumentSourceSingleDocumentTransformation must implement.
+     *
+     * This interface ensures that DocumentSourceSingleDocumentTransformations are passed parsed
+     * objects that can execute the transformation and provide additional features like
+     * serialization and reporting and returning dependencies. The parser must also provide
+     * implementations for optimizing and adding the expression context, even if those functions do
+     * nothing.
+     *
+     * SERVER-25509 Make $replaceRoot use this framework.
+     */
+    class TransformerInterface {
+    public:
+        virtual Document applyTransformation(Document input) = 0;
+        virtual void optimize() = 0;
+        virtual Document serialize(bool explain) const = 0;
+        virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
+        virtual void injectExpressionContext(
+            const boost::intrusive_ptr<ExpressionContext>& pExpCtx) = 0;
+    };
+
+    DocumentSourceSingleDocumentTransformation(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        std::unique_ptr<TransformerInterface> parsedTransform,
+        std::string name);
+
+    // virtuals from DocumentSource
+    const char* getSourceName() const;
+    boost::optional<Document> getNext();
+    boost::intrusive_ptr<DocumentSource> optimize();
+    void dispose();
+    Value serialize(bool explain) const;
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container);
+    void doInjectExpressionContext();
+    DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const;
+
+private:
+    // Stores transformation logic.
+    std::unique_ptr<TransformerInterface> _parsedTransform;
+
+    // Specific name of the transformation.
+    std::string _name;
+};
+
 class DocumentSourceOut final : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
@@ -1045,48 +1098,6 @@ private:
 
     NamespaceString _tempNs;          // output goes here as it is being processed.
     const NamespaceString _outputNs;  // output will go here after all data is processed.
-};
-
-
-class DocumentSourceProject final : public DocumentSource {
-public:
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(bool explain = false) const final;
-    void dispose() final;
-
-    /**
-     * Adds any paths that are included via this projection, or that are referenced by any
-     * expressions.
-     */
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
-
-    /**
-     * Attempt to move a subsequent $skip or $limit stage before the $project, thus reducing the
-     * number of documents that pass through this stage.
-     */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
-
-    /**
-     * Optimize any expressions being used in this stage.
-     */
-    boost::intrusive_ptr<DocumentSource> optimize() final;
-
-    void doInjectExpressionContext() final;
-
-    /**
-     * Parse the projection from the user-supplied BSON.
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceProject(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> parsedProject);
-
-    std::unique_ptr<parsed_aggregation_projection::ParsedAggregationProjection> _parsedProject;
 };
 
 class DocumentSourceRedact final : public DocumentSource {
@@ -1949,6 +1960,39 @@ public:
 
 private:
     DocumentSourceBucket() = default;
+};
+
+/**
+ * The $project stage can be used for simple transformations such as including or excluding a set
+ * of fields, or can do more sophisticated things, like include some fields and add new "computed"
+ * fields, using the expression language. Note you can not mix an exclusion-style projection with
+ * adding or including any other fields.
+ */
+class DocumentSourceProject final {
+public:
+    // Since $project was once a DocumentSource, other stages that use it expect a pointer instead
+    // of a vector. Use the create function to get a single stage.
+    static boost::intrusive_ptr<DocumentSource> create(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceProject() = default;
+};
+
+/**
+ * $addFields adds or replaces the specified fields to/in the document while preserving the original
+ * document. It is modeled on and throws the same errors as $project.
+ */
+class DocumentSourceAddFields final {
+public:
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceAddFields() = default;
 };
 
 /**

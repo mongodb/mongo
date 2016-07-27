@@ -336,8 +336,9 @@ void Pipeline::Optimizations::Sharded::limitFieldsSentFromShardsToMerger(Pipelin
             return;
     }
     // if we get here, add the project.
-    shardPipe->_sources.push_back(DocumentSourceProject::createFromBson(
-        BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->pCtx));
+    boost::intrusive_ptr<DocumentSource> project = DocumentSourceProject::create(
+        BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->pCtx);
+    shardPipe->_sources.push_back(project);
 }
 
 BSONObj Pipeline::getInitialQuery() const {

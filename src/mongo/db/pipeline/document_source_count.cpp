@@ -66,7 +66,7 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONObj projectObj = BSON("$project" << BSON("_id" << 0 << elemString << 1));
 
     auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
-    auto projectSource = DocumentSourceProject::createFromBson(projectObj.firstElement(), pExpCtx);
+    auto projectSource = DocumentSourceProject::create(projectObj.firstElement(), pExpCtx);
 
     return {groupSource, projectSource};
 }
