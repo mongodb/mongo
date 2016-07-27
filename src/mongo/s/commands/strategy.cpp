@@ -303,6 +303,17 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
         }
     }
 
+    // Handle command option maxTimeMS.
+    uassert(ErrorCodes::InvalidOptions,
+            "no such command option $maxTimeMs; use maxTimeMS instead",
+            cmdObj[QueryRequest::queryOptionMaxTimeMS].eoo());
+
+    const int maxTimeMS =
+        uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdObj[QueryRequest::cmdOptionMaxTimeMS]));
+    if (maxTimeMS > 0) {
+        txn->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
+    }
+
     int loops = 5;
 
     while (true) {
@@ -319,7 +330,8 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 throw e;
 
             loops--;
-            log() << "retrying command: " << redact(q.query);
+
+            log() << "Retrying command " << redact(q.query) << causedBy(e);
 
             // For legacy reasons, ns may not actually be set in the exception :-(
             string staleNS = e.getns();

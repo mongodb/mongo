@@ -344,11 +344,17 @@ public:
     }
 
     /**
-     * Returns the number of microseconds remaining for this operation's time limit, or the
-     * special value Microseconds::max() if the operation has no time limit.
+     * Returns the number of milliseconds remaining for this operation's time limit or
+     * Milliseconds::max() if the operation has no time limit.
+     */
+    Milliseconds getRemainingMaxTimeMillis() const;
+
+    /**
+     * NOTE: This is a legacy "max time" method for controlling operation deadlines and it should
+     * not be used in new code. Use getRemainingMaxTimeMillis instead.
      *
-     * This is a legacy "max time" method for controlling operation deadlines. Prefer not to use it
-     * in new code.
+     * Returns the number of microseconds remaining for this operation's time limit, or the special
+     * value Microseconds::max() if the operation has no time limit.
      */
     Microseconds getRemainingMaxTimeMicros() const;
 

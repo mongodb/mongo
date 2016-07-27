@@ -183,6 +183,7 @@ Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Da
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               _locksNS.db().toString(),
                                               request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
                                               Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -218,6 +219,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         request.toBSON(),
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNoRetry);  // Dist lock manager is handling own retries
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -274,6 +276,7 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               _locksNS.db().toString(),
                                               request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
                                               Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -304,6 +307,7 @@ Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSession
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               _locksNS.db().toString(),
                                               request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
                                               Shard::RetryPolicy::kIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -338,6 +342,7 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               _locksNS.db().toString(),
                                               cmdObj,
+                                              Shard::kDefaultConfigCommandTimeout,
                                               Shard::RetryPolicy::kIdempotent);
 
     if (!response.isOK()) {
@@ -363,8 +368,12 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 }
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {
-    auto resultStatus = _client->getConfigShard()->runCommand(
-        txn, kReadPref, "admin", BSON("serverStatus" << 1), Shard::RetryPolicy::kIdempotent);
+    auto resultStatus = _client->getConfigShard()->runCommand(txn,
+                                                              kReadPref,
+                                                              "admin",
+                                                              BSON("serverStatus" << 1),
+                                                              Shard::kDefaultConfigCommandTimeout,
+                                                              Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -455,6 +464,7 @@ Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                               _locksNS.db().toString(),
                                               request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
                                               Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));

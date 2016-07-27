@@ -88,6 +88,7 @@ private:
     Shard::HostWithResponse _runCommand(OperationContext* txn,
                                         const ReadPreferenceSetting& readPref,
                                         const std::string& dbname,
+                                        Milliseconds maxTimeMSOverride,
                                         const BSONObj& cmdObj) final;
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(

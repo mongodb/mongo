@@ -139,6 +139,15 @@ bool OperationContext::hasDeadlineExpired() const {
     return now >= getDeadline();
 }
 
+Milliseconds OperationContext::getRemainingMaxTimeMillis() const {
+    if (!hasDeadline()) {
+        return Milliseconds::max();
+    }
+
+    return std::max(Milliseconds{0},
+                    getDeadline() - getServiceContext()->getFastClockSource()->now());
+}
+
 Microseconds OperationContext::getRemainingMaxTimeMicros() const {
     if (!hasDeadline()) {
         return Microseconds::max();

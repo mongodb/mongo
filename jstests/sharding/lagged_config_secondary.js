@@ -4,6 +4,13 @@
  */
 (function() {
     var st = new ShardingTest({shards: 1});
+    var testDB = st.s.getDB('test');
+
+    assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
+    assert.commandWorked(testDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
+
+    // Ensures that all metadata writes thus far have been replicated to all nodes
+    st.configRS.awaitReplication();
 
     var configSecondaryList = st.configRS.getSecondaries();
     var configSecondaryToKill = configSecondaryList[0];
@@ -12,11 +19,10 @@
     delayedConfigSecondary.getDB('admin').adminCommand(
         {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
-    var testDB = st.s.getDB('test');
-    testDB.adminCommand({enableSharding: 'test'});
-    testDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}});
+    assert.writeOK(testDB.user.insert({_id: 1}));
 
-    testDB.user.insert({_id: 1});
+    // Do one metadata write in order to bump the optime on mongos
+    assert.writeOK(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
 
     st.configRS.stopMaster();
     MongoRunner.stopMongod(configSecondaryToKill.port);
@@ -24,8 +30,9 @@
     // Clears all cached info so mongos will be forced to query from the config.
     st.s.adminCommand({flushRouterConfig: 1});
 
+    print('Attempting read on a sharded collection...');
     var exception = assert.throws(function() {
-        testDB.user.findOne();
+        testDB.user.find({}).maxTimeMS(15000).itcount();
     });
 
     assert.eq(ErrorCodes.ExceededTimeLimit, exception.code);
@@ -43,5 +50,4 @@
     }, 'Did not see any log entries containing the following message: ' + msg, 60000, 300);
 
     st.stop();
-
 }());

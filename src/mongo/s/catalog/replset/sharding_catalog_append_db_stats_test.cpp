@@ -70,7 +70,7 @@ TEST_F(ShardingCatalogClientAppendDbStatsTest, BasicAppendDBStats) {
         ASSERT_EQ(kReplSecondaryOkMetadata, request.metadata);
 
         ASSERT_EQ("admin", request.dbname);
-        ASSERT_EQ(BSON("listDatabases" << 1 << "maxTimeMS" << 30000), request.cmdObj);
+        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
         return fromjson(R"({
             databases: [

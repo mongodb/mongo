@@ -340,8 +340,12 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     auto config = getConfigShard();
     invariant(config);
 
-    auto insertResponse = config->runCommand(
-        txn, kReadPref, ns.db().toString(), request.toBSON(), Shard::RetryPolicy::kNoRetry);
+    auto insertResponse = config->runCommand(txn,
+                                             kReadPref,
+                                             ns.db().toString(),
+                                             request.toBSON(),
+                                             Shard::kDefaultConfigCommandTimeout,
+                                             Shard::RetryPolicy::kNoRetry);
 
     BatchedCommandResponse batchResponse;
     auto status = Shard::CommandResponse::processBatchWriteResponse(insertResponse, &batchResponse);

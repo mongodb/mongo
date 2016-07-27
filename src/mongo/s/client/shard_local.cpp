@@ -124,6 +124,7 @@ repl::OpTime ShardLocal::_getLastOpTime() {
 Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* txn,
                                                 const ReadPreferenceSetting& unused,
                                                 const std::string& dbName,
+                                                Milliseconds maxTimeMSOverrideUnused,
                                                 const BSONObj& cmdObj) {
     repl::OpTime currentOpTimeFromClient =
         repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();

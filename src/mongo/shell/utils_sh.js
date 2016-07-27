@@ -180,6 +180,8 @@ sh.stopBalancer = function(timeoutMs, interval) {
 };
 
 sh.startBalancer = function(timeoutMs, interval) {
+    timeoutMs = timeoutMs || 60000;
+
     var result = db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
     if (result.code === ErrorCodes.CommandNotFound) {
         // For backwards compatibility, use the legacy balancer start method

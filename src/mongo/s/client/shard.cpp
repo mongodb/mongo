@@ -89,6 +89,8 @@ Status Shard::CommandResponse::processBatchWriteResponse(
     return status;
 }
 
+const Milliseconds Shard::kDefaultConfigCommandTimeout = Seconds{30};
+
 Shard::Shard(const ShardId& id) : _id(id) {}
 
 const ShardId Shard::getId() const {
@@ -104,8 +106,18 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
+    return runCommand(txn, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+}
+
+StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const std::string& dbName,
+                                                     const BSONObj& cmdObj,
+                                                     Milliseconds maxTimeMSOverride,
+                                                     RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto swCmdResponse = _runCommand(txn, readPref, dbName, cmdObj).commandResponse;
+        auto hostWithResponse = _runCommand(txn, readPref, dbName, maxTimeMSOverride, cmdObj);
+        auto swCmdResponse = std::move(hostWithResponse.commandResponse);
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
 
         if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
@@ -130,8 +142,11 @@ BatchedCommandResponse Shard::runBatchWriteCommandOnConfig(
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto response =
-            _runCommand(txn, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, dbname, cmdObj);
+        auto response = _runCommand(txn,
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    dbname,
+                                    kDefaultConfigCommandTimeout,
+                                    cmdObj);
 
         BatchedCommandResponse batchResponse;
         Status writeStatus =
@@ -160,6 +175,9 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     const boost::optional<long long> limit) {
+    // Do not allow exhaustive finds to be run against regular shards.
+    invariant(isConfig());
+
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
         auto result =
             _exhaustiveFindOnConfig(txn, readPref, readConcernLevel, nss, query, sort, limit);
@@ -171,7 +189,6 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
 
         return result;
     }
-
     MONGO_UNREACHABLE;
 }
 

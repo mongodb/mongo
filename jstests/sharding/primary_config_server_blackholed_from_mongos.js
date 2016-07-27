@@ -3,12 +3,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({
-        name: 'primary_config_server_blackholed_from_mongos',
-        shards: 2,
-        mongos: 1,
-        useBridge: true
-    });
+    var st = new ShardingTest({shards: 2, mongos: 1, useBridge: true});
 
     var testDB = st.s.getDB('BlackHoleDB');
     var configDB = st.s.getDB('config');
@@ -33,7 +28,8 @@
     // This should fail, because the primary is not available
     jsTest.log('Doing write operation on a new database and collection');
     assert.writeError(st.s.getDB('NonExistentDB')
-                          .TestColl.insert({_id: 0, value: 'This value will never be inserted'}));
+                          .TestColl.insert({_id: 0, value: 'This value will never be inserted'},
+                                           {maxTimeMS: 15000}));
 
     jsTest.log('Doing CRUD operations on the sharded collection');
     assert.eq(1000, testDB.ShardedColl.find().itcount());
@@ -41,6 +37,7 @@
     assert.eq(1001, testDB.ShardedColl.find().count());
 
     jsTest.log('Doing read operations on a config server collection');
+
     // Should fail due to primary read preference
     assert.throws(function() {
         configDB.chunks.find().itcount();
@@ -59,5 +56,4 @@
     assert.lt(0, configDB.chunks.aggregate().itcount());
 
     st.stop();
-
 }());
