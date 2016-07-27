@@ -266,7 +266,6 @@ env.Library(
         'shard_util.cpp',
         'sharding_egress_metadata_hook.cpp',
         'sharding_raii.cpp',
-        'sharding_uptime_reporter.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',
@@ -294,8 +293,6 @@ env.Library(
     ]
 )
 
-# This library is only used by the mongos execuable and any tests which require mongos runtime
-# objects, such as the request processing pipeline or the balancer.
 env.Library(
     target='mongoscore',
     source=[
@@ -304,6 +301,7 @@ env.Library(
         's_only.cpp',
         's_sharding_server_status.cpp',
         'sharding_egress_metadata_hook_for_mongos.cpp',
+        'sharding_uptime_reporter.cpp',
         'version_mongos.cpp',
     ],
     LIBDEPS=[

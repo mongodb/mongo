@@ -92,18 +92,28 @@ StatusWith<ScopedChunkManager> ScopedChunkManager::getExisting(OperationContext*
 
     auto scopedDb = std::move(scopedDbStatus.getValue());
 
-    shared_ptr<ChunkManager> cm = scopedDb.db()->getChunkManagerIfExists(txn, nss.ns(), true);
-    if (!cm) {
-        return {ErrorCodes::NamespaceNotSharded,
-                str::stream() << "Collection " << nss.ns() << " does not exist or is not sharded."};
-    }
+    try {
+        std::shared_ptr<ChunkManager> cm =
+            scopedDb.db()->getChunkManager(txn, nss.ns(), true, false);
 
-    if (cm->getChunkMap().empty()) {
-        return {ErrorCodes::NamespaceNotSharded,
-                str::stream() << "Collection " << nss.ns() << " does not have any chunks."};
-    }
+        if (!cm) {
+            return {ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Collection " << nss.ns()
+                                  << " does not exist or is not sharded."};
+        }
 
-    return {ScopedChunkManager(std::move(scopedDb), std::move(cm))};
+        if (cm->getChunkMap().empty()) {
+            return {ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Collection " << nss.ns()
+                                  << " is marked as sharded, but does not have any chunks. This "
+                                     "most likely indicates a corrupted metadata or "
+                                     "partially completed 'shardCollection' command."};
+        }
+
+        return {ScopedChunkManager(std::move(scopedDb), std::move(cm))};
+    } catch (const AssertionException& e) {
+        return e.toStatus();
+    }
 }
 
 }  // namespace mongo

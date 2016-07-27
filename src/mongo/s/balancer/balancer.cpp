@@ -145,9 +145,9 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
 
 Balancer::Balancer()
     : _balancedLastTime(0),
-      _chunkSelectionPolicy(stdx::make_unique<BalancerChunkSelectionPolicyImpl>(
-          stdx::make_unique<ClusterStatisticsImpl>())),
-      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()) {}
+      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()),
+      _chunkSelectionPolicy(
+          stdx::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())) {}
 
 Balancer::~Balancer() {
     // The balancer thread must have been stopped

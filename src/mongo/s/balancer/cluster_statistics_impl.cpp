@@ -99,60 +99,59 @@ ClusterStatisticsImpl::ClusterStatisticsImpl() = default;
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
 StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* txn) {
-    try {
-        _refreshShardStats(txn);
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
-
-    vector<ShardStatistics> stats;
-
-    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-    for (const auto& stat : _shardStatsMap) {
-        stats.push_back(stat.second);
-    }
-
-    return stats;
-}
-
-void ClusterStatisticsImpl::_refreshShardStats(OperationContext* txn) {
     // Get a list of all the shards that are participating in this balance round along with any
     // maximum allowed quotas and current utilization. We get the latter by issuing
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
     auto shardsStatus = Grid::get(txn)->catalogClient(txn)->getAllShards(txn);
-    uassertStatusOK(shardsStatus.getStatus());
+    if (!shardsStatus.isOK()) {
+        return shardsStatus.getStatus();
+    }
 
     const vector<ShardType> shards(std::move(shardsStatus.getValue().value));
+
+    vector<ShardStatistics> stats;
 
     for (const auto& shard : shards) {
         auto shardSizeStatus = shardutil::retrieveTotalShardSize(txn, shard.getName());
         if (!shardSizeStatus.isOK()) {
-            continue;
+            const Status& status = shardSizeStatus.getStatus();
+
+            return {status.code(),
+                    str::stream() << "Unable to obtain shard utilization information for "
+                                  << shard.getName()
+                                  << " due to "
+                                  << status.reason()};
         }
+
+        string mongoDVersion;
 
         auto mongoDVersionStatus = retrieveShardMongoDVersion(txn, shard.getName());
-        if (!mongoDVersionStatus.isOK()) {
-            continue;
+        if (mongoDVersionStatus.isOK()) {
+            mongoDVersion = std::move(mongoDVersionStatus.getValue());
+        } else {
+            // Since the mongod version is only used for reporting, there is no need to fail the
+            // entire round if it cannot be retrieved, so just leave it empty
+            log() << "Unable to obtain shard version for " << shard.getName()
+                  << causedBy(mongoDVersionStatus.getStatus());
         }
-        const string mongoDVersion(std::move(mongoDVersionStatus.getValue()));
 
         std::set<string> shardTags;
+
         for (const auto& shardTag : shard.getTags()) {
             shardTags.insert(shardTag);
         }
 
-        ShardStatistics newShardStat(shard.getName(),
-                                     shard.getMaxSizeMB(),
-                                     shardSizeStatus.getValue() / 1024 / 1024,
-                                     shard.getDraining(),
-                                     shardTags,
-                                     mongoDVersion);
-
-        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-        _shardStatsMap[shard.getName()] = std::move(newShardStat);
+        stats.emplace_back(shard.getName(),
+                           shard.getMaxSizeMB(),
+                           shardSizeStatus.getValue() / 1024 / 1024,
+                           shard.getDraining(),
+                           std::move(shardTags),
+                           std::move(mongoDVersion));
     }
+
+    return stats;
 }
 
 }  // namespace mongo

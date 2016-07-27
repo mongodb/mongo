@@ -47,7 +47,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/balancer/balancer.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -55,6 +54,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
+#include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_util.h"
@@ -525,7 +525,7 @@ public:
                 chunkType.setShard(chunk->getShardId());
                 chunkType.setVersion(chunkManager->getVersion());
 
-                Status moveStatus = Balancer::get(txn)->moveSingleChunk(
+                Status moveStatus = configsvr_client::moveChunk(
                     txn,
                     chunkType,
                     to->getId(),

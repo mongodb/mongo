@@ -1,8 +1,6 @@
 // Tests that dropping and re-adding a shard with the same name to a cluster doesn't mess up
 // migrations
-
 (function() {
-
     'use strict';
 
     var st = new ShardingTest({shards: 2, mongos: 1});
@@ -44,9 +42,6 @@
     jsTest.log('Shard was dropped and re-added with same name...');
     st.printShardingStatus();
 
-    shards[0].conn.getDB('admin').runCommand({setParameter: 1, traceExceptions: true});
-    shard2.getDB('admin').runCommand({setParameter: 1, traceExceptions: true});
-
     // Try a migration
     assert.commandWorked(
         mongos.adminCommand({moveChunk: coll + '', find: {_id: 0}, to: shards[1]._id}));
@@ -54,5 +49,4 @@
     assert.eq('world', shard2.getCollection(coll + '').findOne().hello);
 
     st.stop();
-
 })();

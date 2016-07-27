@@ -677,6 +677,13 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
 }
 
 StatusWith<ScopedRegisterMigration> ShardingState::registerMigration(const MoveChunkRequest& args) {
+    if (_migrationDestManager.isActive()) {
+        return {
+            ErrorCodes::ConflictingOperationInProgress,
+            str::stream()
+                << "Unable start new migration because this shard is currently receiving a chunk"};
+    }
+
     return _activeMigrationsRegistry.registerMigration(args);
 }
 
