@@ -289,7 +289,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         MONGO_ASIO_INVARIANT(!resp.isOK(), "Failed to connect in setup", op);
         // If we fail during connection, we won't be able to access any of op's members after
         // calling finish(), so we return here.
-        LOG(1) << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        log() << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
         _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;
@@ -300,8 +300,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         MONGO_ASIO_INVARIANT(!resp.isOK(), "In refresh, but did not fail to heartbeat", op);
         // If we fail during heartbeating, we won't be able to access any of op's members after
         // calling finish(), so we return here.
-        LOG(1) << "Failed to heartbeat to " << op->request().target << " - "
-               << redact(resp.getStatus());
+        log() << "Failed asio heartbeat to " << op->request().target << " - "
+              << redact(resp.getStatus());
         _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;

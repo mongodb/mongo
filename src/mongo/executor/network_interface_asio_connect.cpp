@@ -76,7 +76,7 @@ void NetworkInterfaceASIO::AsyncConnection::setServerProtocols(rpc::ProtocolSet 
 }
 
 void NetworkInterfaceASIO::_connect(AsyncOp* op) {
-    LOG(1) << "Connecting to " << op->request().target.toString();
+    log() << "Connecting to " << op->request().target.toString();
 
     tcp::resolver::query query(op->request().target.host(),
                                std::to_string(op->request().target.port()));
