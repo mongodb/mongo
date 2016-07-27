@@ -1325,7 +1325,6 @@ buildvariants:
   display_name: Linux 64-bit
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     push_path: linux
@@ -1338,7 +1337,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_auth
   - name: auth
@@ -1369,14 +1368,11 @@ buildvariants:
   - name: slow2
   - name: tool
   - name: push
-    distros:
-    - rhel55-test
 
 - name: linux-64-debug
   display_name: Linux 64-bit DEBUG
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     push_path: linux
@@ -1389,7 +1385,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_auth
   - name: auth
@@ -1421,7 +1417,6 @@ buildvariants:
   display_name: Linux 64-bit DUR OFF
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     push_path: linux
@@ -1434,7 +1429,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_auth
   - name: auth
@@ -1466,7 +1461,6 @@ buildvariants:
   display_name: Linux 64-bit DEBUG DUR OFF
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     push_path: linux
@@ -1479,7 +1473,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: auth
   - name: core
@@ -1608,7 +1602,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: aggregation
   - name: aggregation_auth
   - name: auth
@@ -2032,7 +2026,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel55
+    - rhel55-build
   - name: audit
   - name: jsCore_auth
   - name: replicasets_auth
