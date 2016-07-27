@@ -693,6 +693,9 @@ Status applyOperation_inlock(OperationContext* txn,
     Collection* collection = db->getCollection(ns);
     IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = txn->lockState()->inAWriteUnitOfWork();
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "applyOps not supported on view: " << ns,
+            collection || !db->getViewCatalog()->lookup(txn, ns));
 
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
@@ -964,9 +967,16 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
 
     BSONObj o = fieldO.embeddedObject();
 
-    const char* ns = fieldNs.valuestrsafe();
-    if (!NamespaceString(ns).isValid()) {
-        return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(ns)};
+    const NamespaceString nss(fieldNs.valuestrsafe());
+    if (!nss.isValid()) {
+        return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
+    }
+    {
+        Database* db = dbHolder().get(txn, nss.ns());
+        if (db && db->getViewCatalog()->lookup(txn, nss.ns())) {
+            return {ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "applyOps not supported on view:" << nss.ns()};
+        }
     }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not
@@ -985,7 +995,7 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
         ApplyOpMetadata curOpToApply = op->second;
         Status status = Status::OK();
         try {
-            status = curOpToApply.applyFunc(txn, ns, o);
+            status = curOpToApply.applyFunc(txn, nss.ns().c_str(), o);
         } catch (...) {
             status = exceptionToStatus();
         }
@@ -998,7 +1008,7 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
             case ErrorCodes::BackgroundOperationInProgressForDatabase: {
                 Lock::TempRelease release(txn->lockState());
 
-                BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
+                BackgroundOperation::awaitNoBgOpInProgForDb(nss.db());
                 txn->recoveryUnit()->abandonSnapshot();
                 txn->checkForInterrupt();
                 break;
@@ -1008,19 +1018,19 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
 
                 Command* cmd = Command::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
-                BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
+                BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nss.db().toString(), o));
                 txn->recoveryUnit()->abandonSnapshot();
                 txn->checkForInterrupt();
                 break;
             }
             default:
                 if (_oplogCollectionName == masterSlaveOplogName) {
-                    error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
-                            << " with status " << status << " during oplog application";
+                    error() << "Failed command " << o << " on " << nss.db() << " with status "
+                            << status << " during oplog application";
                 } else if (curOpToApply.acceptableErrors.find(status.code()) ==
                            curOpToApply.acceptableErrors.end()) {
-                    error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
-                            << " with status " << status << " during oplog application";
+                    error() << "Failed command " << o << " on " << nss.db() << " with status "
+                            << status << " during oplog application";
                     return status;
                 }
             // fallthrough
@@ -1033,7 +1043,7 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     // AuthorizationManager's logOp method registers a RecoveryUnit::Change
     // and to do so we need to have begun a UnitOfWork
     WriteUnitOfWork wuow(txn);
-    getGlobalAuthorizationManager()->logOp(txn, opType, ns, o, nullptr);
+    getGlobalAuthorizationManager()->logOp(txn, opType, nss.ns().c_str(), o, nullptr);
     wuow.commit();
 
     return Status::OK();

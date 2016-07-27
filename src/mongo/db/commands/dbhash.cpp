@@ -126,7 +126,8 @@ public:
                                                                             "system.new_users",
                                                                             "system.roles",
                                                                             "system.users",
-                                                                            "system.version"};
+                                                                            "system.version",
+                                                                            "system.views"};
 
 
         BSONObjBuilder bb(result.subobjStart("collections"));

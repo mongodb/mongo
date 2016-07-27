@@ -237,6 +237,12 @@ public:
         Collection* collection = ctx.getCollection();
 
         if (!collection) {
+            if (ctx.db()->getViewCatalog()->lookup(txn, fullNs.ns())) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::CommandNotSupportedOnView,
+                     str::stream() << "captrunc not supported on views: " << fullNs.ns()});
+            }
             return appendCommandStatus(
                 result,
                 {ErrorCodes::NamespaceNotFound,

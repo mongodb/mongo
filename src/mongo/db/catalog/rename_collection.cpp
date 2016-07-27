@@ -86,6 +86,9 @@ Status renameCollection(OperationContext* txn,
     Database* const sourceDB = dbHolder().get(txn, source.db());
     Collection* const sourceColl = sourceDB ? sourceDB->getCollection(source.ns()) : nullptr;
     if (!sourceColl) {
+        if (sourceDB && sourceDB->getViewCatalog()->lookup(txn, source.ns()))
+            return Status(ErrorCodes::CommandNotSupportedOnView,
+                          str::stream() << "cannot rename view: " << source.ns());
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
@@ -141,6 +144,9 @@ Status renameCollection(OperationContext* txn,
             if (!s.isOK()) {
                 return s;
             }
+        } else if (targetDB->getViewCatalog()->lookup(txn, target.ns())) {
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << "a view already exists with that name: " << target.ns());
         }
 
         // If we are renaming in the same database, just
