@@ -94,11 +94,9 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 		(void)__wt_atomic_add64(&cache->bytes_dirty, size);
 		(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
 	}
-	/* Track internal and overflow size in cache. */
+	/* Track internal size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
 		(void)__wt_atomic_add64(&cache->bytes_internal, size);
-	else if (page->type == WT_PAGE_OVFL)
-		(void)__wt_atomic_add64(&cache->bytes_overflow, size);
 }
 
 /*
@@ -225,13 +223,10 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	    session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
 	if (__wt_page_is_modified(page))
 		__wt_cache_page_byte_dirty_decr(session, page, size);
-	/* Track internal and overflow size in cache. */
+	/* Track internal size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
 		__wt_cache_decr_check_uint64(session,
 		    &cache->bytes_internal, size, "WT_CACHE.bytes_internal");
-	else if (page->type == WT_PAGE_OVFL)
-		__wt_cache_decr_check_uint64(session,
-		    &cache->bytes_overflow, size, "WT_CACHE.bytes_overflow");
 }
 
 /*

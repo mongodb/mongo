@@ -19,6 +19,15 @@ of the path may no longer be specified. Applications depending on the
 ability to set statistics log file names will require modification.
 </dd>
 
+<dt>Deprecated statistics field</dt>
+<dd>
+The connection statistic \c WT_STAT_CONN_CACHE_BYTES_OVERFLOW has been
+removed.  Overflow information is now available in the
+\c WT_STAT_CONN_CACHE_BYTES_OVERFLOW and \c WT_STAT_CONN_CACHE_OVERFLOW_VALUE.
+Applications specifically looking for that statistic will require
+modification.
+</dd>
+
 </dl><hr>
 @section version_280 Upgrading to Version 2.8.0
 <dl>

@@ -82,7 +82,6 @@ struct __wt_cache {
 	uint64_t bytes_inmem;		/* Bytes/pages in memory */
 	uint64_t pages_inmem;
 	uint64_t bytes_internal;	/* Bytes of internal pages */
-	uint64_t bytes_overflow;	/* Bytes of overflow pages */
 	uint64_t bytes_read;		/* Bytes read into memory */
 
 	uint64_t app_waits;		/* User threads waited for cache */

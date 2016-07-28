@@ -201,7 +201,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS **stats;
-	uint64_t inuse, leaf, used;
+	uint64_t inuse, leaf;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -212,8 +212,8 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	 * There are races updating the different cache tracking values so
 	 * be paranoid calculating the leaf byte usage.
 	 */
-	used = cache->bytes_overflow + cache->bytes_internal;
-	leaf = inuse > used ? inuse - used : 0;
+	leaf = inuse > cache->bytes_internal ?
+	    inuse - cache->bytes_internal : 0;
 
 	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
 	WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
@@ -230,8 +230,6 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
 	WT_STAT_SET(
 	    session, stats, cache_bytes_other, __wt_cache_bytes_other(cache));
-	WT_STAT_SET(
-	    session, stats, cache_bytes_overflow, cache->bytes_overflow);
 
 	WT_STAT_SET(session, stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
