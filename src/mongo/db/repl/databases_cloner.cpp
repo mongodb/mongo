@@ -88,7 +88,7 @@ std::string DatabasesCloner::toString() const {
     return str::stream() << "initial sync --"
                          << " active:" << _active << " status:" << _status.toString()
                          << " source:" << _source.toString()
-                         << " db cloners active:" << _clonersActive
+                         << " db cloners completed:" << _currentClonerIndex
                          << " db count:" << _databaseCloners.size();
 }
 
@@ -213,10 +213,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
         }
 
         const std::string dbName = dbBSON["name"].str();
-        ++_clonersActive;
         std::shared_ptr<DatabaseCloner> dbCloner{nullptr};
-        Status startStatus(ErrorCodes::NotYetInitialized,
-                           "The DatabasesCloner could not be started.");
 
         // filters for DatabasesCloner.
         const auto collectionFilterPred = [dbName](const BSONObj& collInfo) {
@@ -245,6 +242,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
         const auto onDbFinish = [this, dbName](const Status& status) {
             _onEachDBCloneFinish(status, dbName);
         };
+        Status startStatus = Status::OK();
         try {
             dbCloner.reset(new DatabaseCloner(
                 _exec,
@@ -259,8 +257,10 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
             if (_scheduleDbWorkFn) {
                 dbCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
             }
-            // Start database cloner.
-            startStatus = dbCloner->startup();
+            // Start first database cloner.
+            if (_databaseCloners.empty()) {
+                startStatus = dbCloner->startup();
+            }
         } catch (...) {
             startStatus = exceptionToStatus();
         }
@@ -290,21 +290,14 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
 
 void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::string& name) {
     UniqueLock lk(_mutex);
-    auto clonersLeft = --_clonersActive;
-
     if (!status.isOK()) {
-        warning() << "database '" << name << "' clone failed due to " << status.toString();
+        warning() << "database '" << name << "' (" << (_currentClonerIndex + 1) << " of "
+                  << _databaseCloners.size() << ") clone failed due to " << status.toString();
         _setStatus_inlock(status);
-        if (clonersLeft == 0) {
-            _failed_inlock(lk);
-        } else {
-            // After cancellation this callback will called until clonersLeft = 0.
-            _cancelCloners_inlock(lk);
-        }
+        _failed_inlock(lk);
         return;
     }
 
-    LOG(2) << "Database clone finished: " << name;
     if (StringData(name).equalCaseInsensitive("admin")) {
         LOG(1) << "Finished the 'admin' db, now calling isAdminDbValid.";
         // Do special checks for the admin database because of auth. collections.
@@ -314,12 +307,25 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
         }
     }
 
-    if (clonersLeft == 0) {
+    _currentClonerIndex++;
+
+    if (_currentClonerIndex == _databaseCloners.size()) {
         _active = false;
         // All cloners are done, trigger event.
         LOG(2) << "All database clones finished, calling _finishFn.";
         lk.unlock();
         _finishFn(_status);
+        return;
+    }
+
+    // Start next database cloner.
+    auto&& dbCloner = _databaseCloners[_currentClonerIndex];
+    auto startStatus = dbCloner->startup();
+    if (!startStatus.isOK()) {
+        warning() << "failed to schedule database '" << name << "' (" << (_currentClonerIndex + 1)
+                  << " of " << _databaseCloners.size() << ") due to " << startStatus.toString();
+        _setStatus_inlock(startStatus);
+        _failed_inlock(lk);
         return;
     }
 }

@@ -49,6 +49,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -435,6 +436,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnOnlyDatabase) {
     ASSERT_FALSE(cloner.isActive());
     ASSERT_NOT_OK(result);
 }
+
 TEST_F(DBsClonerTest, FailsOnListCollectionsOnFirstOfTwoDatabases) {
     Status result{Status::OK()};
     Status expectedStatus{ErrorCodes::NoSuchKey, "fake"};
@@ -459,16 +461,73 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnFirstOfTwoDatabases) {
     net->runReadyNetworkOperations();
     ASSERT_TRUE(cloner.isActive());
     // listCollections (db:a)
-    scheduleNetworkResponse("listCollections", expectedStatus);
-    // listCollections (db:b)
-    processNetworkResponse("listCollections",
-                           fromjson("{ok:1, cursor:{id:NumberLong(0), "
-                                    "ns:'b.$cmd.listCollections', "
-                                    "firstBatch:[]}}"));
+    processNetworkResponse("listCollections", expectedStatus);
 
     cloner.join();
     ASSERT_FALSE(cloner.isActive());
     ASSERT_EQ(result, expectedStatus);
+}
+
+class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
+public:
+    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+
+    TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
+                                                   ShouldFailRequestFn shouldFailRequest)
+        : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
+
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb) override {
+        if (_shouldFailRequest(request)) {
+            return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
+        }
+        return getExecutor()->scheduleRemoteCommand(request, cb);
+    }
+
+private:
+    ShouldFailRequestFn _shouldFailRequest;
+};
+
+TEST_F(DBsClonerTest, FailingToScheduleSecondDatabaseClonerShouldCancelTheCloner) {
+    Status result{Status::OK()};
+
+    TaskExecutorWithFailureInScheduleRemoteCommand _executorProxy(
+        &getExecutor(), [](const executor::RemoteCommandRequest& request) {
+            return str::equals("listCollections", request.cmdObj.firstElementFieldName()) &&
+                request.dbname == "b";
+        });
+
+    DatabasesCloner cloner{&getStorage(),
+                           &_executorProxy,
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    // listDatabases
+    scheduleNetworkResponse("listDatabases",
+                            fromjson("{ok:1, databases:[{name:'a'}, {name:'b'}]}"));
+    net->runReadyNetworkOperations();
+    ASSERT_TRUE(cloner.isActive());
+    // listCollections (db:a)
+    processNetworkResponse(
+        "listCollections",
+        fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch: []}}"));
+
+    // The databases cloner will get an OperationFailed error when it attempts to start the cloner
+    // for the database "b".
+
+    cloner.join();
+    ASSERT_FALSE(cloner.isActive());
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, result);
 }
 
 TEST_F(DBsClonerTest, SingleDatabaseCopiesCompletely) {
@@ -510,11 +569,6 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // listCollections for "b"
-            {"listCollections",
-             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'b.$cmd.listCollections', firstBatch:["
-                      "{name:'b', options:{}} "
-                      "]}}")},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -522,6 +576,16 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
                          "{v:"
                       << OplogEntry::kOplogVersion
                       << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+            // find:a
+            {"find",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                      "{_id:1, a:1} "
+                      "]}}")},
+            // listCollections for "b"
+            {"listCollections",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'b.$cmd.listCollections', firstBatch:["
+                      "{name:'b', options:{}} "
+                      "]}}")},
             // listIndexes:b
             {"listIndexes",
              fromjson(str::stream()
@@ -529,11 +593,6 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
                          "{v:"
                       << OplogEntry::kOplogVersion
                       << ", key:{_id:1}, name:'_id_', ns:'b.b'}]}}")},
-            // find:a
-            {"find",
-             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
-                      "{_id:1, a:1} "
-                      "]}}")},
             // find:b
             {"find",
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'b.b', firstBatch:["
