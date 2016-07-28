@@ -115,7 +115,7 @@ variables:
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1604-64
-  - enterprise-ubuntu1604-aarch64
+  - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1604-ppc64le
   - enterprise-debian71-64
   - enterprise-debian81-64
@@ -128,7 +128,7 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - ubuntu1604
-  - ubuntu1604-aarch64
+  - ubuntu1604-arm64
   - ubuntu1404-jepsen
   - ubuntu1404-rocksdb
   - ubuntu1410-fast-clang
@@ -151,7 +151,7 @@ variables:
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1604-64
-  - enterprise-ubuntu1604-aarch64
+  - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1604-ppc64le
   - enterprise-debian71-64
   - enterprise-debian81-64
@@ -162,7 +162,7 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - ubuntu1604
-  - ubuntu1604-aarch64
+  - ubuntu1604-arm64
   - amazon
   - debian71
   - debian81
@@ -3498,8 +3498,8 @@ buildvariants:
   - name: views_WT
   - name: push
 
-- name: enterprise-ubuntu1604-aarch64
-  display_name: Enterprise Ubuntu 16.04 aarch64
+- name: enterprise-ubuntu1604-arm64
+  display_name: Enterprise Ubuntu 16.04 arm64
   modules:
   - enterprise
   - mongo-tools
@@ -3512,7 +3512,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
-    push_arch: aarch64-enterprise-ubuntu1604
+    push_arch: arm64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
@@ -3572,8 +3572,8 @@ buildvariants:
     distros:
     - ubuntu1604-test
 
-- name: ubuntu1604-aarch64
-  display_name: SSL Ubuntu 16.04 aarch64
+- name: ubuntu1604-arm64
+  display_name: SSL Ubuntu 16.04 arm64
   modules:
   - mongo-tools
   run_on:
@@ -3585,7 +3585,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: aarch64-ubuntu1604
+    push_arch: arm64-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
