@@ -5821,12 +5821,19 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		/* Copy any disk image. */
-		multi->supd = bnd->supd;
-		multi->supd_entries = bnd->supd_next;
-		bnd->supd = NULL;
+		/*
+		 * Copy any disk image.  Don't take saved updates without a
+		 * disk image (which happens if they have been saved to the
+		 * lookaside table): they should be discarded along with the
+		 * original page.
+		 */
 		multi->disk_image = bnd->disk_image;
 		bnd->disk_image = NULL;
+		if (multi->disk_image != NULL) {
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+		}
 
 		/* Copy any address. */
 		multi->addr = bnd->addr;
@@ -5861,12 +5868,19 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		/* Copy any disk image. */
-		multi->supd = bnd->supd;
-		multi->supd_entries = bnd->supd_next;
-		bnd->supd = NULL;
+		/*
+		 * Copy any disk image.  Don't take saved updates without a
+		 * disk image (which happens if they have been saved to the
+		 * lookaside table): they should be discarded along with the
+		 * original page.
+		 */
 		multi->disk_image = bnd->disk_image;
 		bnd->disk_image = NULL;
+		if (multi->disk_image != NULL) {
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+		}
 
 		/* Copy any address. */
 		multi->addr = bnd->addr;
