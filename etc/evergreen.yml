@@ -718,6 +718,17 @@ post:
                 ${tar|tar} cvzf diagnostic-data.tgz -C /data/db $file_list
             fi
         fi
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        # removes files from the (local) scons cache when it's over a
+        # threshold, to the $prune_ratio percentage. Ideally override
+        # these default values in the distro config in evergreen.
+
+        if [ -d "${scons_cache_path}" ]; then
+            ${python|python} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+        fi
   - command: archive.targz_pack
     params:
       target: "diskstats.tgz"
@@ -838,9 +849,8 @@ tasks:
           fi
 
           # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts.
-          echo $MONGO_VERSION | ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
-
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -855,7 +865,8 @@ tasks:
           set -o verbose
 
           rm -rf ${install_directory|/data/mongo-install-directory}
-          ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
+
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -983,7 +994,8 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${scons|scons} ${compile_flags|} --stack-size=1024 lint
+
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
   name: burn_in_tests_WT
@@ -2933,9 +2945,10 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -2970,6 +2983,7 @@ buildvariants:
     push_arch: x86_64
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -3079,6 +3093,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -3142,9 +3157,10 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -4278,6 +4294,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     ext: zip
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -4473,6 +4490,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5817,6 +5835,7 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ -j$(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5836,9 +5855,10 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: "--mongosSetParameters='{messagePortImpl: 'ASIO'}' --mongodSetParameters='{messagePortImpl: 'ASIO'}'"
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5883,6 +5903,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     ext: zip
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6773,13 +6794,9 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: true
-    packager_script: packager-enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel62
-    repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6860,6 +6877,7 @@ buildvariants:
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -7099,6 +7117,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy VARIANT_DIR=release --runtime-hardening=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=rocksdb
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -7569,6 +7588,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -7588,6 +7608,7 @@ buildvariants:
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --allocator=system --ssl -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on --cxx-std=14
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -7718,8 +7739,9 @@ buildvariants:
   run_on:
   - ubuntu1404-jepsen
   expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -7745,6 +7767,7 @@ buildvariants:
     test_flags: "\"--mongodSetParameters={use3dot2InitialSync: true, initialSyncOplogBuffer: \"inMemoryBlockingQueue\"}\""
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
