@@ -162,6 +162,8 @@ protected:
      */
     void runQueryAsCommand(const BSONObj& cmdObj);
 
+    void runInvalidQueryAsCommand(const BSONObj& cmdObj);
+
     //
     // Introspect solutions.
     //

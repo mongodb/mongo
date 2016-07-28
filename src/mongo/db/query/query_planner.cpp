@@ -42,6 +42,8 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_enumerator.h"
 #include "mongo/db/query/planner_access.h"
@@ -114,9 +116,14 @@ static BSONObj getKeyFromQuery(const BSONObj& keyPattern, const BSONObj& query) 
     return query.extractFieldsUnDotted(keyPattern);
 }
 
-static bool indexCompatibleMaxMin(const BSONObj& obj, const BSONObj& keyPattern) {
-    BSONObjIterator kpIt(keyPattern);
+static bool indexCompatibleMaxMin(const BSONObj& obj,
+                                  const CollatorInterface* queryCollator,
+                                  const IndexEntry& indexEntry) {
+    BSONObjIterator kpIt(indexEntry.keyPattern);
     BSONObjIterator objIt(obj);
+
+    const bool collatorsMatch =
+        CollatorInterface::collatorsMatch(queryCollator, indexEntry.collator);
 
     for (;;) {
         // Every element up to this point has matched so the KP matches
@@ -135,21 +142,28 @@ static bool indexCompatibleMaxMin(const BSONObj& obj, const BSONObj& keyPattern)
         if (!mongoutils::str::equals(kpElt.fieldName(), objElt.fieldName())) {
             return false;
         }
+
+        // If the index collation doesn't match the query collation, and the min/max obj has a
+        // boundary value that needs to respect the collation, then the index is not compatible.
+        if (!collatorsMatch && CollationIndexKey::isCollatableType(objElt.type())) {
+            return false;
+        }
     }
 }
 
-static BSONObj stripFieldNames(const BSONObj& obj) {
-    BSONObjIterator it(obj);
+static BSONObj stripFieldNamesAndApplyCollation(const BSONObj& obj,
+                                                const CollatorInterface* collator) {
     BSONObjBuilder bob;
-    while (it.more()) {
-        bob.appendAs(it.next(), "");
+    for (BSONElement elt : obj) {
+        CollationIndexKey::collationAwareIndexKeyAppend(elt, collator, &bob);
     }
     return bob.obj();
 }
 
 /**
  * "Finishes" the min object for the $min query option by filling in an empty object with
- * MinKey/MaxKey and stripping field names.
+ * MinKey/MaxKey and stripping field names. Also translates keys according to the collation, if
+ * necessary.
  *
  * In the case that 'minObj' is empty, we "finish" it by filling in either MinKey or MaxKey
  * instead. Choosing whether to use MinKey or MaxKey is done by comparing against 'maxObj'.
@@ -171,13 +185,15 @@ static BSONObj stripFieldNames(const BSONObj& obj) {
  * If 'minObj' is non-empty, then all we do is strip its field names (because index keys always
  * have empty field names).
  */
-static BSONObj finishMinObj(const BSONObj& kp, const BSONObj& minObj, const BSONObj& maxObj) {
+static BSONObj finishMinObj(const IndexEntry& indexEntry,
+                            const BSONObj& minObj,
+                            const BSONObj& maxObj) {
     BSONObjBuilder bob;
     bob.appendMinKey("");
     BSONObj minKey = bob.obj();
 
     if (minObj.isEmpty()) {
-        if (0 > minKey.woCompare(maxObj, kp, false)) {
+        if (0 > minKey.woCompare(maxObj, indexEntry.keyPattern, false)) {
             BSONObjBuilder minKeyBuilder;
             minKeyBuilder.appendMinKey("");
             return minKeyBuilder.obj();
@@ -187,23 +203,26 @@ static BSONObj finishMinObj(const BSONObj& kp, const BSONObj& minObj, const BSON
             return maxKeyBuilder.obj();
         }
     } else {
-        return stripFieldNames(minObj);
+        return stripFieldNamesAndApplyCollation(minObj, indexEntry.collator);
     }
 }
 
 /**
  * "Finishes" the max object for the $max query option by filling in an empty object with
- * MinKey/MaxKey and stripping field names.
+ * MinKey/MaxKey and stripping field names. Also translates keys according to the collation, if
+ * necessary.
  *
  * See comment for finishMinObj() for why we need both 'minObj' and 'maxObj'.
  */
-static BSONObj finishMaxObj(const BSONObj& kp, const BSONObj& minObj, const BSONObj& maxObj) {
+static BSONObj finishMaxObj(const IndexEntry& indexEntry,
+                            const BSONObj& minObj,
+                            const BSONObj& maxObj) {
     BSONObjBuilder bob;
     bob.appendMaxKey("");
     BSONObj maxKey = bob.obj();
 
     if (maxObj.isEmpty()) {
-        if (0 < maxKey.woCompare(minObj, kp, false)) {
+        if (0 < maxKey.woCompare(minObj, indexEntry.keyPattern, false)) {
             BSONObjBuilder maxKeyBuilder;
             maxKeyBuilder.appendMaxKey("");
             return maxKeyBuilder.obj();
@@ -213,7 +232,7 @@ static BSONObj finishMaxObj(const BSONObj& kp, const BSONObj& minObj, const BSON
             return minKeyBuilder.obj();
         }
     } else {
-        return stripFieldNames(maxObj);
+        return stripFieldNamesAndApplyCollation(maxObj, indexEntry.collator);
     }
 }
 
@@ -597,22 +616,26 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
         // If there's an index hinted we need to be able to use it.
         if (!hintIndex.isEmpty()) {
-            if (!minObj.isEmpty() && !indexCompatibleMaxMin(minObj, hintIndex)) {
+            invariant(hintIndexNumber);
+            const auto& hintedIndexEntry = params.indices[*hintIndexNumber];
+
+            if (!minObj.isEmpty() &&
+                !indexCompatibleMaxMin(minObj, query.getCollator(), hintedIndexEntry)) {
                 LOG(5) << "Minobj doesn't work with hint";
                 return Status(ErrorCodes::BadValue, "hint provided does not work with min query");
             }
 
-            if (!maxObj.isEmpty() && !indexCompatibleMaxMin(maxObj, hintIndex)) {
+            if (!maxObj.isEmpty() &&
+                !indexCompatibleMaxMin(maxObj, query.getCollator(), hintedIndexEntry)) {
                 LOG(5) << "Maxobj doesn't work with hint";
                 return Status(ErrorCodes::BadValue, "hint provided does not work with max query");
             }
 
-            const BSONObj& kp = params.indices[*hintIndexNumber].keyPattern;
-            finishedMinObj = finishMinObj(kp, minObj, maxObj);
-            finishedMaxObj = finishMaxObj(kp, minObj, maxObj);
+            finishedMinObj = finishMinObj(hintedIndexEntry, minObj, maxObj);
+            finishedMaxObj = finishMaxObj(hintedIndexEntry, minObj, maxObj);
 
             // The min must be less than the max for the hinted index ordering.
-            if (0 <= finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
+            if (0 <= finishedMinObj.woCompare(finishedMaxObj, hintedIndexEntry.keyPattern, false)) {
                 LOG(5) << "Minobj/Maxobj don't work with hint";
                 return Status(ErrorCodes::BadValue,
                               "hint provided does not work with min/max query");
@@ -623,20 +646,21 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             // No hinted index, look for one that is compatible (has same field names and
             // ordering thereof).
             for (size_t i = 0; i < params.indices.size(); ++i) {
-                const BSONObj& kp = params.indices[i].keyPattern;
+                const auto& indexEntry = params.indices[i];
 
                 BSONObj toUse = minObj.isEmpty() ? maxObj : minObj;
-                if (indexCompatibleMaxMin(toUse, kp)) {
+                if (indexCompatibleMaxMin(toUse, query.getCollator(), indexEntry)) {
                     // In order to be fully compatible, the min has to be less than the max
                     // according to the index key pattern ordering. The first step in verifying
                     // this is "finish" the min and max by replacing empty objects and stripping
                     // field names.
-                    finishedMinObj = finishMinObj(kp, minObj, maxObj);
-                    finishedMaxObj = finishMaxObj(kp, minObj, maxObj);
+                    finishedMinObj = finishMinObj(indexEntry, minObj, maxObj);
+                    finishedMaxObj = finishMaxObj(indexEntry, minObj, maxObj);
 
                     // Now we have the final min and max. This index is only relevant for
                     // the min/max query if min < max.
-                    if (0 >= finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
+                    if (0 >=
+                        finishedMinObj.woCompare(finishedMaxObj, indexEntry.keyPattern, false)) {
                         // Found a relevant index.
                         idxNo = i;
                         break;

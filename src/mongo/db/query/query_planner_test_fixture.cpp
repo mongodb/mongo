@@ -357,6 +357,25 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(s);
 }
 
+void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
+    solns.clear();
+    cq.reset();
+
+    invariant(nss.isValid());
+
+    const bool isExplain = false;
+    std::unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
+    ASSERT_OK(statusWithCQ.getStatus());
+    cq = std::move(statusWithCQ.getValue());
+
+    Status status = QueryPlanner::plan(*cq, params, &solns.mutableVector());
+    ASSERT_NOT_OK(status);
+}
+
 size_t QueryPlannerTest::getNumSolutions() const {
     return solns.size();
 }
