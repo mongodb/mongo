@@ -165,6 +165,16 @@ public:
     std::unique_ptr<AuthorizationSession> makeAuthorizationSession();
 
     /**
+     * Sets whether or not startup AuthSchema validation checks should be applied in this manager.
+     */
+    void setShouldValidateAuthSchemaOnStartup(bool validate);
+
+    /**
+     * Returns true if startup AuthSchema validation checks should be applied in this manager.
+     */
+    bool shouldValidateAuthSchemaOnStartup();
+
+    /**
      * Sets whether or not access control enforcement is enabled for this manager.
      */
     void setAuthEnabled(bool enabled);
@@ -349,6 +359,14 @@ private:
     Status _fetchUserV2(OperationContext* txn,
                         const UserName& userName,
                         std::unique_ptr<User>* acquiredUser);
+
+    /**
+     * True if AuthSchema startup checks should be applied in this AuthorizationManager.
+     *
+     * Defaults to true.  Changes to its value are not synchronized, so it should only be set
+     * at initalization-time.
+     */
+    bool _startupAuthSchemaValidation;
 
     /**
      * True if access control enforcement is enabled in this AuthorizationManager.
