@@ -62,13 +62,10 @@ const char kShardName[] = "shardName";
 const char kMinOpTime[] = "minOpTime";
 const char kMinOpTimeUpdaters[] = "minOpTimeUpdaters";
 
+const Seconds kWriteTimeout(15);
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
-
-const WriteConcernOptions kLocalWriteConcern(1,
-                                             WriteConcernOptions::SyncMode::UNSET,
-                                             Milliseconds(0));
+                                                kWriteTimeout);
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverShardingState, bool, true);
 
@@ -308,7 +305,7 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
           << grid.shardRegistry()->getConfigOpTime();
 
     // Finally, clear the recovery document so next time we don't need to recover
-    status = modifyRecoveryDocument(txn, RecoveryDocument::Clear, kLocalWriteConcern);
+    status = modifyRecoveryDocument(txn, RecoveryDocument::Clear, kMajorityWriteConcern);
     if (!status.isOK()) {
         warning() << "Failed to reset sharding state recovery document due to " << status;
     }
