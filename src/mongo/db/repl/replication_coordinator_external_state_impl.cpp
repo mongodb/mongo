@@ -181,7 +181,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(Operat
     _bgSync = stdx::make_unique<BackgroundSync>(this, makeSteadyStateOplogBuffer(txn));
     _bgSync->startup(txn);
 
-    log() << "Starting replication applier threads";
+    log() << "Starting replication applier thread";
     invariant(!_applierThread);
     _applierThread.reset(new RSDataSync{_bgSync.get(), ReplicationCoordinator::get(txn)});
     _applierThread->startup();
@@ -196,10 +196,13 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     if (_startedThreads) {
         return;
     }
-    log() << "Starting replication storage threads";
+
     if (settings.isMajorityReadConcernEnabled() || enableReplSnapshotThread) {
+        log() << "Starting replication snapshot thread";
         _snapshotThread = SnapshotThread::start(getGlobalServiceContext());
     }
+
+    log() << "Starting replication storage threads";
     getGlobalServiceContext()->getGlobalStorageEngine()->setJournalListener(this);
 
     _taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
@@ -220,24 +223,28 @@ void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext*
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
-        log() << "Stopping replication applier threads";
         if (_syncSourceFeedbackThread) {
+            log() << "Stopping replication reporter thread";
             _syncSourceFeedback.shutdown();
             _syncSourceFeedbackThread->join();
         }
         if (_applierThread) {
+            log() << "Stopping replication applier thread";
             _applierThread->shutdown();
             _applierThread->join();
             _applierThread.reset();
         }
 
         if (_bgSync) {
+            log() << "Stopping replication fetcher thread";
             _bgSync->shutdown(txn);
             _bgSync->join(txn);
         }
-        if (_snapshotThread)
+        if (_snapshotThread) {
+            log() << "Stopping replication snapshot thread";
             _snapshotThread->shutdown();
-
+        }
+        log() << "Stopping replication storage threads";
         _taskExecutor->shutdown();
         _taskExecutor->join();
         _storageInterface->shutdown();
