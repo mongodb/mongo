@@ -200,7 +200,6 @@ Status addMongoShellOptions(moe::OptionSection* options) {
 
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
     StringBuilder sb;
-    sb << "MongoDB shell version: " << mongo::versionString << "\n";
     sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
        << "db address can be:\n"
        << "  foo                   foo database on local machine\n"
@@ -214,12 +213,14 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
 
 bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args) {
-    if (params.count("help")) {
-        std::cout << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
-        return false;
-    }
-    if (params.count("version")) {
-        cout << "MongoDB shell version: " << mongo::versionString << endl;
+    if (params.count("version") || params.count("help")) {
+        setPlainConsoleLogger();
+        log() << mongoShellVersion();
+        if (params.count("help")) {
+            log() << getMongoShellHelp(args[0], moe::startupOptions);
+        } else {
+            printBuildInfo();
+        }
         return false;
     }
     return true;

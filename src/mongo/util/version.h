@@ -41,6 +41,8 @@ class BSONObjBuilder;
 extern const char versionString[];
 extern const int versionNumber;
 std::string mongodVersion();
+std::string mongosVersion();
+std::string mongoShellVersion();
 
 // mongo git version
 const char* gitVersion();

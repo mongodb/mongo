@@ -225,6 +225,11 @@ std::pair<int, std::string> errnoAndDescription();
  */
 void logContext(const char* msg = NULL);
 
+/**
+ * Turns the global log manager into a plain console logger (no adornments).
+ */
+void setPlainConsoleLogger();
+
 }  // namespace mongo
 
 #endif  // MONGO_UTIL_LOG_H_

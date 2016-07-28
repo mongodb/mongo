@@ -45,8 +45,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -591,14 +589,6 @@ void sysRuntimeInfo() {
 #endif
 }
 }  // namespace
-
-void setPlainConsoleLogger() {
-    logger::LogManager* manager = logger::globalLogManager();
-    manager->getGlobalDomain()->clearAppenders();
-    manager->getGlobalDomain()->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
-        new logger::ConsoleAppender<logger::MessageEventEphemeral>(
-            new logger::MessageEventUnadornedEncoder)));
-}
 
 bool handlePreValidationMongodOptions(const moe::Environment& params,
                                       const std::vector<std::string>& args) {

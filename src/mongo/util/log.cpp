@@ -37,6 +37,8 @@
 #include <unistd.h>
 #endif
 
+#include "mongo/logger/console_appender.h"
+#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/logger/rotatable_file_manager.h"
 #include "mongo/util/assert_util.h"
@@ -160,6 +162,14 @@ void logContext(const char* errmsg) {
     // NOTE: We disable long-line truncation for the stack trace, because the JSON representation of
     // the stack trace can sometimes exceed the long line limit.
     printStackTrace(log().setIsTruncatable(false).stream());
+}
+
+void setPlainConsoleLogger() {
+    logger::globalLogManager()->getGlobalDomain()->clearAppenders();
+    logger::globalLogManager()->getGlobalDomain()->attachAppender(
+        logger::MessageLogDomain::AppenderAutoPtr(
+            new logger::ConsoleAppender<logger::MessageEventEphemeral>(
+                new logger::MessageEventUnadornedEncoder)));
 }
 
 Tee* const warnings = RamLog::get("warnings");  // Things put here go in serverStatus

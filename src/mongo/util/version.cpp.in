@@ -98,6 +98,18 @@ string mongodVersion() {
     return ss.str();
 }
 
+string mongosVersion() {
+    stringstream ss;
+    ss << "mongos version v" << versionString;
+    return ss.str();
+}
+
+string mongoShellVersion() {
+    stringstream ss;
+    ss << "MongoDB shell version v" << versionString;
+    return ss.str();
+}
+
 const std::string openSSLVersion(const std::string& prefix, const std::string& suffix) {
 #ifndef MONGO_CONFIG_SSL
     return "";

@@ -44,10 +44,11 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec GlobalInfo::freeFunctions[4] = {
+const JSFunctionSpec GlobalInfo::freeFunctions[5] = {
     MONGO_ATTACH_JS_FUNCTION(gc),
     MONGO_ATTACH_JS_FUNCTION(print),
     MONGO_ATTACH_JS_FUNCTION(version),
+    MONGO_ATTACH_JS_FUNCTION(buildInfo),
     JS_FS_END,
 };
 
@@ -86,6 +87,12 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
 
 void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData(versionString);
+}
+
+void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
+    BSONObjBuilder b;
+    appendBuildInfo(b);
+    ValueReader(cx, args.rval()).fromBSON(b.obj(), nullptr, false);
 }
 
 void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {
