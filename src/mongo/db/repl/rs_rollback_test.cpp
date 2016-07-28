@@ -138,7 +138,6 @@ private:
 
 void RSRollbackTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    Client::initThreadIfNotAlready();
     _txn = cc().makeOperationContext();
     _coordinator = new ReplicationCoordinatorRollbackMock();
 
@@ -158,6 +157,7 @@ void RSRollbackTest::tearDown() {
         invariant(mongo::dbHolder().closeAll(_txn.get(), unused, false));
     }
     _txn.reset();
+    ServiceContextMongoDTest::tearDown();
     setGlobalReplicationCoordinator(nullptr);
 }
 

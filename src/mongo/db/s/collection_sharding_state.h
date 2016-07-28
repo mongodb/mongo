@@ -59,7 +59,7 @@ public:
     /**
      * Instantiates a new per-collection sharding state as unsharded.
      */
-    CollectionShardingState(NamespaceString nss);
+    CollectionShardingState(ServiceContext* sc, NamespaceString nss);
     ~CollectionShardingState();
 
     /**

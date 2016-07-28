@@ -32,6 +32,7 @@
 
 namespace mongo {
 
+class ServiceContext;
 class OperationContext;
 
 /**
@@ -48,6 +49,12 @@ protected:
      * Clear all databases.
      */
     void tearDown() override;
+
+    /**
+     * Returns a service context, which is only valid for this instance of the test.
+     * Must not be called before setUp or after tearDown.
+     */
+    ServiceContext* getServiceContext();
 
     /**
      * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is

@@ -44,6 +44,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
@@ -129,8 +130,8 @@ private:
 
 }  // unnamed namespace
 
-CollectionShardingState::CollectionShardingState(NamespaceString nss)
-    : _nss(std::move(nss)), _metadataManager{} {}
+CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceString nss)
+    : _nss(std::move(nss)), _metadataManager{sc, _nss} {}
 
 CollectionShardingState::~CollectionShardingState() {
     invariant(!_sourceMgr);
@@ -147,7 +148,7 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
     dassert(txn->lockState()->isCollectionLockedForMode(ns, MODE_IS));
 
     ShardingState* const shardingState = ShardingState::get(txn);
-    return shardingState->getNS(ns);
+    return shardingState->getNS(ns, txn);
 }
 
 ScopedCollectionMetadata CollectionShardingState::getMetadata() {
