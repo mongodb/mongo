@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -153,20 +154,20 @@ private:
     struct Entry {
         Key key{};
         Value value{};
-        std::atomic<Entry*> next{nullptr};
-        std::atomic<bool> valid{false};
+        std::atomic<Entry*> next{nullptr};  // NOLINT
+        std::atomic<bool> valid{false};     // NOLINT
         Entry() {}
     };
 
     const size_t maxEntries;        // we allocate storage for this many entries on creation
-    std::atomic_size_t numEntries;  // number of entries currently in use
+    std::atomic_size_t numEntries;  // number of entries currently in use  NOLINT
     size_t numBuckets;              // number of buckets, computed as numEntries * loadFactor
 
     // pre-allocate buckets and entries
-    std::unique_ptr<std::atomic<Entry*>[]> buckets;
+    std::unique_ptr<std::atomic<Entry*>[]> buckets;  // NOLINT
     std::unique_ptr<Entry[]> entries;
 
-    std::atomic_size_t nextEntry;  // first entry that's never been used
+    std::atomic_size_t nextEntry;  // first entry that's never been used  NOLINT
     Entry* freeEntry;              // linked list of entries returned to us by removeEntry
 
 public:
@@ -174,7 +175,7 @@ public:
         : maxEntries(maxEntries),
           numEntries(0),
           numBuckets(maxEntries * loadFactor),
-          buckets(new std::atomic<Entry*>[numBuckets]()),
+          buckets(new std::atomic<Entry*>[numBuckets]()),  // NOLINT
           entries(new Entry[maxEntries]()),
           nextEntry(0),
           freeEntry(nullptr) {}
@@ -275,13 +276,13 @@ private:
     // 0: sampling internally disabled
     // 1: sample every allocation - byte accurate but slow and big
     // >1: sample ever sampleIntervalBytes bytes allocated - less accurate but fast and small
-    std::atomic_size_t sampleIntervalBytes;
+    std::atomic_size_t sampleIntervalBytes;  // NOLINT
 
-    std::mutex hashtable_mutex;  // guards updates to both object and stack hash tables
-    std::mutex stackinfo_mutex;  // guards against races updating the StackInfo bson representation
+    stdx::mutex hashtable_mutex;  // guards updates to both object and stack hash tables
+    stdx::mutex stackinfo_mutex;  // guards against races updating the StackInfo bson representation
 
     // cumulative bytes allocated - determines when samples are taken
-    std::atomic_size_t bytesAllocated{0};
+    std::atomic_size_t bytesAllocated{0};  // NOLINT
 
     // estimated currently active bytes - sum of activeBytes for all stacks
     size_t totalActiveBytes = 0;
@@ -405,7 +406,7 @@ private:
         Hash stackHash = tempStack.hash();
 
         // Now acquire lock.
-        std::lock_guard<std::mutex> lk(hashtable_mutex);
+        stdx::lock_guard<stdx::mutex> lk(hashtable_mutex);
 
         // Look up stack in stackHashTable.
         StackInfo* stackInfo = stackHashTable.find(stackHash, tempStack);
@@ -451,7 +452,7 @@ private:
             return;
 
         // Now acquire lock.
-        std::lock_guard<std::mutex> lk(hashtable_mutex);
+        stdx::lock_guard<stdx::mutex> lk(hashtable_mutex);
 
         // Remove the object from the hash bucket if present.
         ObjInfo* objInfo = objHashTable.find(objHash, obj);
@@ -542,7 +543,7 @@ private:
         statsBuilder.doneFast();
 
         // Guard against races updating the StackInfo bson representation.
-        std::lock_guard<std::mutex> lk(stackinfo_mutex);
+        stdx::lock_guard<stdx::mutex> lk(stackinfo_mutex);
 
         // Traverse stackHashTable accumulating potential stacks to emit.
         // We do this traversal without locking hashtable_mutex because we need to use the heap.
