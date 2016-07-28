@@ -294,6 +294,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         source=[
             'tcmalloc_server_status_section.cpp',
             'tcmalloc_set_parameter.cpp',
+            'heap_profiler.cpp',
         ],
         LIBDEPS=[
             # TODO: This is needless, the definition of
