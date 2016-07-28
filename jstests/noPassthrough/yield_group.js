@@ -8,8 +8,8 @@
     const worksPerYield = 50;
 
     // Start a mongod that will yield every 50 work cycles.
-    var conn =
-        MongoRunner.runMongod({setParameter: `internalQueryExecYieldIterations=${worksPerYield}`});
+    var conn = MongoRunner.runMongod(
+        {setParameter: `internalQueryExecYieldIterations = ${worksPerYield}`});
     assert.neq(null, conn, 'mongod was unable to start up');
 
     var coll = conn.getDB('test').yield_group;
