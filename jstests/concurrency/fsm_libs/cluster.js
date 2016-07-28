@@ -3,7 +3,7 @@
 /**
  * Represents a MongoDB cluster.
  */
-load('jstests/hooks/check_repl_dbhash.js');  // Loads the checkDBHashesFsyncLocked function.
+load('jstests/hooks/check_repl_dbhash.js');  // Loads the checkDBHashes function.
 
 var Cluster = function(options) {
     if (!(this instanceof Cluster)) {
@@ -494,7 +494,7 @@ var Cluster = function(options) {
                            ' assumed to still be primary, ' + phase);
 
                 // Compare the dbhashes of the primary and secondaries.
-                checkDBHashesFsyncLocked(rst, dbBlacklist, phase);
+                checkDBHashes(rst, dbBlacklist, phase);
                 var totalTime = Date.now() - startTime;
                 jsTest.log('Finished consistency checks of replica set with ' + primary.host +
                            ' as primary in ' + totalTime + ' ms, ' + phase);
