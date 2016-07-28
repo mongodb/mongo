@@ -266,6 +266,14 @@ std::unique_ptr<AuthorizationSession> AuthorizationManager::makeAuthorizationSes
         _externalState->makeAuthzSessionExternalState(this));
 }
 
+void AuthorizationManager::setShouldValidateAuthSchemaOnStartup(bool validate) {
+    _startupAuthSchemaValidation = validate;
+}
+
+bool AuthorizationManager::shouldValidateAuthSchemaOnStartup() {
+    return _startupAuthSchemaValidation;
+}
+
 Status AuthorizationManager::getAuthorizationVersion(OperationContext* txn, int* version) {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
     int newVersion = _version;
