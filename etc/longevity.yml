@@ -209,7 +209,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
+          python -u ../src/dsi/dsi/analysis/post_run_check.py --ycsb-throughput-analysis . --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
 
 
 tasks:

@@ -259,7 +259,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/post_run_check.py --log-analysis .. --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --log-analysis .. --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
 
   "compare":
     - command: shell.exec
@@ -358,6 +358,8 @@ tasks:
       vars:
         test: "ycsb"
     - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
 
 - name: industry_benchmarks_MMAPv1
   depends_on:
@@ -379,6 +381,8 @@ tasks:
       vars:
         test: "ycsb"
     - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
 
 - name: core_workloads_WT
   depends_on:
