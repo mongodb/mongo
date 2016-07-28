@@ -117,7 +117,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 */
 		if (ret != 0 ||
 		    result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP) {
-			fail_msg = "block decryption failed";
+			fail_msg = "block decompression failed";
 			goto corrupt;
 		}
 	} else
