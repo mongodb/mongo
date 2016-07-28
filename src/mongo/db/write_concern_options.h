@@ -55,6 +55,8 @@ public:
 
     WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
 
+    WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout);
+
     WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout);
 
     WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);

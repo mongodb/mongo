@@ -62,6 +62,9 @@ const BSONObj WriteConcernOptions::Majority(BSON("w" << WriteConcernOptions::kMa
 
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, int timeout)
     : syncMode(sync), wNumNodes(numNodes), wTimeout(timeout) {}
+    
+WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout)
+    : syncMode(sync), wNumNodes(numNodes), wTimeout(durationCount<Milliseconds>(timeout)) {}
 
 WriteConcernOptions::WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout)
     : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(timeout) {}
