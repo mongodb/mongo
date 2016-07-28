@@ -7,7 +7,7 @@ load('jstests/libs/trace_missing_docs.js');
     var testDocMissing = function(useReplicaSet) {
         var options = {
             rs: useReplicaSet,
-            shardOptions: {master: "", oplogSize: 10},
+            shardOptions: {oplogSize: 10},
             rsOptions: {nodes: 1, oplogSize: 10}
         };
 
@@ -38,12 +38,10 @@ load('jstests/libs/trace_missing_docs.js');
         assert.eq(ops[0].op, 'i');
         assert.eq(ops.length, 5);
 
-        jsTest.log("DONE! " + (useReplicaSet ? "(using rs)" : "(using master/slave)"));
+        jsTest.log("DONE! (using rs)");
 
         st.stop();
     };
 
     testDocMissing(true);
-    testDocMissing(false);
-
 })();

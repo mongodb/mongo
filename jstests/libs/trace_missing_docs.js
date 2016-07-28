@@ -40,9 +40,6 @@ function traceMissingDoc(coll, doc, mongos) {
     var allOps = [];
     for (var i = 0; i < shards.length; i++) {
         var oplog = shards[i].conn.getCollection("local.oplog.rs");
-        if (!oplog.findOne()) {
-            oplog = shards[i].conn.getCollection("local.oplog.$main");
-        }
 
         if (!oplog.findOne()) {
             jsTest.log("No oplog was found on shard " + shards[i]._id);

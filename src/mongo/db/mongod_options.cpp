@@ -455,7 +455,9 @@ Status addMongodOptions(moe::OptionSection* options) {
                            moe::Switch,
                            "declare this is a shard db of a cluster; default port 27018")
         .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("configsvr");
+        .incompatibleWith("configsvr")
+        .incompatibleWith("master")
+        .incompatibleWith("slave");
 
     sharding_options
         .addOptionChaining(
