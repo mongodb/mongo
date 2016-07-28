@@ -559,8 +559,9 @@ private:
 
         // Sort the stacks and find enough stacks to account for at least 99% of the active bytes
         // deem any stack that has ever met this criterion as "important".
-        auto sortByActiveBytes =
-            [](StackInfo* a, StackInfo* b) -> bool { return a->activeBytes > b->activeBytes; };
+        auto sortByActiveBytes = [](StackInfo* a, StackInfo* b) -> bool {
+            return a->activeBytes > b->activeBytes;
+        };
         std::stable_sort(stackInfos.begin(), stackInfos.end(), sortByActiveBytes);
         size_t threshold = totalActiveBytes * 0.99;
         size_t cumulative = 0;
@@ -666,9 +667,8 @@ ExportedServerParameter<long long, ServerParameterType::kStartupOnly>
                                      "heapProfilingSampleIntervalBytes",
                                      &HeapProfiler::sampleIntervalBytesParameter);
 
-MONGO_INITIALIZER_GENERAL(StartHeapProfiling,
-                          ("EndStartupOptionHandling"),
-                          ("default"))(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
+(InitializerContext* context) {
     if (HeapProfiler::enabledParameter)
         HeapProfiler::heapProfiler = new HeapProfiler();
     return Status::OK();
