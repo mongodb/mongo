@@ -89,12 +89,21 @@ BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion) 
     // more than once face, individual intervals will
     // never cross that threshold. Thus, scans will still
     // produce the same results.
-    BSONObjBuilder b;
     if (indexVersion >= S2_INDEX_VERSION_3) {
+        // The size of an index BSONObj in S2 index version 3 is 15 bytes.
+        // total size (4 bytes)  |  type code 0x12 (1)  |  field name "" 0x00 (1)  |
+        // long long cell id (8) | EOO (1)
+        BSONObjBuilder b(15);
         b.append("", static_cast<long long>(cellId.id()));
-    } else {
-        b.append("", cellId.ToString());
+        return b.obj();
     }
-    return b.obj();
+
+    // The size of an index BSONObj in older versions is 10 ~ 40 bytes.
+    // total size (4 bytes)  |  type code 0x12 (1)  |  field name "" 0x00 (1)  |
+    // cell id string (2 ~ 32) 0x00 (1) | EOO (1)
+    BSONObjBuilder b;
+    b.append("", cellId.ToString());
+    // Return a copy so its buffer size fits the object size.
+    return b.obj().copy();
 }
 }  // namespace mongo
