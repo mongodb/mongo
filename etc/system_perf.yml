@@ -686,7 +686,7 @@ buildvariants:
   modules: *modules
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
-    setup: replica
+    setup: replica-2node
     cluster: replica
     platform: linux
   run_on:
@@ -694,6 +694,7 @@ buildvariants:
   tasks:
     - name: initialsync_WT
     - name: initialsync_MMAPv1
+    - name: initialsync_WT_dr
 
 - name: linux-oplog-compare
   display_name: Linux Oplog Compare
