@@ -29,7 +29,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -52,7 +51,7 @@ public:
      *
      * Returns true if there are more entries in rangesToClean, false if the set is empty.
      */
-    bool cleanupNextRange(OperationContext* txn);
+    bool cleanupNextRange();
 
 private:
     NamespaceString _nss;

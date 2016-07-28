@@ -31,20 +31,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/metadata_manager.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
-
-MetadataManager::MetadataManager(ServiceContext* sc, NamespaceString nss)
-    : _nss(std::move(nss)),
-      _serviceContext(sc),
-      _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)) {}
+MetadataManager::MetadataManager()
+    : _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)) {}
 
 MetadataManager::~MetadataManager() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
@@ -326,11 +320,6 @@ void MetadataManager::_addRangeToClean_inlock(const ChunkRange& range) {
     invariant(!rangeMapOverlaps(_rangesToClean, range.getMin(), range.getMax()));
     invariant(!rangeMapOverlaps(_receivingChunks, range.getMin(), range.getMax()));
     _rangesToClean.insert(std::make_pair(range.getMin().getOwned(), range.getMax().getOwned()));
-
-    // If _rangesToClean was previously empty, we need to start the collection range deleter
-    if (_rangesToClean.size() == 1UL) {
-        ShardingState::get(_serviceContext)->scheduleCleanup(_nss);
-    }
 }
 
 void MetadataManager::removeRangeToClean(const ChunkRange& range) {

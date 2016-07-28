@@ -78,14 +78,8 @@ public:
         return _initCallCount;
     }
 
-    ServiceContext* getServiceContext() {
-        return &_service;
-    }
-
-protected:
-    ServiceContextNoop _service;
-
 private:
+    ServiceContextNoop _service;
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
 
@@ -93,8 +87,7 @@ private:
 };
 
 TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
-    CollectionShardingState collShardingState(&_service,
-                                              NamespaceString::kConfigCollectionNamespace);
+    CollectionShardingState collShardingState(NamespaceString::kConfigCollectionNamespace);
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
@@ -113,8 +106,7 @@ TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
 }
 
 TEST_F(CollShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
-    CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+    CollectionShardingState collShardingState(NamespaceString::kConfigCollectionNamespace);
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
@@ -133,7 +125,7 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
 }
 
 TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentity) {
-    CollectionShardingState collShardingState(getServiceContext(), NamespaceString("admin.user"));
+    CollectionShardingState collShardingState(NamespaceString("admin.user"));
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
@@ -152,8 +144,7 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentit
 }
 
 TEST_F(CollShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument) {
-    CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+    CollectionShardingState collShardingState(NamespaceString::kConfigCollectionNamespace);
 
     ShardIdentityType shardIdentity;
     shardIdentity.setShardName("a");
@@ -162,8 +153,7 @@ TEST_F(CollShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument
 }
 
 TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfShardIdentityDocWasNotInserted) {
-    CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+    CollectionShardingState collShardingState(NamespaceString::kConfigCollectionNamespace);
 
     WriteUnitOfWork wuow(txn());
     collShardingState.onInsertOp(txn(), BSON("_id" << 1));

@@ -32,11 +32,8 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
-
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -47,7 +44,7 @@ class MetadataManager {
     MONGO_DISALLOW_COPYING(MetadataManager);
 
 public:
-    MetadataManager(ServiceContext* sc, NamespaceString nss);
+    MetadataManager();
     ~MetadataManager();
 
     /**
@@ -129,11 +126,6 @@ private:
     void _removeRangeToClean_inlock(const ChunkRange& range);
 
     void _setActiveMetadata_inlock(std::unique_ptr<CollectionMetadata> newMetadata);
-
-    const NamespaceString _nss;
-
-    // ServiceContext from which to obtain instances of global support objects.
-    ServiceContext* _serviceContext;
 
     // Mutex to protect the state below
     stdx::mutex _managerLock;
