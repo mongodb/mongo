@@ -246,7 +246,9 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     const std::vector<BSONObj>& secondaryIndexSpecs) {
 
     LOG(2) << "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: " << nss.ns();
-    std::unique_ptr<TaskRunner> runner = stdx::make_unique<TaskRunner>(_bulkLoaderThreads.get());
+    auto threadPool =
+        stdx::make_unique<OldThreadPool>(1, str::stream() << "InitialSyncInserters-" << nss.ns());
+    std::unique_ptr<TaskRunner> runner = stdx::make_unique<TaskRunner>(threadPool.get());
 
     // Setup cond_var for signalling when done.
     std::unique_ptr<CollectionBulkLoader> loaderToReturn;
@@ -276,8 +278,13 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             coll = stdx::make_unique<AutoGetCollection>(txn, nss, MODE_IX);
 
             // Move locks into loader, so it now controls their lifetime.
-            auto loader = stdx::make_unique<CollectionBulkLoaderImpl>(
-                txn, collection, idIndexSpec, std::move(runner), std::move(db), std::move(coll));
+            auto loader = stdx::make_unique<CollectionBulkLoaderImpl>(txn,
+                                                                      collection,
+                                                                      idIndexSpec,
+                                                                      std::move(threadPool),
+                                                                      std::move(runner),
+                                                                      std::move(db),
+                                                                      std::move(coll));
             invariant(collection);
             auto status = loader->init(txn, collection, secondaryIndexSpecs);
             if (!status.isOK()) {

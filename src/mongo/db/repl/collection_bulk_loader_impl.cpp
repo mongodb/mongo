@@ -53,10 +53,12 @@ namespace repl {
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
                                                    Collection* coll,
                                                    const BSONObj idIndexSpec,
+                                                   std::unique_ptr<OldThreadPool> threadPool,
                                                    std::unique_ptr<TaskRunner> runner,
                                                    std::unique_ptr<AutoGetOrCreateDb> autoDb,
                                                    std::unique_ptr<AutoGetCollection> autoColl)
-    : _runner(std::move(runner)),
+    : _threadPool(std::move(threadPool)),
+      _runner(std::move(runner)),
       _autoColl(std::move(autoColl)),
       _autoDB(std::move(autoDb)),
       _txn(txn),
@@ -75,7 +77,11 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
 }
 
 CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
-    DESTRUCTOR_GUARD(_runner->cancel();)
+    DESTRUCTOR_GUARD({
+        _runner->cancel();
+        _runner->join();
+        _threadPool->join();
+    })
 }
 
 Status CollectionBulkLoaderImpl::init(OperationContext* txn,

@@ -64,6 +64,7 @@ public:
     CollectionBulkLoaderImpl(OperationContext* txn,
                              Collection* coll,
                              const BSONObj idIndexSpec,
+                             std::unique_ptr<OldThreadPool> threadPool,
                              std::unique_ptr<TaskRunner> runner,
                              std::unique_ptr<AutoGetOrCreateDb> autoDB,
                              std::unique_ptr<AutoGetCollection> autoColl);
@@ -83,6 +84,7 @@ public:
     virtual BSONObj toBSON() const override;
 
 private:
+    std::unique_ptr<OldThreadPool> _threadPool;
     std::unique_ptr<TaskRunner> _runner;
     std::unique_ptr<AutoGetCollection> _autoColl;
     std::unique_ptr<AutoGetOrCreateDb> _autoDB;
