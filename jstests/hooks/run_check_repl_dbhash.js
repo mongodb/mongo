@@ -89,7 +89,7 @@
     }
 
     load('jstests/hooks/check_repl_dbhash.js');
-    checkDBHashesFsyncLocked(rst);
+    checkDBHashes(rst);
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of cluster in ' + totalTime + ' ms.');

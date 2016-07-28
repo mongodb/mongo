@@ -39,8 +39,8 @@
 
     load('jstests/hooks/run_validate_collections.js');
 
-    load('jstests/hooks/check_repl_dbhash.js');  // For checkDBHashesFsyncLocked
-    checkDBHashesFsyncLocked(rst);
+    load('jstests/hooks/check_repl_dbhash.js');  // For checkDBHashes
+    checkDBHashes(rst);
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of initial sync node in ' + totalTime + ' ms.');
