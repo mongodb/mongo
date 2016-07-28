@@ -38,9 +38,12 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -101,6 +104,7 @@ void ConfigServerTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
 
     auto serviceContext = getGlobalServiceContext();
+
     _messagePort = stdx::make_unique<MessagingPortMock>();
     Client::initThreadIfNotAlready("ConfigServerTestFixture");
     _opCtx = cc().makeOperationContext();
@@ -108,6 +112,7 @@ void ConfigServerTestFixture::setUp() {
     repl::ReplSettings replSettings;
     replSettings.setReplSetString("mySet/node1:12345,node2:54321,node3:12543");
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(replSettings);
+
     repl::ReplicaSetConfig config;
     config.initialize(BSON("_id"
                            << "mySet"
@@ -122,6 +127,10 @@ void ConfigServerTestFixture::setUp() {
                                               << 1))));
     replCoord->setGetConfigReturnValue(config);
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+
+    serviceContext->setOpObserver(stdx::make_unique<OpObserver>());
+    repl::setOplogCollectionName();
+    repl::createOplog(_opCtx.get());
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
 
