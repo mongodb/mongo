@@ -411,11 +411,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                                                  const OID& epoch,
                                                  const WriteConcernOptions& writeConcern) {
     invariant(isActive());
-    invariant(getState() == READY);
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
-
-    DisableDocumentValidation validationDisabler(txn);
 
     log() << "starting receiving-end of migration of chunk " << min << " -> " << max
           << " for collection " << ns << " from " << fromShard << " at epoch " << epoch.toString();
@@ -423,12 +420,24 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
     string errmsg;
     MoveTimingHelper timing(txn, "to", ns, min, max, 6 /* steps */, &errmsg, ShardId(), ShardId());
 
+    const auto initialState = getState();
+
+    if (initialState == ABORT) {
+        errmsg = "Migration abort requested before it started";
+        error() << errmsg << migrateLog;
+        return;
+    }
+
+    invariant(initialState == READY);
+
     ScopedDbConnection conn(fromShard);
 
     // Just tests the connection
     conn->getLastError();
 
     const NamespaceString nss(ns);
+
+    DisableDocumentValidation validationDisabler(txn);
 
     {
         // 0. copy system.namespaces entry if collection doesn't already exist
@@ -561,10 +570,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         deleterOptions.onlyRemoveOrphanedDocs = true;
         deleterOptions.removeSaverReason = "preCleanup";
 
-        string errMsg;
-
-        if (!getDeleter()->deleteNow(txn, deleterOptions, &errMsg)) {
-            warning() << "Failed to queue delete for migrate abort: " << errMsg;
+        if (!getDeleter()->deleteNow(txn, deleterOptions, &errmsg)) {
+            warning() << "Failed to queue delete for migrate abort: " << errmsg;
             setState(FAIL);
             return;
         }
@@ -624,8 +631,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                 txn->checkForInterrupt();
 
                 if (getState() == ABORT) {
-                    errmsg = str::stream() << "Migration abort requested while "
-                                           << "copying documents";
+                    errmsg = "Migration aborted while copying documents";
                     error() << errmsg << migrateLog;
                     return;
                 }
@@ -715,10 +721,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                 txn->checkForInterrupt();
 
                 if (getState() == ABORT) {
-                    errmsg = str::stream() << "Migration abort requested while waiting "
-                                           << "for replication at catch up stage";
+                    errmsg = "Migration aborted while waiting for replication at catch up stage";
                     error() << errmsg << migrateLog;
-
                     return;
                 }
 
@@ -755,7 +759,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             txn->checkForInterrupt();
 
             if (getState() == ABORT) {
-                errmsg = "Migration abort requested while waiting for replication";
+                errmsg = "Migration aborted while waiting for replication";
                 error() << errmsg << migrateLog;
                 return;
             }
@@ -808,6 +812,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             }
 
             if (getState() == ABORT) {
+                errmsg = "Migration aborted while transferring mods";
+                error() << errmsg << migrateLog;
                 return;
             }
 
