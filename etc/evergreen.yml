@@ -1757,7 +1757,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow1 --storageEngine=mmapv1
-      run_multiple_jobs: true
+      run_multiple_jobs: false
 
 - <<: *task_template
   name: slow1_WT
@@ -1766,7 +1766,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
+      run_multiple_jobs: false
 
 - <<: *task_template
   name: serial_run
