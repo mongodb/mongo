@@ -155,7 +155,14 @@ functions:
           source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           # Copy over the proper test control file
-          cp $DSI_PATH/test_control/test_control.${test}.yml test_control.yml
+          # This is to work around the fact that multinode clusters need a different ycsb test control.
+          # This should eventually be fixed in a better fashion and removed.
+          if [ ${test} == 'ycsb' ] && ( [ ${cluster} == 'shard' ] || [ ${cluster} == 'replica' ] )
+          then
+            cp $DSI_PATH/test_control/test_control.ycsb.multi_node.yml test_control.yml
+          else
+            cp $DSI_PATH/test_control/test_control.${test}.yml test_control.yml
+          fi
           # Specify the test list to use. Change the testList parameter
           # if you want to run a non-default list.
           $DSI_PATH/bin/update_test_list.py ${testList}
