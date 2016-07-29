@@ -66,10 +66,12 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 
 	TAILQ_FOREACH(cursor, &session->cursors, q)
 		if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
+#if 0 /* !!! LSM updates can violate this assertion. */
 			/* We have to do this with a transaction ID pinned. */
 			WT_ASSERT(session,
 			   WT_SESSION_TXN_STATE(session)->snap_min !=
 			   WT_TXN_NONE);
+#endif
 
 			F_CLR(cursor, WT_CURSTD_VALUE_INT);
 			WT_RET(__wt_buf_set(session, &cursor->value,
