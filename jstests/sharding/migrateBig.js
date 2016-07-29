@@ -41,13 +41,9 @@
 
     s.printShardingStatus();
 
-    assert.throws(function() {
-        assert.commandWorked(s.s0.adminCommand({
-            movechunk: "test.foo",
-            find: {x: 50},
-            to: s.getOther(s.getPrimaryShard("test")).name
-        }));
-    }, [], "move should fail");
+    // This is a large chunk, which should not be able to move
+    assert.commandFailed(s.s0.adminCommand(
+        {movechunk: "test.foo", find: {x: 50}, to: s.getOther(s.getPrimaryShard("test")).name}));
 
     for (var i = 0; i < 20; i += 2) {
         try {
@@ -68,7 +64,9 @@
         return x < 2;
     }, "no balance happened", 8 * 60 * 1000, 2000);
 
-    assert.eq(coll.count(), coll.find().itcount());
+    // Use a predicate for the count command so it actually filters out documents, which are being
+    // cleaned up
+    assert.eq(coll.count({x: {$gte: 0}}), coll.find().itcount());
 
     s.stop();
 })();
