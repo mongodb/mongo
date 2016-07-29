@@ -4,6 +4,8 @@
 // WARNING: this test does not always fail deterministically. It is possible for the bug to be
 // present without this test failing. In particular if the rst.stop(1) doesn't execute mid-batch,
 // it isn't actually testing this bug. However, if the test fails there is definitely a bug.
+//
+// @tags: [requires_persistence]
 (function() {
     "use strict";
 
@@ -56,11 +58,16 @@
     assert.neq(null, conn, "secondary failed to start");
 
     // Following a clean shutdown of a 3.2 node, the oplog must exactly match the applied
-    // operations.
+    // operations. Additionally, the begin field must not be in the minValid document and the ts
+    // must match the top of the oplog (SERVER-25353).
     var oplogDoc = conn.getCollection('local.oplog.rs').find().sort({$natural: -1}).limit(1)[0];
     var collDoc = conn.getCollection('test.coll').find().sort({_id: -1}).limit(1)[0];
-    printjson({oplogDoc: oplogDoc, collDoc: collDoc});
+    var minValidDoc =
+        conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
+    printjson({oplogDoc: oplogDoc, collDoc: collDoc, minValidDoc: minValidDoc});
     assert.eq(collDoc._id, oplogDoc.o._id);
+    assert(!('begin' in minValidDoc), 'begin in minValidDoc');
+    assert.eq(minValidDoc.ts, oplogDoc.ts);
 
     rst.stopSet();
 })();

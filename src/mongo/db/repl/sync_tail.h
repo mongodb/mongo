@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <deque>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
@@ -174,8 +176,11 @@ protected:
     static const unsigned int replBatchLimitOperations = 5000;
 
     // Apply a batch of operations, using multiple threads.
+    // If boundries is supplied, will update minValid document at begin and end of batch.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
-    OpTime multiApply(OperationContext* txn, const OpQueue& ops);
+    OpTime multiApply(OperationContext* txn,
+                      const OpQueue& ops,
+                      boost::optional<BatchBoundaries> boundaries = {});
 
 private:
     class OpQueueBatcher;

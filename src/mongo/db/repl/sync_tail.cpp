@@ -54,7 +54,6 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -529,7 +528,9 @@ void fillWriterVectors(OperationContext* txn,
 
 // Applies a batch of oplog entries, by using a set of threads to apply the operations and then
 // writes the oplog entries to the local oplog.
-OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
+OpTime SyncTail::multiApply(OperationContext* txn,
+                            const OpQueue& ops,
+                            boost::optional<BatchBoundaries> boundaries) {
     invariant(_applyFunc);
 
     if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
@@ -560,6 +561,10 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
         fassertFailed(28527);
     }
 
+    if (boundaries) {
+        setMinValid(txn, *boundaries);  // Mark us as in the middle of a batch.
+    }
+
     applyOps(writerVectors, &_writerPool, _applyFunc, this);
 
     OpTime lastOpTime;
@@ -575,6 +580,11 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
 
     // Due to SERVER-24933 we can't enter inShutdown while holding the PBWM lock.
     invariant(!inShutdownStrict());
+
+    if (boundaries) {
+        setMinValid(txn, boundaries->end, DurableRequirement::None);  // Mark batch as complete.
+    }
+
     return lastOpTime;
 }
 
@@ -789,7 +799,7 @@ void SyncTail::oplogApplication() {
         // (last) failed batch, whichever is larger.
         // This will cause this node to go into RECOVERING state
         // if we should crash and restart before updating finishing.
-        const OpTime start(getLastSetTimestamp(), OpTime::kUninitializedTerm);
+        minValidBoundaries.start = OpTime(getLastSetTimestamp(), OpTime::kUninitializedTerm);
 
 
         // Take the max of the first endOptime (if we recovered) and the end of our batch.
@@ -805,25 +815,22 @@ void SyncTail::oplogApplication() {
         // restart
         // batch apply, 20-25, end = max(25, 40) = 40
         // batch apply, 25-45, end = 45
-        const OpTime end(std::max(originalEndOpTime, lastOpTime));
+        minValidBoundaries.end = std::max(originalEndOpTime, lastOpTime);
 
-        // This write will not journal/checkpoint.
-        setMinValid(&txn, {start, end});
 
-        lastWriteOpTime = multiApply(&txn, ops);
+        lastWriteOpTime = multiApply(&txn, ops, minValidBoundaries);
         if (lastWriteOpTime.isNull()) {
             // fassert if oplog application failed for any reasons other than shutdown.
             error() << "Failed to apply " << ops.getDeque().size()
-                    << " operations - batch start:" << start << " end:" << end;
+                    << " operations - batch start:" << minValidBoundaries.start
+                    << " end:" << minValidBoundaries.end;
             fassert(34360, inShutdownStrict());
             // Return without setting minvalid in the case of shutdown.
             return;
         }
 
         setNewTimestamp(lastWriteOpTime.getTimestamp());
-        setMinValid(&txn, end, DurableRequirement::None);
         minValidBoundaries.start = {};
-        minValidBoundaries.end = end;
         finalizer->record(lastWriteOpTime);
     }
 }
