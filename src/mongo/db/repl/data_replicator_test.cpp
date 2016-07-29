@@ -526,7 +526,7 @@ protected:
         _isbr->run();
     }
 
-    void playResponsesNTimees(int n) {
+    void playResponsesNTimes(int n) {
         for (int x = 0; x < n; ++x) {
             log() << "playing responses, pass " << x << " of " << n;
             playResponses(false);
@@ -739,7 +739,7 @@ TEST_F(InitialSyncTest, Complete) {
     auto txn = makeOpCtx();
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
-    startSync(repl::kInitialSyncMaxRetries);
+    startSync(0);
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
@@ -828,7 +828,7 @@ TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCl
     auto txn = makeOpCtx();
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
-    startSync(repl::kInitialSyncMaxRetries);
+    startSync(0);
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
@@ -883,7 +883,7 @@ TEST_F(InitialSyncTest, Failpoint) {
     _memberState = MemberState::RS_SECONDARY;
 
     DataReplicator* dr = &(getDR());
-    InitialSyncBackgroundRunner isbr(dr, repl::kInitialSyncMaxRetries);
+    InitialSyncBackgroundRunner isbr(dr, 0);
     isbr.run();
 
     ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InitialSyncFailure);
@@ -918,9 +918,9 @@ TEST_F(InitialSyncTest, FailsOnClone) {
         {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
 
     };
-    startSync(repl::kInitialSyncMaxRetries);
+    startSync(0);
     setResponses(responses);
-    playResponsesNTimees(repl::kInitialSyncMaxRetries);
+    playResponses(repl::kInitialSyncMaxRetries);
     verifySync(getNet(), ErrorCodes::InitialSyncFailure);
 }
 
@@ -976,10 +976,10 @@ TEST_F(InitialSyncTest, FailOnRollback) {
             {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:2}")},
         };
 
-    startSync(repl::kInitialSyncMaxRetries);
+    startSync(0);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
-    playResponsesNTimees(repl::kInitialSyncMaxRetries);
+    playResponses(repl::kInitialSyncMaxRetries);
     verifySync(getNet(), ErrorCodes::InitialSyncFailure);
 }
 
