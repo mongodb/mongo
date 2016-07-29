@@ -56,7 +56,8 @@ using std::unique_ptr;
 
 namespace {
 SaslAuthenticationSession* createNativeSaslAuthenticationSession(AuthorizationSession* authzSession,
-                                                                 const std::string& mechanism) {
+                                                                 StringData db,
+                                                                 StringData mechanism) {
     return new NativeSaslAuthenticationSession(authzSession);
 }
 
@@ -83,7 +84,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(PostSaslCommands, ("NativeSaslServerCore"))
             continue;
         }
         unique_ptr<SaslAuthenticationSession> session(
-            SaslAuthenticationSession::create(authzSession.get(), mechanism));
+            SaslAuthenticationSession::create(authzSession.get(), "$external", mechanism));
         Status status = session->start(
             "test", mechanism, saslGlobalParams.serviceName, saslGlobalParams.hostName, 1, true);
         if (!status.isOK())

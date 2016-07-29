@@ -294,7 +294,7 @@ bool CmdSaslStart::run(OperationContext* txn,
     }
 
     SaslAuthenticationSession* session =
-        SaslAuthenticationSession::create(AuthorizationSession::get(client), mechanism);
+        SaslAuthenticationSession::create(AuthorizationSession::get(client), db, mechanism);
 
     std::unique_ptr<AuthenticationSession> sessionGuard(session);
 

@@ -51,7 +51,8 @@ class SaslAuthenticationSession : public AuthenticationSession {
     MONGO_DISALLOW_COPYING(SaslAuthenticationSession);
 
 public:
-    typedef stdx::function<SaslAuthenticationSession*(AuthorizationSession*, const std::string&)>
+    typedef stdx::function<SaslAuthenticationSession*(
+        AuthorizationSession*, StringData, StringData)>
         SaslAuthenticationSessionFactoryFn;
     static SaslAuthenticationSessionFactoryFn create;
 
