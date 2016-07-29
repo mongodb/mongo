@@ -794,7 +794,15 @@ void copyDir(const boost::filesystem::path& from, const boost::filesystem::path&
     boost::filesystem::directory_iterator i(from);
     while (i != end) {
         boost::filesystem::path p = *i;
-        if (p.leaf() != "mongod.lock" && p.leaf() != "WiredTiger.lock") {
+        if (p.leaf() == "metrics.interim" || p.leaf() == "metrics.interim.temp") {
+            // Ignore any errors for metrics.interim* files as these may disappear during copy
+            boost::system::error_code ec;
+            boost::filesystem::copy_file(p, to / p.leaf(), ec);
+            if (ec) {
+                log() << "Skipping copying of file from '" << p.generic_string() << "' to '"
+                      << (to / p.leaf()).generic_string() << "' due to: " << ec.message();
+            }
+        } else if (p.leaf() != "mongod.lock" && p.leaf() != "WiredTiger.lock") {
             if (boost::filesystem::is_directory(p)) {
                 boost::filesystem::path newDir = to / p.leaf();
                 boost::filesystem::create_directory(newDir);
