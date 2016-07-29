@@ -556,7 +556,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
                 return;
             }
 
-            response.opTime = replParseStatus.getValue().getLastOpVisible();
+            response.opTime = replParseStatus.getValue().getLastOpCommitted();
             advanceConfigOpTime(response.opTime);
         }
 
@@ -837,11 +837,17 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
             return replParseStatus.getStatus();
         }
 
+        // Use the last committed optime to advance config optime.
+        // For successful majority writes, we could use the optime of the last op
+        // from us and lastOpCommitted is always greater than or equal to it.
+        // On majority write failures, the last visible optime would be incorrect
+        // due to rollback as explained in SERVER-24630 and the last committed optime
+        // is safe to use.
         const auto& replMetadata = replParseStatus.getValue();
-        cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
+        const OpTime lastCommittedOpTime = replMetadata.getLastOpCommitted();
 
         if (shard->isConfig()) {
-            advanceConfigOpTime(cmdResponse.visibleOpTime);
+            advanceConfigOpTime(lastCommittedOpTime);
         }
     }
 
