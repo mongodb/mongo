@@ -4227,7 +4227,7 @@ buildvariants:
     - rhel70
 
 - name: windows-64-2k8-debug
-  display_name: "* Windows 2008R2 DEBUG"
+  display_name: "! Windows 2008R2 DEBUG"
   modules:
   - mongo-tools
   run_on:
@@ -4853,7 +4853,7 @@ buildvariants:
 ###########################################
 
 - name: enterprise-rhel-62-64-bit
-  display_name: "* Enterprise RHEL 6.2"
+  display_name: "! Enterprise RHEL 6.2"
   modules:
   - enterprise
   - mongo-tools
@@ -5753,7 +5753,7 @@ buildvariants:
 
 
 - name: enterprise-ubuntu1404-clang-3.4-libc
-  display_name: "~Enterprise Ubuntu 14.04 (Clang 3.4/libc++)"
+  display_name: "! Enterprise Ubuntu 14.04 (Clang 3.4/libc++)"
   modules:
   - enterprise
   - mongo-tools
