@@ -425,11 +425,10 @@ Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* txn,
                                                            const BSONObj& minKey) {
-    auto doc =
-        findOneOnConfigCollection(txn, NamespaceString(ChunkType::ConfigNS), BSON("min" << minKey));
-    if (!doc.isOK()) {
+    auto doc = findOneOnConfigCollection(
+        txn, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::min() << minKey));
+    if (!doc.isOK())
         return doc.getStatus();
-    }
 
     return ChunkType::fromBSON(doc.getValue());
 }

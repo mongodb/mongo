@@ -76,6 +76,12 @@ public:
                             const std::vector<BSONObj>& splitPoints,
                             const std::string& shardName) override;
 
+    Status commitChunkMerge(OperationContext* txn,
+                            const NamespaceString& ns,
+                            const OID& requestEpoch,
+                            const std::vector<BSONObj>& chunkBoundaries,
+                            const std::string& shardName) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;

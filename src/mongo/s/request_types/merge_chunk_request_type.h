@@ -43,7 +43,10 @@ namespace mongo {
  */
 class MergeChunkRequest {
 public:
-    MergeChunkRequest(NamespaceString nss, OID epoch, std::vector<BSONObj> chunkBoundaries);
+    MergeChunkRequest(NamespaceString nss,
+                      OID epoch,
+                      std::vector<BSONObj> chunkBoundaries,
+                      std::string shardName);
 
     /**
      * Parses the provided BSON content as the internal _configsvrMergeChunk command, and if
@@ -57,6 +60,7 @@ public:
      *       <BSONObj key2>,
      *       ...
      *   ],
+     *   shard: <string shard>
      * }
      */
     static StatusWith<MergeChunkRequest> parseFromConfigCommand(const BSONObj& cmdObj);
@@ -77,6 +81,7 @@ public:
     const NamespaceString& getNamespace() const;
     const OID& getEpoch() const;
     const std::vector<BSONObj>& getChunkBoundaries() const;
+    const std::string& getShardName() const;
 
 private:
     /**
@@ -93,6 +98,7 @@ private:
      * Specifies the boundaries of the chunks to be merged.
      */
     std::vector<BSONObj> _chunkBoundaries;
+    std::string _shardName;
 };
 
 }  // namespace mongo

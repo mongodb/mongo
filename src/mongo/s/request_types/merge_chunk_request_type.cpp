@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+using std::string;
 using std::vector;
 
 namespace {
@@ -42,18 +43,21 @@ namespace {
 const char kConfigsvrMergeChunk[] = "_configsvrMergeChunk";
 const char kCollEpoch[] = "collEpoch";
 const char kChunkBoundaries[] = "chunkBoundaries";
+const char kShardName[] = "shard";
 
 }  // unnamed namespace
 
 MergeChunkRequest::MergeChunkRequest(NamespaceString nss,
                                      OID epoch,
-                                     vector<BSONObj> chunkBoundaries)
+                                     vector<BSONObj> chunkBoundaries,
+                                     string shardName)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
-      _chunkBoundaries(std::move(chunkBoundaries)) {}
+      _chunkBoundaries(std::move(chunkBoundaries)),
+      _shardName(std::move(shardName)) {}
 
 StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BSONObj& cmdObj) {
-    std::string ns;
+    string ns;
     auto parseNamespaceStatus = bsonExtractStringField(cmdObj, kConfigsvrMergeChunk, &ns);
 
     if (!parseNamespaceStatus.isOK()) {
@@ -82,8 +86,15 @@ StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BS
         }
     }
 
-    auto request =
-        MergeChunkRequest(NamespaceString(ns), std::move(epoch), std::move(chunkBoundaries));
+    string shardName;
+    auto parseShardNameStatus = bsonExtractStringField(cmdObj, kShardName, &shardName);
+
+    if (!parseShardNameStatus.isOK()) {
+        return parseShardNameStatus;
+    }
+
+    auto request = MergeChunkRequest(
+        NamespaceString(ns), std::move(epoch), std::move(chunkBoundaries), std::move(shardName));
     Status validationStatus = request._validate();
     if (!validationStatus.isOK()) {
         return validationStatus;
@@ -111,6 +122,7 @@ void MergeChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
             chunkBoundariesArray.append(chunkBoundary);
         }
     }
+    cmdBuilder->append(kShardName, _shardName);
 }
 
 const NamespaceString& MergeChunkRequest::getNamespace() const {
@@ -123,6 +135,10 @@ const OID& MergeChunkRequest::getEpoch() const {
 
 const vector<BSONObj>& MergeChunkRequest::getChunkBoundaries() const {
     return _chunkBoundaries;
+}
+
+const string& MergeChunkRequest::getShardName() const {
+    return _shardName;
 }
 
 Status MergeChunkRequest::_validate() {

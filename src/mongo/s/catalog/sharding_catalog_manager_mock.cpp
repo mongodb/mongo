@@ -90,6 +90,14 @@ Status ShardingCatalogManagerMock::commitChunkSplit(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+Status ShardingCatalogManagerMock::commitChunkMerge(OperationContext* txn,
+                                                    const NamespaceString& ns,
+                                                    const OID& requestEpoch,
+                                                    const std::vector<BSONObj>& chunkBoundaries,
+                                                    const std::string& shardName) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 void ShardingCatalogManagerMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
 
 Status ShardingCatalogManagerMock::initializeConfigDatabaseIfNeeded(OperationContext* txn) {

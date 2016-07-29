@@ -46,12 +46,15 @@ TEST(MergeChunkRequest, BasicValidConfigCommand) {
              << "collEpoch"
              << OID("7fffffff0000000000000001")
              << "chunkBoundaries"
-             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10)))));
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+             << "shard"
+             << "shard0000")));
     ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT_EQ(BSON("a" << 1), request.getChunkBoundaries().at(0));
     ASSERT_EQ(BSON("a" << 5), request.getChunkBoundaries().at(1));
     ASSERT_EQ(BSON("a" << 10), request.getChunkBoundaries().at(2));
+    ASSERT_EQ("shard0000", request.getShardName());
 }
 
 TEST(MergeChunkRequest, ConfigCommandtoBSON) {
@@ -61,7 +64,9 @@ TEST(MergeChunkRequest, ConfigCommandtoBSON) {
              << "collEpoch"
              << OID("7fffffff0000000000000001")
              << "chunkBoundaries"
-             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10)));
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+             << "shard"
+             << "shard0000");
     BSONObj writeConcernObj = BSON("writeConcern" << BSON("w"
                                                           << "majority"));
 
@@ -80,7 +85,9 @@ TEST(MergeChunkRequest, ConfigCommandtoBSON) {
 TEST(MergeChunkRequest, MissingNameSpaceErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
         BSON("collEpoch" << OID("7fffffff0000000000000001") << "chunkBoundaries"
-                         << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))));
+                         << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+                         << "shard"
+                         << "shard0000"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -89,16 +96,30 @@ TEST(MergeChunkRequest, MissingCollEpochErrors) {
         BSON("_configsvrMergeChunk"
              << "TestDB.TestColl"
              << "chunkBoundaries"
-             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))));
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+             << "shard"
+             << "shard0000"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
 TEST(MergeChunkRequest, MissingChunkBoundariesErrors) {
-    auto request =
-        MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrMergeChunk"
-                                                       << "TestDB.TestColl"
-                                                       << "collEpoch"
-                                                       << OID("7fffffff0000000000000001")));
+    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrMergeChunk"
+                                                                  << "TestDB.TestColl"
+                                                                  << "collEpoch"
+                                                                  << OID("7fffffff0000000000000001")
+                                                                  << "shard"
+                                                                  << "shard0000"));
+    ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
+}
+
+TEST(MergeChunkRequest, MissingShardNameErrors) {
+    auto request = MergeChunkRequest::parseFromConfigCommand(
+        BSON("_configsvrMergeChunk"
+             << "TestDB.TestColl"
+             << "collEpoch"
+             << OID("7fffffff0000000000000001")
+             << "chunkBoundaries"
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -106,7 +127,9 @@ TEST(MergeChunkRequest, WrongNamespaceTypeErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(BSON(
         "_configsvrMergeChunk" << 1234 << "collEpoch" << OID("7fffffff0000000000000001")
                                << "chunkBoundaries"
-                               << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))));
+                               << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+                               << "shard"
+                               << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -117,7 +140,9 @@ TEST(MergeChunkRequest, WrongCollEpochTypeErrors) {
              << "collEpoch"
              << 1234
              << "chunkBoundaries"
-             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))));
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+             << "shard"
+             << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -127,7 +152,22 @@ TEST(MergeChunkRequest, WrongChunkBoundariesTypeErrors) {
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
                                                                   << "chunkBoundaries"
-                                                                  << 1234));
+                                                                  << 1234
+                                                                  << "shard"
+                                                                  << "shard0000"));
+    ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
+}
+
+TEST(MergeChunkRequest, WrongShardNameTypeErrors) {
+    auto request = MergeChunkRequest::parseFromConfigCommand(
+        BSON("_configsvrMergeChunk"
+             << "TestDB.TestColl"
+             << "collEpoch"
+             << OID("7fffffff0000000000000001")
+             << "chunkBoundaries"
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+             << "shard"
+             << 1234));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -138,7 +178,9 @@ TEST(MergeChunkRequest, InvalidNamespaceErrors) {
              << "collEpoch"
              << OID("7fffffff0000000000000001")
              << "chunkBoundaries"
-             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))));
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
+             << "shard"
+             << "shard0000"));
     ASSERT_EQ(ErrorCodes::InvalidNamespace, request.getStatus());
 }
 
@@ -148,7 +190,9 @@ TEST(MergeChunkRequest, EmptyChunkBoundariesErrors) {
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
                                                                   << "chunkBoundaries"
-                                                                  << BSONArray()));
+                                                                  << BSONArray()
+                                                                  << "shard"
+                                                                  << "shard0000"));
     ASSERT_EQ(ErrorCodes::InvalidOptions, request.getStatus());
 }
 
@@ -159,7 +203,9 @@ TEST(MergeChunkRequest, TooFewChunkBoundariesErrors) {
              << "collEpoch"
              << OID("7fffffff0000000000000001")
              << "chunkBoundaries"
-             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 10))));
+             << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 10))
+             << "shard"
+             << "shard0000"));
     ASSERT_EQ(ErrorCodes::InvalidOptions, request.getStatus());
 }
 }

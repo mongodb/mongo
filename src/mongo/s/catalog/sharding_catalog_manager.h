@@ -149,6 +149,16 @@ public:
                                     const std::string& shardName) = 0;
 
     /**
+     * Updates chunk metadata in config.chunks collection to reflect the given chunks being merged
+     * into a single larger chunk based on the specified boundaries of the smaller chunks.
+     */
+    virtual Status commitChunkMerge(OperationContext* txn,
+                                    const NamespaceString& ns,
+                                    const OID& requestEpoch,
+                                    const std::vector<BSONObj>& chunkBoundaries,
+                                    const std::string& shardName) = 0;
+
+    /**
      * Append information about the connection pools owned by the CatalogManager.
      */
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
