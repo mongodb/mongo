@@ -53,7 +53,7 @@ namespace {
 class MetadataManagerTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
-    	Client::initThread(getThreadName().c_str());
+        Client::initThread(getThreadName().c_str());
         ServiceContextMongoDTest::setUp();
         ShardingState::get(getServiceContext())
             ->setScheduleCleanupFunctionForTest([](const NamespaceString& nss) {});
@@ -65,8 +65,8 @@ protected:
     }
 
     void tearDown() override {
-    	ON_BLOCK_EXIT([&] { Client::destroy(); });
-    	ServiceContextMongoDTest::tearDown();
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        ServiceContextMongoDTest::tearDown();
     }
 };
 
