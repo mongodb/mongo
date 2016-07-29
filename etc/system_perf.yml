@@ -91,7 +91,7 @@ functions:
       params:
         working_dir: work
         script: |
-          set -e 
+          set -e
           set -o verbose
           if [ -e "$HOME/infrastructure_provisioning/terraform/terraform.tfstate" ]; then
             echo "Restrieving info for existing resources"
@@ -111,7 +111,7 @@ functions:
             echo "Provisinging new resources."
             $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
           else
-            # on host with pre-existing resources, call terraform directly to 
+            # on host with pre-existing resources, call terraform directly to
             # avoid recreating instances due to terraform apply concurrency limitation
             echo "Update expire-on tag for existing resources."
             ./terraform apply -var-file=cluster.json
@@ -130,7 +130,7 @@ functions:
             # remove previous information and keep the latest cluster type
             rm provisioned.*
             touch provisioned.${cluster}
-            echo "Provisioning state updated on Evergreen host."            
+            echo "Provisioning state updated on Evergreen host."
           else
             echo "Failed to provision resources. Cleaning up partial state."
             yes yes | ./terraform destroy
@@ -165,7 +165,14 @@ functions:
           source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           # Copy over the proper test control file
-          cp $DSI_PATH/test_control/test_control.${test}.yml test_control.yml
+          # This is to work around the fact that multinode clusters need a different ycsb test control.
+          # This should eventually be fixed in a better fashion and removed.
+          if [ ${test} == 'ycsb' ] && ( [ ${cluster} == 'shard' ] || [ ${cluster} == 'replica' ] )
+          then
+            cp $DSI_PATH/test_control/test_control.ycsb.multi_node.yml test_control.yml
+          else
+            cp $DSI_PATH/test_control/test_control.${test}.yml test_control.yml
+          fi
           # Specify the test list to use. Change the testList parameter
           # if you want to run a non-default list.
           $DSI_PATH/bin/update_test_list.py ${testList}
@@ -711,4 +718,3 @@ buildvariants:
     - name: core_workloads_WT_oplog_comp
     - name: industry_benchmarks_MMAPv1_oplog_comp
     - name: core_workloads_MMAPv1_oplog_comp
-
