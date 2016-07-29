@@ -28,17 +28,34 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/s/collection_range_deleter.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
 CollectionRangeDeleter::CollectionRangeDeleter(NamespaceString nss) : _nss(std::move(nss)) {}
 
 void CollectionRangeDeleter::run() {
-    // TODO: not implemented
+    Client::initThread(getThreadName().c_str());
+    ON_BLOCK_EXIT([&] { Client::destroy(); });
+    auto txn = cc().makeOperationContext().get();
+    bool hasNextRangeToClean = cleanupNextRange(txn);
+
+    // If there are more ranges to run, we add <this> back onto the task executor to run again.
+    if (hasNextRangeToClean) {
+        auto executor = ShardingState::get(txn)->getRangeDeleterTaskExecutor();
+        executor->scheduleWork([this](const CallbackArgs& cbArgs) { run(); });
+    } else {
+        delete this;
+    }
 }
 
-bool CollectionRangeDeleter::cleanupNextRange() {
+bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
     // TODO: not implemented
     return false;
 }

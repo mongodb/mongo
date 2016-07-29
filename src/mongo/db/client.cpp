@@ -153,7 +153,7 @@ ClientBasic* ClientBasic::getCurrent() {
 
 Client& cc() {
     Client* c = currentClient.getMake()->get();
-    verify(c);
+    invariant(c);
     return *c;
 }
 

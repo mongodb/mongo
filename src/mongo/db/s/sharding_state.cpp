@@ -78,6 +78,8 @@ using std::shared_ptr;
 using std::string;
 using std::vector;
 
+using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+
 namespace {
 
 const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
@@ -120,7 +122,13 @@ ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
       _configServerTickets(kMaxConfigServerRefreshThreads),
-      _globalInit(&initializeGlobalShardingStateForMongod) {}
+      _globalInit(&initializeGlobalShardingStateForMongod),
+      _scheduleWorkFn([this](NamespaceString nss) {
+          getRangeDeleterTaskExecutor()->scheduleWork([=](const CallbackArgs& cbArgs) {
+              CollectionRangeDeleter* rd = new CollectionRangeDeleter(nss);
+              rd->run();
+          });
+      }) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -220,12 +228,14 @@ void ShardingState::setShardName(const string& name) {
     }
 }
 
-CollectionShardingState* ShardingState::getNS(const std::string& ns) {
+CollectionShardingState* ShardingState::getNS(const std::string& ns, OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     CollectionShardingStateMap::iterator it = _collections.find(ns);
     if (it == _collections.end()) {
-        auto inserted = _collections.insert(
-            make_pair(ns, stdx::make_unique<CollectionShardingState>(NamespaceString(ns))));
+        auto inserted =
+            _collections.insert(make_pair(ns,
+                                          stdx::make_unique<CollectionShardingState>(
+                                              txn->getServiceContext(), NamespaceString(ns))));
         invariant(inserted.second);
         it = std::move(inserted.first);
     }
@@ -248,6 +258,14 @@ void ShardingState::resetMetadata(const string& ns) {
 
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
     _globalInit = func;
+}
+
+void ShardingState::setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn) {
+    _scheduleWorkFn = fn;
+}
+
+void ShardingState::scheduleCleanup(const NamespaceString& nss) {
+    _scheduleWorkFn(nss);
 }
 
 Status ShardingState::onStaleShardVersion(OperationContext* txn,

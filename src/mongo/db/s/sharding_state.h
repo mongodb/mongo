@@ -36,7 +36,9 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -72,6 +74,10 @@ class ShardingState {
 public:
     using GlobalInitFunc =
         stdx::function<Status(OperationContext*, const ConnectionString&, StringData)>;
+
+    // Signature for the callback function used by the MetadataManager to inform the
+    // sharding subsystem that there is range cleanup work to be done.
+    using RangeDeleterCleanupNotificationFunc = stdx::function<void(const NamespaceString&)>;
 
     ShardingState();
     ~ShardingState();
@@ -155,7 +161,7 @@ public:
      */
     void setShardName(const std::string& shardName);
 
-    CollectionShardingState* getNS(const std::string& ns);
+    CollectionShardingState* getNS(const std::string& ns, OperationContext* txn);
 
     /**
      * Clears the collection metadata cache after step down.
@@ -243,9 +249,22 @@ public:
     void setGlobalInitMethodForTest(GlobalInitFunc func);
 
     /**
+     * Schedules for the range to clean of the given namespace to be deleted.
+     * Behavior can be modified through setScheduleCleanupFunctionForTest.
+     */
+    void scheduleCleanup(const NamespaceString& nss);
+
+    /**
      * Returns a pointer to the collection range deleter task executor.
      */
     executor::ThreadPoolTaskExecutor* getRangeDeleterTaskExecutor();
+
+    /**
+     * Sets the function used by scheduleWorkOnRangeDeleterTaskExecutor to
+     * schedule work. Used for mocking the executor for testing. See the ShardingState
+     * for the default implementation of _scheduleWorkFn.
+     */
+    void setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn);
 
 private:
     friend class ScopedRegisterMigration;
@@ -362,6 +381,10 @@ private:
 
     // Function for initializing the external sharding state components not owned here.
     GlobalInitFunc _globalInit;
+
+    // Function for scheduling work on the _rangeDeleterTaskExecutor.
+    // Used in call to scheduleCleanup(NamespaceString).
+    RangeDeleterCleanupNotificationFunc _scheduleWorkFn;
 
     // Task executor for the collection range deleter.
     std::unique_ptr<executor::ThreadPoolTaskExecutor> _rangeDeleterTaskExecutor;

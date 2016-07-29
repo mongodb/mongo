@@ -42,6 +42,7 @@
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -62,6 +63,10 @@ void ServiceContextMongoDTest::setUp() {
 void ServiceContextMongoDTest::tearDown() {
     auto txn = cc().makeOperationContext();
     _dropAllDBs(txn.get());
+}
+
+ServiceContext* ServiceContextMongoDTest::getServiceContext() {
+    return getGlobalServiceContext();
 }
 
 void ServiceContextMongoDTest::_dropAllDBs(OperationContext* txn) {
