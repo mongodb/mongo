@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,47 +28,38 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/s/migration_util.h"
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
+namespace migrationutil {
 namespace {
 
-class ShardingServerStatus : public ServerStatusSection {
-public:
-    ShardingServerStatus() : ServerStatusSection("sharding") {}
+const char kSourceShard[] = "source";
+const char kDestinationShard[] = "destination";
+const char kIsDonorShard[] = "isDonorShard";
+const char kChunk[] = "chunk";
+const char kCollection[] = "collection";
+}
 
-    bool includeByDefault() const final {
-        return true;
-    }
+BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
+                                    const ShardId& fromShard,
+                                    const ShardId& toShard,
+                                    const bool& isDonorShard,
+                                    const BSONObj& min,
+                                    const BSONObj& max) {
+    BSONObjBuilder builder;
+    builder.append(kSourceShard, fromShard.toString());
+    builder.append(kDestinationShard, toShard.toString());
+    builder.append(kIsDonorShard, isDonorShard);
+    builder.append(kChunk, BSON(ChunkType::min(min) << ChunkType::max(max)));
+    builder.append(kCollection, nss.ns());
+    return builder.obj();
+}
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const final {
-        BSONObjBuilder result;
-
-        auto shardingState = ShardingState::get(txn);
-        if (shardingState->enabled() &&
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            result.append("configsvrConnectionString",
-                          shardingState->getConfigServer(txn).toString());
-
-            Grid::get(txn)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
-
-            // Get a migration status report if a migration is active for which this is the source
-            // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the
-            // namespace of the active migration if there is one that is active.
-            BSONObj migrationStatus = ShardingState::get(txn)->getActiveMigrationStatusReport(txn);
-            if (!migrationStatus.isEmpty()) {
-                result.append("migrations", migrationStatus);
-            }
-        }
-
-        return result.obj();
-    }
-
-} shardingServerStatus;
-
-}  // namespace
+}  // namespace migrationutil
 }  // namespace mongo

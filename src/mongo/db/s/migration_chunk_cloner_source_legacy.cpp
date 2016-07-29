@@ -212,6 +212,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
                                             _sessionId,
                                             _args.getConfigServerCS(),
                                             _donorCS,
+                                            _args.getFromShardId(),
                                             _args.getToShardId(),
                                             _args.getMinKey(),
                                             _args.getMaxKey(),

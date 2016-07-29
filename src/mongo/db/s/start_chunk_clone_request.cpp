@@ -33,7 +33,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 namespace {
@@ -41,6 +40,7 @@ namespace {
 const char kRecvChunkStart[] = "_recvChunkStart";
 const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardConnectionString[] = "from";
+const char kFromShardId[] = "fromShardName";
 const char kToShardId[] = "toShardName";
 const char kChunkMinKey[] = "min";
 const char kChunkMaxKey[] = "max";
@@ -104,7 +104,18 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
     }
 
     {
-        Status status = bsonExtractStringField(obj, kToShardId, &request._toShardId);
+        std::string fromShard;
+        Status status = bsonExtractStringField(obj, kFromShardId, &fromShard);
+        request._fromShardId = fromShard;
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    {
+        std::string toShard;
+        Status status = bsonExtractStringField(obj, kToShardId, &toShard);
+        request._toShardId = toShard;
         if (!status.isOK()) {
             return status;
         }
@@ -161,6 +172,7 @@ void StartChunkCloneRequest::appendAsCommand(
     const MigrationSessionId& sessionId,
     const ConnectionString& configServerConnectionString,
     const ConnectionString& fromShardConnectionString,
+    const ShardId& fromShardId,
     const ShardId& toShardId,
     const BSONObj& chunkMinKey,
     const BSONObj& chunkMaxKey,
@@ -174,6 +186,7 @@ void StartChunkCloneRequest::appendAsCommand(
     sessionId.append(builder);
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardConnectionString, fromShardConnectionString.toString());
+    builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());
     builder->append(kChunkMinKey, chunkMinKey);
     builder->append(kChunkMaxKey, chunkMaxKey);

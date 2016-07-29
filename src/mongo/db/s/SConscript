@@ -55,6 +55,7 @@ env.Library(
         'migration_chunk_cloner_source_legacy.cpp',
         'migration_destination_manager.cpp',
         'migration_source_manager.cpp',
+        'migration_util.cpp',
         'move_timing_helper.cpp',
         'operation_sharding_state.cpp',
         'shard_identity_rollback_notifier.cpp',

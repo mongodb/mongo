@@ -57,7 +57,8 @@ selector:
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
     - jstests/sharding/migration_failure.js
     - jstests/sharding/migration_with_source_ops.js
-    # Parallel migrations are not supported with 3.2 shards
+    # Testing features that do not exist on v3.2 shards.
+    - jstests/sharding/migration_server_status.js
     - jstests/sharding/movechunk_parallel.js
 
 executor:

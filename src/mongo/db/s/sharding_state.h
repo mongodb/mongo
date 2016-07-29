@@ -228,6 +228,14 @@ public:
     boost::optional<NamespaceString> getActiveMigrationNss();
 
     /**
+     * Get a migration status report from the migration registry. If no migration is active, this
+     * returns an empty BSONObj.
+     *
+     * Takes an IS lock on the namespace of the active migration, if one is active.
+     */
+    BSONObj getActiveMigrationStatusReport(OperationContext* txn);
+
+    /**
      * For testing only. Mock the initialization method used by initializeFromConfigConnString and
      * initializeFromShardIdentity after all checks are performed.
      */

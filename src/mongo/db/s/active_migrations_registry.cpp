@@ -31,6 +31,9 @@
 #include "mongo/db/s/active_migrations_registry.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -66,6 +69,33 @@ boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveMigrationNss
     }
 
     return boost::none;
+}
+
+BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContext* txn) {
+    boost::optional<NamespaceString> nss;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        if (_activeMoveChunkState) {
+            nss = _activeMoveChunkState->args.getNss();
+        }
+    }
+
+    // The state of the MigrationSourceManager could change between taking and releasing the mutex
+    // above and then taking the collection lock here, but that's fine because it isn't important
+    // to return information on a migration that just ended or started. This is just best effort and
+    // desireable for reporting, and then diagnosing, migrations that are stuck.
+    if (nss) {
+        // Lock the collection so nothing changes while we're getting the migration report.
+        AutoGetCollection autoColl(txn, nss.get(), MODE_IS);
+
+        auto css = CollectionShardingState::get(txn, nss.get());
+        if (css && css->getMigrationSourceManager()) {
+            return css->getMigrationSourceManager()->getMigrationStatusReport();
+        }
+    }
+
+    return BSONObj();
 }
 
 void ActiveMigrationsRegistry::_clearMigration() {

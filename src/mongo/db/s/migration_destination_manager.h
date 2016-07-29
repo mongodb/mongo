@@ -34,7 +34,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -42,7 +45,6 @@
 
 namespace mongo {
 
-class NamespaceString;
 class OperationContext;
 class Status;
 struct WriteConcernOptions;
@@ -66,6 +68,9 @@ public:
     State getState() const;
     void setState(State newState);
 
+    /**
+     * Checks whether the MigrationDestinationManager is currently handling a migration.
+     */
     bool isActive() const;
 
     /**
@@ -74,11 +79,19 @@ public:
     void report(BSONObjBuilder& b);
 
     /**
+     * Returns a report on the active migration, if the migration is active. Otherwise return an
+     * empty BSONObj.
+     */
+    BSONObj getMigrationStatusReport();
+
+    /**
      * Returns OK if migration started successfully.
      */
     Status start(const std::string& ns,
                  const MigrationSessionId& sessionId,
-                 const std::string& fromShard,
+                 const ConnectionString& fromShardConnString,
+                 const ShardId& fromShard,
+                 const ShardId& toShard,
                  const BSONObj& min,
                  const BSONObj& max,
                  const BSONObj& shardKeyPattern,
@@ -98,7 +111,7 @@ private:
                         BSONObj min,
                         BSONObj max,
                         BSONObj shardKeyPattern,
-                        std::string fromShard,
+                        ConnectionString fromShardConnString,
                         OID epoch,
                         WriteConcernOptions writeConcern);
 
@@ -108,7 +121,7 @@ private:
                         const BSONObj& min,
                         const BSONObj& max,
                         const BSONObj& shardKeyPattern,
-                        const std::string& fromShard,
+                        const ConnectionString& fromShardConnString,
                         const OID& epoch,
                         const WriteConcernOptions& writeConcern);
 
@@ -159,6 +172,14 @@ private:
                           const BSONObj& max,
                           const OID& epoch);
 
+    /**
+     * Checks whether the MigrationDestinationManager is currently handling a migration by checking
+     * that the migration "_sessionId" is initialized.
+     *
+     * Expects the caller to have the class _mutex locked!
+     */
+    bool _isActive_inlock() const;
+
     // Mutex to guard all fields
     mutable stdx::mutex _mutex;
 
@@ -170,8 +191,10 @@ private:
 
     stdx::thread _migrateThreadHandle;
 
-    std::string _ns;
-    std::string _from;
+    NamespaceString _nss;
+    ConnectionString _fromShardConnString;
+    ShardId _fromShard;
+    ShardId _toShard;
 
     BSONObj _min;
     BSONObj _max;

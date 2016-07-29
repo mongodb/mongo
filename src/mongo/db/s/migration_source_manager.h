@@ -172,6 +172,13 @@ public:
         return _critSecSignal;
     }
 
+    /**
+     * Returns a report on the active migration.
+     *
+     * Must be called with some form of lock on the collection namespace.
+     */
+    BSONObj getMigrationStatusReport() const;
+
 private:
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.

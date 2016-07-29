@@ -751,6 +751,10 @@ boost::optional<NamespaceString> ShardingState::getActiveMigrationNss() {
     return _activeMigrationsRegistry.getActiveMigrationNss();
 }
 
+BSONObj ShardingState::getActiveMigrationStatusReport(OperationContext* txn) {
+    return _activeMigrationsRegistry.getActiveMigrationStatusReport(txn);
+}
+
 void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
     const bool isEnabled = enabled();
     builder.appendBool("enabled", isEnabled);

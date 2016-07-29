@@ -63,7 +63,7 @@ public:
      * arguments, returns a ScopedRegisterMigration, which can be used to join the already running
      * migration.
      *
-     * Othwerwise returns a ConflictingOperationInProgress error.
+     * Otherwise returns a ConflictingOperationInProgress error.
      */
     StatusWith<ScopedRegisterMigration> registerMigration(const MoveChunkRequest& args);
 
@@ -72,6 +72,14 @@ public:
      * that namespace. Otherwise returns boost::none.
      */
     boost::optional<NamespaceString> getActiveMigrationNss();
+
+    /**
+     * Returns a report on the active migration if there currently is one. Otherwise, returns an
+     * empty BSONObj.
+     *
+     * Takes an IS lock on the namespace of the active migration, if one is active.
+     */
+    BSONObj getActiveMigrationStatusReport(OperationContext* txn);
 
 private:
     friend class ScopedRegisterMigration;

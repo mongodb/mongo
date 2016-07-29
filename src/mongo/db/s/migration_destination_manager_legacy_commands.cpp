@@ -126,10 +126,9 @@ public:
             }
         }
 
-        if (!cmdObj["toShardName"].eoo()) {
-            dassert(cmdObj["toShardName"].type() == String);
-            shardingState->setShardName(cmdObj["toShardName"].String());
-        }
+        const ShardId toShard(cmdObj["toShardName"].String());
+        shardingState->setShardName(toShard.toString());
+        const ShardId fromShard(cmdObj["fromShardName"].String());
 
         const string ns = cmdObj.firstElement().String();
 
@@ -158,20 +157,30 @@ public:
 
         BSONObj shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
 
-        const string fromShard(cmdObj["from"].String());
+        auto statusWithFromShardConnectionString = ConnectionString::parse(cmdObj["from"].String());
+        if (!statusWithFromShardConnectionString.isOK()) {
+            errmsg = str::stream() << "cannot start recv'ing chunk "
+                                   << "[" << min << "," << max << ")"
+                                   << causedBy(statusWithFromShardConnectionString.getStatus());
+
+            warning() << errmsg;
+            return false;
+        }
 
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
-        Status startStatus =
-            shardingState->migrationDestinationManager()->start(ns,
-                                                                migrationSessionId,
-                                                                fromShard,
-                                                                min,
-                                                                max,
-                                                                shardKeyPattern,
-                                                                currentVersion.epoch(),
-                                                                writeConcern);
+        Status startStatus = shardingState->migrationDestinationManager()->start(
+            ns,
+            migrationSessionId,
+            statusWithFromShardConnectionString.getValue(),
+            fromShard,
+            toShard,
+            min,
+            max,
+            shardKeyPattern,
+            currentVersion.epoch(),
+            writeConcern);
         if (!startStatus.isOK()) {
             return appendCommandStatus(result, startStatus);
         }

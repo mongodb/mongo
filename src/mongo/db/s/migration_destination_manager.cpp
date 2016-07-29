@@ -53,6 +53,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -216,6 +217,10 @@ void MigrationDestinationManager::setState(State newState) {
 
 bool MigrationDestinationManager::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _isActive_inlock();
+}
+
+bool MigrationDestinationManager::_isActive_inlock() const {
     return _sessionId.is_initialized();
 }
 
@@ -228,8 +233,8 @@ void MigrationDestinationManager::report(BSONObjBuilder& b) {
         b.append("sessionId", _sessionId->toString());
     }
 
-    b.append("ns", _ns);
-    b.append("from", _from);
+    b.append("ns", _nss.ns());
+    b.append("from", _fromShardConnString.toString());
     b.append("min", _min);
     b.append("max", _max);
     b.append("shardKeyPattern", _shardKeyPattern);
@@ -248,9 +253,21 @@ void MigrationDestinationManager::report(BSONObjBuilder& b) {
     bb.done();
 }
 
+BSONObj MigrationDestinationManager::getMigrationStatusReport() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_isActive_inlock()) {
+        return migrationutil::makeMigrationStatusDocument(
+            _nss, _fromShard, _toShard, false, _min, _max);
+    } else {
+        return BSONObj();
+    }
+}
+
 Status MigrationDestinationManager::start(const string& ns,
                                           const MigrationSessionId& sessionId,
-                                          const string& fromShard,
+                                          const ConnectionString& fromShardConnString,
+                                          const ShardId& fromShard,
+                                          const ShardId& toShard,
                                           const BSONObj& min,
                                           const BSONObj& max,
                                           const BSONObj& shardKeyPattern,
@@ -262,9 +279,9 @@ Status MigrationDestinationManager::start(const string& ns,
         return Status(ErrorCodes::ConflictingOperationInProgress,
                       str::stream() << "Active migration already in progress "
                                     << "ns: "
-                                    << _ns
+                                    << _nss.ns()
                                     << ", from: "
-                                    << _from
+                                    << _fromShardConnString.toString()
                                     << ", min: "
                                     << _min
                                     << ", max: "
@@ -274,8 +291,10 @@ Status MigrationDestinationManager::start(const string& ns,
     _state = READY;
     _errmsg = "";
 
-    _ns = ns;
-    _from = fromShard;
+    _nss = NamespaceString(ns);
+    _fromShardConnString = fromShardConnString;
+    _fromShard = fromShard;
+    _toShard = toShard;
     _min = min;
     _max = max;
     _shardKeyPattern = shardKeyPattern;
@@ -296,11 +315,18 @@ Status MigrationDestinationManager::start(const string& ns,
         _migrateThreadHandle.join();
     }
 
-    _migrateThreadHandle = stdx::thread(
-        [this, ns, sessionId, min, max, shardKeyPattern, fromShard, epoch, writeConcern]() {
-            _migrateThread(
-                ns, sessionId, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
-        });
+    _migrateThreadHandle = stdx::thread([this,
+                                         ns,
+                                         sessionId,
+                                         min,
+                                         max,
+                                         shardKeyPattern,
+                                         fromShardConnString,
+                                         epoch,
+                                         writeConcern]() {
+        _migrateThread(
+            ns, sessionId, min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern);
+    });
 
     return Status::OK();
 }
@@ -357,7 +383,7 @@ void MigrationDestinationManager::_migrateThread(std::string ns,
                                                  BSONObj min,
                                                  BSONObj max,
                                                  BSONObj shardKeyPattern,
-                                                 std::string fromShard,
+                                                 ConnectionString fromShardConnString,
                                                  OID epoch,
                                                  WriteConcernOptions writeConcern) {
     Client::initThread("migrateThread");
@@ -369,8 +395,15 @@ void MigrationDestinationManager::_migrateThread(std::string ns,
     }
 
     try {
-        _migrateDriver(
-            opCtx.get(), ns, sessionId, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
+        _migrateDriver(opCtx.get(),
+                       ns,
+                       sessionId,
+                       min,
+                       max,
+                       shardKeyPattern,
+                       fromShardConnString,
+                       epoch,
+                       writeConcern);
     } catch (std::exception& e) {
         {
             stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -408,7 +441,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                                                  const BSONObj& min,
                                                  const BSONObj& max,
                                                  const BSONObj& shardKeyPattern,
-                                                 const std::string& fromShard,
+                                                 const ConnectionString& fromShardConnString,
                                                  const OID& epoch,
                                                  const WriteConcernOptions& writeConcern) {
     invariant(isActive());
@@ -416,7 +449,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
     invariant(!max.isEmpty());
 
     log() << "starting receiving-end of migration of chunk " << min << " -> " << max
-          << " for collection " << ns << " from " << fromShard << " at epoch " << epoch.toString();
+          << " for collection " << ns << " from " << fromShardConnString << " at epoch "
+          << epoch.toString();
 
     string errmsg;
     MoveTimingHelper timing(txn, "to", ns, min, max, 6 /* steps */, &errmsg, ShardId(), ShardId());
@@ -431,7 +465,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
 
     invariant(initialState == READY);
 
-    ScopedDbConnection conn(fromShard);
+    ScopedDbConnection conn(fromShardConnString);
 
     // Just tests the connection
     conn->getLastError();
