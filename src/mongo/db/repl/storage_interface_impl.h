@@ -35,11 +35,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/task_runner.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -118,8 +115,6 @@ public:
     Status isAdminDbValid(OperationContext* txn) override;
 
 private:
-    // One thread per collection/TaskRunner
-    std::unique_ptr<OldThreadPool> _bulkLoaderThreads;
     const NamespaceString _minValidNss;
 };
 

@@ -61,13 +61,14 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_initialsync.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/repl/task_runner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 namespace repl {
 
@@ -77,8 +78,6 @@ const char StorageInterfaceImpl::kBeginFieldName[] = "begin";
 
 namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(dataReplicatorInitialSyncInserterThreads, int, 4);
 
 const BSONObj kInitialSyncFlag(BSON(StorageInterfaceImpl::kInitialSyncFlagFieldName << true));
 }  // namespace
@@ -93,17 +92,9 @@ StorageInterfaceImpl::~StorageInterfaceImpl() {
     DESTRUCTOR_GUARD(shutdown(););
 }
 
-void StorageInterfaceImpl::startup() {
-    _bulkLoaderThreads.reset(
-        new OldThreadPool{dataReplicatorInitialSyncInserterThreads, "InitialSyncInserters-"});
-};
+void StorageInterfaceImpl::startup() {}
 
-void StorageInterfaceImpl::shutdown() {
-    if (_bulkLoaderThreads) {
-        _bulkLoaderThreads->join();
-        _bulkLoaderThreads.reset();
-    }
-}
+void StorageInterfaceImpl::shutdown() {}
 
 NamespaceString StorageInterfaceImpl::getMinValidNss() const {
     return _minValidNss;
