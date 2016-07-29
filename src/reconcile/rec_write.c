@@ -115,6 +115,7 @@ typedef struct {
 	 */
 	uint32_t page_size;		/* Set page size */
 	uint32_t page_size_orig;	/* Saved set page size */
+	uint32_t max_raw_page_size;	/* Max page size with raw compression */
 
 	/*
 	 * Second, the split size: if we're doing the page layout, split to a
@@ -1979,10 +1980,15 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * Ideally accumulate data several times the page size without
 	 * approaching the memory page maximum, but at least have data worth
 	 * one page.
+	 *
+	 * There are cases when we grow the page size to accommodate large
+	 * records, in those cases we split the pages once they have crossed
+	 * the maximum size for a page with raw compression.
 	 */
 	r->page_size = r->page_size_orig = max;
 	if (r->raw_compression)
-		r->page_size = (uint32_t)WT_MIN(r->page_size * 10,
+		r->max_raw_page_size = r->page_size =
+		    (uint32_t)WT_MIN(r->page_size * 10,
 		    WT_MAX(r->page_size, btree->maxmempage / 2));
 
 	/*
@@ -2612,11 +2618,9 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 
 		/*
 		 * Don't create an image so large that any future update will
-		 * cause a split in memory.  Use half of the maximum size so
-		 * we split very compressible pages that have reached the
-		 * maximum size in memory into two equal blocks.
+		 * cause a split in memory.
 		 */
-		if (len > (size_t)btree->maxmempage / 2)
+		if (max_image_slot == 0 && len > (size_t)r->max_raw_page_size)
 			max_image_slot = slots;
 	}
 
@@ -2678,7 +2682,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	    r->page_size_orig, btree->split_pct,
 	    WT_BLOCK_COMPRESS_SKIP + extra_skip,
 	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP, r->raw_offsets,
-	    no_more_rows || max_image_slot == 0 ? slots : max_image_slot,
+	    max_image_slot == 0 ? slots : max_image_slot,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len,
 	    no_more_rows || max_image_slot != 0,
