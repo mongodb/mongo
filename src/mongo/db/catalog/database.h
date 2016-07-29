@@ -151,7 +151,7 @@ public:
 
     Status dropCollection(OperationContext* txn, StringData fullns);
 
-    void dropView(OperationContext* txn, StringData fullns);
+    Status dropView(OperationContext* txn, StringData fullns);
 
     Collection* createCollection(OperationContext* txn,
                                  StringData ns,

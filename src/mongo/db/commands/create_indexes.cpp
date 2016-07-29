@@ -188,7 +188,7 @@ public:
 
         Database* db = dbHolder().get(txn, ns.db());
 
-        if (db && db->getViewCatalog()->lookup(ns.ns())) {
+        if (db && db->getViewCatalog()->lookup(txn, ns.ns())) {
             errmsg = "cannot create indexes on a view";
             return appendCommandStatus(result,
                                        Status(ErrorCodes::CommandNotSupportedOnView, errmsg));

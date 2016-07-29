@@ -155,7 +155,7 @@ Status dropIndexes(OperationContext* txn,
                     str::stream() << "Not primary while dropping indexes in " << nss.ns()};
         }
 
-        if (db && db->getViewCatalog()->lookup(nss.ns())) {
+        if (db && db->getViewCatalog()->lookup(txn, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "Cannot drop indexes on view " << nss.ns()};
         }

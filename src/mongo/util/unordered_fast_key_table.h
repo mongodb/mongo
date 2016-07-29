@@ -170,6 +170,10 @@ public:
         return get(HashedKey(key));
     }
 
+    void clear() {
+        *this = {};
+    }
+
     /**
      * @return number of elements removed
      */

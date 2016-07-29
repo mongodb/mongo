@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -80,6 +81,9 @@ void OpObserver::onInserts(OperationContext* txn,
     if (strstr(ns, ".system.js")) {
         Scope::storedFuncMod(txn);
     }
+    if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(txn, nss);
+    }
 }
 
 void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) {
@@ -100,6 +104,11 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     logOpForDbHash(txn, args.ns.c_str());
     if (strstr(args.ns.c_str(), ".system.js")) {
         Scope::storedFuncMod(txn);
+    }
+
+    NamespaceString nss(args.ns);
+    if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(txn, nss);
     }
 }
 
@@ -137,6 +146,9 @@ void OpObserver::onDelete(OperationContext* txn,
     logOpForDbHash(txn, ns.ns().c_str());
     if (ns.coll() == "system.js") {
         Scope::storedFuncMod(txn);
+    }
+    if (ns.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(txn, ns);
     }
 }
 
@@ -195,6 +207,9 @@ void OpObserver::onDropCollection(OperationContext* txn, const NamespaceString& 
         repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
     }
 
+    if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(txn, collectionName);
+    }
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
     logOpForDbHash(txn, dbName.c_str());
 }
@@ -221,6 +236,11 @@ void OpObserver::onRenameCollection(OperationContext* txn,
                                 << dropTarget);
 
     repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+    if (fromCollection.coll() == DurableViewCatalog::viewsCollectionName() ||
+        toCollection.coll() == DurableViewCatalog::viewsCollectionName()) {
+        DurableViewCatalog::onExternalChange(
+            txn, NamespaceString(DurableViewCatalog::viewsCollectionName()));
+    }
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
     logOpForDbHash(txn, dbName.c_str());

@@ -41,14 +41,15 @@
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 class OperationContext;
 
 /**
- * In-memory data structure for view definitions. Note that this structure is not thread-safe; you
- * must be holding a database lock to access a database's view catalog.
+ * In-memory data structure for view definitions. This datastructure is thread-safe. This is needed
+ * as concurrent updates may happen through direct writes to the views catalog collection.
  */
 class ViewCatalog {
     MONGO_DISALLOW_COPYING(ViewCatalog);
@@ -58,7 +59,7 @@ public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
     static const std::uint32_t kMaxViewDepth;
 
-    ViewCatalog(OperationContext* txn, DurableViewCatalog* durable);
+    explicit ViewCatalog(DurableViewCatalog* durable) : _durable(durable) {}
 
     ViewMap::const_iterator begin() const {
         return _viewMap.begin();
@@ -80,14 +81,25 @@ public:
     Status createView(OperationContext* txn,
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
-                      const BSONObj& pipeline);
+                      const BSONArray& pipeline);
 
     /**
      * Drop the view named 'viewName'.
      *
      * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
      */
-    void dropView(OperationContext* txn, const NamespaceString& viewName);
+    Status dropView(OperationContext* txn, const NamespaceString& viewName);
+
+    /**
+     * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
+     *
+     * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
+     */
+    Status modifyView(OperationContext* txn,
+                      const NamespaceString& viewName,
+                      const NamespaceString& viewOn,
+                      const BSONArray& pipeline);
+
 
     /**
      * Look up the namespace in the view catalog, returning a pointer to a View definition, or
@@ -96,7 +108,7 @@ public:
      * @param ns The full namespace string of the view.
      * @return A bare pointer to a view definition if ns is a valid view with a backing namespace.
      */
-    ViewDefinition* lookup(StringData ns);
+    ViewDefinition* lookup(OperationContext* txn, StringData ns);
 
     /**
      * Resolve the views on 'ns', transforming the pipeline appropriately. This function returns a
@@ -107,8 +119,34 @@ public:
      */
     StatusWith<ResolvedView> resolveView(OperationContext* txn, const NamespaceString& nss);
 
+    /**
+     * Reload the views catalog if marked invalid. No-op if already valid. Does only minimal
+     * validation, namely that the view definitions are valid BSON and have no unknown fields.
+     * No cycle detection etc. This is implicitly called by other methods when the ViewCatalog is
+     * marked invalid, and on first opening a database.
+     */
+    Status reloadIfNeeded(OperationContext* txn);
+
+    /**
+     * To be called when direct modifications to the DurableViewCatalog have been committed, so
+     * subsequent lookups will reload the catalog and make the changes visible.
+     */
+    void invalidate() {
+        _valid.store(false);
+    }
+
 private:
+    void _createOrUpdateView_inlock(OperationContext* txn,
+                                    const NamespaceString& viewName,
+                                    const NamespaceString& viewOn,
+                                    const BSONArray& pipeline);
+
+    ViewDefinition* _lookup_inlock(OperationContext* txn, StringData ns);
+    Status _reloadIfNeeded_inlock(OperationContext* txn);
+
+    stdx::mutex _mutex;  // Protects all members, except for _valid.
     ViewMap _viewMap;
     DurableViewCatalog* _durable;
+    AtomicBool _valid;
 };
 }  // namespace mongo

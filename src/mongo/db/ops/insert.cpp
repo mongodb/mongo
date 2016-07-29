@@ -30,6 +30,7 @@
 
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/global_timestamp.h"
+#include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -184,6 +185,8 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
         if (coll == "system.profile")
             return Status::OK();
         if (coll == "system.users")
+            return Status::OK();
+        if (coll == DurableViewCatalog::viewsCollectionName())
             return Status::OK();
         if (db == "admin") {
             if (coll == "system.version")

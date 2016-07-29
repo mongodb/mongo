@@ -693,8 +693,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
     const NamespaceString& nss(request->getNamespaceString());
     if (!request->isGod()) {
         if (nss.isSystem()) {
-            uassert(
-                12050, "cannot delete from system namespace", legalClientSystemNS(nss.ns(), true));
+            uassert(12050, "cannot delete from system namespace", legalClientSystemNS(nss.ns()));
         }
         if (nss.isVirtualized()) {
             log() << "cannot delete from a virtual collection: " << nss;
@@ -833,7 +832,7 @@ inline void validateUpdate(const char* ns, const BSONObj& updateobj, const BSONO
                 str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig
                               << " u: "
                               << updateobj,
-                legalClientSystemNS(ns, true));
+                legalClientSystemNS(ns));
     }
 }
 

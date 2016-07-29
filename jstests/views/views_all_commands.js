@@ -102,7 +102,7 @@
         },
         collMod: {command: {collMod: "view", viewOn: "other", pipeline: []}},
         collStats: {command: {collStats: "view"}, skip: "TODO(SERVER-24823)"},
-        compact: {command: {compact: "view"}, expectFailure: true},
+        compact: {command: {compact: "view", force: true}, expectFailure: true},
         configureFailPoint: {skip: isUnrelated},
         connPoolStats: {skip: isUnrelated},
         connPoolSync: {skip: isUnrelated},

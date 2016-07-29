@@ -1,0 +1,27 @@
+selector:
+  js_test:
+    roots:
+    - jstests/views/*.js
+    exclude_files:
+    # This test starts its own mongod's, so won't be replicated.
+    - jstests/views/durable_view_catalog.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval: "testingReplication = true;"
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CheckReplDBHash
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        oplogSize: 511
+        set_parameters:
+          enableTestCommands: 1
+          enableViews: 1
+      num_nodes: 2

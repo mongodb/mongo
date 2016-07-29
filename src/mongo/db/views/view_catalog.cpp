@@ -41,6 +41,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view.h"
+#include "mongo/util/log.h"
 
 namespace {
 bool enableViews = false;
@@ -52,28 +53,63 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableViewsPara
 
 const std::uint32_t ViewCatalog::kMaxViewDepth = 20;
 
-ViewCatalog::ViewCatalog(OperationContext* txn, DurableViewCatalog* durable) : _durable(durable) {
-    durable->iterate(txn, [&](const BSONObj& view) {
+Status ViewCatalog::reloadIfNeeded(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _reloadIfNeeded_inlock(txn);
+}
+
+Status ViewCatalog::_reloadIfNeeded_inlock(OperationContext* txn) {
+    if (_valid.load())
+        return Status::OK();
+
+    LOG(1) << "reloading view catalog for database " << _durable->getName();
+
+    // Need to reload, first clear our cache.
+    _viewMap.clear();
+
+    Status status = _durable->iterate(txn, [&](const BSONObj& view) {
         NamespaceString viewName(view["_id"].str());
         ViewDefinition def(
             viewName.db(), viewName.coll(), view["viewOn"].str(), view["pipeline"].Obj());
         _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(def);
     });
+    _valid.store(status.isOK());
+    return status;
 }
+
+void ViewCatalog::_createOrUpdateView_inlock(OperationContext* txn,
+                                             const NamespaceString& viewName,
+                                             const NamespaceString& viewOn,
+                                             const BSONArray& pipeline) {
+    invariant(_valid.load());
+    BSONObj viewDef =
+        BSON("_id" << viewName.ns() << "viewOn" << viewOn.coll() << "pipeline" << pipeline);
+    _durable->upsert(txn, viewName, viewDef);
+
+    BSONObj ownedPipeline = pipeline.getOwned();
+    _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(
+        viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline);
+    txn->recoveryUnit()->onRollback([this, viewName]() { this->_viewMap.erase(viewName.ns()); });
+
+    // We may get invalidated, but we're exclusively locked, so the change must be ours.
+    txn->recoveryUnit()->onCommit([this]() { this->_valid.store(true); });
+}
+
 
 Status ViewCatalog::createView(OperationContext* txn,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
-                               const BSONObj& pipeline) {
+                               const BSONArray& pipeline) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
     if (!enableViews)
         return Status(ErrorCodes::CommandNotSupported, "View support not enabled");
-
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (lookup(StringData(viewName.ns())))
+    if (_lookup_inlock(txn, StringData(viewName.ns())))
         return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
@@ -82,28 +118,58 @@ Status ViewCatalog::createView(OperationContext* txn,
 
     // TODO(SERVER-24768): Need to ensure view is correct and doesn't introduce a cycle.
 
-    BSONObj viewDef =
-        BSON("_id" << viewName.ns() << "viewOn" << viewOn.coll() << "pipeline" << pipeline);
-    _durable->insert(txn, viewDef);
-
-    BSONObj ownedPipeline = pipeline.getOwned();
-    _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(
-        viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline);
-    txn->recoveryUnit()->onRollback([this, viewName]() { this->_viewMap.erase(viewName.ns()); });
+    _createOrUpdateView_inlock(txn, viewName, viewOn, pipeline);
     return Status::OK();
 }
 
-void ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewName) {
-    _durable->remove(txn, viewName);
+Status ViewCatalog::modifyView(OperationContext* txn,
+                               const NamespaceString& viewName,
+                               const NamespaceString& viewOn,
+                               const BSONArray& pipeline) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (viewName.db() != viewOn.db())
+        return Status(ErrorCodes::BadValue,
+                      "View must be created on a view or collection in the same database");
+
+    if (!_lookup_inlock(txn, StringData(viewName.ns())))
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "cannot modify missing view " << viewName.ns());
+
+    if (!NamespaceString::validCollectionName(viewOn.coll()))
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
+
+    _createOrUpdateView_inlock(txn, viewName, viewOn, pipeline);
+    return Status::OK();
+}
+
+Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewName) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
     // Save a copy of the view definition in case we need to roll back.
-    ViewDefinition savedDefinition = *lookup(viewName.ns());
+    ViewDefinition* viewPtr = _lookup_inlock(txn, viewName.ns());
+    if (!viewPtr) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "cannot drop missing view: " << viewName.ns()};
+    }
+
+    ViewDefinition savedDefinition = *viewPtr;
+
+    invariant(_valid.load());
+    _durable->remove(txn, viewName);
     _viewMap.erase(viewName.ns());
     txn->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
     });
+
+    // We may get invalidated, but we're exclusively locked, so the change must be ours.
+    txn->recoveryUnit()->onCommit([this]() { this->_valid.store(true); });
+    return Status::OK();
 }
 
-ViewDefinition* ViewCatalog::lookup(StringData ns) {
+ViewDefinition* ViewCatalog::_lookup_inlock(OperationContext* txn, StringData ns) {
+    uassertStatusOK(_reloadIfNeeded_inlock(txn));
     ViewMap::const_iterator it = _viewMap.find(ns);
     if (it != _viewMap.end()) {
         return it->second.get();
@@ -111,13 +177,19 @@ ViewDefinition* ViewCatalog::lookup(StringData ns) {
     return nullptr;
 }
 
+ViewDefinition* ViewCatalog::lookup(OperationContext* txn, StringData ns) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _lookup_inlock(txn, ns);
+}
+
 StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* txn,
                                                   const NamespaceString& nss) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     const NamespaceString* resolvedNss = &nss;
     std::vector<BSONObj> resolvedPipeline;
 
     for (std::uint32_t i = 0; i < ViewCatalog::kMaxViewDepth; i++) {
-        ViewDefinition* view = lookup(resolvedNss->ns());
+        ViewDefinition* view = _lookup_inlock(txn, resolvedNss->ns());
         if (!view)
             return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
 

@@ -74,7 +74,7 @@ constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
 
 }  // namespace
 
-bool legalClientSystemNS(StringData ns, bool write) {
+bool legalClientSystemNS(StringData ns) {
     if (ns == "local.system.replset")
         return true;
 
@@ -91,6 +91,9 @@ bool legalClientSystemNS(StringData ns, bool write) {
         return true;
 
     if (ns.find(".system.js") != string::npos)
+        return true;
+
+    if (nsToCollectionSubstring(ns) == "system.views")
         return true;
 
     return false;

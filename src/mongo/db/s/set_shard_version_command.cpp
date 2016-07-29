@@ -187,7 +187,7 @@ public:
             autoDb.emplace(txn, nss.db(), MODE_IS);
 
             // Views do not require a shard version check.
-            if (autoDb->getDb() && autoDb->getDb()->getViewCatalog()->lookup(nss.ns())) {
+            if (autoDb->getDb() && autoDb->getDb()->getViewCatalog()->lookup(txn, nss.ns())) {
                 return true;
             }
 

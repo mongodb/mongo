@@ -33,24 +33,46 @@
 #include "mongo/db/views/durable_view_catalog.h"
 
 #include <string>
+#include <unordered_set>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
-void DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback) {
-    dassert(txn->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+// DurableViewCatalog
+
+void DurableViewCatalog::onExternalChange(OperationContext* txn, const NamespaceString& name) {
+    dassert(txn->lockState()->isDbLockedForMode(name.db(), MODE_IX));
+    Database* db = dbHolder().get(txn, name.db());
+
+    if (db) {
+        txn->recoveryUnit()->onCommit([db]() { db->getViewCatalog()->invalidate(); });
+    }
+}
+
+// DurableViewCatalogImpl
+
+const std::string& DurableViewCatalogImpl::getName() const {
+    return _db->name();
+}
+
+Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback) {
+    dassert(txn->lockState()->isDbLockedForMode(_db->name(), MODE_IS) ||
+            txn->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
     Collection* systemViews = _db->getCollection(_db->getSystemViewsName());
     if (!systemViews)
-        return;
+        return Status::OK();
 
+    Lock::CollectionLock lk(txn->lockState(), _db->getSystemViewsName(), MODE_IS);
     auto cursor = systemViews->getCursor(txn);
     while (auto record = cursor->next()) {
         RecordData& data = record->data;
@@ -59,27 +81,62 @@ void DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback) {
         fassertStatusOK(40224, validateBSON(data.data(), data.size()));
         BSONObj viewDef = data.toBson();
 
-        // Make sure we fail when new fields get added to the definition, so we fail safe in case
-        // of future format upgrades.
+        // Check read definitions for correct structure, and refuse reading past invalid
+        // definitions. Complain loudly, but otherwise ignore any further view definitions.
+        bool valid = true;
         for (const BSONElement& e : viewDef) {
             std::string name(e.fieldName());
-            fassert(40225, name == "_id" || name == "viewOn" || name == "pipeline");
+            valid &= name == "_id" || name == "viewOn" || name == "pipeline";
         }
         NamespaceString viewName(viewDef["_id"].str());
-        fassert(40226, viewName.db() == _db->name());
+        valid &= viewName.isValid() && viewName.db() == _db->name();
+        valid &= NamespaceString::validCollectionName(viewDef["viewOn"].str());
+
+        if (!valid) {
+            return {ErrorCodes::InvalidViewDefinition,
+                    str::stream() << "invalid view definitions reading '"
+                                  << _db->getSystemViewsName()
+                                  << "'"};
+        }
 
         callback(viewDef);
     }
+    return Status::OK();
 }
 
-void DurableViewCatalogImpl::insert(OperationContext* txn, const BSONObj& view) {
+void DurableViewCatalogImpl::upsert(OperationContext* txn,
+                                    const NamespaceString& name,
+                                    const BSONObj& view) {
     dassert(txn->lockState()->isDbLockedForMode(_db->name(), MODE_X));
-    Collection* systemViews = _db->getOrCreateCollection(txn, _db->getSystemViewsName());
+    NamespaceString systemViewsNs(_db->getSystemViewsName());
+    Collection* systemViews = _db->getOrCreateCollection(txn, systemViewsNs.ns());
 
-    OpDebug* const opDebug = nullptr;
-    const bool enforceQuota = false;
-    LOG(2) << "insert view " << view << " in " << _db->getSystemViewsName();
-    uassertStatusOK(systemViews->insertDocument(txn, view, opDebug, enforceQuota));
+    const bool requireIndex = false;
+    RecordId id = Helpers::findOne(txn, systemViews, BSON("_id" << name.ns()), requireIndex);
+
+    const bool enforceQuota = true;
+    Snapshotted<BSONObj> oldView;
+    if (!id.isNormal() || !systemViews->findDoc(txn, id, &oldView)) {
+        LOG(2) << "insert view " << view << " into " << _db->getSystemViewsName();
+        uassertStatusOK(
+            systemViews->insertDocument(txn, view, &CurOp::get(txn)->debug(), enforceQuota));
+    } else {
+        OplogUpdateEntryArgs args;
+        args.ns = systemViewsNs.ns();
+        args.update = view;
+        args.criteria = BSON("_id" << name.ns());
+
+        const bool assumeIndexesAreAffected = true;
+        auto res = systemViews->updateDocument(txn,
+                                               id,
+                                               oldView,
+                                               view,
+                                               enforceQuota,
+                                               assumeIndexesAreAffected,
+                                               &CurOp::get(txn)->debug(),
+                                               &args);
+        uassertStatusOK(res);
+    }
 }
 
 void DurableViewCatalogImpl::remove(OperationContext* txn, const NamespaceString& name) {
@@ -93,7 +150,6 @@ void DurableViewCatalogImpl::remove(OperationContext* txn, const NamespaceString
         return;
 
     LOG(2) << "remove view " << name << " from " << _db->getSystemViewsName();
-    OpDebug* const opDebug = nullptr;
-    systemViews->deleteDocument(txn, id, opDebug);
+    systemViews->deleteDocument(txn, id, &CurOp::get(txn)->debug());
 }
 }  // namespace mongo

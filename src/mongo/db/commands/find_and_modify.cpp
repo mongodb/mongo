@@ -395,7 +395,7 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                if (autoDb.getDb()->getViewCatalog()->lookup(nsString.ns())) {
+                if (autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
                                                 "findAndModify not supported on views"});
@@ -472,7 +472,7 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                if (autoDb.getDb()->getViewCatalog()->lookup(nsString.ns())) {
+                if (autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
                                                 "findAndModify not supported on views"});

@@ -56,7 +56,7 @@ Status collMod(OperationContext* txn,
     Collection* coll = db ? db->getCollection(nss) : nullptr;
 
     // May also modify a view instead of a collection.
-    const ViewDefinition* view = db ? db->getViewCatalog()->lookup(nss.ns()) : nullptr;
+    const ViewDefinition* view = db ? db->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
     boost::optional<ViewDefinition> newView;
     if (view)
         newView = {*view};
@@ -259,24 +259,27 @@ Status collMod(OperationContext* txn,
         }
     }
 
-    // Actually update the view if it was parsed successfully.
-    if (view && errorStatus.isOK()) {
+    if (!errorStatus.isOK()) {
+        return errorStatus;
+    }
+
+    // Actually update the view if it was parsed successfully. Only observe non-view collMods,
+    // as view operations are observed as operations on the system.views collection.
+    if (view) {
         ViewCatalog* catalog = db->getViewCatalog();
-        catalog->dropView(txn, nss);
 
         BSONArrayBuilder pipeline;
         for (auto& item : newView->pipeline()) {
             pipeline.append(item);
         }
-        errorStatus = catalog->createView(txn, nss, newView->viewOn(), pipeline.obj());
+        errorStatus = catalog->modifyView(txn, nss, newView->viewOn(), BSONArray(pipeline.obj()));
+        if (!errorStatus.isOK()) {
+            return errorStatus;
+        }
+    } else {
+        getGlobalServiceContext()->getOpObserver()->onCollMod(
+            txn, (dbName.toString() + ".$cmd").c_str(), cmdObj);
     }
-
-    if (!errorStatus.isOK()) {
-        return errorStatus;
-    }
-
-    getGlobalServiceContext()->getOpObserver()->onCollMod(
-        txn, (dbName.toString() + ".$cmd").c_str(), cmdObj);
 
     wunit.commit();
     return Status::OK();

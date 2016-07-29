@@ -54,7 +54,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* txn,
       _collLock(txn->lockState(), nss.ns(), modeColl),
       _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {
     Database* db = _autoDb.getDb();
-    if (_viewMode == ViewMode::kViewsForbidden && db && db->getViewCatalog()->lookup(nss.ns()))
+    // If the database exists, but not the collection, check for views.
+    if (_viewMode == ViewMode::kViewsForbidden && db && !_coll &&
+        db->getViewCatalog()->lookup(txn, nss.ns()))
         uasserted(ErrorCodes::CommandNotSupportedOnView,
                   str::stream() << "Namespace " << nss.ns() << " is a view, not a collection");
 }
@@ -157,8 +159,9 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
 AutoGetCollectionOrViewForRead::AutoGetCollectionOrViewForRead(OperationContext* txn,
                                                                const NamespaceString& nss)
     : AutoGetCollectionForRead(txn, nss, AutoGetCollection::ViewMode::kViewsPermitted),
-      _view(_autoColl->getDb() ? _autoColl->getDb()->getViewCatalog()->lookup(nss.ns()) : nullptr) {
-}
+      _view(_autoColl->getDb() && !getCollection()
+                ? _autoColl->getDb()->getViewCatalog()->lookup(txn, nss.ns())
+                : nullptr) {}
 
 void AutoGetCollectionOrViewForRead::releaseLocksForView() noexcept {
     invariant(_view);

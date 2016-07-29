@@ -45,9 +45,8 @@ const size_t MaxDatabaseNameLen = 128;  // max str len for the db name, includin
 
 /** @return true if a client can modify this namespace even though it is under ".system."
     For example <dbname>.system.users is ok for regular clients to update.
-    @param write used when .system.js
 */
-bool legalClientSystemNS(StringData ns, bool write);
+bool legalClientSystemNS(StringData ns);
 
 /* e.g.
    NamespaceString ns("acme.orders");

@@ -133,7 +133,7 @@ public:
         OldClientContext ctx(txn, toReIndexNs.ns());
 
         Collection* collection = ctx.db()->getCollection(toReIndexNs.ns());
-        auto view = ctx.db()->getViewCatalog()->lookup(toReIndexNs.ns());
+        auto view = ctx.db()->getViewCatalog()->lookup(txn, toReIndexNs.ns());
 
         if (!collection) {
             if (view)

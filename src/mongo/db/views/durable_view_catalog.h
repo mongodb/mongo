@@ -28,6 +28,10 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -39,15 +43,28 @@ class OperationContext;
 
 /**
  * Interface for system.views collection operations associated with view catalog management.
- * Methods must be called from within a WriteUnitOfWork, and with the DBLock held.
+ * All methods must be called from within a WriteUnitOfWork, and with the DBLock held in at
+ * least intent mode.
  */
 class DurableViewCatalog {
 public:
-    using Callback = stdx::function<void(const BSONObj& view)>;
+    static constexpr StringData viewsCollectionName() {
+        return "system.views"_sd;
+    }
 
-    virtual void iterate(OperationContext* txn, Callback callback) = 0;
-    virtual void insert(OperationContext* txn, const BSONObj& view) = 0;
+    /**
+     * Thread-safe method to mark a catalog name was changed. This will cause the in-memory
+     * view catalog to be marked invalid
+     */
+    static void onExternalChange(OperationContext* txn, const NamespaceString& name);
+
+    using Callback = stdx::function<void(const BSONObj& view)>;
+    virtual Status iterate(OperationContext* txn, Callback callback) = 0;
+    virtual void upsert(OperationContext* txn,
+                        const NamespaceString& name,
+                        const BSONObj& view) = 0;
     virtual void remove(OperationContext* txn, const NamespaceString& name) = 0;
+    virtual const std::string& getName() const = 0;
 };
 
 /**
@@ -58,9 +75,10 @@ class DurableViewCatalogImpl final : public DurableViewCatalog {
 public:
     explicit DurableViewCatalogImpl(Database* db) : _db(db) {}
 
-    void iterate(OperationContext* txn, Callback callback);
-    void insert(OperationContext* txn, const BSONObj& view);
+    Status iterate(OperationContext* txn, Callback callback);
+    void upsert(OperationContext* txn, const NamespaceString& name, const BSONObj& view);
     void remove(OperationContext* txn, const NamespaceString& name);
+    const std::string& getName() const;
 
 private:
     Database* const _db;

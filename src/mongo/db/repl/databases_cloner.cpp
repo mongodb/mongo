@@ -219,7 +219,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
         const auto collectionFilterPred = [dbName](const BSONObj& collInfo) {
             const auto collName = collInfo["name"].str();
             const NamespaceString ns(dbName, collName);
-            if (ns.isSystem() && !legalClientSystemNS(ns.ns(), true)) {
+            if (ns.isSystem() && !legalClientSystemNS(ns.ns())) {
                 LOG(1) << "Skipping 'system' collection: " << ns.ns();
                 return false;
             }

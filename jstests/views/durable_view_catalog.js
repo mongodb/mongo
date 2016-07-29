@@ -21,7 +21,7 @@
 
     // Now connect to the mongod, create, remove and modify views and then abruptly stop the server.
     let viewsDB = conn.getDB('test');
-    let pipe = [];
+    let pipe = [{$match: {}}];
     assert.commandWorked(
         viewsDB.runCommand({create: "view1", viewOn: "collection", pipeline: pipe}));
     assert.commandWorked(
@@ -43,21 +43,18 @@
     viewsDB = conn.getDB('test');
     let actualViews = viewsDB.system.views.find().toArray();
     let expectedViews = [
-        {
-          "_id": "test.view2",
-          "viewOn": "collection",
-          "pipeline": {
-
-          }
-        },
-        {
-          "_id": "test.view3",
-          "viewOn": "view2",
-          "pipeline": {
-
-          }
-        }
+        {"_id": "test.view2", "viewOn": "collection", "pipeline": pipe},
+        {"_id": "test.view3", "viewOn": "view2", "pipeline": pipe}
     ];
     assert.eq(actualViews, expectedViews, "view definitions not correctly persisted");
+    let listedViews = viewsDB.runCommand({listCollections: 1, filter: {type: "view"}})
+                          .cursor.firstBatch.map((function(x) {
+                              return {
+                                  _id: "test." + x.name,
+                                  viewOn: x.options.viewOn,
+                                  pipeline: x.options.pipeline
+                              };
+                          }));
+    assert.eq(listedViews, expectedViews, "persisted view definitions not correctly loaded");
     MongoRunner.stopMongod(conn);
 })();
