@@ -2798,6 +2798,9 @@ env = doConfigure( env )
 # compilation database entries for the configure tests, which is weird.
 env.Tool("compilation_db")
 
+# Load the dagger tool for build dependency graph introspection
+env.Tool("dagger")
+
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
@@ -2898,6 +2901,7 @@ def injectMongoIncludePaths(thisEnv):
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
 compileDb = env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
+dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
 
 env.Alias("distsrc-tar", env.DistSrc("mongodb-src-${MONGO_VERSION}.tar"))
 env.Alias("distsrc-tgz", env.GZip(
@@ -2909,7 +2913,10 @@ env.Alias("distsrc", "distsrc-tgz")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 
-env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
+all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
+
+# Require everything to be built before trying to extract build dependency information
+env.Requires(dependencyDb, all)
 
 # Substitute environment variables in any build targets so that we can
 # say, for instance:
