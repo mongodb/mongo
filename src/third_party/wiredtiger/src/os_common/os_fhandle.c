@@ -150,19 +150,19 @@ __open_verbose(
 	 */
 
 	switch (file_type) {
-	case WT_OPEN_FILE_TYPE_CHECKPOINT:
+	case WT_FS_OPEN_FILE_TYPE_CHECKPOINT:
 		file_type_tag = "checkpoint";
 		break;
-	case WT_OPEN_FILE_TYPE_DATA:
+	case WT_FS_OPEN_FILE_TYPE_DATA:
 		file_type_tag = "data";
 		break;
-	case WT_OPEN_FILE_TYPE_DIRECTORY:
+	case WT_FS_OPEN_FILE_TYPE_DIRECTORY:
 		file_type_tag = "directory";
 		break;
-	case WT_OPEN_FILE_TYPE_LOG:
+	case WT_FS_OPEN_FILE_TYPE_LOG:
 		file_type_tag = "log";
 		break;
-	case WT_OPEN_FILE_TYPE_REGULAR:
+	case WT_FS_OPEN_FILE_TYPE_REGULAR:
 		file_type_tag = "regular";
 		break;
 	default:
@@ -172,18 +172,18 @@ __open_verbose(
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 	sep = " (";
-#define	WT_OPEN_VERBOSE_FLAG(f, name)					\
+#define	WT_FS_OPEN_VERBOSE_FLAG(f, name)				\
 	if (LF_ISSET(f)) {						\
 		WT_ERR(__wt_buf_catfmt(					\
 		    session, tmp, "%s%s", sep, name));			\
 		sep = ", ";						\
 	}
 
-	WT_OPEN_VERBOSE_FLAG(WT_OPEN_CREATE, "create");
-	WT_OPEN_VERBOSE_FLAG(WT_OPEN_DIRECTIO, "direct-IO");
-	WT_OPEN_VERBOSE_FLAG(WT_OPEN_EXCLUSIVE, "exclusive");
-	WT_OPEN_VERBOSE_FLAG(WT_OPEN_FIXED, "fixed");
-	WT_OPEN_VERBOSE_FLAG(WT_OPEN_READONLY, "readonly");
+	WT_FS_OPEN_VERBOSE_FLAG(WT_FS_OPEN_CREATE, "create");
+	WT_FS_OPEN_VERBOSE_FLAG(WT_FS_OPEN_DIRECTIO, "direct-IO");
+	WT_FS_OPEN_VERBOSE_FLAG(WT_FS_OPEN_EXCLUSIVE, "exclusive");
+	WT_FS_OPEN_VERBOSE_FLAG(WT_FS_OPEN_FIXED, "fixed");
+	WT_FS_OPEN_VERBOSE_FLAG(WT_FS_OPEN_READONLY, "readonly");
 
 	if (tmp->size != 0)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ")"));
@@ -209,7 +209,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_open(WT_SESSION_IMPL *session,
-    const char *name, WT_OPEN_FILE_TYPE file_type, u_int flags, WT_FH **fhp)
+    const char *name, WT_FS_OPEN_FILE_TYPE file_type, u_int flags, WT_FH **fhp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -247,12 +247,12 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (F_ISSET(conn, WT_CONN_READONLY)) {
 		lock_file = strcmp(name, WT_SINGLETHREAD) == 0;
 		if (!lock_file)
-			LF_SET(WT_OPEN_READONLY);
-		WT_ASSERT(session, lock_file || !LF_ISSET(WT_OPEN_CREATE));
+			LF_SET(WT_FS_OPEN_READONLY);
+		WT_ASSERT(session, lock_file || !LF_ISSET(WT_FS_OPEN_CREATE));
 	}
 
 	/* Create the path to the file. */
-	if (!LF_ISSET(WT_OPEN_FIXED))
+	if (!LF_ISSET(WT_FS_OPEN_FIXED))
 		WT_ERR(__wt_filename(session, name, &path));
 
 	/* Call the underlying open function. */
@@ -261,7 +261,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	open_called = true;
 
 	WT_ERR(__fhandle_method_finalize(
-	    session, fh->handle, LF_ISSET(WT_OPEN_READONLY)));
+	    session, fh->handle, LF_ISSET(WT_FS_OPEN_READONLY)));
 
 	/*
 	 * Repeat the check for a match: if there's no match, link our newly

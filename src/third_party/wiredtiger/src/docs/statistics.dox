@@ -90,11 +90,20 @@ cursor.
 
 @section statistics_log Statistics logging
 
-WiredTiger will optionally log database statistics into a file when the
+WiredTiger will optionally log database statistics into files when the
 the ::wiredtiger_open \c statistics_log configuration is set.
 
-The resulting statistics can be displayed using the \c wtstats visualization
-tool.  For more information, see @ref_single wtstats.
+The log files are named \c WiredTiger.%%d.%%H, where \c %%d is replaced
+with the day of the month as a decimal number (01-31), and \c %%H
+is replaced by the hour (24-hour clock) as a decimal number (00-23).
+Each log file contains the statistics for the hour specified in its name.
+
+The location of the log files may be changed with the \c statistics_log.path
+configuration string.
+
+The resulting statistics can be displayed and interactively examined
+using the \c wtstats visualization tool.  For more information, see
+@ref_single wtstats.
 
 The following example logs statistics every 30 seconds:
 
@@ -120,7 +129,7 @@ Statistics for all underlying data sources of a particular type may be
 included by adding a partial data source URI to the \c statistics_log
 configuration string:
 
-@snippet ex_all.c Statistics logging with all tables
+@snippet ex_all.c Statistics logging with a source type
 
 When database statistics are logged, the database home will be the first
 space-separated entry for each record in the log file.  For example:
@@ -151,23 +160,9 @@ currently open in the database, nor will any statistics requiring the
 traversal of a tree (as if the \c statistics_fast configuration string
 were set).
 
-The location of the log files may be changed with the \c statistics_log.path
-configuration string.  The \c path value value may contain ISO C90 standard
-strftime conversion specifications.  WiredTiger will not create non-existent
-directories in the path, they must exist before ::wiredtiger_open is called.
-
-The following example logs statistics into files named with the month,
-day and year:
-
-@snippet ex_all.c Statistics logging with path
-
 A Python script that parses the default logging output and uses the
 <a href="http://www.gnuplot.info/">gnuplot</a>, utility to generate
 Portable Network Graphics (PNG) format graphs is included in the
 WiredTiger distribution in the file \c tools/statlog.py.
-
-@m_if{c}
-To interactively examine statistics results, see @ref wtstats.
-@m_endif
 
 */

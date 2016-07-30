@@ -38,9 +38,6 @@ __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 	cbt->ins_head = NULL;
 	cbt->ins_stack[0] = NULL;
 
-	cbt->cip_saved = NULL;
-	cbt->rip_saved = NULL;
-
 	F_CLR(cbt, WT_CBT_POSITION_MASK);
 }
 

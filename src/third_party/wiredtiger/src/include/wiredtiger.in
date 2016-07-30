@@ -1836,25 +1836,8 @@ struct __wt_connection {
 	 * configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive
 	 * unneeded log files., a boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor
-	 * for log records.  Permitted values are \c "none" or custom
-	 * compression engine name created with WT_CONNECTION::add_compressor.
-	 * If WiredTiger has builtin support for \c "snappy"\, \c "lz4" or \c
-	 * "zlib" compression\, these names are also available.  See @ref
-	 * compression for more information., a string; default \c none.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a
-	 * boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log
-	 * files., an integer between 100KB and 2GB; default \c 100MB.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
-	 * which the log files are written.  If the value is not an absolute
-	 * path name\, the files are created relative to the database home., a
-	 * string; default \c ".".}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc,
-	 * pre-allocate log files., a boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if
-	 * recovery needs to run after an unclean shutdown., a string\, chosen
-	 * from the following options: \c "error"\, \c "on"; default \c on.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a
+	 * boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into
 	 * log files., a boolean flag; default \c false.}
 	 * @config{ ),,}
@@ -1914,11 +1897,6 @@ struct __wt_connection {
 	 * statistics in JSON format., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database
 	 * close., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
-	 * which the log records are written\, may contain ISO C standard
-	 * strftime conversion specifications.  If the value is not an absolute
-	 * path name\, the file is created relative to the database home., a
-	 * string; default \c "WiredTigerStat.%d.%H".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if non-empty\, include
 	 * statistics for the list of data source URIs\, if they are open at the
 	 * time of the statistics logging.  The list may include URIs matching a
@@ -2343,9 +2321,10 @@ struct __wt_connection {
  * subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
  * integer between 100KB and 2GB; default \c 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
- * log files are written.  If the value is not an absolute path name\, the files
- * are created relative to the database home., a string; default \c ".".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which log
+ * files are written.  The directory must already exist.  If the value is not an
+ * absolute path\, the path is relative to the database home (see @ref
+ * absolute_path for more information)., a string; default \c ".".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
  * flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
@@ -2415,16 +2394,15 @@ struct __wt_connection {
  * boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close,
  * log statistics on database close., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which the
- * log records are written\, may contain ISO C standard strftime conversion
- * specifications.  If the value is not an absolute path name\, the file is
- * created relative to the database home., a string; default \c
- * "WiredTigerStat.%d.%H".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if
- * non-empty\, include statistics for the list of data source URIs\, if they are
- * open at the time of the statistics logging.  The list may include URIs
- * matching a single data source ("table:mytable")\, or a URI matching all data
- * sources of a particular type ("table:")., a list of strings; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which
+ * statistics files are written.  The directory must already exist.  If the
+ * value is not an absolute path\, the path is relative to the database home
+ * (see @ref absolute_path for more information)., a string; default \c ".".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;sources, if non-empty\, include statistics
+ * for the list of data source URIs\, if they are open at the time of the
+ * statistics logging.  The list may include URIs matching a single data source
+ * ("table:mytable")\, or a URI matching all data sources of a particular type
+ * ("table:")., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log
  * record\, may contain strftime conversion specifications\, when \c json is
  * configured\, defaults to \c "%FT%Y.000Z"., a string; default \c "%b %d
@@ -3701,24 +3679,34 @@ struct __wt_extractor {
 #if !defined(SWIG)
 /*! WT_FILE_SYSTEM::open_file file types */
 typedef enum {
-	WT_OPEN_FILE_TYPE_CHECKPOINT,	/*!< open a data file checkpoint */
-	WT_OPEN_FILE_TYPE_DATA,		/*!< open a data file */
-	WT_OPEN_FILE_TYPE_DIRECTORY,	/*!< open a directory */
-	WT_OPEN_FILE_TYPE_LOG,		/*!< open a log file */
-	WT_OPEN_FILE_TYPE_REGULAR	/*!< open a regular file */
-} WT_OPEN_FILE_TYPE;
+	WT_FS_OPEN_FILE_TYPE_CHECKPOINT,/*!< open a data file checkpoint */
+	WT_FS_OPEN_FILE_TYPE_DATA,	/*!< open a data file */
+	WT_FS_OPEN_FILE_TYPE_DIRECTORY,	/*!< open a directory */
+	WT_FS_OPEN_FILE_TYPE_LOG,	/*!< open a log file */
+	WT_FS_OPEN_FILE_TYPE_REGULAR	/*!< open a regular file */
+} WT_FS_OPEN_FILE_TYPE;
 
 /*! WT_FILE_SYSTEM::open_file flags: create if does not exist */
-#define	WT_OPEN_CREATE		0x001
+#define	WT_FS_OPEN_CREATE	0x001
 /*! WT_FILE_SYSTEM::open_file flags: direct I/O requested */
-#define	WT_OPEN_DIRECTIO	0x002
-/*! WT_FILE_SYSTEM::open_file flags: error if exclusive use not available */
-#define	WT_OPEN_EXCLUSIVE	0x004
+#define	WT_FS_OPEN_DIRECTIO	0x002
+/*! WT_FILE_SYSTEM::open_file flags: file creation must be durable */
+#define	WT_FS_OPEN_DURABLE	0x004
+/*!
+ * WT_FILE_SYSTEM::open_file flags: return EBUSY if exclusive use not available
+ */
+#define	WT_FS_OPEN_EXCLUSIVE	0x008
 #ifndef DOXYGEN
-#define	WT_OPEN_FIXED		0x008	/* Path not home relative (internal) */
+#define	WT_FS_OPEN_FIXED	0x010	/* Path not home relative (internal) */
 #endif
 /*! WT_FILE_SYSTEM::open_file flags: open is read-only */
-#define	WT_OPEN_READONLY	0x010
+#define	WT_FS_OPEN_READONLY	0x020
+
+/*!
+ * WT_FILE_SYSTEM::remove or WT_FILE_SYSTEM::rename flags: the remove or rename
+ * operation must be durable
+ */
+#define	WT_FS_DURABLE		0x001
 
 /*!
  * The interface implemented by applications to provide a custom file system
@@ -3768,23 +3756,6 @@ struct __wt_file_system {
 	    WT_SESSION *session, char **dirlist, uint32_t count);
 
 	/*!
-	 * Flush the named directory.
-	 *
-	 * This method is not required for readonly file systems or file systems
-	 * where it is not necessary to flush a file's directory to ensure the
-	 * durability of file system operations, and should be set to NULL when
-	 * not required by the file system.
-	 *
-	 * @errors
-	 *
-	 * @param file_system the WT_FILE_SYSTEM
-	 * @param session the current WiredTiger session
-	 * @param directory the name of the directory
-	 */
-	int (*fs_directory_sync)(WT_FILE_SYSTEM *file_system,
-	    WT_SESSION *session, const char *directory);
-
-	/*!
 	 * Return if the named file system object exists.
 	 *
 	 * @errors
@@ -3800,6 +3771,16 @@ struct __wt_file_system {
 	/*!
 	 * Open a handle for a named file system object
 	 *
+	 * The method should return ENOENT if the file is not being created and
+	 * does not exist.
+	 *
+	 * The method should return EACCES if the file cannot be opened in the
+	 * requested mode (for example, a file opened for writing in a readonly
+	 * file system).
+	 *
+	 * The method should return EBUSY if ::WT_FS_OPEN_EXCLUSIVE is set and
+	 * the file is in use.
+	 *
 	 * @errors
 	 *
 	 * @param file_system the WT_FILE_SYSTEM
@@ -3809,8 +3790,8 @@ struct __wt_file_system {
 	 *    The file type is provided to allow optimization for different file
 	 *    access patterns.
 	 * @param flags flags indicating how to open the file, one or more of
-	 *    ::WT_OPEN_CREATE, ::WT_OPEN_DIRECTIO, ::WT_OPEN_EXCLUSIVE or
-	 *    ::WT_OPEN_READONLY.
+	 *    ::WT_FS_OPEN_CREATE, ::WT_FS_OPEN_DIRECTIO, ::WT_FS_OPEN_DURABLE,
+	 *    ::WT_FS_OPEN_EXCLUSIVE or ::WT_FS_OPEN_READONLY.
 	 * @param[out] file_handlep the handle to the newly opened file. File
 	 *    system implementations must allocate memory for the handle and
 	 *    the WT_FILE_HANDLE::name field, and fill in the WT_FILE_HANDLE::
@@ -3819,7 +3800,7 @@ struct __wt_file_system {
 	 *    their own structure as a superset of a WT_FILE_HANDLE:: structure.
 	 */
 	int (*fs_open_file)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
-	    const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
+	    const char *name, WT_FS_OPEN_FILE_TYPE file_type, uint32_t flags,
 	    WT_FILE_HANDLE **file_handlep);
 
 	/*!
@@ -3833,9 +3814,11 @@ struct __wt_file_system {
 	 * @param file_system the WT_FILE_SYSTEM
 	 * @param session the current WiredTiger session
 	 * @param name the name of the file system object
+	 * @param durable if the operation requires durability
+	 * @param flags 0 or ::WT_FS_DURABLE
 	 */
-	int (*fs_remove)(
-	    WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name);
+	int (*fs_remove)(WT_FILE_SYSTEM *file_system,
+	    WT_SESSION *session, const char *name, uint32_t flags);
 
 	/*!
 	 * Rename a named file system object
@@ -3849,9 +3832,10 @@ struct __wt_file_system {
 	 * @param session the current WiredTiger session
 	 * @param from the original name of the object
 	 * @param to the new name for the object
+	 * @param flags 0 or ::WT_FS_DURABLE
 	 */
-	int (*fs_rename)(WT_FILE_SYSTEM *file_system,
-	    WT_SESSION *session, const char *from, const char *to);
+	int (*fs_rename)(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
+	    const char *from, const char *to, uint32_t flags);
 
 	/*!
 	 * Return the size of a named file system object

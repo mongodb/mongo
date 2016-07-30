@@ -314,6 +314,7 @@ struct __wt_connection_impl {
 	uint32_t	 evict_workers;	/* Number of eviction workers */
 	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
 
+#define	WT_STATLOG_FILENAME	"WiredTigerStat.%d.%H"
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	wt_thread_t	 stat_tid;	/* Statistics log thread */
 	bool		 stat_tid_set;	/* Statistics log thread set */

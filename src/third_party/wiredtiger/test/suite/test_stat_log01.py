@@ -51,9 +51,10 @@ class test_stat_log01(wttest.WiredTigerTestCase):
             None, "create,statistics=(fast),statistics_log=(wait=1)")
         # Wait for the default interval, to ensure stats have been written.
         time.sleep(2)
-        self.check_stats_file("WiredTigerStat")
+        self.check_stats_file(".")
 
     def test_stats_log_name(self):
+        os.mkdir("foo")
         self.conn = self.wiredtiger_open(
             None, "create,statistics=(fast),statistics_log=(wait=1,path=foo)")
         # Wait for the default interval, to ensure stats have been written.
@@ -66,21 +67,18 @@ class test_stat_log01(wttest.WiredTigerTestCase):
         # Wait for the default interval, to ensure stats have been written.
         time.sleep(2)
         self.close_conn()
-        self.check_stats_file("WiredTigerStat")
+        self.check_stats_file(".")
 
     def test_stats_log_on_close(self):
         self.conn = self.wiredtiger_open(None,
             "create,statistics=(fast),statistics_log=(on_close=true)")
         # Close the connection to ensure the statistics get generated.
         self.close_conn()
-        self.check_stats_file("WiredTigerStat")
+        self.check_stats_file(".")
 
-    def check_stats_file(self, filename):
-        if filename == "WiredTigerStat":
-            files = glob.glob(filename + '.[0-9]*')
-            self.assertTrue(files)
-        else:
-            self.assertTrue(os.path.isfile(filename))
+    def check_stats_file(self, dir):
+        files = glob.glob(dir + '/' + 'WiredTigerStat.[0-9]*')
+        self.assertTrue(files)
 
 if __name__ == '__main__':
     wttest.run()
