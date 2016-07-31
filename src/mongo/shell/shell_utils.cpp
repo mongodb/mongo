@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_utils.h"
@@ -42,6 +44,7 @@
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
@@ -324,9 +327,39 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 
         BSONObj currentOpRes;
         conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
+        if (!currentOpRes["inprog"].isABSONObj()) {
+            // We don't have permissions (or the call didn't succeed) - go to the next connection.
+            continue;
+        }
         auto inprog = currentOpRes["inprog"].embeddedObject();
-        BSONForEach(op, inprog) {
-            if (uris.count(op["client"].String())) {
+        for (const auto op : inprog) {
+            // For sharded clusters, `client_s` is used instead and `client` is not present.
+            string client;
+            if (auto elem = op["client"]) {
+                // mongod currentOp client
+                if (elem.type() != String) {
+                    warning() << "Ignoring operation " << op["opid"].toString(false)
+                              << "; expected 'client' field in currentOp response to have type "
+                                 "string, but found "
+                              << typeName(elem.type());
+                    continue;
+                }
+                client = elem.str();
+            } else if (auto elem = op["client_s"]) {
+                // mongos currentOp client
+                if (elem.type() != String) {
+                    warning() << "Ignoring operation " << op["opid"].toString(false)
+                              << "; expected 'client_s' field in currentOp response to have type "
+                                 "string, but found "
+                              << typeName(elem.type());
+                    continue;
+                }
+                client = elem.str();
+            } else {
+                // Internal operation, like TTL index.
+                continue;
+            }
+            if (uris.count(client)) {
                 if (!withPrompt || prompter.confirm()) {
                     BSONObjBuilder cmdBob;
                     BSONObj info;
