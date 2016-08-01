@@ -6,6 +6,7 @@ selector:
     exclude_files:
     # Auth tests require authentication on the stepdown thread's connection
     - jstests/sharding/auth*.js
+    - jstests/sharding/replset_config/auth*.js
     - jstests/sharding/cleanup_orphaned_auth.js
     - jstests/sharding/localhostAuthBypass.js
     - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
