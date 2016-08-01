@@ -3515,7 +3515,7 @@ buildvariants:
     push_arch: arm64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: arm64
@@ -3588,7 +3588,7 @@ buildvariants:
     push_arch: arm64-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager.py
     packager_arch: arm64
@@ -3663,7 +3663,7 @@ buildvariants:
     push_arch: ppc64le-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
@@ -3737,7 +3737,7 @@ buildvariants:
     push_arch: s390x-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
@@ -5337,7 +5337,7 @@ buildvariants:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
@@ -5472,7 +5472,7 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
@@ -5785,7 +5785,7 @@ buildvariants:
     tooltags: "-tags ssl"
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: "--continueOnFailure --mongosSetParameters='{messagePortImpl: 'ASIO'}' --mongodSetParameters='{messagePortImpl: 'ASIO'}'"
+    test_flags: "--mongosSetParameters='{messagePortImpl: 'ASIO'}' --mongodSetParameters='{messagePortImpl: 'ASIO'}'"
   tasks:
   - name: compile
     distros:
@@ -5926,7 +5926,7 @@ buildvariants:
     push_arch: s390x-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --continueOnFailure --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
