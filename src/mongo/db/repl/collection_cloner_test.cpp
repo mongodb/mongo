@@ -265,9 +265,11 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
     ASSERT_OK(collectionCloner->startup());
 
     bool collectionCreated = false;
+    bool writesAreReplicatedOnOpCtx = false;
     NamespaceString collNss;
-    storageInterface->createCollFn = [&collNss, &collectionCreated](
-        OperationContext*, const NamespaceString& nss, const CollectionOptions& options) {
+    storageInterface->createCollFn = [&collNss, &collectionCreated, &writesAreReplicatedOnOpCtx](
+        OperationContext* txn, const NamespaceString& nss, const CollectionOptions& options) {
+        writesAreReplicatedOnOpCtx = txn->writesAreReplicated();
         collectionCreated = true;
         collNss = nss;
         return Status::OK();
@@ -283,7 +285,44 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
     ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());
     ASSERT_TRUE(collectionCreated);
+    ASSERT_FALSE(writesAreReplicatedOnOpCtx);
     ASSERT_EQ(collNss, nss);
+}
+
+TEST_F(CollectionClonerTest,
+       ListIndexesReturnedNamespaceNotFoundAndCreateCollectionCallbackCanceled) {
+    ASSERT_OK(collectionCloner->startup());
+
+    // Replace scheduleDbWork function to schedule the create collection task with an injected error
+    // status.
+    auto exec = &getExecutor();
+    collectionCloner->setScheduleDbWorkFn_forTest(
+        [exec](const executor::TaskExecutor::CallbackFn& workFn) {
+            auto wrappedTask = [workFn](const executor::TaskExecutor::CallbackArgs& cbd) {
+                workFn(executor::TaskExecutor::CallbackArgs(
+                    cbd.executor, cbd.myHandle, Status(ErrorCodes::CallbackCanceled, ""), cbd.txn));
+            };
+            return exec->scheduleWork(wrappedTask);
+        });
+
+    bool collectionCreated = false;
+    storageInterface->createCollFn = [&collectionCreated](
+        OperationContext*, const NamespaceString& nss, const CollectionOptions&) {
+        collectionCreated = true;
+        return Status::OK();
+    };
+
+    // Using a non-zero cursor to ensure that
+    // the cloner stops the fetcher from retrieving more results.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(ErrorCodes::NamespaceNotFound, "The collection doesn't exist.");
+    }
+
+    collectionCloner->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+    ASSERT_FALSE(collectionCreated);
 }
 
 TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {

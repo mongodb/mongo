@@ -217,8 +217,13 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
         // Schedule collection creation and finish callback.
         auto&& scheduleResult =
             _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackArgs& cbd) {
-                auto&& createStatus =
-                    _storageInterface->createCollection(cbd.txn, _destNss, _options);
+                if (!cbd.status.isOK()) {
+                    _finishCallback(cbd.status);
+                    return;
+                }
+                auto txn = cbd.txn;
+                txn->setReplicatedWrites(false);
+                auto&& createStatus = _storageInterface->createCollection(txn, _destNss, _options);
                 _finishCallback(createStatus);
             });
         if (!scheduleResult.isOK()) {
