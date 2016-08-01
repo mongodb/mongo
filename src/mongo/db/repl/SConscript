@@ -795,6 +795,7 @@ env.Library(
     ],
     LIBDEPS=[
         'database_cloner',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

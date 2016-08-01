@@ -35,25 +35,16 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/databases_cloner.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/db/repl/sync_source_selector.h"
-#include "mongo/db/repl/update_position_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace {
@@ -253,7 +244,7 @@ protected:
             net->scheduleResponse(
                 noi,
                 net->now(),
-                ResponseStatus(RemoteCommandResponse(
+                executor::TaskExecutor::ResponseStatus(RemoteCommandResponse(
                     responses[processedRequests].second, BSONObj(), Milliseconds(10))));
 
             if ((Date_t::now() - lastLog) > Seconds(1)) {
@@ -323,12 +314,23 @@ protected:
     };
 
 private:
+    executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
+
+protected:
     StorageInterfaceMock _storageInterface;
+
+private:
     OldThreadPool _dbWorkThreadPool;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
     StorageInterfaceResults _storageInterfaceWorkDone;
 };
+
+executor::ThreadPoolMock::Options DBsClonerTest::makeThreadPoolMockOptions() const {
+    executor::ThreadPoolMock::Options options;
+    options.onCreateThread = []() { Client::initThread("DBsClonerTest"); };
+    return options;
+}
 
 // TODO: Move tests here from data_replicator_test here and figure out
 //       how to script common data (dbs, collections, indexes) scenarios w/failures.
@@ -528,6 +530,92 @@ TEST_F(DBsClonerTest, FailingToScheduleSecondDatabaseClonerShouldCancelTheCloner
     cloner.join();
     ASSERT_FALSE(cloner.isActive());
     ASSERT_EQUALS(ErrorCodes::OperationFailed, result);
+}
+
+TEST_F(DBsClonerTest, DatabaseClonerChecksAdminDbUsingStorageInterfaceAfterCopyingAdminDb) {
+    Status result = getDetectableErrorStatus();
+
+    bool isAdminDbValidFnCalled = false;
+    OperationContext* isAdminDbValidFnOpCtx = nullptr;
+    _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled,
+                                          &isAdminDbValidFnOpCtx](OperationContext* txn) {
+        isAdminDbValidFnCalled = true;
+        isAdminDbValidFnOpCtx = txn;
+        return Status::OK();
+    };
+
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    // listDatabases
+    scheduleNetworkResponse("listDatabases", fromjson("{ok:1, databases:[{name:'admin'}]}"));
+    net->runReadyNetworkOperations();
+    ASSERT_TRUE(cloner.isActive());
+    // listCollections (db:admin)
+    processNetworkResponse(
+        "listCollections",
+        fromjson(
+            "{ok:1, cursor:{id:NumberLong(0), ns:'admin.$cmd.listCollections', firstBatch: []}}"));
+
+    cloner.join();
+    ASSERT_FALSE(cloner.isActive());
+    ASSERT_OK(result);
+    ASSERT_TRUE(isAdminDbValidFnCalled);
+    ASSERT(isAdminDbValidFnOpCtx);
+}
+
+TEST_F(DBsClonerTest, AdminDbValidationErrorShouldAbortTheCloner) {
+    Status result = getDetectableErrorStatus();
+
+    bool isAdminDbValidFnCalled = false;
+    _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled](OperationContext* txn) {
+        isAdminDbValidFnCalled = true;
+        return Status(ErrorCodes::OperationFailed, "admin db invalid");
+    };
+
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    // listDatabases
+    scheduleNetworkResponse("listDatabases",
+                            fromjson("{ok:1, databases:[{name:'admin'}, {name: 'a'}]}"));
+    net->runReadyNetworkOperations();
+    ASSERT_TRUE(cloner.isActive());
+    // listCollections (db:admin)
+    processNetworkResponse(
+        "listCollections",
+        fromjson(
+            "{ok:1, cursor:{id:NumberLong(0), ns:'admin.$cmd.listCollections', firstBatch: []}}"));
+    // Cloner should not attempt to process database 'a' after 'admin' fails validation.
+
+    cloner.join();
+    ASSERT_FALSE(cloner.isActive());
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, result);
+    ASSERT_TRUE(isAdminDbValidFnCalled);
 }
 
 TEST_F(DBsClonerTest, SingleDatabaseCopiesCompletely) {

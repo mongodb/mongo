@@ -38,6 +38,7 @@
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/client.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -301,9 +302,22 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
     if (StringData(name).equalCaseInsensitive("admin")) {
         LOG(1) << "Finished the 'admin' db, now calling isAdminDbValid.";
         // Do special checks for the admin database because of auth. collections.
-        const auto adminStatus = _storage->isAdminDbValid(nullptr /* TODO: wire in txn*/);
+        auto adminStatus = Status(ErrorCodes::NotYetInitialized, "");
+        {
+            // TODO: Move isAdminDbValid() out of the collection/database cloner code paths.
+            OperationContext* txn = cc().getOperationContext();
+            ServiceContext::UniqueOperationContext txnPtr;
+            if (!txn) {
+                txnPtr = cc().makeOperationContext();
+                txn = txnPtr.get();
+            }
+            adminStatus = _storage->isAdminDbValid(txn);
+        }
         if (!adminStatus.isOK()) {
+            LOG(1) << "Validation failed on 'admin' db due to " << adminStatus;
             _setStatus_inlock(adminStatus);
+            _failed_inlock(lk);
+            return;
         }
     }
 

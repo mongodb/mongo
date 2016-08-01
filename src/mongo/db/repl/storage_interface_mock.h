@@ -114,6 +114,7 @@ public:
                                                            const NamespaceString& nss,
                                                            boost::optional<StringData> indexName,
                                                            ScanDirection scanDirection)>;
+    using IsAdminDbValidFn = stdx::function<Status(OperationContext* txn)>;
 
     StorageInterfaceMock() = default;
 
@@ -183,7 +184,7 @@ public:
     }
 
     Status isAdminDbValid(OperationContext* txn) override {
-        return Status::OK();
+        return isAdminDbValidFn(txn);
     };
 
 
@@ -228,6 +229,9 @@ public:
                                  boost::optional<StringData> indexName,
                                  ScanDirection scanDirection) {
         return Status{ErrorCodes::IllegalOperation, "DeleteOneFn not implemented."};
+    };
+    IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
+        return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
     };
 
 private:

@@ -522,17 +522,9 @@ StatusWith<BSONObj> StorageInterfaceImpl::deleteOne(OperationContext* txn,
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* txn) {
-    log() << "StorageInterfaceImpl::isAdminDbValid called.";
-    // TODO: plumb through operation context from caller, for now run on ioThread with runner.
-    TaskRunner runner(_bulkLoaderThreads.get());
-    auto status = runner.runSynchronousTask(
-        [](OperationContext* txn) -> Status {
-            ScopedTransaction transaction(txn, MODE_IX);
-            AutoGetDb autoDB(txn, "admin", MODE_X);
-            return checkAdminDatabase(txn, autoDB.getDb());
-        },
-        TaskRunner::NextAction::kDisposeOperationContext);
-    return status;
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetDb autoDB(txn, "admin", MODE_X);
+    return checkAdminDatabase(txn, autoDB.getDb());
 }
 
 }  // namespace repl
