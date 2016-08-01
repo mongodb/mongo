@@ -1,8 +1,6 @@
-//
-// These tests validates that a migration with session IDs between two shards is protected
-// against disruptive migration commands from a third shard. It tests several scenarios.
-// For more information on migration session IDs see SERVER-20290.
-//
+// These tests validate that a migration with session IDs between two shards is protected against
+// disruptive migration commands from a third shard. It tests several scenarios. For more
+// information on migration session IDs see SERVER-20290.
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
@@ -14,15 +12,15 @@ load('./jstests/libs/chunk_manipulation_util.js');
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Shard0:
-    //      coll1:     [0, 10) [10, 20) [20, 30)
-    //      coll2:     [0, 10) [10, 20)
+    //      coll1:     [-inf, 10) [10, +inf)
+    //      coll2:     [-inf, 10) [10, +inf)
     // Shard1:
     // Shard2:
 
     var staticMongod1 = MongoRunner.runMongod({});  // For startParallelOps.
     var staticMongod2 = MongoRunner.runMongod({});  // For startParallelOps.
 
-    var st = new ShardingTest({shards: 4, mongos: 1});
+    var st = new ShardingTest({shards: 3});
 
     var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
         coll1 = mongos.getCollection(ns1), ns2 = dbName + ".baz", coll2 = mongos.getCollection(ns2),
@@ -36,48 +34,41 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     assert.commandWorked(admin.runCommand({shardCollection: ns1, key: {a: 1}}));
     assert.commandWorked(admin.runCommand({split: ns1, middle: {a: 10}}));
-    assert.commandWorked(admin.runCommand({split: ns1, middle: {a: 20}}));
-    assert.commandWorked(admin.runCommand({shardCollection: ns2, key: {a: 1}}));
-    assert.commandWorked(admin.runCommand({split: ns2, middle: {a: 10}}));
-
     assert.writeOK(coll1.insert({a: 0}));
     assert.writeOK(coll1.insert({a: 10}));
-    assert.writeOK(coll1.insert({a: 20}));
-    assert.eq(3, shard0Coll1.count());
-    assert.eq(3, coll1.count());
+    assert.eq(2, shard0Coll1.count());
+    assert.eq(2, coll1.count());
+
+    assert.commandWorked(admin.runCommand({shardCollection: ns2, key: {a: 1}}));
+    assert.commandWorked(admin.runCommand({split: ns2, middle: {a: 10}}));
     assert.writeOK(coll2.insert({a: 0}));
     assert.writeOK(coll2.insert({a: 10}));
     assert.eq(2, shard0Coll2.count());
     assert.eq(2, coll2.count());
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
     //      1. When a migration is in process from shard0 to shard1 on coll1, shard2 is unable to
     //         start a migration with either shard in the following cases:
-    //               1. coll1 shard2 to shard0 -- coll1 is already locked.
-    //               2. coll1 shard2 to shard1 -- coll1 is already locked.
-    //               3. coll1 shard1 to shard2 -- coll1 is already locked.
-    //               4. coll2 shard2 to shard1 -- shard1 can't receive two chunks simultaneously.
-    //               5. coll2 shard0 to shard2 -- shard0 can't send two chunks simultaneously.
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    //              1. coll2 shard0 to shard2 -- shard0 can't send two chunks simultaneously.
+    //              2. coll2 shard2 to shard1 -- shard1 can't receive two chunks simultaneously.
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // Shard0:
-    //      coll1:     [0, 10)
-    //      coll2:     [0, 10)
+    //      coll1:     [-inf, 10)
+    //      coll2:     [-inf, 10)
     // Shard1:
-    //      coll1:     [20, 30)
     // Shard2:
-    //      coll1:     [10, 20)
-    //      coll2:     [10, 20)
+    //      coll1:     [10, +inf)
+    //      coll2:     [10, +inf)
 
     assert.commandWorked(admin.runCommand(
         {moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
     assert.commandWorked(admin.runCommand(
         {moveChunk: ns2, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
-    assert.commandWorked(admin.runCommand(
-        {moveChunk: ns1, find: {a: 20}, to: st.shard1.shardName, _waitForDelete: true}));
+
     assert.eq(1, shard0Coll1.count());
     assert.eq(1, shard0Coll2.count());
-    assert.eq(1, shard1Coll1.count());
+    assert.eq(0, shard1Coll1.count());
     assert.eq(0, shard1Coll2.count());
     assert.eq(1, shard2Coll1.count());
     assert.eq(1, shard2Coll2.count());
@@ -88,27 +79,15 @@ load('./jstests/libs/chunk_manipulation_util.js');
         staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
-    jsTest.log('Attempting to interrupt migration....');
-    // Test 1.1
-    assert.commandFailed(
-        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}),
-        "(1.1) coll1 lock should have prevented simultaneous migrations in the collection.");
-    // Test 1.2
-    assert.commandFailed(
-        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard1.shardName}),
-        "(1.2) coll1 lock should have prevented simultaneous migrations in the collection.");
-    // Test 1.3
-    assert.commandFailed(
-        admin.runCommand({moveChunk: ns1, find: {a: 20}, to: st.shard2.shardName}),
-        "(1.3) coll1 lock should have prevented simultaneous migrations in the collection.");
-    // Test 1.4
-    assert.commandFailed(
-        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard1.shardName}),
-        "(1.4) A shard should not be able to be the recipient of two ongoing migrations");
-    // Test 1.5
     assert.commandFailed(
         admin.runCommand({moveChunk: ns2, find: {a: 0}, to: st.shard2.shardName}),
-        "(1.5) A shard should not be able to be the donor for two ongoing migrations.");
+        ErrorCodes.ConflictingOperationInProgress,
+        "(1.1) A shard should not be able to be the donor for two ongoing migrations.");
+
+    assert.commandFailed(
+        admin.runCommand({moveChunk: ns2, find: {a: 10}, to: st.shard1.shardName}),
+        ErrorCodes.ConflictingOperationInProgress,
+        "(1.2) A shard should not be able to be the recipient of two ongoing migrations");
 
     // Finish migration
     unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
@@ -116,18 +95,18 @@ load('./jstests/libs/chunk_manipulation_util.js');
         joinMoveChunk1();
     });
     assert.eq(0, shard0Coll1.count());
-    assert.eq(2, shard1Coll1.count());
+    assert.eq(1, shard1Coll1.count());
+    assert.eq(1, shard2Coll1.count());
 
     // Reset setup
     assert.commandWorked(admin.runCommand(
         {moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName, _waitForDelete: true}));
     assert.commandWorked(admin.runCommand(
-        {moveChunk: ns1, find: {a: 20}, to: st.shard0.shardName, _waitForDelete: true}));
-    assert.commandWorked(admin.runCommand(
         {moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName, _waitForDelete: true}));
     assert.commandWorked(admin.runCommand(
         {moveChunk: ns2, find: {a: 10}, to: st.shard0.shardName, _waitForDelete: true}));
-    assert.eq(3, shard0Coll1.count());
+
+    assert.eq(2, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
     assert.eq(0, shard1Coll2.count());
@@ -140,8 +119,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Shard0:
-    //      coll1:     [0, 10) [10, 20) [20, 30)
-    //      coll2:     [0, 10) [10, 20)
+    //      coll1:     [-inf, 10) [10, +inf)
+    //      coll2:     [-inf, 10) [10, +inf)
     // Shard1:
     // Shard2:
 
@@ -165,13 +144,14 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.doesNotThrow(function() {
         joinMoveChunk1();
     });
-    assert.eq(2, shard0Coll1.count());
+    assert.eq(1, shard0Coll1.count());
     assert.eq(1, shard1Coll1.count());
 
     // Reset setup
     assert.commandWorked(admin.runCommand(
         {moveChunk: ns1, find: {a: 0}, to: st.shard0.shardName, _waitForDelete: true}));
-    assert.eq(3, shard0Coll1.count());
+
+    assert.eq(2, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
     assert.eq(0, shard1Coll2.count());
@@ -185,8 +165,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Shard0:
-    //      coll1:     [0, 10) [10, 20) [20, 30)
-    //      coll2:     [0, 10) [10, 20)
+    //      coll1:     [-inf, 10) [10, +inf)
+    //      coll2:     [-inf, 10) [10, +inf)
     // Shard1:
     // Shard2:
 
@@ -223,7 +203,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     jsTest.log('Releasing coll1 migration recipient, whose clone command should fail....');
     unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
-    assert.eq(3, shard0Coll1.count(), "donor shard0 completed a migration that it aborted");
+    assert.eq(2, shard0Coll1.count(), "donor shard0 completed a migration that it aborted");
     assert.eq(0, shard1Coll1.count(), "shard1 cloned documents despite donor migration abortion");
 
     jsTest.log('Finishing coll2 migration, which should succeed....');
@@ -239,7 +219,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Reset setup
     assert.commandWorked(admin.runCommand(
         {moveChunk: ns2, find: {a: 0}, to: st.shard0.shardName, _waitForDelete: true}));
-    assert.eq(3, shard0Coll1.count());
+    assert.eq(2, shard0Coll1.count());
     assert.eq(2, shard0Coll2.count());
     assert.eq(0, shard1Coll1.count());
     assert.eq(0, shard1Coll2.count());
@@ -253,8 +233,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Shard0:
-    //      coll1:     [0, 10) [10, 20) [20, 30)
-    //      coll2:     [0, 10) [10, 20)
+    //      coll1:     [-inf, 10) [10, +inf)
+    //      coll2:     [-inf, 10) [10, +inf)
     // Shard1:
     // Shard2:
 
@@ -296,7 +276,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     jsTest.log('Releasing coll1 migration recipient, whose transferMods command should fail....');
     unpauseMigrateAtStep(shard1, migrateStepNames.cloned);
-    assert.eq(3, shard0Coll1.count(), "donor shard0 completed a migration that it aborted");
+    assert.eq(2, shard0Coll1.count(), "donor shard0 completed a migration that it aborted");
     assert.eq(1,
               shard1Coll1.count(),
               "shard1 accessed the xfermods log despite " + "donor migration abortion");
@@ -312,5 +292,4 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(3, shard2Coll2.count(), "shard2 failed to complete migration");
 
     st.stop();
-
 })();
