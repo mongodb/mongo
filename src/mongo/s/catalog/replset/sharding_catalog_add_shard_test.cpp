@@ -1160,6 +1160,200 @@ TEST_F(AddShardTest, CompatibilityAddShardRetryOnDuplicateKeyFailure) {
     assertShardExists(addedShard);
 }
 
+TEST_F(AddShardTest, CompatibilityAddShardCancelRequestCallback) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Cancel the addShard task directly rather than via the OpObserver for deletes to config.shards
+    // so that we can check that the shard entry did not get updated after the callback ran
+    // (meaning the addShard task was successfully canceled and handled as such).
+    catalogManager()->cancelAddShardTaskIfNeeded(addedShard.getName());
+
+    // Run ready network operations manually to deliver the CallbackCanceled response to the
+    // callback.
+    networkForAddShard()->enterNetwork();
+    networkForAddShard()->runReadyNetworkOperations();
+    networkForAddShard()->exitNetwork();
+
+    assertShardExists(addedShard);
+}
+
+TEST_F(AddShardTest, CompatibilityAddShardCancelRequestCallbackReAddShard) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Cancel the addShard task directly rather than via the OpObserver for deletes to config.shards
+    // so that we can check that the shard entry did not get updated after the callback ran
+    // (meaning the addShard task was successfully canceled and handled as such).
+    catalogManager()->cancelAddShardTaskIfNeeded(addedShard.getName());
+
+    // Before delivering the CallbackCanceled response, simulate another addShard request for the
+    // same shard directly.
+    ASSERT_OK(catalogManager()->upsertShardIdentityOnShard(operationContext(), addedShard));
+
+    // Run ready network operations manually to deliver the CallbackCanceled response to the
+    // callback.
+    networkForAddShard()->enterNetwork();
+    networkForAddShard()->runReadyNetworkOperations();
+    networkForAddShard()->exitNetwork();
+
+    // Ensure the shard entry's state field was not updated.
+    assertShardExists(addedShard);
+
+    // Make the shard respond with success to the second addShard task.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
+
+    addedShard.setState(ShardType::ShardState::kShardAware);
+    assertShardExists(addedShard);
+}
+
+TEST_F(AddShardTest, CompatibilityAddShardCancelRescheduledCallback) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Make the network respond with failure so that the request is rescheduled.
+    expectShardIdentityUpsertReturnFailure(
+        shardTarget, shardName, {ErrorCodes::HostUnreachable, "host unreachable"});
+
+    // Cancel the addShard task directly rather than via the OpObserver for deletes to config.shards
+    // so that we can check that the shard entry did not get updated after the callback ran
+    // (meaning the addShard task was successfully canceled and handled as such).
+    // Note: Since the task being canceled was not a network request, the callback is run as soon
+    // as the callback is canceled by the task executor, so we do not need to run ready network
+    // requests.
+    catalogManager()->cancelAddShardTaskIfNeeded(addedShard.getName());
+
+    assertShardExists(addedShard);
+}
+
+TEST_F(AddShardTest, CompatibilityAddShardCancelRescheduledCallbackReAddShard) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Make the network respond with failure so that the request is rescheduled.
+    expectShardIdentityUpsertReturnFailure(
+        shardTarget, shardName, {ErrorCodes::HostUnreachable, "host unreachable"});
+
+    // Simulate a removeShard by deleting the shard's entry in config.shards. This will trigger
+    // canceling the addShard task via the OpObserver.
+    // Note: Since the task being canceled was not a network request, the callback is run as soon
+    // as the callback is canceled by the task executor, so we do not need to run ready network
+    // requests.
+    ASSERT_OK(catalogClient()->removeConfigDocuments(operationContext(),
+                                                     ShardType::ConfigNS,
+                                                     BSON("_id" << addedShard.getName()),
+                                                     ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Another addShard request for the same shard should succeed (simulated by re-inserting the
+    // same shard entry into config.shards).
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Make the shard respond with success to the second addShard task.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
+
+    addedShard.setState(ShardType::ShardState::kShardAware);
+    assertShardExists(addedShard);
+}
+
 /*
 TODO(SERVER-24213): Add back tests around adding shard that already exists.
 // Host is already part of an existing shard.

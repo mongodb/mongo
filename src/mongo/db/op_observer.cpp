@@ -103,10 +103,10 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     }
 }
 
-OpObserver::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
-                                                  const NamespaceString& ns,
-                                                  const BSONObj& doc) {
-    OpObserver::DeleteState deleteState;
+CollectionShardingState::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
+                                                               const NamespaceString& ns,
+                                                               const BSONObj& doc) {
+    CollectionShardingState::DeleteState deleteState;
     BSONElement idElement = doc["_id"];
     if (!idElement.eoo()) {
         deleteState.idDoc = idElement.wrap();
@@ -120,7 +120,7 @@ OpObserver::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
 
 void OpObserver::onDelete(OperationContext* txn,
                           const NamespaceString& ns,
-                          OpObserver::DeleteState deleteState,
+                          CollectionShardingState::DeleteState deleteState,
                           bool fromMigrate) {
     if (deleteState.idDoc.isEmpty())
         return;
@@ -130,8 +130,8 @@ void OpObserver::onDelete(OperationContext* txn,
         ->logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr);
 
     auto css = CollectionShardingState::get(txn, ns.ns());
-    if (!fromMigrate && deleteState.isMigrating) {
-        css->onDeleteOp(txn, deleteState.idDoc);
+    if (!fromMigrate) {
+        css->onDeleteOp(txn, deleteState);
     }
 
     logOpForDbHash(txn, ns.ns().c_str());

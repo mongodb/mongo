@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 struct CollectionOptions;
@@ -65,18 +66,6 @@ public:
     OpObserver() {}
     ~OpObserver() {}
 
-    /**
-     * Holds document deletion information used in logging.
-     */
-    struct DeleteState {
-        // Contains the _id field of the document being deleted.
-        BSONObj idDoc;
-
-        // True if doc being deleted is located in a currently migrating
-        // chunk, where this is the chunk source.
-        bool isMigrating = false;
-    };
-
     void onCreateIndex(OperationContext* txn,
                        const std::string& ns,
                        BSONObj indexDoc,
@@ -87,7 +76,9 @@ public:
                    std::vector<BSONObj>::const_iterator end,
                    bool fromMigrate = false);
     void onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args);
-    DeleteState aboutToDelete(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc);
+    CollectionShardingState::DeleteState aboutToDelete(OperationContext* txn,
+                                                       const NamespaceString& ns,
+                                                       const BSONObj& doc);
     /**
      * Handles logging before document is deleted.
      *
@@ -99,7 +90,7 @@ public:
      */
     void onDelete(OperationContext* txn,
                   const NamespaceString& ns,
-                  DeleteState deleteState,
+                  CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate);
     void onOpMessage(OperationContext* txn, const BSONObj& msgObj);
     void onCreateCollection(OperationContext* txn,

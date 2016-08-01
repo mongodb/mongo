@@ -58,12 +58,17 @@
         checkShardingStateInitialized(rst.getPrimary(), st.configRS.getURL(), rst.name, clusterId);
         checkShardMarkedAsShardAware(st.s, rst.name);
 
+        jsTest.log("Restart " + rst.name + " without --shardsvr to clear its sharding awareness");
+        for (var nodeId = 0; nodeId < rst.nodes.length; nodeId++) {
+            var rstOpts = rst.nodes[nodeId].fullOptions;
+            delete rstOpts.shardsvr;
+            rst.restart(nodeId, rstOpts);
+        }
+        rst.awaitNodesAgreeOnPrimary();
+
         jsTest.log("Manually delete the shardIdentity document from " + rst.name);
-        // Deleting the shardIdentity document allows for clearing sharding awareness on restarting
-        // the shard (without the shardIdentity document, the shard will not perform sharding
-        // initialization).
         // Use writeConcern: { w: majority } so that the write cannot be lost when the shard is
-        // restarted.
+        // restarted again with --shardsvr.
         assert.writeOK(rst.getPrimary()
                            .getDB("admin")
                            .getCollection("system.version")
@@ -75,10 +80,12 @@
         assert.writeOK(st.c0.getDB("config").getCollection("shards").update(
             {"_id": rst.name}, {$unset: {"state": ""}}, {writeConcern: {w: "majority"}}));
 
-        jsTest.log("Restart " + rst.name + " to clear its sharding awareness");
-        // Restart with fullOptions to ensure node is restarted with --shardsvr.
+        jsTest.log("Restart " + rst.name +
+                   " with --shardsvr to allow initializing its sharding awareness");
         for (var nodeId = 0; nodeId < rst.nodes.length; nodeId++) {
-            rst.restart(nodeId, rst.nodes[nodeId].fullOptions);
+            var rstOpts = rst.nodes[nodeId].fullOptions;
+            rstOpts.shardsvr = "";
+            rst.restart(nodeId, rstOpts);
         }
         rst.awaitNodesAgreeOnPrimary();
     }

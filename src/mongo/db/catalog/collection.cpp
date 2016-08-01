@@ -544,7 +544,7 @@ void Collection::deleteDocument(
 
     Snapshotted<BSONObj> doc = docFor(txn, loc);
 
-    OpObserver::DeleteState deleteState;
+    CollectionShardingState::DeleteState deleteState;
     auto opObserver = getGlobalServiceContext()->getOpObserver();
     if (opObserver)
         deleteState = opObserver->aboutToDelete(txn, ns(), doc.value());

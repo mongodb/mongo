@@ -270,12 +270,13 @@ void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& u
     }
 }
 
-void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) {
+void CollectionShardingState::onDeleteOp(OperationContext* txn,
+                                         const CollectionShardingState::DeleteState& deleteState) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (txn->writesAreReplicated() && serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
         _nss == NamespaceString::kConfigCollectionNamespace) {
-        if (auto idElem = deletedDocId["_id"]) {
+        if (auto idElem = deleteState.idDoc["_id"]) {
             uassert(40070,
                     "cannot delete shardIdentity document while in --shardsvr mode",
                     idElem.str() != ShardIdentityType::IdName);
@@ -287,7 +288,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& d
     // deletedDocId.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
         _nss == ShardType::ConfigNS) {
-        BSONElement idElement = deletedDocId["_id"];
+        BSONElement idElement = deleteState.idDoc["_id"];
         invariant(!idElement.eoo());
         auto shardIdStr = idElement.valuestrsafe();
         txn->recoveryUnit()->registerChange(
@@ -296,8 +297,8 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& d
 
     checkShardVersionOrThrow(txn);
 
-    if (_sourceMgr) {
-        _sourceMgr->getCloner()->onDeleteOp(txn, deletedDocId);
+    if (_sourceMgr && deleteState.isMigrating) {
+        _sourceMgr->getCloner()->onDeleteOp(txn, deleteState.idDoc);
     }
 }
 

@@ -63,6 +63,18 @@ public:
     ~CollectionShardingState();
 
     /**
+     * Holds information used for tracking document removals during chunk migration.
+     */
+    struct DeleteState {
+        // Contains the _id field of the document being deleted.
+        BSONObj idDoc;
+
+        // True if the document being deleted belongs to a chunk which is currently being migrated
+        // out of this shard.
+        bool isMigrating = false;
+    };
+
+    /**
      * Obtains the sharding state for the specified collection. If it does not exist, it will be
      * created and will remain active until the collection is dropped or unsharded.
      *
@@ -145,7 +157,7 @@ public:
 
     void onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc);
 
-    void onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId);
+    void onDeleteOp(OperationContext* txn, const DeleteState& deleteState);
 
 private:
     /**

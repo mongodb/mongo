@@ -1168,6 +1168,9 @@ void ShardingCatalogManagerImpl::cancelAddShardTaskIfNeeded(const ShardId& shard
     if (_hasAddShardHandle_inlock(shardId)) {
         auto cbHandle = _getAddShardHandle_inlock(shardId);
         _executorForAddShard->cancel(cbHandle);
+        // Untrack the handle here so that if this shard is re-added before the CallbackCanceled
+        // status is delivered to the callback, a new addShard task for the shard will be created.
+        _untrackAddShardHandle_inlock(shardId);
     }
 }
 
@@ -1177,8 +1180,6 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTaskUnlessCanceled(
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const BSONObj commandRequest) {
     if (cbArgs.status == ErrorCodes::CallbackCanceled) {
-        stdx::lock_guard<stdx::mutex> lk(_addShardHandlesMutex);
-        _untrackAddShardHandle_inlock(shardType.getName());
         return;
     }
     _scheduleAddShardTask(
@@ -1196,11 +1197,9 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
         // Untrack the handle from scheduleWorkAt, and schedule a new addShard task.
         _untrackAddShardHandle_inlock(shardType.getName());
     } else {
-        // If this is not a retry, only schedule a new addShard task for this shardId if there are
-        // none currently scheduled.
-        if (_hasAddShardHandle_inlock(shardType.getName())) {
-            return;
-        }
+        // We should never be able to schedule an addShard task while one is running, because
+        // there is a unique index on the _id field in config.shards.
+        invariant(!_hasAddShardHandle_inlock(shardType.getName()));
     }
 
     // Schedule the shardIdentity upsert request to run immediately, and track the handle.
@@ -1248,15 +1247,15 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
     std::shared_ptr<RemoteCommandTargeter> targeter) {
     stdx::unique_lock<stdx::mutex> lk(_addShardHandlesMutex);
 
-    // Untrack the handle from scheduleRemoteCommand regardless of whether the command
-    // succeeded. If it failed, we will track the handle for the rescheduled task before
-    // releasing the mutex.
-    _untrackAddShardHandle_inlock(shardType.getName());
-
     Status responseStatus = cbArgs.response.getStatus();
     if (responseStatus == ErrorCodes::CallbackCanceled) {
         return;
     }
+
+    // Untrack the handle from scheduleRemoteCommand regardless of whether the command
+    // succeeded. If it failed, we will track the handle for the rescheduled task before
+    // releasing the mutex.
+    _untrackAddShardHandle_inlock(shardType.getName());
 
     // Examine the response to determine if the upsert succeeded.
 
