@@ -656,7 +656,7 @@ public:
 //
 
 HeapProfiler* HeapProfiler::heapProfiler;
-bool HeapProfiler::enabledParameter = true;
+bool HeapProfiler::enabledParameter = false;
 long long HeapProfiler::sampleIntervalBytesParameter = 256 * 1024;
 
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> heapProfilingEnabledParameter(
