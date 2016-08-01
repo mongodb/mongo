@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/config_server_version.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -187,8 +188,11 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
     ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
 
-    // Now drop all databases and re-run initializeConfigDatabaseIfNeeded()
-    _dropAllDBs(operationContext());
+    // Now remove the version document and re-run initializeConfigDatabaseIfNeeded().
+    ASSERT_OK(catalogClient()->removeConfigDocuments(operationContext(),
+                                                     VersionType::ConfigNS,
+                                                     BSONObj(),
+                                                     ShardingCatalogClient::kMajorityWriteConcern));
 
     ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
                   catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
