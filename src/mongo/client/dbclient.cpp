@@ -463,7 +463,7 @@ bool DBClientWithCommands::authenticateInternalUser() {
     }
 
     try {
-        auth(getInternalUserAuthParamsWithFallback());
+        auth(getInternalUserAuthParams());
         return true;
     } catch (const UserException& ex) {
         if (!serverGlobalParams.quiet) {

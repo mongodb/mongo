@@ -188,7 +188,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     conn->port().setTag(conn->port().getTag() | _messagingPortTags);
 
     if (isInternalAuthSet()) {
-        conn->auth(getInternalUserAuthParamsWithFallback());
+        conn->auth(getInternalUserAuthParams());
     }
 
     if (_hook) {

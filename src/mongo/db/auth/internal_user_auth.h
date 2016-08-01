@@ -53,5 +53,5 @@ void setInternalUserAuthParams(const BSONObj& authParamsIn);
  * for MONGODB-CR auth is included. For MONGODB-XC509 no fallbackParams document is
  * returned.
  **/
-BSONObj getInternalUserAuthParamsWithFallback();
+BSONObj getInternalUserAuthParams();
 }  // namespace mongo
