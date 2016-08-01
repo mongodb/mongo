@@ -56,6 +56,7 @@ _POPEN_LOCK = threading.Lock()
 if sys.platform == "win32":
     import win32api
     import win32con
+    import win32event
     import win32job
     import win32process
     import winerror
@@ -163,11 +164,40 @@ class Process(object):
                     raise
 
     def stop(self):
-        """
-        Terminates the process.
-        """
-
+        """Terminate the process."""
         if sys.platform == "win32":
+
+            # Attempt to cleanly shutdown mongod.
+            if len(self.args) > 0 and self.args[0].find("mongod") != -1:
+                mongo_signal_handle = None
+                try:
+                    mongo_signal_handle = win32event.OpenEvent(
+                        win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" +
+                        str(self._process.pid))
+
+                    if not mongo_signal_handle:
+                        # The process has already died.
+                        return
+                    win32event.SetEvent(mongo_signal_handle)
+                    # Wait 60 seconds for the program to exit.
+                    status = win32event.WaitForSingleObject(
+                        self._process._handle, 60 * 1000)
+                    if status == win32event.WAIT_OBJECT_0:
+                        return
+                except win32process.error as err:
+                    # ERROR_FILE_NOT_FOUND (winerror=2)
+                    # ERROR_ACCESS_DENIED (winerror=5)
+                    # ERROR_INVALID_HANDLE (winerror=6)
+                    # One of the above errors is received if the process has
+                    # already died.
+                    if err[0] not in (2, 5, 6):
+                        raise
+                finally:
+                    win32api.CloseHandle(mongo_signal_handle)
+
+                print "Failed to cleanly exit the program, calling TerminateProcess() on PID: " +\
+                    str(self._process.pid)
+
             # Adapted from implementation of Popen.terminate() in subprocess.py of Python 2.7
             # because earlier versions do not catch exceptions.
             try:
