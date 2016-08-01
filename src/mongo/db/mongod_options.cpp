@@ -1257,12 +1257,6 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
         if (clusterRoleParam == "configsvr") {
-            bool journal = true;
-            params.get("storage.journal.enabled", &journal);
-            if (!journal) {
-                return Status(ErrorCodes::BadValue,
-                              "journaling cannot be turned off when configsvr is specified");
-            }
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
             replSettings.setMajorityReadConcernEnabled(true);
 
@@ -1270,6 +1264,11 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
             // the config server role
             if (!params.count("storage.journal.enabled")) {
                 storageGlobalParams.dur = true;
+            }
+
+            if (!storageGlobalParams.dur) {
+                return Status(ErrorCodes::BadValue,
+                              "journaling cannot be turned off when configsvr is specified");
             }
 
             if (!params.count("storage.dbPath")) {
