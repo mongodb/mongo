@@ -306,6 +306,23 @@ var ReplSetTest = function(opts) {
             {ts: Timestamp(0, 0), t: NumberLong(0)};
     }
 
+    /**
+     * Returns the last durable OpTime timestamp for the host if running with journaling.
+     * Returns the last applied OpTime timestamp otherwise.
+     */
+    function _getDurableOpTimeTimestamp(conn) {
+        var replSetStatus =
+            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
+
+        var runningWithoutJournaling = TestData.noJournal || "inMemory" == TestData.storageEngine ||
+            "ephemeralForTest" == TestData.storageEngine;
+        var opTimeType = "durableOpTime";
+        if (runningWithoutJournaling) {
+            opTimeType = "appliedOpTime";
+        }
+        return replSetStatus.optimes[opTimeType].ts;
+    }
+
     function _isEarlierTimestamp(ts1, ts2) {
         if (ts1.getTime() == ts2.getTime()) {
             return ts1.getInc() < ts2.getInc();
@@ -694,8 +711,10 @@ var ReplSetTest = function(opts) {
         return masterOpTime;
     };
 
-    this.awaitReplication = function(timeout) {
+    // Wait until the optime of the specified type reaches the primary's last applied optime.
+    this.awaitReplication = function(timeout, secondaryOpTimeType) {
         timeout = timeout || 30000;
+        secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
         var masterLatestOpTime;
 
@@ -783,7 +802,12 @@ var ReplSetTest = function(opts) {
 
                     slave.getDB("admin").getMongo().setSlaveOk();
 
-                    var ts = _getLastOpTimeTimestamp(slave);
+                    var getSecondaryTimestampFn = _getLastOpTimeTimestamp;
+                    if (secondaryOpTimeType == ReplSetTest.OpTimeType.LAST_DURABLE) {
+                        getSecondaryTimestampFn = _getDurableOpTimeTimestamp;
+                    }
+
+                    var ts = getSecondaryTimestampFn(slave);
                     if (masterLatestOpTime.t < ts.t ||
                         (masterLatestOpTime.t == ts.t && masterLatestOpTime.i < ts.i)) {
                         masterLatestOpTime = _getLastOpTimeTimestamp(master);
@@ -1264,6 +1288,11 @@ ReplSetTest.State = {
     DOWN: 8,
     ROLLBACK: 9,
     REMOVED: 10,
+};
+
+ReplSetTest.OpTimeType = {
+    LAST_APPLIED: 1,
+    LAST_DURABLE: 2,
 };
 
 /**
