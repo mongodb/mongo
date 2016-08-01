@@ -287,11 +287,7 @@ void asyncAuth(RunCommandHook runCommand,
                StringData hostname,
                StringData clientName,
                AuthCompletionHandler handler) {
-    auth(runCommand,
-         params,
-         hostname,
-         clientName,
-         std::move(handler));
+    auth(runCommand, params, hostname, clientName, std::move(handler));
 }
 
 }  // namespace
