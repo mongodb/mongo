@@ -152,8 +152,8 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          $DSI_PATH/bin/mongodb_setup.py --config && echo "${cluster} MongoDB Cluster STARTED."
-
+          $DSI_PATH/bin/mongodb_setup.py --mongodb-binary-archive https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --config && echo "${cluster} MongoDB Cluster STARTED."
+ 
   "run test":
     - command: shell.exec
       params:
@@ -451,8 +451,6 @@ tasks:
 
 - name: industry_benchmarks_MMAPv1_oplog_comp
   depends_on:
-    - name: core_workloads_WT_oplog_comp
-      status: "*"
     - name: industry_benchmarks_MMAPv1
       variant: linux-standalone
       status: "*"
@@ -469,8 +467,6 @@ tasks:
 
 - name: core_workloads_WT_oplog_comp
   depends_on:
-    - name: industry_benchmarks_WT_oplog_comp
-      status: "*"
     - name: core_workloads_WT
       variant: linux-standalone
       status: "*"
@@ -487,8 +483,6 @@ tasks:
 
 - name: core_workloads_MMAPv1_oplog_comp
   depends_on:
-    - name: industry_benchmarks_MMAPv1_oplog_comp
-      status: "*"
     - name: core_workloads_MMAPv1
       variant: linux-standalone
       status: "*"
