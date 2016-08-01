@@ -60,7 +60,10 @@
     // Following a clean shutdown of a 3.2 node, the oplog must exactly match the applied
     // operations. Additionally, the begin field must not be in the minValid document and the ts
     // must match the top of the oplog (SERVER-25353).
-    var oplogDoc = conn.getCollection('local.oplog.rs').find().sort({$natural: -1}).limit(1)[0];
+    var oplogDoc = conn.getCollection('local.oplog.rs')
+                       .find({ns: 'test.coll'})
+                       .sort({$natural: -1})
+                       .limit(1)[0];
     var collDoc = conn.getCollection('test.coll').find().sort({_id: -1}).limit(1)[0];
     var minValidDoc =
         conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
