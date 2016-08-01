@@ -38,6 +38,7 @@
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -920,7 +921,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
     };
     startSync(0);
     setResponses(responses);
-    playResponses(repl::kInitialSyncMaxRetries);
+    playResponses(true);
     verifySync(getNet(), ErrorCodes::InitialSyncFailure);
 }
 
@@ -979,12 +980,153 @@ TEST_F(InitialSyncTest, FailOnRollback) {
     startSync(0);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
-    playResponses(repl::kInitialSyncMaxRetries);
+    playResponses(true);
     verifySync(getNet(), ErrorCodes::InitialSyncFailure);
+}
+
+TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
+    const Responses responses =
+        {
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // oplog fetcher find
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // Clone Start
+            // listDatabases
+            {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
+            // listCollections for "a"
+            {"listCollections",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
+                      "{name:'a', options:{}} "
+                      "]}}")},
+            // listIndexes:a
+            {"listIndexes",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
+                         "{v:"
+                      << OplogEntry::kOplogVersion
+                      << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+            // find:a
+            {"find",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                      "{_id:1, a:1} "
+                      "]}}")},
+            // Clone Done
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(7,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:5, a:2}}]}}")},
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // Applier starts ...
+        };
+
+    startSync(0);
+
+    numGetMoreOplogEntriesMax = 6;
+    setResponses({responses.begin(), responses.end() - 1});
+    playResponses(false);
+    log() << "done playing first responses";
+
+    // This variable is used for the reponse timestamps. Setting it to 0 will make the oplog
+    // entries come out of order.
+    numGetMoreOplogEntries = 0;
+    setResponses({responses.end() - 1, responses.end()});
+    playResponses(true);
+    log() << "done playing second responses";
+    verifySync(getNet(), ErrorCodes::InitialSyncFailure);
+}
+
+TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
+    const Responses responses =
+        {
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // oplog fetcher find
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // Clone Start
+            // listDatabases
+            {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
+            // listCollections for "a"
+            {"listCollections",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
+                      "{name:'a', options:{}} "
+                      "]}}")},
+            // listIndexes:a
+            {"listIndexes",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
+                         "{v:"
+                      << OplogEntry::kOplogVersion
+                      << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+            // find:a
+            {"find",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                      "{_id:1, a:1} "
+                      "]}}")},
+            // Clone Done
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(7,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:5, a:2}}]}}")},
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:2}")},
+            // Applier starts ...
+        };
+
+    DataReplicator* dr = &(getDR());
+    InitialSyncBackgroundRunner isbr(dr, 1);
+    isbr.run();
+
+    numGetMoreOplogEntriesMax = 6;
+    setResponses(responses);
+    playResponses(false);
+    log() << "done playing first responses";
+
+    // Play first response again to ensure data replicator has entered initial sync state.
+    setResponses({responses.begin(), responses.begin() + 1});
+    playResponses(false);
+    log() << "done playing first response of second round of responses";
+
+    ASSERT_TRUE(dr->getState() == DataReplicatorState::InitialSync);
+    ASSERT_EQUALS(dr->getLastFetched(), OpTimeWithHash());
+    ASSERT_EQUALS(dr->getLastApplied(), OpTimeWithHash());
+
+    setResponses({responses.begin() + 1, responses.end()});
+    playResponses(true);
+    log() << "done playing second round of responses";
+    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InitialSyncFailure);
 }
 
 
 class TestSyncSourceSelector2 : public SyncSourceSelector {
+
 public:
     void clearSyncSourceBlacklist() override {}
     HostAndPort chooseNewSyncSource(const Timestamp& ts) override {

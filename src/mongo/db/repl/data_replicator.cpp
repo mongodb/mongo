@@ -633,9 +633,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         }
     }
 
-    _setState_inlock(DataReplicatorState::InitialSync);
-
-
     LOG(1) << "Creating oplogBuffer.";
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
     _oplogBuffer->startup(txn);
@@ -656,6 +653,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     std::size_t failedAttempts = 0;
     while (failedAttempts < maxFailedAttempts) {
         Status attemptErrorStatus(Status::OK());
+        _setState_inlock(DataReplicatorState::InitialSync);
+        _resetState_inlock(txn, OpTimeWithHash());
         _initialSyncState.reset();
         _reporterPaused = true;
         _applierPaused = true;
@@ -1357,47 +1356,46 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
         _lastFetched = lastFetched;
     } else {
         invariant(!status.isOK());
-        // Got an error, now decide what to do...
-        switch (status.code()) {
-            case ErrorCodes::OplogStartMissing:
-            case ErrorCodes::RemoteOplogStale: {
-                LockGuard lk(_mutex);
-                if (_state == DataReplicatorState::InitialSync) {
-                    // Do not do rollback, just log.
-                    error() << "Error fetching oplog during initial sync: " << status;
-                    if (_initialSyncState) {
-                        _initialSyncState->status = status;
+        if (_state == DataReplicatorState::InitialSync) {
+            // Do not change sync source, just log.
+            error() << "Error fetching oplog during initial sync: " << status;
+            LockGuard lk(_mutex);
+            invariant(_initialSyncState);
+            _initialSyncState->status = status;
+            _exec->signalEvent(_initialSyncState->finishEvent);
+            return;
+        } else {
+            // Got an error, now decide what to do...
+            switch (status.code()) {
+                case ErrorCodes::OplogStartMissing:
+                case ErrorCodes::RemoteOplogStale: {
+                    LockGuard lk(_mutex);
+                    _setState_inlock(DataReplicatorState::Rollback);
+                    // possible rollback
+                    auto scheduleResult = _exec->scheduleWork(stdx::bind(
+                        &DataReplicator::_rollbackOperations, this, stdx::placeholders::_1));
+                    if (!scheduleResult.isOK()) {
+                        error() << "Failed to schedule rollback work: "
+                                << scheduleResult.getStatus();
+                        _setState_inlock(DataReplicatorState::Uninitialized);
+                        return;
                     }
+                    _applierPaused = true;
+                    _fetcherPaused = true;
+                    _reporterPaused = true;
                     break;
                 }
-                _setState_inlock(DataReplicatorState::Rollback);
-                // possible rollback
-                auto scheduleResult = _exec->scheduleWork(
-                    stdx::bind(&DataReplicator::_rollbackOperations, this, stdx::placeholders::_1));
-                if (!scheduleResult.isOK()) {
-                    error() << "Failed to schedule rollback work: " << scheduleResult.getStatus();
-                    _setState_inlock(DataReplicatorState::Uninitialized);
-                    return;
+                default: {
+                    Date_t until{_exec->now() +
+                                 _opts.blacklistSyncSourcePenaltyForNetworkConnectionError};
+                    HostAndPort syncSource;
+                    {
+                        LockGuard lk(_mutex);
+                        syncSource = _syncSource;
+                        _syncSource = HostAndPort();
+                    }
+                    _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
                 }
-                _applierPaused = true;
-                _fetcherPaused = true;
-                _reporterPaused = true;
-                break;
-            }
-            case ErrorCodes::OplogOutOfOrder: {
-                // TODO: Remove this once we fix the oplog fetcher code causing the problem.
-                break;
-            }
-            default: {
-                Date_t until{_exec->now() +
-                             _opts.blacklistSyncSourcePenaltyForNetworkConnectionError};
-                HostAndPort syncSource;
-                {
-                    LockGuard lk(_mutex);
-                    syncSource = _syncSource;
-                    _syncSource = HostAndPort();
-                }
-                _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
             }
         }
     }
