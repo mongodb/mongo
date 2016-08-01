@@ -136,8 +136,17 @@ def find_changed_tests(branch_name, base_commit, max_revisions):
               "the --maxRevisions option."
         return changed_tests
 
-    changed_files = callo(["git", "diff", "--name-only", base_commit])
-    for line in changed_files.splitlines():
+    changed_files = callo(["git", "diff", "--name-only", base_commit]).splitlines()
+    # New files ("untracked" in git terminology) won't show up in the git diff results.
+    untracked_files = callo(["git",
+                             "ls-files",
+                             "--modified",
+                             "--others",
+                             "--",
+                             "jstests/**/*.js"]).splitlines()
+    changed_files += untracked_files
+
+    for line in changed_files:
         line = line.rstrip()
         # Check that the file exists because it may have been moved or deleted in the patch.
         if os.path.splitext(line)[1] != ".js" or not os.path.isfile(line):
