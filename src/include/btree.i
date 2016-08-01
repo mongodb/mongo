@@ -1136,15 +1136,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If the oldest transaction hasn't changed since the last time this
-	 * page was written, it's unlikely that we can make progress.
-	 * Similarly, if the most recent update on the page is not yet globally
-	 * visible, eviction must fail.  These checks also aim to avoid
-	 * repeated attempts to evict the same page.
+	 * If the page is clean, check if it has an update that is too new to
+	 * evict.
 	 */
-	if (modified &&
-	    (mod->disk_snap_min == __wt_txn_oldest_id(session) ||
-	    !__wt_txn_visible_all(session, mod->update_txn)))
+	if (!modified && mod != NULL &&
+	    !__wt_txn_visible_all(session, mod->rec_max_txn))
 		return (false);
 
 	return (true);
