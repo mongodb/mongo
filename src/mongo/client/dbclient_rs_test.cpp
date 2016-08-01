@@ -77,9 +77,6 @@ protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
 
-        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
-        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
-
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
     }
@@ -204,9 +201,6 @@ protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
 
-        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
-        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
-
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
@@ -317,9 +311,6 @@ protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
 
-        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
-        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
-
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
         _replSet->kill(_replSet->getPrimary());
@@ -425,9 +416,6 @@ class SecondaryDown : public unittest::Test {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
-
-        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
-        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
 
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
@@ -544,9 +532,6 @@ protected:
         // This shuts down the background RSMWatcher thread and prevents it from running. These
         // tests depend on controlling when the RSMs are updated.
         ReplicaSetMonitor::cleanup();
-
-        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
-        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
 
         _replSet.reset(new MockReplicaSet("test", 5));
         _originalConnectionHook = ConnectionString::getConnectionHook();

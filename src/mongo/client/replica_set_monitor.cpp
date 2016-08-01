@@ -160,9 +160,6 @@ struct HostNotIn {
 const Seconds kRefreshPeriod(30);
 }  // namespace
 
-// At 1 check every 10 seconds, 30 checks takes 5 minutes
-std::atomic<int> ReplicaSetMonitor::maxConsecutiveFailedChecks(30);  // NOLINT
-
 // If we cannot find a host after 15 seconds of refreshing, give up
 const Seconds ReplicaSetMonitor::kDefaultFindHostTimeout(15);
 
@@ -223,16 +220,6 @@ void ReplicaSetMonitor::_refresh(const CallbackArgs& cbArgs) {
     Timer t;
     startOrContinueRefresh().refreshAll();
     LOG(1) << "Refreshing replica set " << getName() << " took " << t.millis() << " msec";
-
-    if (!isSetUsable()) {
-        log() << "Stopping periodic monitoring of set " << getName()
-              << " because none of the hosts could be contacted for an extended period of "
-                 "time.";
-
-        ReplicaSetMonitor::remove(getName());
-        return;
-    }
-
     {
         // reschedule itself
         invariant(_executor);
@@ -283,12 +270,6 @@ StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreference
         HostAndPort out = refresher.refreshUntilMatches(criteria);
         if (!out.empty())
             return out;
-
-        if (!isSetUsable()) {
-            return Status(ErrorCodes::ReplicaSetNotFound,
-                          str::stream() << "None of the hosts for replica set " << getName()
-                                        << " could be contacted.");
-        }
 
         const Milliseconds remaining = maxWait - (Date_t::now() - startTimeMs);
 
@@ -363,11 +344,6 @@ int ReplicaSetMonitor::getMaxWireVersion() const {
     return maxVersion;
 }
 
-bool ReplicaSetMonitor::isSetUsable() const {
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
-    return _state->isUsable();
-}
-
 std::string ReplicaSetMonitor::getName() const {
     // name is const so don't need to lock
     return _state->name;
@@ -383,8 +359,9 @@ bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
     return _state->seedNodes.count(host);
 }
 
-void ReplicaSetMonitor::createIfNeeded(const string& name, const set<HostAndPort>& servers) {
-    globalRSMonitorManager.getOrCreateMonitor(
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const string& name,
+                                                                const set<HostAndPort>& servers) {
+    return globalRSMonitorManager.getOrCreateMonitor(
         ConnectionString::forReplicaSet(name, vector<HostAndPort>(servers.begin(), servers.end())));
 }
 
@@ -474,11 +451,6 @@ Refresher::Refresher(const SetStatePtr& setState)
 }
 
 Refresher::NextStep Refresher::getNextStep() {
-    // If the set is faulty, don't try anymore
-    if (!_set->isUsable()) {
-        return NextStep(NextStep::DONE);
-    }
-
     // No longer the current scan
     if (_scan != _set->currentScan) {
         return NextStep(NextStep::DONE);
@@ -529,12 +501,12 @@ Refresher::NextStep Refresher::getNextStep() {
         if (_scan->foundAnyUpNodes) {
             _set->consecutiveFailedScans = 0;
         } else {
-            _set->consecutiveFailedScans++;
-            log() << "All nodes for set " << _set->name << " are down. "
-                  << "This has happened for " << _set->consecutiveFailedScans
-                  << " checks in a row. Polling will stop after "
-                  << maxConsecutiveFailedChecks - _set->consecutiveFailedScans
-                  << " more failed checks";
+            auto nScans = _set->consecutiveFailedScans++;
+            if (nScans <= 10 || nScans % 10 == 0) {
+                log() << "All nodes for set " << _set->name << " are down. "
+                      << "This has happened for " << _set->consecutiveFailedScans
+                      << " checks in a row.";
+            }
         }
 
         // Makes sure all other Refreshers in this round return DONE
@@ -971,10 +943,6 @@ SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes)
     }
 
     DEV checkInvariants();
-}
-
-bool SetState::isUsable() const {
-    return consecutiveFailedScans < maxConsecutiveFailedChecks;
 }
 
 HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) const {

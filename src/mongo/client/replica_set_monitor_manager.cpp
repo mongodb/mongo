@@ -65,7 +65,11 @@ ReplicaSetMonitorManager::~ReplicaSetMonitorManager() = default;
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    return mapFindWithDefault(_monitors, setName, shared_ptr<ReplicaSetMonitor>());
+    if (auto monitor = _monitors[setName].lock()) {
+        return monitor;
+    } else {
+        return shared_ptr<ReplicaSetMonitor>();
+    }
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
@@ -85,18 +89,20 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
         _taskExecutor->startup();
     }
 
-    shared_ptr<ReplicaSetMonitor>& monitor = _monitors[connStr.getSetName()];
-    if (!monitor) {
-        const std::set<HostAndPort> servers(connStr.getServers().begin(),
-                                            connStr.getServers().end());
-
-        log() << "Starting new replica set monitor for " << connStr.toString();
-
-        monitor = std::make_shared<ReplicaSetMonitor>(connStr.getSetName(), servers);
-        monitor->init();
+    auto setName = connStr.getSetName();
+    auto monitor = _monitors[setName].lock();
+    if (monitor) {
+        return monitor;
     }
 
-    return monitor;
+    const std::set<HostAndPort> servers(connStr.getServers().begin(), connStr.getServers().end());
+
+    log() << "Starting new replica set monitor for " << connStr.toString();
+
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(setName, servers);
+    _monitors[setName] = newMonitor;
+    newMonitor->init();
+    return newMonitor;
 }
 
 vector<string> ReplicaSetMonitorManager::getAllSetNames() {
@@ -113,7 +119,6 @@ vector<string> ReplicaSetMonitorManager::getAllSetNames() {
 
 void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
         _monitors.erase(it);
@@ -122,7 +127,6 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
 
 void ReplicaSetMonitorManager::removeAllMonitors() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // Reset the _monitors map, which will release all registered monitors
     _monitors = ReplicaSetMonitorsMap();
 
     if (_taskExecutor) {

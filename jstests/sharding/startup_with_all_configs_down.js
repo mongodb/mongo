@@ -66,11 +66,8 @@
         st.restartConfigServer(i);
     }
 
-    // TODO: SERVER-23192 - restart all shards and mongos because their replica set monitor has
-    // deemed the CSRS config server set as unusable.
-    restartShard(st.shard0, true);
-    restartShard(st.shard1, true);
-    st.restartMongos(0);
+    print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetMonitors");
+    sleep(60000);
 
     jsTestLog("Queries against the original mongos should work again");
     assert.eq(100, st.s.getDB('test').foo.find().itcount());

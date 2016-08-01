@@ -292,9 +292,10 @@ private:
     static bool _authPooledSecondaryConn;
 
     // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
-    ReplicaSetMonitorPtr _getMonitor() const;
+    ReplicaSetMonitorPtr _getMonitor();
 
     std::string _setName;
+    std::shared_ptr<ReplicaSetMonitor> _rsm;
 
     HostAndPort _masterHost;
     std::unique_ptr<DBClientConnection> _master;

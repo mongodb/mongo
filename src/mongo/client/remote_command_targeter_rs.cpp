@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_rs.h"
@@ -35,6 +37,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -43,15 +46,13 @@ namespace mongo {
 RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
                                                  const std::vector<HostAndPort>& seedHosts)
     : _rsName(rsName) {
-    _rsMonitor = ReplicaSetMonitor::get(rsName);
-    if (!_rsMonitor) {
-        std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
 
-        ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
-        _rsMonitor = ReplicaSetMonitor::get(rsName);
+    std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
+    _rsMonitor = ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
 
-        fassert(28711, _rsMonitor != nullptr);
-    }
+    LOG(1) << "Started targeter for "
+           << ConnectionString::forReplicaSet(
+                  rsName, std::vector<HostAndPort>(seedServers.begin(), seedServers.end()));
 }
 
 ConnectionString RemoteCommandTargeterRS::connectionString() {

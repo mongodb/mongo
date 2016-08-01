@@ -173,18 +173,15 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
         Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
             txn, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
         if (!readConcernStatus.isOK()) {
-            if (readConcernStatus == ErrorCodes::ShutdownInProgress ||
-                ErrorCodes::isInterruption(readConcernStatus.code())) {
-                return readConcernStatus;
-            }
-
-            fassertStatusOK(40188, readConcernStatus);
+            return readConcernStatus;
         }
 
         // Inform the storage engine to read from the committed snapshot for the rest of this
         // operation.
         status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-        fassertStatusOK(40189, status);
+        if (!status.isOK()) {
+            return status;
+        }
     } else {
         invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
     }

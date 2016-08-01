@@ -87,7 +87,7 @@ public:
     executor::TaskExecutor* getExecutor();
 
 private:
-    using ReplicaSetMonitorsMap = StringMap<std::shared_ptr<ReplicaSetMonitor>>;
+    using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors
     stdx::mutex _mutex;

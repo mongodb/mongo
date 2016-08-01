@@ -73,6 +73,8 @@ using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
+static constexpr auto kRetryInterval = Seconds{2};
+
 std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
     return stdx::make_unique<ThreadPoolTaskExecutor>(
@@ -173,6 +175,9 @@ Status initializeGlobalShardingState(OperationContext* txn,
         std::move(executorPool),
         networkPtr);
 
+    // must be started once the grid is initialized
+    grid.shardRegistry()->startup();
+
     auto status = rawCatalogClient->startup();
     if (!status.isOK()) {
         return status;
@@ -203,21 +208,17 @@ Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
         try {
             uassertStatusOK(ClusterIdentityLoader::get(txn)->loadClusterId(
                 txn, repl::ReadConcernLevel::kMajorityReadConcern));
-            grid.shardRegistry()->reload(txn);
-            return Status::OK();
+            if (grid.shardRegistry()->isUp()) {
+                return Status::OK();
+            }
+            sleepFor(kRetryInterval);
+            continue;
         } catch (const DBException& ex) {
             Status status = ex.toStatus();
-            if (status == ErrorCodes::ReplicaSetNotFound) {
-                // ReplicaSetNotFound most likely means we've been waiting for the config replica
-                // set to come up for so long that the ReplicaSetMonitor stopped monitoring the set.
-                // Rebuild the config shard to force the monitor to resume monitoring the config
-                // servers.
-                grid.shardRegistry()->rebuildConfigShard();
-            }
             warning()
                 << "Error initializing sharding state, sleeping for 2 seconds and trying again"
                 << causedBy(status);
-            sleepmillis(2000);
+            sleepFor(kRetryInterval);
             continue;
         }
     }

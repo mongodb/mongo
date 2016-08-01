@@ -596,11 +596,6 @@ public:
 ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> QuietSetting(
     ServerParameterSet::getGlobal(), "quiet", &serverGlobalParams.quiet);
 
-ExportedServerParameter<int, ServerParameterType::kRuntimeOnly> MaxConsecutiveFailedChecksSetting(
-    ServerParameterSet::getGlobal(),
-    "replMonitorMaxFailedChecks",
-    &ReplicaSetMonitor::maxConsecutiveFailedChecks);
-
 ExportedServerParameter<bool, ServerParameterType::kRuntimeOnly> TraceExceptionsSetting(
     ServerParameterSet::getGlobal(), "traceExceptions", &DBException::traceExceptions);
 

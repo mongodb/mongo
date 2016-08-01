@@ -137,7 +137,8 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const vector<HostAndPort>& servers,
                                        double so_timeout)
     : _setName(name), _so_timeout(so_timeout) {
-    ReplicaSetMonitor::createIfNeeded(name, set<HostAndPort>(servers.begin(), servers.end()));
+    _rsm =
+        ReplicaSetMonitor::createIfNeeded(name, set<HostAndPort>(servers.begin(), servers.end()));
 }
 
 DBClientReplicaSet::~DBClientReplicaSet() {
@@ -146,28 +147,25 @@ DBClientReplicaSet::~DBClientReplicaSet() {
     }
 }
 
-ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() const {
-    ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(_setName);
-
+ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() {
     // If you can't get a ReplicaSetMonitor then this connection isn't valid
     uassert(16340,
             str::stream() << "No replica set monitor active and no cached seed "
                              "found for set: "
                           << _setName,
-            rsm);
-    return rsm;
+            _rsm);
+    return _rsm;
 }
 
 // This can't throw an exception because it is called in the destructor of ScopedDbConnection
 string DBClientReplicaSet::getServerAddress() const {
-    ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(_setName);
-    if (!rsm) {
+    if (!_rsm) {
         warning() << "Trying to get server address for DBClientReplicaSet, but no "
                      "ReplicaSetMonitor exists for "
                   << _setName;
         return str::stream() << _setName << "/";
     }
-    return rsm->getServerAddress();
+    return _rsm->getServerAddress();
 }
 
 HostAndPort DBClientReplicaSet::getSuspectedPrimaryHostAndPort() const {
@@ -622,10 +620,7 @@ void DBClientReplicaSet::isntMaster() {
     log() << "got not master for: " << _masterHost << endl;
     // Can't use _getMonitor because that will create a new monitor from the cached seed if
     // the monitor doesn't exist.
-    ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(_setName);
-    if (monitor) {
-        monitor->failedHost(_masterHost);
-    }
+    _rsm->failedHost(_masterHost);
 
     resetMaster();
 }

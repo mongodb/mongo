@@ -38,6 +38,14 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -59,10 +67,30 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
+using executor::NetworkInterface;
+using executor::NetworkInterfaceThreadPool;
+using executor::TaskExecutorPool;
+using executor::ThreadPoolTaskExecutor;
+using executor::TaskExecutor;
+using CallbackArgs = TaskExecutor::CallbackArgs;
+using CallbackHandle = TaskExecutor::CallbackHandle;
+
+
+namespace {
+const Seconds kRefreshPeriod(30);
+}  // namespace
+
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              const ConnectionString& configServerCS)
-    : _shardFactory(std::move(shardFactory)), _data() {
-    _initConfigServerCS = configServerCS;
+    : _shardFactory(std::move(shardFactory)), _initConfigServerCS(configServerCS) {}
+
+ShardRegistry::~ShardRegistry() {
+    if (_executor) {
+        LOG(1) << "Shutting down task executor for reloading shard registry";
+        _executor->shutdown();
+        _executor->join();
+        _executor.reset();
+    }
 }
 
 ConnectionString ShardRegistry::getConfigServerConnectionString() const {
@@ -136,13 +164,79 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
     _data.rebuildShardIfExists(newConnString, _shardFactory.get());
 }
 
-void ShardRegistry::startup() {
+void ShardRegistry::init() {
     stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
     invariant(_initConfigServerCS.isValid());
     auto configShard = _shardFactory->createShard(ShardId("config"), _initConfigServerCS);
     _data.addConfigShard(configShard);
     // set to invalid so it cant be started more than once.
     _initConfigServerCS = ConnectionString();
+}
+
+void ShardRegistry::startup() {
+    // startup() must be called only once
+    invariant(!_executor);
+
+    // construct task executor
+    auto net = executor::makeNetworkInterface("ShardRegistryUpdater");
+    auto netPtr = net.get();
+    _executor = stdx::make_unique<ThreadPoolTaskExecutor>(
+        stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+    LOG(1) << "Starting up task executor for periodic reloading of ShardRegistry";
+    _executor->startup();
+
+    auto status =
+        _executor->scheduleWork([this](const CallbackArgs& cbArgs) { _internalReload(cbArgs); });
+
+    if (status.getStatus() == ErrorCodes::ShutdownInProgress) {
+        LOG(1) << "Cant schedule Shard Registry reload. "
+               << "Executor shutdown in progress";
+        return;
+    }
+
+    if (!status.isOK()) {
+        severe() << "Can't schedule ShardRegistry reload due to " << causedBy(status.getStatus());
+        fassertFailed(40252);
+    }
+}
+
+void ShardRegistry::_internalReload(const CallbackArgs& cbArgs) {
+    LOG(1) << "Reloading shardRegistry";
+    if (!cbArgs.status.isOK()) {
+        warning() << "cant reload ShardRegistry " << causedBy(cbArgs.status);
+        return;
+    }
+
+    Client::initThreadIfNotAlready("shard registry reload");
+    auto txn = cc().makeOperationContext();
+
+    try {
+        reload(txn.get());
+    } catch (const DBException& e) {
+        log() << "Periodic reload of shard registry failed " << causedBy(e) << "; will retry after "
+              << kRefreshPeriod;
+    }
+
+    // reschedule itself
+    auto status =
+        _executor->scheduleWorkAt(_executor->now() + kRefreshPeriod,
+                                  [this](const CallbackArgs& cbArgs) { _internalReload(cbArgs); });
+
+    if (status.getStatus() == ErrorCodes::ShutdownInProgress) {
+        LOG(1) << "Cant schedule ShardRegistry reload. "
+               << "Executor shutdown in progress";
+        return;
+    }
+
+    if (!status.isOK()) {
+        severe() << "Can't schedule ShardRegistry reload due to " << causedBy(status.getStatus());
+        fassertFailed(40253);
+    }
+}
+
+bool ShardRegistry::isUp() const {
+    stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
+    return _isUp;
 }
 
 bool ShardRegistry::reload(OperationContext* txn) {
@@ -178,11 +272,27 @@ bool ShardRegistry::reload(OperationContext* txn) {
     });
 
 
-    ShardRegistryData newData(txn, _shardFactory.get());
-    newData.addConfigShard(_data.getConfigShard());
-    _data.swap(newData);
+    ShardRegistryData currData(txn, _shardFactory.get());
+    currData.addConfigShard(_data.getConfigShard());
+    _data.swap(currData);
+
+    // Remove RSMs that are not in the catalog any more.
+    std::set<ShardId> removedShardIds;
+    currData.getAllShardIds(removedShardIds);
+    _data.shardIdSetDifference(removedShardIds);
+
+    for (auto& shardId : removedShardIds) {
+        auto shard = currData.findByShardId(shardId);
+        invariant(shard);
+
+        auto name = shard->getConnString().getSetName();
+        log() << "ShardRegistry::reload: Removing RSM for " << name;
+        ReplicaSetMonitor::remove(name);
+    }
 
     nextReloadState = ReloadState::Idle;
+    // first successful reload means that registry is up
+    _isUp = true;
     return true;
 }
 
@@ -306,9 +416,15 @@ void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
     }
 }
 
-void ShardRegistryData::addShard(const std::shared_ptr<Shard>& shard) {
+void ShardRegistryData::shardIdSetDifference(std::set<ShardId>& diff) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _addShard_inlock(shard);
+    for (auto i = _lookup.begin(); i != _lookup.end(); ++i) {
+        invariant(i->second);
+        auto res = diff.find(i->second->getId());
+        if (res != diff.end()) {
+            diff.erase(res);
+        }
+    }
 }
 
 void ShardRegistryData::rebuildConfigShard(ShardFactory* factory) {

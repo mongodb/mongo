@@ -84,7 +84,7 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     _executorPool = std::move(executorPool);
     _network = network;
 
-    _shardRegistry->startup();
+    _shardRegistry->init();
 }
 
 bool Grid::allowLocalHost() const {

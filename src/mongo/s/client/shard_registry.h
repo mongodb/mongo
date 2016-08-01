@@ -36,6 +36,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -56,13 +57,7 @@ public:
     ShardRegistryData() = default;
     ~ShardRegistryData() = default;
 
-
     void swap(ShardRegistryData& other);
-
-    /**
-     * Creates a shard based on the specified information and puts it into the lookup maps.
-     */
-    void addShard(const std::shared_ptr<Shard>&);
 
     /**
      * Lookup shard by replica set name. Returns nullptr if the name can't be found.
@@ -90,6 +85,11 @@ public:
     void addConfigShard(std::shared_ptr<Shard>);
 
     void getAllShardIds(std::set<ShardId>& result) const;
+
+    /**
+     * Erases known by this shardIds from the diff argument.
+     */
+    void shardIdSetDifference(std::set<ShardId>& diff) const;
     void toBSON(BSONObjBuilder* result) const;
     /**
      * If the shard with same replica set name as in the newConnString already exists then replace
@@ -109,6 +109,9 @@ private:
      */
     void _init(OperationContext* txn, ShardFactory* factory);
 
+    /**
+     * Creates a shard based on the specified information and puts it into the lookup maps.
+     */
     void _addShard_inlock(const std::shared_ptr<Shard>&);
     std::shared_ptr<Shard> _findByShardId_inlock(const ShardId&) const;
     void _rebuildShard_inlock(const ConnectionString& newConnString, ShardFactory* factory);
@@ -148,8 +151,7 @@ public:
     ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                   const ConnectionString& configServerCS);
 
-    ~ShardRegistry() = default;
-
+    ~ShardRegistry();
     /**
      *  Starts ReplicaSetMonitor by adding a config shard.
      */
@@ -228,6 +230,13 @@ public:
 
     void getAllShardIds(std::vector<ShardId>* all) const;
     void toBSON(BSONObjBuilder* result) const;
+    bool isUp() const;
+
+    /**
+     * Initializes ShardRegistry with config shard. Must be called outside c-tor to avoid calls on
+     * this while its still not fully constructed.
+     */
+    void init();
 
 private:
     /**
@@ -240,7 +249,7 @@ private:
      * shard
      */
     ConnectionString _initConfigServerCS;
-
+    void _internalReload(const executor::TaskExecutor::CallbackArgs& cbArgs);
     ShardRegistryData _data;
 
     // Protects the _reloadState and _initConfigServerCS during startup.
@@ -254,7 +263,10 @@ private:
     };
 
     ReloadState _reloadState{ReloadState::Idle};
-};
+    bool _isUp{false};
 
+    // Executor for reloading.
+    std::unique_ptr<executor::TaskExecutor> _executor{};
+};
 
 }  // namespace mongo
