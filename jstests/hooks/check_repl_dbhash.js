@@ -258,8 +258,9 @@ function checkDBHashes(rst, dbBlacklist = [], phase = 'after test hook') {
             // collections.
             if (!collName.startsWith('system.') || collName === 'system.js' ||
                 collName === 'system.users')
-                assert.writeOK(
-                    primaryConfigDb.getCollection(collName).insert({invalidate: 'cache'}));
+                // This insert can fail if there's a unique index on the collection, so we can't
+                // check the return value.
+                primaryConfigDb.getCollection(collName).insert({invalidate: 'cache'});
         }
 
         // Lock the primary to prevent the TTL monitor from deleting expired documents in
