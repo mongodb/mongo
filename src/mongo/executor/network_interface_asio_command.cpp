@@ -286,7 +286,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         invariant(!resp.isOK());
         // If we fail during connection, we won't be able to access any of our members after calling
         // op->finish().
-        LOG(1) << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        log() << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
     }
 
     if (op->_inRefresh) {
@@ -294,7 +294,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         invariant(!resp.isOK());
         // If we fail during heartbeating, we won't be able to access any of op's members after
         // calling finish(), so we return here.
-        LOG(1) << "Failed to heartbeat to " << op->request().target << " - " << resp.getStatus();
+        log() << "Failed to heartbeat to " << op->request().target << " - " << resp.getStatus();
         op->finish(resp);
         return;
     }
