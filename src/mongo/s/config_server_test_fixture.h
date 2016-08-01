@@ -96,7 +96,11 @@ public:
 
     executor::NetworkInterfaceMock* network() const;
 
+    executor::NetworkInterfaceMock* networkForAddShard() const;
+
     executor::TaskExecutor* executor() const;
+
+    executor::TaskExecutor* executorForAddShard() const;
 
     MessagingPortMock* getMessagingPort() const;
 
@@ -168,6 +172,7 @@ private:
     RemoteCommandTargeterFactoryMock* _targeterFactory;
 
     executor::NetworkInterfaceMock* _mockNetwork;
+    executor::NetworkInterfaceMock* _mockNetworkForAddShard;
     executor::TaskExecutor* _executor;
     executor::TaskExecutor* _executorForAddShard;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;

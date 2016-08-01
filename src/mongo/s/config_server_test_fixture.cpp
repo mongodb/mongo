@@ -153,9 +153,10 @@ void ConfigServerTestFixture::setUp() {
 
     // Set up executor used for a few special operations during addShard.
     auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
-    auto specialMockNet = specialNet.get();
+    _mockNetworkForAddShard = specialNet.get();
     auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
-    _addShardNetworkTestEnv = stdx::make_unique<NetworkTestEnv>(specialExec.get(), specialMockNet);
+    _addShardNetworkTestEnv =
+        stdx::make_unique<NetworkTestEnv>(specialExec.get(), _mockNetworkForAddShard);
     _executorForAddShard = specialExec.get();
 
     auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
@@ -285,10 +286,22 @@ executor::NetworkInterfaceMock* ConfigServerTestFixture::network() const {
     return _mockNetwork;
 }
 
+executor::NetworkInterfaceMock* ConfigServerTestFixture::networkForAddShard() const {
+    invariant(_mockNetworkForAddShard);
+
+    return _mockNetworkForAddShard;
+}
+
 executor::TaskExecutor* ConfigServerTestFixture::executor() const {
     invariant(_executor);
 
     return _executor;
+}
+
+executor::TaskExecutor* ConfigServerTestFixture::executorForAddShard() const {
+    invariant(_executorForAddShard);
+
+    return _executorForAddShard;
 }
 
 MessagingPortMock* ConfigServerTestFixture::getMessagingPort() const {

@@ -66,6 +66,10 @@ class ShardingCatalogManager {
     MONGO_DISALLOW_COPYING(ShardingCatalogManager);
 
 public:
+    static Seconds getAddShardTaskRetryInterval() {
+        return Seconds{30};
+    }
+
     virtual ~ShardingCatalogManager() = default;
 
     /**

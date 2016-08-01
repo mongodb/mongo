@@ -88,7 +88,6 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
 
-const Seconds kAddShardTaskRetryInterval(30);
 const Seconds kDefaultFindHostMaxWaitTime(20);
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
@@ -228,7 +227,6 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* txn,
 }
 
 }  // namespace
-
 
 ShardingCatalogManagerImpl::ShardingCatalogManagerImpl(
     ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> addShardExecutor)
@@ -1216,7 +1214,7 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
                   << " when trying to upsert a shardIdentity document, "
                   << causedBy(swHost.getStatus());
         const Date_t now = _executorForAddShard->now();
-        const Date_t when = now + kAddShardTaskRetryInterval;
+        const Date_t when = now + getAddShardTaskRetryInterval();
         _trackAddShardHandle_inlock(
             shardType.getName(),
             _executorForAddShard->scheduleWorkAt(
@@ -1310,7 +1308,7 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
         // If the command did not succeed, schedule the upsert shardIdentity task again with a
         // delay.
         const Date_t now = _executorForAddShard->now();
-        const Date_t when = now + kAddShardTaskRetryInterval;
+        const Date_t when = now + getAddShardTaskRetryInterval();
 
         // Track the handle from scheduleWorkAt.
         _trackAddShardHandle_inlock(

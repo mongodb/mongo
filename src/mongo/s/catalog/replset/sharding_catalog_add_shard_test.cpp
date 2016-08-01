@@ -37,6 +37,8 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -131,8 +133,8 @@ protected:
      * Waits for a request for the shardIdentity document to be upserted into a shard from the
      * config server on addShard.
      */
-    void expectShardIdentityUpsert(const HostAndPort& expectedHost,
-                                   const std::string& expectedShardName) {
+    void expectShardIdentityUpsertReturnSuccess(const HostAndPort& expectedHost,
+                                                const std::string& expectedShardName) {
         // Create the expected upsert shardIdentity command for this shardType.
         auto upsertCmdObj = catalogManager()->createShardIdentityUpsertForAddShard(
             operationContext(), expectedShardName);
@@ -142,18 +144,36 @@ protected:
         std::string errMsg;
         invariant(request.parseBSON("admin", upsertCmdObj, &errMsg) || !request.isValid(&errMsg));
 
-        expectUpdates(expectedHost,
-                      NamespaceString(NamespaceString::kConfigCollectionNamespace),
-                      request.getUpdateRequest());
+        expectUpdatesReturnSuccess(expectedHost,
+                                   NamespaceString(NamespaceString::kConfigCollectionNamespace),
+                                   request.getUpdateRequest());
+    }
+
+    void expectShardIdentityUpsertReturnFailure(const HostAndPort& expectedHost,
+                                                const std::string& expectedShardName,
+                                                const Status& statusToReturn) {
+        // Create the expected upsert shardIdentity command for this shardType.
+        auto upsertCmdObj = catalogManager()->createShardIdentityUpsertForAddShard(
+            operationContext(), expectedShardName);
+
+        // Get the BatchedUpdateRequest from the upsert command.
+        BatchedCommandRequest request(BatchedCommandRequest::BatchType::BatchType_Update);
+        std::string errMsg;
+        invariant(request.parseBSON("admin", upsertCmdObj, &errMsg) || !request.isValid(&errMsg));
+
+        expectUpdatesReturnFailure(expectedHost,
+                                   NamespaceString(NamespaceString::kConfigCollectionNamespace),
+                                   request.getUpdateRequest(),
+                                   statusToReturn);
     }
 
     /**
      * Waits for a set of batched updates and ensures that the host, namespace, and updates exactly
      * match what's expected. Responds with a success status.
      */
-    void expectUpdates(const HostAndPort& expectedHost,
-                       const NamespaceString& expectedNss,
-                       BatchedUpdateRequest* expectedBatchedUpdates) {
+    void expectUpdatesReturnSuccess(const HostAndPort& expectedHost,
+                                    const NamespaceString& expectedNss,
+                                    BatchedUpdateRequest* expectedBatchedUpdates) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
 
             ASSERT_EQUALS(expectedHost, request.target);
@@ -191,6 +211,49 @@ protected:
             return response.toBSON();
         });
     }
+
+    /**
+     * Waits for a set of batched updates and ensures that the host, namespace, and updates exactly
+     * match what's expected. Responds with a failure status.
+     */
+    void expectUpdatesReturnFailure(const HostAndPort& expectedHost,
+                                    const NamespaceString& expectedNss,
+                                    BatchedUpdateRequest* expectedBatchedUpdates,
+                                    const Status& statusToReturn) {
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+
+            ASSERT_EQUALS(expectedHost, request.target);
+
+            // Check that the db name in the request matches the expected db name.
+            ASSERT_EQUALS(expectedNss.db(), request.dbname);
+
+            BatchedUpdateRequest actualBatchedUpdates;
+            std::string errmsg;
+            ASSERT_TRUE(actualBatchedUpdates.parseBSON(request.dbname, request.cmdObj, &errmsg));
+
+            // Check that the db and collection names in the BatchedUpdateRequest match the
+            // expected.
+            ASSERT_EQUALS(expectedNss, actualBatchedUpdates.getNS());
+
+            auto expectedUpdates = expectedBatchedUpdates->getUpdates();
+            auto actualUpdates = actualBatchedUpdates.getUpdates();
+
+            ASSERT_EQUALS(expectedUpdates.size(), actualUpdates.size());
+
+            auto itExpected = expectedUpdates.begin();
+            auto itActual = actualUpdates.begin();
+
+            for (; itActual != actualUpdates.end(); itActual++, itExpected++) {
+                ASSERT_EQ((*itExpected)->getUpsert(), (*itActual)->getUpsert());
+                ASSERT_EQ((*itExpected)->getMulti(), (*itActual)->getMulti());
+                ASSERT_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
+                ASSERT_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
+            }
+
+            return statusToReturn;
+        });
+    }
+
 
     /**
      * Asserts that a document exists in the config server's config.shards collection corresponding
@@ -243,6 +306,12 @@ protected:
 
         ASSERT_EQUALS(addedShard.getName(), logEntry.getDetails()["name"].String());
         ASSERT_EQUALS(addedShard.getHost(), logEntry.getDetails()["host"].String());
+    }
+
+    void forwardAddShardNetwork(Date_t when) {
+        networkForAddShard()->enterNetwork();
+        networkForAddShard()->runUntil(when);
+        networkForAddShard()->exitNetwork();
     }
 
     OID _clusterId;
@@ -330,13 +399,13 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kFutureTimeout);
 
-    // Ensure that the shard document was properly added to config.shards
+    // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were properly added to config.database.
@@ -408,13 +477,13 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kFutureTimeout);
 
-    // Ensure that the shard document was properly added to config.shards
+    // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were properly added to config.database.
@@ -780,13 +849,13 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kFutureTimeout);
 
-    // Ensure that the shard document was properly added to config.shards
+    // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were properly added to config.database.
@@ -840,13 +909,13 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kFutureTimeout);
 
-    // Ensure that the shard document was properly added to config.shards
+    // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were properly added to config.database.
@@ -915,13 +984,13 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kFutureTimeout);
 
-    // Ensure that the shard document was properly added to config.shards
+    // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were *not* added.
@@ -933,6 +1002,162 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
         catalogClient()->getDatabase(operationContext(), discoveredDB2.getName()).getStatus());
 
     assertChangeWasLogged(expectedShard);
+}
+
+TEST_F(AddShardTest, CompatibilityAddShardSuccess) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
+
+    // Since the shardIdentity upsert succeeded, the entry in config.shards should have been
+    // updated to reflect that the shard is now shard aware.
+    addedShard.setState(ShardType::ShardState::kShardAware);
+
+    // Ensure that the shard document was properly added to config.shards.
+    assertShardExists(addedShard);
+}
+
+TEST_F(AddShardTest, CompatibilityAddShardRetryOnGenericFailures) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Simulate several failures upserting the shardIdentity doc on the shard. The upsert should
+    // be rescheduled and retried until it succeeds.
+
+    expectShardIdentityUpsertReturnFailure(
+        shardTarget, shardName, {ErrorCodes::HostUnreachable, "host unreachable"});
+    forwardAddShardNetwork(networkForAddShard()->now() +
+                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
+                           Milliseconds(10));
+
+    expectShardIdentityUpsertReturnFailure(
+        shardTarget, shardName, {ErrorCodes::WriteConcernFailed, "write concern failed"});
+    forwardAddShardNetwork(networkForAddShard()->now() +
+                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
+                           Milliseconds(10));
+
+    expectShardIdentityUpsertReturnFailure(
+        shardTarget, shardName, {ErrorCodes::RemoteChangeDetected, "remote change detected"});
+    forwardAddShardNetwork(networkForAddShard()->now() +
+                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
+                           Milliseconds(10));
+
+    // Finally, respond with success.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
+    forwardAddShardNetwork(networkForAddShard()->now() +
+                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
+                           Milliseconds(10));
+
+    // Since the shardIdentity upsert succeeded, the entry in config.shards should have been
+    // updated to reflect that the shard is now shard aware.
+    addedShard.setState(ShardType::ShardState::kShardAware);
+
+    // Ensure that the shard document was properly added to config.shards.
+    assertShardExists(addedShard);
+}
+
+// Note: This test is separated from the generic failures one because there is a special code path
+// to handle DuplicateKey errors, even though the server's actual behavior is the same.
+TEST_F(AddShardTest, CompatibilityAddShardRetryOnDuplicateKeyFailure) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Simulate several DuplicateKeyError failures while the shardIdentity document on the shard
+    // has not yet been manually deleted.
+    for (int i = 0; i < 3; i++) {
+        expectShardIdentityUpsertReturnFailure(
+            shardTarget, shardName, {ErrorCodes::DuplicateKey, "duplicate key"});
+        forwardAddShardNetwork(networkForAddShard()->now() +
+                               ShardingCatalogManager::getAddShardTaskRetryInterval() +
+                               Milliseconds(10));
+    }
+
+    // Finally, respond with success (simulating that the shardIdentity document has been deleted).
+    expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
+    forwardAddShardNetwork(networkForAddShard()->now() +
+                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
+                           Milliseconds(10));
+
+    // Since the shardIdentity upsert succeeded, the entry in config.shards should have been
+    // updated to reflect that the shard is now shard aware.
+    addedShard.setState(ShardType::ShardState::kShardAware);
+
+    // Ensure that the shard document was properly added to config.shards.
+    assertShardExists(addedShard);
 }
 
 /*
@@ -1032,8 +1257,8 @@ TEST_F(AddShardTest, ReAddExistingShard) {
 
     expectGetDatabase("shardDB", boost::none);
 
-    // The shardIdentity doc inserted into the config.version collection on the shard.
-    expectShardIdentityUpsert(shardTarget, expectedShardName);
+    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
+    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard doc inserted into the config.shards collection on the config server.
     ShardType newShard;
