@@ -52,12 +52,9 @@ def CacheRetrieveFunc(target, source, env):
     cd.CacheDebug('CacheRetrieve(%s):  retrieving from %s\n', t, cachefile)
     if SCons.Action.execute_actions:
         if fs.islink(cachefile):
-            realpath = fs.readlink(cachefile)
-            fs.symlink(realpath, t.get_internal_path())
-            os.utime(realpath, None)
+            fs.symlink(fs.readlink(cachefile), t.get_internal_path())
         else:
             env.copy_from_cache(cachefile, t.get_internal_path())
-            os.utime(cachefile, None)
         st = fs.stat(cachefile)
         fs.chmod(t.get_internal_path(), stat.S_IMODE(st[stat.ST_MODE]) | stat.S_IWRITE)
     return 0
