@@ -226,6 +226,29 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_readonly_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {aggregate: "view", pipeline: []},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [{resource: {db: firstDbName, collection: "view"}, actions: ["find"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["find"]}]
+              }
+          ]
+        },
+        {
           testname: "aggregate_explain",
           command: {aggregate: "foo", explain: true, pipeline: [{$match: {bar: 1}}]},
           testcases: [
@@ -239,6 +262,29 @@ var authCommandsLib = {
                 roles: roles_readAny,
                 privileges:
                     [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_explain_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {aggregate: "view", explain: true, pipeline: [{$match: {bar: 1}}]},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [{resource: {db: firstDbName, collection: "view"}, actions: ["find"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["find"]}]
               }
           ]
         },
@@ -263,6 +309,68 @@ var authCommandsLib = {
                     {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
                     {resource: {db: secondDbName, collection: "foo_out"}, actions: ["remove"]}
                 ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_readView_writeCollection",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {aggregate: "view", pipeline: [{$out: "view_out"}]},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "view"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "view_out"}, actions: ["insert"]},
+                    {resource: {db: firstDbName, collection: "view_out"}, actions: ["remove"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: secondDbName, collection: "view"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "view_out"}, actions: ["insert"]},
+                    {resource: {db: secondDbName, collection: "view_out"}, actions: ["remove"]}
+                ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_writeView",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {aggregate: "foo", pipeline: [{$out: "view"}]},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "view"}, actions: ["insert"]},
+                    {resource: {db: firstDbName, collection: "view"}, actions: ["remove"]}
+                ],
+                expectFail: true  // Cannot write to a view.
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "view"}, actions: ["insert"]},
+                    {resource: {db: secondDbName, collection: "view"}, actions: ["remove"]}
+                ],
+                expectFail: true  // Cannot write to a view.
               }
           ]
         },
@@ -621,6 +729,30 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "collMod_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {collMod: "view", viewOn: "collection2", pipeline: [{$limit: 7}]},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "view"}, actions: ["collMod"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["collMod"]}]
+              }
+          ]
+        },
+        {
           testname: "collStats",
           command: {collStats: "bar", scale: 1},
           setup: function(db) {
@@ -892,6 +1024,31 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "create_views",
+          command: {create: "view", viewOn: "collection", pipeline: [{$match: {}}]},
+          teardown: function(db) {
+              db.view.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [{
+                    resource: {db: firstDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [{
+                    resource: {db: secondDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }]
+              },
+          ]
+        },
+        {
           testname: "create_capped",
           command: {create: "x", capped: true, size: 1000},
           teardown: function(db) {
@@ -1135,6 +1292,31 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "drop_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          command: {drop: "view"},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [{
+                    resource: {db: firstDbName, collection: "view"},
+                    actions: ["dropCollection"]
+                }]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [{
+                    resource: {db: secondDbName, collection: "view"},
+                    actions: ["dropCollection"]
+                }]
+              }
+          ]
+        },
+        {
           testname: "dropDatabase",
           command: {dropDatabase: 1},
           setup: function(db) {
@@ -1264,6 +1446,29 @@ var authCommandsLib = {
                 roles: roles_readAny,
                 privileges:
                     [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
+              }
+          ]
+        },
+        {
+          testname: "find_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {find: "view"},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [{resource: {db: firstDbName, collection: "view"}, actions: ["find"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["find"]}]
               }
           ]
         },
