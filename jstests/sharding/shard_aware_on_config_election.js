@@ -77,7 +77,7 @@
         jsTest.log("Manually unset the state field from " + rst.name + "'s entry in config.shards");
         // Use writeConcern: { w: majority } so that the write cannot be rolled back when the
         // current primary is stepped down.
-        assert.writeOK(st.c0.getDB("config").getCollection("shards").update(
+        assert.writeOK(st.s.getDB("config").getCollection("shards").update(
             {"_id": rst.name}, {$unset: {"state": ""}}, {writeConcern: {w: "majority"}}));
 
         jsTest.log("Restart " + rst.name +
