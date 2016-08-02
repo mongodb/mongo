@@ -18,6 +18,17 @@ post:
           set -v
           cd ./clusters/${cluster}
           if [ ! -f "test.success" ]; then yes yes | ./terraform destroy; fi
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          # removes files from the (local) scons cache when it's over a
+          # threshold, to the $prune_ratio percentage. Ideally override
+          # these default values in the distro config in evergreen.
+
+          if [ -d "${scons_cache_path}" ]; then
+              ${python|python} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+          fi
 
 functions:
   "prepare environment":
@@ -216,16 +227,37 @@ tasks:
     - command: git.get_project
       params:
         directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -o errexit
-          set -v
-          ${scons|scons} ${compile_flags|} core
+          set -o verbose
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          MONGO_VERSION=$(git describe)
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} core
+
           mkdir -p mongodb/bin
           strip mongo
           strip mongod
@@ -328,9 +360,10 @@ buildvariants:
     - dsi
     - workloads
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: standalone
     cluster: single-correctness
+    use_scons_cache: true
   run_on:
       - "rhel70-perf-standalone"
   tasks:

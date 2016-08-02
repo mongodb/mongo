@@ -59,7 +59,7 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
 
     (total_size, contents) = collect_cache_contents(cache_path)
 
-    logger.info("cache size {0}, quota {0}".format(total_size, cache_size))
+    logger.info("cache size {0}, quota {1}".format(total_size, cache_size))
 
     if total_size >= cache_size:
         logger.info("trimming the cache since {0} > {0}".format(total_size, cache_size))
