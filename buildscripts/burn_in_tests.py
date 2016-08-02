@@ -138,13 +138,13 @@ def find_changed_tests(branch_name, base_commit, max_revisions):
 
     changed_files = callo(["git", "diff", "--name-only", base_commit]).splitlines()
     # New files ("untracked" in git terminology) won't show up in the git diff results.
-    untracked_files = callo(["git",
-                             "ls-files",
-                             "--modified",
-                             "--others",
-                             "--",
-                             "jstests/**/*.js"]).splitlines()
-    changed_files += untracked_files
+    untracked_files = callo(["git", "status", "--porcelain"]).splitlines()
+
+    # The lines with untracked files start with '?? '.
+    for line in untracked_files:
+        if line.startswith("?"):
+            (status, line) = line.split(" ")
+            changed_files.append(line)
 
     for line in changed_files:
         line = line.rstrip()
