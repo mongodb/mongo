@@ -1225,7 +1225,43 @@ err:	/*
 static int
 __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	return (__checkpoint_tree(session, true, cfg));
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	u_int saved_evict_walk_period;
+
+	btree = S2BT(session);
+	conn = S2C(session);
+	saved_evict_walk_period = btree->evict_walk_period;
+
+	ret = __checkpoint_tree(session, true, cfg);
+
+	/*
+	 * Update the checkpoint generation for this handle so visible
+	 * updates newer than the checkpoint can be evicted.
+	 *
+	 * This has to be published before eviction is enabled again,
+	 * so that eviction knows that the checkpoint has completed.
+	 */
+	WT_PUBLISH(btree->checkpoint_gen, conn->txn_global.checkpoint_gen);
+	WT_STAT_FAST_DATA_SET(session,
+	    btree_checkpoint_generation, btree->checkpoint_gen);
+
+	/*
+	 * In case this tree was being skipped by the eviction server
+	 * during the checkpoint, restore the previous state.
+	 */
+	btree->evict_walk_period = saved_evict_walk_period;
+
+	/*
+	 * Wake the eviction server, in case application threads have
+	 * stalled while the eviction server decided it couldn't make
+	 * progress.  Without this, application threads will be stalled
+	 * until the eviction server next wakes.
+	 */
+	WT_TRET(__wt_evict_server_wake(session));
+
+	return (ret);
 }
 
 /*
