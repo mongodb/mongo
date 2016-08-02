@@ -53,7 +53,6 @@ namespace {
 class MetadataManagerTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
-        Client::initThread(getThreadName().c_str());
         ServiceContextMongoDTest::setUp();
         ShardingState::get(getServiceContext())
             ->setScheduleCleanupFunctionForTest([](const NamespaceString& nss) {});
@@ -62,11 +61,6 @@ protected:
     std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
         return stdx::make_unique<CollectionMetadata>(BSON("key" << 1),
                                                      ChunkVersion(1, 0, OID::gen()));
-    }
-
-    void tearDown() override {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        ServiceContextMongoDTest::tearDown();
     }
 };
 

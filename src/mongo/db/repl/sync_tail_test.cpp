@@ -107,7 +107,7 @@ void SyncTailTest::setUp() {
     ReplSettings replSettings;
     replSettings.setOplogSizeBytes(5 * 1024 * 1024);
 
-    auto serviceContext = mongo::getGlobalServiceContext();
+    auto serviceContext = getServiceContext();
     ReplicationCoordinator::set(serviceContext,
                                 stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
     auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
@@ -117,7 +117,6 @@ void SyncTailTest::setUp() {
                                              const std::vector<BSONObj>&) { return Status::OK(); };
     StorageInterface::set(serviceContext, std::move(storageInterface));
 
-    Client::initThreadIfNotAlready();
     _txn = cc().makeOperationContext();
     _txn->lockState()->setIsBatchWriter(false);
     _opsApplied = 0;
@@ -131,12 +130,8 @@ void SyncTailTest::setUp() {
 }
 
 void SyncTailTest::tearDown() {
-    if (_txn) {
-        Lock::GlobalWrite globalLock(_txn->lockState());
-        BSONObjBuilder unused;
-        invariant(mongo::dbHolder().closeAll(_txn.get(), unused, false));
-    }
     _txn.reset();
+    ServiceContextMongoDTest::tearDown();
     _storageInterface = nullptr;
 }
 

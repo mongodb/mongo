@@ -102,11 +102,9 @@ const Seconds ConfigServerTestFixture::kFutureTimeout{5};
 
 void ConfigServerTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
-
-    auto serviceContext = getGlobalServiceContext();
+    auto serviceContext = getServiceContext();
 
     _messagePort = stdx::make_unique<MessagingPortMock>();
-    Client::initThreadIfNotAlready("ConfigServerTestFixture");
     _opCtx = cc().makeOperationContext();
 
     repl::ReplSettings replSettings;

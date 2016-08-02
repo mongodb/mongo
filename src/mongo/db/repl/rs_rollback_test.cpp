@@ -138,11 +138,10 @@ private:
 
 void RSRollbackTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    Client::initThreadIfNotAlready();
     _txn = cc().makeOperationContext();
     _coordinator = new ReplicationCoordinatorRollbackMock();
 
-    auto serviceContext = mongo::getGlobalServiceContext();
+    auto serviceContext = getServiceContext();
     ReplicationCoordinator::set(serviceContext,
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
     StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceMock>());
@@ -152,12 +151,8 @@ void RSRollbackTest::setUp() {
 }
 
 void RSRollbackTest::tearDown() {
-    {
-        Lock::GlobalWrite globalLock(_txn->lockState());
-        BSONObjBuilder unused;
-        invariant(mongo::dbHolder().closeAll(_txn.get(), unused, false));
-    }
     _txn.reset();
+    ServiceContextMongoDTest::tearDown();
     setGlobalReplicationCoordinator(nullptr);
 }
 

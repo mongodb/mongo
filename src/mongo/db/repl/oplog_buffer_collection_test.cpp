@@ -69,11 +69,7 @@ private:
 
 void OplogBufferCollectionTest::setUp() {
     ServiceContextMongoDTest::setUp();
-
-    // Initializes cc() used in ServiceContextMongoD::_newOpCtx().
-    Client::initThreadIfNotAlready("OplogBufferCollectionTest");
-
-    auto serviceContext = getGlobalServiceContext();
+    auto serviceContext = getServiceContext();
 
     // AutoGetCollectionForRead requires a valid replication coordinator in order to check the shard
     // version.
@@ -91,9 +87,7 @@ void OplogBufferCollectionTest::setUp() {
 
 void OplogBufferCollectionTest::tearDown() {
     _txn.reset();
-
     _storageInterface = nullptr;
-
     ServiceContextMongoDTest::tearDown();
 }
 

@@ -169,13 +169,11 @@ protected:
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
-        // Initializes cc() used in ServiceContextMongoD::_newOpCtx().
-        Client::initThreadIfNotAlready("StorageInterfaceImplTest");
 
         ReplSettings settings;
         settings.setOplogSizeBytes(5 * 1024 * 1024);
         settings.setReplSetString("mySet/node1:12345");
-        ReplicationCoordinator::set(getGlobalServiceContext(),
+        ReplicationCoordinator::set(getServiceContext(),
                                     stdx::make_unique<ReplicationCoordinatorMock>(settings));
     }
 };
@@ -184,7 +182,6 @@ class StorageInterfaceImplWithReplCoordTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
-        Client::initThreadIfNotAlready();
         createOptCtx();
         _coordinator = new ReplicationCoordinatorMock(createReplSettings());
         setGlobalReplicationCoordinator(_coordinator);
@@ -196,7 +193,6 @@ protected:
 
 
     void createOptCtx() {
-        Client::initThreadIfNotAlready();
         _txn = cc().makeOperationContext();
         // We are not replicating nor validating these writes.
         _txn->setReplicatedWrites(false);
@@ -229,7 +225,7 @@ bool RecoveryUnitWithDurabilityTracking::waitUntilDurable() {
 }
 
 TEST_F(StorageInterfaceImplTest, ServiceContextDecorator) {
-    auto serviceContext = getGlobalServiceContext();
+    auto serviceContext = getServiceContext();
     ASSERT_FALSE(StorageInterface::get(serviceContext));
     StorageInterface* storageInterface = new StorageInterfaceImpl();
     StorageInterface::set(serviceContext, std::unique_ptr<StorageInterface>(storageInterface));

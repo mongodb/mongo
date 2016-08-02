@@ -47,7 +47,8 @@
 namespace mongo {
 
 void ServiceContextMongoDTest::setUp() {
-    ServiceContext* serviceContext = getGlobalServiceContext();
+    Client::initThread(getThreadName().c_str());
+    ServiceContext* serviceContext = getServiceContext();
     if (!serviceContext->getGlobalStorageEngine()) {
         // When using the "ephemeralForTest" storage engine, it is fine for the temporary directory
         // to go away after the global storage engine is initialized.
@@ -61,6 +62,7 @@ void ServiceContextMongoDTest::setUp() {
 }
 
 void ServiceContextMongoDTest::tearDown() {
+    ON_BLOCK_EXIT([&] { Client::destroy(); });
     auto txn = cc().makeOperationContext();
     _dropAllDBs(txn.get());
 }
