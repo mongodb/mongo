@@ -24,8 +24,13 @@
             privileges: [{resource: {cluster: true}, actions: ['inprog', 'killop']}]
         });
         db.createUser({user: 'opAdmin', pwd: 'opAdmin', roles: [{role: 'opAdmin', db: 'admin'}]});
+
         var t = db.jstests_killop;
         t.save({x: 1});
+
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+
         admin.logout();
 
         /**
@@ -41,8 +46,8 @@
                 // active, which it may not be in our polling cycle - particularly b/c we sleep
                 // every
                 // second in both the query and the assert
-                if ((o.active || o.waitingForLock) && o.query && o.query.query &&
-                    o.query.query.$where && o.query.count == "jstests_killop") {
+                if ((o.active || o.waitingForLock) && o.query && o.query &&
+                    o.query.find === "jstests_killop" && o.query.comment === "kill_own_ops") {
                     print("OP: " + tojson(o));
                     ids.push(o.opid);
                 }
@@ -50,12 +55,14 @@
             return ids;
         }
 
-        var countWithWhereOp =
-            'db = db.getSiblingDB("foo"); db.auth("reader", "reader"); db.jstests_killop.count({ $where: function() { while (1) { sleep(500); } } });';
+        var queryAsReader =
+            'db = db.getSiblingDB("foo"); db.auth("reader", "reader"); db.jstests_killop.find().comment("kill_own_ops").toArray()';
 
+        jsTestLog("Starting long-running operation");
         db.auth('reader', 'reader');
-        jsTestLog("Starting long-running $where operation");
-        var s1 = startParallelShell(countWithWhereOp, m.port);
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+        var s1 = startParallelShell(queryAsReader, m.port);
 
         jsTestLog("Finding ops in currentOp() output");
         var o = [];
@@ -75,9 +82,8 @@
         db.logout();
         db.auth('otherReader', 'otherReader');
         assert.eq([], ops());
-        db.killOp(o[0]);
+        assert.commandFailed(db.killOp(o[0]));
         db.logout();
-        sleep(10);
         db.auth('reader', 'reader');
         assert.eq(1, ops().length);
         db.logout();
@@ -85,20 +91,25 @@
         jsTestLog("Checking that originating user can kill operation");
         var start = new Date();
         db.auth('reader', 'reader');
-        db.killOp(o[0]);
+        assert.commandWorked(db.killOp(o[0]));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
 
         jsTestLog("Waiting for ops to terminate");
         var exitCode = s1({checkExitSuccess: false});
-        assert.neq(
-            0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
+        assert.neq(0,
+                   exitCode,
+                   "expected shell to exit abnormally due to operation execution being terminated");
 
         // don't want to pass if timeout killed the js function.
         var end = new Date();
         var diff = end - start;
         assert.lt(diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);
 
-        jsTestLog("Starting a second long-running $where operation");
-        var s2 = startParallelShell(countWithWhereOp, m.port);
+        jsTestLog("Starting a second long-running operation");
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+        var s2 = startParallelShell(queryAsReader, m.port);
         jsTestLog("Finding ops in currentOp() output");
         var o2 = [];
         assert.soon(
@@ -125,7 +136,9 @@
 
         jsTestLog("Checking that an administrative user can kill others' operations");
         var start = new Date();
-        db.killOp(o2[0]);
+        assert.commandWorked(db.killOp(o2[0]));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
         jsTestLog("Waiting for ops to terminate");
         var exitCode = s2({checkExitSuccess: false});
         assert.neq(

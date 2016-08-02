@@ -40,6 +40,7 @@
 namespace mongo {
 
 namespace {
+MONGO_FP_DECLARE(setYieldAllLocksHang);
 MONGO_FP_DECLARE(setYieldAllLocksWait);
 }  // namespace
 
@@ -70,6 +71,8 @@ void QueryYield::yieldAllLocks(OperationContext* txn,
     // Top-level locks are freed, release any potential low-level (storage engine-specific
     // locks). If we are yielding, we are at a safe place to do so.
     txn->recoveryUnit()->abandonSnapshot();
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
 
     MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
         const BSONObj& data = customWait.getData();
