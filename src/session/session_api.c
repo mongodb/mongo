@@ -66,11 +66,15 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 
 	TAILQ_FOREACH(cursor, &session->cursors, q)
 		if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
-#if 0 /* !!! LSM updates can violate this assertion. */
-			/* We have to do this with a transaction ID pinned. */
-			WT_ASSERT(session,
-			   WT_SESSION_TXN_STATE(session)->snap_min !=
-			   WT_TXN_NONE);
+#ifdef HAVE_DIAGNOSTIC
+			/*
+			 * We have to do this with a transaction ID pinned
+			 * unless the cursor is reading from a checkpoint.
+			 */
+			WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(session);
+			WT_ASSERT(session, txn_state->snap_min != WT_TXN_NONE ||
+			   (WT_PREFIX_MATCH(cursor->uri, "file:") &&
+			   F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
 #endif
 
 			F_CLR(cursor, WT_CURSTD_VALUE_INT);
