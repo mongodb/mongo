@@ -578,13 +578,12 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
 
     // Check for roll back, and fail if so.
     auto hasHadRollbackResponse = rollbackChecker.hasHadRollback();
-    if (!hasHadRollbackResponse.isOK() || hasHadRollbackResponse.getValue()) {
-        lk.lock();
+    lk.lock();
+    if (!hasHadRollbackResponse.isOK()) {
+        _initialSyncState->status = hasHadRollbackResponse.getStatus();
+    } else if (hasHadRollbackResponse.getValue()) {
         _initialSyncState->status = {ErrorCodes::UnrecoverableRollbackError,
                                      "Rollback occurred during initial sync"};
-        return _initialSyncState->status;
-    } else {
-        lk.lock();
     }
 
     if (!_initialSyncState->status.isOK()) {
@@ -732,7 +731,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
             severe() << err;
 
             _setState_inlock(DataReplicatorState::Uninitialized);
-            return Status(ErrorCodes::InitialSyncFailure, err);
+            return attemptErrorStatus;
         }
 
         // Sleep for retry time

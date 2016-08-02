@@ -887,7 +887,7 @@ TEST_F(InitialSyncTest, Failpoint) {
     InitialSyncBackgroundRunner isbr(dr, 0);
     isbr.run();
 
-    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InitialSyncFailure);
+    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InvalidSyncSource);
 
     mongo::getGlobalFailPointRegistry()
         ->getFailPoint("failInitialSyncWithBadHost")
@@ -914,7 +914,10 @@ TEST_F(InitialSyncTest, FailsOnClone) {
         // Clone Start
         // listDatabases
         {"listDatabases",
-         fromjson("{ok:0, errmsg:'fail on clone -- listDBs injected failure', code:9}")},
+         fromjson(
+             str::stream() << "{ok:0, errmsg:'fail on clone -- listDBs injected failure', code: "
+                           << int(ErrorCodes::FailedToParse)
+                           << "}")},
         // rollback checker.
         {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
 
@@ -922,7 +925,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
     startSync(0);
     setResponses(responses);
     playResponses(true);
-    verifySync(getNet(), ErrorCodes::InitialSyncFailure);
+    verifySync(getNet(), ErrorCodes::FailedToParse);
 }
 
 TEST_F(InitialSyncTest, FailOnRollback) {
@@ -981,7 +984,66 @@ TEST_F(InitialSyncTest, FailOnRollback) {
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponses(true);
-    verifySync(getNet(), ErrorCodes::InitialSyncFailure);
+    verifySync(getNet(), ErrorCodes::UnrecoverableRollbackError);
+}
+
+TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError) {
+    const Responses responses =
+        {
+            // get rollback id
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // oplog fetcher find
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // Clone Start
+            // listDatabases
+            {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
+            // listCollections for "a"
+            {"listCollections",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
+                      "{name:'a', options:{}} "
+                      "]}}")},
+            // listIndexes:a
+            {"listIndexes",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
+                         "{v:"
+                      << OplogEntry::kOplogVersion
+                      << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+            // find:a
+            {"find",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                      "{_id:1, a:1} "
+                      "]}}")},
+            // Clone Done
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(2,2), h:NumberLong(1), ns:'b.c', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, c:1}}]}}")},
+            // Response to replSetGetRBID request is left out so that we can cancel the request by
+            // shutting the executor down.
+        };
+
+    startSync(0);
+    numGetMoreOplogEntriesMax = 5;
+    setResponses(responses);
+    playResponses(true);
+    getExecutor().shutdown();
+    verifySync(getNet(), ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
@@ -1047,7 +1109,7 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
     setResponses({responses.end() - 1, responses.end()});
     playResponses(true);
     log() << "done playing second responses";
-    verifySync(getNet(), ErrorCodes::InitialSyncFailure);
+    verifySync(getNet(), ErrorCodes::OplogOutOfOrder);
 }
 
 TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
@@ -1121,7 +1183,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     setResponses({responses.begin() + 1, responses.end()});
     playResponses(true);
     log() << "done playing second round of responses";
-    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InitialSyncFailure);
+    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::UnrecoverableRollbackError);
 }
 
 
