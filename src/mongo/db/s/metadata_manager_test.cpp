@@ -203,6 +203,65 @@ TEST_F(MetadataManagerTest, RemoveRangeWithMultipleRangeOverlaps) {
     ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
 }
 
+TEST_F(MetadataManagerTest, AddAndRemoveRangeNotificationsBlockAndYield) {
+    MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
+    manager.refreshActiveMetadata(makeEmptyMetadata());
+
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    auto notification = manager.addRangeToClean(cr1);
+    manager.removeRangeToClean(cr1, Status::OK());
+    ASSERT_OK(notification->get());
+    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
+}
+
+TEST_F(MetadataManagerTest, RemoveRangeToCleanCorrectlySetsBadStatus) {
+    MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
+    manager.refreshActiveMetadata(makeEmptyMetadata());
+
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    auto notification = manager.addRangeToClean(cr1);
+    manager.removeRangeToClean(cr1, Status(ErrorCodes::InternalError, "test error"));
+    ASSERT_NOT_OK(notification->get());
+    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
+}
+
+TEST_F(MetadataManagerTest, RemovingSubrangeStillSetsNotificationStatus) {
+    MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
+    manager.refreshActiveMetadata(makeEmptyMetadata());
+
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    auto notification = manager.addRangeToClean(cr1);
+    manager.removeRangeToClean(ChunkRange(BSON("key" << 3), BSON("key" << 7)));
+    ASSERT_OK(notification->get());
+    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 2UL);
+    manager.removeRangeToClean(cr1);
+    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
+
+    notification = manager.addRangeToClean(cr1);
+    manager.removeRangeToClean(ChunkRange(BSON("key" << 7), BSON("key" << 15)));
+    ASSERT_OK(notification->get());
+    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
+    manager.removeRangeToClean(cr1);
+    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
+}
+
+TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
+    MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
+    manager.refreshActiveMetadata(makeEmptyMetadata());
+
+    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
+    auto notification = manager.addRangeToClean(cr1);
+    auto txn = cc().makeOperationContext().get();
+    // Once the new range deleter is set up, this might fail if the range deleter
+    // deleted cr1 before we got here...
+    ASSERT_FALSE(notification->waitFor(txn, Milliseconds(0)));
+
+    manager.removeRangeToClean(cr1);
+    ASSERT_TRUE(notification->waitFor(txn, Milliseconds(0)));
+    ASSERT_OK(notification->get());
+}
+
+
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
     MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
     manager.refreshActiveMetadata(makeEmptyMetadata());

@@ -197,7 +197,7 @@ void MetadataManager::beginReceive(const ChunkRange& range) {
 
     // Need to ensure that the background range deleter task won't delete the range we are about to
     // receive
-    _removeRangeToClean_inlock(range);
+    _removeRangeToClean_inlock(range, Status::OK());
     _receivingChunks.insert(std::make_pair(range.getMin().getOwned(), range.getMax().getOwned()));
 
     // For compatibility with the current range deleter, update the pending chunks on the collection
@@ -315,31 +315,46 @@ ScopedCollectionMetadata::operator bool() const {
 
 RangeMap MetadataManager::getCopyOfRangesToClean() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    return _rangesToClean;
+    return _getCopyOfRangesToClean_inlock();
 }
 
-void MetadataManager::addRangeToClean(const ChunkRange& range) {
+RangeMap MetadataManager::_getCopyOfRangesToClean_inlock() {
+    RangeMap ranges;
+    for (auto it = _rangesToClean.begin(); it != _rangesToClean.end(); ++it) {
+        ranges.insert(std::make_pair(it->first, it->second.getMax()));
+    }
+    return ranges;
+}
+
+std::shared_ptr<Notification<Status>> MetadataManager::addRangeToClean(const ChunkRange& range) {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    _addRangeToClean_inlock(range);
+    return _addRangeToClean_inlock(range);
 }
 
-void MetadataManager::_addRangeToClean_inlock(const ChunkRange& range) {
-    invariant(!rangeMapOverlaps(_rangesToClean, range.getMin(), range.getMax()));
+std::shared_ptr<Notification<Status>> MetadataManager::_addRangeToClean_inlock(
+    const ChunkRange& range) {
+    // This first invariant currently makes an unnecessary copy, to reuse the
+    // rangeMapOverlaps helper function.
+    invariant(!rangeMapOverlaps(_getCopyOfRangesToClean_inlock(), range.getMin(), range.getMax()));
     invariant(!rangeMapOverlaps(_receivingChunks, range.getMin(), range.getMax()));
-    _rangesToClean.insert(std::make_pair(range.getMin().getOwned(), range.getMax().getOwned()));
+
+    RangeToCleanDescriptor descriptor(range.getMax().getOwned());
+    _rangesToClean.insert(std::make_pair(range.getMin().getOwned(), descriptor));
 
     // If _rangesToClean was previously empty, we need to start the collection range deleter
     if (_rangesToClean.size() == 1UL) {
         ShardingState::get(_serviceContext)->scheduleCleanup(_nss);
     }
+
+    return descriptor.getNotification();
 }
 
-void MetadataManager::removeRangeToClean(const ChunkRange& range) {
+void MetadataManager::removeRangeToClean(const ChunkRange& range, Status deletionStatus) {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    _removeRangeToClean_inlock(range);
+    _removeRangeToClean_inlock(range, deletionStatus);
 }
 
-void MetadataManager::_removeRangeToClean_inlock(const ChunkRange& range) {
+void MetadataManager::_removeRangeToClean_inlock(const ChunkRange& range, Status deletionStatus) {
     auto it = _rangesToClean.upper_bound(range.getMin());
     // We want our iterator to point at the greatest value
     // that is still less than or equal to range.
@@ -348,14 +363,16 @@ void MetadataManager::_removeRangeToClean_inlock(const ChunkRange& range) {
     }
 
     for (; it != _rangesToClean.end() && it->first < range.getMax();) {
-        if (it->second <= range.getMin()) {
+        if (it->second.getMax() <= range.getMin()) {
             ++it;
             continue;
         }
 
         // There's overlap between *it and range so we remove *it
         // and then replace with new ranges.
-        BSONObj oldMin = it->first, oldMax = it->second;
+        BSONObj oldMin = it->first;
+        BSONObj oldMax = it->second.getMax();
+        it->second.complete(deletionStatus);
         _rangesToClean.erase(it++);
         if (oldMin < range.getMin()) {
             _addRangeToClean_inlock(ChunkRange(oldMin, range.getMin()));
@@ -373,7 +390,7 @@ void MetadataManager::append(BSONObjBuilder* builder) {
     BSONArrayBuilder rtcArr(builder->subarrayStart("rangesToClean"));
     for (const auto& entry : _rangesToClean) {
         BSONObjBuilder obj;
-        ChunkRange r = ChunkRange(entry.first, entry.second);
+        ChunkRange r = ChunkRange(entry.first, entry.second.getMax());
         r.append(&obj);
         rtcArr.append(obj.done());
     }

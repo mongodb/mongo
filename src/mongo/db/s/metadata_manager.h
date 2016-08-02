@@ -36,6 +36,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/util/concurrency/notification.h"
 
 #include "mongo/stdx/memory.h"
 
@@ -70,7 +71,7 @@ public:
      */
     void beginReceive(const ChunkRange& range);
 
-    /*
+    /**
      * Removes a range from the list of chunks, which are being received. Used externally to
      * indicate that a chunk migration failed.
      */
@@ -86,20 +87,29 @@ public:
     * Adds a new range to be cleaned up.
     * The newly introduced range must not overlap with the existing ranges.
     */
-    void addRangeToClean(const ChunkRange& range);
+    std::shared_ptr<Notification<Status>> addRangeToClean(const ChunkRange& range);
+
+    /**
+     * Calls removeRangeToClean with Status::OK.
+     */
+    void removeRangeToClean(const ChunkRange& range) {
+        removeRangeToClean(range, Status::OK());
+    }
 
     /**
      * Removes the specified range from the ranges to be cleaned up.
+     * The specified deletionStatus will be returned to callers waiting
+     * on whether the deletion succeeded or failed.
      */
-    void removeRangeToClean(const ChunkRange& range);
+    void removeRangeToClean(const ChunkRange& range, Status deletionStatus);
 
     /**
-     * Gets copy of the set of chunk ranges which are scheduled for cleanup. This method is intended
-     * for testing purposes only and should not be used in any production code.
+     * Gets copy of the set of chunk ranges which are scheduled for cleanup.
+     * Converts RangeToCleanMap to RangeMap.
      */
     RangeMap getCopyOfRangesToClean();
 
-    /*
+    /**
      * Appends information on all the chunk ranges in rangesToClean to builder.
      */
     void append(BSONObjBuilder* builder);
@@ -135,14 +145,58 @@ private:
         uint32_t usageCounter{0};
     };
 
+    // Class for the value of the _rangesToClean map. Used because callers of addRangeToClean
+    // sometimes need to wait until a range is deleted. Thus, complete(Status) is called
+    // when the range is deleted from _rangesToClean in removeRangeToClean(), letting callers
+    // of addRangeToClean know if the deletion succeeded or failed.
+    class RangeToCleanDescriptor {
+    public:
+        /**
+         * Initializes a RangeToCleanDescriptor with an empty notification.
+         */
+        RangeToCleanDescriptor(BSONObj max)
+            : _max(max.getOwned()), _notification(std::make_shared<Notification<Status>>()) {}
+
+        /**
+         * Gets the maximum value of the range to be deleted.
+         */
+        const BSONObj& getMax() const {
+            return _max;
+        }
+
+        // See comment on _notification.
+        std::shared_ptr<Notification<Status>> getNotification() {
+            return _notification;
+        }
+
+        /**
+         * Sets the status on _notification. This will tell threads
+         * waiting on the value of status that the deletion succeeded or failed.
+         */
+        void complete(Status status) {
+            _notification->set(status);
+        }
+
+    private:
+        // The maximum value of the range to be deleted.
+        BSONObj _max;
+
+        // This _notification will be set with a value indicating whether the deletion
+        // succeeded or failed.
+        std::shared_ptr<Notification<Status>> _notification;
+    };
+
     /**
      * Removes the CollectionMetadata stored in the tracker from the _metadataInUse
      * list (if it's there).
      */
     void _removeMetadata_inlock(CollectionMetadataTracker* metadataTracker);
 
-    void _addRangeToClean_inlock(const ChunkRange& range);
-    void _removeRangeToClean_inlock(const ChunkRange& range);
+    std::shared_ptr<Notification<Status>> _addRangeToClean_inlock(const ChunkRange& range);
+
+    void _removeRangeToClean_inlock(const ChunkRange& range, Status deletionStatus);
+
+    RangeMap _getCopyOfRangesToClean_inlock();
 
     void _setActiveMetadata_inlock(std::unique_ptr<CollectionMetadata> newMetadata);
 
@@ -166,7 +220,8 @@ private:
     RangeMap _receivingChunks;
 
     // Set of ranges to be deleted. Indexed by the min key of the range.
-    RangeMap _rangesToClean;
+    typedef std::map<BSONObj, RangeToCleanDescriptor, BSONObjCmp> RangeToCleanMap;
+    RangeToCleanMap _rangesToClean;
 };
 
 class ScopedCollectionMetadata {
