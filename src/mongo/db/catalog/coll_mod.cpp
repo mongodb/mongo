@@ -257,7 +257,6 @@ Status collMod(OperationContext* txn,
                     Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
                 continue;
             }
-            NamespaceString nss(dbName, e.str());
             newView->setViewOn(NamespaceString(dbName, e.str()));
         } else {
             // As of SERVER-17312 we only support these two options. When SERVER-17320 is
