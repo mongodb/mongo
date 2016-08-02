@@ -654,7 +654,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     while (failedAttempts < maxFailedAttempts) {
         Status attemptErrorStatus(Status::OK());
         _setState_inlock(DataReplicatorState::InitialSync);
-        _resetState_inlock(txn, OpTimeWithHash());
         _initialSyncState.reset();
         _reporterPaused = true;
         _applierPaused = true;
@@ -670,6 +669,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
             warning() << "The applier is running, so stopping it.";
             _applier.reset();
         }
+
+        _resetState_inlock(txn, OpTimeWithHash());
 
         // For testing, we may want to fail if we receive a getmore.
         if (MONGO_FAIL_POINT(failInitialSyncWithBadHost)) {
