@@ -66,6 +66,8 @@
 		else if (ret == 0 && !F_ISSET(&(s)->txn, WT_TXN_ERROR))	\
 			ret = __wt_txn_commit((s), NULL);		\
 		else {							\
+			if (retry)					\
+				WT_TRET(__wt_session_copy_values(s));	\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
 			if ((ret == 0 || ret == WT_ROLLBACK) &&		\
 			    (retry)) {					\
