@@ -557,6 +557,7 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
+        setup: replica-2node.dr
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -733,6 +734,7 @@ buildvariants:
     - name: initialsync_WT
     - name: initialsync_MMAPv1
     - name: initialsync_WT_dr
+    - name: initialsync_MMAPv1_dr
 
 - name: linux-oplog-compare
   display_name: Linux Oplog Compare
