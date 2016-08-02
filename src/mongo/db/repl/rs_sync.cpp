@@ -72,8 +72,7 @@ RSDataSync::RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord
 void RSDataSync::startup() {
     LockGuard lk(_mutex);
     _runThread = stdx::make_unique<stdx::thread>(&RSDataSync::_run, this);
-    _stopped = false;
-    _inShutdown = _stopped;
+    _inShutdown = false;
 }
 
 void RSDataSync::shutdown() {
@@ -87,13 +86,13 @@ bool RSDataSync::_isInShutdown() const {
 }
 
 void RSDataSync::join() {
-    UniqueLock lk(_mutex);
-    if (_stopped) {
-        return;
+    std::unique_ptr<stdx::thread> thr;
+    {
+        LockGuard lk(_mutex);
+        thr.swap(_runThread);
     }
-    if (_runThread) {
-        lk.unlock();
-        _runThread->join();
+    if (thr) {
+        thr->join();
     }
 }
 
@@ -149,7 +148,6 @@ void RSDataSync::_run() {
 
     LockGuard lk(_mutex);
     _inShutdown = false;
-    _stopped = true;
 }
 
 }  // namespace repl

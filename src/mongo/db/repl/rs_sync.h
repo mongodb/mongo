@@ -61,8 +61,6 @@ private:
     std::unique_ptr<stdx::thread> _runThread;
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;
-    // If the thread should not be running.
-    bool _stopped = true;
     // BackgroundSync instance that is paired to this instance.
     BackgroundSync* _bgsync;
     // ReplicationCordinator instance.
