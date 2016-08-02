@@ -711,12 +711,12 @@ static ExitCode _initAndListen(int listenPort) {
 
     HostnameCanonicalizationWorker::start(getGlobalServiceContext());
 
+    uassertStatusOK(ShardingState::get(startupOpCtx.get())
+                        ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
+
     if (!storageGlobalParams.readOnly) {
         startFTDC();
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                                ->initializeFromShardIdentity(startupOpCtx.get()));
-
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
             if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
                 uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
@@ -728,13 +728,6 @@ static ExitCode _initAndListen(int listenPort) {
                                                        kDistLockProcessIdForConfigServer));
             Balancer::create(startupOpCtx->getServiceContext());
         }
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        auto parseStatus = ShardIdentityType::fromBSON(serverGlobalParams.overrideShardIdentity);
-        uassertStatusOK(parseStatus);
-        uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                            ->initializeFromShardIdentity(
-                                startupOpCtx.get(), parseStatus.getValue(), Date_t::max()));
-        uassertStatusOK(reloadShardRegistryUntilSuccess(startupOpCtx.get()));
     }
 
     // MessageServer::run will return when exit code closes its socket and we don't need the

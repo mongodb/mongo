@@ -118,25 +118,10 @@ public:
     void initializeFromConfigConnString(OperationContext* txn, const std::string& configSvr);
 
     /**
-     * Initializes the sharding state of this server from the shard identity document from local
-     * storage.
-     *
-     * Note that this will also try to connect to the config servers and will block until it
-     * succeeds.
-     */
-    Status initializeFromShardIdentity(OperationContext* txn);
-
-    /**
      * Initializes the sharding state of this server from the shard identity document argument.
-     * This is the more genaralized form of the initializeFromShardIdentity(OperationContext*)
-     * method that can accept the shard identity from any source. Note that shardIdentity must
-     * be valid.
-     *
-     * Returns ErrorCodes::ExceededTimeLimit if deadline has passed.
      */
     Status initializeFromShardIdentity(OperationContext* txn,
-                                       const ShardIdentityType& shardIdentity,
-                                       Date_t deadline);
+                                       const ShardIdentityType& shardIdentity);
 
     /**
      * Shuts down sharding machinery on the shard.
@@ -265,6 +250,8 @@ public:
      * for the default implementation of _scheduleWorkFn.
      */
     void setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn);
+
+    Status initializeShardingAwarenessIfNeeded(OperationContext* txn);
 
 private:
     friend class ScopedRegisterMigration;

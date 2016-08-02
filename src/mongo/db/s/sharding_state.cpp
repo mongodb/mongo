@@ -364,48 +364,11 @@ void ShardingState::initializeFromConfigConnString(OperationContext* txn, const 
     uassertStatusOK(updateConfigServerOpTimeFromMetadata(txn));
 }
 
-Status ShardingState::initializeFromShardIdentity(OperationContext* txn) {
-    invariant(!txn->lockState()->isLocked());
-
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-        return Status::OK();
-    }
-
-    BSONObj shardIdentityBSON;
-    try {
-        AutoGetCollection autoColl(txn, NamespaceString::kConfigCollectionNamespace, MODE_IS);
-        if (!Helpers::findOne(txn,
-                              autoColl.getCollection(),
-                              BSON("_id"
-                                   << "shardIdentity"),
-                              shardIdentityBSON)) {
-            return Status::OK();
-        }
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
-    auto parseStatus = ShardIdentityType::fromBSON(shardIdentityBSON);
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
-
-    auto status = initializeFromShardIdentity(txn, parseStatus.getValue(), txn->getDeadline());
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return reloadShardRegistryUntilSuccess(txn);
-}
-
 // NOTE: This method can be called inside a database lock so it should never take any database
 // locks, perform I/O, or any long running operations.
 Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
-                                                  const ShardIdentityType& shardIdentity,
-                                                  Date_t deadline) {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-        return Status::OK();
-    }
+                                                  const ShardIdentityType& shardIdentity) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
     Status validationStatus = shardIdentity.validate();
     if (!validationStatus.isOK()) {
@@ -422,10 +385,10 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
 
     // TODO: remove after v3.4.
     // This is for backwards compatibility with old style initialization through metadata
-    // commands/setShardVersion. As well as all assignments to _initializationStatus and
-    // _setInitializationState_inlock in this method.
+    // commands/setShardVersion, which can happen concurrently with an insert of a
+    // shardIdentity document to admin.system.version.
     if (_getInitializationState() == InitializationState::kInitializing) {
-        auto waitStatus = _waitForInitialization_inlock(deadline, lk);
+        auto waitStatus = _waitForInitialization_inlock(Date_t::max(), lk);
         if (!waitStatus.isOK()) {
             return waitStatus;
         }
@@ -440,6 +403,9 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
 
     auto configSvrConnStr = shardIdentity.getConfigsvrConnString();
 
+    // TODO: remove after v3.4.
+    // This is for backwards compatibility with old style initialization through metadata
+    // commands/setShardVersion, which sets the shardName and configsvrConnectionString.
     if (_getInitializationState() == InitializationState::kInitialized) {
         if (_shardName != shardIdentity.getShardName()) {
             return {ErrorCodes::InconsistentShardIdentity,
@@ -464,7 +430,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
                                   << configSvrConnStr.toString()};
         }
 
-        // clusterId will only be unset if sharding state was initialized via the sharding
+        // The clusterId will only be unset if sharding state was initialized via the sharding
         // metadata commands.
         if (!_clusterId.isSet()) {
             _clusterId = shardIdentity.getClusterId();
@@ -484,7 +450,10 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
         try {
             Status status = _globalInit(txn, configSvrConnStr, generateDistLockProcessId(txn));
 
-            // For backwards compatibility with old style inits from metadata commands.
+            // TODO: remove after v3.4.
+            // This is for backwards compatibility with old style initialization through metadata
+            // commands/setShardVersion, which can happen concurrently with an insert of a
+            // shardIdentity document to admin.system.version.
             if (status.isOK()) {
                 _setInitializationState_inlock(InitializationState::kInitialized);
                 ReplicaSetMonitor::setSynchronousConfigChangeHook(
@@ -601,6 +570,94 @@ void ShardingState::_signalInitializationComplete(Status status) {
     }
 
     _initializationFinishedCondition.notify_all();
+}
+
+Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn) {
+    // In sharded readOnly mode, we ignore the shardIdentity document on disk and instead *require*
+    // a shardIdentity document to be passed through --overrideShardIdentity.
+    if (storageGlobalParams.readOnly) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            if (serverGlobalParams.overrideShardIdentity.isEmpty()) {
+                return {ErrorCodes::InvalidOptions,
+                        "If started with --shardsvr in queryableBackupMode, a shardIdentity "
+                        "document must be provided through --overrideShardIdentity"};
+            }
+            auto swOverrideShardIdentity =
+                ShardIdentityType::fromBSON(serverGlobalParams.overrideShardIdentity);
+            if (!swOverrideShardIdentity.isOK()) {
+                return swOverrideShardIdentity.getStatus();
+            }
+            auto status = initializeFromShardIdentity(txn, swOverrideShardIdentity.getValue());
+            if (!status.isOK()) {
+                return status;
+            }
+            return reloadShardRegistryUntilSuccess(txn);
+        } else {
+            // Warn if --overrideShardIdentity is used but *not* started with --shardsvr.
+            if (!serverGlobalParams.overrideShardIdentity.isEmpty()) {
+                warning() << "Not started with --shardsvr, but a shardIdentity document was "
+                             "provided through --overrideShardIdentity: "
+                          << serverGlobalParams.overrideShardIdentity;
+            }
+            return Status::OK();
+        }
+    }
+    // In sharded *non*-readOnly mode, error if --overrideShardIdentity is provided. Use the
+    // shardIdentity document on disk if one exists, but it is okay if no shardIdentity document is
+    // provided at all (sharding awareness will be initialized when a shardIdentity document is
+    // inserted).
+    else {
+        if (!serverGlobalParams.overrideShardIdentity.isEmpty()) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "--overrideShardIdentity is only allowed in sharded "
+                                     "queryableBackupMode. If not in queryableBackupMode, edit the "
+                                     "shardIdentity document by starting the server *without* "
+                                     "--shardsvr, manually updating the shardIdentity document in "
+                                     "the "
+                                  << NamespaceString::kConfigCollectionNamespace.toString()
+                                  << " collection, and restarting the server with --shardsvr."};
+        }
+
+        // Load the shardIdentity document from disk.
+        invariant(!txn->lockState()->isLocked());
+        BSONObj shardIdentityBSON;
+        try {
+            AutoGetCollection autoColl(txn, NamespaceString::kConfigCollectionNamespace, MODE_IS);
+            Helpers::findOne(txn,
+                             autoColl.getCollection(),
+                             BSON("_id" << ShardIdentityType::IdName),
+                             shardIdentityBSON);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            if (shardIdentityBSON.isEmpty()) {
+                warning() << "Started with --shardsvr, but no shardIdentity document was found on "
+                             "disk in "
+                          << NamespaceString::kConfigCollectionNamespace;
+                return Status::OK();
+            }
+            auto swShardIdentity = ShardIdentityType::fromBSON(shardIdentityBSON);
+            if (!swShardIdentity.isOK()) {
+                return swShardIdentity.getStatus();
+            }
+            auto status = initializeFromShardIdentity(txn, swShardIdentity.getValue());
+            if (!status.isOK()) {
+                return status;
+            }
+            return reloadShardRegistryUntilSuccess(txn);
+        } else {
+            // Warn if a shardIdentity document is found on disk but *not* started with --shardsvr.
+            if (!shardIdentityBSON.isEmpty()) {
+                warning() << "Not started with --shardsvr, but a shardIdentity document was found "
+                             "on disk in "
+                          << NamespaceString::kConfigCollectionNamespace << ": "
+                          << shardIdentityBSON;
+            }
+            return Status::OK();
+        }
+    }
 }
 
 StatusWith<ChunkVersion> ShardingState::_refreshMetadata(

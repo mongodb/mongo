@@ -67,8 +67,7 @@ public:
 
     void commit() override {
         fassertNoTrace(40071,
-                       ShardingState::get(_txn)->initializeFromShardIdentity(
-                           _txn, _shardIdentity, Date_t::max()));
+                       ShardingState::get(_txn)->initializeFromShardIdentity(_txn, _shardIdentity));
     }
 
     void rollback() override {}

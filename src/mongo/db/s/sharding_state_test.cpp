@@ -173,7 +173,7 @@ TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity));
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(txn()).toString());
@@ -192,8 +192,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
         });
 
     {
-        auto status =
-            shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max());
+        auto status = shardingState()->initializeFromShardIdentity(txn(), shardIdentity);
         ASSERT_EQ(ErrorCodes::ShutdownInProgress, status);
     }
 
@@ -205,8 +204,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
         });
 
     {
-        auto status =
-            shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max());
+        auto status = shardingState()->initializeFromShardIdentity(txn(), shardIdentity);
         ASSERT_EQ(ErrorCodes::ManualInterventionRequired, status);
     }
 
@@ -221,7 +219,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -234,7 +232,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2));
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
@@ -249,7 +247,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -262,7 +260,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity2));
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ("a", shardingState()->getShardName());
@@ -277,7 +275,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -290,8 +288,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
-    auto status =
-        shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max());
+    auto status = shardingState()->initializeFromShardIdentity(txn(), shardIdentity2);
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
@@ -307,7 +304,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(clusterID);
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -320,8 +317,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
-    auto status =
-        shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max());
+    auto status = shardingState()->initializeFromShardIdentity(txn(), shardIdentity2);
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
@@ -336,7 +332,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity, Date_t::max()));
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(txn(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
@@ -349,8 +345,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
-    auto status =
-        shardingState()->initializeFromShardIdentity(txn(), shardIdentity2, Date_t::max());
+    auto status = shardingState()->initializeFromShardIdentity(txn(), shardIdentity2);
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
