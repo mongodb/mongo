@@ -198,7 +198,7 @@ private:
         JS::RootedObject thisv;
 
         // ids for the keys of thisv
-        JS::AutoIdArray ids;
+        JS::AutoIdVector ids;
 
         // Current index of the current key we're working on
         std::size_t idx = 0;

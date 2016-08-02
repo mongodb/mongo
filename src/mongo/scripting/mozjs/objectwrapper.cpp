@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 
 #include <js/Conversions.h>
+#include <jsapi.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -537,15 +538,42 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
                                                                   JSObject* obj,
                                                                   BSONObjBuilder* parent,
                                                                   StringData sd)
-    : thisv(cx, obj), ids(cx, JS_Enumerate(cx, thisv)) {
+    : thisv(cx, obj), ids(cx) {
+    bool isArray = false;
     if (parent) {
-        subbob.emplace(JS_IsArrayObject(cx, thisv) ? parent->subarrayStart(sd)
-                                                   : parent->subobjStart(sd));
+        isArray = JS_IsArrayObject(cx, thisv);
+
+        subbob.emplace(isArray ? parent->subarrayStart(sd) : parent->subobjStart(sd));
     }
 
-    if (!ids) {
-        throwCurrentJSException(
-            cx, ErrorCodes::JSInterpreterFailure, "Failure to enumerate object");
+    if (isArray) {
+        uint32_t length;
+        if (!JS_GetArrayLength(cx, thisv, &length)) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to get array length");
+        }
+
+        if (!ids.reserve(length)) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to reserve array");
+        }
+
+        JS::RootedId rid(cx);
+        for (uint32_t i = 0; i < length; i++) {
+            rid.set(INT_TO_JSID(i));
+            ids.infallibleAppend(rid);
+        }
+    } else {
+        JS::AutoIdArray rids(cx, JS_Enumerate(cx, thisv));
+
+        if (!ids.reserve(rids.length())) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to reserve array");
+        }
+
+        for (uint32_t i = 0; i < rids.length(); i++) {
+            ids.infallibleAppend(rids[i]);
+        }
     }
 
     if (getScope(cx)->getProto<BSONInfo>().instanceOf(thisv)) {
