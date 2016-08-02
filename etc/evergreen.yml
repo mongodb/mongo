@@ -2332,7 +2332,7 @@ tasks:
         script: |
           set -o errexit
 
-          mkdir ~/.aws
+          mkdir -p ~/.aws
 
           cat <<EOF > ~/.aws/config
           [default]
