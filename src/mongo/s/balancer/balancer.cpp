@@ -308,46 +308,42 @@ void Balancer::report(OperationContext* txn, BSONObjBuilder* builder) {
 void Balancer::_mainThread() {
     Client::initThread("Balancer");
 
-    // TODO (SERVER-24754): Balancer thread should only keep the operation context alive while it is
-    // doing balancing
-    const auto txn = cc().makeOperationContext();
-
     log() << "CSRS balancer is starting";
 
     const Seconds kInitBackoffInterval(60);
 
-    // The balancer thread is holding the balancer during its entire lifetime
-    boost::optional<DistLockManager::ScopedDistLock> scopedBalancerLock;
-
-    // Take the balancer distributed lock
-    while (!_stopRequested() && !scopedBalancerLock) {
+    // Take the balancer distributed lock and hold it permanently
+    while (!_stopRequested()) {
+        auto txn = cc().makeOperationContext();
         auto shardingContext = Grid::get(txn.get());
-        auto scopedDistLock = shardingContext->catalogClient(txn.get())->distLock(
-            txn.get(), "balancer", "CSRS Balancer");
-        if (!scopedDistLock.isOK()) {
-            warning() << "Balancer distributed lock could not be acquired and will be retried in "
-                         "one minute"
-                      << causedBy(scopedDistLock.getStatus());
-            _sleepFor(txn.get(), kInitBackoffInterval);
-            continue;
+
+        auto distLockHandleStatus =
+            shardingContext->catalogClient(txn.get())->getDistLockManager()->lockWithSessionID(
+                txn.get(), "balancer", "CSRS Balancer", OID::gen());
+        if (distLockHandleStatus.isOK()) {
+            break;
         }
 
-        // Initialization and distributed lock acquisition succeeded
-        scopedBalancerLock = std::move(scopedDistLock.getValue());
+        warning() << "Balancer distributed lock could not be acquired and will be retried in "
+                  << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
+                  << causedBy(distLockHandleStatus.getStatus());
+
+        _sleepFor(txn.get(), kInitBackoffInterval);
     }
 
     log() << "CSRS balancer thread is now running";
 
     // Main balancer loop
     while (!_stopRequested()) {
+        auto txn = cc().makeOperationContext();
         auto shardingContext = Grid::get(txn.get());
         auto balancerConfig = shardingContext->getBalancerConfiguration();
 
         BalanceRoundDetails roundDetails;
 
-        try {
-            _beginRound(txn.get());
+        _beginRound(txn.get());
 
+        try {
             shardingContext->shardRegistry()->reload(txn.get());
 
             uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));

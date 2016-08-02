@@ -71,6 +71,20 @@ DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     return *this;
 }
 
+StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationContext* txn,
+                                                                  StringData name,
+                                                                  StringData whyMessage,
+                                                                  Milliseconds waitFor,
+                                                                  Milliseconds lockTryInterval) {
+    auto distLockHandleStatus =
+        lockWithSessionID(txn, name, whyMessage, OID::gen(), waitFor, lockTryInterval);
+    if (!distLockHandleStatus.isOK()) {
+        return distLockHandleStatus.getStatus();
+    }
+
+    return DistLockManager::ScopedDistLock(txn, std::move(distLockHandleStatus.getValue()), this);
+}
+
 Status DistLockManager::ScopedDistLock::checkStatus() {
     if (!_lockManager) {
         return Status(ErrorCodes::IllegalOperation, "no lock manager, lock was not acquired");

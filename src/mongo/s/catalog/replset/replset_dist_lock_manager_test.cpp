@@ -1186,26 +1186,11 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingWithSessionID) {
         },
         currentLockDoc);
 
-    int unlockCallCount = 0;
-    OID unlockSessionIDPassed;
+    auto distLockHandleStatus = getMgr()->lockWithSessionID(
+        txn(), "bar", "foo", passedLockSessionID, Milliseconds(0), Milliseconds(0));
+    ASSERT_OK(distLockHandleStatus.getStatus());
 
-    {
-        auto lockStatus = getMgr()->lockWithSessionID(
-            txn(), "bar", "foo", passedLockSessionID, Milliseconds(0), Milliseconds(0));
-
-        ASSERT_OK(lockStatus.getStatus());
-
-        getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
-                unlockCallCount++;
-                unlockSessionIDPassed = lockSessionID;
-            },
-            Status::OK());
-    }
-
-    ASSERT_EQUALS(1, unlockCallCount);
-    ASSERT_EQUALS(passedLockSessionID, unlockSessionIDPassed);
+    getMockCatalog()->expectNoGrabLock();
 }
 
 TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfExpirationHasNotElapsed) {

@@ -261,22 +261,12 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* txn,
     return false;
 }
 
-StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    Milliseconds waitFor,
-    Milliseconds lockTryInterval) {
-    return lockWithSessionID(txn, name, whyMessage, OID::gen(), waitFor, lockTryInterval);
-}
-
-StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSessionID(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    const OID lockSessionID,
-    Milliseconds waitFor,
-    Milliseconds lockTryInterval) {
+StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationContext* txn,
+                                                                     StringData name,
+                                                                     StringData whyMessage,
+                                                                     const OID lockSessionID,
+                                                                     Milliseconds waitFor,
+                                                                     Milliseconds lockTryInterval) {
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
@@ -286,6 +276,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
     int networkErrorRetries = 0;
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+
     // Distributed lock acquisition works by tring to update the state of the lock to 'taken'. If
     // the lock is currently taken, we will back off and try the acquisition again, repeating this
     // until the lockTryInterval has been reached. If a network error occurs at each lock
@@ -321,7 +312,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
             // the lock document.
             log() << "distributed lock '" << name << "' acquired for '"
                   << redact(whyMessage.toString()) << "', ts : " << lockSessionID;
-            return ScopedDistLock(txn, lockSessionID, this);
+            return lockSessionID;
         }
 
         // If a network error occurred, unlock the lock synchronously and try again
@@ -390,7 +381,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lockWithSess
 
                     LOG(0) << "lock '" << name << "' successfully forced";
                     LOG(0) << "distributed lock '" << name << "' acquired, ts : " << lockSessionID;
-                    return ScopedDistLock(txn, lockSessionID, this);
+                    return lockSessionID;
                 }
 
                 if (overtakeStatus != ErrorCodes::LockStateChangeFailed) {

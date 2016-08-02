@@ -72,23 +72,12 @@ std::string DistLockManagerMock::getProcessID() {
     return "Mock dist lock manager process id";
 }
 
-StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    Milliseconds waitFor,
-    Milliseconds lockTryInterval) {
-    return lockWithSessionID(
-        txn, name, whyMessage, DistLockHandle::gen(), waitFor, lockTryInterval);
-}
-
-StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lockWithSessionID(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    const OID lockSessionID,
-    Milliseconds waitFor,
-    Milliseconds lockTryInterval) {
+StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationContext* txn,
+                                                                  StringData name,
+                                                                  StringData whyMessage,
+                                                                  const OID lockSessionID,
+                                                                  Milliseconds waitFor,
+                                                                  Milliseconds lockTryInterval) {
     _lockChecker(name, whyMessage, waitFor, lockTryInterval);
     _lockChecker = NoLockFuncSet;
 
@@ -108,7 +97,7 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lockWithSession
     info.lockID = lockSessionID;
     _locks.push_back(info);
 
-    return DistLockManager::ScopedDistLock(nullptr, info.lockID, this);
+    return info.lockID;
 }
 
 void DistLockManagerMock::unlockAll(OperationContext* txn, const std::string& processID) {
