@@ -363,7 +363,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
                 if (!withPrompt || prompter.confirm()) {
                     BSONObjBuilder cmdBob;
                     BSONObj info;
-                    cmdBob.append("op", op["opid"]);
+                    cmdBob.appendAs(op["opid"], "op");
                     auto cmdArgs = cmdBob.done();
                     conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", cmdArgs, info);
                 } else {
