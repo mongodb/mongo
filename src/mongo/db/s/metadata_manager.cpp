@@ -422,14 +422,16 @@ bool MetadataManager::hasRangesToClean() {
 
 bool MetadataManager::isInRangesToClean(const ChunkRange& range) {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    return rangeMapContains(_rangesToClean, range.getMin(), range.getMax());
+    // For convenience, this line makes an unnecessary copy, to reuse the
+    // rangeMapContains helper function.
+    return rangeMapContains(_getCopyOfRangesToClean_inlock(), range.getMin(), range.getMax());
 }
 
 ChunkRange MetadataManager::getNextRangeToClean() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
     invariant(!_rangesToClean.empty());
     auto it = _rangesToClean.begin();
-    return ChunkRange(it->first, it->second);
+    return ChunkRange(it->first, it->second.getMax());
 }
 
 }  // namespace mongo
