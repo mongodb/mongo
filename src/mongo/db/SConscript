@@ -342,6 +342,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+        '$BUILD_DIR/mongo/transport/message_compressor_registry',
         # The dependency on network is a temporary crutch that should go away once the
         # networking library has separate options
         '$BUILD_DIR/mongo/util/net/network',

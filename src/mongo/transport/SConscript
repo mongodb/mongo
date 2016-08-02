@@ -99,4 +99,24 @@ env.CppUnitTest(
     LIBDEPS=[
         'transport_layer_mock',
     ],
+
+env.Library(
+    target='message_compressor_registry',
+    source=[
+        'message_compressor_registry.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ]
+)
+
+env.CppUnitTest(
+    target='message_compressor_test',
+    source=[
+        'message_compressor_registry_test.cpp',
+    ],
+    LIBDEPS=[
+        'message_compressor_registry',
+    ]
 )

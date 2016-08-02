@@ -44,6 +44,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
@@ -194,6 +195,10 @@ Status addMongoShellOptions(moe::OptionSection* options) {
         ->addOptionChaining(
             "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opCommandOnly, all")
         .hidden();
+
+    ret = addMessageCompressionOptions(options, true);
+    if (!ret.isOK())
+        return ret;
 
     return Status::OK();
 }
@@ -400,6 +405,10 @@ Status storeMongoShellOptions(const moe::Environment& params,
         sb << " in connection URI and as a command-line option";
         return Status(ErrorCodes::InvalidOptions, sb.str());
     }
+
+    ret = storeMessageCompressionOptions(params);
+    if (!ret.isOK())
+        return ret;
 
     return Status::OK();
 }

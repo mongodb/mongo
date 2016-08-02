@@ -48,6 +48,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
@@ -388,6 +389,11 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                             "Enable command computing aggregate statistics on storage.")
         .hidden()
         .setSources(moe::SourceAllLegacy);
+
+    auto ret = addMessageCompressionOptions(options, false);
+    if (!ret.isOK()) {
+        return ret;
+    }
 
     return Status::OK();
 }
@@ -1037,6 +1043,11 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
         return ret;
     }
 #endif
+
+    ret = storeMessageCompressionOptions(params);
+    if (!ret.isOK()) {
+        return ret;
+    }
 
     return Status::OK();
 }
