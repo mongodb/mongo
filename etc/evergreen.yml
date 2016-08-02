@@ -896,8 +896,12 @@ tasks:
             ${strip_command|/usr/bin/strip} mongobridge
           fi
 
+          # If this is a scheduled build, we check for changes against the last commit.
+          if [ "${is_patch}" != "true" ]; then
+            burn_in_args="--baseCommit=HEAD~1"
+          fi
           # Capture a list of new and modified tests.
-          ${python|python} buildscripts/burn_in_tests.py --reportFile=jstests/new_tests.json --noExec
+          ${python|python} buildscripts/burn_in_tests.py --reportFile=jstests/new_tests.json --noExec $burn_in_args
 
           # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
           sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
@@ -1021,10 +1025,8 @@ tasks:
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
-      burn_msg: This task is currently only configured for patch builds.
-      burn_patch_check: if [ "${is_patch}" != "true" ]; then echo ${burn_msg}; exit 0; fi;
       path_prefix: PATH=$PATH:/data/multiversion
-      resmoke_wrapper: ${burn_patch_check} ${python|python} buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
+      resmoke_wrapper: ${python|python} buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeat=2
       run_multiple_jobs: true
 
