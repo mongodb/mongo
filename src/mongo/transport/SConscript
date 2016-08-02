@@ -101,9 +101,10 @@ env.CppUnitTest(
     ],
 
 env.Library(
-    target='message_compressor_registry',
+    target='message_compressor',
     source=[
         'message_compressor_registry.cpp',
+        'message_compressor_manager.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -114,9 +115,10 @@ env.Library(
 env.CppUnitTest(
     target='message_compressor_test',
     source=[
+        'message_compressor_manager_test.cpp',
         'message_compressor_registry_test.cpp',
     ],
     LIBDEPS=[
-        'message_compressor_registry',
+        'message_compressor',
     ]
 )

@@ -58,6 +58,9 @@ class MessageCompressorRegistry {
 public:
     MessageCompressorRegistry() = default;
 
+    MessageCompressorRegistry(MessageCompressorRegistry&&) = default;
+    MessageCompressorRegistry& operator=(MessageCompressorRegistry&&) = default;
+
     /*
      * Returns the global MessageCompressorRegistry
      */

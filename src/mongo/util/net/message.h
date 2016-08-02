@@ -66,6 +66,7 @@ enum NetworkOp : int32_t {
     // dbCommandReply_DEPRECATED = 2009, //
     dbCommand = 2010,
     dbCommandReply = 2011,
+    dbCompressed = 2012,
 };
 
 enum class LogicalOp {
@@ -78,6 +79,7 @@ enum class LogicalOp {
     opDelete,
     opKillCursors,
     opCommand,
+    opCompressed,
 };
 
 static inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
@@ -98,6 +100,8 @@ static inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
             return LogicalOp::opKillCursors;
         case dbCommand:
             return LogicalOp::opCommand;
+        case dbCompressed:
+            return LogicalOp::opCompressed;
         default:
             int op = int(networkOp);
             massert(34348, str::stream() << "cannot translate opcode " << op, !op);
@@ -131,6 +135,8 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "command";
         case dbCommandReply:
             return "commandReply";
+        case dbCompressed:
+            return "compressed";
         default:
             int op = static_cast<int>(networkOp);
             massert(16141, str::stream() << "cannot translate opcode " << op, !op);
@@ -158,6 +164,8 @@ inline const char* logicalOpToString(LogicalOp logicalOp) {
             return "killcursors";
         case LogicalOp::opCommand:
             return "command";
+        case LogicalOp::opCompressed:
+            return "compressed";
         default:
             MONGO_UNREACHABLE;
     }
@@ -171,6 +179,7 @@ inline bool opIsWrite(int op) {
         case dbQuery:
         case dbGetMore:
         case dbKillCursors:
+        case dbCompressed:
             return false;
 
         case dbUpdate:
