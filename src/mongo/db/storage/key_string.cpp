@@ -129,6 +129,7 @@ uint8_t bsonTypeToGenericKeyStringType(BSONType type) {
         case Undefined:
             return CType::kUndefined;
 
+        case NumberDecimal:
         case NumberDouble:
         case NumberInt:
         case NumberLong:
@@ -164,9 +165,8 @@ uint8_t bsonTypeToGenericKeyStringType(BSONType type) {
 
         case MaxKey:
             return CType::kMaxKey;
-        default:
-            invariant(false);
     }
+    MONGO_UNREACHABLE;
 }
 
 // Doubles smaller than this store only a single bit indicating a decimal continuation follows.
@@ -837,9 +837,6 @@ void KeyString::_appendBsonValue(const BSONElement& elem, bool invert, const Str
                     version >= Version::V1);
             _appendNumberDecimal(elem._numberDecimal(), invert);
             break;
-
-        default:
-            invariant(false);
     }
 }
 

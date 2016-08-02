@@ -332,6 +332,9 @@ TEST_F(KeyStringTest, DecimalNumbers) {
               BSON("" << Decimal128("0.2512388057698744585180135042133610E-6020")));  // 2**(-10000)
     ROUNDTRIP(V1, BSON("" << Decimal128("4.940656458412465441765687928682213E-324") << "" << 1));
     ROUNDTRIP(V1, BSON("" << Decimal128("-0.8289046058458094980903836776809409E-316")));
+
+    // Decimal inside sub-doc
+    ROUNDTRIP(V1, BSON("" << BSONNULL << "" << BSON("a" << Decimal128::kPositiveInfinity)));
 }
 
 TEST_F(KeyStringTest, LotsOfNumbers1) {
