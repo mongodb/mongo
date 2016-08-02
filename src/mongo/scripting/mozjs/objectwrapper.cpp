@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 
 #include <js/Conversions.h>
+#include <jsapi.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -539,9 +540,8 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
                                                                   BSONObjBuilder* parent,
                                                                   StringData sd)
     : thisv(cx, obj), ids(cx, JS::IdVector(cx)) {
+    bool isArray = false;
     if (parent) {
-        bool isArray;
-
         if (!JS_IsArrayObject(cx, thisv, &isArray)) {
             throwCurrentJSException(
                 cx, ErrorCodes::JSInterpreterFailure, "Failure to check object is an array");
@@ -550,9 +550,25 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
         subbob.emplace(isArray ? parent->subarrayStart(sd) : parent->subobjStart(sd));
     }
 
-    if (!JS_Enumerate(cx, thisv, &ids)) {
-        throwCurrentJSException(
-            cx, ErrorCodes::JSInterpreterFailure, "Failure to enumerate object");
+    if (isArray) {
+        uint32_t length;
+        JS_GetArrayLength(cx, thisv, &length);
+
+        if (!ids.reserve(length)) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to reserve array");
+        }
+
+        JS::RootedId rid(cx);
+        for (uint32_t i = 0; i < length; i++) {
+            rid.set(INT_TO_JSID(i));
+            ids.infallibleAppend(rid);
+        }
+    } else {
+        if (!JS_Enumerate(cx, thisv, &ids)) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to enumerate object");
+        }
     }
 
     if (getScope(cx)->getProto<BSONInfo>().instanceOf(thisv)) {
