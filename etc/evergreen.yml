@@ -727,7 +727,7 @@ post:
         # these default values in the distro config in evergreen.
 
         if [ -d "${scons_cache_path}" ]; then
-            ${python|python} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+            ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
   - command: archive.targz_pack
     params:
@@ -4294,7 +4294,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     ext: zip
-    use_scons_cache: true
+    use_scons_cache: false
   tasks:
   - name: compile
     distros:
@@ -4490,7 +4490,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
-    use_scons_cache: true
+    use_scons_cache: false
   tasks:
   - name: compile
     distros:
@@ -5903,7 +5903,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     ext: zip
-    use_scons_cache: true
+    use_scons_cache: false
   tasks:
   - name: compile
     distros:
