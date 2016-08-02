@@ -71,9 +71,9 @@ else:
 
 if os.path.isfile(system_id_path):
     with open(system_id_path, "r") as f:
-        default_cache_path = os.path.join(default_cache_path_base, f.readline())
+        default_cache_path = os.path.join(default_cache_path_base, f.readline().strip())
 
         print "scons_cache_path: {0}".format(default_cache_path)
 
         if os.getenv("USE_SCONS_CACHE") not in (None, False, "false", ""):
-            print "scons_cache_args: --cache --cache-dir={0}".format(default_cache_path)
+            print "scons_cache_args: --cache --cache-dir='{0}'".format(default_cache_path)
