@@ -118,7 +118,13 @@ __handler_failure(WT_SESSION_IMPL *session,
 	    handler->handle_error(handler, wt_session, error, s) == 0)
 		return;
 
+	/*
+	 * In case there is a failure in the default error handler, make sure
+	 * we don't recursively try to report *that* error.
+	 */
+	session->event_handler = &__event_handler_default;
 	(void)__handle_error_default(NULL, wt_session, error, s);
+	session->event_handler = handler;
 }
 
 /*
