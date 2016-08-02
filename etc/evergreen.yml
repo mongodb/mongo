@@ -1940,7 +1940,7 @@ tasks:
         script: |
           set -o errexit
 
-          mkdir ~/.aws
+          mkdir -p ~/.aws
 
           cat <<EOF > ~/.aws/config
           [default]
@@ -2206,29 +2206,11 @@ tasks:
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5
 
-    # Put the tarred up Package repo
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        build_variants: *packaging_variants
-        local_file: src/repo-${push_arch}.tgz
-        bucket: build-push-testing
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/repo-${push_arch}-${task_id}.tgz
-
     - command: s3Copy.copy
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         s3_copy_files:
-            #Package repo tarballs
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/repo-${push_arch}-${task_id}.tgz', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'packages/repo-${push_arch}-${suffix}.tgz', 'bucket': '${push_bucket}'},
-                build_variants: *packaging_variants
-                 }
-
             #Binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
