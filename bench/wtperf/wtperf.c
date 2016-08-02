@@ -1869,7 +1869,7 @@ create_uris(CONFIG *cfg)
 	base_uri_len = strlen(cfg->base_uri);
 	cfg->uris = dcalloc(cfg->table_count, sizeof(char *));
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = dcalloc(base_uri_len + 5, 1);
+		uri = cfg->uris[i] = dcalloc(base_uri_len + 6, 1);
 		/*
 		 * If there is only one table, just use base name.
 		 */
