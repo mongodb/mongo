@@ -191,7 +191,8 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
         txn,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 
-    RemoteCommandResponse swResponse = Status(ErrorCodes::InternalError, "Internal error running command");
+    RemoteCommandResponse swResponse =
+        Status(ErrorCodes::InternalError, "Internal error running command");
 
     TaskExecutor* executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
     auto callStatus = executor->scheduleRemoteCommand(

@@ -221,8 +221,8 @@ void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& rs) {
     // We never hold the access lock when we call finish from NetworkInterfaceASIO.
     _transitionToState(AsyncOp::State::kFinished);
 
-    LOG(2) << "Request " << _request.id
-           << " finished with response: " << redact(rs.isOK() ? rs.data.toString() : rs.status.toString());
+    LOG(2) << "Request " << _request.id << " finished with response: "
+           << redact(rs.isOK() ? rs.data.toString() : rs.status.toString());
 
     // Calling the completion handler may invalidate state in this op, so do it last.
     _onFinish(rs);

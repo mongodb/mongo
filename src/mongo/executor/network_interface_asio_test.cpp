@@ -103,8 +103,8 @@ public:
         }
     }
 
-    Deferred<RemoteCommandResponse> startCommand(
-        const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest& request) {
+    Deferred<RemoteCommandResponse> startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                                 RemoteCommandRequest& request) {
         Deferred<RemoteCommandResponse> deferredResponse;
         ASSERT_OK(net().startCommand(
             cbHandle, request, [deferredResponse](ResponseStatus response) mutable {
@@ -450,8 +450,8 @@ TEST_F(NetworkInterfaceASIOTest, InShutdown) {
 TEST_F(NetworkInterfaceASIOTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
     net().shutdown();
     RemoteCommandRequest request;
-    ASSERT_NOT_OK(net().startCommand(
-        makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {}));
+    ASSERT_NOT_OK(
+        net().startCommand(makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {}));
 }
 
 class MalformedMessageTest : public NetworkInterfaceASIOTest {

@@ -187,9 +187,8 @@ public:
                                      timeout};
         auto out = fixture->runCommand(cb, request)
                        .then(pool, [self](RemoteCommandResponse resp) -> Status {
-                           auto status = resp.isOK()
-                               ? getStatusFromCommandResult(resp.data)
-                               : resp.status;
+                           auto status =
+                               resp.isOK() ? getStatusFromCommandResult(resp.data) : resp.status;
 
                            return status == self._expected
                                ? Status::OK()
