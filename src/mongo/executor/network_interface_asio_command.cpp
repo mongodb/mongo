@@ -142,15 +142,16 @@ ResponseStatus decodeRPC(Message* received,
         if (reply->getProtocol() != protocol) {
             auto requestProtocol = rpc::toString(static_cast<rpc::ProtocolSet>(protocol));
             if (!requestProtocol.isOK())
-                return requestProtocol.getStatus();
+                return {requestProtocol.getStatus(), elapsed};
 
-            return Status(ErrorCodes::RPCProtocolNegotiationFailed,
-                          str::stream() << "Mismatched RPC protocols - request was '"
-                                        << requestProtocol.getValue().toString()
-                                        << "' '"
-                                        << " but reply was '"
-                                        << networkOpToString(received->operation())
-                                        << "'");
+            return {ErrorCodes::RPCProtocolNegotiationFailed,
+                    str::stream() << "Mismatched RPC protocols - request was '"
+                                  << requestProtocol.getValue().toString()
+                                  << "' '"
+                                  << " but reply was '"
+                                  << networkOpToString(received->operation())
+                                  << "'",
+                    elapsed};
         }
         auto commandReply = reply->getCommandReply();
         auto replyMetadata = reply->getMetadata();
@@ -160,14 +161,14 @@ ResponseStatus decodeRPC(Message* received,
             auto listenStatus = callNoexcept(
                 *metadataHook, &rpc::EgressMetadataHook::readReplyMetadata, source, replyMetadata);
             if (!listenStatus.isOK()) {
-                return listenStatus;
+                return {listenStatus, elapsed};
             }
         }
 
         return {RemoteCommandResponse(
             std::move(*received), std::move(commandReply), std::move(replyMetadata), elapsed)};
     } catch (...) {
-        return exceptionToStatus();
+        return {exceptionToStatus(), elapsed};
     }
 }
 
@@ -198,13 +199,17 @@ MSGHEADER::Value& NetworkInterfaceASIO::AsyncCommand::header() {
     return _header;
 }
 
-ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protocol,
+ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(AsyncOp* op,
+                                                            rpc::Protocol protocol,
                                                             Date_t now,
                                                             rpc::EgressMetadataHook* metadataHook) {
     auto& received = _toRecv;
     switch (_type) {
         case CommandType::kRPC: {
-            return decodeRPC(&received, protocol, now - _start, _target, metadataHook);
+            auto rs = decodeRPC(&received, protocol, now - _start, _target, metadataHook);
+            if (rs.isOK())
+                op->setResponseMetadata(rs.metadata);
+            return rs;
         }
         case CommandType::kDownConvertedFind: {
             auto ns = DbMessage(_toSend).getns();
@@ -257,30 +262,33 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 }
 
 void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
-    auto response = op->command()->response(op->operationProtocol(), now(), _metadataHook.get());
+    auto response =
+        op->command()->response(op, op->operationProtocol(), now(), _metadataHook.get());
     _completeOperation(op, response);
 }
 
 void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_code& ec) {
-    if (ec.category() == mongoErrorCategory()) {
-        // If we get a Mongo error code, we can preserve it.
-        _completeOperation(op, Status(ErrorCodes::fromInt(ec.value()), ec.message()));
-    } else {
-        // If we get an asio or system error, we just convert it to a network error.
-        _completeOperation(op, Status(ErrorCodes::HostUnreachable, ec.message()));
-    }
+    ErrorCodes::Error errorCode = (ec.category() == mongoErrorCategory())
+        ? ErrorCodes::fromInt(ec.value())
+        : ErrorCodes::HostUnreachable;
+    _completeOperation(op, {errorCode, ec.message(), Milliseconds(now() - op->_start)});
 }
 
 // NOTE: This method may only be called by ASIO threads
 // (do not call from methods entered by TaskExecutor threads)
-void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus& resp) {
+void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) {
+    auto metadata = op->getResponseMetadata();
+    if (!metadata.isEmpty()) {
+        resp.metadata = metadata;
+    }
+
     // Cancel this operation's timeout. Note that the timeout callback may already be running,
     // may have run, or may have already been scheduled to run in the near future.
     if (op->_timeoutAlarm) {
         op->_timeoutAlarm->cancel();
     }
 
-    if (resp.getStatus().code() == ErrorCodes::ExceededTimeLimit) {
+    if (resp.status.code() == ErrorCodes::ExceededTimeLimit) {
         _numTimedOutOps.fetchAndAdd(1);
     }
 
@@ -289,7 +297,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         MONGO_ASIO_INVARIANT(!resp.isOK(), "Failed to connect in setup", op);
         // If we fail during connection, we won't be able to access any of op's members after
         // calling finish(), so we return here.
-        log() << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        log() << "Failed to connect to " << op->request().target << " - " << resp.status;
         _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;
@@ -301,7 +309,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         // If we fail during heartbeating, we won't be able to access any of op's members after
         // calling finish(), so we return here.
         log() << "Failed asio heartbeat to " << op->request().target << " - "
-              << redact(resp.getStatus());
+              << redact(resp.status);
         _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;
@@ -312,9 +320,9 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         // that
         // we got from the pool to execute a command, but it failed for some reason.
         LOG(2) << "Failed to execute command: " << redact(op->request().toString())
-               << " reason: " << redact(resp.getStatus());
+               << " reason: " << redact(resp.status);
 
-        if (resp.getStatus().code() != ErrorCodes::CallbackCanceled) {
+        if (resp.status.code() != ErrorCodes::CallbackCanceled) {
             _numFailedOps.fetchAndAdd(1);
         }
     } else {
@@ -357,7 +365,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 
     asioConn->bindAsyncOp(std::move(ownedOp));
     if (!resp.isOK()) {
-        asioConn->indicateFailure(resp.getStatus());
+        asioConn->indicateFailure(resp.status);
     } else {
         asioConn->indicateUsed();
         asioConn->indicateSuccess();
@@ -451,16 +459,14 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
 
     auto finishHook = [this, op]() {
         auto response =
-            op->command()->response(op->operationProtocol(), now(), _metadataHook.get());
+            op->command()->response(op, op->operationProtocol(), now(), _metadataHook.get());
 
         if (!response.isOK()) {
-            return _completeOperation(op, response.getStatus());
+            return _completeOperation(op, response);
         }
 
-        auto handleStatus = callNoexcept(*_hook,
-                                         &NetworkConnectionHook::handleReply,
-                                         op->request().target,
-                                         std::move(response.getValue()));
+        auto handleStatus = callNoexcept(
+            *_hook, &NetworkConnectionHook::handleReply, op->request().target, std::move(response));
 
         if (!handleStatus.isOK()) {
             return _completeOperation(op, handleStatus);

@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <iosfwd>
 #include <memory>
 #include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
@@ -51,34 +53,24 @@ namespace executor {
 struct RemoteCommandResponse {
     RemoteCommandResponse() = default;
 
-    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj)
-        : RemoteCommandResponse(dataObj, metadataObj, Milliseconds(0)) {}
+    RemoteCommandResponse(ErrorCodes::Error code, std::string reason);
 
-    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
-        : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {
-        // The buffer backing the default empty BSONObj has static duration so it is effectively
-        // owned.
-        invariant(data.isOwned() || data.objdata() == BSONObj().objdata());
-        invariant(metadata.isOwned() || metadata.objdata() == BSONObj().objdata());
-    }
+    RemoteCommandResponse(ErrorCodes::Error code, std::string reason, Milliseconds millis);
+
+    RemoteCommandResponse(Status s);
+
+    RemoteCommandResponse(Status s, Milliseconds millis);
+
+    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis);
 
     RemoteCommandResponse(Message messageArg,
                           BSONObj dataObj,
                           BSONObj metadataObj,
-                          Milliseconds millis)
-        : message(std::make_shared<const Message>(std::move(messageArg))),
-          data(std::move(dataObj)),
-          metadata(std::move(metadataObj)),
-          elapsedMillis(millis) {
-        if (!data.isOwned()) {
-            data.shareOwnershipWith(message->sharedBuffer());
-        }
-        if (!metadata.isOwned()) {
-            metadata.shareOwnershipWith(message->sharedBuffer());
-        }
-    }
+                          Milliseconds millis);
 
     RemoteCommandResponse(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
+
+    bool isOK() const;
 
     std::string toString() const;
 
@@ -88,7 +80,8 @@ struct RemoteCommandResponse {
     std::shared_ptr<const Message> message;  // May be null.
     BSONObj data;                            // Always owned. May point into message.
     BSONObj metadata;                        // Always owned. May point into message.
-    Milliseconds elapsedMillis = {};
+    boost::optional<Milliseconds> elapsedMillis;
+    Status status = Status::OK();
 };
 
 }  // namespace executor

@@ -403,7 +403,7 @@ void AsyncResultsMerger::handleBatchResponse(
         // Make a best effort to parse the response and retrieve the cursor id. We need the cursor
         // id in order to issue a killCursors command against it.
         if (cbData.response.isOK()) {
-            auto cursorResponse = parseCursorResponse(cbData.response.getValue().data, remote);
+            auto cursorResponse = parseCursorResponse(cbData.response.data, remote);
             if (cursorResponse.isOK()) {
                 remote.cursorId = cursorResponse.getValue().getCursorId();
             }
@@ -432,8 +432,8 @@ void AsyncResultsMerger::handleBatchResponse(
     ScopeGuard signaller = MakeGuard(&AsyncResultsMerger::signalCurrentEventIfReady_inlock, this);
 
     StatusWith<CursorResponse> cursorResponseStatus(
-        cbData.response.isOK() ? parseCursorResponse(cbData.response.getValue().data, remote)
-                               : cbData.response.getStatus());
+        cbData.response.isOK() ? parseCursorResponse(cbData.response.data, remote)
+                               : cbData.response.status);
 
     if (!cursorResponseStatus.isOK()) {
         // In the case a read is performed against a view, the shard primary can return an error
@@ -443,7 +443,7 @@ void AsyncResultsMerger::handleBatchResponse(
         // collection.
         if (cursorResponseStatus.getStatus() ==
             ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
-            auto& responseObj = cbData.response.getValue().data;
+            auto& responseObj = cbData.response.data;
             if (!responseObj.hasField("resolvedView")) {
                 remote.status = Status(ErrorCodes::InternalError,
                                        str::stream() << "Missing field 'resolvedView' in document: "

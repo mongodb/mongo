@@ -95,6 +95,7 @@ class NetworkInterfaceASIO final : public NetworkInterface {
     friend class connection_pool_asio::ASIOConnection;
     friend class connection_pool_asio::ASIOTimer;
     friend class connection_pool_asio::ASIOImpl;
+    class AsyncOp;
 
 public:
     struct Options {
@@ -207,7 +208,8 @@ private:
         Message& toRecv();
         MSGHEADER::Value& header();
 
-        ResponseStatus response(rpc::Protocol protocol,
+        ResponseStatus response(AsyncOp* op,
+                                rpc::Protocol protocol,
                                 Date_t now,
                                 rpc::EgressMetadataHook* metadataHook = nullptr);
 
@@ -314,6 +316,9 @@ private:
 
         void setOperationProtocol(rpc::Protocol proto);
 
+        void setResponseMetadata(BSONObj m);
+        BSONObj getResponseMetadata();
+
         void reset();
 
         void clearStateTransitions();
@@ -416,6 +421,8 @@ private:
          * Must be holding the access control's lock to edit.
          */
         std::array<State, kMaxStateTransitions> _states;
+
+        BSONObj _responseMetadata{};
     };
 
     void _startCommand(AsyncOp* op);
@@ -430,16 +437,17 @@ private:
      */
     template <typename Handler>
     void _validateAndRun(AsyncOp* op, std::error_code ec, Handler&& handler) {
-        if (op->canceled())
-            return _completeOperation(op,
-                                      Status(ErrorCodes::CallbackCanceled, "Callback canceled"));
-        if (op->timedOut()) {
+        if (op->canceled()) {
+            auto rs = ResponseStatus(
+                ErrorCodes::CallbackCanceled, "Callback canceled", now() - op->start());
+            return _completeOperation(op, rs);
+        } else if (op->timedOut()) {
             str::stream msg;
             msg << "Operation timed out"
                 << ", request was " << op->_request.toString();
-            return _completeOperation(op, Status(ErrorCodes::ExceededTimeLimit, msg));
-        }
-        if (ec)
+            auto rs = ResponseStatus(ErrorCodes::ExceededTimeLimit, msg, now() - op->start());
+            return _completeOperation(op, rs);
+        } else if (ec)
             return _networkErrorCallback(op, ec);
 
         handler();
@@ -459,7 +467,7 @@ private:
     void _beginCommunication(AsyncOp* op);
     void _completedOpCallback(AsyncOp* op);
     void _networkErrorCallback(AsyncOp* op, const std::error_code& ec);
-    void _completeOperation(AsyncOp* op, const TaskExecutor::ResponseStatus& resp);
+    void _completeOperation(AsyncOp* op, TaskExecutor::ResponseStatus resp);
 
     void _signalWorkAvailable_inlock();
 

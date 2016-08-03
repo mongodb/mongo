@@ -268,7 +268,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
 
     executor::RemoteCommandRequest request(
         host.getValue(), dbName, cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
-    StatusWith<executor::RemoteCommandResponse> swResponse =
+    executor::RemoteCommandResponse swResponse =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
     auto callStatus = _executorForAddShard->scheduleRemoteCommand(
@@ -283,14 +283,14 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
     _executorForAddShard->wait(callStatus.getValue());
 
     if (!swResponse.isOK()) {
-        if (swResponse.getStatus().compareCode(ErrorCodes::ExceededTimeLimit)) {
-            LOG(0) << "Operation for addShard timed out with status " << swResponse.getStatus();
+        if (swResponse.status.compareCode(ErrorCodes::ExceededTimeLimit)) {
+            LOG(0) << "Operation for addShard timed out with status " << swResponse.status;
         }
-        return swResponse.getStatus();
+        return swResponse.status;
     }
 
-    BSONObj responseObj = swResponse.getValue().data.getOwned();
-    BSONObj responseMetadata = swResponse.getValue().metadata.getOwned();
+    BSONObj responseObj = swResponse.data.getOwned();
+    BSONObj responseMetadata = swResponse.metadata.getOwned();
     Status commandStatus = getStatusFromCommandResult(responseObj);
     Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
 
@@ -1247,7 +1247,7 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
     std::shared_ptr<RemoteCommandTargeter> targeter) {
     stdx::unique_lock<stdx::mutex> lk(_addShardHandlesMutex);
 
-    Status responseStatus = cbArgs.response.getStatus();
+    Status responseStatus = cbArgs.response.status;
     if (responseStatus == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -1266,12 +1266,12 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
         warning() << "Failed to upsert shardIdentity document during addShard into shard "
                   << shardType.getName() << "(" << shardType.getHost()
                   << "). The shardIdentity upsert will continue to be retried. "
-                  << causedBy(swResponse.getStatus());
+                  << causedBy(swResponse.status);
         rescheduleTask = true;
     } else {
         // Create a CommandResponse object in order to use processBatchWriteResponse.
-        BSONObj responseObj = swResponse.getValue().data.getOwned();
-        BSONObj responseMetadata = swResponse.getValue().metadata.getOwned();
+        BSONObj responseObj = swResponse.data.getOwned();
+        BSONObj responseMetadata = swResponse.metadata.getOwned();
         Status commandStatus = getStatusFromCommandResult(responseObj);
         Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
         Shard::CommandResponse commandResponse(std::move(responseObj),

@@ -127,7 +127,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     // Parse and validate the response.  At the end of this step, if responseStatus is OK then
     // hbResponse is valid.
-    Status responseStatus = cbData.response.getStatus();
+    Status responseStatus = cbData.response.status;
     if (responseStatus == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -136,10 +136,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     ReplSetHeartbeatResponse hbResponse;
     BSONObj resp;
     if (responseStatus.isOK()) {
-        resp = cbData.response.getValue().data;
+        resp = cbData.response.data;
         responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         StatusWith<rpc::ReplSetMetadata> replMetadata =
-            rpc::ReplSetMetadata::readFromMetadata(cbData.response.getValue().metadata);
+            rpc::ReplSetMetadata::readFromMetadata(cbData.response.metadata);
 
         // Reject heartbeat responses (and metadata) from nodes with mismatched replica set IDs.
         // It is problematic to perform this check in the heartbeat reconfiguring logic because it
@@ -170,7 +170,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
     if (responseStatus.isOK()) {
-        networkTime = cbData.response.getValue().elapsedMillis;
+        networkTime = cbData.response.elapsedMillis.value_or(Milliseconds{0});
         // TODO(sz) Because the term is duplicated in ReplSetMetaData, we can get rid of this
         // and update tests.
         _updateTerm_incallback(hbStatusResponse.getValue().getTerm());
@@ -288,17 +288,17 @@ namespace {
  * This callback is purely for logging and has no effect on any other operations
  */
 void remoteStepdownCallback(const ReplicationExecutor::RemoteCommandCallbackArgs& cbData) {
-    const Status status = cbData.response.getStatus();
+    const Status status = cbData.response.status;
     if (status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
     if (status.isOK()) {
         LOG(1) << "stepdown of primary(" << cbData.request.target << ") succeeded with response -- "
-               << cbData.response.getValue().data;
+               << cbData.response.data;
     } else {
         warning() << "stepdown of primary(" << cbData.request.target << ") failed due to "
-                  << cbData.response.getStatus();
+                  << cbData.response.status;
     }
 }
 }  // namespace

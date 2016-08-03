@@ -74,9 +74,9 @@ void FreshnessScanner::Algorithm::processResponse(const RemoteCommandRequest& re
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
         LOG(2) << "FreshnessScanner: Got failed response from " << request.target << ": "
-               << response.getStatus();
+               << response.status;
     } else {
-        BSONObj opTimesObj = response.getValue().data.getObjectField("optimes");
+        BSONObj opTimesObj = response.data.getObjectField("optimes");
         OpTime lastOpTime;
         Status status = bsonExtractOpTimeField(opTimesObj, "appliedOpTime", &lastOpTime);
         if (!status.isOK()) {

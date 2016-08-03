@@ -257,14 +257,14 @@ void Reporter::_processResponseCallback(
             return;
         }
 
-        _status = rcbd.response.getStatus();
+        _status = rcbd.response.status;
         if (!_status.isOK()) {
             _onShutdown_inlock();
             return;
         }
 
         // Override _status with the one embedded in the command result.
-        const auto& commandResult = rcbd.response.getValue().data;
+        const auto& commandResult = rcbd.response.data;
         _status = getStatusFromCommandResult(commandResult);
 
         // Some error types are OK and should not cause the reporter to stop sending updates to the

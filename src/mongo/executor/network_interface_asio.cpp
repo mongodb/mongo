@@ -276,9 +276,10 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
                 wasPreviouslyCanceled = _inGetConnection.erase(cbHandle) == 0;
             }
 
-            onFinish(wasPreviouslyCanceled
-                         ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
-                         : swConn.getStatus());
+            Status status = wasPreviouslyCanceled
+                ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
+                : swConn.getStatus();
+            onFinish({status, now() - getConnectionStartTime});
             signalWorkAvailable();
             return;
         }
@@ -295,7 +296,9 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
         if (eraseCount == 0) {
             lk.unlock();
 
-            onFinish({ErrorCodes::CallbackCanceled, "Callback canceled"});
+            onFinish({ErrorCodes::CallbackCanceled,
+                      "Callback canceled",
+                      now() - getConnectionStartTime});
 
             // Though we were canceled, we know that the stream is fine, so indicate success.
             conn->indicateSuccess();
@@ -342,7 +345,9 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
                     std::stringstream msg;
                     msg << "Remote command timed out while waiting to get a connection from the "
                         << "pool, took " << getConnectionDuration;
-                    return _completeOperation(op, {ErrorCodes::ExceededTimeLimit, msg.str()});
+                    auto rs = ResponseStatus(
+                        ErrorCodes::ExceededTimeLimit, msg.str(), getConnectionDuration);
+                    return _completeOperation(op, rs);
                 }
 
                 // The above conditional guarantees that the adjusted timeout will never underflow.

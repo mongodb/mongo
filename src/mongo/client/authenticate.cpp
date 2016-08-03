@@ -159,7 +159,7 @@ void authMongoCR(RunCommandHook runCommand, const BSONObj& params, AuthCompletio
 
         // Ensure response was valid
         std::string nonce;
-        BSONObj nonceResponse = response.getValue().data;
+        BSONObj nonceResponse = response.data;
         auto valid = bsonExtractStringField(nonceResponse, "nonce", &nonce);
         if (!valid.isOK())
             return handler({ErrorCodes::AuthenticationFailed,
@@ -235,7 +235,8 @@ void authX509(RunCommandHook runCommand,
 //
 
 bool isFailedAuthOk(const AuthResponse& response) {
-    return (response == ErrorCodes::AuthenticationFailed && serverGlobalParams.transitionToAuth);
+    return (response.status == ErrorCodes::AuthenticationFailed &&
+            serverGlobalParams.transitionToAuth);
 }
 
 void auth(RunCommandHook runCommand,
@@ -305,9 +306,9 @@ void authenticateClient(const BSONObj& params,
         // NOTE: this assumes that runCommand executes synchronously.
         asyncAuth(runCommand, params, hostname, clientName, [](AuthResponse response) {
             // DBClient expects us to throw in case of an auth error.
-            uassertStatusOK(response);
+            uassertStatusOK(response.status);
 
-            auto serverResponse = response.getValue().data;
+            auto serverResponse = response.data;
             uassert(ErrorCodes::AuthenticationFailed,
                     serverResponse["errmsg"].str(),
                     isOk(serverResponse));

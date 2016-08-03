@@ -85,12 +85,12 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     // Callback to parse protocol information out of received ismaster response
     auto parseIsMaster = [this, op]() {
 
-        auto swCommandReply = op->command()->response(rpc::Protocol::kOpQuery, now());
+        auto swCommandReply = op->command()->response(op, rpc::Protocol::kOpQuery, now());
         if (!swCommandReply.isOK()) {
-            return _completeOperation(op, swCommandReply.getStatus());
+            return _completeOperation(op, swCommandReply);
         }
 
-        auto commandReply = std::move(swCommandReply.getValue());
+        auto commandReply = std::move(swCommandReply);
 
         // Ensure that the isMaster response is "ok:1".
         auto commandStatus = getStatusFromCommandResult(commandReply.data);
@@ -178,7 +178,8 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
         }
 
         auto callAuthCompletionHandler = [this, op, handler]() {
-            auto authResponse = op->command()->response(op->operationProtocol(), now(), nullptr);
+            auto authResponse =
+                op->command()->response(op, op->operationProtocol(), now(), nullptr);
             handler(authResponse);
         };
 

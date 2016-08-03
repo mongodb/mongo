@@ -166,14 +166,12 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
                                                  BSONObj(),
                                                  Milliseconds(0)};
 
-    ASSERT_OK(
-        net().startCommand(cb, actualCommandExpected, [&](StatusWith<RemoteCommandResponse> resp) {
-            commandFinished = true;
-            if (resp.isOK()) {
-                gotCorrectCommandReply =
-                    (actualResponseExpected.toString() == resp.getValue().toString());
-            }
-        }));
+    ASSERT_OK(net().startCommand(cb, actualCommandExpected, [&](RemoteCommandResponse resp) {
+        commandFinished = true;
+        if (resp.isOK()) {
+            gotCorrectCommandReply = (actualResponseExpected.toString() == resp.toString());
+        }
+    }));
 
     // At this point validate and makeRequest should have been called.
     ASSERT(validateCalled);
@@ -239,10 +237,10 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     bool statusPropagated = false;
 
     RemoteCommandRequest request;
-    ASSERT_OK(net().startCommand(cb, request, [&](StatusWith<RemoteCommandResponse> resp) {
+    ASSERT_OK(net().startCommand(cb, request, [&](RemoteCommandResponse resp) {
         commandFinished = true;
 
-        statusPropagated = resp.getStatus().code() == ErrorCodes::ConflictingOperationInProgress;
+        statusPropagated = resp.status.code() == ErrorCodes::ConflictingOperationInProgress;
     }));
 
     {
@@ -280,7 +278,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
 
     RemoteCommandRequest request;
     ASSERT_OK(net().startCommand(
-        cb, request, [&](StatusWith<RemoteCommandResponse> resp) { commandFinished = true; }));
+        cb, request, [&](RemoteCommandResponse resp) { commandFinished = true; }));
 
     {
         net().enterNetwork();
@@ -316,9 +314,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
     bool errorPropagated = false;
 
     RemoteCommandRequest request;
-    ASSERT_OK(net().startCommand(cb, request, [&](StatusWith<RemoteCommandResponse> resp) {
+    ASSERT_OK(net().startCommand(cb, request, [&](RemoteCommandResponse resp) {
         commandFinished = true;
-        errorPropagated = resp.getStatus().code() == ErrorCodes::InvalidSyncSource;
+        errorPropagated = resp.status.code() == ErrorCodes::InvalidSyncSource;
     }));
 
     {
@@ -353,9 +351,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     bool errorPropagated = false;
 
     RemoteCommandRequest request;
-    ASSERT_OK(net().startCommand(cb, request, [&](StatusWith<RemoteCommandResponse> resp) {
+    ASSERT_OK(net().startCommand(cb, request, [&](RemoteCommandResponse resp) {
         commandFinished = true;
-        errorPropagated = resp.getStatus().code() == ErrorCodes::CappedPositionLost;
+        errorPropagated = resp.status.code() == ErrorCodes::CappedPositionLost;
     }));
 
     ASSERT(!handleReplyCalled);
@@ -387,7 +385,7 @@ TEST_F(NetworkInterfaceMockTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
 
     TaskExecutor::CallbackHandle cb{};
     RemoteCommandRequest request;
-    ASSERT_NOT_OK(net().startCommand(cb, request, [](StatusWith<RemoteCommandResponse> resp) {}));
+    ASSERT_NOT_OK(net().startCommand(cb, request, [](RemoteCommandResponse resp) {}));
 }
 
 TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
@@ -404,9 +402,7 @@ TEST_F(NetworkInterfaceMockTest, CommandTimeout) {
     request.timeout = Milliseconds(2000);
 
     ErrorCodes::Error statusPropagated = ErrorCodes::OK;
-    auto finishFn = [&](StatusWith<RemoteCommandResponse> resp) {
-        statusPropagated = resp.getStatus().code();
-    };
+    auto finishFn = [&](RemoteCommandResponse resp) { statusPropagated = resp.status.code(); };
 
     //
     // Command times out.
@@ -435,8 +431,7 @@ TEST_F(NetworkInterfaceMockTest, CommandTimeout) {
     ASSERT_EQUALS(start + Milliseconds(1000), net().now());
     ASSERT_NOT_EQUALS(ErrorCodes::OK, statusPropagated);
     // Reply with a successful response.
-    StatusWith<RemoteCommandResponse> responseStatus(RemoteCommandResponse{});
-    net().scheduleResponse(noi, net().now(), responseStatus);
+    net().scheduleResponse(noi, net().now(), {});
     net().runReadyNetworkOperations();
     net().exitNetwork();
     ASSERT_EQUALS(ErrorCodes::OK, statusPropagated);

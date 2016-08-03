@@ -82,7 +82,7 @@ public:
     class EventState;
     class EventHandle;
 
-    using ResponseStatus = StatusWith<RemoteCommandResponse>;
+    using ResponseStatus = RemoteCommandResponse;
 
     /**
      * Type of a regular callback function.
@@ -404,12 +404,12 @@ struct TaskExecutor::RemoteCommandCallbackArgs {
     RemoteCommandCallbackArgs(TaskExecutor* theExecutor,
                               const CallbackHandle& theHandle,
                               const RemoteCommandRequest& theRequest,
-                              const StatusWith<RemoteCommandResponse>& theResponse);
+                              const ResponseStatus& theResponse);
 
     TaskExecutor* executor;
     CallbackHandle myHandle;
     RemoteCommandRequest request;
-    StatusWith<RemoteCommandResponse> response;
+    ResponseStatus response;
 };
 
 }  // namespace executor

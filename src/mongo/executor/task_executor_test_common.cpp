@@ -367,7 +367,7 @@ static void setStatusOnRemoteCommandCompletion(
                                                       << getRequestDescription(expectedRequest));
         return;
     }
-    *outStatus = cbData.response.getStatus();
+    *outStatus = cbData.response.status;
 }
 
 COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
@@ -386,8 +386,7 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
     net->enterNetwork();
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, net->now(), TaskExecutor::ResponseStatus(ErrorCodes::NoSuchKey, "I'm missing"));
+    net->scheduleResponse(noi, net->now(), {ErrorCodes::NoSuchKey, "I'm missing"});
     net->runReadyNetworkOperations();
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
@@ -434,8 +433,7 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     ASSERT(net->hasReadyRequests());
     const Date_t startTime = net->now();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(
-        noi, startTime + Milliseconds(2), TaskExecutor::ResponseStatus(RemoteCommandResponse{}));
+    net->scheduleResponse(noi, startTime + Milliseconds(2), {});
     net->runUntil(startTime + Milliseconds(2));
     ASSERT_EQUALS(startTime + Milliseconds(2), net->now());
     net->exitNetwork();

@@ -49,6 +49,7 @@ class BSONObj;
 
 namespace executor {
 
+using ResponseStatus = TaskExecutor::ResponseStatus;
 class NetworkConnectionHook;
 
 /**
@@ -173,7 +174,7 @@ public:
      */
     void scheduleResponse(NetworkOperationIterator noi,
                           Date_t when,
-                          const TaskExecutor::ResponseStatus& response);
+                          const ResponseStatus& response);
 
     /**
      * Schedules a successful "response" to "noi" at virtual time "when".
@@ -195,6 +196,7 @@ public:
      * "when" defaults to now().
      */
     RemoteCommandRequest scheduleErrorResponse(const Status& response);
+    RemoteCommandRequest scheduleErrorResponse(const ResponseStatus response);
     RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
                                                const Status& response);
     RemoteCommandRequest scheduleErrorResponse(NetworkOperationIterator noi,
@@ -247,7 +249,7 @@ public:
      * Cancel a command with specified response, e.g. NetworkTimeout or CallbackCanceled errors.
      */
     void _cancelCommand_inlock(const TaskExecutor::CallbackHandle& cbHandle,
-                               const TaskExecutor::ResponseStatus& response);
+                               const ResponseStatus& response);
 
 private:
     /**
@@ -412,7 +414,7 @@ public:
     /**
      * Sets the response and thet virtual time at which it will be delivered.
      */
-    void setResponse(Date_t responseDate, const TaskExecutor::ResponseStatus& response);
+    void setResponse(Date_t responseDate, const ResponseStatus& response);
 
     /**
      * Predicate that returns true if cbHandle equals the executor's handle for this network
@@ -472,7 +474,7 @@ private:
     Date_t _responseDate;
     TaskExecutor::CallbackHandle _cbHandle;
     RemoteCommandRequest _request;
-    TaskExecutor::ResponseStatus _response;
+    ResponseStatus _response;
     RemoteCommandCompletionFn _onFinish;
 };
 

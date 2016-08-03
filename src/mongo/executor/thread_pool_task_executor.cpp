@@ -282,35 +282,29 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
 
 namespace {
 
+using ResponseStatus = TaskExecutor::ResponseStatus;
+
 // If the request received a connection from the pool but failed in its execution,
-// convert the raw Status in cbData to a StatusWith<RemoteCommandResponse> so that the callback,
-// which expects a StatusWith<RemoteCommandResponse> as part of RemoteCommandCallbackArgs,
+// convert the raw Status in cbData to a RemoteCommandResponse so that the callback,
+// which expects a RemoteCommandResponse as part of RemoteCommandCallbackArgs,
 // can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
                            const TaskExecutor::RemoteCommandCallbackFn& cb,
                            const RemoteCommandRequest& request,
-                           const TaskExecutor::ResponseStatus& response) {
-    using ResponseStatus = TaskExecutor::ResponseStatus;
-    if (cbData.status.isOK()) {
-        cb(TaskExecutor::RemoteCommandCallbackArgs(
-            cbData.executor, cbData.myHandle, request, response));
-    } else {
-        cb(TaskExecutor::RemoteCommandCallbackArgs(
-            cbData.executor, cbData.myHandle, request, ResponseStatus(cbData.status)));
-    }
+                           const ResponseStatus& rs) {
+    cb(TaskExecutor::RemoteCommandCallbackArgs(cbData.executor, cbData.myHandle, request, rs));
 }
 
 // If the request failed to receive a connection from the pool,
-// convert the raw Status in cbData to a StatusWith<RemoteCommandResponse> so that the callback,
-// which expects a StatusWith<RemoteCommandResponse> as part of RemoteCommandCallbackArgs,
+// convert the raw Status in cbData to a RemoteCommandResponse so that the callback,
+// which expects a RemoteCommandResponse as part of RemoteCommandCallbackArgs,
 // can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFailedEarly(const TaskExecutor::CallbackArgs& cbData,
                               const TaskExecutor::RemoteCommandCallbackFn& cb,
                               const RemoteCommandRequest& request) {
-    using ResponseStatus = TaskExecutor::ResponseStatus;
     invariant(!cbData.status.isOK());
     cb(TaskExecutor::RemoteCommandCallbackArgs(
-        cbData.executor, cbData.myHandle, request, ResponseStatus(cbData.status)));
+        cbData.executor, cbData.myHandle, request, {cbData.status}));
 }
 }  // namespace
 
@@ -349,8 +343,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
                 return;
             }
             LOG(3) << "Received remote response: "
-                   << redact(response.isOK() ? response.getValue().toString()
-                                             : response.getStatus().toString());
+                   << redact(response.isOK() ? response.toString() : response.status.toString());
             swap(cbState->callback, newCb);
             scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
         });

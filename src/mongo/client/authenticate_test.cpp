@@ -92,7 +92,7 @@ public:
 
         // Then pop a response and call the handler
         ASSERT(!_responses.empty());
-        handler(StatusWith<RemoteCommandResponse>(_responses.front()));
+        handler(_responses.front());
         _responses.pop();
     }
 

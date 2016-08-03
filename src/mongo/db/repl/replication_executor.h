@@ -263,7 +263,7 @@ private:
     void finishShutdown();
 
     void _finishRemoteCommand(const executor::RemoteCommandRequest& request,
-                              const StatusWith<executor::RemoteCommandResponse>& response,
+                              const executor::RemoteCommandResponse& response,
                               const CallbackHandle& cbHandle,
                               const uint64_t expectedHandleGeneration,
                               const RemoteCommandCallbackFn& cb);

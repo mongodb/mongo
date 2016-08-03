@@ -317,7 +317,7 @@ void ReplicationExecutor::_finishRemoteCommand(const RemoteCommandRequest& reque
     }
 
     LOG(4) << "Received remote response: "
-           << (response.isOK() ? response.getValue().toString() : response.getStatus().toString());
+           << (response.isOK() ? response.toString() : response.status.toString());
 
     callback->_callbackFn =
         stdx::bind(remoteCommandFinished, stdx::placeholders::_1, cb, request, response);

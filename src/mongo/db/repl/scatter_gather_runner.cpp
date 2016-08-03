@@ -138,7 +138,7 @@ void ScatterGatherRunner::RunnerImpl::processResponse(
     std::swap(*iter, _callbacks.back());
     _callbacks.pop_back();
 
-    if (cbData.response.getStatus() == ErrorCodes::CallbackCanceled) {
+    if (cbData.response.status == ErrorCodes::CallbackCanceled) {
         return;
     }
 

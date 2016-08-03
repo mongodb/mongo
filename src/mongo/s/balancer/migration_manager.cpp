@@ -203,9 +203,6 @@ void MigrationManager::_executeMigrations(OperationContext* txn,
 
         RemoteCommandRequest remoteRequest(host.getValue(), "admin", moveChunkRequestObj, txn);
 
-        StatusWith<RemoteCommandResponse> remoteCommandResponse(
-            Status{ErrorCodes::InternalError, "Uninitialized value"});
-
         executor::TaskExecutor* executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
 
         StatusWith<executor::TaskExecutor::CallbackHandle> callbackHandleWithStatus =
@@ -259,17 +256,14 @@ void MigrationManager::_checkMigrationCallback(
     OperationContext* txn,
     Migration* migration,
     MigrationStatuses* migrationStatuses) {
-    const auto& remoteCommandResponseWithStatus = callbackArgs.response;
+    const auto& remoteCommandResponse = callbackArgs.response;
 
-    if (!remoteCommandResponseWithStatus.isOK()) {
+    if (!remoteCommandResponse.isOK()) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        migrationStatuses->insert(
-            MigrationStatuses::value_type(migration->chunkInfo.migrateInfo.getName(),
-                                          std::move(remoteCommandResponseWithStatus.getStatus())));
+        migrationStatuses->insert(MigrationStatuses::value_type(
+            migration->chunkInfo.migrateInfo.getName(), std::move(remoteCommandResponse.status)));
         return;
     }
-
-    const auto& remoteCommandResponse = callbackArgs.response.getValue();
 
     Status commandStatus = getStatusFromCommandResult(remoteCommandResponse.data);
 

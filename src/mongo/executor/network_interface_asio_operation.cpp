@@ -217,16 +217,15 @@ NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {
     return _command.get_ptr();
 }
 
-void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {
+void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& rs) {
     // We never hold the access lock when we call finish from NetworkInterfaceASIO.
     _transitionToState(AsyncOp::State::kFinished);
 
-    LOG(2) << "Request " << _request.id << " finished with response: "
-           << redact(status.getStatus().isOK() ? status.getValue().data.toString()
-                                               : status.getStatus().toString());
+    LOG(2) << "Request " << _request.id
+           << " finished with response: " << redact(rs.isOK() ? rs.data.toString() : rs.status.toString());
 
     // Calling the completion handler may invalidate state in this op, so do it last.
-    _onFinish(status);
+    _onFinish(rs);
 }
 
 const RemoteCommandRequest& NetworkInterfaceASIO::AsyncOp::request() const {
@@ -251,6 +250,14 @@ rpc::Protocol NetworkInterfaceASIO::AsyncOp::operationProtocol() const {
 void NetworkInterfaceASIO::AsyncOp::setOperationProtocol(rpc::Protocol proto) {
     MONGO_ASYNC_OP_INVARIANT(!_operationProtocol.is_initialized(), "Protocol already set");
     _operationProtocol = proto;
+}
+
+void NetworkInterfaceASIO::AsyncOp::setResponseMetadata(BSONObj m) {
+    _responseMetadata = m;
+}
+
+BSONObj NetworkInterfaceASIO::AsyncOp::getResponseMetadata() {
+    return _responseMetadata;
 }
 
 void NetworkInterfaceASIO::AsyncOp::reset() {

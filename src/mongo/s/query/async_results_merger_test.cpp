@@ -54,6 +54,8 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
+using ResponseStatus = executor::TaskExecutor::ResponseStatus;
+
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 const std::vector<ShardId> kTestShardIds = {
     ShardId("FakeShard1"), ShardId("FakeShard2"), ShardId("FakeShard3")};
@@ -197,12 +199,13 @@ protected:
         return retRequest;
     }
 
-    void scheduleErrorResponse(Status status) {
-        invariant(!status.isOK());
+    void scheduleErrorResponse(ResponseStatus rs) {
+        invariant(!rs.isOK());
+        rs.elapsedMillis = Milliseconds(0);
         executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
-        net->scheduleResponse(net->getNextReadyRequest(), net->now(), status);
+        net->scheduleResponse(net->getNextReadyRequest(), net->now(), rs);
         net->runReadyNetworkOperations();
         net->exitNetwork();
     }

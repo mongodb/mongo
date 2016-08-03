@@ -128,8 +128,7 @@ void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& re
 
     Status status = Status::OK();
 
-    if (!response.isOK() ||
-        !((status = getStatusFromCommandResult(response.getValue().data)).isOK())) {
+    if (!response.isOK() || !((status = getStatusFromCommandResult(response.data)).isOK())) {
         if (votingMember) {
             ++_failedVoterResponses;
             if (hadTooManyFailedVoterResponses()) {
@@ -145,7 +144,7 @@ void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& re
         return;
     }
 
-    const BSONObj res = response.getValue().data;
+    const BSONObj res = response.data;
 
     LOG(2) << "FreshnessChecker: Got response from " << request.target << " of " << res;
 

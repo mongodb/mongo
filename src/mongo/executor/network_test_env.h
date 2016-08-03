@@ -128,7 +128,7 @@ public:
 
     using OnCommandFunction = stdx::function<StatusWith<BSONObj>(const RemoteCommandRequest&)>;
     using OnCommandWithMetadataFunction =
-        stdx::function<StatusWith<RemoteCommandResponse>(const RemoteCommandRequest&)>;
+        stdx::function<RemoteCommandResponse(const RemoteCommandRequest&)>;
 
     using OnFindCommandFunction =
         stdx::function<StatusWith<std::vector<BSONObj>>(const RemoteCommandRequest&)>;

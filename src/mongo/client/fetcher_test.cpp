@@ -44,6 +44,8 @@ using namespace mongo;
 using executor::NetworkInterfaceMock;
 using executor::TaskExecutor;
 
+using ResponseStatus = TaskExecutor::ResponseStatus;
+
 const HostAndPort source("localhost", -1);
 const BSONObj findCmdObj = BSON("find"
                                 << "coll");
@@ -61,12 +63,11 @@ public:
     void processNetworkResponse(const BSONObj& obj,
                                 ReadyQueueState readyQueueStateAfterProcessing,
                                 FetcherState fetcherStateAfterProcessing);
-    void processNetworkResponse(const BSONObj& obj,
-                                Milliseconds elapsed,
+    void processNetworkResponse(const ResponseStatus,
                                 ReadyQueueState readyQueueStateAfterProcessing,
                                 FetcherState fetcherStateAfterProcessing);
-    void processNetworkResponse(ErrorCodes::Error code,
-                                const std::string& reason,
+    void processNetworkResponse(const BSONObj& obj,
+                                Milliseconds elapsed,
                                 ReadyQueueState readyQueueStateAfterProcessing,
                                 FetcherState fetcherStateAfterProcessing);
 
@@ -148,12 +149,11 @@ void FetcherTest::processNetworkResponse(const BSONObj& obj,
     finishProcessingNetworkResponse(readyQueueStateAfterProcessing, fetcherStateAfterProcessing);
 }
 
-void FetcherTest::processNetworkResponse(ErrorCodes::Error code,
-                                         const std::string& reason,
+void FetcherTest::processNetworkResponse(ResponseStatus rs,
                                          ReadyQueueState readyQueueStateAfterProcessing,
                                          FetcherState fetcherStateAfterProcessing) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-    getNet()->scheduleErrorResponse({code, reason});
+    getNet()->scheduleErrorResponse(rs);
     finishProcessingNetworkResponse(readyQueueStateAfterProcessing, fetcherStateAfterProcessing);
 }
 
@@ -373,8 +373,8 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
 
 TEST_F(FetcherTest, FindCommandFailed1) {
     ASSERT_OK(fetcher->schedule());
-    processNetworkResponse(
-        ErrorCodes::BadValue, "bad hint", ReadyQueueState::kEmpty, FetcherState::kInactive);
+    auto rs = ResponseStatus(ErrorCodes::BadValue, "bad hint", Milliseconds(0));
+    processNetworkResponse(rs, ReadyQueueState::kEmpty, FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
     ASSERT_EQUALS("bad hint", status.reason());
     ASSERT_FALSE(fetcher->inShutdown_forTest());
@@ -939,7 +939,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         ASSERT_EQUALS(cursorId, cursors.front().numberLong());
 
         // Failed killCursors command response should be logged.
-        getNet()->scheduleSuccessfulResponse(noi, {BSON("ok" << false), {}});
+        getNet()->scheduleSuccessfulResponse(noi, {BSON("ok" << false), {}, Milliseconds(0)});
         getNet()->runReadyNetworkOperations();
     }
 
@@ -1049,12 +1049,10 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
 
     // Retry policy is applied to find command.
     const BSONObj doc = BSON("_id" << 1);
-    processNetworkResponse(
-        ErrorCodes::BadValue, "first", ReadyQueueState::kHasReadyRequests, FetcherState::kActive);
-    processNetworkResponse(ErrorCodes::InternalError,
-                           "second",
-                           ReadyQueueState::kHasReadyRequests,
-                           FetcherState::kActive);
+    auto rs = ResponseStatus(ErrorCodes::BadValue, "first", Milliseconds(0));
+    processNetworkResponse(rs, ReadyQueueState::kHasReadyRequests, FetcherState::kActive);
+    rs = ResponseStatus(ErrorCodes::InternalError, "second", Milliseconds(0));
+    processNetworkResponse(rs, ReadyQueueState::kHasReadyRequests, FetcherState::kActive);
     processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
                                                       << "db.coll"
                                                       << "firstBatch"
@@ -1070,11 +1068,9 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
     ASSERT_EQUALS(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
+    rs = ResponseStatus(ErrorCodes::OperationFailed, "getMore failed", Milliseconds(0));
     // No retry policy for subsequent getMore commands.
-    processNetworkResponse(ErrorCodes::OperationFailed,
-                           "getMore failed",
-                           ReadyQueueState::kEmpty,
-                           FetcherState::kInactive);
+    processNetworkResponse(rs, ReadyQueueState::kEmpty, FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
     ASSERT_FALSE(fetcher->inShutdown_forTest());
 }

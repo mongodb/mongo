@@ -146,7 +146,7 @@ void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi,
     auto net = getNet();
     executor::TaskExecutor::ResponseStatus responseStatus(code, reason);
     log() << "Scheduling error response to request:" << noi->getDiagnosticString()
-          << " -- status:" << responseStatus.getStatus().toString();
+          << " -- status:" << responseStatus.status.toString();
     net->scheduleResponse(noi, net->now(), responseStatus);
 }
 

@@ -160,9 +160,9 @@ std::unique_ptr<NetworkInterfaceASIO::AsyncOp> ASIOConnection::makeAsyncOp(ASIOC
                              BSON("isMaster" << 1),
                              BSONObj(),
                              nullptr},
-        [conn](const TaskExecutor::ResponseStatus& status) {
+        [conn](const TaskExecutor::ResponseStatus& rs) {
             auto cb = std::move(conn->_setupCallback);
-            cb(conn, status.isOK() ? Status::OK() : status.getStatus());
+            cb(conn, rs.status);
         },
         conn->_global->now());
 }
@@ -244,10 +244,10 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
         // need to intercept those calls so we can capture them. This will get cleared out when we
         // fill
         // in the real onFinish in startCommand.
-        op->setOnFinish([this](StatusWith<RemoteCommandResponse> failedResponse) {
+        op->setOnFinish([this](RemoteCommandResponse failedResponse) {
             invariant(!failedResponse.isOK());
             auto cb = std::move(_refreshCallback);
-            cb(this, failedResponse.getStatus());
+            cb(this, failedResponse.status);
         });
 
         op->_inRefresh = true;

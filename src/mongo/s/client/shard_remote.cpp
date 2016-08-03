@@ -191,8 +191,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
         txn,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 
-    StatusWith<RemoteCommandResponse> swResponse =
-        Status(ErrorCodes::InternalError, "Internal error running command");
+    RemoteCommandResponse swResponse = Status(ErrorCodes::InternalError, "Internal error running command");
 
     TaskExecutor* executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
     auto callStatus = executor->scheduleRemoteCommand(
@@ -205,17 +204,17 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
     // Block until the command is carried out
     executor->wait(callStatus.getValue());
 
-    updateReplSetMonitor(host.getValue(), swResponse.getStatus());
+    updateReplSetMonitor(host.getValue(), swResponse.status);
 
     if (!swResponse.isOK()) {
-        if (swResponse.getStatus().compareCode(ErrorCodes::ExceededTimeLimit)) {
-            LOG(0) << "Operation timed out with status " << redact(swResponse.getStatus());
+        if (swResponse.status.compareCode(ErrorCodes::ExceededTimeLimit)) {
+            LOG(0) << "Operation timed out with status " << redact(swResponse.status);
         }
-        return Shard::HostWithResponse(host.getValue(), swResponse.getStatus());
+        return Shard::HostWithResponse(host.getValue(), swResponse.status);
     }
 
-    BSONObj responseObj = swResponse.getValue().data.getOwned();
-    BSONObj responseMetadata = swResponse.getValue().metadata.getOwned();
+    BSONObj responseObj = swResponse.data.getOwned();
+    BSONObj responseMetadata = swResponse.metadata.getOwned();
     Status commandStatus = getStatusFromCommandResult(responseObj);
     Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
 

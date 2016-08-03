@@ -58,7 +58,8 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     } else {
-        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), resultStatus.getStatus());
+        _mockNetwork->scheduleResponse(
+            noi, _mockNetwork->now(), {resultStatus.getStatus(), Milliseconds(0)});
     }
 
     _mockNetwork->runReadyNetworkOperations();
@@ -72,18 +73,18 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
     const RemoteCommandRequest& request = noi->getRequest();
 
     const auto cmdResponseStatus = func(request);
-    const auto cmdResponse = cmdResponseStatus.getValue();
 
     BSONObjBuilder result;
 
     if (cmdResponseStatus.isOK()) {
-        result.appendElements(cmdResponse.data);
-        Command::appendCommandStatus(result, cmdResponseStatus.getStatus());
-        const RemoteCommandResponse response(result.obj(), cmdResponse.metadata, Milliseconds(1));
+        result.appendElements(cmdResponseStatus.data);
+        Command::appendCommandStatus(result, cmdResponseStatus.status);
+        const RemoteCommandResponse response(
+            result.obj(), cmdResponseStatus.metadata, Milliseconds(1));
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     } else {
-        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), cmdResponseStatus.getStatus());
+        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), cmdResponseStatus.status);
     }
 
     _mockNetwork->runReadyNetworkOperations();
@@ -113,30 +114,29 @@ void NetworkTestEnv::onFindCommand(OnFindCommandFunction func) {
 }
 
 void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction func) {
-    onCommandWithMetadata(
-        [&func](const RemoteCommandRequest& request) -> StatusWith<RemoteCommandResponse> {
-            const auto& resultStatus = func(request);
+    onCommandWithMetadata([&func](const RemoteCommandRequest& request) -> RemoteCommandResponse {
+        const auto& resultStatus = func(request);
 
-            if (!resultStatus.isOK()) {
-                return resultStatus.getStatus();
-            }
+        if (!resultStatus.isOK()) {
+            return resultStatus.getStatus();
+        }
 
-            std::vector<BSONObj> result;
-            BSONObj metadata;
-            std::tie(result, metadata) = resultStatus.getValue();
+        std::vector<BSONObj> result;
+        BSONObj metadata;
+        std::tie(result, metadata) = resultStatus.getValue();
 
-            BSONArrayBuilder arr;
-            for (const auto& obj : result) {
-                arr.append(obj);
-            }
+        BSONArrayBuilder arr;
+        for (const auto& obj : result) {
+            arr.append(obj);
+        }
 
-            const NamespaceString nss =
-                NamespaceString(request.dbname, request.cmdObj.firstElement().String());
-            BSONObjBuilder resultBuilder;
-            appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &resultBuilder);
+        const NamespaceString nss =
+            NamespaceString(request.dbname, request.cmdObj.firstElement().String());
+        BSONObjBuilder resultBuilder;
+        appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &resultBuilder);
 
-            return RemoteCommandResponse(resultBuilder.obj(), metadata, Milliseconds(1));
-        });
+        return RemoteCommandResponse(resultBuilder.obj(), metadata, Milliseconds(1));
+    });
 }
 
 }  // namespace executor

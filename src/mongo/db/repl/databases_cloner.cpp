@@ -191,9 +191,9 @@ void DatabasesCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::Schedu
 }
 
 void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
-    Status respStatus = cbd.response.getStatus();
+    Status respStatus = cbd.response.status;
     if (respStatus.isOK()) {
-        respStatus = getStatusFromCommandResult(cbd.response.getValue().data);
+        respStatus = getStatusFromCommandResult(cbd.response.data);
     }
 
     UniqueLock lk(_mutex);
@@ -204,7 +204,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
         return;
     }
 
-    const auto respBSON = cbd.response.getValue().data;
+    const auto respBSON = cbd.response.data;
     // There should not be any cloners yet
     invariant(_databaseCloners.size() == 0);
     const auto dbsElem = respBSON["databases"].Obj();

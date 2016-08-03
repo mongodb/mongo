@@ -208,12 +208,12 @@ StatusWith<Message> downconvertFindCommandRequest(const RemoteCommandRequest& re
     return {std::move(message)};
 }
 
-StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::int32_t requestId,
-                                                               StringData cursorNamespace,
-                                                               const Message& response) {
+RemoteCommandResponse upconvertLegacyQueryResponse(std::int32_t requestId,
+                                                   StringData cursorNamespace,
+                                                   const Message& response) {
     auto swBatch = getBatchFromReply(requestId, response);
     if (!swBatch.isOK()) {
-        return swBatch.getStatus();
+        return {swBatch.getStatus()};
     }
 
     BSONArray batch;
@@ -252,12 +252,12 @@ StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest&
     return {std::move(m)};
 }
 
-StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::int32_t requestId,
-                                                                 StringData cursorNamespace,
-                                                                 const Message& response) {
+RemoteCommandResponse upconvertLegacyGetMoreResponse(std::int32_t requestId,
+                                                     StringData cursorNamespace,
+                                                     const Message& response) {
     auto swBatch = getBatchFromReply(requestId, response);
     if (!swBatch.isOK()) {
-        return swBatch.getStatus();
+        return {swBatch.getStatus()};
     }
 
     BSONArray batch;

@@ -210,7 +210,7 @@ void asyncSaslConversation(auth::RunCommandHook runCommand,
                 return handler(std::move(response));
             }
 
-            auto serverResponse = response.getValue().data.getOwned();
+            auto serverResponse = response.data.getOwned();
             auto code = getStatusFromCommandResult(serverResponse).code();
 
             // Server versions 2.3.2 and earlier may return "ok: 1" with a non-zero

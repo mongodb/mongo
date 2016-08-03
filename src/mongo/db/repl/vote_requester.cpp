@@ -93,24 +93,23 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
         log() << "VoteRequester: Got failed response from " << request.target << ": "
-              << response.getStatus();
+              << response.status;
     } else {
         _responders.insert(request.target);
         ReplSetRequestVotesResponse voteResponse;
-        const auto status = voteResponse.initialize(response.getValue().data);
+        const auto status = voteResponse.initialize(response.data);
         if (!status.isOK()) {
             log() << "VoteRequester: Got error processing response with status: " << status
-                  << ", resp:" << response.getValue().data;
+                  << ", resp:" << response.data;
         }
 
         if (voteResponse.getVoteGranted()) {
             LOG(3) << "VoteRequester: Got yes vote from " << request.target
-                   << ", resp:" << response.getValue().data;
+                   << ", resp:" << response.data;
             _votes++;
         } else {
             log() << "VoteRequester: Got no vote from " << request.target
-                  << " because: " << voteResponse.getReason()
-                  << ", resp:" << response.getValue().data;
+                  << " because: " << voteResponse.getReason() << ", resp:" << response.data;
         }
 
         if (voteResponse.getTerm() > _term) {

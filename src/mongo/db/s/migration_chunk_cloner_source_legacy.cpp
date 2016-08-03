@@ -467,7 +467,7 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* txn) {
 }
 
 StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONObj& cmdObj) {
-    StatusWith<executor::RemoteCommandResponse> responseStatus(
+    executor::RemoteCommandResponse responseStatus(
         Status{ErrorCodes::InternalError, "Uninitialized value"});
 
     auto executor = grid.getExecutorPool()->getArbitraryExecutor();
@@ -485,15 +485,15 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
     executor->wait(scheduleStatus.getValue());
 
     if (!responseStatus.isOK()) {
-        return responseStatus.getStatus();
+        return responseStatus.status;
     }
 
-    Status commandStatus = getStatusFromCommandResult(responseStatus.getValue().data);
+    Status commandStatus = getStatusFromCommandResult(responseStatus.data);
     if (!commandStatus.isOK()) {
         return commandStatus;
     }
 
-    return responseStatus.getValue().data.getOwned();
+    return responseStatus.data.getOwned();
 }
 
 Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn) {

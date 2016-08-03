@@ -75,8 +75,8 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
 
     const auto bsonObjPing = BSON("ping" << 1);
 
-    const auto callback = [&](StatusWith<RemoteCommandResponse> resp) {
-        uassertStatusOK(resp);
+    const auto callback = [&](RemoteCommandResponse resp) {
+        uassertStatusOK(resp.status);
         if (--remainingOps) {
             return func();
         }

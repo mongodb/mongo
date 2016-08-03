@@ -445,8 +445,7 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
                 Milliseconds millis(Date_t::now() - start);
 
                 // Hand control back to authenticateClient()
-                handler(StatusWith<RemoteCommandResponse>(
-                    RemoteCommandResponse(data, metadata, millis)));
+                handler({data, metadata, millis});
 
             } catch (...) {
                 handler(exceptionToStatus());
@@ -713,7 +712,7 @@ private:
 /**
 * Initializes the wire version of conn, and returns the isMaster reply.
 */
-StatusWith<executor::RemoteCommandResponse> initWireVersion(DBClientConnection* conn) {
+executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn) {
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
         // detected support for OP_COMMAND on a connection. This is necessary to handle the case
@@ -773,16 +772,16 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
     auto swIsMasterReply = initWireVersion(this);
     if (!swIsMasterReply.isOK()) {
         _failed = true;
-        return swIsMasterReply.getStatus();
+        return swIsMasterReply.status;
     }
 
     // Ensure that the isMaster response is "ok:1".
-    auto isMasterStatus = getStatusFromCommandResult(swIsMasterReply.getValue().data);
+    auto isMasterStatus = getStatusFromCommandResult(swIsMasterReply.data);
     if (!isMasterStatus.isOK()) {
         return isMasterStatus;
     }
 
-    auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.getValue().data);
+    auto swProtocolSet = rpc::parseProtocolSetFromIsMasterReply(swIsMasterReply.data);
     if (!swProtocolSet.isOK()) {
         return swProtocolSet.getStatus();
     }
@@ -799,7 +798,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
     }
 
     if (_hook) {
-        auto validationStatus = _hook(swIsMasterReply.getValue());
+        auto validationStatus = _hook(swIsMasterReply);
         if (!validationStatus.isOK()) {
             // Disconnect and mark failed.
             _failed = true;

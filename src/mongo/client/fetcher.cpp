@@ -301,7 +301,7 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
 
 void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batchFieldName) {
     if (!rcbd.response.isOK()) {
-        _work(StatusWith<Fetcher::QueryResponse>(rcbd.response.getStatus()), nullptr, nullptr);
+        _work(StatusWith<Fetcher::QueryResponse>(rcbd.response.status), nullptr, nullptr);
         _finishCallback();
         return;
     }
@@ -312,7 +312,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         return;
     }
 
-    const BSONObj& queryResponseObj = rcbd.response.getValue().data;
+    const BSONObj& queryResponseObj = rcbd.response.data;
     Status status = getStatusFromCommandResult(queryResponseObj);
     if (!status.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
@@ -328,8 +328,8 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         return;
     }
 
-    batchData.otherFields.metadata = std::move(rcbd.response.getValue().metadata);
-    batchData.elapsedMillis = rcbd.response.getValue().elapsedMillis;
+    batchData.otherFields.metadata = std::move(rcbd.response.metadata);
+    batchData.elapsedMillis = rcbd.response.elapsedMillis.value_or(Milliseconds{0});
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         batchData.first = _first;
@@ -380,10 +380,10 @@ void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
     if (id) {
         auto logKillCursorsResult = [](const RemoteCommandCallbackArgs& args) {
             if (!args.response.isOK()) {
-                warning() << "killCursors command task failed: " << args.response.getStatus();
+                warning() << "killCursors command task failed: " << args.response.status;
                 return;
             }
-            auto status = getStatusFromCommandResult(args.response.getValue().data);
+            auto status = getStatusFromCommandResult(args.response.data);
             if (!status.isOK()) {
                 warning() << "killCursors command failed: " << status;
             }

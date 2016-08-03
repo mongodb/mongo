@@ -52,6 +52,8 @@ namespace mongo {
 namespace executor {
 namespace {
 
+using ResponseStatus = TaskExecutor::ResponseStatus;
+
 HostAndPort testHost{"localhost", 20000};
 
 void initWireSpecMongoD() {
@@ -101,20 +103,18 @@ public:
         }
     }
 
-    Deferred<StatusWith<RemoteCommandResponse>> startCommand(
+    Deferred<RemoteCommandResponse> startCommand(
         const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest& request) {
-        Deferred<StatusWith<RemoteCommandResponse>> deferredResponse;
+        Deferred<RemoteCommandResponse> deferredResponse;
         ASSERT_OK(net().startCommand(
-            cbHandle,
-            request,
-            [deferredResponse](StatusWith<RemoteCommandResponse> response) mutable {
+            cbHandle, request, [deferredResponse](ResponseStatus response) mutable {
                 deferredResponse.emplace(std::move(response));
             }));
         return deferredResponse;
     }
 
     // Helper to run startCommand and wait for it
-    StatusWith<RemoteCommandResponse> startCommandSync(RemoteCommandRequest& request) {
+    RemoteCommandResponse startCommandSync(RemoteCommandRequest& request) {
         auto deferred = startCommand(makeCallbackHandle(), request);
 
         // wait for the operation to complete
@@ -180,7 +180,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
 
     // Wait for op to complete, assert that it was canceled.
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::CallbackCanceled);
+    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
 
@@ -202,7 +203,8 @@ TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
                            });
 
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::CallbackCanceled);
+    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT(result.elapsedMillis);
     // expect 0 completed ops because the op was canceled before getting a connection
     assertNumOps(1u, 0u, 0u, 0u);
 }
@@ -230,9 +232,11 @@ TEST_F(NetworkInterfaceASIOTest, LateCancel) {
                            });
 
     // Allow to complete, then cancel, nothing should happen.
-    deferred.get();
+    auto& result = deferred.get();
     net().cancelCommand(cbh);
 
+    ASSERT(result.isOK());
+    ASSERT(result.elapsedMillis);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -262,7 +266,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
 
     // Wait for op to complete, assert that cancellation error had precedence.
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::CallbackCanceled);
+    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
 
@@ -290,7 +295,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
 
     // Wait for op to complete, assert that cancellation error had precedence.
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::CallbackCanceled);
+    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
 
@@ -319,7 +325,8 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
 
     // Wait for op to complete, assert that timeout had precedence.
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::ExceededTimeLimit);
+    ASSERT(result.status == ErrorCodes::ExceededTimeLimit);
+    ASSERT(result.elapsedMillis);
     assertNumOps(0u, 1u, 1u, 0u);
 }
 
@@ -349,7 +356,8 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
 
     // Wait for op to complete, assert that the cancellation had precedence.
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::CallbackCanceled);
+    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
 
@@ -386,7 +394,8 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
     }
 
     auto& result = deferred.get();
-    ASSERT(result == ErrorCodes::ExceededTimeLimit);
+    ASSERT(result.status == ErrorCodes::ExceededTimeLimit);
+    ASSERT(result.elapsedMillis);
     assertNumOps(0u, 1u, 1u, 0u);
 }
 
@@ -425,10 +434,10 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
         });
 
     auto& res = deferred.get();
-
-    auto response = uassertStatusOK(res);
-    ASSERT_EQ(response.data, expectedCommandReply);
-    ASSERT_EQ(response.metadata, expectedMetadata);
+    ASSERT(res.elapsedMillis);
+    uassertStatusOK(res.status);
+    ASSERT_EQ(res.data, expectedCommandReply);
+    ASSERT_EQ(res.metadata, expectedMetadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -442,7 +451,7 @@ TEST_F(NetworkInterfaceASIOTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
     net().shutdown();
     RemoteCommandRequest request;
     ASSERT_NOT_OK(net().startCommand(
-        makeCallbackHandle(), request, [&](StatusWith<RemoteCommandResponse> resp) {}));
+        makeCallbackHandle(), request, [&](RemoteCommandResponse resp) {}));
 }
 
 class MalformedMessageTest : public NetworkInterfaceASIOTest {
@@ -502,7 +511,8 @@ public:
         }
 
         auto& response = deferred.get();
-        ASSERT(response == code);
+        ASSERT(response.status == code);
+        ASSERT(response.elapsedMillis);
         assertNumOps(0u, 0u, 1u, 0u);
     }
 };
@@ -614,8 +624,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, InvalidIsMaster) {
 
     // we should stop here.
     auto& res = deferred.get();
-
-    ASSERT(res == validationFailedStatus);
+    ASSERT(res.status == validationFailedStatus);
+    ASSERT(res.elapsedMillis);
 
     assertNumOps(0u, 0u, 1u, 0u);
 }
@@ -671,9 +681,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
 
     // we should stop here.
     auto& res = deferred.get();
-
-    // auto result = uassertStatusOK(res);
-    ASSERT(res == validationFailedStatus);
+    ASSERT(res.status == validationFailedStatus);
+    ASSERT(res.elapsedMillis);
     ASSERT(validateCalled);
     ASSERT(hostCorrect);
     ASSERT(isMasterReplyCorrect);
@@ -721,7 +730,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
     // We should stop here.
     auto& res = deferred.get();
 
-    ASSERT(res == makeRequestError);
+    ASSERT(res.status == makeRequestError);
+    ASSERT(res.elapsedMillis);
     ASSERT(makeRequestCalled);
     ASSERT(!handleReplyCalled);
     assertNumOps(0u, 0u, 1u, 0u);
@@ -782,8 +792,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto& result = deferred.get();
 
     ASSERT(result.isOK());
-    ASSERT(result.getValue().data == commandReply);
-    ASSERT(result.getValue().metadata == metadata);
+    ASSERT(result.data == commandReply);
+    ASSERT(result.elapsedMillis);
+    ASSERT(result.metadata == metadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -849,8 +860,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                            });
 
     auto& result = deferred.get();
-
-    ASSERT(result == handleReplyError);
+    ASSERT(result.status == handleReplyError);
+    ASSERT(result.elapsedMillis);
     ASSERT(makeRequestCalled);
     ASSERT(handleReplyCalled);
     ASSERT(handleReplyArgumentCorrect);
@@ -954,7 +965,8 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
                                return response;
                            });
 
-    deferred.get();
+    auto& res = deferred.get();
+    ASSERT(res.elapsedMillis);
     ASSERT(wroteRequestMetadata);
     ASSERT(gotReplyMetadata);
     assertNumOps(0u, 0u, 0u, 1u);

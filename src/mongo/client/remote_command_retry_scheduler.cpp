@@ -207,7 +207,7 @@ Status RemoteCommandRetryScheduler::_schedule_inlock(std::size_t requestCount) {
 
 void RemoteCommandRetryScheduler::_remoteCommandCallback(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba, std::size_t requestCount) {
-    auto status = rcba.response.getStatus();
+    auto status = rcba.response.status;
 
     if (status.isOK() || status == ErrorCodes::CallbackCanceled ||
         requestCount == _retryPolicy->getMaximumAttempts() ||

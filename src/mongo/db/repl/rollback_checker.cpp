@@ -51,14 +51,14 @@ RollbackChecker::~RollbackChecker() {}
 RollbackChecker::CallbackHandle RollbackChecker::checkForRollback(const CallbackFn& nextAction) {
     return _scheduleGetRollbackId(
         [this, nextAction](const RemoteCommandCallbackArgs& args) {
-            if (args.response.getStatus() == ErrorCodes::CallbackCanceled) {
+            if (args.response.status == ErrorCodes::CallbackCanceled) {
                 return;
             }
             if (!args.response.isOK()) {
-                nextAction(args.response.getStatus());
+                nextAction(args.response.status);
                 return;
             }
-            if (auto rbidElement = args.response.getValue().data["rbid"]) {
+            if (auto rbidElement = args.response.data["rbid"]) {
                 int remoteRBID = rbidElement.numberInt();
 
                 UniqueLock lk(_mutex);
@@ -97,14 +97,14 @@ StatusWith<bool> RollbackChecker::hasHadRollback() {
 RollbackChecker::CallbackHandle RollbackChecker::reset(const CallbackFn& nextAction) {
     return _scheduleGetRollbackId(
         [this, nextAction](const RemoteCommandCallbackArgs& args) {
-            if (args.response.getStatus() == ErrorCodes::CallbackCanceled) {
+            if (args.response.status == ErrorCodes::CallbackCanceled) {
                 return;
             }
             if (!args.response.isOK()) {
-                nextAction(args.response.getStatus());
+                nextAction(args.response.status);
                 return;
             }
-            if (auto rbidElement = args.response.getValue().data["rbid"]) {
+            if (auto rbidElement = args.response.data["rbid"]) {
                 int newRBID = rbidElement.numberInt();
 
                 UniqueLock lk(_mutex);
