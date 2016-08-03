@@ -41,7 +41,6 @@
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/views/view_graph.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -58,6 +57,7 @@ class ViewCatalog {
 public:
     // TODO(SERVER-23700): Make this a unique_ptr once StringMap supports move-only types.
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
+    static const std::uint32_t kMaxViewDepth;
 
     explicit ViewCatalog(DurableViewCatalog* durable) : _durable(durable) {}
 
@@ -133,19 +133,13 @@ public:
      */
     void invalidate() {
         _valid.store(false);
-        _viewGraphNeedsRefresh = true;
     }
 
 private:
-    Status _createOrUpdateView_inlock(OperationContext* txn,
-                                      const NamespaceString& viewName,
-                                      const NamespaceString& viewOn,
-                                      const BSONArray& pipeline);
-    /**
-     * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
-     * the graph if necessary. Returns an error status if the resulting graph would be invalid.
-     */
-    Status _upsertIntoGraph(OperationContext* txn, const ViewDefinition& viewDef);
+    void _createOrUpdateView_inlock(OperationContext* txn,
+                                    const NamespaceString& viewName,
+                                    const NamespaceString& viewOn,
+                                    const BSONArray& pipeline);
 
     ViewDefinition* _lookup_inlock(OperationContext* txn, StringData ns);
     Status _reloadIfNeeded_inlock(OperationContext* txn);
@@ -154,7 +148,5 @@ private:
     ViewMap _viewMap;
     DurableViewCatalog* _durable;
     AtomicBool _valid;
-    ViewGraph _viewGraph;
-    bool _viewGraphNeedsRefresh = true;  // Defers initializing the graph until the first insert.
 };
 }  // namespace mongo

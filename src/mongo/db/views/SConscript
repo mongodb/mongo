@@ -21,7 +21,6 @@ env.Library(
     source=[
         'view.cpp',
         'view_catalog.cpp',
-        'view_graph.cpp',
         'resolved_view.cpp',
     ],
     LIBDEPS=[

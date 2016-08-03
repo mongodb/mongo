@@ -68,4 +68,26 @@
     const doOrderedSort = true;
     assertAggResultEq("popSortedView", [], allDocuments.sort(byPopulation), doOrderedSort);
     assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Palo Alto"}]);
+
+    // Create a cyclical view and assert that aggregation fails appropriately.
+    // TODO(SERVER-24768) This should be prohibited on the create command
+    assert.commandWorked(viewsDB.runCommand({create: "viewCycle1", viewOn: "viewCycle2"}));
+    assert.commandWorked(viewsDB.runCommand({create: "viewCycle2", viewOn: "viewCycle1"}));
+    assert.commandFailedWithCode(viewsDB.runCommand({aggregate: "viewCycle1", pipeline: []}),
+                                 ErrorCodes.ViewDepthLimitExceeded);
+
+    // Create views-on-views that exceed the maximum depth of 20.
+    // TODO(SERVER-24768) Consider making this fail as well on creation
+    const kMaxViewDepth = 20;
+    assert.commandWorked(viewsDB.runCommand({create: "viewChain0", viewOn: "coll"}));
+    for (let i = 1; i <= kMaxViewDepth; i++) {
+        const viewName = "viewChain" + i;
+        const viewOnName = "viewChain" + (i - 1);
+        assert.commandWorked(viewsDB.runCommand({create: viewName, viewOn: viewOnName}));
+    }
+    assert.commandFailedWithCode(viewsDB.runCommand({aggregate: "viewChain20", pipeline: []}),
+                                 ErrorCodes.ViewDepthLimitExceeded);
+
+    // However, an aggregation in the middle of the chain should succeed.
+    assertAggResultEq("viewChain16", [], allDocuments, !doOrderedSort);
 }());

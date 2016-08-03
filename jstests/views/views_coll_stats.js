@@ -57,4 +57,15 @@
     checkCollStatsBelongTo(viewsDB["a"].aggregate().next(), "b");
     checkCollStatsBelongTo(viewsDB["b"].aggregate().next(), "c");
     clear();
+
+    // Assert that an aggregation fails if $collStats is not the first stage of the pipeline.
+    makeView("a", "b");
+    makeView("b", "c", [matchStage, collStatsStage]);
+    checkCollStatsBelongTo(viewsDB["a"].latencyStats().next(), "a");
+    checkCollStatsBelongTo(viewsDB["b"].latencyStats().next(), "b");
+    assert.commandFailedWithCode(viewsDB.runCommand({aggregate: "a", pipeline: []}),
+                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(viewsDB.runCommand({aggregate: "b", pipeline: []}),
+                                 ErrorCodes.BadValue);
+    clear();
 }());
