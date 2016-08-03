@@ -1,8 +1,3 @@
-mirrors:
-  3.3: unstable
-  nightly: testing
-  rc: testing
-
 services:
   notary_url: "http://notary-service.build.10gen.cc:5000"
 
