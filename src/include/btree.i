@@ -166,7 +166,7 @@ __wt_cache_page_byte_dirty_decr(
 {
 	WT_CACHE *cache;
 	const char *destname;
-	size_t *dest;
+	uint64_t *dest;
 	size_t decr, orig;
 	int i;
 
@@ -328,8 +328,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_PAGE_MODIFY *modify;
+	uint64_t *dest;
 	const char *destname;
-	size_t *dest;
 
 	cache = S2C(session)->cache;
 	dest = WT_PAGE_IS_INTERNAL(page) ?
@@ -352,7 +352,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
-		if (*dest < modify->bytes_dirty) {
+		if ((size_t)*dest < modify->bytes_dirty) {
 			__wt_errx(session,
 			   "%s decrement failed: "
 			   "dirty byte count went negative", destname);
