@@ -321,6 +321,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_force_delete;
 	int64_t cache_eviction_app;
 	int64_t cache_eviction_pages_queued;
+	int64_t cache_eviction_pages_queued_urgent;
 	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
@@ -444,13 +445,13 @@ struct __wt_connection_stats {
 	int64_t txn_checkpoint_time_max;
 	int64_t txn_checkpoint_time_min;
 	int64_t txn_checkpoint_time_recent;
+	int64_t txn_checkpoint_scrub_target;
+	int64_t txn_checkpoint_scrub_time;
 	int64_t txn_checkpoint_time_total;
 	int64_t txn_checkpoint;
 	int64_t txn_fail_cache;
 	int64_t txn_checkpoint_fsync_post;
-	int64_t txn_checkpoint_fsync_pre;
 	int64_t txn_checkpoint_fsync_post_duration;
-	int64_t txn_checkpoint_fsync_pre_duration;
 	int64_t txn_pinned_range;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;

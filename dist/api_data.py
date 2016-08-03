@@ -401,16 +401,16 @@ connection_runtime_config = [
                 vary depending on the current eviction load''',
                 min=1, max=20),
             ]),
-    Config('eviction_dirty_target', '80', r'''
+    Config('eviction_dirty_target', '5', r'''
         continue evicting until the cache has less dirty memory than the
         value, as a percentage of the total cache size. Dirty pages will
         only be evicted if the cache is full enough to trigger eviction''',
-        min=5, max=99),
-    Config('eviction_dirty_trigger', '95', r'''
+        min=1, max=99),
+    Config('eviction_dirty_trigger', '20', r'''
         trigger eviction when the cache is using this much memory for dirty
         content, as a percentage of the total cache size. This setting only
         alters behavior if it is lower than eviction_trigger''',
-        min=5, max=99),
+        min=1, max=99),
     Config('eviction_target', '80', r'''
         continue evicting until the cache has less total memory than the
         value, as a percentage of the total cache size. Must be less than

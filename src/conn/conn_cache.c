@@ -233,7 +233,8 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 
 	WT_STAT_SET(session, stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
-	WT_STAT_SET(session, stats, cache_pages_dirty, cache->pages_dirty);
+	WT_STAT_SET(session, stats, cache_pages_dirty,
+	    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
 	/*
 	 * The number of files with active walks ~= number of hazard pointers
@@ -273,11 +274,13 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 		__wt_errx(session,
 		    "cache server: exiting with %" PRIu64 " bytes in memory",
 		    cache->bytes_inmem);
-	if (cache->bytes_dirty != 0 || cache->pages_dirty != 0)
+	if (cache->bytes_dirty_intl + cache->bytes_dirty_leaf != 0 ||
+	    cache->pages_dirty_intl + cache->pages_dirty_leaf != 0)
 		__wt_errx(session,
 		    "cache server: exiting with %" PRIu64
 		    " bytes dirty and %" PRIu64 " pages dirty",
-		    cache->bytes_dirty, cache->pages_dirty);
+		    cache->bytes_dirty_intl + cache->bytes_dirty_leaf,
+		    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
 	WT_TRET(__wt_cond_auto_destroy(session, &cache->evict_cond));
 	WT_TRET(__wt_cond_destroy(session, &cache->evict_waiter_cond));

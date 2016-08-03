@@ -2,6 +2,20 @@
 
 @section version_281 Upgrading to Version 2.8.1
 <dl>
+<dt>Cache management defaults</dt>
+<dd>
+The default values for the \c eviction_dirty_target and \c
+eviction_dirty_trigger settings to ::wiredtiger_open have changed to 5 and 20,
+respectively.  This means that by default, WiredTiger will start writing dirty
+pages from cache when it becomes 5% dirty and will throttle activity to keep
+the volume of dirty data in cache under 20%.  For write-heavy workloads, the
+new defaults may result in lower throughput and more threads writing to data
+files concurrently.
+
+These settings also now determine how much work is done at the beginning of a
+checkpoint to make the critical section of checkpoints complete more quickly.
+</dd>
+
 <dt>Checkpoint server created checkpoint names</dt>
 <dd>
 The ::wiredtiger_open checkpoint configuration no longer supports the

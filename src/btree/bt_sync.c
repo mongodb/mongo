@@ -93,7 +93,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		/*
 		 * If we are flushing a file at read-committed isolation, which
 		 * is of particular interest for flushing the metadata to make
-		 * schema-changing operation durable, get a transactional
+		 * a schema-changing operation durable, get a transactional
 		 * snapshot now.
 		 *
 		 * All changes committed up to this point should be included.

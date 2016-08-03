@@ -524,17 +524,18 @@ __evict_review(
 		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 			LF_SET(WT_EVICT_IN_MEMORY |
 			    WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
-		else if (page->read_gen == WT_READGEN_OLDEST ||
-		    page->memory_footprint > S2BT(session)->splitmempage)
-			LF_SET(WT_EVICT_UPDATE_RESTORE | WT_EVICT_SCRUB);
 		else if (F_ISSET(cache, WT_CACHE_STUCK))
 			LF_SET(WT_EVICT_LOOKASIDE);
+		else if (!__wt_txn_visible_all(
+		    session, page->modify->update_txn))
+			LF_SET(WT_EVICT_UPDATE_RESTORE);
+
 		/*
-		 * If we aren't trying to free space in the cache, just
-		 * scrub the page and keep it around.
+		 * If we aren't trying to free space in the cache, scrub the
+		 * page and keep it around.
 		 */
 		if (!LF_ISSET(WT_EVICT_LOOKASIDE) &&
-		    cache->state != WT_EVICT_STATE_ALL)
+		    FLD_ISSET(cache->state, WT_EVICT_STATE_SCRUB))
 			LF_SET(WT_EVICT_SCRUB);
 	}
 	*flagsp = flags;

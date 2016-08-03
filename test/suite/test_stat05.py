@@ -43,13 +43,15 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
         ('file',  dict(uri='file:' + pfx, pop=simple_populate, cfg='')),
         ('table', dict(uri='table:' + pfx, pop=simple_populate, cfg='')),
         ('inmem', dict(uri='table:' + pfx, pop=simple_populate, cfg='',
-            conn_config='in_memory,statistics=(fast)')),
+            conn_config = 'in_memory,statistics=(fast)')),
         ('table-lsm', dict(uri='table:' + pfx, pop=simple_populate,
-            cfg=',type=lsm,lsm=(chunk_size=1MB,merge_min=2)')),
+            cfg=',type=lsm,lsm=(chunk_size=1MB,merge_min=2)',
+            conn_config = 'statistics=(fast),eviction_dirty_target=99,eviction_dirty_trigger=99')),
         ('complex', dict(uri='table:' + pfx, pop=complex_populate, cfg='')),
         ('complex-lsm',
             dict(uri='table:' + pfx, pop=complex_populate_lsm,
-            cfg=',lsm=(chunk_size=1MB,merge_min=2)')),
+            cfg=',lsm=(chunk_size=1MB,merge_min=2)',
+            conn_config = 'statistics=(fast),eviction_dirty_target=99,eviction_dirty_trigger=99')),
     ]
 
     scenarios = make_scenarios(uri)
@@ -61,7 +63,6 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
         while c.next() == 0:
             count += 1
         c.close()
-
 
     # Open a size-only statistics cursor on various table types. Ensure that
     # the cursor open succeeds. Insert enough data that LSM tables to need to

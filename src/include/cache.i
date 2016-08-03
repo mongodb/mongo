@@ -104,7 +104,24 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 {
 	uint64_t dirty_inuse;
 
-	dirty_inuse = cache->bytes_dirty;
+	dirty_inuse = cache->bytes_dirty_intl + cache->bytes_dirty_leaf;
+	if (cache->overhead_pct != 0)
+		dirty_inuse +=
+		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
+
+	return (dirty_inuse);
+}
+
+/*
+ * __wt_cache_dirty_leaf_inuse --
+ *	Return the number of dirty bytes in use by leaf pages.
+ */
+static inline uint64_t
+__wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
+{
+	uint64_t dirty_inuse;
+
+	dirty_inuse = cache->bytes_dirty_leaf;
 	if (cache->overhead_pct != 0)
 		dirty_inuse +=
 		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
@@ -185,7 +202,7 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 /*
  * __wt_eviction_needed --
  *	Return if an application thread should do eviction, and the cache full
- * percentage as a side-effect.
+ *      percentage as a side-effect.
  */
 static inline bool
 __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
@@ -223,10 +240,17 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	if (pct_full > cache->eviction_trigger)
 		return (true);
 
-	/* Return if there are too many dirty bytes in cache. */
-	if (__wt_cache_dirty_inuse(cache) >
+	/*
+	 * Check if there are too many dirty bytes in cache.
+	 *
+	 * We try to avoid penalizing read-only operations by only checking the
+	 * dirty limit once a transaction ID has been allocated, or if the last
+	 * transaction did an update.
+	 */
+	if (__wt_cache_dirty_leaf_inuse(cache) >
 	    (cache->eviction_dirty_trigger * bytes_max) / 100)
 		return (true);
+
 	return (false);
 }
 

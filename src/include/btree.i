@@ -91,8 +91,9 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	(void)__wt_atomic_add64(&cache->bytes_inmem, size);
 	(void)__wt_atomic_addsize(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
-		(void)__wt_atomic_add64(&cache->bytes_dirty, size);
 		(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
+		(void)__wt_atomic_add64(WT_PAGE_IS_INTERNAL(page) ?
+		    &cache->bytes_dirty_intl : &cache->bytes_dirty_leaf, size);
 	}
 	/* Track internal size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
@@ -164,10 +165,16 @@ __wt_cache_page_byte_dirty_decr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
+	const char *destname;
+	size_t *dest;
 	size_t decr, orig;
 	int i;
 
 	cache = S2C(session)->cache;
+	dest = WT_PAGE_IS_INTERNAL(page) ?
+	    &cache->bytes_dirty_intl : &cache->bytes_dirty_leaf;
+	destname = WT_PAGE_IS_INTERNAL(page) ?
+	    "WT_CACHE.bytes_dirty_intl" : "WT_CACHE.bytes_dirty_leaf";
 
 	/*
 	 * We don't have exclusive access and there are ways of decrementing the
@@ -195,8 +202,8 @@ __wt_cache_page_byte_dirty_decr(
 		decr = WT_MIN(size, orig);
 		if (__wt_atomic_cassize(
 		    &page->modify->bytes_dirty, orig, orig - decr)) {
-			__wt_cache_decr_check_uint64(session,
-			    &cache->bytes_dirty, decr, "WT_CACHE.bytes_dirty");
+			__wt_cache_decr_check_uint64(
+			    session, dest, decr, destname);
 			break;
 		}
 	}
@@ -241,14 +248,16 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	size_t size;
 
 	cache = S2C(session)->cache;
-	(void)__wt_atomic_add64(&cache->pages_dirty, 1);
+	(void)__wt_atomic_add64(WT_PAGE_IS_INTERNAL(page) ?
+	    &cache->pages_dirty_intl : &cache->pages_dirty_leaf, 1);
 
 	/*
 	 * Take care to read the memory_footprint once in case we are racing
 	 * with updates.
 	 */
 	size = page->memory_footprint;
-	(void)__wt_atomic_add64(&cache->bytes_dirty, size);
+	(void)__wt_atomic_add64(WT_PAGE_IS_INTERNAL(page) ?
+	    &cache->bytes_dirty_intl : &cache->bytes_dirty_leaf, size);
 	(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
 }
 
@@ -262,16 +271,19 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_PAGE_MODIFY *modify;
+	uint64_t *pages_dirty;
 
 	cache = S2C(session)->cache;
+	pages_dirty = WT_PAGE_IS_INTERNAL(page) ?
+	    &cache->pages_dirty_intl : &cache->pages_dirty_leaf;
 
-	if (cache->pages_dirty < 1) {
+	if (*pages_dirty < 1) {
 		__wt_errx(session,
 		   "cache eviction dirty-page decrement failed: dirty page"
 		   "count went negative");
-		cache->pages_dirty = 0;
+		*pages_dirty = 0;
 	} else
-		(void)__wt_atomic_sub64(&cache->pages_dirty, 1);
+		(void)__wt_atomic_sub64(pages_dirty, 1);
 
 	modify = page->modify;
 	if (modify != NULL && modify->bytes_dirty != 0)
@@ -316,8 +328,14 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_PAGE_MODIFY *modify;
+	const char *destname;
+	size_t *dest;
 
 	cache = S2C(session)->cache;
+	dest = WT_PAGE_IS_INTERNAL(page) ?
+	    &cache->bytes_dirty_intl : &cache->bytes_dirty_leaf;
+	destname = WT_PAGE_IS_INTERNAL(page) ?
+	    "WT_CACHE.bytes_dirty_intl" : "WT_CACHE.bytes_dirty_leaf";
 	modify = page->modify;
 
 	/* Update the bytes in-memory to reflect the eviction. */
@@ -334,15 +352,14 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
-		if (cache->bytes_dirty < modify->bytes_dirty) {
+		if (*dest < modify->bytes_dirty) {
 			__wt_errx(session,
-			   "cache eviction dirty-bytes decrement failed: "
-			   "dirty byte count went negative");
-			cache->bytes_dirty = 0;
+			   "%s decrement failed: "
+			   "dirty byte count went negative", destname);
+			*dest = 0;
 		} else
-			__wt_cache_decr_check_uint64(session,
-			    &cache->bytes_dirty,
-			    modify->bytes_dirty, "WT_CACHE.bytes_dirty");
+			__wt_cache_decr_check_uint64(session, dest,
+			    modify->bytes_dirty, destname);
 	}
 
 	/* Update pages and bytes evicted. */

@@ -134,6 +134,7 @@ struct __wt_btree {
 	WT_REF	   *evict_ref;		/* Eviction thread's location */
 	uint64_t    evict_priority;	/* Relative priority of cached pages */
 	u_int	    evict_walk_period;	/* Skip this many LRU walks */
+	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
 	u_int	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */

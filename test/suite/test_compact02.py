@@ -96,7 +96,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         self.home = '.'
         conn_params = 'create,' + \
             cacheSize + ',error_prefix="%s: ",' % self.shortid() + \
-            'statistics=(fast)'
+            'statistics=(fast),eviction_dirty_target=99,eviction_dirty_trigger=99'
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:

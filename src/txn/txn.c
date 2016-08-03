@@ -480,6 +480,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
+
 	/* Ensure the transaction flags are cleared on exit */
 	txn->flags = 0;
 }
@@ -497,10 +498,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	u_int i;
+	bool did_update;
 
 	txn = &session->txn;
 	conn = S2C(session);
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
+	did_update = txn->mod_count != 0;
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
@@ -561,7 +564,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* If we are logging, write a commit log record. */
-	if (ret == 0 && txn->mod_count > 0 &&
+	if (ret == 0 && did_update &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING)) {
 		/*

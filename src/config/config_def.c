@@ -114,10 +114,10 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_eviction_subconfigs, 2 },
 	{ "eviction_dirty_target", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_dirty_trigger", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_target", "int", NULL, "min=10,max=99", NULL, 0 },
 	{ "eviction_trigger", "int", NULL, "min=10,max=99", NULL, 0 },
@@ -658,10 +658,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_eviction_subconfigs, 2 },
 	{ "eviction_dirty_target", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_dirty_trigger", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_target", "int", NULL, "min=10,max=99", NULL, 0 },
 	{ "eviction_trigger", "int", NULL, "min=10,max=99", NULL, 0 },
@@ -739,10 +739,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_eviction_subconfigs, 2 },
 	{ "eviction_dirty_target", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_dirty_trigger", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_target", "int", NULL, "min=10,max=99", NULL, 0 },
 	{ "eviction_trigger", "int", NULL, "min=10,max=99", NULL, 0 },
@@ -819,10 +819,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_eviction_subconfigs, 2 },
 	{ "eviction_dirty_target", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_dirty_trigger", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_target", "int", NULL, "min=10,max=99", NULL, 0 },
 	{ "eviction_trigger", "int", NULL, "min=10,max=99", NULL, 0 },
@@ -895,10 +895,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_eviction_subconfigs, 2 },
 	{ "eviction_dirty_target", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_dirty_trigger", "int",
-	    NULL, "min=5,max=99",
+	    NULL, "min=1,max=99",
 	    NULL, 0 },
 	{ "eviction_target", "int", NULL, "min=10,max=99", NULL, 0 },
 	{ "eviction_trigger", "int", NULL, "min=10,max=99", NULL, 0 },
@@ -989,8 +989,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_CONNECTION.reconfigure",
 	  "async=(enabled=0,ops_max=1024,threads=2),cache_overhead=8,"
 	  "cache_size=100MB,checkpoint=(log_size=0,wait=0),error_prefix=,"
-	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
-	  "eviction_dirty_trigger=95,eviction_target=80,eviction_trigger=95"
+	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=5,"
+	  "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
 	  ",file_manager=(close_handle_minimum=250,close_idle_time=30,"
 	  "close_scan_interval=10),log=(archive=,prealloc=,zero_fill=0),"
 	  "lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,"
@@ -1186,8 +1186,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "cache_overhead=8,cache_size=100MB,checkpoint=(log_size=0,wait=0)"
 	  ",checkpoint_sync=,config_base=,create=0,direct_io=,"
 	  "encryption=(keyid=,name=,secretkey=),error_prefix=,"
-	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
-	  "eviction_dirty_trigger=95,eviction_target=80,eviction_trigger=95"
+	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=5,"
+	  "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
 	  ",exclusive=0,extensions=,file_extend=,"
 	  "file_manager=(close_handle_minimum=250,close_idle_time=30,"
 	  "close_scan_interval=10),hazard_max=1000,in_memory=0,"
@@ -1207,8 +1207,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "cache_overhead=8,cache_size=100MB,checkpoint=(log_size=0,wait=0)"
 	  ",checkpoint_sync=,config_base=,create=0,direct_io=,"
 	  "encryption=(keyid=,name=,secretkey=),error_prefix=,"
-	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
-	  "eviction_dirty_trigger=95,eviction_target=80,eviction_trigger=95"
+	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=5,"
+	  "eviction_dirty_trigger=20,eviction_target=80,eviction_trigger=95"
 	  ",exclusive=0,extensions=,file_extend=,"
 	  "file_manager=(close_handle_minimum=250,close_idle_time=30,"
 	  "close_scan_interval=10),hazard_max=1000,in_memory=0,"
@@ -1228,7 +1228,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "cache_overhead=8,cache_size=100MB,checkpoint=(log_size=0,wait=0)"
 	  ",checkpoint_sync=,direct_io=,encryption=(keyid=,name=,"
 	  "secretkey=),error_prefix=,eviction=(threads_max=1,threads_min=1)"
-	  ",eviction_dirty_target=80,eviction_dirty_trigger=95,"
+	  ",eviction_dirty_target=5,eviction_dirty_trigger=20,"
 	  "eviction_target=80,eviction_trigger=95,extensions=,file_extend=,"
 	  "file_manager=(close_handle_minimum=250,close_idle_time=30,"
 	  "close_scan_interval=10),hazard_max=1000,log=(archive=,"
@@ -1247,7 +1247,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "cache_overhead=8,cache_size=100MB,checkpoint=(log_size=0,wait=0)"
 	  ",checkpoint_sync=,direct_io=,encryption=(keyid=,name=,"
 	  "secretkey=),error_prefix=,eviction=(threads_max=1,threads_min=1)"
-	  ",eviction_dirty_target=80,eviction_dirty_trigger=95,"
+	  ",eviction_dirty_target=5,eviction_dirty_trigger=20,"
 	  "eviction_target=80,eviction_trigger=95,extensions=,file_extend=,"
 	  "file_manager=(close_handle_minimum=250,close_idle_time=30,"
 	  "close_scan_interval=10),hazard_max=1000,log=(archive=,"
