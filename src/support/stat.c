@@ -685,6 +685,22 @@ static const char * const __stats_connection_desc[] = {
 	"reconciliation: split objects currently awaiting free",
 	"session: open cursor count",
 	"session: open session count",
+	"session: table compact failed calls",
+	"session: table compact successful calls",
+	"session: table create failed calls",
+	"session: table create successful calls",
+	"session: table drop failed calls",
+	"session: table drop successful calls",
+	"session: table rebalance failed calls",
+	"session: table rebalance successful calls",
+	"session: table rename failed calls",
+	"session: table rename successful calls",
+	"session: table salvage failed calls",
+	"session: table salvage successful calls",
+	"session: table truncate failed calls",
+	"session: table truncate successful calls",
+	"session: table verify failed calls",
+	"session: table verify successful calls",
 	"thread-state: active filesystem fsync calls",
 	"thread-state: active filesystem read calls",
 	"thread-state: active filesystem write calls",
@@ -911,6 +927,22 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing rec_split_stashed_objects */
 		/* not clearing session_cursor_open */
 		/* not clearing session_open */
+		/* not clearing session_table_compact_fail */
+		/* not clearing session_table_compact_success */
+		/* not clearing session_table_create_fail */
+		/* not clearing session_table_create_success */
+		/* not clearing session_table_drop_fail */
+		/* not clearing session_table_drop_success */
+		/* not clearing session_table_rebalance_fail */
+		/* not clearing session_table_rebalance_success */
+		/* not clearing session_table_rename_fail */
+		/* not clearing session_table_rename_success */
+		/* not clearing session_table_salvage_fail */
+		/* not clearing session_table_salvage_success */
+		/* not clearing session_table_truncate_fail */
+		/* not clearing session_table_truncate_success */
+		/* not clearing session_table_verify_fail */
+		/* not clearing session_table_verify_success */
 		/* not clearing thread_fsync_active */
 		/* not clearing thread_read_active */
 		/* not clearing thread_write_active */
@@ -1168,6 +1200,38 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, rec_split_stashed_objects);
 	to->session_cursor_open += WT_STAT_READ(from, session_cursor_open);
 	to->session_open += WT_STAT_READ(from, session_open);
+	to->session_table_compact_fail +=
+	    WT_STAT_READ(from, session_table_compact_fail);
+	to->session_table_compact_success +=
+	    WT_STAT_READ(from, session_table_compact_success);
+	to->session_table_create_fail +=
+	    WT_STAT_READ(from, session_table_create_fail);
+	to->session_table_create_success +=
+	    WT_STAT_READ(from, session_table_create_success);
+	to->session_table_drop_fail +=
+	    WT_STAT_READ(from, session_table_drop_fail);
+	to->session_table_drop_success +=
+	    WT_STAT_READ(from, session_table_drop_success);
+	to->session_table_rebalance_fail +=
+	    WT_STAT_READ(from, session_table_rebalance_fail);
+	to->session_table_rebalance_success +=
+	    WT_STAT_READ(from, session_table_rebalance_success);
+	to->session_table_rename_fail +=
+	    WT_STAT_READ(from, session_table_rename_fail);
+	to->session_table_rename_success +=
+	    WT_STAT_READ(from, session_table_rename_success);
+	to->session_table_salvage_fail +=
+	    WT_STAT_READ(from, session_table_salvage_fail);
+	to->session_table_salvage_success +=
+	    WT_STAT_READ(from, session_table_salvage_success);
+	to->session_table_truncate_fail +=
+	    WT_STAT_READ(from, session_table_truncate_fail);
+	to->session_table_truncate_success +=
+	    WT_STAT_READ(from, session_table_truncate_success);
+	to->session_table_verify_fail +=
+	    WT_STAT_READ(from, session_table_verify_fail);
+	to->session_table_verify_success +=
+	    WT_STAT_READ(from, session_table_verify_success);
 	to->thread_fsync_active += WT_STAT_READ(from, thread_fsync_active);
 	to->thread_read_active += WT_STAT_READ(from, thread_read_active);
 	to->thread_write_active += WT_STAT_READ(from, thread_write_active);

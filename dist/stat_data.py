@@ -336,6 +336,22 @@ connection_stats = [
     ##########################################
     SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
     SessionStat('session_open', 'open session count', 'no_clear,no_scale'),
+    SessionStat('session_table_compact_fail', 'table compact failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_compact_success', 'table compact successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_create_fail', 'table create failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_drop_success', 'table drop successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rebalance_fail', 'table rebalance failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rebalance_success', 'table rebalance successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rename_fail', 'table rename failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rename_success', 'table rename successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_salvage_fail', 'table salvage failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_salvage_success', 'table salvage successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
 
     ##########################################
     # Total cursor operations
