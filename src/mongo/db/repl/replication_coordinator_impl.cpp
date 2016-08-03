@@ -476,10 +476,10 @@ void ReplicationCoordinatorImpl::_setFollowerModeFinish(
     _topCoord->setFollowerMode(newState.s);
 
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
-    *success = true;
-    _replExecutor.signalEvent(finishedSettingFollowerMode);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
+    *success = true;
+    _replExecutor.signalEvent(finishedSettingFollowerMode);
 }
 
 bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
