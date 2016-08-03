@@ -3,7 +3,8 @@
  * are behind the majority opTime.
  */
 (function() {
-    var st = new ShardingTest({shards: 1});
+    var st = new ShardingTest(
+        {shards: 1, configReplSetTestOptions: {settings: {chainingAllowed: false}}});
     var testDB = st.s.getDB('test');
 
     assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
