@@ -316,6 +316,7 @@ env.Library(
         'downconvert_find_and_getmore_commands.cpp',
     ],
     LIBDEPS=[
+        'remote_command',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/client_query',
         '$BUILD_DIR/mongo/db/query/command_request_response',
