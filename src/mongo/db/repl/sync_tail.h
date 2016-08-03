@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 
@@ -177,9 +176,7 @@ public:
     static std::atomic<int> replBatchLimitOperations;  // NOLINT (sever params must use std::atomic)
 
 protected:
-    // Cap the batches using the limit on journal commits.
-    // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
-    static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
+    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
     static const int replBatchLimitSeconds = 1;
 
     // Apply a batch of operations, using multiple threads.
