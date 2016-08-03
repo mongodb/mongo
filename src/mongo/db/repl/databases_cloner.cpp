@@ -85,6 +85,10 @@ DatabasesCloner::DatabasesCloner(StorageInterface* si,
     uassert(ErrorCodes::InvalidOptions, "includeDbPred must be provided.", includeDbPred);
 };
 
+DatabasesCloner::~DatabasesCloner() {
+    DESTRUCTOR_GUARD(shutdown(); join(););
+}
+
 std::string DatabasesCloner::toString() const {
     return str::stream() << "initial sync --"
                          << " active:" << _active << " status:" << _status.toString()

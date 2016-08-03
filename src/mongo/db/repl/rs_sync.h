@@ -46,6 +46,7 @@ class ReplicationCoordinator;
 class RSDataSync {
 public:
     RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord);
+    ~RSDataSync();
     void startup();
     void shutdown();
     void join();

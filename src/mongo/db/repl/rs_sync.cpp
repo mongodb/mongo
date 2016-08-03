@@ -52,6 +52,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -68,6 +69,10 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 RSDataSync::RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord)
     : _bgsync(bgsync), _replCoord(replCoord) {}
+
+RSDataSync::~RSDataSync() {
+    DESTRUCTOR_GUARD(shutdown(); join(););
+}
 
 void RSDataSync::startup() {
     LockGuard lk(_mutex);
@@ -142,6 +147,8 @@ void RSDataSync::_run() {
             SyncTail tail(_bgsync, multiSyncApply);
             tail.oplogApplication(_replCoord, [this]() { return _isInShutdown(); });
         } catch (...) {
+            auto status = exceptionToStatus();
+            severe() << "Exception thrown in RSDataSync: " << status;
             std::terminate();
         }
     }

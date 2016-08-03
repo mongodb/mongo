@@ -72,6 +72,8 @@ public:
                     IncludeDbFilterFn includeDbPred,
                     OnFinishFn finishFn);
 
+    ~DatabasesCloner();
+
     Status startup();
     bool isActive();
     void join();
