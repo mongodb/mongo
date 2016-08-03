@@ -51,9 +51,6 @@ RollbackChecker::~RollbackChecker() {}
 RollbackChecker::CallbackHandle RollbackChecker::checkForRollback(const CallbackFn& nextAction) {
     return _scheduleGetRollbackId(
         [this, nextAction](const RemoteCommandCallbackArgs& args) {
-            if (args.response.status == ErrorCodes::CallbackCanceled) {
-                return;
-            }
             if (!args.response.isOK()) {
                 nextAction(args.response.status);
                 return;
@@ -64,13 +61,7 @@ RollbackChecker::CallbackHandle RollbackChecker::checkForRollback(const Callback
                 UniqueLock lk(_mutex);
                 bool hadRollback = _checkForRollback_inlock(remoteRBID);
                 lk.unlock();
-
-                if (hadRollback) {
-                    nextAction(Status(ErrorCodes::UnrecoverableRollbackError,
-                                      "RollbackChecker detected rollback occurred"));
-                } else {
-                    nextAction(Status::OK());
-                }
+                nextAction(hadRollback);
             } else {
                 nextAction(Status(ErrorCodes::CommandFailed,
                                   "replSetGetRBID command failed when checking for rollback"));
@@ -79,11 +70,10 @@ RollbackChecker::CallbackHandle RollbackChecker::checkForRollback(const Callback
         nextAction);
 }
 
-StatusWith<bool> RollbackChecker::hasHadRollback() {
+RollbackChecker::Result RollbackChecker::hasHadRollback() {
     // Default to true in case the callback is not called in an error case.
-    bool hasHadRollback = true;
-    auto cbh = checkForRollback(
-        [&hasHadRollback](const Status& status) { hasHadRollback = !status.isOK(); });
+    Result result(true);
+    auto cbh = checkForRollback([&result](const Result& cbResult) { result = cbResult; });
 
     if (!cbh.isValid()) {
         return Status(ErrorCodes::CallbackCanceled,
@@ -91,15 +81,12 @@ StatusWith<bool> RollbackChecker::hasHadRollback() {
     }
 
     _executor->wait(cbh);
-    return hasHadRollback;
+    return result;
 }
 
 RollbackChecker::CallbackHandle RollbackChecker::reset(const CallbackFn& nextAction) {
     return _scheduleGetRollbackId(
         [this, nextAction](const RemoteCommandCallbackArgs& args) {
-            if (args.response.status == ErrorCodes::CallbackCanceled) {
-                return;
-            }
             if (!args.response.isOK()) {
                 nextAction(args.response.status);
                 return;
@@ -111,7 +98,9 @@ RollbackChecker::CallbackHandle RollbackChecker::reset(const CallbackFn& nextAct
                 _setRBID_inlock(newRBID);
                 lk.unlock();
 
-                nextAction(Status::OK());
+                // Actual bool value does not matter because reset_sync()
+                // will convert non-error StatusWith<bool> to Status::OK.
+                nextAction(true);
             } else {
                 nextAction(Status(ErrorCodes::CommandFailed,
                                   "replSetGetRBID command failed when checking for rollback"));
@@ -123,7 +112,7 @@ RollbackChecker::CallbackHandle RollbackChecker::reset(const CallbackFn& nextAct
 Status RollbackChecker::reset_sync() {
     // Default to an error in case the callback is not called in an error case.
     Status resetStatus = Status(ErrorCodes::CommandFailed, "RollbackChecker reset failed");
-    auto cbh = reset([&resetStatus](const Status& status) { resetStatus = status; });
+    auto cbh = reset([&resetStatus](const Result& result) { resetStatus = result.getStatus(); });
 
     if (!cbh.isValid()) {
         return Status(ErrorCodes::CallbackCanceled,

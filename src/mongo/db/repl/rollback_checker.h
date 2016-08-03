@@ -58,7 +58,10 @@ class RollbackChecker {
     MONGO_DISALLOW_COPYING(RollbackChecker);
 
 public:
-    using CallbackFn = stdx::function<void(const Status& status)>;
+    // Rollback checker result - true if rollback occurred; false if rollback IDs
+    // were the same; Otherwise, error status indicating why rollback check failed.
+    using Result = StatusWith<bool>;
+    using CallbackFn = stdx::function<void(const Result& result)>;
     using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
     using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 
@@ -67,15 +70,14 @@ public:
     virtual ~RollbackChecker();
 
     // Checks whether the the sync source has had a rollback since the last time reset was called,
-    // and then calls the nextAction with a status specifying what should occur next. The status
-    // will either be OK if there was no rollback and no error, UnrecoverableRollbackError if there
-    // was a rollback, or another status if the command failed. The nextAction should account for
-    // each of these cases.
+    // and then calls the nextAction with the rollback checker result. An error status
+    // will be passed to the callback if the RBID cannot be determined or if
+    // the callback was canceled.
     CallbackHandle checkForRollback(const CallbackFn& nextAction);
 
     // Synchronously checks if there has been a rollback and returns a boolean specifying if one
-    // has occurred. If any error occurs this will return true.
-    StatusWith<bool> hasHadRollback();
+    // has occurred.
+    Result hasHadRollback();
 
     // Resets the state used to decide if a rollback occurs, and then calls the nextAction with a
     // status specifying what should occur next. The status will either be OK if there was no
