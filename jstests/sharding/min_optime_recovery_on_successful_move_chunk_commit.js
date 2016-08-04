@@ -31,6 +31,7 @@
     assert.eq(st.configRS.getURL(), minOpTimeRecoveryDoc.configsvrConnectionString);
     assert.eq('shard0000', minOpTimeRecoveryDoc.shardName);
     assert.gt(minOpTimeRecoveryDoc.minOpTime.ts.getTime(), 0);
+    assert.eq(0, minOpTimeRecoveryDoc.minOpTimeUpdaters);
 
     st.stop();
 
