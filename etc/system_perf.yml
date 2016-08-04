@@ -148,7 +148,7 @@ functions:
             echo "Resource released."
             rm -r $HOME/infrastructure_provisioning
             echo "Cleaned up provisioning state on Evergreen host. Exiting test."
-            exit
+            exit 1
           fi
 
   "configure mongodb cluster":
