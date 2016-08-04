@@ -152,9 +152,17 @@ public:
         size_t _bytes;
     };
 
-    // returns true if we should continue waiting for BSONObjs, false if we should
-    // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-    bool tryPopAndWaitForMore(OperationContext* txn, OpQueue* ops);
+    /**
+     * Attempts to pop an OplogEntry off the BGSync queue and add it to ops.
+     *
+     * If slaveDelayLimit is provided, only operations with a timestamp <= the provided Date_t will
+     * be included in the batch. Returns true if the (possibly empty) batch in ops should be ended
+     * and a new one started. If ops is empty on entry and nothing can be added yet, will wait up to
+     * a second before returning.
+     */
+    bool tryPopAndWaitForMore(OperationContext* txn,
+                              OpQueue* ops,
+                              boost::optional<Date_t> slaveDelayLimit = {});
 
     /**
      * Fetch a single document referenced in the operation from the sync source.

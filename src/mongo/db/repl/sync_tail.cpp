@@ -159,39 +159,6 @@ bool isCrudOpType(const char* field) {
     }
     return false;
 }
-
-void handleSlaveDelay(const Timestamp& ts) {
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-    int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
-
-    // ignore slaveDelay if the box is still initializing. once
-    // it becomes secondary we can worry about it.
-    if (slaveDelaySecs > 0 && replCoord->getMemberState().secondary()) {
-        long long a = ts.getSecs();
-        long long b = time(0);
-        long long lag = b - a;
-        long long sleeptime = slaveDelaySecs - lag;
-        if (sleeptime > 0) {
-            uassert(12000,
-                    "rs slaveDelay differential too big check clocks and systems",
-                    sleeptime < 0x40000000);
-            if (sleeptime < 60) {
-                sleepsecs((int)sleeptime);
-            } else {
-                warning() << "slavedelay causing a long sleep of " << sleeptime << " seconds";
-                // sleep(hours) would prevent reconfigs from taking effect & such!
-                long long waitUntil = b + sleeptime;
-                while (time(0) < waitUntil) {
-                    sleepsecs(6);
-
-                    // Handle reconfigs that changed the slave delay
-                    if (durationCount<Seconds>(replCoord->getSlaveDelaySecs()) != slaveDelaySecs)
-                        break;
-                }
-            }
-        }
-    }  // endif slaveDelay
-}
 }
 
 namespace {
@@ -755,11 +722,17 @@ private:
 
         while (!shouldShutdown()) {
             const auto batchStartTime = fastClockSource->now();
-            const int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
+            const auto slaveDelay = replCoord->getSlaveDelaySecs();
+            const auto slaveDelayLimit = (slaveDelay > Seconds(0)) ? (batchStartTime - slaveDelay)
+                                                                   : boost::optional<Date_t>();
 
             OpQueue ops;
             // tryPopAndWaitForMore returns true when we need to end a batch early
-            while (!_syncTail->tryPopAndWaitForMore(&txn, &ops) && !_inShutdown.load()) {
+            while (!_inShutdown.load()) {
+                if (_syncTail->tryPopAndWaitForMore(&txn, &ops, slaveDelayLimit)) {
+                    break;  // We need to end this batch early, even if there is more room.
+                }
+
                 if (!ops.empty()) {
                     // apply replication batch limits
                     const auto batchDuration = fastClockSource->now() - batchStartTime;
@@ -770,29 +743,16 @@ private:
                     if (ops.getBytes() >= replBatchLimitBytes)
                         break;
                 }
-
-                if (!ops.empty() && slaveDelaySecs > 0) {
-                    const unsigned int opTimestampSecs = ops.back().ts.timestamp().getSecs();
-
-                    // Stop the batch as the lastOp is too new to be applied. If we continue
-                    // on, we can get ops that are way ahead of the delay and this will
-                    // make this thread sleep longer when handleSlaveDelay is called
-                    // and apply ops much sooner than we like.
-                    if (opTimestampSecs > static_cast<unsigned int>(time(0) - slaveDelaySecs)) {
-                        break;
-                    }
-                }
-
-                if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
-                    break;
-                }
-
-                // keep fetching more ops as long as we haven't filled up a full batch yet
+                // keep fetching more ops as long as we haven't hit any batch-ending conditions
             }
 
             // For pausing replication in tests
             while (MONGO_FAIL_POINT(rsSyncApplyStop) && !_inShutdown.load()) {
                 sleepmillis(10);
+            }
+
+            if (ops.empty()) {
+                continue;  // Don't emit empty batches.
             }
 
             stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -872,8 +832,6 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
                                          << ")."));
         }
 
-        handleSlaveDelay(lastOpTime.getTimestamp());
-
         // Set minValid to the last OpTime that needs to be applied, in this batch or from the
         // (last) failed batch, whichever is larger.
         // This will cause this node to go into RECOVERING state
@@ -925,26 +883,54 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
 // This function also blocks 1 second waiting for new ops to appear in the bgsync
 // queue.  We can't block forever because there are maintenance things we need
 // to periodically check in the loop.
-bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* ops) {
+bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
+                                    SyncTail::OpQueue* ops,
+                                    boost::optional<Date_t> slaveDelayLimit) {
     {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
         bool peek_success = peek(txn, &op);
         if (!peek_success) {
-            // if we don't have anything in the queue, wait a bit for something to appear
+            // If we don't have anything in the queue, wait a bit for something to appear.
             if (ops->empty()) {
-                // block up to 1 second
+                // Block up to 1 second. We still return true in this case because we want this op
+                // to be the first in a new batch with a new start time.
                 _networkQueue->waitForMore(txn);
-                return false;
             }
 
-            // otherwise, apply what we have
             return true;
         }
         ops->emplace_back(std::move(op));
     }
 
     auto& entry = ops->back();
+
+    if (!entry.raw.isEmpty()) {
+        // check for oplog version change
+        int curVersion = 0;
+        if (entry.version.eoo()) {
+            // missing version means version 1
+            curVersion = 1;
+        } else {
+            curVersion = entry.version.Int();
+        }
+
+        if (curVersion != OplogEntry::kOplogVersion) {
+            severe() << "expected oplog version " << OplogEntry::kOplogVersion
+                     << " but found version " << curVersion << " in oplog entry: " << entry.raw;
+            fassertFailedNoTrace(18820);
+        }
+    }
+
+    if (slaveDelayLimit && entry.ts.timestampTime() > *slaveDelayLimit) {
+        ops->pop_back();  // Don't do this op yet.
+        if (ops->empty()) {
+            // Sleep if we've got nothing to do. Only sleep for 1 second at a time to allow
+            // reconfigs and shutdown to occur.
+            sleepsecs(1);
+        }
+        return true;
+    }
 
     // Check for ops that must be processed one at a time.
     if (entry.raw.isEmpty() ||       // sentinel that network queue is drained.
@@ -964,20 +950,6 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* op
 
         // Apply what we have so far.
         return true;
-    }
-
-    // check for oplog version change
-    int curVersion = 0;
-    if (entry.version.eoo())
-        // missing version means version 1
-        curVersion = 1;
-    else
-        curVersion = entry.version.Int();
-
-    if (curVersion != OplogEntry::kOplogVersion) {
-        severe() << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
-                 << curVersion << " in oplog entry: " << entry.raw;
-        fassertFailedNoTrace(18820);
     }
 
     // We are going to apply this Op.
