@@ -53,6 +53,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -345,10 +346,17 @@ protected:
         }
     }
 
-    void tearDown() override {
+    void tearDownExecutorThread() {
+        if (_executorThreadShutdownComplete) {
+            return;
+        }
         executor::ThreadPoolExecutorTest::shutdownExecutorThread();
         executor::ThreadPoolExecutorTest::joinExecutorThread();
+        _executorThreadShutdownComplete = true;
+    }
 
+    void tearDown() override {
+        tearDownExecutorThread();
         _dr.reset();
         _dbWorkThreadPool->join();
         _dbWorkThreadPool.reset();
@@ -389,6 +397,7 @@ protected:
 private:
     DataReplicatorExternalStateMock* _externalState;
     std::unique_ptr<DataReplicator> _dr;
+    bool _executorThreadShutdownComplete = false;
 };
 
 executor::ThreadPoolMock::Options DataReplicatorTest::makeThreadPoolMockOptions() const {
@@ -668,9 +677,17 @@ protected:
     BSONObj lastGetMoreOplogEntry;
 
 private:
+    void tearDown() override;
+
     Responses _responses;
     std::unique_ptr<InitialSyncBackgroundRunner> _isbr{nullptr};
 };
+
+void InitialSyncTest::tearDown() {
+    DataReplicatorTest::tearDownExecutorThread();
+    _isbr.reset();
+    DataReplicatorTest::tearDown();
+}
 
 TEST_F(InitialSyncTest, Complete) {
     /**
@@ -862,36 +879,18 @@ TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCl
 }
 
 TEST_F(InitialSyncTest, Failpoint) {
-    mongo::getGlobalFailPointRegistry()
-        ->getFailPoint("failInitialSyncWithBadHost")
-        ->setMode(FailPoint::alwaysOn);
-
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")));
+    auto failPoint = getGlobalFailPointRegistry()->getFailPoint("failInitialSyncWithBadHost");
+    failPoint->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
 
     Timestamp time1(100, 1);
     OpTime opTime1(time1, OpTime::kInitialTerm);
     _myLastOpTime = opTime1;
     _memberState = MemberState::RS_SECONDARY;
 
-    DataReplicator* dr = &(getDR());
-    InitialSyncBackgroundRunner isbr(dr, 0);
-    isbr.run();
+    startSync(0);
 
-    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::InvalidSyncSource);
-
-    mongo::getGlobalFailPointRegistry()
-        ->getFailPoint("failInitialSyncWithBadHost")
-        ->setMode(FailPoint::off);
+    verifySync(getNet(), ErrorCodes::InvalidSyncSource);
 }
 
 TEST_F(InitialSyncTest, FailsOnClone) {
@@ -1162,9 +1161,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
             // Applier starts ...
         };
 
-    DataReplicator* dr = &(getDR());
-    InitialSyncBackgroundRunner isbr(dr, 1);
-    isbr.run();
+    startSync(1);
 
     numGetMoreOplogEntriesMax = 6;
     setResponses(responses);
@@ -1176,6 +1173,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     playResponses(false);
     log() << "done playing first response of second round of responses";
 
+    auto dr = &getDR();
     ASSERT_TRUE(dr->getState() == DataReplicatorState::InitialSync);
     ASSERT_EQUALS(dr->getLastFetched(), OpTimeWithHash());
     ASSERT_EQUALS(dr->getLastApplied(), OpTimeWithHash());
@@ -1183,7 +1181,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     setResponses({responses.begin() + 1, responses.end()});
     playResponses(true);
     log() << "done playing second round of responses";
-    ASSERT_EQ(isbr.getResult(getNet()).getStatus().code(), ErrorCodes::UnrecoverableRollbackError);
+    verifySync(getNet(), ErrorCodes::UnrecoverableRollbackError);
 }
 
 
