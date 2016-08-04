@@ -2341,8 +2341,8 @@ tasks:
 
           cat <<EOF > ~/.aws/credentials
           [default]
-          aws_access_key_id = ${aws_key}
-          aws_secret_access_key = ${aws_secret}
+          aws_access_key_id = ${repo_aws_key}
+          aws_secret_access_key = ${repo_aws_secret}
           EOF
 
           cat <<EOF > notary_env.sh
