@@ -180,6 +180,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
+TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdAndKeepAllOtherFields) {
+    ParsedExclusionProjection exclusion;
+    exclusion.parse(BSON("_id" << false));
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
+    auto expectedResult = Document{{"a", 1}, {"b", 2}};
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
 //
 // Tests of execution of nested exclusions.
 //

@@ -306,11 +306,6 @@ TEST(ParsedAggregationProjectionErrors, ShouldErrorOnInvalidFieldPath) {
     ASSERT_THROWS(ParsedAggregationProjection::create(BSON("c.$d" << false)), UserException);
 }
 
-TEST(ParsedAggregationProjectionErrors, ShouldErrorOnProjectionWithNoOutputFields) {
-    // This is treated as an inclusion projection without any fields, so should error.
-    ASSERT_THROWS(ParsedAggregationProjection::create(BSON("_id" << false)), UserException);
-}
-
 TEST(ParsedAggregationProjectionErrors, ShouldNotErrorOnTwoNestedFields) {
     ParsedAggregationProjection::create(BSON("a.b" << true << "a.c" << true));
     ParsedAggregationProjection::create(BSON("a.b" << true << "a" << BSON("c" << true)));
@@ -342,6 +337,9 @@ TEST(ParsedAggregationProjectionType, ShouldDetectExclusionProjection) {
     ASSERT(parsedProject->getType() == ProjectionType::kExclusion);
 
     parsedProject = ParsedAggregationProjection::create(BSON("x" << BSON("_id" << false)));
+    ASSERT(parsedProject->getType() == ProjectionType::kExclusion);
+
+    parsedProject = ParsedAggregationProjection::create(BSON("_id" << false));
     ASSERT(parsedProject->getType() == ProjectionType::kExclusion);
 }
 

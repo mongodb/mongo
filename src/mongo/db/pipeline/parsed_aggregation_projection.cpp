@@ -100,8 +100,19 @@ private:
     void parse() {
         uassert(40177, "$project specification must have at least one field", !_rawObj.isEmpty());
 
+        size_t nFields = 0;
         for (auto&& elem : _rawObj) {
             parseElement(elem, FieldPath(elem.fieldName()));
+            nFields++;
+        }
+
+        // Check for the case where we only exclude '_id'.
+        if (nFields == 1) {
+            BSONElement elem = _rawObj.firstElement();
+            if (elem.fieldNameStringData() == "_id" && (elem.isBoolean() || elem.isNumber()) &&
+                !elem.trueValue()) {
+                _parsedType = ProjectionType::kExclusion;
+            }
         }
 
         // Default to inclusion if nothing (except maybe '_id') is explicitly included or excluded.
