@@ -3,6 +3,7 @@
     "use strict";
     var t = db.jstests_server22053;
 
+    /* eslint-disable no-sparse-arrays */
     var s0 = [, , 3, , , 6];
     t.coll.insert({mys: s0});
 
