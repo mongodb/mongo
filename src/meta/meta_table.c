@@ -68,6 +68,9 @@ __wt_metadata_cursor_open(
 	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
 
+	/* The metadata file always uses checkpoint IDs in visibility checks. */
+	btree->include_checkpoint_txn = true;
+
 	return (0);
 }
 

@@ -278,6 +278,12 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret);
 	}
 
+	/*
+	 * Flag that the handle is part of a checkpoint for the purposes
+	 * of transaction visibility checks.
+	 */
+	WT_PUBLISH(btree->include_checkpoint_txn, true);
+
 	session->ckpt_handle[session->ckpt_handle_next++] = session->dhandle;
 	return (0);
 }
@@ -295,6 +301,9 @@ __checkpoint_update_generation(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 
 	btree = S2BT(session);
+	if (!WT_IS_METADATA(session, session->dhandle))
+		WT_PUBLISH(btree->include_checkpoint_txn, false);
+
 	WT_PUBLISH(btree->checkpoint_gen,
 	    S2C(session)->txn_global.checkpoint_gen);
 	WT_STAT_FAST_DATA_SET(session,
@@ -695,7 +704,6 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Release the snapshot so we aren't pinning updates in cache. */
 	__wt_txn_release_snapshot(session);
-	txn_global->checkpoint_pinned = WT_TXN_NONE;
 
 	/* Mark all trees as open for business (particularly eviction). */
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_presync));
@@ -762,6 +770,12 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
+
+	/*
+	 * Now that the metadata is stable, re-open the metadata file for
+	 * regular eviction by clearing the checkpoint_pinned flag.
+	 */
+	txn_global->checkpoint_pinned = WT_TXN_NONE;
 
 	if (full) {
 		WT_ERR(__wt_epoch(session, &stop));
@@ -1421,6 +1435,7 @@ __checkpoint_presync(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
+	WT_ASSERT(session, !btree->include_checkpoint_txn);
 	btree->evict_walk_period = btree->evict_walk_saved;
 	return (0);
 }
