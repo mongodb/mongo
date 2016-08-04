@@ -42,6 +42,7 @@
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Delete as findAndModify.
@@ -64,6 +65,7 @@
     assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
     assert.eq(profileObj.planSummary, "COLLSCAN", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Update with {upsert: true} as findAndModify.
@@ -90,6 +92,7 @@
     assert.eq(profileObj.nModified, 0, tojson(profileObj));
     assert.eq(profileObj.upsert, true, tojson(profileObj));
     assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Idhack update as findAndModify.
@@ -106,6 +109,7 @@
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IDHACK", tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Update as findAndModify with projection.
@@ -128,6 +132,7 @@
     assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Delete as findAndModify with projection.
@@ -146,6 +151,7 @@
     assert.eq(profileObj.command.fields, {_id: 0, a: 1}, tojson(profileObj));
     assert(!profileObj.hasOwnProperty("updateobj"), tojson(profileObj));
     assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "hasSortStage" on findAndModify with sort.

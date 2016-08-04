@@ -45,6 +45,7 @@
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     // We cannot confirm "fromMultiPlanner" or "replanned" metrics as there can be at most one
     // valid index choice for geoNear. The reason for this is:

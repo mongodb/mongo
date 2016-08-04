@@ -59,6 +59,7 @@
     assert(profileObj.locks.hasOwnProperty("Global"), tojson(profileObj));
     assert(profileObj.locks.hasOwnProperty("Database"), tojson(profileObj));
     assert(profileObj.locks.hasOwnProperty("Collection"), tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "cursorId" and "hasSortStage" metrics.
@@ -77,6 +78,7 @@
     assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
     assert(profileObj.hasOwnProperty("cursorid"), tojson(profileObj));
     assert(!profileObj.hasOwnProperty("cursorExhausted"), tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.
@@ -92,6 +94,7 @@
     profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "replanned" metric.
@@ -111,6 +114,7 @@
     profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.replanned, true, tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
     //
     // Confirm that query modifiers such as "hint" are in the profiler document.
