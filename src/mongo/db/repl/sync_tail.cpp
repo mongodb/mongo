@@ -687,10 +687,7 @@ class SyncTail::OpQueueBatcher {
     MONGO_DISALLOW_COPYING(OpQueueBatcher);
 
 public:
-    OpQueueBatcher(SyncTail* syncTail, stdx::function<bool()> shouldShutdown)
-        : _syncTail(syncTail), _thread([this, shouldShutdown] {
-              run([this, shouldShutdown] { return _inShutdown.load() || shouldShutdown(); });
-          }) {}
+    OpQueueBatcher(SyncTail* syncTail) : _syncTail(syncTail), _thread([this] { run(); }) {}
     ~OpQueueBatcher() {
         _inShutdown.store(true);
         _cv.notify_all();
@@ -713,14 +710,14 @@ public:
     }
 
 private:
-    void run(stdx::function<bool()> shouldShutdown) {
+    void run() {
         Client::initThread("ReplBatcher");
         const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
         OperationContext& txn = *txnPtr;
         const auto replCoord = ReplicationCoordinator::get(&txn);
         const auto fastClockSource = txn.getServiceContext()->getFastClockSource();
 
-        while (!shouldShutdown()) {
+        while (!_inShutdown.load()) {
             const auto batchStartTime = fastClockSource->now();
             const auto slaveDelay = replCoord->getSlaveDelaySecs();
             const auto slaveDelayLimit = (slaveDelay > Seconds(0)) ? (batchStartTime - slaveDelay)
@@ -758,7 +755,7 @@ private:
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             while (!_ops.empty()) {
                 // Block until the previous batch has been taken.
-                if (shouldShutdown())
+                if (_inShutdown.load())
                     return;
                 _cv.wait(lk);
             }
@@ -780,7 +777,7 @@ private:
 /* tail an oplog.  ok to return, will be re-called. */
 void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
                                 stdx::function<bool()> shouldShutdown) {
-    OpQueueBatcher batcher(this, shouldShutdown);
+    OpQueueBatcher batcher(this);
 
     const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
     OperationContext& txn = *txnPtr;
