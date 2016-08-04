@@ -229,7 +229,7 @@ RemoteCommandResponse upconvertLegacyQueryResponse(std::int32_t requestId,
     RemoteCommandResponse upconvertedResponse;
     upconvertedResponse.data = result.obj();
 
-    return {upconvertedResponse};
+    return upconvertedResponse;
 }
 
 StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest& request) {
@@ -272,7 +272,7 @@ RemoteCommandResponse upconvertLegacyGetMoreResponse(std::int32_t requestId,
     RemoteCommandResponse resp;
     resp.data = result.obj();
 
-    return {resp};
+    return resp;
 }
 
 }  // namespace mongo
