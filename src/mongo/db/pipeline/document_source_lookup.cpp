@@ -110,20 +110,20 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
     // '_handlingUnwind' would be set to true, and we would not have made it here.
     invariant(!_matchSrc);
 
-    BSONObj query = queryForInput(*input, _localField, _foreignFieldFieldName, BSONObj());
-    std::unique_ptr<DBClientCursor> cursor = _mongod->directClient()->query(_fromNs.ns(), query);
+    auto matchStage =
+        makeMatchStageFromInput(*input, _localField, _foreignFieldFieldName, BSONObj());
+    auto pipeline = uassertStatusOK(_mongod->makePipeline({matchStage}, _fromExpCtx));
 
     std::vector<Value> results;
     int objsize = 0;
-    while (cursor->more()) {
-        BSONObj result = cursor->nextSafe();
-        objsize += result.objsize();
+    while (auto result = pipeline->output()->getNext()) {
+        objsize += result->getApproximateSize();
         uassert(4568,
                 str::stream() << "Total size of documents in " << _fromNs.coll() << " matching "
-                              << query
+                              << matchStage
                               << " exceeds maximum document size",
                 objsize <= BSONObjMaxInternalSize);
-        results.push_back(Value(result));
+        results.emplace_back(std::move(*result));
     }
 
     MutableDocument output(std::move(*input));
@@ -264,14 +264,14 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::optimizeAt(
 }
 
 void DocumentSourceLookUp::dispose() {
-    _cursor.reset();
+    _pipeline.reset();
     pSource->dispose();
 }
 
-BSONObj DocumentSourceLookUp::queryForInput(const Document& input,
-                                            const FieldPath& localFieldPath,
-                                            const std::string& foreignFieldName,
-                                            const BSONObj& additionalFilter) {
+BSONObj DocumentSourceLookUp::makeMatchStageFromInput(const Document& input,
+                                                      const FieldPath& localFieldPath,
+                                                      const std::string& foreignFieldName,
+                                                      const BSONObj& additionalFilter) {
     Value localFieldVal = input.getNestedField(localFieldPath);
 
     // Missing values are treated as null.
@@ -279,38 +279,53 @@ BSONObj DocumentSourceLookUp::queryForInput(const Document& input,
         localFieldVal = Value(BSONNULL);
     }
 
-    // We are constructing a query of one of the following forms:
-    // {$and: [{<foreignFieldName>: {$eq: <localFieldVal>}}, <additionalFilter>]}
-    // {$and: [{<foreignFieldName>: {$in: [<value>, <value>, ...]}}, <additionalFilter>]}
-    // {$and: [{$or: [{<foreignFieldName>: {$eq: <value>}},
-    //                {<foreignFieldName>: {$eq: <value>}}, ...]},
-    //         <additionalFilter>]}
+    // We construct a query of one of the following forms, depending on the contents of
+    // 'localFieldVal'.
+    //
+    //   {$and: [{<foreignFieldName>: {$eq: <localFieldVal>}}, <additionalFilter>]}
+    //     if 'localFieldVal' isn't an array value.
+    //
+    //   {$and: [{<foreignFieldName>: {$in: [<value>, <value>, ...]}}, <additionalFilter>]}
+    //     if 'localFieldVal' is an array value but doesn't contain any elements that are regular
+    //     expressions.
+    //
+    //   {$and: [{$or: [{<foreignFieldName>: {$eq: <value>}},
+    //                  {<foreignFieldName>: {$eq: <value>}}, ...]},
+    //           <additionalFilter>]}
+    //     if 'localFieldVal' is an array value and it contains at least one element that is a
+    //     regular expression.
 
-    BSONObjBuilder query;
+    // We wrap the query in a $match so that it can be parsed into a DocumentSourceMatch when
+    // constructing a pipeline to execute.
+    BSONObjBuilder match;
+    BSONObjBuilder query(match.subobjStart("$match"));
 
     BSONArrayBuilder andObj(query.subarrayStart("$and"));
     BSONObjBuilder joiningObj(andObj.subobjStart());
 
     if (localFieldVal.isArray()) {
-        // Assume an array value logically corresponds to many documents, rather than logically
-        // corresponding to one document with an array value.
+        // A $lookup on an array value corresponds to finding documents in the foreign collection
+        // that have a value of any of the elements in the array value, rather than finding
+        // documents that have a value equal to the entire array value. These semantics are
+        // automatically provided to us by using the $in query operator.
         const vector<Value>& localArray = localFieldVal.getArray();
         const bool containsRegex = std::any_of(
             localArray.begin(), localArray.end(), [](Value val) { return val.getType() == RegEx; });
 
         if (containsRegex) {
-            // A regex inside of an $in will not be treated as an equality comparison, so use an
-            // $or.
+            // A regular expression inside the $in query operator will perform pattern matching on
+            // any string values. Since we want regular expressions to only match other RegEx types,
+            // we write the query as a $or of equality comparisons instead.
             BSONObj orQuery = buildEqualityOrQuery(foreignFieldName, localFieldVal.getArray());
             joiningObj.appendElements(orQuery);
         } else {
-            // { _foreignFieldFieldName : { "$in" : localFieldValue } }
+            // { <foreignFieldName> : { "$in" : <localFieldVal> } }
             BSONObjBuilder subObj(joiningObj.subobjStart(foreignFieldName));
             subObj << "$in" << localFieldVal;
             subObj.doneFast();
         }
     } else {
-        // { _foreignFieldFieldName : { "$eq" : localFieldValue } }
+        // { <foreignFieldName> : { "$eq" : <localFieldVal> } }
         BSONObjBuilder subObj(joiningObj.subobjStart(foreignFieldName));
         subObj << "$eq" << localFieldVal;
         subObj.doneFast();
@@ -324,7 +339,8 @@ BSONObj DocumentSourceLookUp::queryForInput(const Document& input,
 
     andObj.doneFast();
 
-    return query.obj();
+    query.doneFast();
+    return match.obj();
 }
 
 boost::optional<Document> DocumentSourceLookUp::unwindResult() {
@@ -333,24 +349,25 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
     // Loop until we get a document that has at least one match.
     // Note we may return early from this loop if our source stage is exhausted or if the unwind
     // source was asked to return empty arrays and we get a document without a match.
-    while (!_cursor || !_cursor->more()) {
+    while (!_pipeline || !_nextValue) {
         _input = pSource->getNext();
         if (!_input)
             return {};
 
         BSONObj filter = _additionalFilter.value_or(BSONObj());
-        _cursor = _mongod->directClient()->query(
-            _fromNs.ns(),
-            DocumentSourceLookUp::queryForInput(
-                *_input, _localField, _foreignFieldFieldName, filter));
-        _cursorIndex = 0;
+        auto matchStage =
+            makeMatchStageFromInput(*_input, _localField, _foreignFieldFieldName, filter);
+        _pipeline = uassertStatusOK(_mongod->makePipeline({matchStage}, _fromExpCtx));
 
-        if (_unwindSrc->preserveNullAndEmptyArrays() && !_cursor->more()) {
+        _cursorIndex = 0;
+        _nextValue = _pipeline->output()->getNext();
+
+        if (_unwindSrc->preserveNullAndEmptyArrays() && !_nextValue) {
             // There were no results for this cursor, but the $unwind was asked to preserve empty
             // arrays, so we should return a document without the array.
             MutableDocument output(std::move(*_input));
-            // Note this will correctly objects in the prefix of '_as', to act as if we had created
-            // an empty array and then removed it.
+            // Note this will correctly create objects in the prefix of '_as', to act as if we had
+            // created an empty array and then removed it.
             output.setNestedField(_as, Value());
             if (indexPath) {
                 output.setNestedField(*indexPath, Value(BSONNULL));
@@ -358,18 +375,20 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
             return output.freeze();
         }
     }
-    invariant(_cursor->more() && bool(_input));
-    auto nextVal = Value(_cursor->nextSafe());
+
+    invariant(bool(_input) && bool(_nextValue));
+    auto currentValue = *_nextValue;
+    _nextValue = _pipeline->output()->getNext();
 
     // Move input document into output if this is the last or only result, otherwise perform a copy.
-    MutableDocument output(_cursor->more() ? *_input : std::move(*_input));
-    output.setNestedField(_as, nextVal);
+    MutableDocument output(_nextValue ? *_input : std::move(*_input));
+    output.setNestedField(_as, Value(currentValue));
 
     if (indexPath) {
         output.setNestedField(*indexPath, Value(_cursorIndex));
     }
 
-    _cursorIndex++;
+    ++_cursorIndex;
     return output.freeze();
 }
 
@@ -418,6 +437,32 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
 DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(_localField.fullPath());
     return SEE_NEXT;
+}
+
+void DocumentSourceLookUp::doInjectExpressionContext() {
+    _fromExpCtx = pExpCtx->copyWith(_fromNs);
+}
+
+void DocumentSourceLookUp::doDetachFromOperationContext() {
+    if (_pipeline) {
+        // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
+        // use Pipeline::detachFromOperationContext() to take care of updating '_fromExpCtx->opCtx'.
+        _pipeline->detachFromOperationContext();
+        invariant(_fromExpCtx->opCtx == nullptr);
+    } else {
+        _fromExpCtx->opCtx = nullptr;
+    }
+}
+
+void DocumentSourceLookUp::doReattachToOperationContext(OperationContext* opCtx) {
+    if (_pipeline) {
+        // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
+        // use Pipeline::reattachToOperationContext() to take care of updating '_fromExpCtx->opCtx'.
+        _pipeline->reattachToOperationContext(opCtx);
+        invariant(_fromExpCtx->opCtx == opCtx);
+    } else {
+        _fromExpCtx->opCtx = opCtx;
+    }
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(

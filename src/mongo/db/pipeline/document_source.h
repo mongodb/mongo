@@ -392,6 +392,16 @@ public:
             const BSONObj& originalCollectionOptions,
             const std::list<BSONObj>& originalIndexes) = 0;
 
+        /**
+         * Parses a Pipeline from a vector of BSONObjs representing DocumentSources and readies it
+         * for execution. The returned pipeline is optimized and has a cursor source prepared.
+         *
+         * This function returns a non-OK status if parsing the pipeline failed.
+         */
+        virtual StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+            const std::vector<BSONObj>& rawPipeline,
+            const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+
         // Add new methods as needed.
     };
 
@@ -447,7 +457,6 @@ protected:
 class DocumentSourceCursor final : public DocumentSource {
 public:
     // virtuals from DocumentSource
-    ~DocumentSourceCursor() final;
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final {
@@ -464,6 +473,10 @@ public:
     }
     void dispose() final;
 
+    void detachFromOperationContext() final;
+
+    void reattachToOperationContext(OperationContext* opCtx) final;
+
     /**
      * Create a document source based on a passed-in PlanExecutor.
      *
@@ -472,7 +485,7 @@ public:
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         const std::string& ns,
-        const std::shared_ptr<PlanExecutor>& exec,
+        std::unique_ptr<PlanExecutor> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /*
@@ -533,7 +546,7 @@ protected:
 
 private:
     DocumentSourceCursor(const std::string& ns,
-                         const std::shared_ptr<PlanExecutor>& exec,
+                         std::unique_ptr<PlanExecutor> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     void loadBatch();
@@ -554,7 +567,7 @@ private:
     long long _docsAddedToBatches;  // for _limit enforcement
 
     const std::string _ns;
-    std::shared_ptr<PlanExecutor> _exec;  // PipelineProxyStage holds a weak_ptr to this.
+    std::unique_ptr<PlanExecutor> _exec;
     BSONObjSet _outputSorts;
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;
@@ -1689,16 +1702,23 @@ public:
         collections->push_back(_fromNs);
     }
 
+    void doDetachFromOperationContext() final;
+
+    void doReattachToOperationContext(OperationContext* opCtx) final;
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
-     * Build the BSONObj used to query the foreign collection.
+     * Builds the BSONObj used to query the foreign collection and wraps it in a $match.
      */
-    static BSONObj queryForInput(const Document& input,
-                                 const FieldPath& localFieldName,
-                                 const std::string& foreignFieldName,
-                                 const BSONObj& additionalFilter);
+    static BSONObj makeMatchStageFromInput(const Document& input,
+                                           const FieldPath& localFieldName,
+                                           const std::string& foreignFieldName,
+                                           const BSONObj& additionalFilter);
+
+protected:
+    void doInjectExpressionContext() final;
 
 private:
     DocumentSourceLookUp(NamespaceString fromNs,
@@ -1708,7 +1728,8 @@ private:
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     Value serialize(bool explain = false) const final {
-        invariant(false);
+        // Should not be called; use serializeToArray instead.
+        MONGO_UNREACHABLE;
     }
 
     boost::optional<Document> unwindResult();
@@ -1720,14 +1741,22 @@ private:
     std::string _foreignFieldFieldName;
     boost::optional<BSONObj> _additionalFilter;
 
+    // The ExpressionContext used when performing aggregation pipelines against the '_fromNs'
+    // namespace.
+    boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
+
     boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;
     boost::intrusive_ptr<DocumentSourceUnwind> _unwindSrc;
 
     bool _handlingUnwind = false;
     bool _handlingMatch = false;
-    std::unique_ptr<DBClientCursor> _cursor;
+
+    // The following members are used to hold onto state across getNext() calls when
+    // '_handlingUnwind' is true.
     long long _cursorIndex = 0;
+    boost::intrusive_ptr<Pipeline> _pipeline;
     boost::optional<Document> _input;
+    boost::optional<Document> _nextValue;
 };
 
 // TODO SERVER-25139: Make $graphLookup respect the collation.
@@ -1758,10 +1787,15 @@ public:
         collections->push_back(_from);
     }
 
-    void doInjectExpressionContext() final;
+    void doDetachFromOperationContext() final;
+
+    void doReattachToOperationContext(OperationContext* opCtx) final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+protected:
+    void doInjectExpressionContext() final;
 
 private:
     DocumentSourceGraphLookUp(NamespaceString from,
@@ -1780,14 +1814,15 @@ private:
     }
 
     /**
-     * Prepare the query to execute on the 'from' collection, using the contents of '_frontier'.
+     * Prepares the query to execute on the 'from' collection wrapped in a $match by using the
+     * contents of '_frontier'.
      *
      * Fills 'cached' with any values that were retrieved from the cache.
      *
      * Returns boost::none if no query is necessary, i.e., all values were retrieved from the cache.
      * Otherwise, returns a query object.
      */
-    boost::optional<BSONObj> constructQuery(BSONObjSet* cached);
+    boost::optional<BSONObj> makeMatchStageFromFrontier(BSONObjSet* cached);
 
     /**
      * If we have internalized a $unwind, getNext() dispatches to this function.
@@ -1836,6 +1871,10 @@ private:
     boost::optional<BSONObj> _additionalFilter;
     boost::optional<FieldPath> _depthField;
     boost::optional<long long> _maxDepth;
+
+    // The ExpressionContext used when performing aggregation pipelines against the '_from'
+    // namespace.
+    boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
     size_t _maxMemoryUsageBytes = 100 * 1024 * 1024;
 

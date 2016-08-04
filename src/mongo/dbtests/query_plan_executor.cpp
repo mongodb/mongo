@@ -44,6 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_executor.h"
@@ -278,36 +279,47 @@ public:
         BSONObj indexSpec = BSON("a" << 1);
         addIndex(indexSpec);
 
-        // Create the PlanExecutor which feeds the aggregation pipeline.
-        std::shared_ptr<PlanExecutor> innerExec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
+        Collection* collection = ctx.getCollection();
 
         // Create the aggregation pipeline.
         std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
-        boost::intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(
-            &_txn, AggregationRequest(NamespaceString(nss.ns()), rawPipeline));
+        boost::intrusive_ptr<ExpressionContext> expCtx =
+            new ExpressionContext(&_txn, AggregationRequest(nss, rawPipeline));
 
-        auto statusWithPipeline = Pipeline::parse(rawPipeline, expCtx);
-        auto pipeline = assertGet(statusWithPipeline);
+        // Create an "inner" plan executor and register it with the cursor manager so that it can
+        // get notified when the collection is dropped.
+        unique_ptr<PlanExecutor> innerExec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
+        registerExec(innerExec.get());
+
+        // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
+        // in the pipeline.
+        innerExec->saveState();
+        auto cursorSource = DocumentSourceCursor::create(nss.ns(), std::move(innerExec), expCtx);
+        auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
 
         // Create the output PlanExecutor that pulls results from the pipeline.
         auto ws = make_unique<WorkingSet>();
-        auto proxy = make_unique<PipelineProxyStage>(&_txn, pipeline, innerExec, ws.get());
-        Collection* collection = ctx.getCollection();
+        auto proxy = make_unique<PipelineProxyStage>(&_txn, pipeline, ws.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> outerExec = std::move(statusWithPlanExecutor.getValue());
 
-        // Only the outer executor gets registered.
+        // Register the "outer" plan executor with the cursor manager so it can get notified when
+        // the collection is dropped.
         registerExec(outerExec.get());
 
-        // Verify that both the "inner" and "outer" plan executors have been killed after
-        // dropping the collection.
-        BSONObj objOut;
         dropCollection();
-        ASSERT_EQUALS(PlanExecutor::DEAD, innerExec->getNext(&objOut, NULL));
-        ASSERT_EQUALS(PlanExecutor::DEAD, outerExec->getNext(&objOut, NULL));
+
+        // Verify that the aggregation pipeline returns an error because its "inner" plan executor
+        // has been killed due to the collection being dropped.
+        ASSERT_THROWS_CODE(pipeline->output()->getNext(), UserException, 16028);
+
+        // Verify that the "outer" plan executor has been killed due to the collection being
+        // dropped.
+        BSONObj objOut;
+        ASSERT_EQUALS(PlanExecutor::DEAD, outerExec->getNext(&objOut, nullptr));
 
         deregisterExec(outerExec.get());
     }

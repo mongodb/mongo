@@ -1,8 +1,8 @@
 /**
- * Tests that the server correctly handles when the OperationContext used by the $lookup stage
- * changes as it unwinds the results.
+ * Tests that the cursor underlying the $lookup stage is killed when the cursor returned to the
+ * client for the aggregation pipeline is killed.
  *
- * This test was designed to reproduce SERVER-22537.
+ * This test was designed to reproduce SERVER-24386.
  */
 (function() {
     'use strict';
@@ -13,9 +13,8 @@
 
     const testDB = conn.getDB('test');
 
-    // We use a batch size of 2 to ensure that the mongo shell issues a getMore when unwinding the
-    // results from the 'dest' collection for the same document in the 'source' collection under a
-    // different OperationContext.
+    // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on its
+    // first batch.
     const batchSize = 2;
     const numMatches = 5;
 
@@ -47,7 +46,10 @@
     }));
 
     const cursor = new DBCommandCursor(conn, res, batchSize);
-    assert.eq(numMatches, cursor.itcount());
+    cursor.close();  // Closing the cursor will issue the "killCursors" command.
+
+    const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus));
 
     MongoRunner.stopMongod(conn);
 })();

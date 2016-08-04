@@ -152,7 +152,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
         // Check whether each key in the frontier exists in the cache or needs to be queried.
         BSONObjSet cached;
-        auto query = constructQuery(&cached);
+        auto matchStage = makeMatchStageFromFrontier(&cached);
 
         ValueUnorderedSet queried = pExpCtx->getValueComparator().makeUnorderedValueSet();
         _frontier->swap(queried);
@@ -167,14 +167,13 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             checkMemoryUsage();
         }
 
-        if (query) {
+        if (matchStage) {
             // Query for all keys that were in the frontier and not in the cache, populating
             // '_frontier' for the next iteration of search.
-            unique_ptr<DBClientCursor> cursor = _mongod->directClient()->query(_from.ns(), *query);
 
-            // Iterate the cursor.
-            while (cursor->more()) {
-                BSONObj result = cursor->nextSafe();
+            auto pipeline = uassertStatusOK(_mongod->makePipeline({*matchStage}, _fromExpCtx));
+            while (auto next = pipeline->output()->getNext()) {
+                BSONObj result = next->toBson();
                 shouldPerformAnotherQuery =
                     addToVisitedAndFrontier(result.getOwned(), depth) || shouldPerformAnotherQuery;
                 addToCache(result, queried);
@@ -269,7 +268,7 @@ void DocumentSourceGraphLookUp::addToCache(const BSONObj& result,
     }
 }
 
-boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* cached) {
+boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(BSONObjSet* cached) {
     // Add any cached values to 'cached' and remove them from '_frontier'.
     for (auto it = _frontier->begin(); it != _frontier->end();) {
         if (auto entry = _cache[*it]) {
@@ -289,28 +288,34 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::constructQuery(BSONObjSet* c
     }
 
     // Create a query of the form {$and: [_additionalFilter, {_connectToField: {$in: [...]}}]}.
-    BSONObjBuilder query;
+    //
+    // We wrap the query in a $match so that it can be parsed into a DocumentSourceMatch when
+    // constructing a pipeline to execute.
+    BSONObjBuilder match;
     {
-        BSONArrayBuilder andObj(query.subarrayStart("$and"));
-        if (_additionalFilter) {
-            andObj << *_additionalFilter;
-        }
-
+        BSONObjBuilder query(match.subobjStart("$match"));
         {
-            BSONObjBuilder connectToObj(andObj.subobjStart());
+            BSONArrayBuilder andObj(query.subarrayStart("$and"));
+            if (_additionalFilter) {
+                andObj << *_additionalFilter;
+            }
+
             {
-                BSONObjBuilder subObj(connectToObj.subobjStart(_connectToField.fullPath()));
+                BSONObjBuilder connectToObj(andObj.subobjStart());
                 {
-                    BSONArrayBuilder in(subObj.subarrayStart("$in"));
-                    for (auto&& value : *_frontier) {
-                        in << value;
+                    BSONObjBuilder subObj(connectToObj.subobjStart(_connectToField.fullPath()));
+                    {
+                        BSONArrayBuilder in(subObj.subarrayStart("$in"));
+                        for (auto&& value : *_frontier) {
+                            in << value;
+                        }
                     }
                 }
             }
         }
     }
 
-    return _frontier->empty() ? boost::none : boost::optional<BSONObj>(query.obj());
+    return _frontier->empty() ? boost::none : boost::optional<BSONObj>(match.obj());
 }
 
 void DocumentSourceGraphLookUp::performSearch() {
@@ -411,8 +416,17 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
 }
 
 void DocumentSourceGraphLookUp::doInjectExpressionContext() {
+    _fromExpCtx = pExpCtx->copyWith(_from);
     _frontier = pExpCtx->getValueComparator().makeUnorderedValueSet();
     _visited = pExpCtx->getValueComparator().makeUnorderedValueMap<BSONObj>();
+}
+
+void DocumentSourceGraphLookUp::doDetachFromOperationContext() {
+    _fromExpCtx->opCtx = nullptr;
+}
+
+void DocumentSourceGraphLookUp::doReattachToOperationContext(OperationContext* opCtx) {
+    _fromExpCtx->opCtx = opCtx;
 }
 
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(

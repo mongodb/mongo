@@ -93,7 +93,6 @@ protected:
     void createSource(boost::optional<BSONObj> hint = boost::none) {
         // clean up first if this was called before
         _source.reset();
-        _exec.reset();
 
         OldClientWriteContext ctx(&_opCtx, nss.ns());
 
@@ -104,13 +103,13 @@ protected:
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
             &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
-        _exec = uassertStatusOK(
+        auto exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
 
-        _exec->saveState();
-        _exec->registerExec(ctx.getCollection());
+        exec->saveState();
+        exec->registerExec(ctx.getCollection());
 
-        _source = DocumentSourceCursor::create(nss.ns(), _exec, _ctx);
+        _source = DocumentSourceCursor::create(nss.ns(), std::move(exec), _ctx);
     }
 
     intrusive_ptr<ExpressionContext> ctx() {
@@ -123,7 +122,6 @@ protected:
 
 private:
     // It is important that these are ordered to ensure correct destruction order.
-    std::shared_ptr<PlanExecutor> _exec;
     intrusive_ptr<ExpressionContext> _ctx;
     intrusive_ptr<DocumentSourceCursor> _source;
 };

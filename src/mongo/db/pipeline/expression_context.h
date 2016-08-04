@@ -68,6 +68,12 @@ public:
         return _valueComparator;
     }
 
+    /**
+     * Returns an ExpressionContext that is identical to 'this' that can be used to execute a
+     * separate aggregation pipeline on 'ns'.
+     */
+    boost::intrusive_ptr<ExpressionContext> copyWith(NamespaceString ns) const;
+
     bool isExplain = false;
     bool inShard = false;
     bool inRouter = false;
@@ -81,7 +87,7 @@ public:
 
     // Collation requested by the user for this pipeline. Empty if the user did not request a
     // collation.
-    const BSONObj collation;
+    BSONObj collation;
 
     static const int kInterruptCheckPeriod = 128;
     int interruptCounter = kInterruptCheckPeriod;  // when 0, check interruptStatus

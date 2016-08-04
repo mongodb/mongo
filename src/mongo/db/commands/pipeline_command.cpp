@@ -358,14 +358,13 @@ public:
 
             // This does mongod-specific stuff like creating the input PlanExecutor and adding
             // it to the front of the pipeline if needed.
-            std::shared_ptr<PlanExecutor> input =
-                PipelineD::prepareCursorSource(txn, collection, nss, pipeline, expCtx);
+            PipelineD::prepareCursorSource(collection, pipeline);
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
             // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
             // PlanExecutor.
             auto ws = make_unique<WorkingSet>();
-            auto proxy = make_unique<PipelineProxyStage>(txn, pipeline, input, ws.get());
+            auto proxy = make_unique<PipelineProxyStage>(txn, pipeline, ws.get());
 
             auto statusWithPlanExecutor = (NULL == collection)
                 ? PlanExecutor::make(

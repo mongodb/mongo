@@ -506,32 +506,44 @@ void CursorManager::deregisterCursor(ClientCursor* cc) {
 }
 
 Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    ClientCursor* cursor;
 
-    CursorMap::iterator it = _cursors.find(id);
-    if (it == _cursors.end()) {
-        if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::CursorNotFound);
+    {
+        stdx::lock_guard<SimpleMutex> lk(_mutex);
+
+        CursorMap::iterator it = _cursors.find(id);
+        if (it == _cursors.end()) {
+            if (shouldAudit) {
+                audit::logKillCursorsAuthzCheck(
+                    txn->getClient(), _nss, id, ErrorCodes::CursorNotFound);
+            }
+            return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
         }
-        return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
-    }
 
-    ClientCursor* cursor = it->second;
+        cursor = it->second;
 
-    if (cursor->isPinned()) {
-        if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(
-                txn->getClient(), _nss, id, ErrorCodes::OperationFailed);
+        if (cursor->isPinned()) {
+            if (shouldAudit) {
+                audit::logKillCursorsAuthzCheck(
+                    txn->getClient(), _nss, id, ErrorCodes::OperationFailed);
+            }
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Cannot kill pinned cursor: " << id};
         }
-        return {ErrorCodes::OperationFailed, str::stream() << "Cannot kill pinned cursor: " << id};
+
+        if (shouldAudit) {
+            audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::OK);
+        }
+
+        cursor->kill();
+        _deregisterCursor_inlock(cursor);
     }
 
-    if (shouldAudit) {
-        audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::OK);
-    }
-
-    cursor->kill();
-    _deregisterCursor_inlock(cursor);
+    // If 'cursor' represents an aggregation cursor, then the destructor of the ClientCursor will
+    // eventually cause the destructor of the underlying PlanExecutor to be called. Since the
+    // underlying PlanExecutor is also registered on this CursorManager, we must destruct 'cursor'
+    // without holding '_mutex' so that it's possible to call CursorManager::deregisterCursor()
+    // without deadlocking ourselves.
     delete cursor;
     return Status::OK();
 }

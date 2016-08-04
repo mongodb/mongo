@@ -398,42 +398,44 @@ public:
 
 namespace DocumentSourceLookup {
 
-TEST(QueryForInput, NonArrayValueUsesEqQuery) {
+TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {
     Document input = DOC("local" << 1);
-    BSONObj query =
-        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(query, fromjson("{$and: [{foreign: {$eq: 1}}, {}]}"));
+    BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
+        input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$eq: 1}}, {}]}}"));
 }
 
-TEST(QueryForInput, RegexValueUsesEqQuery) {
+TEST(MakeMatchStageFromInput, RegexValueUsesEqQuery) {
     BSONRegEx regex("^a");
     Document input = DOC("local" << Value(regex));
-    BSONObj query =
-        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(query,
-              BSON("$and" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << regex)) << BSONObj())));
+    BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
+        input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(matchStage,
+              BSON("$match" << BSON("$and" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << regex))
+                                                         << BSONObj()))));
 }
 
-TEST(QueryForInput, ArrayValueUsesInQuery) {
+TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
     vector<Value> inputArray = {Value(1), Value(2)};
     Document input = DOC("local" << Value(inputArray));
-    BSONObj query =
-        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(query, fromjson("{$and: [{foreign: {$in: [1, 2]}}, {}]}"));
+    BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
+        input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$in: [1, 2]}}, {}]}}"));
 }
 
-TEST(QueryForInput, ArrayValueWithRegexUsesOrQuery) {
+TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
     BSONRegEx regex("^a");
     vector<Value> inputArray = {Value(1), Value(regex), Value(2)};
     Document input = DOC("local" << Value(inputArray));
-    BSONObj query =
-        DocumentSourceLookUp::queryForInput(input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(query,
-              BSON("$and" << BSON_ARRAY(
-                       BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
-                                                << BSON("foreign" << BSON("$eq" << regex))
-                                                << BSON("foreign" << BSON("$eq" << Value(2)))))
-                       << BSONObj())));
+    BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
+        input, FieldPath("local"), "foreign", BSONObj());
+    ASSERT_EQ(matchStage,
+              BSON("$match" << BSON(
+                       "$and" << BSON_ARRAY(
+                           BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
+                                                    << BSON("foreign" << BSON("$eq" << regex))
+                                                    << BSON("foreign" << BSON("$eq" << Value(2)))))
+                           << BSONObj()))));
 }
 
 }  // namespace DocumentSourceLookUp

@@ -517,29 +517,6 @@ void PlanExecutor::deregisterExec() {
 
 void PlanExecutor::kill(string reason) {
     _killReason = std::move(reason);
-
-    // XXX: PlanExecutor is designed to wrap a single execution tree. In the case of
-    // aggregation queries, PlanExecutor wraps a proxy stage responsible for pulling results
-    // from an aggregation pipeline. The aggregation pipeline pulls results from yet another
-    // PlanExecutor. Such nested PlanExecutors require us to manually propagate kill() to
-    // the "inner" executor. This is bad, and hopefully can be fixed down the line with the
-    // unification of agg and query.
-    //
-    // The CachedPlanStage is another special case. It needs to update the plan cache from
-    // its destructor. It needs to know whether it has been killed so that it can avoid
-    // touching a potentially invalid plan cache in this case.
-    //
-    // TODO: get rid of this code block.
-    {
-        PlanStage* foundStage = getStageByType(_root.get(), STAGE_PIPELINE_PROXY);
-        if (foundStage) {
-            PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(foundStage);
-            shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
-            if (childExec) {
-                childExec->kill(*_killReason);
-            }
-        }
-    }
 }
 
 Status PlanExecutor::executePlan() {
