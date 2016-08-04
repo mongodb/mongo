@@ -108,15 +108,22 @@
     assert.commandWorked(st.admin.runCommand({enableSharding: shardedDBName}));
     assert.commandWorked(
         st.admin.runCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
-    assert.commandFailed(unshardedColl.runCommand({
-        aggregate: unshardedColl,
-        pipline: [{
+
+    // Test that trying to perform a $lookup on a sharded collection returns an error.
+    let res = assert.commandFailed(unshardedColl.runCommand({
+        aggregate: unshardedColl.getName(),
+        pipeline: [{
             $lookup:
                 {from: shardedCollName, localField: "_id", foreignField: "_id", as: "results"}
         }]
     }));
-    assert.commandFailed(unshardedColl.runCommand({
-        aggregate: unshardedColl,
+    assert.eq(
+        28769, res.code, "Expected aggregation to fail due to $lookup on a sharded collection");
+
+    // Test that trying to perform a $lookup on a sharded collection inside a $facet stage still
+    // returns an error.
+    res = assert.commandFailed(unshardedColl.runCommand({
+        aggregate: unshardedColl.getName(),
         pipeline: [{
             $facet: {
                 a: [{
@@ -130,5 +137,8 @@
             }
         }]
     }));
+    assert.eq(
+        28769, res.code, "Expected aggregation to fail due to $lookup on a sharded collection");
+
     st.stop();
 }());

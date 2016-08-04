@@ -74,8 +74,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/parallel',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/commands/killcursors_common',
+        '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/s/cluster_ops_impl',
         '$BUILD_DIR/mongo/s/coreshard',
