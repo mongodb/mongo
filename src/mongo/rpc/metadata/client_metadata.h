@@ -170,6 +170,11 @@ public:
      */
     void logClientMetadata(Client* client) const;
 
+    /**
+     * Field name for OP_Command metadata that contains client metadata.
+     */
+    static StringData fieldName();
+
 public:
     /**
      * Create a new client metadata document.

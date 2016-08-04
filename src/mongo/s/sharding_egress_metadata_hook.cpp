@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -55,6 +56,8 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(bool shardedConnection,
                                                         BSONObjBuilder* metadataBob) {
     try {
         audit::writeImpersonatedUsersToMetadata(txn, metadataBob);
+
+        ClientMetadataIsMasterState::writeToMetadata(txn, metadataBob);
         if (!shardedConnection) {
             return Status::OK();
         }
@@ -70,6 +73,7 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(OperationContext* txn,
                                                         BSONObjBuilder* metadataBob) {
     try {
         audit::writeImpersonatedUsersToMetadata(txn, metadataBob);
+        ClientMetadataIsMasterState::writeToMetadata(txn, metadataBob);
         rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
         return Status::OK();
     } catch (...) {

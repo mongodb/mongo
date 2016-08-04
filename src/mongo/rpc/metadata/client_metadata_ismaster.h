@@ -72,6 +72,25 @@ public:
      */
     void setSeenIsMaster();
 
+    /**
+     * Read from the $client section of OP_Command's metadata.
+     *
+     * Returns an error if the $client section is not valid. It is valid for it to not exist though.
+     *
+     * Thread-Safety:
+     *   None - must be only be read and written from the thread owning "Client".
+     */
+    static Status readFromMetadata(OperationContext* txn, BSONElement& elem);
+
+    /**
+     * Write the $client section to OP_Command's metadata if there is a non-empty client metadata
+     * connection with the current client.
+     *
+     * Thread-Safety:
+     *   None - must be only be read and written from the thread owning "Client".
+     */
+    static void writeToMetadata(OperationContext* txn, BSONObjBuilder* builder);
+
 private:
     // Optional client metadata document.
     // Set if client sees isMaster cmd or as part of OP_Command processing.

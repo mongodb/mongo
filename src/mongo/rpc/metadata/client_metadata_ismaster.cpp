@@ -74,4 +74,41 @@ void ClientMetadataIsMasterState::setClientMetadata(
 }
 
 
+Status ClientMetadataIsMasterState::readFromMetadata(OperationContext* txn, BSONElement& element) {
+    if (element.eoo()) {
+        return Status::OK();
+    }
+
+    auto swParseClientMetadata = ClientMetadata::parse(element);
+
+    if (!swParseClientMetadata.getStatus().isOK()) {
+        return swParseClientMetadata.getStatus();
+    }
+
+    auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(txn->getClient());
+
+    clientMetadataIsMasterState.setClientMetadata(txn->getClient(),
+                                                  std::move(swParseClientMetadata.getValue()));
+
+    return Status::OK();
+}
+
+void ClientMetadataIsMasterState::writeToMetadata(OperationContext* txn, BSONObjBuilder* builder) {
+    // We may be asked to write metadata on background threads that are not associated with an
+    // operation context
+    if (!txn) {
+        return;
+    }
+
+    const auto& clientMetadata =
+        ClientMetadataIsMasterState::get(txn->getClient()).getClientMetadata();
+
+    // Skip appending metadata if there is none
+    if (!clientMetadata || clientMetadata.get().getDocument().isEmpty()) {
+        return;
+    }
+
+    builder->append(ClientMetadata::fieldName(), clientMetadata.get().getDocument());
+}
+
 }  // namespace mongo

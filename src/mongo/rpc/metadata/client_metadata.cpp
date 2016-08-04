@@ -47,6 +47,7 @@
 namespace mongo {
 
 namespace {
+constexpr auto kClientMetadataFieldName = "$client"_sd;
 
 constexpr auto kApplication = "application"_sd;
 constexpr auto kDriver = "driver"_sd;
@@ -395,6 +396,10 @@ void ClientMetadata::logClientMetadata(Client* client) const {
     invariant(!getDocument().isEmpty());
     log() << "received client metadata from " << client->getRemote().toString() << " "
           << client->desc() << ": " << getDocument();
+}
+
+StringData ClientMetadata::fieldName() {
+    return kClientMetadataFieldName;
 }
 
 }  // namespace mongo
