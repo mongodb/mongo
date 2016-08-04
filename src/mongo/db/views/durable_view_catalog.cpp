@@ -125,6 +125,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* txn,
         args.ns = systemViewsNs.ns();
         args.update = view;
         args.criteria = BSON("_id" << name.ns());
+        args.fromMigrate = false;
 
         const bool assumeIndexesAreAffected = true;
         auto res = systemViews->updateDocument(txn,
