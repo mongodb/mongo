@@ -11,7 +11,7 @@
     var mongos2 = st._mongos[1];
 
     var coll = mongos2.getCollection("test.foo");
-    coll.insert({i: 0});
+    assert.writeOK(coll.insert({i: 0}));
 
     print("Sharding collection...");
 
