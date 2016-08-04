@@ -1664,8 +1664,6 @@ private:
 /**
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
- *
- * TODO SERVER-25139: Make $lookup respect the collation.
  */
 class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
                                    public SplittableDocumentSource {
