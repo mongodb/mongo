@@ -153,13 +153,10 @@ db3.auth('spencer', 'pwd');
     // s0/db1 should update its cache instantly
     assert.writeOK(db1.foo.update({}, {$inc: {a: 1}}));
 
-    // s1/db2 should update its cache in 5 seconds.
-    assert.soon(
-        function() {
-            return !db2.foo.update({}, {$inc: {a: 1}}).hasWriteError();
-        },
-        "Mongos did not update its user cache after 5 seconds",
-        6 * 1000);  // Give an extra 1 second to avoid races
+    // s1/db2 should update its cache in 10 seconds.
+    assert.soon(function() {
+        return !db2.foo.update({}, {$inc: {a: 1}}).hasWriteError();
+    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
