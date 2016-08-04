@@ -298,7 +298,7 @@ static int
 __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
     WT_REF **from_refp, size_t *decrp, WT_REF **to_refp, size_t *incrp)
 {
-	WT_ADDR *addr;
+	WT_ADDR *addr, *ref_addr;
 	WT_CELL_UNPACK unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -345,13 +345,18 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 	}
 
 	/*
-	 * If there's no address (the page has never been written), or the
-	 * address has been instantiated, there's no work to do.  Otherwise,
-	 * instantiate the address in-memory, from the on-page cell.
+	 * If there's no address at all (the page has never been written), or
+	 * the address has already been instantiated, there's no work to do.
+	 * Otherwise, the address still references a split page on-page cell,
+	 * instantiate it. We can race with reconciliation and/or eviction of
+	 * the child pages, be cautious: read the address and verify it, and
+	 * only update it if the value is unchanged from the original. In the
+	 * case of a race, the address must no longer reference the split page,
+	 * we're done.
 	 */
-	addr = ref->addr;
-	if (addr != NULL && !__wt_off_page(from_home, addr)) {
-		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
+	WT_ORDERED_READ(ref_addr, ref->addr);
+	if (ref_addr != NULL && !__wt_off_page(from_home, ref_addr)) {
+		__wt_cell_unpack((WT_CELL *)ref_addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
 		if ((ret = __wt_strndup(
 		    session, unpack.data, unpack.size, &addr->addr)) != 0) {
@@ -371,7 +376,10 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-		ref->addr = addr;
+		if (!__wt_atomic_cas_ptr(&ref->addr, ref_addr, addr)) {
+			__wt_free(session, addr->addr);
+			__wt_free(session, addr);
+		}
 	}
 
 	/* And finally, copy the WT_REF pointer itself. */
@@ -786,7 +794,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	if (result_entries == 0) {
 		empty_parent = true;
-		__wt_page_evict_soon(parent);
+		if (!__wt_ref_is_root(parent->pg_intl_parent_ref))
+			ret = __wt_page_evict_soon(
+			    session, parent->pg_intl_parent_ref);
 		goto err;
 	}
 
@@ -1462,11 +1472,11 @@ err:	if (parent != NULL)
 
 /*
  * __split_multi_inmem --
- *	Instantiate a page in a multi-block set.
+ *	Instantiate a page from a disk image.
  */
 static int
 __split_multi_inmem(
-    WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref, WT_MULTI *multi)
+    WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT_REF *ref)
 {
 	WT_CURSOR_BTREE cbt;
 	WT_DECL_ITEM(key);
@@ -1487,13 +1497,12 @@ __split_multi_inmem(
 	    orig->type != WT_PAGE_COL_VAR || ref->ref_recno != 0);
 
 	/*
-	 * This code re-creates an in-memory page that is part of a set created
-	 * while evicting a large page, and adds references to any unresolved
-	 * update chains to the new page. We get here due to choosing to keep
-	 * the results of a split in memory or because and update could not be
-	 * written when attempting to evict a page.
+	 * This code re-creates an in-memory page from a disk image, and adds
+	 * references to any unresolved update chains to the new page. We get
+	 * here either because an update could not be written when evicting a
+	 * page, or eviction chose to keep a page in memory.
 	 *
-	 * Clear the disk image and link the page into the passed-in WT_REF to
+	 * Steal the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
 	 * when discarding the original page, and our caller will discard the
 	 * allocated page on error, when discarding the allocated WT_REF.
@@ -1502,6 +1511,19 @@ __split_multi_inmem(
 	    multi->disk_image, ((WT_PAGE_HEADER *)multi->disk_image)->mem_size,
 	    WT_PAGE_DISK_ALLOC, &page));
 	multi->disk_image = NULL;
+
+	/*
+	 * Put the re-instantiated page in the same LRU queue location as the
+	 * original page, unless this was a forced eviction, in which case we
+	 * leave the new page with the read generation unset.  Eviction will
+	 * set the read generation next time it visits this page.
+	 */
+	if (orig->read_gen != WT_READGEN_OLDEST)
+		page->read_gen = orig->read_gen;
+
+	/* If there are no updates to apply to the page, we're done. */
+	if (multi->supd_entries == 0)
+		return (0);
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -1551,14 +1573,12 @@ __split_multi_inmem(
 		}
 
 	/*
-	 * If we modified the page above, it will have set the first dirty
-	 * transaction to the last transaction currently running.  However, the
-	 * updates we installed may be older than that.  Set the first dirty
-	 * transaction to an impossibly old value so this page is never skipped
-	 * in a checkpoint.
+	 * When modifying the page we set the first dirty transaction to the
+	 * last transaction currently running.  However, the updates we made
+	 * might be older than that. Set the first dirty transaction to an
+	 * impossibly old value so this page is never skipped in a checkpoint.
 	 */
-	if (page->modify != NULL)
-		page->modify->first_dirty_txn = WT_TXN_FIRST;
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
@@ -1629,19 +1649,17 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
  */
 int
 __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
+    WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp, bool closing)
 {
 	WT_ADDR *addr;
 	WT_IKEY *ikey;
 	WT_REF *ref;
-	size_t incr;
-
-	incr = 0;
 
 	/* Allocate an underlying WT_REF. */
 	WT_RET(__wt_calloc_one(session, refp));
 	ref = *refp;
-	incr += sizeof(WT_REF);
+	if (incrp)
+		*incrp += sizeof(WT_REF);
 
 	/*
 	 * Set the WT_REF key before (optionally) building the page, underlying
@@ -1653,21 +1671,34 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		ikey = multi->key.ikey;
 		WT_RET(__wt_row_ikey(
 		    session, 0, WT_IKEY_DATA(ikey), ikey->size, ref));
-		incr += sizeof(WT_IKEY) + ikey->size;
+		if (incrp)
+			*incrp += sizeof(WT_IKEY) + ikey->size;
 		break;
 	default:
 		ref->ref_recno = multi->key.recno;
 		break;
 	}
 
-	/* If there's a disk image, build a page, otherwise set the address. */
-	if (multi->disk_image == NULL) {
-		/*
-		 * Copy the address: we could simply take the buffer, but that
-		 * would complicate error handling, freeing the reference array
-		 * would have to avoid freeing the memory, and it's not worth
-		 * the confusion.
-		 */
+	/* There should be an address or a disk image (or both). */
+	WT_ASSERT(session,
+	    multi->addr.addr != NULL || multi->disk_image != NULL);
+
+	/* If we're closing the file, there better be an address. */
+	WT_ASSERT(session, multi->addr.addr != NULL || !closing);
+
+	/* Verify any disk image we have. */
+	WT_ASSERT(session, multi->disk_image == NULL ||
+	    __wt_verify_dsk_image(session,
+	    "[page instantiate]", multi->disk_image, 0, false) == 0);
+
+	/*
+	 * If there's an address, the page was written, set it.
+	 *
+	 * Copy the address: we could simply take the buffer, but that would
+	 * complicate error handling, freeing the reference array would have
+	 * to avoid freeing the memory, and it's not worth the confusion.
+	 */
+	if (multi->addr.addr != NULL) {
 		WT_RET(__wt_calloc_one(session, &addr));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
@@ -1675,14 +1706,20 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
 		ref->state = WT_REF_DISK;
-	} else {
-		WT_RET(__split_multi_inmem(session, page, ref, multi));
-		ref->state = WT_REF_MEM;
 	}
 
-	/* Optionally return changes in the memory footprint. */
-	if (incrp != NULL)
-		*incrp += incr;
+	/*
+	 * If we have a disk image and we're not closing the file,
+	 * re-instantiate the page.
+	 *
+	 * Discard any page image we don't use.
+	 */
+	if (multi->disk_image != NULL && !closing) {
+		WT_RET(__split_multi_inmem(session, page, multi, ref));
+		ref->state = WT_REF_MEM;
+	}
+	__wt_free(session, multi->disk_image);
+
 	return (0);
 }
 
@@ -2086,8 +2123,8 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 */
 	WT_RET(__wt_calloc_def(session, new_entries, &ref_new));
 	for (i = 0; i < new_entries; ++i)
-		WT_ERR(__wt_multi_to_ref(session,
-		    page, &mod->mod_multi[i], &ref_new[i], &parent_incr));
+		WT_ERR(__wt_multi_to_ref(session, page,
+		    &mod->mod_multi[i], &ref_new[i], &parent_incr, closing));
 
 	/*
 	 * Split into the parent; if we're closing the file, we hold it
@@ -2175,15 +2212,13 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Rewrite an in-memory page with a new version.
  */
 int
-__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	WT_REF *new;
 
 	page = ref->page;
-	mod = page->modify;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_SPLIT, "%p: split-rewrite", ref->page));
@@ -2198,14 +2233,14 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Build the new page.
 	 *
-	 * Allocate a WT_REF because the error path uses routines that will ea
-	 * free memory. The only field we need to set is the record number, as
-	 * it's used by the search routines.
+	 * Allocate a WT_REF, the error path calls routines that free memory.
+	 * The only field we need to set is the record number, as it's used by
+	 * the search routines.
 	 */
 	WT_RET(__wt_calloc_one(session, &new));
 	new->ref_recno = ref->ref_recno;
 
-	WT_ERR(__split_multi_inmem(session, page, new, &mod->mod_multi[0]));
+	WT_ERR(__split_multi_inmem(session, page, multi, new));
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.
@@ -2213,7 +2248,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Finalize the move, discarding moved update lists from the original
 	 * page.
 	 */
-	__split_multi_inmem_final(page, &mod->mod_multi[0]);
+	__split_multi_inmem_final(page, multi);
 
 	/*
 	 * Discard the original page.

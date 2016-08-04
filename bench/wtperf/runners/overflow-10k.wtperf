@@ -1,9 +1,7 @@
-# wtperf options file: simulate riak and its test1 and test2 configuration
-# The configuration for the connection and table are from riak and the
-# specification of the data (count, size, threads) is from basho_bench.
 #
-#conn_config="cache_size=21G,checkpoint_sync=false,mmap=false,session_max=1024,statistics=(fast,clear),statistics_log=(wait=600)"
-conn_config="cache_size=21G,checkpoint_sync=false,mmap=false,session_max=1024,lsm_manager=(worker_thread_max=6)"
+# Run with overflow items and LSM.
+#
+conn_config="cache_size=21G,checkpoint_sync=false,mmap=false,lsm_manager=(worker_thread_max=6),statistics=(fast),statistics_log=(wait=10)"
 compact=true
 compression="snappy"
 sess_config="isolation=snapshot"
@@ -13,8 +11,8 @@ key_sz=40
 value_sz=10000
 max_latency=2000
 populate_threads=1
-report_interval=10
+report_interval=5
 random_value=true
-run_time=18000
-sample_interval=10
-threads=((count=20,read=1,update=1))
+run_time=300
+threads=((count=10,read=1),(count=10,update=1))
+warmup=30

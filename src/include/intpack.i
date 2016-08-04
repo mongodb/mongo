@@ -59,7 +59,7 @@
 /* Count the leading zero bytes. */
 #if defined(__GNUC__)
 #define	WT_LEADING_ZEROS(x, i)						\
-	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
+	(i = (x == 0) ? (int)sizeof(x) : __builtin_clzll(x) >> 3)
 #elif defined(_MSC_VER)
 #define	WT_LEADING_ZEROS(x, i)	do {					\
 	if (x == 0) i = (int)sizeof(x);				\
@@ -89,7 +89,7 @@ __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 	int len, lz, shift;
 
 	WT_LEADING_ZEROS(x, lz);
-	len = (int)sizeof (x) - lz;
+	len = (int)sizeof(x) - lz;
 	WT_SIZE_CHECK_PACK(len + 1, maxlen);
 	p = *pp;
 
@@ -114,7 +114,7 @@ __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 	int len, lz, shift;
 
 	WT_LEADING_ZEROS(~x, lz);
-	len = (int)sizeof (x) - lz;
+	len = (int)sizeof(x) - lz;
 	WT_SIZE_CHECK_PACK(len + 1, maxlen);
 	p = *pp;
 
@@ -170,7 +170,7 @@ __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 
 	/* There are four length bits in the first byte. */
 	p = *pp;
-	len = (int)sizeof (x) - (*p++ & 0xf);
+	len = (int)sizeof(x) - (*p++ & 0xf);
 	WT_SIZE_CHECK_UNPACK(len + 1, maxlen);
 
 	for (x = UINT64_MAX; len != 0; --len)

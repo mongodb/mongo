@@ -34,7 +34,7 @@ from helper import complex_populate, complex_populate_lsm, simple_populate
 from helper import key_populate, complex_value_populate, value_populate
 from helper import complex_populate_colgroup_count, complex_populate_index_count
 from helper import complex_populate_colgroup_name, complex_populate_index_name
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_stat03.py
 #    Statistics reset test.
@@ -51,7 +51,7 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
             dict(uri='table:' + pfx, pop=complex_populate_lsm)),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', uri))
+    scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def stat_cursor(self, uri):

@@ -80,6 +80,7 @@ SCons
 Seward's
 SiH
 TXT
+UNC
 URIs
 WILLNEED
 WiredTiger
@@ -368,6 +369,7 @@ php
 png
 posix
 pre
+prepends
 primary's
 printf
 printlog
@@ -411,6 +413,7 @@ runtime
 rwlock
 sHQ
 sHq
+sanitization
 scalable
 scanf
 schemas

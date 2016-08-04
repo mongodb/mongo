@@ -381,16 +381,6 @@ restart:	/*
 			__ref_ascend(session, &ref, &pindex, &slot);
 
 			/*
-			 * If we got all the way through an internal page and
-			 * all of the child pages were deleted, mark it for
-			 * eviction.
-			 */
-			if (empty_internal && pindex->entries > 1) {
-				__wt_page_evict_soon(ref->page);
-				empty_internal = false;
-			}
-
-			/*
 			 * If at the root and returning internal pages, return
 			 * the root page, otherwise we're done. Regardless, no
 			 * hazard pointer is required, release the one we hold.
@@ -401,6 +391,16 @@ restart:	/*
 				if (!LF_ISSET(WT_READ_SKIP_INTL))
 					*refp = ref;
 				goto done;
+			}
+
+			/*
+			 * If we got all the way through an internal page and
+			 * all of the child pages were deleted, mark it for
+			 * eviction.
+			 */
+			if (empty_internal && pindex->entries > 1) {
+				WT_ERR(__wt_page_evict_soon(session, ref));
+				empty_internal = false;
 			}
 
 			/*

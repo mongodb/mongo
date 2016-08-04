@@ -32,7 +32,7 @@
 
 import os, run, random
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
 
 # Test basic encryption with mismatched configuration
@@ -69,8 +69,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         ('rotn11xyz_and_clear', dict( name2='rotn', keyid2='11',
                                       secretkey2='XYZ', fileinclear2=True))
     ]
-    scenarios = number_scenarios(multiply_scenarios \
-                                 ('.', encrypt_scen_1, encrypt_scen_2))
+    scenarios = make_scenarios(encrypt_scen_1, encrypt_scen_2)
     nrecords = 5000
     bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010
 

@@ -104,12 +104,73 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 {
 	uint64_t dirty_inuse;
 
-	dirty_inuse = cache->bytes_dirty;
+	dirty_inuse = cache->bytes_dirty_intl + cache->bytes_dirty_leaf;
 	if (cache->overhead_pct != 0)
 		dirty_inuse +=
 		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
 
 	return (dirty_inuse);
+}
+
+/*
+ * __wt_cache_dirty_leaf_inuse --
+ *	Return the number of dirty bytes in use by leaf pages.
+ */
+static inline uint64_t
+__wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
+{
+	uint64_t dirty_inuse;
+
+	dirty_inuse = cache->bytes_dirty_leaf;
+	if (cache->overhead_pct != 0)
+		dirty_inuse +=
+		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
+
+	return (dirty_inuse);
+}
+
+/*
+ * __wt_cache_bytes_image --
+ *	Return the number of page image bytes in use.
+ */
+static inline uint64_t
+__wt_cache_bytes_image(WT_CACHE *cache)
+{
+	uint64_t bytes_image;
+
+	bytes_image = cache->bytes_image;
+	if (cache->overhead_pct != 0)
+		bytes_image +=
+		    (bytes_image * (uint64_t)cache->overhead_pct) / 100;
+
+	return (bytes_image);
+}
+
+/*
+ * __wt_cache_bytes_other --
+ *	Return the number of bytes in use not for page images.
+ */
+static inline uint64_t
+__wt_cache_bytes_other(WT_CACHE *cache)
+{
+	uint64_t bytes_image, bytes_inmem, bytes_other;
+
+	bytes_image = cache->bytes_image;
+	bytes_inmem = cache->bytes_inmem;
+
+	/*
+	 * The reads above could race with changes to the values, so protect
+	 * against underflow.
+	 */
+	if (bytes_image > bytes_inmem)
+		return (0);
+
+	bytes_other = bytes_inmem - bytes_image;
+	if (cache->overhead_pct != 0)
+		bytes_other +=
+		    (bytes_other * (uint64_t)cache->overhead_pct) / 100;
+
+	return (bytes_other);
 }
 
 /*
@@ -139,20 +200,9 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_eviction_dirty_target --
- *	Return if the eviction server is running to reduce the number of dirty
- * pages (versus running to discard pages from the cache).
- */
-static inline bool
-__wt_eviction_dirty_target(WT_SESSION_IMPL *session)
-{
-	return (FLD_ISSET(S2C(session)->cache->state, WT_EVICT_PASS_DIRTY));
-}
-
-/*
  * __wt_eviction_needed --
  *	Return if an application thread should do eviction, and the cache full
- * percentage as a side-effect.
+ *      percentage as a side-effect.
  */
 static inline bool
 __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
@@ -186,22 +236,21 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
 	if (pct_fullp != NULL)
 		*pct_fullp = pct_full;
-	/*
-	 * If the connection is closing we do not need eviction from an
-	 * application thread.  The eviction subsystem is already closed.
-	 * We return here because some callers depend on the percent full
-	 * having been filled in.
-	 */
-	if (F_ISSET(conn, WT_CONN_CLOSING))
-		return (false);
 
 	if (pct_full > cache->eviction_trigger)
 		return (true);
 
-	/* Return if there are too many dirty bytes in cache. */
-	if (__wt_cache_dirty_inuse(cache) >
+	/*
+	 * Check if there are too many dirty bytes in cache.
+	 *
+	 * We try to avoid penalizing read-only operations by only checking the
+	 * dirty limit once a transaction ID has been allocated, or if the last
+	 * transaction did an update.
+	 */
+	if (__wt_cache_dirty_leaf_inuse(cache) >
 	    (cache->eviction_dirty_trigger * bytes_max) / 100)
 		return (true);
+
 	return (false);
 }
 

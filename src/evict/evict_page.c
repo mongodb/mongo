@@ -10,7 +10,7 @@
 
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, bool);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
-static int __evict_review(WT_SESSION_IMPL *, WT_REF *, bool *, bool);
+static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t *, bool);
 
 /*
  * __evict_exclusive_clear --
@@ -46,6 +46,55 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
+ * __wt_page_release_evict --
+ *	Release a reference to a page, and attempt to immediately evict it.
+ */
+int
+__wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	bool locked, too_big;
+
+	btree = S2BT(session);
+	page = ref->page;
+
+	/*
+	 * Take some care with order of operations: if we release the hazard
+	 * reference without first locking the page, it could be evicted in
+	 * between.
+	 */
+	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
+		if (locked)
+			ref->state = WT_REF_MEM;
+		return (ret == 0 ? EBUSY : ret);
+	}
+
+	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
+
+	too_big = page->memory_footprint > btree->splitmempage;
+	if ((ret = __wt_evict(session, ref, false)) == 0) {
+		if (too_big)
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+		else
+			/*
+			 * If the page isn't too big, we are evicting it because
+			 * it had a chain of deleted entries that make traversal
+			 * expensive.
+			 */
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_force_delete);
+	} else
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
+
+	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
+
+	return (ret);
+}
+
+/*
  * __wt_evict --
  *	Evict a page.
  */
@@ -56,7 +105,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	bool clean_page, forced_eviction, inmem_split, tree_dead;
+	uint32_t flags;
+	bool clean_page, tree_dead;
 
 	conn = S2C(session);
 
@@ -64,8 +114,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_ASSERT(session, !WT_SESSION_IS_CHECKPOINT(session));
 
 	page = ref->page;
-	forced_eviction = page->read_gen == WT_READGEN_OLDEST;
-	inmem_split = false;
 	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
@@ -78,20 +126,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 * to make this check for clean pages, too: while unlikely eviction
 	 * would choose an internal page with children, it's not disallowed.
 	 */
-	WT_ERR(__evict_review(session, ref, &inmem_split, closing));
+	WT_ERR(__evict_review(session, ref, &flags, closing));
 
 	/*
 	 * If there was an in-memory split, the tree has been left in the state
 	 * we want: there is nothing more to do.
 	 */
-	if (inmem_split)
-		goto done;
-
-	/*
-	 * Update the page's modification reference, reconciliation might have
-	 * changed it.
-	 */
-	mod = page->modify;
+	if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
+		return (0);
 
 	/* Count evictions of internal pages during normal operation. */
 	if (!closing && WT_PAGE_IS_INTERNAL(page)) {
@@ -108,12 +150,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Figure out whether reconciliation was done on the page */
+	mod = page->modify;
 	clean_page = mod == NULL || mod->rec_result == 0;
 
 	/* Update the reference and discard the page. */
 	if (__wt_ref_is_root(ref))
 		__wt_ref_out(session, ref);
-	else if (tree_dead || (clean_page && !F_ISSET(conn, WT_CONN_IN_MEMORY)))
+	else if ((clean_page && !LF_ISSET(WT_EVICT_IN_MEMORY)) || tree_dead)
 		/*
 		 * Pages that belong to dead trees never write back to disk
 		 * and can't support page splits.
@@ -139,14 +182,9 @@ err:		if (!closing)
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 
-done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
-	    !F_ISSET(conn->cache, WT_CACHE_WOULD_BLOCK)) {
-		F_SET(conn->cache, WT_CACHE_WOULD_BLOCK);
-		WT_TRET(__wt_evict_server_wake(session));
-	}
-
 	return (ret);
 }
+
 /*
  * __evict_delete_ref --
  *	Mark a page reference deleted and check if the parent can reverse
@@ -210,13 +248,6 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_DECL_RET;
 
 	/*
-	 * If doing normal system eviction, but only in the service of reducing
-	 * the number of dirty pages, leave the clean page in cache.
-	 */
-	if (!closing && __wt_eviction_dirty_target(session))
-		return (EBUSY);
-
-	/*
 	 * Discard the page and update the reference structure; if the page has
 	 * an address, it's a disk page; if it has no address, it's a deleted
 	 * page re-instantiated (for example, by searching) and never written.
@@ -242,6 +273,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_ADDR *addr;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+	WT_MULTI multi;
 
 	mod = ref->page->modify;
 
@@ -284,23 +316,14 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 * write. Take advantage of the fact we have exclusive access
 		 * to the page and rewrite it in memory.
 		 */
-		if (mod->mod_multi_entries == 1)
-			WT_RET(__wt_split_rewrite(session, ref));
-		else
+		if (mod->mod_multi_entries == 1) {
+			WT_ASSERT(session, closing == false);
+			WT_RET(__wt_split_rewrite(
+			    session, ref, &mod->mod_multi[0]));
+		} else
 			WT_RET(__wt_split_multi(session, ref, closing));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
-		/*
-		 * If doing normal system eviction, but only in the service of
-		 * reducing the number of dirty pages, leave the clean page in
-		 * cache. Only do this when replacing a page with another one,
-		 * because when a page splits into multiple pages, we want to
-		 * push it out of cache (and read it back in, when needed), we
-		 * would rather have more, smaller pages than fewer large pages.
-		 */
-		if (!closing && __wt_eviction_dirty_target(session))
-			return (EBUSY);
-
 		/*
 		 * Update the parent to reference the replacement page.
 		 *
@@ -311,10 +334,26 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		*addr = mod->mod_replace;
 		mod->mod_replace.addr = NULL;
 		mod->mod_replace.size = 0;
-
-		__wt_ref_out(session, ref);
 		ref->addr = addr;
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+
+		/*
+		 * Eviction wants to keep this page if we have a disk image,
+		 * re-instantiate the page in memory, else discard the page.
+		 */
+		if (mod->mod_disk_image == NULL) {
+			__wt_ref_out(session, ref);
+			WT_PUBLISH(ref->state, WT_REF_DISK);
+		} else {
+			/*
+			 * The split code works with WT_MULTI structures, build
+			 * one for the disk image.
+			 */
+			memset(&multi, 0, sizeof(multi));
+			multi.disk_image = mod->mod_disk_image;
+
+			WT_RET(__wt_split_rewrite(session, ref, &multi));
+		}
+
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -351,12 +390,16 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp, bool closing)
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *flagsp, bool closing)
 {
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
 	bool modified;
+
+	flags = WT_EVICTING;
+	*flagsp = flags;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -423,8 +466,9 @@ __evict_review(
 			WT_RET(__wt_txn_update_oldest(
 			    session, WT_TXN_OLDEST_STRICT));
 
-		if (!__wt_page_can_evict(session, ref, inmem_splitp))
+		if (!__wt_page_can_evict(session, ref, flagsp))
 			return (EBUSY);
+		flags = *flagsp;
 
 		/*
 		 * Check for an append-only workload needing an in-memory
@@ -433,8 +477,12 @@ __evict_review(
 		 * the page stays in memory and the tree is left in the desired
 		 * state: avoid the usual cleanup.
 		 */
-		if (*inmem_splitp)
+		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 			return (__wt_split_insert(session, ref));
+
+		/* We are done if reconciliation is disabled. */
+		if (F_ISSET(S2BT(session), WT_BTREE_NO_RECONCILE))
+			return (EBUSY);
 	}
 
 	/* If the page is clean, we're done and we can evict. */
@@ -447,10 +495,15 @@ __evict_review(
 	 * If we have an exclusive lock (we're discarding the tree), assert
 	 * there are no updates we cannot read.
 	 *
-	 * Otherwise, if the page we're evicting is a leaf page marked for
-	 * forced eviction, set the update-restore flag, so reconciliation will
-	 * write blocks it can write and create a list of skipped updates for
-	 * blocks it cannot write.  This is how forced eviction of active, huge
+	 * Don't set any other flags for internal pages: they don't have update
+	 * lists to be saved and restored, nor can we re-create them in memory.
+	 *
+	 * For leaf pages:
+	 *
+	 * If an in-memory configuration or the page is being forcibly evicted,
+	 * set the update-restore flag, so reconciliation will write blocks it
+	 * can write and create a list of skipped updates for blocks it cannot
+	 * write, along with disk images.  This is how eviction of active, huge
 	 * pages works: we take a big page and reconcile it into blocks, some of
 	 * which we write and discard, the rest of which we re-create as smaller
 	 * in-memory pages, (restoring the updates that stopped us from writing
@@ -461,32 +514,43 @@ __evict_review(
 	 * allowing the eviction of pages we'd otherwise have to retain in cache
 	 * to support older readers.
 	 *
-	 * Don't set the update-restore or lookaside table flags for internal
-	 * pages, they don't have update lists that can be saved and restored.
+	 * Finally, if we don't need to do eviction at the moment, create disk
+	 * images of split pages in order to re-instantiate them.
 	 */
-	flags = WT_EVICTING;
+	cache = S2C(session)->cache;
 	if (closing)
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
 		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-			LF_SET(WT_EVICT_IN_MEMORY | WT_EVICT_UPDATE_RESTORE);
-		else if (page->read_gen == WT_READGEN_OLDEST)
-			LF_SET(WT_EVICT_UPDATE_RESTORE);
-		else if (F_ISSET(S2C(session)->cache, WT_CACHE_STUCK))
+			LF_SET(WT_EVICT_IN_MEMORY |
+			    WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
+		else if (F_ISSET(cache, WT_CACHE_STUCK))
 			LF_SET(WT_EVICT_LOOKASIDE);
+		else if (!__wt_txn_visible_all(
+		    session, page->modify->update_txn))
+			LF_SET(WT_EVICT_UPDATE_RESTORE);
+
+		/*
+		 * If we aren't trying to free space in the cache, scrub the
+		 * page and keep it around.
+		 */
+		if (!LF_ISSET(WT_EVICT_LOOKASIDE) &&
+		    FLD_ISSET(cache->state, WT_EVICT_STATE_SCRUB))
+			LF_SET(WT_EVICT_SCRUB);
 	}
+	*flagsp = flags;
 
 	WT_RET(__wt_reconcile(session, ref, NULL, flags));
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured
-	 * for an update/restore split.  If the page is clean, assert that
-	 * reconciliation was configured for a lookaside table, or it's not a
-	 * durable object (currently the lookaside table), or all page updates
-	 * were globally visible.
+	 * for update/restore. If the page is clean, assert that reconciliation
+	 * was configured for a lookaside table, or it's not a durable object
+	 * (currently the lookaside table), or all page updates were globally
+	 * visible.
 	 */
 	WT_ASSERT(session,
-	    LF_ISSET(WT_EVICT_UPDATE_RESTORE) || !__wt_page_is_modified(page));
+	    !__wt_page_is_modified(page) || LF_ISSET(WT_EVICT_UPDATE_RESTORE));
 	WT_ASSERT(session,
 	    __wt_page_is_modified(page) ||
 	    LF_ISSET(WT_EVICT_LOOKASIDE) ||

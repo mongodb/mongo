@@ -329,7 +329,7 @@ __wt_txn_checkpoint_log(
 	case WT_TXN_LOG_CKPT_START:
 		/* Take a copy of the transaction snapshot. */
 		txn->ckpt_nsnapshot = txn->snapshot_count;
-		recsize = txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
+		recsize = (size_t)txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
 		WT_ERR(__wt_scr_alloc(session, recsize, &txn->ckpt_snapshot));
 		p = txn->ckpt_snapshot->mem;
 		end = p + recsize;

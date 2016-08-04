@@ -28,7 +28,7 @@
 
 import itertools, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 from wiredtiger import stat
 from helper import complex_populate, complex_populate_lsm, simple_populate
 
@@ -57,8 +57,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
         ('size', dict(cursor_config='size'))
     ]
 
-    scenarios = number_scenarios(
-        multiply_scenarios('.', uri, data_config, cursor_config))
+    scenarios = make_scenarios(uri, data_config, cursor_config)
 
     # Turn on statistics for this test.
     def conn_config(self, dir):
@@ -106,13 +105,13 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_dsrc_clear'
 
     uri = [
-        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('dsrc_clear_1',  dict(uri='file:' + pfx, pop=simple_populate)),
+        ('dsrc_clear_2', dict(uri='table:' + pfx, pop=simple_populate)),
+        ('dsrc_clear_3', dict(uri='table:' + pfx, pop=complex_populate)),
+        ('dsrc_clear_4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', uri))
+    scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_dsrc_clear(self):
@@ -136,13 +135,13 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_fast'
 
     uri = [
-        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('fast_1',  dict(uri='file:' + pfx, pop=simple_populate)),
+        ('fast_2', dict(uri='table:' + pfx, pop=simple_populate)),
+        ('fast_3', dict(uri='table:' + pfx, pop=complex_populate)),
+        ('fast_4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', uri))
+    scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_fast(self):
@@ -180,13 +179,13 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_dsrc_error'
 
     uri = [
-        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('dsrc_error_1',  dict(uri='file:' + pfx, pop=simple_populate)),
+        ('dsrc_error_2', dict(uri='table:' + pfx, pop=simple_populate)),
+        ('dsrc_error_3', dict(uri='table:' + pfx, pop=complex_populate)),
+        ('dsrc_error_4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', uri))
+    scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_dsrc_error(self):

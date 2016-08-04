@@ -250,9 +250,19 @@ struct __wt_page_modify {
 	 * a replace address and multiple replacement blocks.
 	 */
 	union {
-	WT_ADDR	 replace;		/* Single, written replacement block */
+	struct {			/* Single, written replacement block */
+		WT_ADDR	 replace;
+
+		/*
+		 * A disk image that may or may not have been written, used to
+		 * re-instantiate the page in memory.
+		 */
+		void	*disk_image;
+	} r;
 #undef	mod_replace
-#define	mod_replace	u1.replace
+#define	mod_replace	u1.r.replace
+#undef	mod_disk_image
+#define	mod_disk_image	u1.r.disk_image
 
 	struct {			/* Multiple replacement blocks */
 	struct __wt_multi {
@@ -266,14 +276,19 @@ struct __wt_page_modify {
 		} key;
 
 		/*
-		 * Eviction, but the block wasn't written: either an in-memory
-		 * configuration or unresolved updates prevented the write.
-		 * There may be a list of unresolved updates, there's always an
-		 * associated disk image.
+		 * A disk image that may or may not have been written, used to
+		 * re-instantiate the page in memory.
+		 */
+		void	*disk_image;
+
+		/*
+		 * List of unresolved updates. Updates are either a WT_INSERT
+		 * or a row-store leaf page entry; when creating lookaside
+		 * records, there is an additional value, the committed item's
+		 * transaction ID.
 		 *
-		 * Saved updates are either a WT_INSERT, or a row-store leaf
-		 * page entry; in the case of creating lookaside records, there
-		 * is an additional value, the committed item's transaction ID.
+		 * If there are unresolved updates, the block wasn't written and
+		 * there will always be a disk image.
 		 */
 		struct __wt_save_upd {
 			WT_INSERT *ins;
@@ -281,10 +296,9 @@ struct __wt_page_modify {
 			uint64_t   onpage_txn;
 		} *supd;
 		uint32_t supd_entries;
-		void	*disk_image;
 
 		/*
-		 * Block was written: address, size and checksum.
+		 * Disk image was written: address, size and checksum.
 		 * On subsequent reconciliations of this page, we avoid writing
 		 * the block if it's unchanged by comparing size and checksum;
 		 * the reuse flag is set when the block is unchanged and we're

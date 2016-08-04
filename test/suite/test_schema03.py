@@ -29,7 +29,7 @@
 import os
 import suite_random
 import wiredtiger, wtscenario, wttest
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 try:
     # Windows does not getrlimit/setrlimit so we must catch the resource
@@ -249,7 +249,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     # but boost it up to this limit anyway.
     OPEN_FILE_LIMIT = 1000
 
-    restart_scenarios = check_scenarios([('table', dict(s_restart=['table'],P=0.3)),
+    restart_scenarios = [('table', dict(s_restart=['table'],P=0.3)),
                          ('colgroup0', dict(s_restart=['colgroup0'],P=0.3)),
                          ('index0', dict(s_restart=['index0'],P=0.3)),
                          ('colgroup1', dict(s_restart=['colgroup1'],P=0.3)),
@@ -259,7 +259,7 @@ class test_schema03(wttest.WiredTigerTestCase):
                          ('populate1', dict(s_restart=['populate1'],P=0.3)),
                          ('ipop', dict(s_restart=['index0','populate0'],P=0.3)),
                          ('all', dict(s_restart=['table','colgroup0','index0','colgroup1','index1','populate0','index2','populate1'],P=1.0)),
-    ])
+    ]
 
     ntable_scenarios = wtscenario.quick_scenarios('s_ntable',
         [1,2,5,8], [1.0,0.4,0.5,0.5])
@@ -272,11 +272,10 @@ class test_schema03(wttest.WiredTigerTestCase):
     table_args_scenarios = wtscenario.quick_scenarios('s_extra_table_args',
         ['', ',type=file', ',type=lsm'], [0.5, 0.3, 0.2])
 
-    all_scenarios = wtscenario.multiply_scenarios('_', restart_scenarios, ntable_scenarios, ncolgroup_scenarios, nindex_scenarios, idx_args_scenarios, table_args_scenarios)
-
-    # Prune the scenarios according to the probabilities given above.
-    scenarios = wtscenario.prune_scenarios(all_scenarios, 30)
-    scenarios = wtscenario.number_scenarios(scenarios)
+    scenarios = wtscenario.make_scenarios(
+        restart_scenarios, ntable_scenarios, ncolgroup_scenarios,
+        nindex_scenarios, idx_args_scenarios, table_args_scenarios,
+        prune=30)
 
     # Note: the set can be reduced here for debugging, e.g.
     # scenarios = scenarios[40:44]

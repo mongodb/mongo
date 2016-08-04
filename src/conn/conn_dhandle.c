@@ -64,6 +64,16 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 		F_SET(dhandle, WT_DHANDLE_IS_METADATA);
 
 	/*
+	 * We are holding the data handle list lock, which protects most
+	 * threads from seeing the new handle until that lock is released.
+	 *
+	 * However, the sweep server scans the list of handles without holding
+	 * that lock, so we need a write barrier here to ensure the sweep
+	 * server doesn't see a partially filled in structure.
+	 */
+	WT_WRITE_BARRIER();
+
+	/*
 	 * Prepend the handle to the connection list, assuming we're likely to
 	 * need new files again soon, until they are cached by all sessions.
 	 */

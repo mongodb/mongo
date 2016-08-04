@@ -479,11 +479,11 @@ __bm_verify_start(WT_BM *bm,
  *	Write a buffer into a block, returning the block's address cookie.
  */
 static int
-__bm_write(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
+__bm_write(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf,
+    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
 {
-	return (__wt_block_write(
-	    session, bm->block, buf, addr, addr_sizep, data_cksum));
+	return (__wt_block_write(session,
+	    bm->block, buf, addr, addr_sizep, data_cksum, checkpoint_io));
 }
 
 /*
@@ -492,13 +492,14 @@ __bm_write(WT_BM *bm, WT_SESSION_IMPL *session,
  * readonly version.
  */
 static int
-__bm_write_readonly(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
+__bm_write_readonly(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf,
+    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
 {
 	WT_UNUSED(buf);
 	WT_UNUSED(addr);
 	WT_UNUSED(addr_sizep);
 	WT_UNUSED(data_cksum);
+	WT_UNUSED(checkpoint_io);
 
 	return (__bm_readonly(bm, session));
 }

@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
 
 # test_join08.py
 #    Test join error paths

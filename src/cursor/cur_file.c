@@ -388,11 +388,11 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __wt_curfile_create --
+ * __curfile_create --
  *	Open a cursor for a given btree handle.
  */
-int
-__wt_curfile_create(WT_SESSION_IMPL *session,
+static int
+__curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner, const char *cfg[], bool bulk, bool bitmap,
     WT_CURSOR **cursorp)
 {
@@ -439,6 +439,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->value_format = btree->value_format;
 	cbt->btree = btree;
 
+	/*
+	 * Increment the data-source's in-use counter; done now because closing
+	 * the cursor will decrement it, and all failure paths from here close
+	 * the cursor.
+	 */
+	__wt_cursor_dhandle_incr_use(session);
+
 	if (session->dhandle->checkpoint != NULL)
 		F_SET(cbt, WT_CBT_NO_TXN);
 
@@ -478,7 +485,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	/* Underlying btree initialization. */
 	__wt_btcur_open(cbt);
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(
 	    cursor, cursor->internal_uri, owner, cfg, cursorp));
 
@@ -486,7 +492,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_DATA_INCR(session, cursor_create);
 
 	if (0) {
-err:		__wt_free(session, cbt);
+err:		WT_TRET(__curfile_close(cursor));
+		*cursorp = NULL;
 	}
 
 	return (ret);
@@ -503,9 +510,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	uint32_t flags;
-	bool bitmap, bulk;
+	bool bitmap, bulk, checkpoint_wait;
 
 	bitmap = bulk = false;
+	checkpoint_wait = true;
 	flags = 0;
 
 	/*
@@ -531,6 +539,12 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		else if (!WT_STRING_MATCH("unordered", cval.str, cval.len))
 			WT_RET_MSG(session, EINVAL,
 			    "Value for 'bulk' must be a boolean or 'bitmap'");
+
+		if (bulk) {
+			WT_RET(__wt_config_gets(session,
+			    cfg, "checkpoint_wait", &cval));
+			checkpoint_wait = cval.val != 0;
+		}
 	}
 
 	/* Bulk handles require exclusive access. */
@@ -540,11 +554,11 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	/* Get the handle and lock it while the cursor is using it. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
 		/*
-		 * If we are opening exclusive, get the handle while holding
-		 * the checkpoint lock.  This prevents a bulk cursor open
-		 * failing with EBUSY due to a database-wide checkpoint.
+		 * If we are opening exclusive and don't want a bulk cursor
+		 * open to fail with EBUSY due to a database-wide checkpoint,
+		 * get the handle while holding the checkpoint lock.
 		 */
-		if (LF_ISSET(WT_DHANDLE_EXCLUSIVE))
+		if (LF_ISSET(WT_DHANDLE_EXCLUSIVE) && checkpoint_wait)
 			WT_WITH_CHECKPOINT_LOCK(session, ret,
 			    ret = __wt_session_get_btree_ckpt(
 			    session, uri, cfg, flags));
@@ -555,10 +569,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	} else
 		WT_RET(__wt_bad_object_type(session, uri));
 
-	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
+	WT_ERR(__curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 
-	/* Increment the data-source's in-use counter. */
-	__wt_cursor_dhandle_incr_use(session);
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */

@@ -28,7 +28,7 @@
 
 import os, re, run
 import wiredtiger, wttest, suite_random
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 class ParseException(Exception):
     def __init__(self, msg):
@@ -198,7 +198,7 @@ class test_join07(wttest.WiredTigerTestCase):
         ('noextractor', dict(extractor=False))
     ]
 
-    scenarios = number_scenarios(extractscen)
+    scenarios = make_scenarios(extractscen)
 
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, exts):

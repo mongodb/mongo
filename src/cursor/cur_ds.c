@@ -518,10 +518,7 @@ __wt_curds_open(
 	source->flags = 0;
 
 	if (0) {
-err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
-			WT_TRET(cursor->close(cursor));
-		else
-			__wt_free(session, data_source);
+err:		WT_TRET(__curds_close(cursor));
 		*cursorp = NULL;
 	}
 

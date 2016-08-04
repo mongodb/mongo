@@ -342,7 +342,7 @@ snap_check(WT_CURSOR *cursor,
 		switch (g.type) {
 		case FIX:
 			testutil_die(ret,
-			    "snap_check: %" PRIu64 " search: "
+			    "snapshot-isolation: %" PRIu64 " search: "
 			    "expected {0x%02x}, found {0x%02x}",
 			    start->keyno,
 			    start->deleted ? 0 : *(uint8_t *)start->vdata,
@@ -350,7 +350,7 @@ snap_check(WT_CURSOR *cursor,
 			/* NOTREACHED */
 		case ROW:
 			testutil_die(ret,
-			    "snap_check: %.*s search: "
+			    "snapshot-isolation: %.*s search: "
 			    "expected {%.*s}, found {%.*s}",
 			    (int)key->size, key->data,
 			    start->deleted ?
@@ -362,7 +362,7 @@ snap_check(WT_CURSOR *cursor,
 			/* NOTREACHED */
 		case VAR:
 			testutil_die(ret,
-			    "snap_check: %" PRIu64 " search: "
+			    "snapshot-isolation: %" PRIu64 " search: "
 			    "expected {%.*s}, found {%.*s}",
 			    start->keyno,
 			    start->deleted ?

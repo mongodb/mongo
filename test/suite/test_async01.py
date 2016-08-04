@@ -29,7 +29,7 @@
 import sys, threading, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wiredtiger import WiredTigerError
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # TODO - tmp code
 def tty_pr(s):
@@ -122,7 +122,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
     async_threads = 3
     current = {}
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-col', dict(tablekind='col',uri='file')),
         ('file-fix', dict(tablekind='fix',uri='file')),
         ('file-row', dict(tablekind='row',uri='file')),

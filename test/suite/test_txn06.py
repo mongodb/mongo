@@ -30,7 +30,6 @@
 #   Transactions: test long-running snapshots
 
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
 from helper import simple_populate
 import wiredtiger, wttest
 

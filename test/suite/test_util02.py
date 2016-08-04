@@ -29,7 +29,7 @@
 import string, os
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 from helper import complex_populate
 
 # test_util02.py
@@ -44,7 +44,7 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     nentries = 1000
     stringclass = ''.__class__
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('SS', dict(key_format='S',value_format='S')),
         ('rS', dict(key_format='r',value_format='S')),
         ('ri', dict(key_format='r',value_format='i')),

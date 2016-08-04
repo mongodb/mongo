@@ -263,19 +263,57 @@ err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 static int
 __curindex_search_near(WT_CURSOR *cursor, int *exact)
 {
+	WT_CURSOR *child;
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
+	WT_ITEM found_key;
 	WT_SESSION_IMPL *session;
+	int cmp;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
-	__wt_cursor_set_raw_key(cindex->child, &cursor->key);
-	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
-		ret = __curindex_move(cindex);
-	else
-		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	child = cindex->child;
+	JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
 
-err:	API_END_RET(session, ret);
+	/*
+	 * We are searching using the application-specified key, which
+	 * (usually) doesn't contain the primary key, so it is just a prefix of
+	 * any matching index key.  That said, if there is an exact match, we
+	 * want to find the first matching index entry and set exact equal to
+	 * zero. Do a search_near, step to the next entry if we land on one
+	 * that is too small, then check that the prefix matches.
+	 */
+	__wt_cursor_set_raw_key(child, &cursor->key);
+	WT_ERR(child->search_near(child, &cmp));
+
+	if (cmp < 0)
+		WT_ERR(child->next(child));
+
+	/*
+	 * We expect partial matches, and want the smallest record with a key
+	 * greater than or equal to the search key.
+	 *
+	 * If the key we find is shorter than the search key, it can't possibly
+	 * match.
+	 *
+	 * The only way for the key to be exactly equal is if there is an index
+	 * on the primary key, because otherwise the primary key columns will
+	 * be appended to the index key, but we don't disallow that (odd) case.
+	 */
+	found_key = child->key;
+	if (found_key.size < cursor->key.size)
+		WT_ERR(WT_NOTFOUND);
+	found_key.size = cursor->key.size;
+
+	WT_ERR(__wt_compare(
+	    session, cindex->index->collator, &cursor->key, &found_key, exact));
+
+	WT_ERR(__curindex_move(cindex));
+
+	if (0) {
+err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	}
+
+	API_END_RET(session, ret);
 }
 
 /*

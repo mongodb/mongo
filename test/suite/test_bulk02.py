@@ -32,7 +32,7 @@
 import shutil, os
 from helper import confirm_empty, key_populate, value_populate
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 import wiredtiger, wttest
 
 # test_bulkload_checkpoint
@@ -47,7 +47,7 @@ class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
         ('unnamed', dict(ckpt_type='unnamed')),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types, ckpt_type))
+    scenarios = make_scenarios(types, ckpt_type)
 
     # Bulk-load handles are skipped by checkpoints.
     # Named and unnamed checkpoint versions.
@@ -90,8 +90,7 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
         ('different', dict(session_type='different')),
         ('same', dict(session_type='same')),
     ]
-    scenarios = number_scenarios(
-        multiply_scenarios('.', types, ckpt_type, session_type))
+    scenarios = make_scenarios(types, ckpt_type, session_type)
 
     # Backup a set of chosen tables/files using the wt backup command.
     # The only files are bulk-load files, so they shouldn't be copied.

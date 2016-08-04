@@ -27,13 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_txn01.py
 #    Transactions: basic functionality
 class test_txn01(wttest.WiredTigerTestCase):
     nentries = 1000
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('col-f', dict(uri='file:text_txn01',key_format='r',value_format='S')),
         ('col-t', dict(uri='table:text_txn01',key_format='r',value_format='S')),
         ('fix-f', dict(uri='file:text_txn01',key_format='r',value_format='8t')),

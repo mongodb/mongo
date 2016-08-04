@@ -247,8 +247,8 @@ file_config = format_meta + [
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower
-        bound of <code>50 * leaf_page_max</code>, and an upper bound of
-        <code>cache_size / 2</code>.  This limit is soft - it is possible
+        bound of <code>leaf_page_max</code>, and an upper bound of
+        <code>cache_size / 10</code>.  This limit is soft - it is possible
         for pages to be temporarily larger than this value.  This setting
         is ignored for LSM trees, see \c chunk_size''',
         min='512B', max='10TB'),
@@ -373,8 +373,6 @@ connection_runtime_config = [
         periodically checkpoint the database. Enabling the checkpoint server
         uses a session from the configured session_max''',
         type='category', subconfig=[
-        Config('name', '"WiredTigerCheckpoint"', r'''
-            the checkpoint name'''),
         Config('log_size', '0', r'''
             wait for this amount of log record bytes to be written to
                 the log between each checkpoint.  A database can configure
@@ -388,16 +386,31 @@ connection_runtime_config = [
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
-    Config('eviction_dirty_target', '80', r'''
+    Config('eviction', '', r'''
+        eviction configuration options.''',
+        type='category', subconfig=[
+            Config('threads_max', '1', r'''
+                maximum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads started will vary
+                depending on the current eviction load. Each eviction worker
+                thread uses a session from the configured session_max''',
+                min=1, max=20),
+            Config('threads_min', '1', r'''
+                minimum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads currently running will
+                vary depending on the current eviction load''',
+                min=1, max=20),
+            ]),
+    Config('eviction_dirty_target', '5', r'''
         continue evicting until the cache has less dirty memory than the
         value, as a percentage of the total cache size. Dirty pages will
         only be evicted if the cache is full enough to trigger eviction''',
-        min=5, max=99),
-    Config('eviction_dirty_trigger', '95', r'''
+        min=1, max=99),
+    Config('eviction_dirty_trigger', '20', r'''
         trigger eviction when the cache is using this much memory for dirty
         content, as a percentage of the total cache size. This setting only
         alters behavior if it is lower than eviction_trigger''',
-        min=5, max=99),
+        min=1, max=99),
     Config('eviction_target', '80', r'''
         continue evicting until the cache has less total memory than the
         value, as a percentage of the total cache size. Must be less than
@@ -420,40 +433,6 @@ connection_runtime_config = [
             interval in seconds at which to check for files that are
             inactive and close them''', min=1, max=100000),
         ]),
-    Config('log', '', r'''
-        enable logging. Enabling logging uses three sessions from the
-        configured session_max''',
-        type='category', subconfig=[
-        Config('archive', 'true', r'''
-            automatically archive unneeded log files''',
-            type='boolean'),
-        Config('compressor', 'none', r'''
-            configure a compressor for log records.  Permitted values are
-            \c "none" or custom compression engine name created with
-            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-            for \c "snappy", \c "lz4" or \c "zlib" compression, these names
-            are also available. See @ref compression for more information'''),
-        Config('enabled', 'false', r'''
-            enable logging subsystem''',
-            type='boolean'),
-        Config('file_max', '100MB', r'''
-            the maximum size of log files''',
-            min='100KB', max='2GB'),
-        Config('path', '"."', r'''
-            the path to a directory into which the log files are written.
-            If the value is not an absolute path name, the files are created
-            relative to the database home'''),
-        Config('prealloc', 'true', r'''
-            pre-allocate log files.''',
-            type='boolean'),
-        Config('recover', 'on', r'''
-            run recovery or error if recovery needs to run after an
-            unclean shutdown.''',
-            choices=['error','on']),
-        Config('zero_fill', 'false', r'''
-            manually write zeroes into log files''',
-            type='boolean'),
-        ]),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.
@@ -472,21 +451,6 @@ connection_runtime_config = [
     Config('lsm_merge', 'true', r'''
         merge LSM chunks where possible (deprecated)''',
         type='boolean', undoc=True),
-    Config('eviction', '', r'''
-        eviction configuration options.''',
-        type='category', subconfig=[
-            Config('threads_max', '1', r'''
-                maximum number of threads WiredTiger will start to help evict
-                pages from cache. The number of threads started will vary
-                depending on the current eviction load. Each eviction worker
-                thread uses a session from the configured session_max''',
-                min=1, max=20),
-            Config('threads_min', '1', r'''
-                minimum number of threads WiredTiger will start to help evict
-                pages from cache. The number of threads currently running will
-                vary depending on the current eviction load''',
-                min=1, max=20),
-            ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
         either a cache_size or a shared_cache not both. Enabling a
@@ -525,38 +489,6 @@ connection_runtime_config = [
         are logged using the \c statistics_log configuration.  See
         @ref statistics for more information''',
         type='list', choices=['all', 'fast', 'none', 'clear']),
-    Config('statistics_log', '', r'''
-        log any statistics the database is configured to maintain,
-        to a file.  See @ref statistics for more information. Enabling
-        the statistics log server uses a session from the configured
-        session_max''',
-        type='category', subconfig=[
-        Config('json', 'false', r'''
-            encode statistics in JSON format''',
-            type='boolean'),
-        Config('on_close', 'false', r'''log statistics on database close''',
-            type='boolean'),
-        Config('path', '"WiredTigerStat.%d.%H"', r'''
-            the pathname to a file into which the log records are written,
-            may contain ISO C standard strftime conversion specifications.
-            If the value is not an absolute path name, the file is created
-            relative to the database home'''),
-        Config('sources', '', r'''
-            if non-empty, include statistics for the list of data source
-            URIs, if they are open at the time of the statistics logging.
-            The list may include URIs matching a single data source
-            ("table:mytable"), or a URI matching all data sources of a
-            particular type ("table:")''',
-            type='list'),
-        Config('timestamp', '"%b %d %H:%M:%S"', r'''
-            a timestamp prepended to each log record, may contain strftime
-            conversion specifications, when \c json is configured, defaults
-            to \c "%FT%Y.000Z"'''),
-        Config('wait', '0', r'''
-            seconds to wait between each write of the log records; setting
-            this value above 0 configures statistics logging''',
-            min='0', max='100000'),
-        ]),
     Config('verbose', '', r'''
         enable messages for various events. Only available if WiredTiger
         is configured with --enable-verbose. Options are given as a
@@ -590,13 +522,113 @@ connection_runtime_config = [
             'write']),
 ]
 
+# wiredtiger_open and WT_CONNECTION.reconfigure log configurations.
+log_configuration_common = [
+    Config('archive', 'true', r'''
+        automatically archive unneeded log files''',
+        type='boolean'),
+    Config('prealloc', 'true', r'''
+        pre-allocate log files.''',
+        type='boolean'),
+    Config('zero_fill', 'false', r'''
+        manually write zeroes into log files''',
+        type='boolean')
+]
+connection_reconfigure_log_configuration = [
+    Config('log', '', r'''
+        enable logging. Enabling logging uses three sessions from the
+        configured session_max''',
+        type='category', subconfig=
+        log_configuration_common)
+]
+wiredtiger_open_log_configuration = [
+    Config('log', '', r'''
+        enable logging. Enabling logging uses three sessions from the
+        configured session_max''',
+        type='category', subconfig=
+        log_configuration_common + [
+        Config('enabled', 'false', r'''
+            enable logging subsystem''',
+            type='boolean'),
+        Config('compressor', 'none', r'''
+            configure a compressor for log records.  Permitted values are
+            \c "none" or custom compression engine name created with
+            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
+            for \c "snappy", \c "lz4" or \c "zlib" compression, these names
+            are also available. See @ref compression for more information'''),
+        Config('file_max', '100MB', r'''
+            the maximum size of log files''',
+            min='100KB', max='2GB'),
+            Config('path', '"."', r'''
+                the name of a directory into which log files are written. The
+                directory must already exist. If the value is not an absolute
+                path, the path is relative to the database home (see @ref
+                absolute_path for more information)'''),
+        Config('recover', 'on', r'''
+            run recovery or error if recovery needs to run after an
+            unclean shutdown''',
+            choices=['error','on'])
+    ]),
+]
+
+# wiredtiger_open and WT_CONNECTION.reconfigure statistics log configurations.
+statistics_log_configuration_common = [
+    Config('json', 'false', r'''
+        encode statistics in JSON format''',
+        type='boolean'),
+    Config('on_close', 'false', r'''log statistics on database close''',
+        type='boolean'),
+    Config('sources', '', r'''
+        if non-empty, include statistics for the list of data source
+        URIs, if they are open at the time of the statistics logging.
+        The list may include URIs matching a single data source
+        ("table:mytable"), or a URI matching all data sources of a
+        particular type ("table:")''',
+        type='list'),
+    Config('timestamp', '"%b %d %H:%M:%S"', r'''
+        a timestamp prepended to each log record, may contain strftime
+        conversion specifications, when \c json is configured, defaults
+        to \c "%FT%Y.000Z"'''),
+    Config('wait', '0', r'''
+        seconds to wait between each write of the log records; setting
+        this value above 0 configures statistics logging''',
+        min='0', max='100000'),
+]
+connection_reconfigure_statistics_log_configuration = [
+    Config('statistics_log', '', r'''
+        log any statistics the database is configured to maintain,
+        to a file.  See @ref statistics for more information. Enabling
+        the statistics log server uses a session from the configured
+        session_max''',
+        type='category', subconfig=
+        statistics_log_configuration_common)
+]
+wiredtiger_open_statistics_log_configuration = [
+    Config('statistics_log', '', r'''
+        log any statistics the database is configured to maintain,
+        to a file.  See @ref statistics for more information. Enabling
+        the statistics log server uses a session from the configured
+        session_max''',
+        type='category', subconfig=
+        statistics_log_configuration_common + [
+        Config('path', '"."', r'''
+            the name of a directory into which statistics files are written.
+            The directory must already exist. If the value is not an absolute
+            path, the path is relative to the database home (see @ref
+            absolute_path for more information)''')
+        ])
+]
+
 session_config = [
     Config('isolation', 'read-committed', r'''
         the default isolation level for operations in this session''',
         choices=['read-uncommitted', 'read-committed', 'snapshot']),
 ]
 
-wiredtiger_open_common = connection_runtime_config + [
+wiredtiger_open_common =\
+    connection_runtime_config +\
+    wiredtiger_open_log_configuration +\
+    wiredtiger_open_statistics_log_configuration + [
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
         default value of -1 indicates a platform-specific alignment value
@@ -788,8 +820,9 @@ methods = {
 
 'WT_SESSION.drop' : Method([
     Config('checkpoint_wait', 'true', r'''
-        wait for the checkpoint lock, if \c checkpoint_wait=false, fail if
-        this lock is not available immediately''',
+        wait for the checkpoint lock, if \c checkpoint_wait=false, perform
+        the drop operation without taking a lock, returning EBUSY if the
+        operation conflicts with a running checkpoint''',
         type='boolean', undoc=True),
     Config('force', 'false', r'''
         return success if the object does not exist''',
@@ -870,6 +903,11 @@ methods = {
         "WiredTigerCheckpoint" opens the most recent internal
         checkpoint taken for the object).  The cursor does not
         support data modification'''),
+    Config('checkpoint_wait', 'true', r'''
+        wait for the checkpoint lock, if \c checkpoint_wait=false, open the
+        cursor without taking a lock, returning EBUSY if the operation
+        conflicts with a running checkpoint''',
+        type='boolean', undoc=True),
     Config('dump', '', r'''
         configure the cursor for dump format inputs and outputs: "hex"
         selects a simple hexadecimal format, "json" selects a JSON format
@@ -1084,7 +1122,11 @@ methods = {
         don't free memory during close''',
         type='boolean'),
 ]),
-'WT_CONNECTION.reconfigure' : Method(connection_runtime_config),
+'WT_CONNECTION.reconfigure' : Method(
+    connection_reconfigure_log_configuration +\
+    connection_reconfigure_statistics_log_configuration +\
+    connection_runtime_config
+),
 'WT_CONNECTION.set_file_system' : Method([]),
 
 'WT_CONNECTION.load_extension' : Method([

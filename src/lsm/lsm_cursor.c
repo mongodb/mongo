@@ -205,6 +205,12 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 			WT_RET(__wt_txn_id_check(session));
 
 			WT_RET(__clsm_enter_update(clsm));
+			/*
+			 * Switching the tree will update the generation before
+			 * updating the switch transaction.  We test the
+			 * transaction in clsm_enter_update.  Now test the
+			 * disk generation to avoid races.
+			 */
 			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 				goto open;
 
@@ -219,13 +225,20 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 			 * transaction ID in each chunk: any transaction ID
 			 * that overlaps with our snapshot is a potential
 			 * conflict.
+			 *
+			 * Note that the global snap_min is correct here: it
+			 * tracks concurrent transactions excluding special
+			 * transactions such as checkpoint (which we can't
+			 * conflict with because checkpoint only writes the
+			 * metadata, which is not an LSM tree).
 			 */
 			clsm->nupdates = 1;
 			if (txn->isolation == WT_ISO_SNAPSHOT &&
 			    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
 				WT_ASSERT(session,
 				    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
-				snap_min = txn->snap_min;
+				snap_min =
+				    WT_SESSION_TXN_STATE(session)->snap_min;
 				for (switch_txnp =
 				    &clsm->switch_txn[clsm->nchunks - 2];
 				    clsm->nupdates < clsm->nchunks;
@@ -1521,6 +1534,8 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_LSM_TREE *lsm_tree;
 	bool bulk;
 
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
+
 	clsm = NULL;
 	cursor = NULL;
 	lsm_tree = NULL;
@@ -1566,6 +1581,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	cursor->value_format = lsm_tree->value_format;
 
 	clsm->lsm_tree = lsm_tree;
+	lsm_tree = NULL;
 
 	/*
 	 * The tree's dsk_gen starts at one, so starting the cursor on zero
@@ -1573,7 +1589,6 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 */
 	clsm->dsk_gen = 0;
 
-	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	if (bulk)
@@ -1585,10 +1600,6 @@ err:		if (clsm != NULL)
 		else if (lsm_tree != NULL)
 			__wt_lsm_tree_release(session, lsm_tree);
 
-		/*
-		 * We open bulk cursors after setting the returned cursor.
-		 * Fix that here.
-		 */
 		*cursorp = NULL;
 	}
 

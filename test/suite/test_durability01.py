@@ -34,7 +34,6 @@
 import fnmatch, os, shutil, time
 from helper import copy_wiredtiger_home
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
 class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):

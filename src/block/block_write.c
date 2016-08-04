@@ -210,15 +210,15 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
 {
 	wt_off_t offset;
 	uint32_t size, cksum;
 	uint8_t *endp;
 
-	WT_RET(__wt_block_write_off(
-	    session, block, buf, &offset, &size, &cksum, data_cksum, false));
+	WT_RET(__wt_block_write_off(session, block,
+	    buf, &offset, &size, &cksum, data_cksum, checkpoint_io, false));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -228,14 +228,14 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 }
 
 /*
- * __wt_block_write_off --
+ * __block_write_off --
  *	Write a buffer into a block, returning the block's offset, size and
  * checksum.
  */
-int
-__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
+static int
+__block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
-    bool data_cksum, bool caller_locked)
+    bool data_cksum, bool checkpoint_io, bool caller_locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
@@ -253,12 +253,6 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	memset(blk, 0, sizeof(*blk));
-
-	/*
-	 * Swap the page-header as needed; this doesn't belong here, but it's
-	 * the best place to catch all callers.
-	 */
-	__wt_page_header_byteswap(buf->mem);
 
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
@@ -380,6 +374,9 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_STAT_FAST_CONN_INCR(session, block_write);
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
+	if (checkpoint_io)
+		WT_STAT_FAST_CONN_INCRV(
+		    session, block_byte_write_checkpoint, align_size);
 
 	WT_RET(__wt_verbose(session, WT_VERB_WRITE,
 	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
@@ -390,4 +387,29 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	*cksump = cksum;
 
 	return (0);
+}
+
+/*
+ * __wt_block_write_off --
+ *	Write a buffer into a block, returning the block's offset, size and
+ * checksum.
+ */
+int
+__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
+    bool data_cksum, bool checkpoint_io, bool caller_locked)
+{
+	WT_DECL_RET;
+
+	/*
+	 * Ensure the page header is in little endian order; this doesn't belong
+	 * here, but it's the best place to catch all callers. After the write,
+	 * swap values back to native order so callers never see anything other
+	 * than their original content.
+	 */
+	__wt_page_header_byteswap(buf->mem);
+	ret = __block_write_off(session, block, buf,
+	    offsetp, sizep, cksump, data_cksum, checkpoint_io, caller_locked);
+	__wt_page_header_byteswap(buf->mem);
+	return (ret);
 }

@@ -93,5 +93,5 @@ __wt_sync_and_rename(WT_SESSION_IMPL *session,
 	WT_TRET(__wt_fclose(session, &fstr));
 	WT_RET(ret);
 
-	return (__wt_rename_and_sync_directory(session, from, to));
+	return (__wt_fs_rename(session, from, to, true));
 }

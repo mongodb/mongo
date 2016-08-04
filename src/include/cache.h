@@ -13,7 +13,6 @@
 #define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
 					   pages by this many increments of the
 					   read generation. */
-#define	WT_EVICT_WALK_PER_FILE	 10	/* Pages to queue per file */
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
 
@@ -24,9 +23,12 @@
 struct __wt_evict_entry {
 	WT_BTREE *btree;		/* Enclosing btree object */
 	WT_REF	 *ref;			/* Page to flush/evict */
+	uint64_t  score;		/* Relative eviction priority */
 };
 
-#define	WT_EVICT_QUEUE_MAX	2
+#define	WT_EVICT_URGENT_QUEUE	0	/* Urgent queue index */
+#define	WT_EVICT_QUEUE_MAX	3	/* Urgent plus two ordinary queues */
+
 /*
  * WT_EVICT_QUEUE --
  *	Encapsulation of an eviction candidate queue.
@@ -34,6 +36,7 @@ struct __wt_evict_entry {
 struct __wt_evict_queue {
 	WT_SPINLOCK evict_lock;		/* Eviction LRU queue */
 	WT_EVICT_ENTRY *evict_queue;	/* LRU pages being tracked */
+	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	uint32_t evict_entries;		/* LRU entries in the queue */
 	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
@@ -70,16 +73,19 @@ struct __wt_cache {
 	 * be exact, they can't be garbage, we track what comes in and what goes
 	 * out and calculate the difference as needed.
 	 */
-	uint64_t bytes_inmem;		/* Bytes/pages in memory */
-	uint64_t pages_inmem;
-	uint64_t bytes_internal;	/* Bytes of internal pages */
-	uint64_t bytes_overflow;	/* Bytes of overflow pages */
+	uint64_t bytes_dirty_intl;	/* Bytes/pages currently dirty */
+	uint64_t pages_dirty_intl;
+	uint64_t bytes_dirty_leaf;
+	uint64_t pages_dirty_leaf;
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 	uint64_t pages_evicted;		/* Pages evicted during a pass */
-	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
-	uint64_t pages_dirty;
+	uint64_t bytes_image;		/* Bytes of disk images */
+	uint64_t bytes_inmem;		/* Bytes/pages in memory */
+	uint64_t pages_inmem;
+	uint64_t bytes_internal;	/* Bytes of internal pages */
 	uint64_t bytes_read;		/* Bytes read into memory */
+	uint64_t bytes_written;
 
 	uint64_t app_waits;		/* User threads waited for cache */
 	uint64_t app_evicts;		/* Pages evicted by user threads */
@@ -121,7 +127,6 @@ struct __wt_cache {
 	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
 	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
 	WT_EVICT_QUEUE *evict_current_queue;/* LRU current queue in use */
-	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	uint32_t evict_queue_fill;	/* LRU eviction queue index to fill */
 	uint32_t evict_slots;		/* LRU list eviction slots */
 	WT_DATA_HANDLE
@@ -145,10 +150,13 @@ struct __wt_cache {
 	/*
 	 * Work state.
 	 */
-#define	WT_EVICT_PASS_AGGRESSIVE	0x01
-#define	WT_EVICT_PASS_ALL		0x02
-#define	WT_EVICT_PASS_DIRTY		0x04
-#define	WT_EVICT_PASS_WOULD_BLOCK	0x08
+#define	WT_EVICT_STATE_AGGRESSIVE	0x01 /* Eviction isn't making progress:
+						try harder */
+#define	WT_EVICT_STATE_CLEAN		0x02 /* Evict clean pages */
+#define	WT_EVICT_STATE_DIRTY		0x04 /* Evict dirty pages */
+#define	WT_EVICT_STATE_SCRUB		0x08 /* Scrub dirty pages pages */
+#define	WT_EVICT_STATE_URGENT		0x10 /* Pages are in the urgent queue */
+#define	WT_EVICT_STATE_ALL	(WT_EVICT_STATE_CLEAN | WT_EVICT_STATE_DIRTY)
 	uint32_t state;
 	/*
 	 * Pass interrupt counter.
@@ -162,7 +170,6 @@ struct __wt_cache {
 #define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
 #define	WT_CACHE_STUCK		0x04	/* Eviction server is stuck */
 #define	WT_CACHE_WALK_REVERSE	0x08	/* Scan backwards for candidates */
-#define	WT_CACHE_WOULD_BLOCK	0x10	/* Pages that would block apps */
 	uint32_t flags;
 };
 

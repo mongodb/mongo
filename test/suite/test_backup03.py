@@ -28,7 +28,7 @@
 
 import glob, os, shutil, string
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 import wiredtiger, wttest
 from helper import compare_files,\
     complex_populate, complex_populate_lsm, simple_populate
@@ -56,25 +56,25 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         ('table:' + pfx + '.4', complex_populate_lsm, 3),
     ]
     list = [
-        ( '1', dict(big=0,list=[0])),           # Target objects individually
-        ( '2', dict(big=1,list=[1])),
-        ( '3', dict(big=2,list=[2])),
-        ( '4', dict(big=3,list=[3])),
-        ('5a', dict(big=0,list=[0,2])),         # Target groups of objects
-        ('5b', dict(big=2,list=[0,2])),
-        ('6a', dict(big=1,list=[1,3])),
-        ('6b', dict(big=3,list=[1,3])),
-        ('7a', dict(big=0,list=[0,1,2])),
-        ('7b', dict(big=1,list=[0,1,2])),
-        ('7c', dict(big=2,list=[0,1,2])),
-        ('8a', dict(big=0,list=[0,1,2,3])),
-        ('8b', dict(big=1,list=[0,1,2,3])),
-        ('8c', dict(big=2,list=[0,1,2,3])),
-        ('8d', dict(big=3,list=[0,1,2,3])),
-        ( '9', dict(big=3,list=[])),            # Backup everything
+        ( 'backup_1', dict(big=0,list=[0])),       # Target objects individually
+        ( 'backup_2', dict(big=1,list=[1])),
+        ( 'backup_3', dict(big=2,list=[2])),
+        ( 'backup_4', dict(big=3,list=[3])),
+        ('backup_5a', dict(big=0,list=[0,2])),     # Target groups of objects
+        ('backup_5b', dict(big=2,list=[0,2])),
+        ('backup_6a', dict(big=1,list=[1,3])),
+        ('backup_6b', dict(big=3,list=[1,3])),
+        ('backup_7a', dict(big=0,list=[0,1,2])),
+        ('backup_7b', dict(big=1,list=[0,1,2])),
+        ('backup_7c', dict(big=2,list=[0,1,2])),
+        ('backup_8a', dict(big=0,list=[0,1,2,3])),
+        ('backup_8b', dict(big=1,list=[0,1,2,3])),
+        ('backup_8c', dict(big=2,list=[0,1,2,3])),
+        ('backup_8d', dict(big=3,list=[0,1,2,3])),
+        ('backup_9', dict(big=3,list=[])),         # Backup everything
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', list))
+    scenarios = make_scenarios(list)
     # Create a large cache, otherwise this test runs quite slowly.
     conn_config = 'cache_size=1G'
 

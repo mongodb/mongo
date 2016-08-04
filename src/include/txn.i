@@ -105,7 +105,8 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t checkpoint_gen, checkpoint_pinned, oldest_id;
+	uint64_t checkpoint_pinned, oldest_id;
+	bool include_checkpoint_txn;
 
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
@@ -117,7 +118,11 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * we take the minimum of the other two IDs, which is what we want.
 	 */
 	oldest_id = txn_global->oldest_id;
-	WT_ORDERED_READ(checkpoint_gen, txn_global->checkpoint_gen);
+	if (btree == NULL)
+		include_checkpoint_txn = false;
+	else
+		WT_ORDERED_READ(
+		    include_checkpoint_txn, btree->include_checkpoint_txn);
 	checkpoint_pinned = txn_global->checkpoint_pinned;
 
 	/*
@@ -130,10 +135,9 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * checkpoint, or this handle is up to date with the active checkpoint
 	 * then it's safe to ignore the checkpoint ID in the visibility check.
 	 */
-	if (checkpoint_pinned == WT_TXN_NONE ||
+	if (!include_checkpoint_txn || checkpoint_pinned == WT_TXN_NONE ||
 	    WT_TXNID_LT(oldest_id, checkpoint_pinned) ||
-	    WT_SESSION_IS_CHECKPOINT(session) ||
-	    (btree != NULL && btree->checkpoint_gen == checkpoint_gen))
+	    WT_SESSION_IS_CHECKPOINT(session))
 		return (oldest_id);
 
 	return (checkpoint_pinned);

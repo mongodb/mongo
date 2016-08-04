@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_join01.py
 #    Join operations
@@ -67,11 +67,9 @@ class test_join01(wttest.WiredTigerTestCase):
         ('order=2', dict(join_order=2)),
         ('order=3', dict(join_order=3)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', type_scen,
-                                                    bloom0_scen, bloom1_scen,
-                                                    projection_scen,
-                                                    nested_scen, stats_scen,
-                                                    order_scen))
+    scenarios = make_scenarios(type_scen, bloom0_scen, bloom1_scen,
+                               projection_scen, nested_scen, stats_scen,
+                               order_scen)
 
     # We need statistics for these tests.
     conn_config = 'statistics=(all)'

@@ -41,6 +41,9 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_STAT_SET(session, stats, btree_maxleafpage, btree->maxleafpage);
 	WT_STAT_SET(session, stats, btree_maxleafvalue, btree->maxleafvalue);
 
+	WT_STAT_SET(session, stats, cache_bytes_inuse,
+	    __wt_btree_bytes_inuse(session));
+
 	/* Everything else is really, really expensive. */
 	if (!F_ISSET(cst, WT_CONN_STAT_ALL))
 		return (0);
@@ -139,7 +142,7 @@ __stat_page_col_var(
 		} else {
 			orig_deleted = false;
 			__wt_cell_unpack(cell, unpack);
-			if (unpack->type == WT_CELL_ADDR_DEL)
+			if (unpack->type == WT_CELL_DEL)
 				orig_deleted = true;
 			else {
 				entry_cnt += __wt_cell_rle(unpack);
