@@ -266,16 +266,14 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         _journalFlusher->go();
     }
 
-    if (!_readOnly) {
-        _sizeStorerUri = "table:sizeStorer";
-        WiredTigerSession session(_conn);
-        if (repair && _hasUri(session.getSession(), _sizeStorerUri)) {
-            log() << "Repairing size cache";
-            fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
-        }
-        _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri));
-        _sizeStorer->fillCache();
+    _sizeStorerUri = "table:sizeStorer";
+    WiredTigerSession session(_conn);
+    if (!_readOnly && repair && _hasUri(session.getSession(), _sizeStorerUri)) {
+        log() << "Repairing size cache";
+        fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
     }
+    _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri));
+    _sizeStorer->fillCache();
 
     Locker::setGlobalThrottling(&openReadTransaction, &openWriteTransaction);
 }
@@ -310,7 +308,8 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
 
 void WiredTigerKVEngine::cleanShutdown() {
     log() << "WiredTigerKVEngine shutting down";
-    syncSizeInfo(true);
+    if (!_readOnly)
+        syncSizeInfo(true);
     if (_conn) {
         // these must be the last things we do before _conn->close();
         if (_journalFlusher)
@@ -576,7 +575,7 @@ bool WiredTigerKVEngine::haveDropsQueued() const {
     Date_t now = Date_t::now();
     Milliseconds delta = now - _previousCheckedDropsQueued;
 
-    if (_sizeStorerSyncTracker.intervalHasElapsed()) {
+    if (!_readOnly && _sizeStorerSyncTracker.intervalHasElapsed()) {
         _sizeStorerSyncTracker.resetLastTime();
         syncSizeInfo(false);
     }
