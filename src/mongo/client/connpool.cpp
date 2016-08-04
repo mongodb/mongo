@@ -235,7 +235,7 @@ DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTi
     }
 
     string errmsg;
-    c = url.connect(errmsg, socketTimeout);
+    c = url.connect(StringData(), errmsg, socketTimeout);
     uassert(13328, _name + ": connect failed " + url.toString() + " : " + errmsg, c);
 
     return _finishCreate(url.toString(), socketTimeout, c);
@@ -256,7 +256,7 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     const ConnectionString cs(uassertStatusOK(ConnectionString::parse(host)));
 
     string errmsg;
-    c = cs.connect(errmsg, socketTimeout);
+    c = cs.connect(StringData(), errmsg, socketTimeout);
     if (!c)
         throw SocketException(SocketException::CONNECT_ERROR,
                               host,

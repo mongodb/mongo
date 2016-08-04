@@ -181,6 +181,10 @@ error_code("WindowsPdhError", 179)
 error_code("BadPerfCounterPath", 180)
 error_code("AmbiguousIndexKeyPattern", 181)
 error_code("InvalidViewDefinition", 182);
+error_code("ClientMetadataMissingField", 183)
+error_code("ClientMetadataAppNameTooLarge", 184)
+error_code("ClientMetadataDocumentTooLarge", 185)
+error_code("ClientMetadataCannotBeMutated", 186)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

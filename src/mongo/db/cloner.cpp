@@ -542,7 +542,7 @@ Status Cloner::copyDb(OperationContext* txn,
             // nothing to do
         } else if (!masterSameProcess) {
             std::string errmsg;
-            unique_ptr<DBClientBase> con(cs.connect(errmsg));
+            unique_ptr<DBClientBase> con(cs.connect(StringData(), errmsg));
             if (!con.get()) {
                 return Status(ErrorCodes::HostUnreachable, errmsg);
             }

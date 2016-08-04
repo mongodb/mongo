@@ -30,6 +30,7 @@
 
 #include "mongo/client/mongo_uri.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -330,7 +331,7 @@ TEST(MongoURI, ValidButBadURIsFailToConnect) {
     ASSERT_TRUE(uri.isValid());
 
     std::string errmsg;
-    auto dbclient = uri.connect(errmsg);
+    auto dbclient = uri.connect(mongo::StringData(), errmsg);
     ASSERT_EQ(dbclient, static_cast<decltype(dbclient)>(nullptr));
 }
 

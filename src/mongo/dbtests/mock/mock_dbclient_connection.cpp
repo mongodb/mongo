@@ -46,7 +46,9 @@ MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
 
 MockDBClientConnection::~MockDBClientConnection() {}
 
-bool MockDBClientConnection::connect(const char* hostName, std::string& errmsg) {
+bool MockDBClientConnection::connect(const char* hostName,
+                                     StringData applicationName,
+                                     std::string& errmsg) {
     if (_remoteServer->isRunning()) {
         _remoteServerInstanceID = _remoteServer->getInstanceID();
         return true;

@@ -42,10 +42,12 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_request_builder.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 namespace executor {
@@ -62,6 +64,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
     bob.append("hangUpOnStepDown", false);
+    ClientMetadata::serialize(_options.instanceName, mongo::versionString, &bob);
 
     if (Command::testCommandsEnabled) {
         // Only include the host:port of this process in the isMaster command request if test

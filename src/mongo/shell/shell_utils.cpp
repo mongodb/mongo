@@ -318,7 +318,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
         const ConnectionString cs(status.getValue());
 
         string errmsg;
-        std::unique_ptr<DBClientWithCommands> conn(cs.connect(errmsg));
+        std::unique_ptr<DBClientWithCommands> conn(cs.connect("MongoDB Shell", errmsg));
         if (!conn) {
             continue;
         }

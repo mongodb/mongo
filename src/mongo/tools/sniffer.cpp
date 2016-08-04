@@ -404,7 +404,7 @@ void processMessage(Connection& c, Message& m) {
             std::shared_ptr<DBClientConnection> conn = forwarder[c];
             if (!conn) {
                 conn.reset(new DBClientConnection(true));
-                uassertStatusOK(conn->connect(mongo::HostAndPort{forwardAddress}));
+                uassertStatusOK(conn->connect(mongo::HostAndPort{forwardAddress}, "mongosniff"));
                 forwarder[c] = conn;
             }
             if (m.operation() == mongo::dbQuery || m.operation() == mongo::dbGetMore) {

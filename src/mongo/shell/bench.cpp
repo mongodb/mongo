@@ -485,7 +485,7 @@ DBClientBase* BenchRunConfig::createConnection() const {
     const ConnectionString connectionString = uassertStatusOK(ConnectionString::parse(host));
 
     std::string errorMessage;
-    DBClientBase* connection = connectionString.connect(errorMessage);
+    DBClientBase* connection = connectionString.connect("BenchRun", errorMessage);
     uassert(16158, errorMessage, connection != NULL);
 
     return connection;

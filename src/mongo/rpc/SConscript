@@ -139,6 +139,7 @@ env.Library(
         'metadata/repl_set_metadata.cpp',
     ],
     LIBDEPS=[
+        'client_metadata',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
@@ -193,4 +194,29 @@ env.CppUnitTest(
         'metadata/config_server_metadata_test.cpp',
     ],
     LIBDEPS=['metadata']
+)
+
+env.Library(
+    target='client_metadata',
+    source=[
+        'metadata/client_metadata.cpp',
+        'metadata/client_metadata_ismaster.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+        '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+        "$BUILD_DIR/mongo/util/processinfo",
+    ],
+)
+
+env.CppUnitTest(
+    target='client_metadata_test',
+    source=[
+        'metadata/client_metadata_test.cpp',
+    ],
+    LIBDEPS=[
+        'client_metadata',
+    ]
 )

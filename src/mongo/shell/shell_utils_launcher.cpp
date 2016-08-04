@@ -856,7 +856,8 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
             //
             try {
                 DBClientConnection conn;
-                conn.connect(HostAndPort{"127.0.0.1:" + BSONObjBuilder::numStr(port)});
+                conn.connect(HostAndPort{"127.0.0.1:" + BSONObjBuilder::numStr(port)},
+                             "MongoDB Shell");
 
                 BSONElement authObj = opt["auth"];
 

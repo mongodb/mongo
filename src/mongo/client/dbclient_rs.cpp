@@ -135,8 +135,9 @@ bool DBClientReplicaSet::_authPooledSecondaryConn = true;
 
 DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const vector<HostAndPort>& servers,
+                                       StringData applicationName,
                                        double so_timeout)
-    : _setName(name), _so_timeout(so_timeout) {
+    : _setName(name), _applicationName(applicationName.toString()), _so_timeout(so_timeout) {
     _rsm =
         ReplicaSetMonitor::createIfNeeded(name, set<HostAndPort>(servers.begin(), servers.end()));
 }
@@ -303,7 +304,8 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
         // Needs to perform a dynamic_cast because we need to set the replSet
         // callback. We should eventually not need this after we remove the
         // callback.
-        newConn = dynamic_cast<DBClientConnection*>(connStr.connect(errmsg, _so_timeout));
+        newConn = dynamic_cast<DBClientConnection*>(
+            connStr.connect(_applicationName, errmsg, _so_timeout));
     } catch (const AssertionException& ex) {
         errmsg = ex.toString();
     }

@@ -975,7 +975,9 @@ public:
      * @param errmsg any relevant error message will appended to the string
      * @return false if fails to connect.
      */
-    virtual bool connect(const HostAndPort& server, std::string& errmsg);
+    virtual bool connect(const HostAndPort& server,
+                         StringData applicationName,
+                         std::string& errmsg);
 
     /**
      * Semantically equivalent to the previous connect method, but returns a Status
@@ -986,7 +988,7 @@ public:
      * @param a hook to validate the 'isMaster' reply received during connection. If the hook
      * fails, the connection will be terminated and a non-OK status will be returned.
      */
-    Status connect(const HostAndPort& server);
+    Status connect(const HostAndPort& server, StringData applicationName);
 
     /**
      * This version of connect does not run 'isMaster' after creating a TCP connection to the
@@ -1131,6 +1133,7 @@ protected:
 
     HostAndPort _serverAddress;
     std::string _resolvedAddress;
+    std::string _applicationName;
 
     void _checkConnection();
 

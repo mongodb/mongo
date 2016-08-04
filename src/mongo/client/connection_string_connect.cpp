@@ -45,13 +45,15 @@ namespace mongo {
 stdx::mutex ConnectionString::_connectHookMutex;
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 
-DBClientBase* ConnectionString::connect(std::string& errmsg, double socketTimeout) const {
+DBClientBase* ConnectionString::connect(StringData applicationName,
+                                        std::string& errmsg,
+                                        double socketTimeout) const {
     switch (_type) {
         case MASTER: {
             auto c = stdx::make_unique<DBClientConnection>(true);
             c->setSoTimeout(socketTimeout);
             LOG(1) << "creating new connection to:" << _servers[0];
-            if (!c->connect(_servers[0], errmsg)) {
+            if (!c->connect(_servers[0], applicationName, errmsg)) {
                 return 0;
             }
             LOG(1) << "connected connection!";
@@ -59,7 +61,8 @@ DBClientBase* ConnectionString::connect(std::string& errmsg, double socketTimeou
         }
 
         case SET: {
-            auto set = stdx::make_unique<DBClientReplicaSet>(_setName, _servers, socketTimeout);
+            auto set = stdx::make_unique<DBClientReplicaSet>(
+                _setName, _servers, applicationName, socketTimeout);
             if (!set->connect()) {
                 errmsg = "connect failed to replica set ";
                 errmsg += toString();

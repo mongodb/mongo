@@ -164,7 +164,7 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
     return bob.obj();
 }
 
-DBClientBase* MongoURI::connect(std::string& errmsg) const {
+DBClientBase* MongoURI::connect(StringData applicationName, std::string& errmsg) const {
     double socketTimeout = 0.0;
 
     OptionsMap::const_iterator it = _options.find("socketTimeoutMS");
@@ -177,7 +177,7 @@ DBClientBase* MongoURI::connect(std::string& errmsg) const {
         }
     }
 
-    auto ret = _connectString.connect(errmsg, socketTimeout);
+    auto ret = _connectString.connect(applicationName, errmsg, socketTimeout);
     if (!ret) {
         return ret;
     }

@@ -58,10 +58,10 @@ public:
     // DBClientBase methods
     //
 
-    bool connect(const char* hostName, std::string& errmsg);
+    bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
-    inline bool connect(const HostAndPort& host, std::string& errmsg) {
-        return connect(host.toString().c_str(), errmsg);
+    inline bool connect(const HostAndPort& host, StringData applicationName, std::string& errmsg) {
+        return connect(host.toString().c_str(), applicationName, errmsg);
     }
 
     bool runCommand(const std::string& dbname,

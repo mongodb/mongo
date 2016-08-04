@@ -224,7 +224,7 @@ public:
 
         // Make sure the dummy server is up and running before proceeding
         while (true) {
-            auto connectStatus = conn.connect(HostAndPort{TARGET_HOST});
+            auto connectStatus = conn.connect(HostAndPort{TARGET_HOST}, StringData());
             if (connectStatus.isOK()) {
                 break;
             }

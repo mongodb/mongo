@@ -91,7 +91,7 @@ mongo::DBClientBase* MockConnRegistry::MockConnHook::connect(const ConnectionStr
     const string hostName(connString.toString());
     MockDBClientConnection* conn = _registry->connect(hostName);
 
-    if (!conn->connect(hostName.c_str(), errmsg)) {
+    if (!conn->connect(hostName.c_str(), StringData(), errmsg)) {
         // Assumption: connect never throws, so no leak.
         delete conn;
 

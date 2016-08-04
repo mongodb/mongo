@@ -72,7 +72,7 @@ public:
 
     static StatusWith<MongoURI> parse(const std::string& url);
 
-    DBClientBase* connect(std::string& errmsg) const;
+    DBClientBase* connect(StringData applicationName, std::string& errmsg) const;
 
     const std::string& getUser() const {
         return _user;

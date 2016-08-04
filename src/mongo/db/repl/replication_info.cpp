@@ -25,6 +25,7 @@
 *    exception statement from all source files in the program, then also delete
 *    it in the license file.
 */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kFTDC
 
 #include "mongo/platform/basic.h"
 
@@ -50,6 +51,8 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/map_util.h"
 
@@ -243,6 +246,36 @@ public:
                                      executor::NetworkInterface::kMessagingPortKeepOpen);
             }
         }
+
+        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(txn->getClient());
+        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
+        if (!seenIsMaster) {
+            clientMetadataIsMasterState.setSeenIsMaster();
+        }
+
+        BSONElement element = cmdObj[kMetadataDocumentName];
+        if (!element.eoo()) {
+            if (seenIsMaster) {
+                return Command::appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::ClientMetadataCannotBeMutated,
+                           "The client metadata document may only be sent in the first isMaster"));
+            }
+
+            auto swParseClientMetadata = ClientMetadata::parse(element);
+
+            if (!swParseClientMetadata.getStatus().isOK()) {
+                return Command::appendCommandStatus(result, swParseClientMetadata.getStatus());
+            }
+
+            invariant(swParseClientMetadata.getValue());
+
+            swParseClientMetadata.getValue().get().logClientMetadata(txn->getClient());
+
+            clientMetadataIsMasterState.setClientMetadata(
+                txn->getClient(), std::move(swParseClientMetadata.getValue()));
+        }
+
         appendReplicationInfo(txn, result, 0);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

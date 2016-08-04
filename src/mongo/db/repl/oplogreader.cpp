@@ -93,7 +93,7 @@ bool OplogReader::connect(const HostAndPort& host) {
         _conn = shared_ptr<DBClientConnection>(
             new DBClientConnection(false, durationCount<Seconds>(kSocketTimeout)));
         string errmsg;
-        if (!_conn->connect(host, errmsg) || !replAuthenticate(_conn.get())) {
+        if (!_conn->connect(host, StringData(), errmsg) || !replAuthenticate(_conn.get())) {
             resetConnection();
             error() << errmsg << endl;
             return false;

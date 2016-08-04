@@ -116,7 +116,9 @@ public:
     bool operator==(const ConnectionString& other) const;
     bool operator!=(const ConnectionString& other) const;
 
-    DBClientBase* connect(std::string& errmsg, double socketTimeout = 0) const;
+    DBClientBase* connect(StringData applicationName,
+                          std::string& errmsg,
+                          double socketTimeout = 0) const;
 
     static StatusWith<ConnectionString> parse(const std::string& url);
 

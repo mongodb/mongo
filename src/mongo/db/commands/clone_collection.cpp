@@ -148,7 +148,7 @@ public:
         Cloner cloner;
         unique_ptr<DBClientConnection> myconn;
         myconn.reset(new DBClientConnection());
-        if (!myconn->connect(HostAndPort(fromhost), errmsg))
+        if (!myconn->connect(HostAndPort(fromhost), StringData(), errmsg))
             return false;
 
         cloner.setConnection(myconn.release());

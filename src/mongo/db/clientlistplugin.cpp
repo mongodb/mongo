@@ -40,6 +40,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/fill_locker_info.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/stringutils.h"
 
@@ -198,6 +200,15 @@ private:
             stdx::lock_guard<Client> lk(*client);
 
             client->reportState(b);
+
+            const auto& clientMetadata =
+                ClientMetadataIsMasterState::get(client).getClientMetadata();
+            if (clientMetadata) {
+                auto appName = clientMetadata.get().getApplicationName();
+                if (!appName.empty()) {
+                    b.append("applicationName", appName);
+                }
+            }
 
             const OperationContext* txn = client->getOperationContext();
             b.appendBool("active", static_cast<bool>(txn));
