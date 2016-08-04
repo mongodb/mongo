@@ -30,7 +30,7 @@ import Queue
 import threading, time, wiredtiger, wttest
 import glob, os, shutil
 from suite_subprocess import suite_subprocess
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 from wtthread import op_thread
 from helper import compare_files, key_populate
 
@@ -54,7 +54,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # and that is not what we want here.
     #
     pfx = 'test_backup'
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('table', dict(uri='table:test',dsize=100,nops=2000,nthreads=1,time=30)),
     ])
 

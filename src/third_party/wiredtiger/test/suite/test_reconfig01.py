@@ -92,22 +92,25 @@ class test_reconfig01(wttest.WiredTigerTestCase):
         self.conn.reconfigure("checkpoint=(wait=5)")
         self.conn.reconfigure("checkpoint=(log_size=0)")
         self.conn.reconfigure("checkpoint=(log_size=1M)")
-        self.conn.reconfigure("checkpoint=(wait=0,name=hi)")
-        self.conn.reconfigure("checkpoint=(wait=5,name=hi)")
 
-    def test_reconfig_stat_log(self):
+    # Statistics logging: reconfigure the things we can reconfigure.
+    def test_reconfig_statistics_log_ok(self):
         self.conn.reconfigure("statistics=[all],statistics_log=(wait=0)")
         self.conn.reconfigure("statistics_log=(wait=0)")
-        self.conn.reconfigure("statistics_log=(wait=2)")
+        self.conn.reconfigure("statistics_log=(wait=2,json=true)")
+        self.conn.reconfigure("statistics_log=(wait=0)")
+        self.conn.reconfigure("statistics_log=(wait=2,on_close=true)")
         self.conn.reconfigure("statistics_log=(wait=0)")
         self.conn.reconfigure("statistics_log=(wait=2,sources=[lsm:])")
         self.conn.reconfigure("statistics_log=(wait=0)")
         self.conn.reconfigure("statistics_log=(wait=2,timestamp=\"t%b %d\")")
         self.conn.reconfigure("statistics_log=(wait=0)")
-        self.conn.reconfigure("statistics_log=(wait=2,path=\"wts.%d.%H\")")
-        self.conn.reconfigure("statistics_log=(wait=0)")
-        self.conn.reconfigure(
-             "statistics_log=(wait=2,sources=[lsm:],timestamp=\"%b\")")
+
+    # Statistics logging: reconfigure the things we can't reconfigure.
+    def test_reconfig_statistics_log_fail(self):
+        msg = '/unknown configuration key/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.reconfigure("log=(path=foo)"), msg)
 
     def test_file_manager(self):
         self.conn.reconfigure("file_manager=(close_scan_interval=3)")

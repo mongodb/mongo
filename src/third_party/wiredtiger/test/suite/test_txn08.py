@@ -33,7 +33,6 @@
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
 class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):

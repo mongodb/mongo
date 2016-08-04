@@ -28,7 +28,7 @@
 
 import wiredtiger, wttest
 from helper import simple_populate, key_populate, value_populate
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_colgap.py
 #    Test variable-length column-store gap performance.
@@ -149,8 +149,8 @@ class test_colmax(wttest.WiredTigerTestCase):
         ('not-single', dict(single=0)),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios(\
-        '.', types, valfmt, record_number, bulk, reopen, single))
+    scenarios = make_scenarios(\
+        types, valfmt, record_number, bulk, reopen, single)
 
     # Test that variable-length column-store correctly/efficiently handles big
     # records (if it's not efficient, we'll just hang).

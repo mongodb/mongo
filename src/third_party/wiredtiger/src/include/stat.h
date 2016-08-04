@@ -145,14 +145,14 @@ __wt_stats_clear(void *stats_arg, int slot)
 #define	WT_STAT_DECRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
 #define	WT_STAT_DECRV_ATOMIC(session, stats, fld, value)		\
-	__wt_atomic_addi64(						\
+	__wt_atomic_subi64(						\
 	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_DECR(session, stats, fld)				\
 	WT_STAT_DECRV(session, stats, fld, 1)
 #define	WT_STAT_INCRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value)
 #define	WT_STAT_INCRV_ATOMIC(session, stats, fld, value)		\
-	__wt_atomic_subi64(						\
+	__wt_atomic_addi64(						\
 	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
 #define	WT_STAT_INCR(session, stats, fld)				\
 	WT_STAT_INCRV(session, stats, fld, 1)
@@ -273,9 +273,12 @@ struct __wt_connection_stats {
 	int64_t block_write;
 	int64_t block_byte_read;
 	int64_t block_byte_write;
+	int64_t block_byte_write_checkpoint;
 	int64_t block_map_read;
 	int64_t block_byte_map_read;
+	int64_t cache_bytes_image;
 	int64_t cache_bytes_inuse;
+	int64_t cache_bytes_other;
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
 	int64_t cache_eviction_checkpoint;
@@ -309,6 +312,8 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_maximum_page_size;
 	int64_t cache_eviction_dirty;
 	int64_t cache_eviction_app_dirty;
+	int64_t cache_read_overflow;
+	int64_t cache_overflow_value;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
 	int64_t cache_pages_inuse;
@@ -316,6 +321,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_force_delete;
 	int64_t cache_eviction_app;
 	int64_t cache_eviction_pages_queued;
+	int64_t cache_eviction_pages_queued_urgent;
 	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
@@ -328,7 +334,6 @@ struct __wt_connection_stats {
 	int64_t cache_overhead;
 	int64_t cache_bytes_internal;
 	int64_t cache_bytes_leaf;
-	int64_t cache_bytes_overflow;
 	int64_t cache_bytes_dirty;
 	int64_t cache_pages_dirty;
 	int64_t cache_eviction_clean;
@@ -408,9 +413,25 @@ struct __wt_connection_stats {
 	int64_t rec_split_stashed_objects;
 	int64_t session_cursor_open;
 	int64_t session_open;
-	int64_t fsync_active;
-	int64_t read_active;
-	int64_t write_active;
+	int64_t session_table_compact_fail;
+	int64_t session_table_compact_success;
+	int64_t session_table_create_fail;
+	int64_t session_table_create_success;
+	int64_t session_table_drop_fail;
+	int64_t session_table_drop_success;
+	int64_t session_table_rebalance_fail;
+	int64_t session_table_rebalance_success;
+	int64_t session_table_rename_fail;
+	int64_t session_table_rename_success;
+	int64_t session_table_salvage_fail;
+	int64_t session_table_salvage_success;
+	int64_t session_table_truncate_fail;
+	int64_t session_table_truncate_success;
+	int64_t session_table_verify_fail;
+	int64_t session_table_verify_success;
+	int64_t thread_fsync_active;
+	int64_t thread_read_active;
+	int64_t thread_write_active;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
 	int64_t page_locked_blocked;
@@ -424,13 +445,13 @@ struct __wt_connection_stats {
 	int64_t txn_checkpoint_time_max;
 	int64_t txn_checkpoint_time_min;
 	int64_t txn_checkpoint_time_recent;
+	int64_t txn_checkpoint_scrub_target;
+	int64_t txn_checkpoint_scrub_time;
 	int64_t txn_checkpoint_time_total;
 	int64_t txn_checkpoint;
 	int64_t txn_fail_cache;
 	int64_t txn_checkpoint_fsync_post;
-	int64_t txn_checkpoint_fsync_pre;
 	int64_t txn_checkpoint_fsync_post_duration;
-	int64_t txn_checkpoint_fsync_pre_duration;
 	int64_t txn_pinned_range;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
@@ -484,6 +505,7 @@ struct __wt_dsrc_stats {
 	int64_t btree_compact_rewrite;
 	int64_t btree_row_internal;
 	int64_t btree_row_leaf;
+	int64_t cache_bytes_inuse;
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
 	int64_t cache_eviction_checkpoint;

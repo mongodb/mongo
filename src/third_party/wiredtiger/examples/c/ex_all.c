@@ -1160,34 +1160,27 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
+#ifdef MIGHT_NOT_RUN
+	/*
+	 * Don't run this code, statistics logging doesn't yet support tables.
+	 */
 	/*! [Statistics logging with a table] */
 	ret = wiredtiger_open(home, NULL,
 	    "create, statistics_log=("
-	    "sources=(\"lsm:table1\",\"lsm:table2\"), wait=5)",
+	    "sources=(\"table:table1\",\"table:table2\"), wait=5)",
 	    &conn);
 	/*! [Statistics logging with a table] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
-	/*! [Statistics logging with all tables] */
-	ret = wiredtiger_open(home, NULL,
-	    "create, statistics_log=(sources=(\"lsm:\"), wait=5)",
-	    &conn);
-	/*! [Statistics logging with all tables] */
-	if (ret == 0)
-		(void)conn->close(conn, NULL);
-
-#ifdef MIGHT_NOT_RUN
 	/*
-	 * This example code gets run, and a non-existent log file path might
-	 * cause the open to fail.  The documentation requires code snippets,
-	 * use #ifdef's to avoid running it.
+	 * Don't run this code, statistics logging doesn't yet support indexes.
 	 */
-	/*! [Statistics logging with path] */
+	/*! [Statistics logging with a source type] */
 	ret = wiredtiger_open(home, NULL,
-	    "create,"
-	    "statistics_log=(wait=120,path=/log/log.%m.%d.%y)", &conn);
-	/*! [Statistics logging with path] */
+	    "create, statistics_log=(sources=(\"index:\"), wait=5)",
+	    &conn);
+	/*! [Statistics logging with a source type] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 

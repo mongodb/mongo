@@ -29,13 +29,10 @@
 #ifndef	HAVE_WTPERF_H
 #define	HAVE_WTPERF_H
 
-#include <wt_internal.h>
+#include "test_util.h"
+
 #include <assert.h>
 #include <math.h>
-
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
 
 #include "config_opt.h"
 
@@ -83,7 +80,6 @@ typedef struct {
 typedef struct {
 	uint64_t stone_gap;
 	uint64_t needed_stones;
-	uint64_t final_stone_gap;
 	uint64_t expected_total;
 	uint64_t total_inserts;
 	uint64_t last_total_inserts;
@@ -126,7 +122,6 @@ struct __config {			/* Configuration structure */
 	char *reopen_config;		/* Config string for conn reopen */
 	char *base_uri;			/* Object URI */
 	char **uris;			/* URIs if multiple tables */
-	const char *helium_mount;	/* Optional Helium mount point */
 
 	WT_CONNECTION *conn;		/* Database connection */
 
@@ -281,7 +276,7 @@ void	 latency_print(CONFIG *);
 int	 run_truncate(
     CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
-int	 setup_throttle(CONFIG_THREAD*);
+void	 setup_throttle(CONFIG_THREAD*);
 int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 int	 start_idle_table_cycle(CONFIG *, pthread_t *);
 int	 stop_idle_table_cycle(CONFIG *, pthread_t);
@@ -292,7 +287,7 @@ uint64_t sum_read_ops(CONFIG *);
 uint64_t sum_truncate_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
-int	 worker_throttle(CONFIG_THREAD*);
+void	 worker_throttle(CONFIG_THREAD*);
 
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 #if defined(__GNUC__)
@@ -327,76 +322,5 @@ die(int e, const char *str)
 {
 	fprintf(stderr, "Call to %s failed: %s", str, wiredtiger_strerror(e));
 	exit(EXIT_FAILURE);
-}
-
-/*
- * dmalloc --
- *      Call malloc, dying on failure.
- */
-static inline void *
-dmalloc(size_t len)
-{
-	void *p;
-
-	if ((p = malloc(len)) == NULL)
-		die(errno, "malloc");
-	return (p);
-}
-
-/*
- * dcalloc --
- *      Call calloc, dying on failure.
- */
-static inline void *
-dcalloc(size_t num, size_t size)
-{
-	void *p;
-
-	if ((p = calloc(num, size)) == NULL)
-		die(errno, "calloc");
-	return (p);
-}
-
-/*
- * drealloc --
- *      Call realloc, dying on failure.
- */
-static inline void *
-drealloc(void *p, size_t len)
-{
-	void *repl;
-
-	if ((repl = realloc(p, len)) == NULL)
-		die(errno, "realloc");
-	return (repl);
-}
-
-/*
- * dstrdup --
- *      Call strdup, dying on failure.
- */
-static inline char *
-dstrdup(const char *str)
-{
-	char *p;
-
-	if ((p = strdup(str)) == NULL)
-		die(errno, "strdup");
-	return (p);
-}
-
-/*
- * dstrndup --
- *      Call emulating strndup, dying on failure. Don't use actual strndup here
- *	as it is not supported within MSVC.
- */
-static inline char *
-dstrndup(const char *str, const size_t len)
-{
-	char *p;
-
-	p = dcalloc(len + 1, sizeof(char));
-	memcpy(p, str, len);
-	return (p);
 }
 #endif

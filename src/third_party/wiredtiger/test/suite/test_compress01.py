@@ -32,7 +32,7 @@
 
 import os, run
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Test basic compression
 class test_compress01(wttest.WiredTigerTestCase):
@@ -46,7 +46,7 @@ class test_compress01(wttest.WiredTigerTestCase):
         ('snappy', dict(compress='snappy')),
         ('none', dict(compress=None)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, compress))
+    scenarios = make_scenarios(types, compress)
 
     nrecords = 10000
     bigvalue = "abcdefghij" * 1000

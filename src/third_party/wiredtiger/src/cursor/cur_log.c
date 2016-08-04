@@ -315,16 +315,16 @@ __curlog_close(WT_CURSOR *cursor)
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
-	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 	cl = (WT_CURSOR_LOG *)cursor;
 	conn = S2C(session);
+
 	WT_ASSERT(session, FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
-	log = conn->log;
-	WT_TRET(__wt_readunlock(session, log->log_archive_lock));
-	WT_TRET(__curlog_reset(cursor));
+	if (F_ISSET(cl, WT_CURLOG_ARCHIVE_LOCK))
+		WT_TRET(__wt_readunlock(session, conn->log->log_archive_lock));
+
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
 	__wt_scr_free(session, &cl->logrec);
@@ -332,6 +332,7 @@ __curlog_close(WT_CURSOR *cursor)
 	__wt_scr_free(session, &cl->opvalue);
 	__wt_free(session, cl->packed_key);
 	__wt_free(session, cl->packed_value);
+
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -401,23 +402,10 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	/* Log cursors block archiving. */
 	WT_ERR(__wt_readlock(session, log->log_archive_lock));
+	F_SET(cl, WT_CURLOG_ARCHIVE_LOCK);
 
 	if (0) {
-err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
-			WT_TRET(cursor->close(cursor));
-		else {
-			__wt_free(session, cl->cur_lsn);
-			__wt_free(session, cl->next_lsn);
-			__wt_scr_free(session, &cl->logrec);
-			__wt_scr_free(session, &cl->opkey);
-			__wt_scr_free(session, &cl->opvalue);
-			/*
-			 * NOTE:  We cannot get on the error path with the
-			 * readlock held.  No need to unlock it unless that
-			 * changes above.
-			 */
-			__wt_free(session, cl);
-		}
+err:		WT_TRET(__curlog_close(cursor));
 		*cursorp = NULL;
 	}
 

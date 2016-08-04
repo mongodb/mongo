@@ -36,7 +36,6 @@ static const CONFIG default_cfg = {
 	NULL,				/* reopen config */
 	NULL,				/* base_uri */
 	NULL,				/* uris */
-	NULL,				/* helium_mount */
 	NULL,				/* conn */
 	NULL,				/* logf */
 	NULL,				/* async */
@@ -73,14 +72,14 @@ static const char * const debug_cconfig = "";
 static const char * const debug_tconfig = "";
 
 static void	*checkpoint_worker(void *);
-static int	 create_tables(CONFIG *);
-static int	drop_all_tables(CONFIG *);
+static int	 drop_all_tables(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
 static void	 randomize_value(CONFIG_THREAD *, char *);
+static void	 recreate_dir(const char *);
 static int	 start_all_runs(CONFIG *);
 static int	 start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
@@ -93,10 +92,6 @@ static void	*worker(void *);
 static uint64_t	 wtperf_rand(CONFIG_THREAD *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
-#define	HELIUM_NAME	"dev1"
-#define	HELIUM_PATH							\
-	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
-#define	HELIUM_CONFIG	",type=helium"
 #define	INDEX_COL_NAMES	",columns=(key,val)"
 
 /* Retrieve an ID for the next insert operation. */
@@ -152,6 +147,23 @@ randomize_value(CONFIG_THREAD *thread, char *value_buf)
 	 * twice, but that doesn't matter.
 	 */
 	vb[i] = ((rand_val >> 16) % 255) + 1;
+}
+
+/*
+ * Partition data by key ranges.
+ */
+static uint32_t
+map_key_to_table(CONFIG *cfg, uint64_t k)
+{
+	if (cfg->range_partition) {
+		/* Take care to return a result in [0..table_count-1]. */
+		if (k > cfg->icount + cfg->random_range)
+			return (0);
+		return ((uint32_t)((k - 1) /
+		    ((cfg->icount + cfg->random_range + cfg->table_count - 1) /
+		    cfg->table_count)));
+	} else
+		return ((uint32_t)(k % cfg->table_count));
 }
 
 /*
@@ -393,7 +405,7 @@ worker_async(void *arg)
 		 * Then retry to get an async op.
 		 */
 		while ((ret = conn->async_new_op(
-		    conn, cfg->uris[next_val % cfg->table_count],
+		    conn, cfg->uris[map_key_to_table(cfg, next_val)],
 		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
 		if (ret != 0)
@@ -466,7 +478,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 	range_key_buf = &buf[0];
 
 	/* Save where the first key is for comparisons. */
-	cursor->get_key(cursor, &range_key_buf);
+	testutil_check(cursor->get_key(cursor, &range_key_buf));
 	extract_key(range_key_buf, &next_val);
 
 	for (range = 0; range < cfg->read_range; ++range) {
@@ -477,7 +489,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 			break;
 
 		/* Retrieve and decode the key */
-		cursor->get_key(cursor, &range_key_buf);
+		testutil_check(cursor->get_key(cursor, &range_key_buf));
 		extract_key(range_key_buf, &next_val);
 		if (next_val < prev_val) {
 			lprintf(cfg, EINVAL, 0,
@@ -547,9 +559,8 @@ worker(void *arg)
 		}
 	}
 	/* Setup the timer for throttling. */
-	if (thread->workload->throttle != 0 &&
-	    (ret = setup_throttle(thread)) != 0)
-		goto err;
+	if (thread->workload->throttle != 0)
+		setup_throttle(thread);
 
 	/* Setup for truncate */
 	if (thread->workload->truncate != 0)
@@ -611,7 +622,7 @@ worker(void *arg)
 		/*
 		 * Spread the data out around the multiple databases.
 		 */
-		cursor = cursors[next_val % cfg->table_count];
+		cursor = cursors[map_key_to_table(cfg, next_val)];
 
 		/*
 		 * Skip the first time we do an operation, when trk->ops
@@ -1010,7 +1021,7 @@ populate_thread(void *arg)
 		/*
 		 * Figure out which table this op belongs to.
 		 */
-		cursor = cursors[op % cfg->table_count];
+		cursor = cursors[map_key_to_table(cfg, op)];
 		generate_key(cfg, key_buf, op);
 		measure_latency =
 		    cfg->sample_interval != 0 &&
@@ -1148,7 +1159,7 @@ populate_async(void *arg)
 		 * Allocate an async op for whichever table.
 		 */
 		while ((ret = conn->async_new_op(
-		    conn, cfg->uris[op % cfg->table_count],
+		    conn, cfg->uris[map_key_to_table(cfg, op)],
 		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
 		if (ret != 0)
@@ -1858,7 +1869,7 @@ create_uris(CONFIG *cfg)
 	base_uri_len = strlen(cfg->base_uri);
 	cfg->uris = dcalloc(cfg->table_count, sizeof(char *));
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = dcalloc(base_uri_len + 5, 1);
+		uri = cfg->uris[i] = dcalloc(base_uri_len + 6, 1);
 		/*
 		 * If there is only one table, just use base name.
 		 */
@@ -1876,9 +1887,6 @@ create_tables(CONFIG *cfg)
 	size_t i;
 	int ret;
 	char buf[512];
-
-	if (cfg->create == 0)
-		return (0);
 
 	if ((ret = cfg->conn->open_session(
 	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -1971,13 +1979,10 @@ start_all_runs(CONFIG *cfg)
 		if (strcmp(cfg->monitor_dir, cfg->home) == 0)
 			next_cfg->monitor_dir = new_home;
 
-		/* Create clean home directories. */
-		snprintf(cmd_buf, cmd_len, "rm -rf %s && mkdir %s",
-		    next_cfg->home, next_cfg->home);
-		if ((ret = system(cmd_buf)) != 0) {
-			fprintf(stderr, "%s: failed\n", cmd_buf);
-			goto err;
-		}
+		/* If creating the sub-database, recreate it's home */
+		if (cfg->create != 0)
+			recreate_dir(next_cfg->home);
+
 		if ((ret = pthread_create(
 		    &threads[i], NULL, thread_run_wtperf, next_cfg)) != 0) {
 			lprintf(cfg, ret, 0, "Error creating thread");
@@ -2024,8 +2029,8 @@ start_run(CONFIG *cfg)
 {
 	pthread_t monitor_thread;
 	uint64_t total_ops;
+	uint32_t run_time;
 	int monitor_created, ret, t_ret;
-	char helium_buf[256];
 
 	monitor_created = ret = 0;
 					/* [-Wconditional-uninitialized] */
@@ -2040,21 +2045,10 @@ start_run(CONFIG *cfg)
 		goto err;
 	}
 
-	/* Configure optional Helium volume. */
-	if (cfg->helium_mount != NULL) {
-		snprintf(helium_buf, sizeof(helium_buf),
-		    "entry=wiredtiger_extension_init,config=["
-		    "%s=[helium_devices=\"he://./%s\","
-		    "helium_o_volume_truncate=1]]",
-		    HELIUM_NAME, cfg->helium_mount);
-		if ((ret = cfg->conn->load_extension(
-		    cfg->conn, HELIUM_PATH, helium_buf)) != 0)
-			lprintf(cfg,
-			    ret, 0, "Error loading Helium: %s", helium_buf);
-	}
-
 	create_uris(cfg);
-	if ((ret = create_tables(cfg)) != 0)
+
+	/* If creating, create the tables. */
+	if (cfg->create != 0 && (ret = create_tables(cfg)) != 0)
 		goto err;
 
 	/* Start the monitor thread. */
@@ -2083,7 +2077,8 @@ start_run(CONFIG *cfg)
 			goto err;
 
 		/* Didn't create, set insert count. */
-		if (cfg->create == 0 && find_table_count(cfg) != 0)
+		if (cfg->create == 0 && cfg->random_range == 0 &&
+		    find_table_count(cfg) != 0)
 			goto err;
 		/* Start the checkpoint thread. */
 		if (cfg->checkpoint_threads != 0) {
@@ -2108,26 +2103,27 @@ start_run(CONFIG *cfg)
 		cfg->ckpt_ops = sum_ckpt_ops(cfg);
 		total_ops = cfg->read_ops + cfg->insert_ops + cfg->update_ops;
 
+		run_time = cfg->run_time == 0 ? 1 : cfg->run_time;
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " read operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->read_ops, (cfg->read_ops * 100) / total_ops,
-		    cfg->read_ops / cfg->run_time);
+		    cfg->read_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " insert operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->insert_ops, (cfg->insert_ops * 100) / total_ops,
-		    cfg->insert_ops / cfg->run_time);
+		    cfg->insert_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " truncate operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->truncate_ops, (cfg->truncate_ops * 100) / total_ops,
-		    cfg->truncate_ops / cfg->run_time);
+		    cfg->truncate_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->update_ops, (cfg->update_ops * 100) / total_ops,
-		    cfg->update_ops / cfg->run_time);
+		    cfg->update_ops / run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations",
 		    cfg->ckpt_ops);
@@ -2182,18 +2178,21 @@ err:		if (ret == 0)
 
 extern int __wt_optind, __wt_optreset;
 extern char *__wt_optarg;
+void (*custom_die)(void) = NULL;
 
 int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
 	size_t req_len, sreq_len;
-	int ch, monitor_set, ret;
-	const char *opts = "C:H:h:m:O:o:T:";
+	bool monitor_set;
+	int ch, ret;
+	const char *opts = "C:h:m:O:o:T:";
 	const char *config_opts;
 	char *cc_buf, *sess_cfg, *tc_buf, *user_cconfig, *user_tconfig;
 
-	monitor_set = ret = 0;
+	monitor_set = false;
+	ret = 0;
 	config_opts = NULL;
 	cc_buf = sess_cfg = tc_buf = user_cconfig = user_tconfig = NULL;
 
@@ -2219,8 +2218,12 @@ main(int argc, char *argv[])
 				strcat(user_cconfig, __wt_optarg);
 			}
 			break;
-		case 'H':
-			cfg->helium_mount = __wt_optarg;
+		case 'h':
+			cfg->home = __wt_optarg;
+			break;
+		case 'm':
+			cfg->monitor_dir = __wt_optarg;
+			monitor_set = true;
 			break;
 		case 'O':
 			config_opts = __wt_optarg;
@@ -2236,15 +2239,7 @@ main(int argc, char *argv[])
 				strcat(user_tconfig, __wt_optarg);
 			}
 			break;
-		case 'h':
-			cfg->home = __wt_optarg;
-			break;
-		case 'm':
-			cfg->monitor_dir = __wt_optarg;
-			monitor_set = 1;
-			break;
 		case '?':
-			fprintf(stderr, "Invalid option\n");
 			usage();
 			goto einval;
 		}
@@ -2300,7 +2295,7 @@ main(int argc, char *argv[])
 		 * to 4096 if needed.
 		 */
 		req_len = strlen(",async=(enabled=true,threads=)") + 4;
-		cfg->async_config = dcalloc(req_len, 1);
+		cfg->async_config = dmalloc(req_len);
 		snprintf(cfg->async_config, req_len,
 		    ",async=(enabled=true,threads=%" PRIu32 ")",
 		    cfg->async_threads);
@@ -2321,13 +2316,9 @@ main(int argc, char *argv[])
 	}
 
 	/* Build the URI from the table name. */
-	req_len = strlen("table:") +
-	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
-	cfg->base_uri = dcalloc(req_len, 1);
-	snprintf(cfg->base_uri, req_len, "table:%s%s%s",
-	    cfg->helium_mount == NULL ? "" : HELIUM_NAME,
-	    cfg->helium_mount == NULL ? "" : "/",
-	    cfg->table_name);
+	req_len = strlen("table:") + strlen(cfg->table_name) + 2;
+	cfg->base_uri = dmalloc(req_len);
+	snprintf(cfg->base_uri, req_len, "table:%s", cfg->table_name);
 
 	/* Make stdout line buffered, so verbose output appears quickly. */
 	__wt_stream_set_line_buffer(stdout);
@@ -2346,13 +2337,13 @@ main(int argc, char *argv[])
 		if (cfg->session_count_idle > 0) {
 			sreq_len = strlen(",session_max=") + 6;
 			req_len += sreq_len;
-			sess_cfg = dcalloc(sreq_len, 1);
+			sess_cfg = dmalloc(sreq_len);
 			snprintf(sess_cfg, sreq_len,
 			    ",session_max=%" PRIu32,
 			    cfg->session_count_idle + cfg->workers_cnt +
 			    cfg->populate_threads + 10);
 		}
-		cc_buf = dcalloc(req_len, 1);
+		cc_buf = dmalloc(req_len);
 		/*
 		 * This is getting hard to parse.
 		 */
@@ -2368,36 +2359,34 @@ main(int argc, char *argv[])
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg->verbose > 1 || cfg->index || cfg->helium_mount != NULL ||
+	if (cfg->verbose > 1 || cfg->index ||
 	    user_tconfig != NULL || cfg->compress_table != NULL) {
-		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
-		    strlen(debug_tconfig) + 3;
+		req_len = strlen(cfg->table_config) + strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
 		if (cfg->compress_table != NULL)
 			req_len += strlen(cfg->compress_table);
 		if (cfg->index)
 			req_len += strlen(INDEX_COL_NAMES);
-		tc_buf = dcalloc(req_len, 1);
+		tc_buf = dmalloc(req_len);
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s%s",
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
 		    cfg->table_config,
 		    cfg->index ? INDEX_COL_NAMES : "",
 		    cfg->compress_table ? cfg->compress_table : "",
 		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? ",": "",
-		    user_tconfig ? user_tconfig : "",
-		    cfg->helium_mount == NULL ? "" : HELIUM_CONFIG);
+		    user_tconfig ? user_tconfig : "");
 		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
 			goto err;
 	}
 	if (cfg->log_partial && cfg->table_count > 1) {
 		req_len = strlen(cfg->table_config) +
 		    strlen(LOG_PARTIAL_CONFIG) + 1;
-		cfg->partial_config = dcalloc(req_len, 1);
+		cfg->partial_config = dmalloc(req_len);
 		snprintf(cfg->partial_config, req_len, "%s%s",
 		    cfg->table_config, LOG_PARTIAL_CONFIG);
 	}
@@ -2410,7 +2399,7 @@ main(int argc, char *argv[])
 		    strlen(READONLY_CONFIG) + 1;
 	else
 		req_len = strlen(cfg->conn_config) + 1;
-	cfg->reopen_config = dcalloc(req_len, 1);
+	cfg->reopen_config = dmalloc(req_len);
 	if (cfg->readonly)
 		snprintf(cfg->reopen_config, req_len, "%s%s",
 		    cfg->conn_config, READONLY_CONFIG);
@@ -2421,6 +2410,10 @@ main(int argc, char *argv[])
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
+
+	/* If creating, remove and re-create the home directory. */
+	if (cfg->create != 0)
+		recreate_dir(cfg->home);
 
 	/* Write a copy of the config. */
 	config_to_file(cfg);
@@ -2536,6 +2529,19 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	return (0);
 }
 
+static void
+recreate_dir(const char *name)
+{
+	char *buf;
+	size_t len;
+
+	len = strlen(name) * 2 + 100;
+	buf = dmalloc(len);
+	(void)snprintf(buf, len, "rm -rf %s && mkdir %s", name, name);
+	testutil_checkfmt(system(buf), "system: %s", buf);
+	free(buf);
+}
+
 static int
 drop_all_tables(CONFIG *cfg)
 {
@@ -2615,7 +2621,7 @@ wtperf_rand(CONFIG_THREAD *thread)
 		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))
-			rval = wtperf_value_range(cfg);
+			rval = 0;
 	}
 	/*
 	 * Wrap the key to within the expected range and avoid zero: we never

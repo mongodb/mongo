@@ -29,12 +29,12 @@
 import wiredtiger, wttest
 from helper import key_populate, value_populate, simple_populate
 from helper import complex_populate, complex_value_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_cursor09.py
 #    JIRA WT-2217: insert resets key/value "set".
 class test_cursor09(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-r', dict(type='file:', config='key_format=r', complex=0)),
         ('file-S', dict(type='file:', config='key_format=S', complex=0)),
         ('lsm-S', dict(type='lsm:', config='key_format=S', complex=0)),

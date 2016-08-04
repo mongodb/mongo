@@ -2,10 +2,23 @@
 
 @section directory_permissions Database directory permissions
 
-All WiredTiger files are stored in the database home directory, and the
-WiredTiger database directory should have its permissions set to ensure
-database objects are not accessible to users without appropriate
-permissions.  See @ref home for more information.
+By default, WiredTiger files are stored beneath the database home directory.
+The WiredTiger database directory should have its permissions set to ensure
+database objects are not accessible to users without appropriate permissions.
+See @ref home for more information.
+
+@section absolute_path Absolute paths
+
+WiredTiger prepends the name of the database home to file names which
+do not appear to be absolute paths. (The absolute path test is
+simplistic, matching a leading slash character on POSIX systems or a
+leading alphabetic character and colon on Windows.) No file path
+sanitization or validation is done by WiredTiger, for example, file
+paths may match universal naming conventions (UNC), or include \c "../"
+(dot dot slash) components.
+
+Applications are responsible for validating user-supplied file paths as
+necessary to prevent directory traversal attacks.
 
 @section file_permissions File permissions
 

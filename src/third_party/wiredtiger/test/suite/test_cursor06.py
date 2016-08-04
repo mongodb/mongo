@@ -29,13 +29,13 @@
 import wiredtiger, wttest
 from helper import key_populate, value_populate, simple_populate
 from helper import complex_value_populate, complex_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_cursor06.py
 #    Test cursor reconfiguration.
 class test_cursor06(wttest.WiredTigerTestCase):
     name = 'reconfigure'
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-r', dict(type='file:', config='key_format=r', complex=0)),
         ('file-S', dict(type='file:', config='key_format=S', complex=0)),
         ('lsm-S', dict(type='lsm:', config='key_format=S', complex=0)),

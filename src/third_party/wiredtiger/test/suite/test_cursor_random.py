@@ -29,7 +29,7 @@
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate
 from helper import key_populate, value_populate
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_cursor_random.py
 #    Cursor next_random operations
@@ -42,7 +42,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         ('sample', dict(config='next_random=true,next_random_sample_size=35')),
         ('not-sample', dict(config='next_random=true'))
     ]
-    scenarios =number_scenarios(multiply_scenarios('.', types, config))
+    scenarios = make_scenarios(types, config)
 
     # Check that opening a random cursor on a row-store returns not-supported
     # for methods other than next, reconfigure and reset, and next returns
@@ -136,7 +136,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
 
 # Check that opening a random cursor on column-store returns not-supported.
 class test_cursor_random_column(wttest.WiredTigerTestCase):
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:random')),
         ('table', dict(uri='table:random'))
     ])
@@ -159,7 +159,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         ('sample', dict(config='next_random=true,next_random_sample_size=35')),
         ('not-sample', dict(config='next_random=true'))
     ]
-    scenarios =number_scenarios(multiply_scenarios('.', types, config))
+    scenarios = make_scenarios(types, config)
 
     def test_cursor_random_invisible_all(self):
         uri = self.type

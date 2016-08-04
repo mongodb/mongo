@@ -271,7 +271,6 @@ struct __wt_connection_impl {
 	wt_thread_t	 ckpt_tid;	/* Checkpoint thread */
 	bool		 ckpt_tid_set;	/* Checkpoint thread set */
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
-	const char	*ckpt_config;	/* Checkpoint configuration */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
@@ -314,6 +313,7 @@ struct __wt_connection_impl {
 	uint32_t	 evict_workers;	/* Number of eviction workers */
 	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
 
+#define	WT_STATLOG_FILENAME	"WiredTigerStat.%d.%H"
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	wt_thread_t	 stat_tid;	/* Statistics log thread */
 	bool		 stat_tid_set;	/* Statistics log thread set */

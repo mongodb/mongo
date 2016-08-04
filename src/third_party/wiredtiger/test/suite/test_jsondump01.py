@@ -29,10 +29,12 @@
 import os, json
 import wiredtiger, wttest
 from helper import \
-    complex_populate, complex_populate_check_cursor,\
-    simple_populate, simple_populate_check_cursor
+    complex_populate, complex_populate_check, complex_populate_check_cursor,\
+    simple_populate, simple_populate_check, simple_populate_check_cursor, \
+    simple_index_populate, simple_index_populate_check, \
+    simple_index_populate_check_cursor, compare_files
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # A 'fake' cursor based on a set of rows.
 # It emulates a WT cursor well enough for the *_check_cursor methods.
@@ -79,25 +81,34 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:', config='', lsm=False,
           populate=simple_populate,
-          populate_check=simple_populate_check_cursor)),
+          populate_check=simple_populate_check,
+          populate_check_cursor=simple_populate_check_cursor)),
         ('lsm', dict(uri='lsm:', config='', lsm=True,
           populate=simple_populate,
-          populate_check=simple_populate_check_cursor)),
+          populate_check=simple_populate_check,
+          populate_check_cursor=simple_populate_check_cursor)),
         ('table-simple', dict(uri='table:', config='', lsm=False,
           populate=simple_populate,
-          populate_check=simple_populate_check_cursor)),
+          populate_check=simple_populate_check,
+          populate_check_cursor=simple_populate_check_cursor)),
+        ('table-index', dict(uri='table:', config='', lsm=False,
+          populate=simple_index_populate,
+          populate_check=simple_index_populate_check,
+          populate_check_cursor=simple_index_populate_check_cursor)),
         ('table-simple-lsm', dict(uri='table:', config='type=lsm', lsm=True,
           populate=simple_populate,
-          populate_check=simple_populate_check_cursor)),
+          populate_check=simple_populate_check,
+          populate_check_cursor=simple_populate_check_cursor)),
         ('table-complex', dict(uri='table:', config='', lsm=False,
           populate=complex_populate,
-          populate_check=complex_populate_check_cursor)),
+          populate_check=complex_populate_check,
+          populate_check_cursor=complex_populate_check_cursor)),
         ('table-complex-lsm', dict(uri='table:', config='type=lsm', lsm=True,
           populate=complex_populate,
-          populate_check=complex_populate_check_cursor))
+          populate_check=complex_populate_check,
+          populate_check_cursor=complex_populate_check_cursor))
     ]
-    scenarios = number_scenarios(
-        multiply_scenarios('.', types, keyfmt))
+    scenarios = make_scenarios(types, keyfmt)
 
     # Dump using util, re-load using python's JSON, and do a content comparison.
     def test_jsondump_util(self):
@@ -132,7 +143,7 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
         cursor = self.session.open_cursor(uri, None)
         fake = FakeCursor(cursor.key_format, cursor.value_format, data)
         cursor.close()
-        self.populate_check(self, fake, self.nentries)
+        self.populate_check_cursor(self, fake, self.nentries)
 
     # Dump using util, re-load using python's JSON, and do a content comparison.
     def test_jsonload_util(self):
@@ -153,9 +164,18 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
             loadcmd.append('-a')
         self.runWt(loadcmd)
 
-        # check the contents of the data we read.
-        cursor = self.session.open_cursor(uri2, None)
-        self.populate_check(self, cursor, self.nentries)
+        # Check the contents of the data we read.
+        self.populate_check(self, uri2, self.nentries)
+
+        # Reload into the original uri, and dump into another file.
+        self.session.drop(uri, None)
+        self.session.drop(uri2, None)
+        self.runWt(['load', '-jf', 'jsondump.out'])
+        self.runWt(['dump', '-j', uri], outfilename='jsondump2.out')
+
+        # Compare the two outputs, and check the content again.
+        compare_files(self, 'jsondump.out', 'jsondump2.out')
+        self.populate_check(self, uri, self.nentries)
 
 if __name__ == '__main__':
     wttest.run()

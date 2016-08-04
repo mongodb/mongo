@@ -36,13 +36,14 @@ __win_fs_exist(WT_FILE_SYSTEM *file_system,
  *	Remove a file.
  */
 static int
-__win_fs_remove(
-    WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *name)
+__win_fs_remove(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *name, uint32_t flags)
 {
 	DWORD windows_error;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
+	WT_UNUSED(flags);
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -62,12 +63,13 @@ __win_fs_remove(
  */
 static int
 __win_fs_rename(WT_FILE_SYSTEM *file_system,
-    WT_SESSION *wt_session, const char *from, const char *to)
+    WT_SESSION *wt_session, const char *from, const char *to, uint32_t flags)
 {
 	DWORD windows_error;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
+	WT_UNUSED(flags);
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -426,7 +428,7 @@ __win_file_write(WT_FILE_HANDLE *file_handle,
  */
 static int
 __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
-    const char *name, WT_OPEN_FILE_TYPE file_type, uint32_t flags,
+    const char *name, WT_FS_OPEN_FILE_TYPE file_type, uint32_t flags,
     WT_FILE_HANDLE **file_handlep)
 {
 	DWORD dwCreationDisposition, windows_error;
@@ -458,11 +460,11 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	 * require that functionality: create an empty WT_FH structure with
 	 * invalid handles.
 	 */
-	if (file_type == WT_OPEN_FILE_TYPE_DIRECTORY)
+	if (file_type == WT_FS_OPEN_FILE_TYPE_DIRECTORY)
 		goto directory_open;
 
 	desired_access = GENERIC_READ;
-	if (!LF_ISSET(WT_OPEN_READONLY))
+	if (!LF_ISSET(WT_FS_OPEN_READONLY))
 		desired_access |= GENERIC_WRITE;
 
 	/*
@@ -476,15 +478,15 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	f = FILE_ATTRIBUTE_NORMAL;
 
 	dwCreationDisposition = 0;
-	if (LF_ISSET(WT_OPEN_CREATE)) {
+	if (LF_ISSET(WT_FS_OPEN_CREATE)) {
 		dwCreationDisposition = CREATE_NEW;
-		if (LF_ISSET(WT_OPEN_EXCLUSIVE))
+		if (LF_ISSET(WT_FS_OPEN_EXCLUSIVE))
 			dwCreationDisposition = CREATE_ALWAYS;
 	} else
 		dwCreationDisposition = OPEN_EXISTING;
 
 	/* Direct I/O. */
-	if (LF_ISSET(WT_OPEN_DIRECTIO)) {
+	if (LF_ISSET(WT_FS_OPEN_DIRECTIO)) {
 		f |= FILE_FLAG_NO_BUFFERING;
 		win_fh->direct_io = true;
 	}
@@ -493,19 +495,19 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	if (FLD_ISSET(conn->write_through, file_type))
 		f |= FILE_FLAG_WRITE_THROUGH;
 
-	if (file_type == WT_OPEN_FILE_TYPE_LOG &&
+	if (file_type == WT_FS_OPEN_FILE_TYPE_LOG &&
 	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC))
 		f |= FILE_FLAG_WRITE_THROUGH;
 
 	/* Disable read-ahead on trees: it slows down random read workloads. */
-	if (file_type == WT_OPEN_FILE_TYPE_DATA)
+	if (file_type == WT_FS_OPEN_FILE_TYPE_DATA)
 		f |= FILE_FLAG_RANDOM_ACCESS;
 
 	win_fh->filehandle = CreateFileA(name, desired_access,
 	    FILE_SHARE_READ | FILE_SHARE_WRITE,
 	    NULL, dwCreationDisposition, f, NULL);
 	if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
-		if (LF_ISSET(WT_OPEN_CREATE) &&
+		if (LF_ISSET(WT_FS_OPEN_CREATE) &&
 		    GetLastError() == ERROR_FILE_EXISTS)
 			win_fh->filehandle = CreateFileA(name, desired_access,
 			    FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -528,7 +530,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	 * concurrently with reads on the file. Writes would also move the file
 	 * pointer.
 	 */
-	if (!LF_ISSET(WT_OPEN_READONLY)) {
+	if (!LF_ISSET(WT_FS_OPEN_READONLY)) {
 		win_fh->filehandle_secondary = CreateFileA(name, desired_access,
 		    FILE_SHARE_READ | FILE_SHARE_WRITE,
 		    NULL, OPEN_EXISTING, f, NULL);

@@ -475,9 +475,11 @@ __curmetadata_close(WT_CURSOR *cursor)
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
 	CURSOR_API_CALL(cursor, session,
-	    close, ((WT_CURSOR_BTREE *)file_cursor)->btree);
+	    close, file_cursor == NULL ?
+	    NULL : ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	ret = file_cursor->close(file_cursor);
+	if (file_cursor != NULL)
+		ret = file_cursor->close(file_cursor);
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -552,9 +554,8 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		if (mdc->file_cursor != NULL)
-			WT_TRET(mdc->file_cursor->close(mdc->file_cursor));
-		__wt_free(session, mdc);
+err:		WT_TRET(__curmetadata_close(cursor));
+		*cursorp = NULL;
 	}
 	return (ret);
 }

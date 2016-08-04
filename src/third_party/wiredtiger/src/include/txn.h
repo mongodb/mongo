@@ -98,6 +98,7 @@ struct __wt_txn_global {
 	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	volatile uint64_t checkpoint_gen;
 	volatile uint64_t checkpoint_pinned;
+	volatile uint64_t checkpoint_txnid;	/* Checkpoint's txn ID */
 
 	/* Named snapshot state. */
 	WT_RWLOCK *nsnap_rwlock;

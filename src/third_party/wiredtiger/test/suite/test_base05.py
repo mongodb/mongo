@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_base05.py
 #    Cursor operations
@@ -40,7 +40,7 @@ class test_base05(wttest.WiredTigerTestCase):
     table_name1 = 'test_base05a'
     table_name2 = 'test_base05b'
     nentries = 1000
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('no_huffman', dict(extraconfig='')),
         ('huffman_key', dict(extraconfig='huffman_key="english"')),
         ('huffman_val', dict(extraconfig='huffman_value="english"')),

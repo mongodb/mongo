@@ -115,6 +115,7 @@ void *dcalloc(size_t, size_t);
 void *dmalloc(size_t);
 void *drealloc(void *, size_t);
 void *dstrdup(const void *);
+void *dstrndup(const char *, size_t);
 void  testutil_clean_work_dir(char *);
 void  testutil_cleanup(TEST_OPTS *);
 void  testutil_make_work_dir(char *);

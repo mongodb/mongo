@@ -8,12 +8,12 @@ functions:
     command: git.get_project
     params:
       directory: wiredtiger
-  "fetch artifacts" : &fetch_artifacts
+  "fetch binaries" : &fetch_binaries
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        remote_file: wiredtiger/${build_variant}/${revision}/binaries/${build_id}.tgz
         bucket: build_external
         extract_to: wiredtiger
 
@@ -23,6 +23,22 @@ pre:
       script: |
         rm -rf "wiredtiger"
 post:
+  - command: archive.targz_pack
+    params:
+      target: "wiredtiger.tgz"
+      source_dir: "wiredtiger"
+      include:
+        - "./**"
+  - command: s3.put
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_file: wiredtiger.tgz
+      bucket: build_external
+      permissions: public-read
+      content_type: application/tar
+      display_name: Artifacts
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
   - command: shell.exec
     params:
       script: |
@@ -49,7 +65,7 @@ tasks:
               ./build_posix/reconf
               ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-verbose
               ${make_command|make} ${smp_command|} 2>&1
-              ${make_command|make} check 2>&1
+              ${make_command|make} VERBOSE=1 check 2>&1
             fi
       - command: archive.targz_pack
         params:
@@ -65,14 +81,14 @@ tasks:
           bucket: build_external
           permissions: public-read
           content_type: application/tar
-          display_name: Artifacts
-          remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+          display_name: Binaries
+          remote_file: wiredtiger/${build_variant}/${revision}/binaries/${build_id}.tgz
 
   - name: unit-test
     depends_on:
     - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "fetch binaries"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
@@ -85,7 +101,7 @@ tasks:
     depends_on:
     - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "fetch binaries"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"
@@ -99,7 +115,7 @@ tasks:
     depends_on:
     - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "fetch binaries"
       - command: shell.exec
         params:
           working_dir: "wiredtiger"

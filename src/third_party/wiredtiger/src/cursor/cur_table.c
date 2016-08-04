@@ -525,15 +525,20 @@ __curtable_insert(WT_CURSOR *cursor)
 	}
 
 	/*
-	 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
-	 * application may want to free the memory used to configure the
-	 * insert; don't read that memory again (matching the underlying
-	 * file object cursor insert semantics).
+	 * Insert is the one cursor operation that doesn't end with the cursor
+	 * pointing to an on-page item (except for column-store appends, where
+	 * we are returning a key). That is, the application's cursor continues
+	 * to reference the application's memory after a successful cursor call,
+	 * which isn't true anywhere else. We don't want to have to explain that
+	 * scoping corner case, so we reset the application's cursor so it can
+	 * free the referenced memory and continue on without risking subsequent
+	 * core dumps.
 	 */
 	F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if (F_ISSET(primary, WT_CURSTD_APPEND))
+		F_SET(primary, WT_CURSTD_KEY_INT);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
-
 	return (ret);
 }
 

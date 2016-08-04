@@ -183,6 +183,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage)
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->ref->ref_recno);
+		cbt->cip_saved = NULL;
 		goto new_page;
 	}
 
@@ -301,12 +302,13 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage)
 	 * WT_INSERT_HEAD[0], and so on.  This means WT_INSERT lists are
 	 * odd-numbered slots, and WT_ROW array slots are even-numbered slots.
 	 *
-	 * New page configuration.
+	 * Initialize for each new page.
 	 */
 	if (newpage) {
 		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 		cbt->row_iteration_slot = 1;
+		cbt->rip_saved = NULL;
 		goto new_insert;
 	}
 
@@ -517,10 +519,12 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
 	 */
 	F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
 
-	/*
-	 * Clear the count of deleted items on the page.
-	 */
+	/* Clear the count of deleted items on the page. */
 	cbt->page_deleted_count = 0;
+
+	/* Clear saved iteration cursor position information. */
+	cbt->cip_saved = NULL;
+	cbt->rip_saved = NULL;
 
 	/*
 	 * If we don't have a search page, then we're done, we're starting at
@@ -661,7 +665,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 		if (page != NULL &&
 		    (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
 		    (newpage && cbt->page_deleted_count > 0)))
-			__wt_page_evict_soon(page);
+			WT_ERR(__wt_page_evict_soon(session, cbt->ref));
 		cbt->page_deleted_count = 0;
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));

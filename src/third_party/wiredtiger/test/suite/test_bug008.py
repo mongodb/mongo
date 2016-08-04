@@ -31,13 +31,13 @@
 
 import wiredtiger, wttest
 from helper import simple_populate, key_populate, value_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # Test search/search-near operations, including invisible values and keys
 # past the end of the table.
 class test_bug008(wttest.WiredTigerTestCase):
     uri = 'file:test_bug008'                # This is a btree layer test.
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('fix', dict(fmt='key_format=r,value_format=8t', empty=1, colvar=0)),
         ('row', dict(fmt='key_format=S', empty=0, colvar=0)),
         ('var', dict(fmt='key_format=r', empty=0, colvar=1))

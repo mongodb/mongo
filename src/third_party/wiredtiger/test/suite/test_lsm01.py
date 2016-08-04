@@ -54,12 +54,10 @@ class test_lsm01(wttest.WiredTigerTestCase):
     config_vars = [ 'chunk_size', 'merge_max', 'bloom',
                     'bloom_bit_count', 'bloom_hash_count' ]
 
-    all_scenarios = wtscenario.multiply_scenarios('_',
+    scenarios = wtscenario.make_scenarios(
         chunk_size_scenarios, merge_max_scenarios, bloom_scenarios,
-        bloom_bit_scenarios, bloom_hash_scenarios, record_count_scenarios)
-
-    scenarios = wtscenario.prune_scenarios(all_scenarios, 500)
-    scenarios = wtscenario.number_scenarios(scenarios)
+        bloom_bit_scenarios, bloom_hash_scenarios, record_count_scenarios,
+        prune=500)
 
     # Test drop of an object.
     def test_lsm(self):

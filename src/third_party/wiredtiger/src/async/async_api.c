@@ -490,12 +490,24 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t i, workers;
 
 	conn = S2C(session);
 	if (!conn->async_cfg)
 		return (0);
 
 	async = conn->async;
+	/*
+	 * Only add a flush operation if there are workers who can process
+	 * it.  Otherwise we will wait forever.
+	 */
+	workers = 0;
+	for (i = 0; i < conn->async_workers; ++i)
+		if (async->worker_tids[i] != 0)
+			++workers;
+	if (workers == 0)
+		return (0);
+
 	WT_STAT_FAST_CONN_INCR(session, async_flush);
 	/*
 	 * We have to do several things.  First we have to prevent

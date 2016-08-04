@@ -28,7 +28,6 @@
 
 import os
 import wiredtiger, wttest, run
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
 
 # test_join04.py
 #    Join operations

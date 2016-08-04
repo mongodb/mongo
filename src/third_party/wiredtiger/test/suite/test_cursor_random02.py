@@ -29,7 +29,7 @@
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate
 from helper import key_populate, value_populate
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_cursor_random02.py
 #    Cursor next_random operations
@@ -46,7 +46,7 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
         ('10000', dict(records=10000)),
         ('50000', dict(records=50000)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', config, records))
+    scenarios = make_scenarios(config, records)
 
     # Check that next_random works in the presence of a larger set of values,
     # where the values are in an insert list.

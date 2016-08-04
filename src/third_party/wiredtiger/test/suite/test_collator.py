@@ -28,7 +28,6 @@
 
 import os
 import wiredtiger, wttest, run
-from wtscenario import check_scenarios, number_scenarios
 
 # test_collator.py
 #    Test indices using a custom extractor and collator.

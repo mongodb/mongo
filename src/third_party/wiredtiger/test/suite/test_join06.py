@@ -28,7 +28,7 @@
 
 import os
 import wiredtiger, wttest, run
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_join06.py
 #    Join operations
@@ -46,7 +46,7 @@ class test_join06(wttest.WiredTigerTestCase):
         ('nobloom', dict(bloom=False))
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', isoscen, bloomscen))
+    scenarios = make_scenarios(isoscen, bloomscen)
 
     def gen_values(self, i):
         s = str(i)                    # 345 => "345"

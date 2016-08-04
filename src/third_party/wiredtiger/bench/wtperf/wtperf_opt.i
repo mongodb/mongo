@@ -144,6 +144,7 @@ DEF_OPT_AS_UINT32(random_range, 0,
     "if non zero choose a value from within this range as the key for "
     "insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
+DEF_OPT_AS_BOOL(range_partition, 0, "partition data by range (vs hash)")
 DEF_OPT_AS_UINT32(read_range, 0, "scan a range of keys after each search")
 DEF_OPT_AS_BOOL(readonly, 0,
     "reopen the connection between populate and workload phases in readonly "

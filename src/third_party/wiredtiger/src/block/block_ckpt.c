@@ -252,7 +252,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	} else
 		WT_ERR(__wt_block_write_off(session, block, buf,
 		    &ci->root_offset, &ci->root_size, &ci->root_cksum,
-		    data_cksum, false));
+		    data_cksum, true, false));
 
 	/*
 	 * Checkpoints are potentially reading/writing/merging lots of blocks,

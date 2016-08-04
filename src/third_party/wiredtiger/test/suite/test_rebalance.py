@@ -29,7 +29,7 @@
 import os, time
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_rebalance.py
 #    session level rebalance operation
@@ -41,7 +41,7 @@ class test_rebalance(wttest.WiredTigerTestCase):
     config = 'key_format=S,allocation_size=512,internal_page_max=512' + \
              ',leaf_page_max=1k,lsm=(chunk_size=512k,merge_min=10)'
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
         ('lsm', dict(uri='lsm:'))

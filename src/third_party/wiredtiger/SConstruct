@@ -484,7 +484,7 @@ t = env.Program("wtperf", [
     "bench/wtperf/wtperf_throttle.c",
     "bench/wtperf/wtperf_truncate.c",
     ],
-    LIBS=[wtlib, shim]  + wtlibs)
+    LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
 #Build the Examples

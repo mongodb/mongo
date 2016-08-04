@@ -32,7 +32,7 @@
 
 import wiredtiger, wttest
 from helper import key_populate, value_populate
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Smoke test bulk-load.
 class test_bulk_load(wttest.WiredTigerTestCase):
@@ -52,7 +52,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         ('integer', dict(valfmt='i')),
         ('string', dict(valfmt='S')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt, valfmt))
+    scenarios = make_scenarios(types, keyfmt, valfmt)
 
     # Test a simple bulk-load
     def test_bulk_load(self):

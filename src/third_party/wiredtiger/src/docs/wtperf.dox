@@ -210,6 +210,8 @@ if non zero choose a value from within this range as the key for
 insert operations
 @par random_value (boolean, default=false)
 generate random content for the value
+@par range_partition (boolean, default=false)
+partition data by range (vs hash)
 @par read_range (unsigned int, default=0)
 scan a range of keys after each search
 @par readonly (boolean, default=false)

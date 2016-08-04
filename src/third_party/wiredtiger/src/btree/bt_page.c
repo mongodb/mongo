@@ -219,6 +219,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Update the page's in-memory size and the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
+	__wt_cache_page_image_incr(session, dsk->mem_size);
 
 	/* Link the new internal page to the parent. */
 	if (ref != NULL) {
