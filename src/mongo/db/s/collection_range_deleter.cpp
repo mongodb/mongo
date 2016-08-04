@@ -89,6 +89,8 @@ void CollectionRangeDeleter::run() {
 
 bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
     int numDocumentsDeleted;
+    const int maxDocumentsToDelete =
+        std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
 
     {
         AutoGetCollection autoColl(txn, _nss, MODE_IX);
@@ -115,7 +117,8 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
             return false;
         }
 
-        numDocumentsDeleted = _doDeletion(txn, collection, metadata->getKeyPattern());
+        numDocumentsDeleted =
+            _doDeletion(txn, collection, metadata->getKeyPattern(), maxDocumentsToDelete);
         if (numDocumentsDeleted <= 0) {
             metadataManager.removeRangeToClean(_rangeInProgress.get());
             _rangeInProgress = boost::none;
@@ -137,7 +140,8 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
 
 int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
                                         Collection* collection,
-                                        const BSONObj& keyPattern) {
+                                        const BSONObj& keyPattern,
+                                        int maxDocumentsToDelete) {
     invariant(_rangeInProgress);
     invariant(collection);
 
@@ -179,9 +183,7 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
                                                                   InternalPlanner::FORWARD,
                                                                   InternalPlanner::IXSCAN_FETCH));
     int numDeleted = 0;
-    const int maxItersBeforeYield = std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
-
-    while (numDeleted < maxItersBeforeYield) {
+    while (numDeleted < maxDocumentsToDelete) {
         RecordId rloc;
         BSONObj obj;
         PlanExecutor::ExecState state;

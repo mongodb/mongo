@@ -65,7 +65,10 @@ private:
      *
      * Returns the number of documents deleted (0 if deletion is finished), or -1 for error.
      */
-    int _doDeletion(OperationContext* txn, Collection* collection, const BSONObj& keyPattern);
+    int _doDeletion(OperationContext* txn,
+                    Collection* collection,
+                    const BSONObj& keyPattern,
+                    int maxDocumentsToDelete);
 
     NamespaceString _nss;
 
