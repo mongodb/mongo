@@ -41,6 +41,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -408,7 +410,9 @@ StringData getProtoString(int op) {
     if (x)                            \
     s << " " #x ":" << (x)
 
-string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const {
+string OpDebug::report(Client* client,
+                       const CurOp& curop,
+                       const SingleThreadedLockStats& lockStats) const {
     StringBuilder s;
     if (iscommand)
         s << "command ";
@@ -416,6 +420,14 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
         s << networkOpToString(networkOp) << ' ';
 
     s << curop.getNS();
+
+    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
+    if (clientMetadata) {
+        auto appName = clientMetadata.get().getApplicationName();
+        if (!appName.empty()) {
+            s << " appName:" << appName;
+        }
+    }
 
     auto query = curop.query();
 

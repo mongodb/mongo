@@ -52,7 +52,9 @@ class OpDebug {
 public:
     OpDebug() = default;
 
-    std::string report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const;
+    std::string report(Client* client,
+                       const CurOp& curop,
+                       const SingleThreadedLockStats& lockStats) const;
 
     /**
      * Appends information about the current operation to "builder"
