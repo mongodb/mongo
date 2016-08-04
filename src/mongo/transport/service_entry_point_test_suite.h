@@ -132,7 +132,7 @@ private:
         std::string getX509SubjectName(const transport::Session& session) override;
         void registerTags(const transport::Session& session) override;
         Stats sessionStats() override;
-        void end(const transport::Session& session) override;
+        void end(transport::Session& session) override;
         void endAllSessions(
             transport::Session::TagMask tags = transport::Session::kEmptyTagMask) override;
         Status start() override;

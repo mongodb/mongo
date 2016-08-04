@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/status.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
@@ -37,8 +38,15 @@ namespace transport {
 
 const Date_t Ticket::kNoExpirationDate{Date_t::max()};
 
+Status Ticket::ExpiredStatus = Status(ErrorCodes::ExceededTimeLimit, "Ticket has expired.");
+
+Status Ticket::SessionClosedStatus =
+    Status(ErrorCodes::TransportSessionClosed, "Ticket's Session is closed.");
+
 Ticket::Ticket(TransportLayer* tl, std::unique_ptr<TicketImpl> ticket)
     : _tl(tl), _ticket(std::move(ticket)) {}
+
+Ticket::Ticket(Status status) : _status(status) {}
 
 Ticket::~Ticket() = default;
 
@@ -51,6 +59,22 @@ Status Ticket::wait()&& {
 
 void Ticket::asyncWait(TicketCallback cb)&& {
     return _tl->asyncWait(std::move(*this), std::move(cb));
+}
+
+bool Ticket::valid() {
+    return _status == Status::OK() && !expired();
+}
+
+Status Ticket::status() const {
+    return _status;
+}
+
+bool Ticket::expired() {
+    bool expired = expiration() <= Date_t::now();
+    if (_status == Status::OK() && expired) {
+        _status = Status(ErrorCodes::ExceededTimeLimit, "Ticket has expired.");
+    }
+    return expired;
 }
 
 }  // namespace transport

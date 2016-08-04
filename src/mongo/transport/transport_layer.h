@@ -57,6 +57,10 @@ class TransportLayer {
     MONGO_DISALLOW_COPYING(TransportLayer);
 
 public:
+    static const Status SessionUnknownStatus;
+    static const Status ShutdownStatus;
+    static const Status TicketSessionUnknownStatus;
+
     /**
      * Stats for sessions open in the Transport Layer.
      */
@@ -171,7 +175,7 @@ public:
      *
      * This method is idempotent and synchronous.
      */
-    virtual void end(const Session& session) = 0;
+    virtual void end(Session& session) = 0;
 
     /**
      * End all active sessions in the TransportLayer. Tickets that have already been started via

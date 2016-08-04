@@ -100,7 +100,7 @@ void TransportLayerManager::registerTags(const Session& session) {
     session.getTransportLayer()->registerTags(session);
 }
 
-void TransportLayerManager::end(const Session& session) {
+void TransportLayerManager::end(Session& session) {
     session.getTransportLayer()->end(session);
 }
 

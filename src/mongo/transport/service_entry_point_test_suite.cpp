@@ -158,7 +158,7 @@ TransportLayer::Stats ServiceEntryPointTestSuite::MockTLHarness::sessionStats() 
     return Stats();
 }
 
-void ServiceEntryPointTestSuite::MockTLHarness::end(const Session& session) {
+void ServiceEntryPointTestSuite::MockTLHarness::end(Session& session) {
     return _end(session);
 }
 

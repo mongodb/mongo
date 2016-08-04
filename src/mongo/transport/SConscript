@@ -17,6 +17,7 @@ env.Library(
     source=[
         'session.cpp',
         'ticket.cpp',
+        'transport_layer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -87,5 +88,15 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'service_entry_point_test_suite',
+    ],
+)
+
+env.CppUnitTest(
+    target='transport_layer_mock_test',
+    source=[
+        'transport_layer_mock_test.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_mock',
     ],
 )

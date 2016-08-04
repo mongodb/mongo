@@ -69,11 +69,10 @@ public:
 
     Stats sessionStats() override;
 
-    void end(const Session& session) override;
+    void end(Session& session) override;
     void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) override;
 
     Status start() override;
-
     void shutdown() override;
 
     Status addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl);

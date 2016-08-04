@@ -33,6 +33,7 @@
 #include "mongo/transport/ticket.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
@@ -56,6 +57,9 @@ public:
      * Tags for groups of connections.
      */
     using TagMask = uint32_t;
+
+    static const Status ClosedStatus;
+
     static constexpr TagMask kEmptyTagMask = 0;
     static constexpr TagMask kKeepOpen = 1;
 
@@ -136,7 +140,21 @@ public:
         return _tl;
     }
 
+    /*
+     * End the session.
+     */
+    void end();
+
+    /*
+     * Return true if the session ended, false otherwise.
+     */
+    bool ended() const {
+        return _ended;
+    }
+
 private:
+    bool _ended = false;
+
     Id _id;
 
     HostAndPort _remote;

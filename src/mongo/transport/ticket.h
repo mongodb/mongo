@@ -31,14 +31,15 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/transport/session_id.h"
 #include "mongo/transport/ticket_impl.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
 
+class Session;
 class TransportLayer;
 
 /**
@@ -59,7 +60,16 @@ public:
      */
     static const Date_t kNoExpirationDate;
 
+    static Status ExpiredStatus;
+    static Status SessionClosedStatus;
+
     Ticket(TransportLayer* tl, std::unique_ptr<TicketImpl> ticket);
+
+    /**
+     * An invalid ticket and a Status for why it's invalid.
+     */
+    Ticket(Status status);
+
     ~Ticket();
 
     /**
@@ -96,7 +106,27 @@ public:
      */
     void asyncWait(TicketCallback cb) &&;
 
-protected:
+    /*
+     * Return's the Status of the ticket.
+     */
+    Status status() const;
+
+    /*
+     * Returns true if the ticket has expired, false otherwise.
+     *
+     * If the ticket has expired, changes the Status of the ticket to TicketExpired but
+     * only if the current Status is Status::OK().
+     */
+    bool expired();
+
+    /*
+     * Return true if the ticket is usable, false otherwise.
+     *
+     * If the ticket has expired, changes the Status of the ticket to TicketExpired but
+     * only if the current Status is Status::OK().
+     */
+    bool valid();
+
     /**
      * Return a non-owning pointer to the underlying TicketImpl type
      */
@@ -106,6 +136,7 @@ protected:
 
 private:
     TransportLayer* _tl;
+    Status _status = Status::OK();
     std::unique_ptr<TicketImpl> _ticket;
 };
 

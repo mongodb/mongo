@@ -26,43 +26,22 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/transport/session_id.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/time_support.h"
+#include "mongo/base/status.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo {
 namespace transport {
 
-/**
- * Interface representing implementations of Ticket.
- *
- * Ticket implementations are specific to a TransportLayer implementation.
- */
-class TicketImpl {
-    MONGO_DISALLOW_COPYING(TicketImpl);
+const Status TransportLayer::SessionUnknownStatus =
+    Status(ErrorCodes::TransportSessionUnknown, "TransportLayer does not own the Session.");
 
-public:
-    virtual ~TicketImpl() = default;
+const Status TransportLayer::ShutdownStatus =
+    Status(ErrorCodes::ShutdownInProgress, "TransportLayer is in shutdown.");
 
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
-
-    /**
-     * Return this ticket's session id.
-     */
-    virtual SessionId sessionId() const = 0;
-
-    /**
-     * Return this ticket's expiration date.
-     */
-    virtual Date_t expiration() const = 0;
-
-protected:
-    TicketImpl() = default;
-};
+const Status TransportLayer::TicketSessionUnknownStatus = Status(
+    ErrorCodes::TransportSessionUnknown, "TransportLayer does not own the Ticket's Session.");
 
 }  // namespace transport
 }  // namespace mongo

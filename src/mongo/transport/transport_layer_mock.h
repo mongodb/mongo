@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "mongo/base/status.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
@@ -46,7 +48,33 @@ class TransportLayerMock : public TransportLayer {
     MONGO_DISALLOW_COPYING(TransportLayerMock);
 
 public:
-    TransportLayerMock() = default;
+    class TicketMock : public TicketImpl {
+    public:
+        // Source constructor
+        TicketMock(const Session* session,
+                   Message* message,
+                   Date_t expiration = Ticket::kNoExpirationDate);
+
+        // Sink constructor
+        TicketMock(const Session* session, Date_t expiration = Ticket::kNoExpirationDate);
+
+        TicketMock(TicketMock&&) = default;
+        TicketMock& operator=(TicketMock&&) = default;
+
+        SessionId sessionId() const override;
+
+        Date_t expiration() const override;
+
+        boost::optional<Message*> msg() const;
+
+    private:
+        const Session* _session;
+        boost::optional<Message*> _message;
+        Date_t _expiration;
+    };
+
+    TransportLayerMock();
+    ~TransportLayerMock();
 
     Ticket sourceMessage(const Session& session,
                          Message* message,
@@ -63,27 +91,19 @@ public:
 
     Stats sessionStats() override;
 
-    void end(const Session& session) override;
+    Session* createSession();
+    Session* get(Session::Id id);
+    bool owns(Session::Id id);
+    void end(Session& session) override;
     void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) override;
 
     Status start() override;
     void shutdown() override;
+    bool inShutdown() const;
 
 private:
-    /**
-     * A class for Tickets issued from the TransportLayerMock. These will
-     * route to the appropriate TransportLayer when run with wait() or
-     * asyncWait().
-     */
-    class MockTicket : public TicketImpl {
-        MONGO_DISALLOW_COPYING(MockTicket);
-
-    public:
-        MockTicket() = default;
-
-        Session::Id sessionId() const override;
-        Date_t expiration() const override;
-    };
+    std::unordered_map<Session::Id, std::unique_ptr<Session>> _sessions;
+    bool _shutdown;
 };
 
 }  // namespace transport

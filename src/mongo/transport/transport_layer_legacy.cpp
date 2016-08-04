@@ -163,7 +163,7 @@ void TransportLayerLegacy::asyncWait(Ticket&& ticket, TicketCallback callback) {
     MONGO_UNREACHABLE;
 }
 
-void TransportLayerLegacy::end(const Session& session) {
+void TransportLayerLegacy::end(Session& session) {
     stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
     auto conn = _connections.find(session.id());
     if (conn != _connections.end()) {
@@ -225,11 +225,11 @@ void TransportLayerLegacy::shutdown() {
 
 Status TransportLayerLegacy::_runTicket(Ticket ticket) {
     if (!_running.load()) {
-        return {ErrorCodes::ShutdownInProgress, "TransportLayer in shutdown"};
+        return TransportLayer::ShutdownStatus;
     }
 
     if (ticket.expiration() < Date_t::now()) {
-        return {ErrorCodes::ExceededTimeLimit, "Ticket has expired"};
+        return Ticket::ExpiredStatus;
     }
 
     AbstractMessagingPort* amp;
@@ -239,7 +239,7 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
 
         auto conn = _connections.find(ticket.sessionId());
         if (conn == _connections.end()) {
-            return {ErrorCodes::TransportSessionNotFound, "No such session in TransportLayer"};
+            return TransportLayer::TicketSessionUnknownStatus;
         }
 
         // "check out" the port

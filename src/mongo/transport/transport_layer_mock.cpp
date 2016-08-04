@@ -28,42 +28,82 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/transport/transport_layer_mock.h"
 
 #include "mongo/base/status.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/transport/ticket_impl.h"
-#include "mongo/transport/transport_layer_mock.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
-
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace transport {
 
-Session::Id TransportLayerMock::MockTicket::sessionId() const {
-    return Session::Id{};
+TransportLayerMock::TicketMock::TicketMock(const Session* session,
+                                           Message* message,
+                                           Date_t expiration)
+    : _session(session), _message(message), _expiration(expiration) {}
+
+TransportLayerMock::TicketMock::TicketMock(const Session* session, Date_t expiration)
+    : _session(session), _expiration(expiration) {}
+
+Session::Id TransportLayerMock::TicketMock::sessionId() const {
+    return _session->id();
 }
 
-Date_t TransportLayerMock::MockTicket::expiration() const {
-    return Date_t::now();
+Date_t TransportLayerMock::TicketMock::expiration() const {
+    return _expiration;
 }
+
+boost::optional<Message*> TransportLayerMock::TicketMock::msg() const {
+    return _message;
+}
+
+TransportLayerMock::TransportLayerMock() : _shutdown(false) {}
 
 Ticket TransportLayerMock::sourceMessage(const Session& session,
                                          Message* message,
                                          Date_t expiration) {
-    return Ticket(this, stdx::make_unique<MockTicket>());
+    if (inShutdown()) {
+        return Ticket(TransportLayer::ShutdownStatus);
+    } else if (!owns(session.id())) {
+        return Ticket(TransportLayer::SessionUnknownStatus);
+    } else if (session.ended()) {
+        return Ticket(Session::ClosedStatus);
+    }
+
+    return Ticket(this,
+                  stdx::make_unique<TransportLayerMock::TicketMock>(&session, message, expiration));
 }
 
 Ticket TransportLayerMock::sinkMessage(const Session& session,
                                        const Message& message,
                                        Date_t expiration) {
-    return Ticket(this, stdx::make_unique<MockTicket>());
+    if (inShutdown()) {
+        return Ticket(TransportLayer::ShutdownStatus);
+    } else if (!owns(session.id())) {
+        return Ticket(TransportLayer::SessionUnknownStatus);
+    } else if (session.ended()) {
+        return Ticket(Session::ClosedStatus);
+    }
+
+    return Ticket(this, stdx::make_unique<TransportLayerMock::TicketMock>(&session, expiration));
 }
 
 Status TransportLayerMock::wait(Ticket&& ticket) {
+    if (inShutdown()) {
+        return ShutdownStatus;
+    } else if (!ticket.valid()) {
+        return ticket.status();
+    } else if (!owns(ticket.sessionId())) {
+        return TicketSessionUnknownStatus;
+    } else if (get(ticket.sessionId())->ended()) {
+        return Ticket::SessionClosedStatus;
+    }
+
     return Status::OK();
 }
 
@@ -81,15 +121,57 @@ TransportLayer::Stats TransportLayerMock::sessionStats() {
 
 void TransportLayerMock::registerTags(const Session& session) {}
 
-void TransportLayerMock::end(const Session& session) {}
+Session* TransportLayerMock::createSession() {
+    std::unique_ptr<Session> session =
+        stdx::make_unique<Session>(HostAndPort(), HostAndPort(), this);
+    Session::Id sessionId = session->id();
 
-void TransportLayerMock::endAllSessions(Session::TagMask tags) {}
+    _sessions[sessionId] = std::move(session);
+
+    return _sessions[sessionId].get();
+}
+
+Session* TransportLayerMock::get(Session::Id id) {
+    if (!owns(id))
+        return nullptr;
+
+    return _sessions[id].get();
+}
+
+bool TransportLayerMock::owns(Session::Id id) {
+    return _sessions.count(id) > 0;
+}
+
+void TransportLayerMock::end(Session& session) {
+    session.end();
+}
+
+void TransportLayerMock::endAllSessions(Session::TagMask tags) {
+    auto it = _sessions.begin();
+    while (it != _sessions.end()) {
+        end(*it->second.get());
+        it++;
+    }
+}
 
 Status TransportLayerMock::start() {
     return Status::OK();
 }
 
-void TransportLayerMock::shutdown() {}
+void TransportLayerMock::shutdown() {
+    if (!inShutdown()) {
+        _shutdown = true;
+        endAllSessions();
+    }
+}
+
+bool TransportLayerMock::inShutdown() const {
+    return _shutdown;
+}
+
+TransportLayerMock::~TransportLayerMock() {
+    shutdown();
+}
 
 }  // namespace transport
 }  // namespace mongo

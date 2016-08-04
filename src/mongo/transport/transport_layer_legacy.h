@@ -83,8 +83,9 @@ public:
 
     Stats sessionStats() override;
 
-    void end(const Session& session) override;
+    void end(Session& session) override;
     void endAllSessions(transport::Session::TagMask tags = Session::kKeepOpen) override;
+
     void shutdown() override;
 
 private:
