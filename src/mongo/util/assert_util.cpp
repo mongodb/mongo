@@ -127,7 +127,7 @@ NOINLINE_DECL void wasserted(const char* expr, const char* file, unsigned line) 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // this is so we notice in buildbot
     log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
-    quickExit(EXIT_ABRUPT);
+    std::abort();
 #endif
 }
 
@@ -142,7 +142,7 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // this is so we notice in buildbot
     log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
-    quickExit(EXIT_ABRUPT);
+    std::abort();
 #endif
     throw e;
 }
