@@ -653,21 +653,8 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     while (failedAttempts < maxFailedAttempts) {
         Status attemptErrorStatus(Status::OK());
         _setState_inlock(DataReplicatorState::InitialSync);
-        _initialSyncState.reset();
         _reporterPaused = true;
         _applierPaused = true;
-
-        // The reporter is paused for the duration of the initial sync, so shut down just in case.
-        if (_reporter) {
-            warning() << "The reporter is running, so stopping it.";
-            _reporter->shutdown();
-            _reporter.reset();
-        }
-
-        if (_applier) {
-            warning() << "The applier is running, so stopping it.";
-            _applier.reset();
-        }
 
         _resetState_inlock(txn, OpTimeWithHash());
 
@@ -701,6 +688,12 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
                 LOG(1) << "initial sync attempt returned with status: " << attemptErrorStatus;
             }
         }
+
+        // Cleanup
+        _cancelAllHandles_inlock();
+        _waitOnAndResetAll_inlock(&lk);
+        invariant(!_anyActiveHandles_inlock());
+
         if (attemptErrorStatus.isOK()) {
             break;
         }
@@ -709,19 +702,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
 
         error() << "Initial sync attempt failed -- attempts left: "
                 << (maxFailedAttempts - failedAttempts) << " cause: " << attemptErrorStatus;
-
-        // Reset state.
-        if (_oplogFetcher) {
-            _oplogFetcher->shutdown();
-            std::unique_ptr<OplogFetcher> oplogFetcher;
-            _oplogFetcher.swap(oplogFetcher);
-            lk.unlock();
-
-            oplogFetcher->join();
-            invariant(!oplogFetcher->isActive());
-
-            lk.lock();
-        }
 
         // Check if need to do more retries.
         if (failedAttempts >= maxFailedAttempts) {
@@ -740,19 +720,10 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         lk.lock();
     }
 
-    // Success, cleanup
-    _cancelAllHandles_inlock();
-    _waitOnAndResetAll_inlock(&lk);
-    invariant(!_anyActiveHandles_inlock());
-
     _reporterPaused = false;
     _fetcherPaused = false;
     _applierPaused = false;
     _applierActive = false;
-    _initialSyncState.reset();
-    _oplogFetcher.reset();
-    _lastOplogEntryFetcher.reset();
-    _applier.reset();
 
     _lastFetched = _lastApplied;
 
@@ -852,6 +823,7 @@ void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
     if (_initialSyncState) {
         swapAndJoin_inlock(lk, _initialSyncState->dbsCloner, "Waiting on databases cloner: ");
     }
+    _initialSyncState.reset();
 }
 
 void DataReplicator::_doNextActions() {
