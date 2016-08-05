@@ -129,13 +129,12 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * if they are only required for the checkpoint and it has already
 	 * seen them.
 	 *
-	 * If there is no active checkpoint, this session is doing the
-	 * checkpoint, or this handle is up to date with the active checkpoint
-	 * then it's safe to ignore the checkpoint ID in the visibility check.
+	 * If there is no active checkpoint or this handle is up to date with
+	 * the active checkpoint then it's safe to ignore the checkpoint ID in
+	 * the visibility check.
 	 */
 	if (!include_checkpoint_txn || checkpoint_pinned == WT_TXN_NONE ||
-	    WT_TXNID_LT(oldest_id, checkpoint_pinned) ||
-	    WT_SESSION_IS_CHECKPOINT(session))
+	    WT_TXNID_LT(oldest_id, checkpoint_pinned))
 		return (oldest_id);
 
 	return (checkpoint_pinned);
