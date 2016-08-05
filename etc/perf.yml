@@ -61,7 +61,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf-3.2
           cd perf-3.2
-          git checkout r20160127
+          git checkout r20160805
     - command: shell.exec
       params:
         background: true
@@ -518,6 +518,22 @@ tasks:
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
     - func: "analyze"
+- name: aggregation-wt-mmap-standalone-comp
+  depends_on:
+    - name : aggregation
+      variant : linux-wt-standalone
+      status : "*"
+    - name : aggregation
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "aggregation"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+    - func: "analyze"
 - name: singleThreaded-wt-mmap-repl-comp
   depends_on:
     - name : compile
@@ -662,6 +678,22 @@ tasks:
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
     - func: "analyze"
+- name: aggregation
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "aggregation"
+        includeFilter2: "regression"
+        excludeFilter: "none"
+        threads : "1"
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        log_analysis: true
 
 buildvariants:
 - name: linux-wt-standalone
@@ -679,6 +711,7 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: aggregation
   - name: query
   - name: where
   - name: update
@@ -699,6 +732,7 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
+  - name: aggregation
   - name: query
   - name: where
   - name: update
@@ -779,7 +813,7 @@ buildvariants:
   - name: query-wt-mmap-standalone-comp
   - name: where-wt-mmap-standalone-comp
   - name: geo-wt-mmap-standalone-comp
-
+  - name: aggregation-wt-mmap-standalone-comp
 - name: linux-wt-mmap-repl-compare
   display_name: 1-Node ReplSet Linux WT Comparison MMAPv1
   batchtime: 360 # 6 hours
