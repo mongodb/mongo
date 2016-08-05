@@ -205,10 +205,10 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
 
         ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString(), 30);
 
-        unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version", BSONObj())));
-
         bool hasConfigData = conn->count(ShardType::ConfigNS) ||
             conn->count(DatabaseType::ConfigNS) || conn->count(CollectionType::ConfigNS);
+
+        unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version", BSONObj())));
 
         if (!cursor->more()) {
             // Version is 1 if we have data, 0 if we're completely empty
