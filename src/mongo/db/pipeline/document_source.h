@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/granularity_rounder.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -2028,7 +2029,7 @@ private:
     /**
      * Adds 'newBucket' to _buckets and updates any boundaries if necessary.
      */
-    void addBucket(const Bucket& newBucket);
+    void addBucket(Bucket& newBucket);
 
     /**
      * Makes a document using the information from bucket. This is what is returned when getNext()
@@ -2037,6 +2038,8 @@ private:
     Document makeDocument(const Bucket& bucket);
 
     void parseGroupByExpression(const BSONElement& groupByField, const VariablesParseState& vps);
+
+    void setGranularity(std::string granularity);
 
     std::unique_ptr<Sorter<Value, Document>> _sorter;
     std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
@@ -2056,6 +2059,7 @@ private:
     std::vector<Bucket>::iterator _bucketsIterator;
     std::unique_ptr<Variables> _variables;
     boost::intrusive_ptr<Expression> _groupByExpression;
+    boost::intrusive_ptr<GranularityRounder> _granularityRounder;
     long long _nDocuments = 0;
 };
 }  // namespace mongo

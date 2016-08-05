@@ -4481,9 +4481,19 @@ TEST_F(BucketAutoTests, SerializesOutputFieldIfSpecified) {
     testSerialize(spec, expected);
 }
 
+TEST_F(BucketAutoTests, SerializesGranularityFieldIfSpecified) {
+    BSONObj spec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+    BSONObj expected = fromjson(
+        "{groupBy : '$x', buckets : 2, granularity : 'R5', output : {count : {$sum : {$const : "
+        "1}}}}");
+
+    testSerialize(spec, expected);
+}
+
 TEST_F(BucketAutoTests, ShouldBeAbleToReParseSerializedStage) {
-    auto bucketAuto = createBucketAuto(fromjson(
-        "{$bucketAuto : {groupBy : '$x', buckets : 2, output : {field : {$avg : '$x'}}}}"));
+    auto bucketAuto =
+        createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity: 'R5', "
+                                  "output : {field : {$avg : '$x'}}}}"));
     vector<Value> serialization;
     bucketAuto->serializeToArray(serialization);
     ASSERT_EQUALS(serialization.size(), 1UL);
@@ -4619,6 +4629,112 @@ TEST_F(BucketAutoTests, FailsWhenBufferingTooManyDocuments) {
     auto bucketAuto = DocumentSourceBucketAuto::create(ctx(), numBuckets, maxMemoryUsageBytes);
     bucketAuto->setSource(mock.get());
     ASSERT_THROWS_CODE(bucketAuto->getNext(), UserException, 16819);
+}
+
+TEST_F(BucketAutoTests, ShouldRoundUpMaximumBoundariesWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    // Values are 0, 15, 24, 30, 50
+    auto docs = {Document{{"x", 24}},
+                 Document{{"x", 15}},
+                 Document{{"x", 30}},
+                 Document{{"x", 50}},
+                 Document{{"x", 0}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 25}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 25, max : 63}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, ShouldRoundDownFirstMinimumBoundaryWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    // Values are 1, 15, 24, 30, 50
+    auto docs = {Document{{"x", 24}},
+                 Document{{"x", 15}},
+                 Document{{"x", 30}},
+                 Document{{"x", 50}},
+                 Document{{"x", 1}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0.63, max : 25}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 25, max : 63}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, ShouldAbsorbAllValuesSmallerThanAdjustedBoundaryWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto docs = {Document{{"x", 0}},
+                 Document{{"x", 5}},
+                 Document{{"x", 10}},
+                 Document{{"x", 15}},
+                 Document{{"x", 30}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 16}, count : 4}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 16, max : 40}, count : 1}")));
+}
+
+TEST_F(BucketAutoTests, ShouldBeAbleToAbsorbAllValuesIntoOneBucketWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto docs = {Document{{"x", 0}},
+                 Document{{"x", 5}},
+                 Document{{"x", 10}},
+                 Document{{"x", 14}},
+                 Document{{"x", 15}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 16}, count : 5}")));
+}
+
+TEST_F(BucketAutoTests, ShouldNotRoundZeroInFirstBucketWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto docs = {Document{{"x", 0}}, Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 1}}};
+    auto results = getResults(bucketAutoSpec, docs);
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 0.63}, count : 2}")));
+    ASSERT_DOCUMENT_EQ(results[1],
+                       Document(fromjson("{_id : {min : 0.63, max : 1.6}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, ShouldFailOnNaNWhenGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto docs = {Document{{"x", 0}},
+                 Document{{"x", std::nan("NaN")}},
+                 Document{{"x", 1}},
+                 Document{{"x", 1}}};
+    ASSERT_THROWS_CODE(getResults(bucketAutoSpec, docs), UserException, 40259);
+}
+
+TEST_F(BucketAutoTests, ShouldFailOnNonNumericValuesWhenGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto docs = {
+        Document{{"x", 0}}, Document{{"x", "test"}}, Document{{"x", 1}}, Document{{"x", 1}}};
+    ASSERT_THROWS_CODE(getResults(bucketAutoSpec, docs), UserException, 40258);
+}
+
+TEST_F(BucketAutoTests, ShouldFailOnNegativeNumbersWhenGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto docs = {Document{{"x", 0}}, Document{{"x", -1}}, Document{{"x", 1}}, Document{{"x", 2}}};
+    ASSERT_THROWS_CODE(getResults(bucketAutoSpec, docs), UserException, 40260);
 }
 }  // namespace DocumentSourceBucketAuto
 

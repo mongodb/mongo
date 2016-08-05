@@ -26,12 +26,15 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 using std::pair;
+using std::string;
 using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(bucketAuto, DocumentSourceBucketAuto::createFromBson);
@@ -102,6 +105,25 @@ Value DocumentSourceBucketAuto::extractKey(const Document& doc) {
 
     _variables->setRoot(doc);
     Value key = _groupByExpression->evaluate(_variables.get());
+
+    if (_granularityRounder) {
+        uassert(40258,
+                str::stream() << "$bucketAuto can specify a 'granularity' with numeric boundaries "
+                                 "only, but found a value with type: "
+                              << typeName(key.getType()),
+                key.numeric());
+
+        double keyValue = key.coerceToDouble();
+        uassert(
+            40259,
+            "$bucketAuto can specify a 'granularity' with numeric boundaries only, but found a NaN",
+            !std::isnan(keyValue));
+
+        uassert(40260,
+                "$bucketAuto can specify a 'granularity' with non-negative numbers only, but found "
+                "a negative number",
+                keyValue >= 0.0);
+    }
 
     // To be consistent with the $group stage, we consider "missing" to be equivalent to null when
     // grouping values into buckets.
@@ -186,20 +208,47 @@ void DocumentSourceBucketAuto::populateBuckets() {
                 ? boost::optional<pair<Value, Document>>(_sortedInput->next())
                 : boost::none;
 
-            // If there are any more values that are equal to the boundary value, then absorb them
-            // into the current bucket too.
-            while (nextValue &&
-                   pExpCtx->getValueComparator().evaluate(currentBucket._max == nextValue->first)) {
-                addDocumentToBucket(*nextValue, currentBucket);
-                nextValue = _sortedInput->more()
-                    ? boost::optional<pair<Value, Document>>(_sortedInput->next())
-                    : boost::none;
+            if (_granularityRounder) {
+                Value boundaryValue = _granularityRounder->roundUp(currentBucket._max);
+                // If there are any values that now fall into this bucket after we round the
+                // boundary, absorb them into this bucket too.
+                while (nextValue &&
+                       pExpCtx->getValueComparator().evaluate(boundaryValue > nextValue->first)) {
+                    addDocumentToBucket(*nextValue, currentBucket);
+                    nextValue = _sortedInput->more()
+                        ? boost::optional<pair<Value, Document>>(_sortedInput->next())
+                        : boost::none;
+                }
+                if (nextValue) {
+                    currentBucket._max = boundaryValue;
+                }
+            } else {
+                // If there are any more values that are equal to the boundary value, then absorb
+                // them into the current bucket too.
+                while (nextValue &&
+                       pExpCtx->getValueComparator().evaluate(currentBucket._max ==
+                                                              nextValue->first)) {
+                    addDocumentToBucket(*nextValue, currentBucket);
+                    nextValue = _sortedInput->more()
+                        ? boost::optional<pair<Value, Document>>(_sortedInput->next())
+                        : boost::none;
+                }
             }
             firstEntryInNextBucket = nextValue;
         }
 
         // Add the current bucket to the vector of buckets.
         addBucket(currentBucket);
+    }
+
+    if (!_buckets.empty() && _granularityRounder) {
+        // If we we have a granularity, we round the first bucket's minimum down and the last
+        // bucket's maximum up. This way all of the bucket boundaries are rounded to numbers in the
+        // granularity specification.
+        Bucket& firstBucket = _buckets.front();
+        Bucket& lastBucket = _buckets.back();
+        firstBucket._min = _granularityRounder->roundDown(firstBucket._min);
+        lastBucket._max = _granularityRounder->roundUp(lastBucket._max);
     }
 }
 
@@ -213,14 +262,33 @@ DocumentSourceBucketAuto::Bucket::Bucket(Value min,
     }
 }
 
-void DocumentSourceBucketAuto::addBucket(const Bucket& newBucket) {
-    // If there is a bucket that comes before the new bucket being added, then the previous bucket's
-    // max boundary is updated to the new bucket's min. This is makes it so that buckets' min
-    // boundaries are inclusive and max boundaries are exclusive (except for the last bucket, which
-    // has an inclusive max).
+void DocumentSourceBucketAuto::addBucket(Bucket& newBucket) {
     if (!_buckets.empty()) {
         Bucket& previous = _buckets.back();
-        previous._max = newBucket._min;
+        if (_granularityRounder) {
+            // If we have a granularity specified and if there is a bucket that comes before the new
+            // bucket being added, then the new bucket's min boundary is updated to be the
+            // previous bucket's max boundary. This makes it so that bucket boundaries follow the
+            // granularity, have inclusive minimums, and have exclusive maximums.
+
+            double prevMax = previous._max.coerceToDouble();
+            if (prevMax == 0.0) {
+                // Handle the special case where the largest value in the first bucket is zero. In
+                // this case, we take the minimum boundary of the second bucket and round it down.
+                // We then set the maximum boundary of the first bucket to be the rounded down
+                // value. This maintains that the maximum boundary of the first bucket is exclusive
+                // and the minimum boundary of the second bucket is inclusive.
+                previous._max = _granularityRounder->roundDown(newBucket._min);
+            }
+
+            newBucket._min = previous._max;
+        } else {
+            // If there is a bucket that comes before the new bucket being added, then the previous
+            // bucket's max boundary is updated to the new bucket's min. This makes it so that
+            // buckets' min boundaries are inclusive and max boundaries are exclusive (except for
+            // the last bucket, which has an inclusive max).
+            previous._max = newBucket._min;
+        }
     }
     _buckets.push_back(newBucket);
 }
@@ -254,6 +322,10 @@ Value DocumentSourceBucketAuto::serialize(bool explain) const {
     insides["groupBy"] = _groupByExpression->serialize(explain);
     insides["buckets"] = Value(_nBuckets);
 
+    if (_granularityRounder) {
+        insides["granularity"] = Value(_granularityRounder->getName());
+    }
+
     const size_t nOutputFields = _fieldNames.size();
     MutableDocument outputSpec(nOutputFields);
     for (size_t i = 0; i < nOutputFields; i++) {
@@ -262,8 +334,6 @@ Value DocumentSourceBucketAuto::serialize(bool explain) const {
             Value{Document{{accum->getOpName(), _expressions[i]->serialize(explain)}}};
     }
     insides["output"] = outputSpec.freezeToValue();
-
-    // TODO SERVER-24152: handle granularity field
 
     return Value{Document{{getSourceName(), insides.freezeToValue()}}};
 }
@@ -302,6 +372,10 @@ void DocumentSourceBucketAuto::addAccumulator(StringData fieldName,
     _fieldNames.push_back(fieldName.toString());
     _accumulatorFactories.push_back(accumulatorFactory);
     _expressions.push_back(expression);
+}
+
+void DocumentSourceBucketAuto::setGranularity(string granularity) {
+    _granularityRounder = GranularityRounder::getGranularityRounder(std::move(granularity));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
@@ -363,11 +437,16 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
 
                 bucketAuto->addAccumulator(fieldName, factory, accExpression);
             }
+        } else if ("granularity" == argName) {
+            uassert(40261,
+                    str::stream()
+                        << "The $bucketAuto 'granularity' field must be a string, but found type: "
+                        << typeName(argument.type()),
+                    argument.type() == BSONType::String);
+            bucketAuto->setGranularity(argument.str());
         } else {
             uasserted(40245, str::stream() << "Unrecognized option to $bucketAuto: " << argName);
         }
-
-        // TODO SERVER-24152: handle granularity field
     }
 
     uassert(40246,

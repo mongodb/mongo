@@ -2482,6 +2482,15 @@ const char* ExpressionOr::getOpName() const {
 
 /* ----------------------- ExpressionPow ---------------------------- */
 
+intrusive_ptr<Expression> ExpressionPow::create(Value base, Value exp) {
+    intrusive_ptr<ExpressionPow> expr(new ExpressionPow());
+    expr->vpOperand.push_back(
+        ExpressionConstant::create(expr->getExpressionContext(), std::move(base)));
+    expr->vpOperand.push_back(
+        ExpressionConstant::create(expr->getExpressionContext(), std::move(exp)));
+    return expr;
+}
+
 Value ExpressionPow::evaluateInternal(Variables* vars) const {
     Value baseVal = vpOperand[0]->evaluateInternal(vars);
     Value expVal = vpOperand[1]->evaluateInternal(vars);

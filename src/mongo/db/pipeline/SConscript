@@ -175,6 +175,21 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='granularity_rounder',
+    source=[
+        'granularity_rounder.cpp',
+        'granularity_rounder_powers_of_two.cpp',
+        'granularity_rounder_preferred_numbers.cpp',
+        ],
+    LIBDEPS=[
+        'document_value',
+        'document_value_test_util',
+        'expression',
+        'field_path',
+    ]
+)
+
 docSourceEnv = env.Clone()
 docSourceEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 docSourceEnv.Library(
@@ -205,6 +220,7 @@ docSourceEnv.Library(
         ],
     LIBDEPS=[
         'accumulator',
+        'granularity_rounder',
         'dependencies',
         'document_value',
         'expression',
@@ -377,6 +393,17 @@ env.CppUnitTest(
     LIBDEPS=[
         'document_value_test_util',
         'parsed_aggregation_projection',
+    ],
+)
+
+env.CppUnitTest(
+    target='granularity_rounder_test',
+    source=[
+        'granularity_rounder_powers_of_two_test.cpp',
+        'granularity_rounder_preferred_numbers_test.cpp',
+    ],
+    LIBDEPS=[
+        'granularity_rounder',
     ],
 )
 

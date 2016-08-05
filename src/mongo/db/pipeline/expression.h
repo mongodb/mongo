@@ -1094,6 +1094,10 @@ public:
 };
 
 class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
+public:
+    static boost::intrusive_ptr<Expression> create(Value base, Value exp);
+
+private:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
 };
