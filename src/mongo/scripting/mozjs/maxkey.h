@@ -50,9 +50,10 @@ struct MaxKeyInfo : public BaseInfo {
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(tojson);
+        MONGO_DECLARE_JS_FUNCTION(toJSON);
     };
 
-    static const JSFunctionSpec methods[2];
+    static const JSFunctionSpec methods[3];
 
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 

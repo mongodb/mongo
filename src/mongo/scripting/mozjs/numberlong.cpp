@@ -43,9 +43,10 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec NumberLongInfo::methods[5] = {
+const JSFunctionSpec NumberLongInfo::methods[6] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberLongInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberLongInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberLongInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberLongInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(compare, NumberLongInfo),
     JS_FS_END};
@@ -53,7 +54,7 @@ const JSFunctionSpec NumberLongInfo::methods[5] = {
 const char* const NumberLongInfo::className = "NumberLong";
 
 void NumberLongInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto numLong = static_cast<int*>(JS_GetPrivate(obj));
+    auto numLong = static_cast<int64_t*>(JS_GetPrivate(obj));
 
     if (numLong)
         delete numLong;
@@ -92,6 +93,13 @@ void NumberLongInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args)
 
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
+}
+
+void NumberLongInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    int64_t val = NumberLongInfo::ToNumberLong(cx, args.thisv());
+
+    ValueReader(cx, args.rval())
+        .fromBSON(BSON("$numberLong" << std::to_string(val)), nullptr, false);
 }
 
 void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) {

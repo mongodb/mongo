@@ -29,11 +29,27 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/mozjs/regexp.h"
+#include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 
 namespace mongo {
 namespace mozjs {
 
+const JSFunctionSpec RegExpInfo::methods[2] = {
+    MONGO_ATTACH_JS_FUNCTION(toJSON), JS_FS_END,
+};
+
 const char* const RegExpInfo::className = "RegExp";
+
+void RegExpInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    ObjectWrapper o(cx, args.thisv());
+
+    auto regex_string = o.getString(InternedString::source);
+    auto flags_string = o.getString(InternedString::flags);
+
+    ValueReader(cx, args.rval())
+        .fromBSON(BSON("$regex" << regex_string << "$options" << flags_string), nullptr, false);
+}
 
 }  // namespace mozjs
 }  // namespace mongo

@@ -45,10 +45,11 @@ struct NumberIntInfo : public BaseInfo {
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toNumber);
         MONGO_DECLARE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toJSON);
         MONGO_DECLARE_JS_FUNCTION(valueOf);
     };
 
-    static const JSFunctionSpec methods[4];
+    static const JSFunctionSpec methods[5];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

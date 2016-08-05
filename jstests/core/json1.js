@@ -55,3 +55,28 @@ x = {
     "x": Timestamp(10, 2)
 };
 assert.eq(tojson(x, "", false), '{\n\t"x" : Timestamp(10, 2)\n}', "H");
+
+// tostrictjson produces proper output
+x = {
+    "x": NumberLong(64)
+};
+assert.eq(tostrictjson(x), '{ "x" : { "$numberLong" : "64" } }');
+
+// JSON.stringify produces proper strict JSON
+x = {
+    "data_binary": BinData(0, "VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg=="),
+    "data_timestamp": Timestamp(987654321, 0),
+    "data_regex": /^acme/i,
+    "data_oid": ObjectId("579a70d9e249393f153b5bc1"),
+    "data_ref": DBRef("test", "579a70d9e249393f153b5bc1"),
+    "data_undefined": undefined,
+    "data_minkey": MinKey,
+    "data_maxkey": MaxKey,
+    "data_numberlong": NumberLong("12345"),
+    "data_numberint": NumberInt(5),
+    "data_numberdecimal": NumberDecimal(3.14)
+};
+
+assert.eq(
+    JSON.stringify(x),
+    '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"}}');

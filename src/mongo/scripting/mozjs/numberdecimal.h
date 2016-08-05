@@ -46,9 +46,10 @@ struct NumberDecimalInfo : public BaseInfo {
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toJSON);
     };
 
-    static const JSFunctionSpec methods[2];
+    static const JSFunctionSpec methods[3];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

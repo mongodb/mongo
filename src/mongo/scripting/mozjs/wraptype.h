@@ -226,6 +226,7 @@ public:
     WrapType(JSContext* context)
         : _context(context),
           _proto(),
+          _constructor(),
           _jsclass({T::className,
                     T::classFlags,
                     T::addProperty != BaseInfo::addProperty ? smUtils::addProperty<T> : nullptr,
@@ -265,6 +266,7 @@ public:
     ~WrapType() {
         // Persistent globals don't RAII, you have to reset() them manually
         _proto.reset();
+        _constructor.reset();
     }
 
     void install(JS::HandleObject global) {
@@ -310,7 +312,8 @@ public:
     void newInstance(const JS::HandleValueArray& args, JS::MutableHandleObject out) {
         dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
 
-        out.set(_assertPtr(JS_New(_context, _proto, args)));
+        out.set(_assertPtr(JS_New(
+            _context, T::installType == InstallType::OverNative ? _constructor : _proto, args)));
     }
 
     void newInstance(JS::MutableHandleValue out) {
@@ -324,7 +327,8 @@ public:
     void newInstance(const JS::HandleValueArray& args, JS::MutableHandleValue out) {
         dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
 
-        out.setObjectOrNull(_assertPtr(JS_New(_context, _proto, args)));
+        out.setObjectOrNull(_assertPtr(JS_New(
+            _context, T::installType == InstallType::OverNative ? _constructor : _proto, args)));
     }
 
     // instanceOf doesn't go up the prototype tree.  It's a lower level more specific match
@@ -419,7 +423,25 @@ private:
         if (!value.isObject())
             uasserted(ErrorCodes::BadValue, "className isn't object");
 
-        _proto.init(_context, value.toObjectOrNull());
+        JS::RootedObject classNameObject(_context);
+        if (!JS_ValueToObject(_context, value, &classNameObject))
+            throwCurrentJSException(_context,
+                                    ErrorCodes::JSInterpreterFailure,
+                                    "Couldn't convert className property into an object.");
+
+        JS::RootedValue protoValue(_context);
+        if (!JS_GetPropertyById(_context,
+                                classNameObject,
+                                InternedStringId(_context, InternedString::prototype),
+                                &protoValue))
+            throwCurrentJSException(
+                _context, ErrorCodes::JSInterpreterFailure, "Couldn't get className prototype");
+
+        if (!protoValue.isObject())
+            uasserted(ErrorCodes::BadValue, "className's prototype isn't object");
+
+        _constructor.init(_context, value.toObjectOrNull());
+        _proto.init(_context, protoValue.toObjectOrNull());
 
         _installFunctions(_proto, T::methods);
         _installFunctions(global, T::freeFunctions);
@@ -508,6 +530,7 @@ private:
 
     JSContext* _context;
     JS::PersistentRootedObject _proto;
+    JS::PersistentRootedObject _constructor;
     JSClass _jsclass;
 };
 

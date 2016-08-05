@@ -46,6 +46,12 @@ namespace mozjs {
 struct TimestampInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
+    struct Functions {
+        MONGO_DECLARE_JS_FUNCTION(toJSON);
+    };
+
+    static const JSFunctionSpec methods[2];
+
     static const char* const className;
 };
 

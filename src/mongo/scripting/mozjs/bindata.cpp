@@ -46,10 +46,11 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec BinDataInfo::methods[4] = {
+const JSFunctionSpec BinDataInfo::methods[5] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(base64, BinDataInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hex, BinDataInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toString, BinDataInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toJSON, BinDataInfo),
     JS_FS_END,
 };
 
@@ -161,6 +162,21 @@ void BinDataInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     ss << "BinData(" << o.getNumber(InternedString::type) << ",\"" << *str << "\")";
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
+}
+
+void BinDataInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    ObjectWrapper o(cx, args.thisv());
+
+    auto data_str = getEncoded(args.thisv());
+
+    std::stringstream ss;
+    ss << std::hex;
+    ss.width(2);
+    ss.fill('0');
+    ss << o.getNumber(InternedString::type);
+
+    ValueReader(cx, args.rval())
+        .fromBSON(BSON("$binary" << *data_str << "$type" << ss.str()), nullptr, false);
 }
 
 void BinDataInfo::Functions::base64::call(JSContext* cx, JS::CallArgs args) {
