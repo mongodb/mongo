@@ -825,7 +825,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         // long they retry connecting to a mongod or mongos process. We have them retry
         // connecting for up to 30 seconds to handle when the tests are run on a
         // resource-constrained host machine.
-        if (!opts.hasOwnProperty('dialTimeout') &&
+        //
+        // The bsondump tool doesn't accept the --dialTimeout flag because it doesn't connect to a
+        // mongod or mongos process.
+        if (!opts.hasOwnProperty('dialTimeout') && binaryName !== 'bsondump' &&
             _toolVersionSupportsDialTimeout(opts.binVersion)) {
             opts['dialTimeout'] = '30';
         }
