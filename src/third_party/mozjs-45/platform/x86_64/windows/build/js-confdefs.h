@@ -14,6 +14,8 @@
 #define HAVE_HYPOT 1
 #define HAVE_LOCALECONV 1
 #define HAVE_LOCALECONV 1
+// Define HAVE_LOG2 manually until we regenerate the config as part of SERVER-25464.
+#define HAVE_LOG2 1
 #define HAVE_MALLOC_H 1
 #define HAVE_SNPRINTF 1
 #define HAVE__GETC_NOLOCK 1
