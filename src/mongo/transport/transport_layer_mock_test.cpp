@@ -53,11 +53,11 @@ private:
 
 // sinkMessage() generates a valid Ticket
 TEST_F(TransportLayerMockTest, SinkMessageGeneratesTicket) {
-    Message* msg = nullptr;
+    Message msg{};
     Session* session = tl()->createSession();
 
     // call sinkMessage() with no expiration
-    Ticket ticket = tl()->sinkMessage(*session, *msg);
+    Ticket ticket = tl()->sinkMessage(*session, msg);
     ASSERT(ticket.valid());
     ASSERT_OK(ticket.status());
     ASSERT_EQUALS(ticket.sessionId(), session->id());
@@ -65,7 +65,7 @@ TEST_F(TransportLayerMockTest, SinkMessageGeneratesTicket) {
 
     // call sinkMessage() with an expiration
     Date_t expiration = Date_t::now() + Hours(1);
-    ticket = tl()->sinkMessage(*session, *msg, expiration);
+    ticket = tl()->sinkMessage(*session, msg, expiration);
     ASSERT(ticket.valid());
     ASSERT_OK(ticket.status());
     ASSERT_EQUALS(ticket.sessionId(), session->id());
@@ -74,95 +74,95 @@ TEST_F(TransportLayerMockTest, SinkMessageGeneratesTicket) {
 
 // sinkMessage() generates an invalid Ticket if the Session is closed
 TEST_F(TransportLayerMockTest, SinkMessageSessionClosed) {
-    Message* msg = nullptr;
+    Message msg{};
     Session* session = tl()->createSession();
 
     tl()->end(*session);
 
-    Ticket ticket = tl()->sinkMessage(*session, *msg);
+    Ticket ticket = tl()->sinkMessage(*session, msg);
     ASSERT_FALSE(ticket.valid());
     ASSERT_EQUALS(ticket.status().code(), ErrorCodes::TransportSessionClosed);
 }
 
 // sinkMessage() generates an invalid Ticket if the TransportLayer does not own the Session
 TEST_F(TransportLayerMockTest, SinkMessageSessionUnknown) {
-    Message* msg = nullptr;
+    Message msg{};
 
     std::unique_ptr<TransportLayerMock> anotherTL = stdx::make_unique<TransportLayerMock>();
     Session* session = anotherTL->createSession();
 
-    Ticket ticket = tl()->sinkMessage(*session, *msg);
+    Ticket ticket = tl()->sinkMessage(*session, msg);
     ASSERT_FALSE(ticket.valid());
     ASSERT_EQUALS(ticket.status().code(), ErrorCodes::TransportSessionUnknown);
 }
 
 // sinkMessage() generates an invalid Ticket if the TransportLayer is in shutdown
 TEST_F(TransportLayerMockTest, SinkMessageTLShutdown) {
-    Message* msg = nullptr;
+    Message msg{};
     Session* session = tl()->createSession();
 
     tl()->shutdown();
 
-    Ticket ticket = tl()->sinkMessage(*session, *msg);
+    Ticket ticket = tl()->sinkMessage(*session, msg);
     ASSERT_FALSE(ticket.valid());
     ASSERT_EQUALS(ticket.status().code(), ErrorCodes::ShutdownInProgress);
 }
 
 // sourceMessage() generates a valid ticket
 TEST_F(TransportLayerMockTest, SourceMessageGeneratesTicket) {
-    Message* msg = nullptr;
+    Message msg{};
     Session* session = tl()->createSession();
 
     // call sourceMessage() with no expiration
-    Ticket ticket = tl()->sourceMessage(*session, msg);
+    Ticket ticket = tl()->sourceMessage(*session, &msg);
     ASSERT(ticket.valid());
     ASSERT_OK(ticket.status());
     ASSERT_EQUALS(ticket.sessionId(), session->id());
-    ASSERT_EQUALS(*static_cast<TransportLayerMock::TicketMock*>(ticket.impl())->msg(), msg);
+    ASSERT(msg.empty());
     ASSERT_EQUALS(ticket.expiration(), Ticket::kNoExpirationDate);
 
     // call sourceMessage() with an expiration
     Date_t expiration = Date_t::now() + Hours(1);
-    ticket = tl()->sourceMessage(*session, msg, expiration);
+    ticket = tl()->sourceMessage(*session, &msg, expiration);
     ASSERT(ticket.valid());
     ASSERT_OK(ticket.status());
     ASSERT_EQUALS(ticket.sessionId(), session->id());
-    ASSERT_EQUALS(*static_cast<TransportLayerMock::TicketMock*>(ticket.impl())->msg(), msg);
+    ASSERT(msg.empty());
     ASSERT_EQUALS(ticket.expiration(), expiration);
 }
 
 // sourceMessage() generates an invalid ticket if the Session is closed
 TEST_F(TransportLayerMockTest, SourceMessageSessionClosed) {
-    Message* msg = nullptr;
+    Message msg{};
     Session* session = tl()->createSession();
 
     tl()->end(*session);
 
-    Ticket ticket = tl()->sourceMessage(*session, msg);
+    Ticket ticket = tl()->sourceMessage(*session, &msg);
     ASSERT_FALSE(ticket.valid());
     ASSERT_EQUALS(ticket.status().code(), ErrorCodes::TransportSessionClosed);
 }
 
 // sourceMessage() generates an invalid ticket if the TransportLayer does not own the Session
 TEST_F(TransportLayerMockTest, SourceMessageSessionUnknown) {
-    Message* msg = nullptr;
+    Message msg{};
 
     std::unique_ptr<TransportLayerMock> anotherTL = stdx::make_unique<TransportLayerMock>();
     Session* session = anotherTL->createSession();
 
-    Ticket ticket = tl()->sourceMessage(*session, msg);
+    Ticket ticket = tl()->sourceMessage(*session, &msg);
     ASSERT_FALSE(ticket.valid());
     ASSERT_EQUALS(ticket.status().code(), ErrorCodes::TransportSessionUnknown);
 }
 
 // sourceMessage() generates an invalid ticket if the TransportLayer is in shutdown
 TEST_F(TransportLayerMockTest, SourceMessageTLShutdown) {
-    Message* msg = nullptr;
+    Message msg{};
     Session* session = tl()->createSession();
 
     tl()->shutdown();
 
-    Ticket ticket = tl()->sourceMessage(*session, msg);
+    Ticket ticket = tl()->sourceMessage(*session, &msg);
     ASSERT_FALSE(ticket.valid());
     ASSERT_EQUALS(ticket.status().code(), ErrorCodes::ShutdownInProgress);
 }
