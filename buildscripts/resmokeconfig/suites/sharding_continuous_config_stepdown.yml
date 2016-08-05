@@ -116,6 +116,8 @@ selector:
     - jstests/sharding/commands_that_write_accept_wc_configRS.js
     - jstests/sharding/commands_that_write_accept_wc_shards.js
     - jstests/sharding/move_chunk_wc.js
+    # Expects that connections to all shards/config servers will never close
+    - jstests/sharding/shard6.js
 
 executor:
   js_test:
