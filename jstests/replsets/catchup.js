@@ -29,7 +29,7 @@ load("jstests/replsets/rslib.js");
         }
     };
     rst.nodes.forEach(function(node) {
-        node.adminCommand(verbosity)
+        node.adminCommand(verbosity);
     });
 
     function enableFailPoint(node) {
