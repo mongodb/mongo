@@ -780,8 +780,15 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
         return connectStatus;
     }
 
+    // NOTE: If the 'applicationName' parameter is a view of the '_applicationName' member, as
+    // happens, for instance, in the call to DBClientConnection::connect from
+    // DBClientConnection::_checkConnection then the following line will invalidate the
+    // 'applicationName' parameter, since the memory that it views within _applicationName will be
+    // freed. Do not reference the 'applicationName' parameter after this line. If you need to
+    // access the application name, do it through the _applicationName member.
     _applicationName = applicationName.toString();
-    auto swIsMasterReply = initWireVersion(this, applicationName);
+
+    auto swIsMasterReply = initWireVersion(this, _applicationName);
     if (!swIsMasterReply.isOK()) {
         _failed = true;
         return swIsMasterReply.status;
