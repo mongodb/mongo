@@ -85,8 +85,10 @@ fi
 
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
+	# Only a warning, we need to build release packages without SWIG.
 	AX_PKG_SWIG(2.0.4, [],
-	    [AC_MSG_WARN([SWIG is required to rebuild Java or Python APIs.])])
+	    [AC_MSG_WARN([SWIG is required to rebuild Java or Python APIs.]) &&
+              SWIG="SWIG_NOT_FOUND_DURING_CONFIGURE"])
 fi
 
 if test "$wt_cv_enable_java" = "yes"; then

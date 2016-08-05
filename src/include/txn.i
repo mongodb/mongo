@@ -113,16 +113,14 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 
 	/*
 	 * Take a local copy of these IDs in case they are updated while we are
-	 * checking visibility.  Only the generation needs to be carefully
-	 * ordered: if a checkpoint is starting and the generation is bumped,
-	 * we take the minimum of the other two IDs, which is what we want.
+	 * checking visibility.  The read of the transaction ID pinned by a
+	 * checkpoint needs to be carefully ordered: if a checkpoint is
+	 * starting and we have to start checking the pinned ID, we take the
+	 * minimum of it with the oldest ID, which is what we want.
 	 */
 	oldest_id = txn_global->oldest_id;
-	if (btree == NULL)
-		include_checkpoint_txn = false;
-	else
-		WT_ORDERED_READ(
-		    include_checkpoint_txn, btree->include_checkpoint_txn);
+	include_checkpoint_txn = btree == NULL || btree->include_checkpoint_txn;
+	WT_READ_BARRIER();
 	checkpoint_pinned = txn_global->checkpoint_pinned;
 
 	/*
@@ -131,13 +129,12 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * if they are only required for the checkpoint and it has already
 	 * seen them.
 	 *
-	 * If there is no active checkpoint, this session is doing the
-	 * checkpoint, or this handle is up to date with the active checkpoint
-	 * then it's safe to ignore the checkpoint ID in the visibility check.
+	 * If there is no active checkpoint or this handle is up to date with
+	 * the active checkpoint then it's safe to ignore the checkpoint ID in
+	 * the visibility check.
 	 */
 	if (!include_checkpoint_txn || checkpoint_pinned == WT_TXN_NONE ||
-	    WT_TXNID_LT(oldest_id, checkpoint_pinned) ||
-	    WT_SESSION_IS_CHECKPOINT(session))
+	    WT_TXNID_LT(oldest_id, checkpoint_pinned))
 		return (oldest_id);
 
 	return (checkpoint_pinned);

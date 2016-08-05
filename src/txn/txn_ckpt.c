@@ -322,7 +322,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	struct timespec start, last, stop;
 	u_int current_dirty;
 	uint64_t bytes_written_last, bytes_written_start, bytes_written_total;
-	uint64_t current_us, stepdown_us, total_ms;
+	uint64_t cache_size, current_us, stepdown_us, total_ms;
 	bool progress;
 
 	conn = S2C(session);
@@ -332,13 +332,21 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	last = start;
 	bytes_written_last = 0;
 	bytes_written_start = cache->bytes_written;
+	cache_size = conn->cache_size;
+	/*
+	 * If the cache size is zero or very small, we're done.  The cache
+	 * size can briefly become zero if we're transitioning to a shared
+	 * cache via reconfigure.  This avoids potential divide by zero.
+	 */
+	if (cache_size < (WT_MEGABYTE * 5))
+		return (0);
 	stepdown_us = 10000;
 	progress = false;
 
 	/* Step down the dirty target to the eviction trigger */
 	for (;;) {
 		current_dirty = (u_int)((100 *
-		    __wt_cache_dirty_leaf_inuse(cache)) / conn->cache_size);
+		    __wt_cache_dirty_leaf_inuse(cache)) / cache_size);
 		if (current_dirty <= cache->eviction_dirty_target)
 			break;
 
@@ -366,7 +374,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		    (!progress ||
 		    current_dirty <= cache->eviction_dirty_trigger)) {
 			stepdown_us = (uint64_t)(WT_THOUSAND * (
-			    (double)(conn->cache_size / 100) /
+			    (double)(cache_size / 100) /
 			    (double)(bytes_written_total / total_ms)));
 			if (!progress)
 				stepdown_us = WT_MIN(stepdown_us, 200000);
