@@ -56,6 +56,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -161,6 +162,10 @@ private:
         rpc::ProtocolSet clientProtocols() const;
         void setServerProtocols(rpc::ProtocolSet protocols);
 
+        MessageCompressorManager& getCompressorManager() {
+            return _compressorManager;
+        }
+
     private:
         std::unique_ptr<AsyncStreamInterface> _stream;
 
@@ -169,6 +174,8 @@ private:
         // Dynamically initialized from [min max]WireVersionOutgoing.
         // Its expected that isMaster response is checked only on the caller.
         rpc::ProtocolSet _clientProtocols{rpc::supports::kNone};
+
+        MessageCompressorManager _compressorManager;
     };
 
     /**

@@ -195,6 +195,7 @@ jsTestOptions = function() {
             // Note: does not support the array version
             mongosBinVersion: TestData.mongosBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
+            networkMessageCompressors: TestData.networkMessageCompressors
         });
     }
     return _jsTestOptions;

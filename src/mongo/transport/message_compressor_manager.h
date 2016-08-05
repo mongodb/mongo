@@ -48,13 +48,16 @@ public:
     /*
      * Default constructor. Uses the global MessageCompressorRegistry.
      */
-    explicit MessageCompressorManager();
+    MessageCompressorManager();
 
     /*
      * Constructs a manager from a specific MessageCompressorRegistry - used by the unit tests
      * to test various registry configurations.
      */
-    MessageCompressorManager(MessageCompressorRegistry* factory);
+    explicit MessageCompressorManager(MessageCompressorRegistry* factory);
+
+    MessageCompressorManager(MessageCompressorManager&&) = default;
+    MessageCompressorManager& operator=(MessageCompressorManager&&) = default;
 
     /*
      * Called by a client constructing an isMaster request. This function will append the result

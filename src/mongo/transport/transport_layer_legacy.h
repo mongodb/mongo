@@ -67,11 +67,11 @@ public:
     Status setup();
     Status start() override;
 
-    Ticket sourceMessage(const Session& session,
+    Ticket sourceMessage(Session& session,
                          Message* message,
                          Date_t expiration = Ticket::kNoExpirationDate) override;
 
-    Ticket sinkMessage(const Session& session,
+    Ticket sinkMessage(Session& session,
                        const Message& message,
                        Date_t expiration = Ticket::kNoExpirationDate) override;
 

@@ -740,6 +740,8 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
             return serializeStatus;
         }
 
+        conn->getCompressorManager().clientBegin(&bob);
+
         Date_t start{Date_t::now()};
         auto result =
             conn->runCommandWithMetadata("admin", "isMaster", rpc::makeEmptyMetadata(), bob.done());
@@ -752,6 +754,8 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
             int maxWireVersion = isMasterObj["maxWireVersion"].numberInt();
             conn->setWireVersions(minWireVersion, maxWireVersion);
         }
+
+        conn->getCompressorManager().clientFinish(isMasterObj);
 
         return executor::RemoteCommandResponse{
             std::move(isMasterObj), result->getMetadata().getOwned(), finish - start};
@@ -1288,7 +1292,9 @@ DBClientConnection::DBClientConnection(bool _autoReconnect,
 void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer) {
     checkConnection();
     try {
-        port().say(toSend);
+        auto swm = _compressorManager.compressMessage(toSend);
+        uassertStatusOK(swm.getStatus());
+        port().say(swm.getValue());
     } catch (SocketException&) {
         _failed = true;
         throw;
@@ -1296,12 +1302,18 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
 }
 
 bool DBClientConnection::recv(Message& m) {
-    if (port().recv(m)) {
-        return true;
+    if (!port().recv(m)) {
+        _failed = true;
+        return false;
     }
 
-    _failed = true;
-    return false;
+    if (m.operation() == dbCompressed) {
+        auto swm = _compressorManager.decompressMessage(m);
+        uassertStatusOK(swm.getStatus());
+        m = std::move(swm.getValue());
+    }
+
+    return true;
 }
 
 bool DBClientConnection::call(Message& toSend,
@@ -1314,13 +1326,22 @@ bool DBClientConnection::call(Message& toSend,
     */
     checkConnection();
     try {
-        if (!port().call(toSend, response)) {
+        auto swm = _compressorManager.compressMessage(toSend);
+        uassertStatusOK(swm.getStatus());
+
+        if (!port().call(swm.getValue(), response)) {
             _failed = true;
             if (assertOk)
                 uasserted(10278,
                           str::stream() << "dbclient error communicating with server: "
                                         << getServerAddress());
             return false;
+        }
+
+        if (response.operation() == dbCompressed) {
+            auto swm = _compressorManager.decompressMessage(response);
+            uassertStatusOK(swm.getStatus());
+            response = std::move(swm.getValue());
         }
     } catch (SocketException&) {
         _failed = true;

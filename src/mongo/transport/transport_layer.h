@@ -98,7 +98,7 @@ public:
      * TransportLayer is unable to source a Message, this will be a failed status,
      * and the passed-in Message buffer may be left in an invalid state.
      */
-    virtual Ticket sourceMessage(const Session& session,
+    virtual Ticket sourceMessage(Session& session,
                                  Message* message,
                                  Date_t expiration = Ticket::kNoExpirationDate) = 0;
 
@@ -117,7 +117,7 @@ public:
      * This method does NOT take ownership of the sunk Message, which must be cleaned
      * up by the caller.
      */
-    virtual Ticket sinkMessage(const Session& session,
+    virtual Ticket sinkMessage(Session& session,
                                const Message& message,
                                Date_t expiration = Ticket::kNoExpirationDate) = 0;
 

@@ -75,6 +75,8 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         bob.append("hostInfo", sb.str());
     }
 
+    op->connection().getCompressorManager().clientBegin(&bob);
+
     requestBuilder.setCommandArgs(bob.done());
     requestBuilder.setMetadata(rpc::makeEmptyMetadata());
 
@@ -131,6 +133,8 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         }
 
         op->setOperationProtocol(negotiatedProtocol.getValue());
+
+        op->connection().getCompressorManager().clientFinish(commandReply.data);
 
         if (_hook) {
             // Run the validation hook.

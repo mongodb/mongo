@@ -171,8 +171,12 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
     MONGO_ASYNC_OP_INVARIANT(_connection.is_initialized(),
                              "Connection should not change over AsyncOp's lifetime");
 
+    auto swm = _connection->getCompressorManager().compressMessage(newCommand);
+    if (!swm.isOK())
+        return swm.getStatus();
+
     // Construct a new AsyncCommand object for each command.
-    _command.emplace(_connection.get_ptr(), type, std::move(newCommand), _owner->now(), target);
+    _command.emplace(_connection.get_ptr(), type, std::move(swm.getValue()), _owner->now(), target);
     return Status::OK();
 }
 

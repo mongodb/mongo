@@ -30,6 +30,7 @@
 
 #include <iostream>
 
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -37,6 +38,9 @@
 
 namespace mongo {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoBridgeOptions)(InitializerContext* context) {
+    auto ret = addMessageCompressionOptions(&moe::startupOptions, false);
+    if (!ret.isOK())
+        return ret;
     return addMongoBridgeOptions(&moe::startupOptions);
 }
 
@@ -58,6 +62,13 @@ MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
+
+    ret = storeMessageCompressionOptions(moe::startupOptionsParsed);
+    if (!ret.isOK()) {
+        std::cerr << ret.toString() << std::endl;
+        quickExit(EXIT_BADOPTIONS);
+    }
+
     return Status::OK();
 }
 }

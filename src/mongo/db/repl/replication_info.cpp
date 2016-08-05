@@ -296,6 +296,8 @@ public:
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
 
+        txn->getClient()->session()->getCompressorManager().serverNegotiate(cmdObj, &result);
+
         return true;
     }
 } cmdismaster;

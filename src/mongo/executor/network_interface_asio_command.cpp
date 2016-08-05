@@ -204,6 +204,14 @@ ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(AsyncOp* op,
                                                             Date_t now,
                                                             rpc::EgressMetadataHook* metadataHook) {
     auto& received = _toRecv;
+    if (received.operation() == dbCompressed) {
+        auto swm = conn().getCompressorManager().decompressMessage(received);
+        if (!swm.isOK()) {
+            return swm.getStatus();
+        }
+        received = std::move(swm.getValue());
+    }
+
     switch (_type) {
         case CommandType::kRPC: {
             auto rs = decodeRPC(&received, protocol, now - _start, _target, metadataHook);

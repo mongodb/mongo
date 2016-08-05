@@ -86,7 +86,7 @@ public:
     /**
      * Sends the message.
      */
-    virtual void say(Message& toSend, int responseTo = 0) = 0;
+    virtual void say(Message& toSend, int responseTo) = 0;
 
     /**
      * Sends the message (does not set headers).

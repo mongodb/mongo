@@ -43,13 +43,11 @@ namespace transport {
 
 TransportLayerManager::TransportLayerManager() = default;
 
-Ticket TransportLayerManager::sourceMessage(const Session& session,
-                                            Message* message,
-                                            Date_t expiration) {
+Ticket TransportLayerManager::sourceMessage(Session& session, Message* message, Date_t expiration) {
     return session.getTransportLayer()->sourceMessage(session, message, expiration);
 }
 
-Ticket TransportLayerManager::sinkMessage(const Session& session,
+Ticket TransportLayerManager::sinkMessage(Session& session,
                                           const Message& message,
                                           Date_t expiration) {
     return session.getTransportLayer()->sinkMessage(session, message, expiration);

@@ -33,8 +33,17 @@
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 
+#include <type_traits>
+
 namespace mongo {
-using MessageCompressorId = uint8_t;
+enum class MessageCompressor : uint8_t {
+    kNoop = 0,
+    kSnappy = 1,
+    kExtended = 255,
+};
+
+StringData getMessageCompressorName(MessageCompressor id);
+using MessageCompressorId = std::underlying_type<MessageCompressor>::type;
 
 class MessageCompressorBase {
     MONGO_DISALLOW_COPYING(MessageCompressorBase);
@@ -109,8 +118,9 @@ protected:
     /*
      * This is called by sub-classes to intialize their ID/name fields.
      */
-    MessageCompressorBase(MessageCompressorId id, StringData name)
-        : _id{id}, _name{name.toString()} {}
+    MessageCompressorBase(MessageCompressor id)
+        : _id{static_cast<MessageCompressorId>(id)},
+          _name{getMessageCompressorName(id).toString()} {}
 
     /*
      * Called by sub-classes to bump their bytesIn/bytesOut counters for compression

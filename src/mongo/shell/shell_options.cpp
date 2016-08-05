@@ -233,11 +233,12 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
 
 Status storeMongoShellOptions(const moe::Environment& params,
                               const std::vector<std::string>& args) {
+    Status ret = Status::OK();
     if (params.count("quiet")) {
         mongo::serverGlobalParams.quiet = true;
     }
 #ifdef MONGO_CONFIG_SSL
-    Status ret = storeSSLClientOptions(params);
+    ret = storeSSLClientOptions(params);
     if (!ret.isOK()) {
         return ret;
     }

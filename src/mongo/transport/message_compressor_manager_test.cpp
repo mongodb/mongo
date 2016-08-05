@@ -30,10 +30,11 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_noop.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/message.h"
 
 #include <string>
 #include <vector>
@@ -49,7 +50,7 @@ MessageCompressorRegistry buildRegistry() {
     ret.registerImplementation(std::move(compressor));
     ret.finalizeSupportedCompressors();
 
-    return std::move(ret);
+    return ret;
 }
 
 void checkNegotiationResult(const BSONObj& result, const std::vector<std::string>& algos) {
@@ -80,7 +81,57 @@ void checkServerNegotiation(const BSONObj& input, const std::vector<std::string>
     manager.serverNegotiate(input, &serverOutput);
     checkNegotiationResult(serverOutput.done(), expected);
 }
-}  // namespace
+
+void checkFidelity(const Message& msg, std::unique_ptr<MessageCompressorBase> compressor) {
+    MessageCompressorRegistry registry;
+    const auto originalView = msg.singleData();
+    const auto compressorName = compressor->getName();
+
+    std::vector<std::string> compressorList = {compressorName};
+    registry.setSupportedCompressors(std::move(compressorList));
+    registry.registerImplementation(std::move(compressor));
+    registry.finalizeSupportedCompressors();
+
+    MessageCompressorManager mgr(&registry);
+    auto negotiator = BSON("isMaster" << 1 << "compression" << BSON_ARRAY(compressorName));
+    BSONObjBuilder negotiatorOut;
+    mgr.serverNegotiate(negotiator, &negotiatorOut);
+    checkNegotiationResult(negotiatorOut.done(), {compressorName});
+
+    auto swm = mgr.compressMessage(msg);
+    ASSERT_OK(swm.getStatus());
+    auto compressedMsg = std::move(swm.getValue());
+    const auto compressedMsgView = compressedMsg.singleData();
+
+    ASSERT_EQ(compressedMsgView.getId(), originalView.getId());
+    ASSERT_EQ(compressedMsgView.getResponseToMsgId(), originalView.getResponseToMsgId());
+    ASSERT_EQ(compressedMsgView.getNetworkOp(), dbCompressed);
+
+    swm = mgr.decompressMessage(compressedMsg);
+    ASSERT_OK(swm.getStatus());
+    auto decompressedMsg = std::move(swm.getValue());
+
+    const auto decompressedMsgView = decompressedMsg.singleData();
+    ASSERT_EQ(decompressedMsgView.getId(), originalView.getId());
+    ASSERT_EQ(decompressedMsgView.getResponseToMsgId(), originalView.getResponseToMsgId());
+    ASSERT_EQ(decompressedMsgView.getNetworkOp(), originalView.getNetworkOp());
+    ASSERT_EQ(decompressedMsgView.getLen(), originalView.getLen());
+
+    ASSERT_EQ(memcmp(decompressedMsgView.data(), originalView.data(), originalView.dataLen()), 0);
+}
+
+Message buildMessage() {
+    const auto data = std::string{"Hello, world!"};
+    const auto bufferSize = MsgData::MsgDataHeaderSize + data.size();
+    auto buf = SharedBuffer::allocate(bufferSize);
+    MsgData::View testView(buf.get());
+    testView.setId(123456);
+    testView.setResponseToMsgId(654321);
+    testView.setOperation(dbQuery);
+    testView.setLen(bufferSize);
+    memcpy(testView.data(), data.data(), data.size());
+    return Message{buf};
+}
 
 TEST(MessageCompressorManager, NoCompressionRequested) {
     auto input = BSON("isMaster" << 1);
@@ -120,4 +171,16 @@ TEST(MessageCompressorManager, FullNormalCompression) {
 
     clientManager.clientFinish(serverObj);
 }
+
+TEST(NoopMessageCompressor, Fidelity) {
+    auto testMessage = buildMessage();
+    checkFidelity(testMessage, stdx::make_unique<NoopMessageCompressor>());
+}
+
+TEST(SnappyMessageCompressor, Fidelity) {
+    auto testMessage = buildMessage();
+    checkFidelity(testMessage, stdx::make_unique<NoopMessageCompressor>());
+}
+
 }  // namespace mongo
+}  // namespace

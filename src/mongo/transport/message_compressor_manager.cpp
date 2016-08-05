@@ -59,10 +59,10 @@ struct CompressionHeader {
     CompressionHeader(int32_t _opcode, int32_t _size, uint8_t _id)
         : originalOpCode{_opcode}, uncompressedSize{_size}, compressorId{_id} {}
 
-    CompressionHeader(ConstDataRangeCursor cursor) {
-        originalOpCode = cursor.readAndAdvance<LittleEndian<std::int32_t>>().getValue();
-        uncompressedSize = cursor.readAndAdvance<LittleEndian<std::int32_t>>().getValue();
-        compressorId = cursor.readAndAdvance<LittleEndian<uint8_t>>().getValue();
+    CompressionHeader(ConstDataRangeCursor* cursor) {
+        originalOpCode = cursor->readAndAdvance<LittleEndian<std::int32_t>>().getValue();
+        uncompressedSize = cursor->readAndAdvance<LittleEndian<std::int32_t>>().getValue();
+        compressorId = cursor->readAndAdvance<LittleEndian<uint8_t>>().getValue();
     }
 
     static size_t size() {
@@ -93,6 +93,8 @@ StatusWith<Message> MessageCompressorManager::compressMessage(const Message& msg
         inputHeader.getNetworkOp(), inputHeader.dataLen(), compressor->getId());
 
     if (bufferSize > MaxMessageSizeBytes) {
+        LOG(3) << "Compressed message would be larger than " << MaxMessageSizeBytes
+               << ", returning original uncompressed message";
         return {msg};
     }
 
@@ -122,7 +124,7 @@ StatusWith<Message> MessageCompressorManager::compressMessage(const Message& msg
 StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg) {
     auto inputHeader = msg.header();
     ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
-    CompressionHeader compressionHeader(input);
+    CompressionHeader compressionHeader(&input);
 
     auto compressor = _registry->getCompressor(compressionHeader.compressorId);
     if (!compressor) {
@@ -144,6 +146,10 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
 
     if (!sws.isOK())
         return sws.getStatus();
+
+    if (sws.getValue() != static_cast<std::size_t>(compressionHeader.uncompressedSize)) {
+        return {ErrorCodes::BadValue, "Decompressing message returned less data than expected"};
+    }
 
     outMessage.setLen(sws.getValue() + MsgData::MsgDataHeaderSize);
 
@@ -224,8 +230,8 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
         if ((cur = _registry->getCompressor(curName))) {
             LOG(3) << cur->getName() << " is supported";
             _negotiated.push_back(cur);
-        } else { // Otherwise the compressor is not supported and we skip over it.
-            LOG(3) << cur->getName() << " is not supported";
+        } else {  // Otherwise the compressor is not supported and we skip over it.
+            LOG(3) << curName << " is not supported";
         }
     }
 

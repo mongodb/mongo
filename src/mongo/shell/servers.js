@@ -446,6 +446,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
         }
 
+        if (jsTestOptions().networkMessageCompressors) {
+            opts.networkMessageCompressors = jsTestOptions().networkMessageCompressors;
+        }
+
         return opts;
     };
 

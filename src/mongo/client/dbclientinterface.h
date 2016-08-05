@@ -42,6 +42,7 @@
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
@@ -1119,6 +1120,10 @@ public:
 
     uint64_t getSockCreationMicroSec() const;
 
+    MessageCompressorManager& getCompressorManager() {
+        return _compressorManager;
+    }
+
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
@@ -1162,6 +1167,8 @@ private:
 
     // Hook ran on every call to connect()
     HandshakeValidationHook _hook;
+
+    MessageCompressorManager _compressorManager;
 };
 
 BSONElement getErrField(const BSONObj& result);

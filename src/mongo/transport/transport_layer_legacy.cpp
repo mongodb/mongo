@@ -98,12 +98,18 @@ Status TransportLayerLegacy::start() {
 
 TransportLayerLegacy::~TransportLayerLegacy() = default;
 
-Ticket TransportLayerLegacy::sourceMessage(const Session& session,
-                                           Message* message,
-                                           Date_t expiration) {
-    auto sourceCb = [message](AbstractMessagingPort* amp) -> Status {
+Ticket TransportLayerLegacy::sourceMessage(Session& session, Message* message, Date_t expiration) {
+    auto& compressorMgr = session.getCompressorManager();
+    auto sourceCb = [message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         if (!amp->recv(*message)) {
             return {ErrorCodes::HostUnreachable, "Recv failed"};
+        }
+
+        if (message->operation() == dbCompressed) {
+            auto swm = compressorMgr.decompressMessage(*message);
+            if (!swm.isOK())
+                return swm.getStatus();
+            *message = swm.getValue();
         }
         return Status::OK();
     };
@@ -137,12 +143,18 @@ TransportLayer::Stats TransportLayerLegacy::sessionStats() {
     return stats;
 }
 
-Ticket TransportLayerLegacy::sinkMessage(const Session& session,
+Ticket TransportLayerLegacy::sinkMessage(Session& session,
                                          const Message& message,
                                          Date_t expiration) {
-    auto sinkCb = [&message](AbstractMessagingPort* amp) -> Status {
+    auto& compressorMgr = session.getCompressorManager();
+    auto sinkCb = [&message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         try {
-            amp->say(message);
+            auto swm = compressorMgr.compressMessage(message);
+            if (!swm.isOK())
+                return swm.getStatus();
+            const auto& compressedMessage = swm.getValue();
+            amp->say(compressedMessage);
+
             return Status::OK();
         } catch (const SocketException& e) {
             return {ErrorCodes::HostUnreachable, e.what()};

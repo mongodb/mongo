@@ -1,0 +1,14 @@
+selector:
+  js_test:
+    roots:
+    - jstests/sharding/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            networkMessageCompressors: snappy
+        nodb: ''
+        readMode: commands

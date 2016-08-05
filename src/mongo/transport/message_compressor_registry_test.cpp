@@ -73,15 +73,17 @@ TEST(MessageCompressorRegistry, NothingRegistered) {
 TEST(MessageCompressorRegistry, SetSupported) {
     MessageCompressorRegistry registry;
     auto compressor = stdx::make_unique<NoopMessageCompressor>();
-    auto compressorPtr = compressor.get();
+    auto compressorId = compressor->getId();
+    auto compressorName = compressor->getName();
 
     std::vector<std::string> compressorList = {"foobar"};
     registry.setSupportedCompressors(std::move(compressorList));
     registry.registerImplementation(std::move(compressor));
-    registry.finalizeSupportedCompressors();
+    auto ret = registry.finalizeSupportedCompressors();
+    ASSERT_NOT_OK(ret);
 
-    ASSERT_NULL(registry.getCompressor(compressorPtr->getName()));
-    ASSERT_NULL(registry.getCompressor(compressorPtr->getId()));
+    ASSERT_NULL(registry.getCompressor(compressorId));
+    ASSERT_NULL(registry.getCompressor(compressorName));
 }
 }  // namespace
 }  // namespace mongo

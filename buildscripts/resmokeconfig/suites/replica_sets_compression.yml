@@ -1,0 +1,17 @@
+selector:
+  js_test:
+    roots:
+    - jstests/replsets/*.js
+    exclude_files:
+    # Disable config_server_checks.js since it starts mmap servers.
+    - jstests/replsets/config_server_checks.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        global_vars:
+          TestData:
+            networkMessageCompressors: snappy
+        readMode: commands

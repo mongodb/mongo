@@ -33,12 +33,25 @@
 #include "mongo/base/init.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_noop.h"
+#include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/util/options_parser/option_section.h"
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
 namespace mongo {
+
+StringData getMessageCompressorName(MessageCompressor id) {
+    switch (id) {
+        case MessageCompressor::kNoop:
+            return "noop"_sd;
+        case MessageCompressor::kSnappy:
+            return "snappy"_sd;
+        default:
+            fassert(40269, "Invalid message compressor ID");
+    }
+    MONGO_UNREACHABLE;
+}
 
 MessageCompressorRegistry& MessageCompressorRegistry::get() {
     static MessageCompressorRegistry globalRegistry;
@@ -48,7 +61,7 @@ MessageCompressorRegistry& MessageCompressorRegistry::get() {
 void MessageCompressorRegistry::registerImplementation(
     std::unique_ptr<MessageCompressorBase> impl) {
     // It's an error to register a compressor that's already been registered
-    fassert(40254,
+    fassert(40270,
             _compressorsByName.find(impl->getName()) == _compressorsByName.end() &&
                 _compressorsByIds[impl->getId()] == nullptr);
 
@@ -61,13 +74,15 @@ void MessageCompressorRegistry::registerImplementation(
     _compressorsByIds[impl->getId()] = std::move(impl);
 }
 
-void MessageCompressorRegistry::finalizeSupportedCompressors() {
-    // Remove compressor names from the compressorNames list if they were never registered.
-    // This prevents _compressorNames from having totally bogus names specified by users.
-    std::remove_if(
-        _compressorNames.begin(), _compressorNames.end(), [this](const std::string& name) {
-            return _compressorsByName.find(name) == _compressorsByName.end();
-        });
+Status MessageCompressorRegistry::finalizeSupportedCompressors() {
+    for (auto it = _compressorNames.begin(); it != _compressorNames.end(); ++it) {
+        if (_compressorsByName.find(*it) == _compressorsByName.end()) {
+            std::stringstream ss;
+            ss << "Invalid network message compressor specified in configuration: " << *it;
+            return {ErrorCodes::BadValue, ss.str()};
+        }
+    }
+    return Status::OK();
 }
 
 const std::vector<std::string>& MessageCompressorRegistry::getCompressorNames() const {
@@ -119,7 +134,7 @@ Status storeMessageCompressionOptions(const moe::Environment& params) {
 // This instantiates and registers the "noop" compressor. It must happen after option storage
 // because that's when the configuration of the compressors gets set.
 MONGO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
-                          ("EndStartupOptionHandling"),
+                          ("EndStartupOptionStorage"),
                           ("AllCompressorsRegistered"))
 (InitializerContext* context) {
     auto& compressorRegistry = MessageCompressorRegistry::get();
@@ -131,7 +146,6 @@ MONGO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
 // any compressor. It must be run after all the compressors have registered themselves with
 // the global registry.
 MONGO_INITIALIZER(AllCompressorsRegistered)(InitializerContext* context) {
-    MessageCompressorRegistry::get().finalizeSupportedCompressors();
-    return Status::OK();
+    return MessageCompressorRegistry::get().finalizeSupportedCompressors();
 }
 }  // namespace mongo

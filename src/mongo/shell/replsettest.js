@@ -938,6 +938,11 @@ var ReplSetTest = function(opts) {
                 dest: getHostName() + ":" + _unbridgedPorts[n],
             });
 
+            if (jsTestOptions().networkMessageCompressors) {
+                bridgeOptions["networkMessageCompressors"] =
+                    jsTestOptions().networkMessageCompressors;
+            }
+
             this.nodes[n] = new MongoBridge(bridgeOptions);
         }
 

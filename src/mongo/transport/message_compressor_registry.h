@@ -107,7 +107,7 @@ public:
      * calls to registerImplementation. It will remove any compressor names that aren't keys in
      * the _compressors map.
      */
-    void finalizeSupportedCompressors();
+    Status finalizeSupportedCompressors();
 
 private:
     StringMap<MessageCompressorBase*> _compressorsByName;

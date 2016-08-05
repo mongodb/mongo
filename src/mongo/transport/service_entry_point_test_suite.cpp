@@ -127,13 +127,13 @@ ServiceEntryPointTestSuite::MockTLHarness::MockTLHarness()
       _asyncWait(kDefaultAsyncWait),
       _end(kDefaultEnd) {}
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::sourceMessage(const Session& session,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::sourceMessage(Session& session,
                                                                 Message* message,
                                                                 Date_t expiration) {
     return _sourceMessage(session, message, expiration);
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::sinkMessage(const Session& session,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::sinkMessage(Session& session,
                                                               const Message& message,
                                                               Date_t expiration) {
     return _sinkMessage(session, message, expiration);
@@ -191,19 +191,17 @@ Status ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError(transport::
     return _defaultWait(std::move(ticket));
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSource(const Session& s,
-                                                                 Message* m,
-                                                                 Date_t d) {
+Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSource(Session& s, Message* m, Date_t d) {
     return Ticket(this, stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, m, d));
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSink(const Session& s,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSink(Session& s,
                                                                const Message&,
                                                                Date_t d) {
     return Ticket(this, stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, d));
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait(const Session& s,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait(Session& s,
                                                                        const Message& m,
                                                                        Date_t d) {
     _wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError, this, _1);
@@ -264,7 +262,7 @@ void ServiceEntryPointTestSuite::halfLifeCycleTest() {
     // Step 1: SEP gets a ticket to source a Message
     // Step 2: SEP calls wait() on the ticket and receives a Message
     // Step 3: SEP gets a ticket to sink a Message
-    _tl->_sinkMessage = [this](const Session& session, const Message& m, Date_t expiration) {
+    _tl->_sinkMessage = [this](Session& session, const Message& m, Date_t expiration) {
 
         // Step 4: SEP calls wait() on the ticket and receives an error
         _tl->_wait =

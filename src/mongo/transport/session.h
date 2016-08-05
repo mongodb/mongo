@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/util/net/hostandport.h"
@@ -152,6 +153,10 @@ public:
         return _ended;
     }
 
+    MessageCompressorManager& getCompressorManager() {
+        return _messageCompressorManager;
+    }
+
 private:
     bool _ended = false;
 
@@ -163,6 +168,8 @@ private:
     TagMask _tags;
 
     TransportLayer* _tl;
+
+    MessageCompressorManager _messageCompressorManager;
 };
 
 }  // namespace transport

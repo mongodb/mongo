@@ -38,6 +38,7 @@
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -119,6 +120,8 @@ public:
                                                   static_cast<ServerParameter*>(nullptr));
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
+
+        txn->getClient()->session()->getCompressorManager().serverNegotiate(cmdObj, &result);
 
         return true;
     }

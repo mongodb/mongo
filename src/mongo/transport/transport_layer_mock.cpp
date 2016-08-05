@@ -64,9 +64,7 @@ boost::optional<Message*> TransportLayerMock::TicketMock::msg() const {
 
 TransportLayerMock::TransportLayerMock() : _shutdown(false) {}
 
-Ticket TransportLayerMock::sourceMessage(const Session& session,
-                                         Message* message,
-                                         Date_t expiration) {
+Ticket TransportLayerMock::sourceMessage(Session& session, Message* message, Date_t expiration) {
     if (inShutdown()) {
         return Ticket(TransportLayer::ShutdownStatus);
     } else if (!owns(session.id())) {
@@ -79,7 +77,7 @@ Ticket TransportLayerMock::sourceMessage(const Session& session,
                   stdx::make_unique<TransportLayerMock::TicketMock>(&session, message, expiration));
 }
 
-Ticket TransportLayerMock::sinkMessage(const Session& session,
+Ticket TransportLayerMock::sinkMessage(Session& session,
                                        const Message& message,
                                        Date_t expiration) {
     if (inShutdown()) {

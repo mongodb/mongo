@@ -978,6 +978,11 @@ var ShardingTest = function(params) {
     otherParams.useBridge = otherParams.useBridge || false;
     otherParams.bridgeOptions = otherParams.bridgeOptions || {};
 
+    if (jsTestOptions().networkMessageCompressors) {
+        otherParams.bridgeOptions["networkMessageCompressors"] =
+            jsTestOptions().networkMessageCompressors;
+    }
+
     var keyFile = otherParams.keyFile;
     var hostName = getHostName();
 

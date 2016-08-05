@@ -1588,6 +1588,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: jsCore_compression
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_compression
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: jsCore_auth
   depends_on:
   - name: jsCore
@@ -2041,6 +2052,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: replicasets_compression
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_compression
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replicasets_legacy
   commands:
   - func: "do setup"
@@ -2103,6 +2123,15 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_compression
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_compression
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -3751,6 +3780,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore_WT
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal_WT
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
@@ -3837,6 +3867,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal_WT
   - name: jsCore_op_query_WT
   - name: jsCore_small_oplog_WT
@@ -3850,6 +3881,7 @@ buildvariants:
   - name: replicasets_WT
   - name: replicasets_WT_ese
   - name: replicasets_auth
+  - name: replicasets_compression
   - name: replicasets_legacy
   - name: replication_WT
   - name: replication_auth
@@ -3859,6 +3891,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_compression
   - name: sharding_csrs_continuous_config_stepdown_WT
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
@@ -4235,6 +4268,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
@@ -4274,10 +4308,12 @@ buildvariants:
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
+  - name: replicasets_compression
   - name: replication
   - name: replication_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_compression
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -4334,6 +4370,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
@@ -4685,6 +4722,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsCore_small_oplog
@@ -4719,6 +4757,7 @@ buildvariants:
   - name: concurrency_simultaneous_WT
   - name: replicasets
   - name: replicasets_WT
+  - name: replicasets_compression
   - name: replication
   - name: replication_WT
   - name: slow1
@@ -5009,6 +5048,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
@@ -5064,6 +5104,9 @@ buildvariants:
   - name: replicasets_auth
     distros:
     - rhel62-large
+  - name: replicasets_compression
+    distros:
+    - rhel62-large
   - name: replicasets_legacy
     distros:
     - rhel62-large
@@ -5088,6 +5131,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: sharding_auth_audit_WT
+    distros:
+    - rhel62-large
+  - name: sharding_compression
     distros:
     - rhel62-large
   - name: sharding_gle_auth_basics_passthrough
@@ -7258,6 +7304,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
@@ -7289,6 +7336,7 @@ buildvariants:
   - name: replicasets_WT
   - name: replicasets_WT_ese
   - name: replicasets_auth
+  - name: replicasets_compression
   - name: replicasets_legacy
   - name: replication
   - name: replication_WT
@@ -7301,6 +7349,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_compression
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -7418,6 +7467,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
@@ -7449,6 +7499,7 @@ buildvariants:
   - name: replicasets_WT
   - name: replicasets_WT_ese
   - name: replicasets_auth
+  - name: replicasets_compression
   - name: replicasets_legacy
   - name: replication
   - name: replication_WT
@@ -7461,6 +7512,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
+  - name: sharding_compression
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd

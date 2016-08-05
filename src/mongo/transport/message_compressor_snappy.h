@@ -29,25 +29,16 @@
 #include "mongo/transport/message_compressor_base.h"
 
 namespace mongo {
-
-class NoopMessageCompressor final : public MessageCompressorBase {
+class SnappyMessageCompressor final : public MessageCompressorBase {
 public:
-    NoopMessageCompressor() : MessageCompressorBase(MessageCompressor::kNoop) {}
+    SnappyMessageCompressor();
 
-    std::size_t getMaxCompressedSize(size_t inputSize) override {
-        return inputSize;
-    }
+    std::size_t getMaxCompressedSize(size_t inputSize) override;
 
-    StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override {
-        output.write(input);
-        counterHitCompress(input.length(), input.length());
-        return {input.length()};
-    }
+    StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override;
 
-    StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override {
-        output.write(input);
-        counterHitDecompress(input.length(), input.length());
-        return {input.length()};
-    }
+    StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override;
 };
+
+
 }  // namespace mongo
