@@ -251,6 +251,12 @@ public:
      */
     void setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn);
 
+    /**
+     * If started with --shardsvr, initializes sharding awareness from the shardIdentity document
+     * on disk, if there is one.
+     * If started with --shardsvr in queryableBackupMode, initializes sharding awareness from the
+     * shardIdentity document passed through the --overrideShardIdentity startup parameter.
+     */
     Status initializeShardingAwarenessIfNeeded(OperationContext* txn);
 
 private:

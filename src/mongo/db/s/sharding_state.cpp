@@ -593,11 +593,14 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
             }
             return reloadShardRegistryUntilSuccess(txn);
         } else {
-            // Warn if --overrideShardIdentity is used but *not* started with --shardsvr.
+            // Error if --overrideShardIdentity is used but *not* started with --shardsvr.
             if (!serverGlobalParams.overrideShardIdentity.isEmpty()) {
-                warning() << "Not started with --shardsvr, but a shardIdentity document was "
-                             "provided through --overrideShardIdentity: "
-                          << serverGlobalParams.overrideShardIdentity;
+                return {
+                    ErrorCodes::InvalidOptions,
+                    str::stream()
+                        << "Not started with --shardsvr, but a shardIdentity document was provided "
+                           "through --overrideShardIdentity: "
+                        << serverGlobalParams.overrideShardIdentity};
             }
             return Status::OK();
         }
@@ -608,14 +611,14 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
     // inserted).
     else {
         if (!serverGlobalParams.overrideShardIdentity.isEmpty()) {
-            return {ErrorCodes::InvalidOptions,
-                    str::stream() << "--overrideShardIdentity is only allowed in sharded "
-                                     "queryableBackupMode. If not in queryableBackupMode, edit the "
-                                     "shardIdentity document by starting the server *without* "
-                                     "--shardsvr, manually updating the shardIdentity document in "
-                                     "the "
-                                  << NamespaceString::kConfigCollectionNamespace.toString()
-                                  << " collection, and restarting the server with --shardsvr."};
+            return {
+                ErrorCodes::InvalidOptions,
+                str::stream() << "--overrideShardIdentity is only allowed in sharded "
+                                 "queryableBackupMode. If not in queryableBackupMode, you can edit "
+                                 "the shardIdentity document by starting the server *without* "
+                                 "--shardsvr, manually updating the shardIdentity document in the "
+                              << NamespaceString::kConfigCollectionNamespace.toString()
+                              << " collection, and restarting the server with --shardsvr."};
         }
 
         // Load the shardIdentity document from disk.
@@ -635,7 +638,9 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
             if (shardIdentityBSON.isEmpty()) {
                 warning() << "Started with --shardsvr, but no shardIdentity document was found on "
                              "disk in "
-                          << NamespaceString::kConfigCollectionNamespace;
+                          << NamespaceString::kConfigCollectionNamespace
+                          << ". This most likely means this server has not yet been added to a "
+                             "sharded cluster.";
                 return Status::OK();
             }
             auto swShardIdentity = ShardIdentityType::fromBSON(shardIdentityBSON);
@@ -682,8 +687,8 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
         }
     }
 
-    // The _configServerTickets serializes this process such that only a small number of threads can
-    // try to refresh at the same time
+    // The _configServerTickets serializes this process such that only a small number of threads
+    // can try to refresh at the same time
     _configServerTickets.waitForTicket();
     TicketHolderReleaser needTicketFrom(&_configServerTickets);
 
@@ -713,8 +718,8 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
         }
     }
 
-    // Exclusive collection lock needed since we're now potentially changing the metadata, and don't
-    // want reads/writes to be ongoing
+    // Exclusive collection lock needed since we're now potentially changing the metadata, and
+    // don't want reads/writes to be ongoing
     ScopedTransaction transaction(txn, MODE_IX);
     AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
