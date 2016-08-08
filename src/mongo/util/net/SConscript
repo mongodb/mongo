@@ -49,6 +49,7 @@ networkEnv.Library(
         "thread_idle_callback.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/auth_rolename',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/background_job',

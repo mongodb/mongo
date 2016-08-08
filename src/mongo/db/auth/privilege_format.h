@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2016 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,27 +26,17 @@
 *    it in the license file.
 */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
-
-stdx::function<std::unique_ptr<AuthzManagerExternalState>()> AuthzManagerExternalState::create;
-
-AuthzManagerExternalState::AuthzManagerExternalState() = default;
-AuthzManagerExternalState::~AuthzManagerExternalState() = default;
-
-bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* txn,
-                                                             const UserName& userName) {
-    return txn && txn->getClient() && txn->getClient()->session() &&
-        txn->getClient()->session()->getX509PeerInfo().subjectName == userName.getUser() &&
-        userName.getDB() == "$external" &&
-        !txn->getClient()->session()->getX509PeerInfo().roles.empty();
-}
-
-
+/**
+ * How user management functions should structure the BSON representation of privileges and roles.
+ */
+enum class PrivilegeFormat {
+    kOmit,               // Privileges should not be included in the BSON representation.
+    kShowSeparate,       // Privileges should be included, each as a separate entry.
+    kShowAsUserFragment  // Privileges and roles should all be collapsed together, and presented as
+                         // a fragment of a user document.
+};
 }  // namespace mongo

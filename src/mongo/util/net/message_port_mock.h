@@ -79,9 +79,9 @@ public:
 
     uint64_t getSockCreationMicroSec() const override;
 
-    void setX509SubjectName(const std::string& x509SubjectName) override;
+    void setX509PeerInfo(SSLPeerInfo x509PeerInfo) override;
 
-    std::string getX509SubjectName() const override;
+    const SSLPeerInfo& getX509PeerInfo() const override;
 
     void setConnectionId(const long long connectionId) override;
 
@@ -97,6 +97,7 @@ public:
 
 private:
     HostAndPort _remote;
+    SSLPeerInfo _x509PeerInfo;
 };
 
 }  // namespace mongo

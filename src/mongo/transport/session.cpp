@@ -32,6 +32,7 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 namespace transport {
@@ -95,8 +96,8 @@ Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
     return _tl->sinkMessage(*this, message, expiration);
 }
 
-std::string Session::getX509SubjectName() const {
-    return _tl->getX509SubjectName(*this);
+SSLPeerInfo Session::getX509PeerInfo() const {
+    return _tl->getX509PeerInfo(*this);
 }
 
 void Session::end() {

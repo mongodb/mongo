@@ -314,7 +314,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
 
     Client* client = Client::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    auto clientName = client->session()->getX509SubjectName();
+    auto clientName = client->session()->getX509PeerInfo().subjectName;
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,

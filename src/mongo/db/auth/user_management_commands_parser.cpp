@@ -414,10 +414,20 @@ Status parseRolesInfoCommand(const BSONObj& cmdObj, StringData dbname, RolesInfo
         parsedArgs->roleNames.push_back(name);
     }
 
-    status = bsonExtractBooleanFieldWithDefault(
-        cmdObj, "showPrivileges", false, &parsedArgs->showPrivileges);
-    if (!status.isOK()) {
-        return status;
+    BSONElement showPrivileges = cmdObj["showPrivileges"];
+    if (showPrivileges.eoo()) {
+        parsedArgs->privilegeFormat = PrivilegeFormat::kOmit;
+    } else if (showPrivileges.isNumber() || showPrivileges.isBoolean()) {
+        parsedArgs->privilegeFormat =
+            showPrivileges.trueValue() ? PrivilegeFormat::kShowSeparate : PrivilegeFormat::kOmit;
+    } else if (showPrivileges.type() == BSONType::String &&
+               showPrivileges.String() == "asUserFragment") {
+        parsedArgs->privilegeFormat = PrivilegeFormat::kShowAsUserFragment;
+    } else {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Failed to parse 'showPrivileges'. 'showPrivileges' should "
+                                       "either be a boolean or the string 'asUserFragment', given: "
+                                    << showPrivileges.toString());
     }
 
     status = bsonExtractBooleanFieldWithDefault(

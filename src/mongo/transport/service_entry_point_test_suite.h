@@ -39,6 +39,7 @@
 namespace mongo {
 
 class ServiceEntryPoint;
+struct SSLPeerInfo;
 
 /**
  * Test class. Uses a mock TransportLayer to test that the ServiceEntryPoint
@@ -129,7 +130,7 @@ private:
             Date_t expiration = transport::Ticket::kNoExpirationDate) override;
         Status wait(transport::Ticket&& ticket) override;
         void asyncWait(transport::Ticket&& ticket, TicketCallback callback) override;
-        std::string getX509SubjectName(const transport::Session& session) override;
+        SSLPeerInfo getX509PeerInfo(const transport::Session& session) const override;
         void registerTags(const transport::Session& session) override;
         Stats sessionStats() override;
         void end(transport::Session& session) override;

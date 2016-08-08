@@ -83,7 +83,7 @@ ASIOMessagingPort::ASIOMessagingPort(int fd, SockAddr farEnd)
       _remote(),
       _isEncrypted(false),
       _awaitingHandshake(true),
-      _x509SubjectName(),
+      _x509PeerInfo(),
       _bytesIn(0),
       _bytesOut(0),
       _logLevel(logger::LogSeverity::Log()),
@@ -121,7 +121,7 @@ ASIOMessagingPort::ASIOMessagingPort(Milliseconds timeout, logger::LogSeverity l
       _remote(),
       _isEncrypted(false),
       _awaitingHandshake(true),
-      _x509SubjectName(),
+      _x509PeerInfo(),
       _bytesIn(0),
       _bytesOut(0),
       _logLevel(logLevel),
@@ -383,13 +383,13 @@ bool ASIOMessagingPort::recv(Message& m) {
                     throw asio::system_error(ec);
                 }
 
-                auto swPeerSubjectName =
+                auto swPeerInfo =
                     getSSLManager()->parseAndValidatePeerCertificate(_sslSock.native_handle(), "");
-                if (!swPeerSubjectName.isOK()) {
+                if (!swPeerInfo.isOK()) {
                     throw SocketException(SocketException::CONNECT_ERROR,
-                                          swPeerSubjectName.getStatus().reason());
+                                          swPeerInfo.getStatus().reason());
                 }
-                setX509SubjectName(swPeerSubjectName.getValue().get_value_or(""));
+                setX509PeerInfo(swPeerInfo.getValue().get_value_or(SSLPeerInfo()));
 
                 _isEncrypted = true;
                 _awaitingHandshake = false;
@@ -590,13 +590,12 @@ bool ASIOMessagingPort::secure(SSLManagerInterface* ssl, const std::string& remo
         return false;
     }
 
-    auto swPeerSubjectName =
+    auto swPeerInfo =
         getSSLManager()->parseAndValidatePeerCertificate(_sslSock.native_handle(), remoteHost);
-    if (!swPeerSubjectName.isOK()) {
-        throw SocketException(SocketException::CONNECT_ERROR,
-                              swPeerSubjectName.getStatus().reason());
+    if (!swPeerInfo.isOK()) {
+        throw SocketException(SocketException::CONNECT_ERROR, swPeerInfo.getStatus().reason());
     }
-    setX509SubjectName(swPeerSubjectName.getValue().get_value_or(""));
+    setX509PeerInfo(swPeerInfo.getValue().get_value_or(SSLPeerInfo()));
 
     _isEncrypted = true;
     return true;
@@ -630,12 +629,12 @@ long long ASIOMessagingPort::getBytesOut() const {
     return _bytesOut;
 }
 
-void ASIOMessagingPort::setX509SubjectName(const std::string& x509SubjectName) {
-    _x509SubjectName = x509SubjectName;
+void ASIOMessagingPort::setX509PeerInfo(SSLPeerInfo x509PeerInfo) {
+    _x509PeerInfo = std::move(x509PeerInfo);
 }
 
-std::string ASIOMessagingPort::getX509SubjectName() const {
-    return _x509SubjectName;
+const SSLPeerInfo& ASIOMessagingPort::getX509PeerInfo() const {
+    return _x509PeerInfo;
 }
 
 void ASIOMessagingPort::setConnectionId(const long long connectionId) {
