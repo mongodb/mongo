@@ -69,7 +69,7 @@ Status WhereMatchExpression::init(StringData dbName) {
     _dbName = dbName.toString();
 
     const string userToken =
-        AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
+        AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
     try {
         _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);

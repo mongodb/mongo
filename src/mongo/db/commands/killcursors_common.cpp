@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-Status KillCursorsCmdBase::checkAuthForCommand(ClientBasic* client,
+Status KillCursorsCmdBase::checkAuthForCommand(Client* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
     auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);

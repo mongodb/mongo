@@ -34,7 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_set.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 
@@ -49,13 +49,13 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logUserIds, bool, false);
  * includeEndingNull parameter.
  */
 void appendServerExtraLogContext(BufBuilder& builder) {
-    ClientBasic* clientBasic = ClientBasic::getCurrent();
-    if (!clientBasic)
+    Client* client = Client::getCurrent();
+    if (!client)
         return;
-    if (!AuthorizationSession::exists(clientBasic))
+    if (!AuthorizationSession::exists(client))
         return;
 
-    UserNameIterator users = AuthorizationSession::get(clientBasic)->getAuthenticatedUserNames();
+    UserNameIterator users = AuthorizationSession::get(client)->getAuthenticatedUserNames();
 
     if (!users.more())
         return;

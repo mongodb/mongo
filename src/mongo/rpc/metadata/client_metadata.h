@@ -40,7 +40,6 @@
 namespace mongo {
 
 class Client;
-class ClientBasic;
 class OperationContext;
 
 constexpr auto kMetadataDocumentName = "client"_sd;

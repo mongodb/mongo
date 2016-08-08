@@ -38,7 +38,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_internal.h"
@@ -97,7 +97,7 @@ public:
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
 
-        const auto authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+        const auto authSession = AuthorizationSession::get(Client::getCurrent());
         auto canonicalizer = HostnameCanonicalizationWorker::get(service);
 
         // --- basic fields that are global

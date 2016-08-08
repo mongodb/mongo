@@ -75,7 +75,7 @@ void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
     }
 }
 
-Status checkAuthForWriteCommand(ClientBasic* client,
+Status checkAuthForWriteCommand(Client* client,
                                 BatchedCommandRequest::BatchType batchType,
                                 NamespaceString ns,
                                 const BSONObj& cmdObj) {
@@ -242,7 +242,7 @@ public:
         help << "insert documents";
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         return checkAuthForWriteCommand(client,
@@ -278,7 +278,7 @@ public:
         help << "update documents";
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         return checkAuthForWriteCommand(client,
@@ -346,7 +346,7 @@ public:
         help << "delete documents";
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         return checkAuthForWriteCommand(client,

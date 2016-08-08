@@ -49,14 +49,14 @@ namespace auth {
 
 struct CreateOrUpdateRoleArgs;
 }
-class ClientBasic;
+class Client;
 
 /**
  * Contains all the authorization logic for a single client connection.  It contains a set of
  * the users which have been authenticated, as well as a set of privileges that have been
  * granted to those users to perform various actions.
  *
- * An AuthorizationSession object is present within every mongo::ClientBasic object.
+ * An AuthorizationSession object is present within every mongo::Client object.
  *
  * Users in the _authenticatedUsers cache may get marked as invalid by the AuthorizationManager,
  * for instance if their privileges are changed by a user or role modification command.  At the
@@ -74,19 +74,19 @@ public:
      *
      * The "client" object continues to own the returned AuthorizationSession.
      */
-    static AuthorizationSession* get(ClientBasic* client);
+    static AuthorizationSession* get(Client* client);
 
     /**
      * Gets the AuthorizationSession associated with the given "client", or nullptr.
      *
      * The "client" object continues to own the returned AuthorizationSession.
      */
-    static AuthorizationSession* get(ClientBasic& client);
+    static AuthorizationSession* get(Client& client);
 
     /**
      * Returns false if AuthorizationSession::get(client) would return nullptr.
      */
-    static bool exists(ClientBasic* client);
+    static bool exists(Client* client);
 
     /**
      * Sets the AuthorizationSession associated with "client" to "session".
@@ -94,7 +94,7 @@ public:
      * "session" must not be NULL, and it is only legal to call this function once
      * on each instance of "client".
      */
-    static void set(ClientBasic* client, std::unique_ptr<AuthorizationSession> session);
+    static void set(Client* client, std::unique_ptr<AuthorizationSession> session);
 
     // Takes ownership of the externalState.
     explicit AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState);
@@ -252,7 +252,7 @@ public:
     // those users will be considered as 'authenticated' for the purpose of this check.
     //
     // The existence of 'opClient' must be guaranteed through locks taken by the caller.
-    bool isCoauthorizedWithClient(ClientBasic* opClient);
+    bool isCoauthorizedWithClient(Client* opClient);
 
     // Tells whether impersonation is active or not.  This state is set when
     // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is

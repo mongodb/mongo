@@ -182,9 +182,7 @@ void addPrivilegesForStage(const std::string& db,
 
 }  // namespace
 
-Status Pipeline::checkAuthForCommand(ClientBasic* client,
-                                     const std::string& db,
-                                     const BSONObj& cmdObj) {
+Status Pipeline::checkAuthForCommand(Client* client, const std::string& db, const BSONObj& cmdObj) {
     NamespaceString inputNs(db, cmdObj.firstElement().str());
     auto inputResource = ResourcePattern::forExactNamespace(inputNs);
     uassert(17138,

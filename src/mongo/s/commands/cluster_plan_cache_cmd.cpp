@@ -29,7 +29,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/s/commands/strategy.h"
@@ -74,9 +74,7 @@ public:
         return parseNsCollectionRequired(dbname, cmdObj).ns();
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 

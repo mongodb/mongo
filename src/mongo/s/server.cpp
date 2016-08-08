@@ -147,7 +147,7 @@ static void cleanupTask() {
         grid.catalogClient(txn)->shutDown(txn);
     }
 
-    audit::logShutdown(ClientBasic::getCurrent());
+    audit::logShutdown(Client::getCurrent());
 }
 
 static BSONObj buildErrReply(const DBException& ex) {

@@ -36,7 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
@@ -219,7 +219,7 @@ public:
      * Checks if the given client is authorized to run this command on database "dbname"
      * with the invocation described by "cmdObj".
      */
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj);
 
@@ -325,14 +325,14 @@ public:
                             rpc::ReplyBuilderInterface* replyBuilder);
 
     // For mongos
-    // TODO: remove this entirely now that all instances of ClientBasic are instances
+    // TODO: remove this entirely now that all instances of Client are instances
     // of Client. This will happen as part of SERVER-18292
-    static void execCommandClientBasic(OperationContext* txn,
-                                       Command* c,
-                                       int queryOptions,
-                                       const char* ns,
-                                       BSONObj& cmdObj,
-                                       BSONObjBuilder& result);
+    static void execCommandClient(OperationContext* txn,
+                                  Command* c,
+                                  int queryOptions,
+                                  const char* ns,
+                                  BSONObj& cmdObj,
+                                  BSONObjBuilder& result);
 
     // Helper for setting errmsg and ok field in command result object.
     static void appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg);

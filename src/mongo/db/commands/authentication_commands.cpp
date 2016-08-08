@@ -50,7 +50,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_key.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
@@ -122,7 +122,7 @@ public:
         stringstream ss;
         ss << hex << n;
         result.append("nonce", ss.str());
-        AuthenticationSession::set(ClientBasic::getCurrent(),
+        AuthenticationSession::set(Client::getCurrent(),
                                    stdx::make_unique<MongoAuthenticationSession>(n));
         return true;
     }
@@ -176,7 +176,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
         mechanism = "MONGODB-CR";
     }
     Status status = _authenticate(txn, mechanism, user, cmdObj);
-    audit::logAuthentication(ClientBasic::getCurrent(), mechanism, user, status.code());
+    audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
     if (!status.isOK()) {
         if (!serverGlobalParams.quiet) {
             log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": "
@@ -241,7 +241,7 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
     stringstream digestBuilder;
 
     {
-        ClientBasic* client = ClientBasic::getCurrent();
+        Client* client = Client::getCurrent();
         std::unique_ptr<AuthenticationSession> session;
         AuthenticationSession::swap(client, session);
         if (!session || session->getType() != AuthenticationSession::SESSION_TYPE_MONGO) {
@@ -290,8 +290,7 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
         return Status(ErrorCodes::AuthenticationFailed, "key mismatch");
     }
 
-    AuthorizationSession* authorizationSession =
-        AuthorizationSession::get(ClientBasic::getCurrent());
+    AuthorizationSession* authorizationSession = AuthorizationSession::get(Client::getCurrent());
     status = authorizationSession->addAndAuthorizeUser(txn, user);
     if (!status.isOK()) {
         return status;
@@ -313,7 +312,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
                       "X.509 authentication must always use the $external database.");
     }
 
-    ClientBasic* client = ClientBasic::getCurrent();
+    Client* client = Client::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
     auto clientName = client->session()->getX509SubjectName();
 
@@ -374,7 +373,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        AuthorizationSession* authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+        AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
         authSession->logoutDatabase(dbname);
         if (Command::testCommandsEnabled && dbname == "admin") {
             // Allows logging out as the internal user against the admin database, however

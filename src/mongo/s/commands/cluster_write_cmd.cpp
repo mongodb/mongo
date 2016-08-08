@@ -32,7 +32,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/lasterror.h"
@@ -78,7 +78,7 @@ public:
         return true;
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         Status status = auth::checkAuthForWriteCommand(AuthorizationSession::get(client),

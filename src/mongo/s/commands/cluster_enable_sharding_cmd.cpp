@@ -37,7 +37,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -71,7 +71,7 @@ public:
              << "  { enablesharding : \"<dbname>\" }\n";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
@@ -107,7 +107,7 @@ public:
 
         Status status = grid.catalogClient(txn)->enableSharding(txn, dbname);
         if (status.isOK()) {
-            audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
+            audit::logEnableSharding(Client::getCurrent(), dbname);
         }
 
         // Make sure to force update of any stale metadata

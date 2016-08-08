@@ -91,7 +91,7 @@ public:
         help << "list indexes for a collection";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);

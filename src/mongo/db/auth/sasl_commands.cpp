@@ -45,7 +45,7 @@
 #include "mongo/db/auth/mongo_authentication_session.h"
 #include "mongo/db/auth/sasl_authentication_session.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/server_options.h"
@@ -172,7 +172,7 @@ void addStatus(const Status& status, BSONObjBuilder* builder) {
         builder->append(saslCommandErrmsgFieldName, status.reason());
 }
 
-Status doSaslStep(const ClientBasic* client,
+Status doSaslStep(const Client* client,
                   SaslAuthenticationSession* session,
                   const BSONObj& cmdObj,
                   BSONObjBuilder* result) {
@@ -217,7 +217,7 @@ Status doSaslStep(const ClientBasic* client,
     return Status::OK();
 }
 
-Status doSaslStart(const ClientBasic* client,
+Status doSaslStart(const Client* client,
                    SaslAuthenticationSession* session,
                    const std::string& db,
                    const BSONObj& cmdObj,
@@ -251,7 +251,7 @@ Status doSaslStart(const ClientBasic* client,
     return doSaslStep(client, session, cmdObj, result);
 }
 
-Status doSaslContinue(const ClientBasic* client,
+Status doSaslContinue(const Client* client,
                       SaslAuthenticationSession* session,
                       const BSONObj& cmdObj,
                       BSONObjBuilder* result) {
@@ -285,7 +285,7 @@ bool CmdSaslStart::run(OperationContext* txn,
                        int options,
                        std::string& ignored,
                        BSONObjBuilder& result) {
-    ClientBasic* client = ClientBasic::getCurrent();
+    Client* client = Client::getCurrent();
     AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
 
     std::string mechanism;
@@ -327,7 +327,7 @@ bool CmdSaslContinue::run(OperationContext* txn,
                           int options,
                           std::string& ignored,
                           BSONObjBuilder& result) {
-    ClientBasic* client = ClientBasic::getCurrent();
+    Client* client = Client::getCurrent();
     std::unique_ptr<AuthenticationSession> sessionGuard;
     AuthenticationSession::swap(client, sessionGuard);
 

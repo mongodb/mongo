@@ -35,7 +35,7 @@
 namespace mongo {
 
 class Status;
-class ClientBasic;
+class Client;
 class BSONObj;
 
 namespace repl {
@@ -59,7 +59,7 @@ protected:
         return false;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override;
 

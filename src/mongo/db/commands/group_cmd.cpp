@@ -94,7 +94,7 @@ private:
         help << "http://dochub.mongodb.org/core/aggregation";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         std::string ns = parseNs(dbname, cmdObj);

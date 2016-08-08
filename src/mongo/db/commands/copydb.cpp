@@ -102,7 +102,7 @@ public:
         return true;
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);

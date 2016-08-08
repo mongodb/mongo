@@ -34,8 +34,8 @@
 
 namespace mongo {
 
-const ClientBasic::Decoration<ClusterLastErrorInfo> ClusterLastErrorInfo::get =
-    ClientBasic::declareDecoration<ClusterLastErrorInfo>();
+const Client::Decoration<ClusterLastErrorInfo> ClusterLastErrorInfo::get =
+    Client::declareDecoration<ClusterLastErrorInfo>();
 
 void ClusterLastErrorInfo::addShardHost(const std::string& shardHost) {
     _cur->shardHostsWritten.insert(shardHost);

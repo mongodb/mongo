@@ -61,7 +61,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        AuthorizationSession* authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+        AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
 
         bool showPrivileges;
         Status status =

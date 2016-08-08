@@ -38,7 +38,6 @@
 namespace mongo {
 
 class Client;
-class ClientBasic;
 
 /**
  * ClientMetadataIsMasterState is responsible for tracking whether the client metadata document has
@@ -50,7 +49,7 @@ class ClientMetadataIsMasterState {
 public:
     ClientMetadataIsMasterState() = default;
 
-    static ClientMetadataIsMasterState& get(ClientBasic* client);
+    static ClientMetadataIsMasterState& get(Client* client);
 
     /**
      * Get the optional client metadata object.

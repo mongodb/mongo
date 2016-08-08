@@ -87,7 +87,7 @@ public:
      * the command that you are explaining. The auth check is performed recursively
      * on the nested command.
      */
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         if (Object != cmdObj.firstElement().type()) {

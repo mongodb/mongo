@@ -70,7 +70,7 @@ public:
         return false;
     }  // TODO: this could be made true...
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         ActionSet actions;

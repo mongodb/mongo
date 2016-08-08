@@ -82,18 +82,17 @@ void Command::execCommand(OperationContext* txn,
     std::string db = request.getDatabase().rawData();
     BSONObjBuilder result;
 
-    execCommandClientBasic(
-        txn, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
+    execCommandClient(txn, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
 
     replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
 }
 
-void Command::execCommandClientBasic(OperationContext* txn,
-                                     Command* c,
-                                     int queryOptions,
-                                     const char* ns,
-                                     BSONObj& cmdObj,
-                                     BSONObjBuilder& result) {
+void Command::execCommandClient(OperationContext* txn,
+                                Command* c,
+                                int queryOptions,
+                                const char* ns,
+                                BSONObj& cmdObj,
+                                BSONObjBuilder& result) {
     std::string dbname = nsToDatabase(ns);
 
     if (cmdObj.getBoolField("help")) {

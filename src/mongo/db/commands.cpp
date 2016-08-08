@@ -204,7 +204,7 @@ void Command::appendCommandWCStatus(BSONObjBuilder& result,
     }
 }
 
-Status Command::checkAuthForCommand(ClientBasic* client,
+Status Command::checkAuthForCommand(Client* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj) {
     std::vector<Privilege> privileges;
@@ -226,7 +226,7 @@ BSONObj Command::getRedactedCopyForLogging(const BSONObj& cmdObj) {
 }
 
 static Status _checkAuthorizationImpl(Command* c,
-                                      ClientBasic* client,
+                                      Client* client,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj) {
     namespace mmb = mutablebson;

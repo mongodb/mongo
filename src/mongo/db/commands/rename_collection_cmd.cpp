@@ -68,7 +68,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);

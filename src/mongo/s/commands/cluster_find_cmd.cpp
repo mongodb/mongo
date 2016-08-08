@@ -92,7 +92,7 @@ public:
      * In order to run the find command, you must be authorized for the "find" action
      * type on the collection.
      */
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         NamespaceString nss(parseNs(dbname, cmdObj));

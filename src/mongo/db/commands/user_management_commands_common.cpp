@@ -110,7 +110,7 @@ Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
     return Status::OK();
 }
 
-Status checkAuthForCreateUserCommand(ClientBasic* client,
+Status checkAuthForCreateUserCommand(Client* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -130,7 +130,7 @@ Status checkAuthForCreateUserCommand(ClientBasic* client,
     return checkAuthorizedToGrantRoles(authzSession, args.roles);
 }
 
-Status checkAuthForUpdateUserCommand(ClientBasic* client,
+Status checkAuthForUpdateUserCommand(Client* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -178,7 +178,7 @@ Status checkAuthForUpdateUserCommand(ClientBasic* client,
     return Status::OK();
 }
 
-Status checkAuthForGrantRolesToUserCommand(ClientBasic* client,
+Status checkAuthForGrantRolesToUserCommand(Client* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -193,7 +193,7 @@ Status checkAuthForGrantRolesToUserCommand(ClientBasic* client,
     return checkAuthorizedToGrantRoles(authzSession, roles);
 }
 
-Status checkAuthForCreateRoleCommand(ClientBasic* client,
+Status checkAuthForCreateRoleCommand(Client* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -217,7 +217,7 @@ Status checkAuthForCreateRoleCommand(ClientBasic* client,
     return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
 }
 
-Status checkAuthForUpdateRoleCommand(ClientBasic* client,
+Status checkAuthForUpdateRoleCommand(Client* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -244,7 +244,7 @@ Status checkAuthForUpdateRoleCommand(ClientBasic* client,
     return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
 }
 
-Status checkAuthForGrantRolesToRoleCommand(ClientBasic* client,
+Status checkAuthForGrantRolesToRoleCommand(Client* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -259,7 +259,7 @@ Status checkAuthForGrantRolesToRoleCommand(ClientBasic* client,
     return checkAuthorizedToGrantRoles(authzSession, roles);
 }
 
-Status checkAuthForGrantPrivilegesToRoleCommand(ClientBasic* client,
+Status checkAuthForGrantPrivilegesToRoleCommand(Client* client,
                                                 const std::string& dbname,
                                                 const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -274,7 +274,7 @@ Status checkAuthForGrantPrivilegesToRoleCommand(ClientBasic* client,
     return checkAuthorizedToGrantPrivileges(authzSession, privileges);
 }
 
-Status checkAuthForDropUserCommand(ClientBasic* client,
+Status checkAuthForDropUserCommand(Client* client,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -293,7 +293,7 @@ Status checkAuthForDropUserCommand(ClientBasic* client,
     return Status::OK();
 }
 
-Status checkAuthForDropRoleCommand(ClientBasic* client,
+Status checkAuthForDropRoleCommand(Client* client,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -312,7 +312,7 @@ Status checkAuthForDropRoleCommand(ClientBasic* client,
     return Status::OK();
 }
 
-Status checkAuthForDropAllUsersFromDatabaseCommand(ClientBasic* client, const std::string& dbname) {
+Status checkAuthForDropAllUsersFromDatabaseCommand(Client* client, const std::string& dbname) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                         ActionType::dropUser)) {
@@ -323,7 +323,7 @@ Status checkAuthForDropAllUsersFromDatabaseCommand(ClientBasic* client, const st
     return Status::OK();
 }
 
-Status checkAuthForRevokeRolesFromUserCommand(ClientBasic* client,
+Status checkAuthForRevokeRolesFromUserCommand(Client* client,
                                               const std::string& dbname,
                                               const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -338,7 +338,7 @@ Status checkAuthForRevokeRolesFromUserCommand(ClientBasic* client,
     return checkAuthorizedToRevokeRoles(authzSession, roles);
 }
 
-Status checkAuthForRevokeRolesFromRoleCommand(ClientBasic* client,
+Status checkAuthForRevokeRolesFromRoleCommand(Client* client,
                                               const std::string& dbname,
                                               const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -353,7 +353,7 @@ Status checkAuthForRevokeRolesFromRoleCommand(ClientBasic* client,
     return checkAuthorizedToRevokeRoles(authzSession, roles);
 }
 
-Status checkAuthForUsersInfoCommand(ClientBasic* client,
+Status checkAuthForUsersInfoCommand(Client* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -387,7 +387,7 @@ Status checkAuthForUsersInfoCommand(ClientBasic* client,
     return Status::OK();
 }
 
-Status checkAuthForRevokePrivilegesFromRoleCommand(ClientBasic* client,
+Status checkAuthForRevokePrivilegesFromRoleCommand(Client* client,
                                                    const std::string& dbname,
                                                    const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -402,7 +402,7 @@ Status checkAuthForRevokePrivilegesFromRoleCommand(ClientBasic* client,
     return checkAuthorizedToRevokePrivileges(authzSession, privileges);
 }
 
-Status checkAuthForDropAllRolesFromDatabaseCommand(ClientBasic* client, const std::string& dbname) {
+Status checkAuthForDropAllRolesFromDatabaseCommand(Client* client, const std::string& dbname) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                         ActionType::dropRole)) {
@@ -413,7 +413,7 @@ Status checkAuthForDropAllRolesFromDatabaseCommand(ClientBasic* client, const st
     return Status::OK();
 }
 
-Status checkAuthForRolesInfoCommand(ClientBasic* client,
+Status checkAuthForRolesInfoCommand(Client* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -450,7 +450,7 @@ Status checkAuthForRolesInfoCommand(ClientBasic* client,
     return Status::OK();
 }
 
-Status checkAuthForInvalidateUserCacheCommand(ClientBasic* client) {
+Status checkAuthForInvalidateUserCacheCommand(Client* client) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                         ActionType::invalidateUserCache)) {
@@ -459,7 +459,7 @@ Status checkAuthForInvalidateUserCacheCommand(ClientBasic* client) {
     return Status::OK();
 }
 
-Status checkAuthForGetUserCacheGenerationCommand(ClientBasic* client) {
+Status checkAuthForGetUserCacheGenerationCommand(Client* client) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                         ActionType::internal)) {
@@ -468,7 +468,7 @@ Status checkAuthForGetUserCacheGenerationCommand(ClientBasic* client) {
     return Status::OK();
 }
 
-Status checkAuthForMergeAuthzCollectionsCommand(ClientBasic* client, const BSONObj& cmdObj) {
+Status checkAuthForMergeAuthzCollectionsCommand(Client* client, const BSONObj& cmdObj) {
     auth::MergeAuthzCollectionsArgs args;
     Status status = auth::parseMergeAuthzCollectionsCommand(cmdObj, &args);
     if (!status.isOK()) {
@@ -508,7 +508,7 @@ Status checkAuthForMergeAuthzCollectionsCommand(ClientBasic* client, const BSONO
     return Status::OK();
 }
 
-Status checkAuthForAuthSchemaUpgradeCommand(ClientBasic* client) {
+Status checkAuthForAuthSchemaUpgradeCommand(Client* client) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                         ActionType::authSchemaUpgrade)) {

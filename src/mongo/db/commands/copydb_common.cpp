@@ -36,16 +36,14 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace copydb {
 
-Status checkAuthForCopydbCommand(ClientBasic* client,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) {
+Status checkAuthForCopydbCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj) {
     bool fromSelf = StringData(cmdObj.getStringField("fromhost")).empty();
     StringData fromdb = cmdObj.getStringField("fromdb");
     StringData todb = cmdObj.getStringField("todb");

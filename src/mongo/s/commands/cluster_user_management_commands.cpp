@@ -73,7 +73,7 @@ public:
         ss << "Adds a user to the system";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForCreateUserCommand(client, dbname, cmdObj);
@@ -112,7 +112,7 @@ public:
         ss << "Used to update a user, for example to change its password";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForUpdateUserCommand(client, dbname, cmdObj);
@@ -162,7 +162,7 @@ public:
         ss << "Drops a single user.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForDropUserCommand(client, dbname, cmdObj);
@@ -208,7 +208,7 @@ public:
         ss << "Drops all users for a single database.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForDropAllUsersFromDatabaseCommand(client, dbname);
@@ -249,7 +249,7 @@ public:
         ss << "Grants roles to a user.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForGrantRolesToUserCommand(client, dbname, cmdObj);
@@ -297,7 +297,7 @@ public:
         ss << "Revokes roles from a user.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForRevokeRolesFromUserCommand(client, dbname, cmdObj);
@@ -349,7 +349,7 @@ public:
         ss << "Returns information about users.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
@@ -383,7 +383,7 @@ public:
         ss << "Adds a role to the system";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForCreateRoleCommand(client, dbname, cmdObj);
@@ -418,7 +418,7 @@ public:
         ss << "Used to update a role";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForUpdateRoleCommand(client, dbname, cmdObj);
@@ -459,7 +459,7 @@ public:
         ss << "Grants privileges to a role";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForGrantPrivilegesToRoleCommand(client, dbname, cmdObj);
@@ -500,7 +500,7 @@ public:
         ss << "Revokes privileges from a role";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForRevokePrivilegesFromRoleCommand(client, dbname, cmdObj);
@@ -541,7 +541,7 @@ public:
         ss << "Grants roles to another role.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForGrantRolesToRoleCommand(client, dbname, cmdObj);
@@ -582,7 +582,7 @@ public:
         ss << "Revokes roles from another role.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForRevokeRolesFromRoleCommand(client, dbname, cmdObj);
@@ -626,7 +626,7 @@ public:
               "removed from some user/roles but otherwise still exists.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForDropRoleCommand(client, dbname, cmdObj);
@@ -671,7 +671,7 @@ public:
               "exist.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForDropAllRolesFromDatabaseCommand(client, dbname);
@@ -716,7 +716,7 @@ public:
         ss << "Returns information about roles.";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
@@ -754,7 +754,7 @@ public:
         ss << "Invalidates the in-memory cache of user information";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForInvalidateUserCacheCommand(client);
@@ -805,7 +805,7 @@ public:
         ss << "Internal command used by mongorestore for updating user/role data";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
@@ -903,7 +903,7 @@ public:
         ss << "Upgrades the auth data storage schema";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return auth::checkAuthForAuthSchemaUpgradeCommand(client);

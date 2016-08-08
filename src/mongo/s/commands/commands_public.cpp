@@ -501,7 +501,7 @@ public:
 class CreateCmd : public PublicGridCommand {
 public:
     CreateCmd() : PublicGridCommand("create") {}
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -594,7 +594,7 @@ public:
 class RenameCollectionCmd : public PublicGridCommand {
 public:
     RenameCollectionCmd() : PublicGridCommand("renameCollection") {}
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
@@ -639,7 +639,7 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
@@ -1081,7 +1081,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
@@ -1694,7 +1694,7 @@ class CmdListCollections final : public PublicGridCommand {
 public:
     CmdListCollections() : PublicGridCommand("listCollections") {}
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -1735,7 +1735,7 @@ public:
 class CmdListIndexes final : public PublicGridCommand {
 public:
     CmdListIndexes() : PublicGridCommand("listIndexes") {}
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
@@ -1783,7 +1783,7 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return Status::OK();

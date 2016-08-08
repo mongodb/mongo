@@ -82,7 +82,7 @@ public:
      * One action type defined for index filter commands:
      * - planCacheIndexFilter
      */
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj);
 

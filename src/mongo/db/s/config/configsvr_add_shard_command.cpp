@@ -76,7 +76,7 @@ public:
         return false;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
@@ -113,7 +113,7 @@ public:
             return appendCommandStatus(result, validationStatus);
         }
 
-        audit::logAddShard(ClientBasic::getCurrent(),
+        audit::logAddShard(Client::getCurrent(),
                            parsedRequest.hasName() ? parsedRequest.getName() : "",
                            parsedRequest.getConnString().toString(),
                            parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize()

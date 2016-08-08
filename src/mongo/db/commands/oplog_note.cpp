@@ -60,7 +60,7 @@ public:
     virtual void help(stringstream& help) const {
         help << "Adds a no-op entry to the oplog";
     }
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(

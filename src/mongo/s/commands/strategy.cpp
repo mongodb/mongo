@@ -108,7 +108,7 @@ void runAgainstRegistered(OperationContext* txn,
         return;
     }
 
-    Command::execCommandClientBasic(txn, c, queryOptions, ns, jsobj, anObjBuilder);
+    Command::execCommandClient(txn, c, queryOptions, ns, jsobj, anObjBuilder);
 }
 
 /**
@@ -159,7 +159,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     QueryMessage q(request.d());
 
     NamespaceString ns(q.ns);
-    ClientBasic* client = txn->getClient();
+    Client* client = txn->getClient();
     AuthorizationSession* authSession = AuthorizationSession::get(client);
     Status status = authSession->checkAuthForFind(ns, false);
     audit::logQueryAuthzCheck(client, ns, q.query, status.code());

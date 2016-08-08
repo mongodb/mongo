@@ -35,7 +35,7 @@
 namespace mongo {
 namespace repl {
 
-Status ReplSetCommand::checkAuthForCommand(ClientBasic* client,
+Status ReplSetCommand::checkAuthForCommand(Client* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
     if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(

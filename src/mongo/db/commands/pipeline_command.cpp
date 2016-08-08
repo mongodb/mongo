@@ -229,7 +229,7 @@ public:
              << "See http://dochub.mongodb.org/core/aggregation for more details.";
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
         return Pipeline::checkAuthForCommand(client, dbname, cmdObj);

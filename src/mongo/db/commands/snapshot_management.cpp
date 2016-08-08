@@ -53,7 +53,7 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return Status::OK();
@@ -103,7 +103,7 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         return Status::OK();

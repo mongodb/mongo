@@ -44,11 +44,11 @@ namespace mongo {
 namespace {
 
 const auto getClientMetadataIsMasterState =
-    ClientBasic::declareDecoration<ClientMetadataIsMasterState>();
+    Client::declareDecoration<ClientMetadataIsMasterState>();
 
 }  // namespace
 
-ClientMetadataIsMasterState& ClientMetadataIsMasterState::get(ClientBasic* client) {
+ClientMetadataIsMasterState& ClientMetadataIsMasterState::get(Client* client) {
     return getClientMetadataIsMasterState(*client);
 }
 

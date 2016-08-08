@@ -36,14 +36,19 @@
 
 #pragma once
 
-#include "mongo/db/client_basic.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/net/abstract_message_port.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -57,8 +62,10 @@ class Session;
 
 typedef long long ConnectionId;
 
-/** the database's concept of an outside "client" */
-class Client : public ClientBasic {
+/**
+ * The database's concept of an outside "client".
+ * */
+class Client final : public Decorable<Client> {
 public:
     /**
      * Creates a Client object and stores it in TLS for the current thread.
@@ -73,6 +80,38 @@ public:
     static void initThread(const char* desc,
                            ServiceContext* serviceContext,
                            transport::Session* session);
+
+    static Client* getCurrent();
+
+    bool getIsLocalHostConnection() {
+        if (!hasRemote()) {
+            return false;
+        }
+        return getRemote().isLocalHost();
+    }
+
+    bool hasRemote() const {
+        return _session;
+    }
+
+    HostAndPort getRemote() const {
+        verify(_session);
+        return _session->remote();
+    }
+
+    /**
+     * Returns the ServiceContext that owns this client session context.
+     */
+    ServiceContext* getServiceContext() const {
+        return _serviceContext;
+    }
+
+    /**
+     * Returns the Session to which this client is bound, if any.
+     */
+    transport::Session* session() const {
+        return _session;
+    }
 
     /**
      * Inits a thread if that thread has not already been init'd, setting the thread name to
@@ -165,6 +204,8 @@ private:
     friend class ServiceContext;
     Client(std::string desc, ServiceContext* serviceContext, transport::Session* session = nullptr);
 
+    ServiceContext* const _serviceContext;
+    transport::Session* const _session;
 
     // Description for the client (e.g. conn8)
     const std::string _desc;

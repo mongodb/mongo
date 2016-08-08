@@ -163,7 +163,7 @@ void IndexFilterCommand::help(stringstream& ss) const {
     ss << helpText;
 }
 
-Status IndexFilterCommand::checkAuthForCommand(ClientBasic* client,
+Status IndexFilterCommand::checkAuthForCommand(Client* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);

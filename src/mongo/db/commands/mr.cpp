@@ -814,7 +814,7 @@ State::~State() {
 void State::init() {
     // setup js
     const string userToken =
-        AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
+        AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
     _scope.reset(globalScriptEngine->newScopeForCurrentThread());
     _scope->registerOperation(_txn);
     _scope->setLocalDB(_config.dbname);

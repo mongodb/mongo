@@ -144,7 +144,7 @@ static TimerStats applyBatchStats;
 static ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches",
                                                                    &applyBatchStats);
 void initializePrefetchThread() {
-    if (!ClientBasic::getCurrent()) {
+    if (!Client::getCurrent()) {
         Client::initThreadIfNotAlready();
         AuthorizationSession::get(cc())->grantInternalAuthorization();
     }
@@ -489,7 +489,7 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>* writerVectors,
 
 void initializeWriterThread() {
     // Only do this once per thread
-    if (!ClientBasic::getCurrent()) {
+    if (!Client::getCurrent()) {
         Client::initThreadIfNotAlready();
         AuthorizationSession::get(cc())->grantInternalAuthorization();
     }

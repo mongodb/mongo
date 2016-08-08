@@ -35,14 +35,14 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace rename_collection {
 
-Status checkAuthForRenameCollectionCommand(ClientBasic* client,
+Status checkAuthForRenameCollectionCommand(Client* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
     NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));

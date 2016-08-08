@@ -157,7 +157,7 @@ void PlanCacheCommand::help(stringstream& ss) const {
     ss << helpText;
 }
 
-Status PlanCacheCommand::checkAuthForCommand(ClientBasic* client,
+Status PlanCacheCommand::checkAuthForCommand(Client* client,
                                              const std::string& dbname,
                                              const BSONObj& cmdObj) {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);

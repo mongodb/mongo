@@ -42,7 +42,7 @@
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
-class ClientBasic;
+class Client;
 class CollatorInterface;
 class DocumentSource;
 struct ExpressionContext;
@@ -77,7 +77,7 @@ public:
     /**
      * Helper to implement Command::checkAuthForCommand.
      */
-    static Status checkAuthForCommand(ClientBasic* client,
+    static Status checkAuthForCommand(Client* client,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj);
 

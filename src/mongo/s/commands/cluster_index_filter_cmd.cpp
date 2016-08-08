@@ -78,9 +78,7 @@ public:
         ss << _helpText;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 

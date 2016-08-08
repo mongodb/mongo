@@ -69,7 +69,7 @@ public:
         help << "{clone: \"host13\"[, slaveOk: <bool>]}";
     }
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
+    virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
         ActionSet actions;

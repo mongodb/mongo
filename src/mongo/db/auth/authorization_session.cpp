@@ -624,7 +624,7 @@ void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernam
     _impersonationFlag = true;
 }
 
-bool AuthorizationSession::isCoauthorizedWithClient(ClientBasic* opClient) {
+bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient) {
     auto getUserNames = [](AuthorizationSession* authSession) {
         if (authSession->isImpersonating()) {
             return authSession->getImpersonatedUserNames();
