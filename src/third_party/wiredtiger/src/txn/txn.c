@@ -408,6 +408,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_TRET(txn->notify->notify(txn->notify,
 		    (WT_SESSION *)session, txn->id, 1));
 
+	/*
+	 * We are about to release the snapshot: copy values into any
+	 * positioned cursors so they don't point to updates that could be
+	 * freed once we don't have a snapshot.
+	 */
+	if (session->ncursors > 0) {
+		WT_DIAGNOSTIC_YIELD;
+		WT_RET(__wt_session_copy_values(session));
+	}
+
 	/* If we are logging, write a commit log record. */
 	if (ret == 0 && txn->mod_count > 0 &&
 	    FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
@@ -436,14 +446,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
 		__wt_txn_op_free(session, op);
 	txn->mod_count = 0;
-
-	/*
-	 * We are about to release the snapshot: copy values into any
-	 * positioned cursors so they don't point to updates that could be
-	 * freed once we don't have a transaction ID pinned.
-	 */
-	if (session->ncursors > 0)
-		WT_RET(__wt_session_copy_values(session));
 
 	__wt_txn_release(session);
 	return (0);

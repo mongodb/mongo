@@ -247,30 +247,6 @@ err:	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 }
 
 /*
- * __conn_dhandle_mark_dead --
- *	Mark a data handle dead.
- */
-static int
-__conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
-{
-	bool evict_reset;
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
-
-	/*
-	 * Handle forced discard (e.g., when dropping a file).
-	 *
-	 * We need exclusive access to the file -- disable ordinary
-	 * eviction and drain any blocks already queued.
-	 */
-	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
-	F_SET(session->dhandle, WT_DHANDLE_DEAD);
-	if (evict_reset)
-		__wt_evict_file_exclusive_off(session);
-	return (0);
-}
-
-/*
  * __wt_conn_btree_sync_and_close --
  *	Sync and close the underlying btree handle.
  */
@@ -280,10 +256,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	bool no_schema_lock;
+	bool evict_reset, marked_dead, no_schema_lock;
 
 	dhandle = session->dhandle;
 	btree = S2BT(session);
+	evict_reset = marked_dead = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
@@ -309,6 +286,13 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	__wt_spin_lock(session, &dhandle->close_lock);
 
 	/*
+	 * Ensure we aren't racing with the eviction server; inside the close
+	 * lock so threads won't race setting/clearing the tree's "no eviction"
+	 * flag.
+	 */
+	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
+
+	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
 	 * error to our caller for eventual retry.
 	 *
@@ -319,20 +303,31 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 * invalid if the mapping is closed.
 	 */
 	if (!F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(force && (btree->bm == NULL || btree->bm->map == NULL) ?
-		    __conn_dhandle_mark_dead(session) :
-		    __wt_checkpoint_close(session, final));
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+		if (force && (btree->bm == NULL || btree->bm->map == NULL)) {
+			F_SET(session->dhandle, WT_DHANDLE_DEAD);
+			marked_dead = true;
+		}
+		if (!marked_dead || final)
+			WT_ERR(__wt_checkpoint_close(session, final));
+	}
 
 	WT_TRET(__wt_btree_close(session));
-	if (!force || final) {
+
+	/*
+	 * If we marked a handle dead it will be closed by sweep, via
+	 * another call to sync and close.
+	 */
+	if (!marked_dead) {
 		F_CLR(dhandle, WT_DHANDLE_OPEN);
 		if (dhandle->checkpoint == NULL)
 			--S2C(session)->open_btree_count;
 	}
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
-err:	__wt_spin_unlock(session, &dhandle->close_lock);
+err:	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
+	__wt_spin_unlock(session, &dhandle->close_lock);
 
 	if (no_schema_lock)
 		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);

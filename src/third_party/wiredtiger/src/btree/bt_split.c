@@ -251,7 +251,7 @@ static int
 __split_ref_deepen_move(WT_SESSION_IMPL *session,
     WT_PAGE *parent, WT_REF *ref, size_t *parent_decrp, size_t *child_incrp)
 {
-	WT_ADDR *addr;
+	WT_ADDR *addr, *ref_addr;
 	WT_CELL_UNPACK unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -287,13 +287,18 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If there's no address (the page has never been written), or the
-	 * address has been instantiated, there's no work to do.  Otherwise,
-	 * get the address from the on-page cell.
+	 * If there's no address at all (the page has never been written), or
+	 * the address has already been instantiated, there's no work to do.
+	 * Otherwise, the address still references a split page on-page cell,
+	 * instantiate it. We can race with reconciliation and/or eviction of
+	 * the child pages, be cautious: read the address and verify it, and
+	 * only update it if the value is unchanged from the original. In the
+	 * case of a race, the address must no longer reference the split page,
+	 * we're done.
 	 */
-	addr = ref->addr;
-	if (addr != NULL && !__wt_off_page(parent, addr)) {
-		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
+	WT_ORDERED_READ(ref_addr, ref->addr);
+	if (ref_addr != NULL && !__wt_off_page(parent, ref_addr)) {
+		__wt_cell_unpack((WT_CELL *)ref_addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
 		if ((ret = __wt_strndup(
 		    session, unpack.data, unpack.size, &addr->addr)) != 0) {
@@ -304,6 +309,10 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 		addr->type =
 		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
 		ref->addr = addr;
+		if (!__wt_atomic_cas_ptr(&ref->addr, ref_addr, addr)) {
+			__wt_free(session, addr->addr);
+			__wt_free(session, addr);
+		}
 	}
 
 	/* And finally, the WT_REF itself. */
@@ -502,7 +511,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * array, a thread might see a freed WT_REF.  Set the eviction
 		 * transaction requirement for the newly created internal pages.
 		 */
-		child->modify->mod_split_txn = __wt_txn_id_alloc(session, false);
+		child->modify->mod_split_txn =
+		    __wt_txn_id_alloc(session, false);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -856,7 +866,7 @@ __split_parent_lock(
 		}
 		/*
 		 * If a checkpoint is running and we fail to lock the parent
-		 * page, give up immmediately to avoid deadlock.
+		 * page, give up immediately to avoid deadlock.
 		 */
 		if (S2BT(session)->checkpointing)
 			return (EBUSY);
