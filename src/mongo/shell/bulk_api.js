@@ -469,9 +469,6 @@ var _bulk_api_module = (function() {
         };
     };
 
-    WriteError.prototype = new Error();
-    WriteError.prototype.constructor = WriteError;
-
     /**
      * Wraps a write concern error
      */
@@ -499,9 +496,6 @@ var _bulk_api_module = (function() {
             return this.toString();
         };
     };
-
-    WriteConcernError.prototype = new Error();
-    WriteConcernError.prototype.constructor = WriteConcernError;
 
     /**
      * Keeps the state of an unordered batch so we can rewrite the results
