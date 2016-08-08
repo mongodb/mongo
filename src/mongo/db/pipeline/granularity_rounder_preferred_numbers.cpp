@@ -156,7 +156,7 @@ void uassertNonNegativeNumber(Value value) {
 
     double number = value.coerceToDouble();
     uassert(40263, "A granularity rounder cannot round NaN", !std::isnan(number));
-    uassert(40264, "A granularity rounder can only round non-negative numbers", number >= 0.0);
+    uassert(40268, "A granularity rounder can only round non-negative numbers", number >= 0.0);
 }
 }  // namespace
 

@@ -553,12 +553,12 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNegativeNumber)
 
         // Make sure that each GranularityRounder fails when rounding a negative number.
         Value negativeNumber = Value(-1);
-        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40264);
-        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40264);
+        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40268);
+        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40268);
 
         negativeNumber = Value(Decimal128(-1));
-        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40264);
-        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40264);
+        ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40268);
+        ASSERT_THROWS_CODE(rounder->roundDown(negativeNumber), UserException, 40268);
     }
 }
 }  // namespace
