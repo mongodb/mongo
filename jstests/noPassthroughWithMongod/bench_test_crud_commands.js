@@ -82,7 +82,14 @@
         testInsert(docs, writeCmd, {});
         testInsert(docs, writeCmd, {"w": "majority"});
         testInsert(docs, writeCmd, {"w": 1, "j": false});
-        testInsert(docs, writeCmd, {"j": true});
+
+        var storageEnginesWithoutJournaling = new Set(["ephemeralForTest", "inMemory"]);
+        var runningWithoutJournaling = TestData.noJournal ||
+            storageEnginesWithoutJournaling.has(db.serverStatus().storageEngine.name);
+        if (!runningWithoutJournaling) {
+            // Only test journaled writes if the server actually supports them.
+            testInsert(docs, writeCmd, {"j": true});
+        }
     }
 
     testWriteConcern(false);
