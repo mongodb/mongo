@@ -583,15 +583,6 @@ list<string> DBClientWithCommands::getDatabaseNames() {
     return names;
 }
 
-list<string> DBClientWithCommands::getCollectionNames(const string& db) {
-    list<BSONObj> infos = getCollectionInfos(db);
-    list<string> names;
-    for (list<BSONObj>::iterator it = infos.begin(); it != infos.end(); ++it) {
-        names.push_back(db + "." + (*it)["name"].valuestr());
-    }
-    return names;
-}
-
 list<BSONObj> DBClientWithCommands::getCollectionInfos(const string& db, const BSONObj& filter) {
     list<BSONObj> infos;
 

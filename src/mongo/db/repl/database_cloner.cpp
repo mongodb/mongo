@@ -38,6 +38,7 @@
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
@@ -94,7 +95,10 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
       _dbWorkThreadPool(dbWorkThreadPool),
       _source(source),
       _dbname(dbname),
-      _listCollectionsFilter(listCollectionsFilter),
+      _listCollectionsFilter(
+          listCollectionsFilter.isEmpty()
+              ? ListCollectionsFilter::makeTypeCollectionFilter()
+              : ListCollectionsFilter::addTypeCollectionFilter(listCollectionsFilter)),
       _listCollectionsPredicate(listCollectionsPred ? listCollectionsPred : acceptAllPred),
       _storageInterface(si),
       _collectionWork(collWork),
@@ -128,7 +132,7 @@ DatabaseCloner::~DatabaseCloner() {
     DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
-const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos() const {
+const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos_forTest() const {
     LockGuard lk(_mutex);
     return _collectionInfos;
 }

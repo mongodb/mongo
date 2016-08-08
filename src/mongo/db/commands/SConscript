@@ -170,6 +170,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="list_collections_filter",
+    source=[
+        'list_collections_filter.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target="index_filter_commands_test",
     source=[

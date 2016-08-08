@@ -692,12 +692,6 @@ public:
     std::list<std::string> getDatabaseNames();
 
     /**
-     * Get a list of all the current collections in db.
-     * Returns fully qualified names.
-     */
-    std::list<std::string> getCollectionNames(const std::string& db);
-
-    /**
      * { name : "<short collection name>",
      *   options : { }
      * }

@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -332,8 +333,8 @@ Status _initialSync(BackgroundSync* bgsync) {
         CloneOptions options;
         options.fromDB = db;
         log() << "fetching and creating collections for " << db;
-        std::list<BSONObj> initialCollections =
-            r.conn()->getCollectionInfos(options.fromDB);  // may uassert
+        std::list<BSONObj> initialCollections = r.conn()->getCollectionInfos(
+            options.fromDB, ListCollectionsFilter::makeTypeCollectionFilter());  // may uassert
         auto fetchStatus = cloner.filterCollectionsForClone(options, initialCollections);
         if (!fetchStatus.isOK()) {
             return fetchStatus.getStatus();

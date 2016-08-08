@@ -106,6 +106,8 @@ public:
      * 'onCompletion' will be called exactly once.
      *
      * Takes ownership of the passed StorageInterface object.
+     *
+     * 'listCollectionsFilter' will be extended to include collections only, filtering out views.
      */
     DatabaseCloner(executor::TaskExecutor* executor,
                    OldThreadPool* dbWorkThreadPool,
@@ -120,11 +122,9 @@ public:
     virtual ~DatabaseCloner();
 
     /**
-     * Returns collection info objects read from listCollections result.
-     * This will return an empty vector until we have processed the last
-     * batch of results from listCollections.
+     * Returns collection info objects read from listCollections result and will not include views.
      */
-    const std::vector<BSONObj>& getCollectionInfos() const;
+    const std::vector<BSONObj>& getCollectionInfos_forTest() const;
 
     std::string getDiagnosticString() const override;
 

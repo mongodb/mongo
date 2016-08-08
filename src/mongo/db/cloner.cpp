@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
@@ -568,7 +569,8 @@ Status Cloner::copyDb(OperationContext* txn,
         // getCollectionInfos may make a remote call, which may block indefinitely, so release
         // the global lock that we are entering with.
         Lock::TempRelease tempRelease(txn->lockState());
-        std::list<BSONObj> initialCollections = _conn->getCollectionInfos(opts.fromDB);
+        std::list<BSONObj> initialCollections = _conn->getCollectionInfos(
+            opts.fromDB, ListCollectionsFilter::makeTypeCollectionFilter());
         auto status = filterCollectionsForClone(opts, initialCollections);
         if (!status.isOK()) {
             return status.getStatus();

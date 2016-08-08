@@ -32,6 +32,7 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/database_cloner.h"
@@ -197,7 +198,10 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithoutFilter) {
     ASSERT_EQUALS(nss.db().toString(), noiRequest.dbname);
     ASSERT_EQUALS("listCollections", std::string(noiRequest.cmdObj.firstElementFieldName()));
     ASSERT_EQUALS(1, noiRequest.cmdObj.firstElement().numberInt());
-    ASSERT_FALSE(noiRequest.cmdObj.hasField("filter"));
+    ASSERT_TRUE(noiRequest.cmdObj.hasField("filter"));
+    BSONElement filterElement = noiRequest.cmdObj.getField("filter");
+    ASSERT_TRUE(filterElement.isABSONObj());
+    ASSERT_EQUALS(ListCollectionsFilter::makeTypeCollectionFilter(), filterElement.Obj());
     ASSERT_FALSE(net->hasReadyRequests());
     ASSERT_TRUE(_databaseCloner->isActive());
 }
@@ -230,7 +234,8 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithFilter) {
     ASSERT_EQUALS(1, noiRequest.cmdObj.firstElement().numberInt());
     BSONElement filterElement = noiRequest.cmdObj.getField("filter");
     ASSERT_TRUE(filterElement.isABSONObj());
-    ASSERT_EQUALS(listCollectionsFilter, filterElement.Obj());
+    ASSERT_EQUALS(ListCollectionsFilter::addTypeCollectionFilter(listCollectionsFilter),
+                  filterElement.Obj());
     ASSERT_FALSE(net->hasReadyRequests());
     ASSERT_TRUE(_databaseCloner->isActive());
 }
@@ -313,7 +318,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
     ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
     ASSERT_TRUE(_databaseCloner->isActive());
 
-    const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos();
+    const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
     ASSERT_EQUALS(2U, collectionInfos.size());
     ASSERT_EQUALS(sourceInfos[0], collectionInfos[0]);
     ASSERT_EQUALS(sourceInfos[2], collectionInfos[1]);
@@ -339,7 +344,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
     ASSERT_TRUE(_databaseCloner->isActive());
 
     {
-        const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos();
+        const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
         ASSERT_EQUALS(1U, collectionInfos.size());
         ASSERT_EQUALS(sourceInfos[0], collectionInfos[0]);
     }
@@ -354,7 +359,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
     ASSERT_TRUE(_databaseCloner->isActive());
 
     {
-        const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos();
+        const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
         ASSERT_EQUALS(2U, collectionInfos.size());
         ASSERT_EQUALS(sourceInfos[0], collectionInfos[0]);
         ASSERT_EQUALS(sourceInfos[1], collectionInfos[1]);
