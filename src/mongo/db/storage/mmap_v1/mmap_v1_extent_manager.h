@@ -111,8 +111,6 @@ public:
      */
     void freeExtent(OperationContext* txn, DiskLoc extent);
 
-    // For debug only: not thread safe
-    void printFreeList() const;
 
     void freeListStats(OperationContext* txn, int* numExtents, int64_t* totalFreeSizeBytes) const;
 
