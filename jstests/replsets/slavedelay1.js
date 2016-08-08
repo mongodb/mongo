@@ -42,11 +42,11 @@ doTest = function(signal) {
         sleep(1000);
     }
 
-    // within 30 seconds delayed slave should have it
+    // within 120 seconds delayed slave should have it
     assert.soon(function() {
         var z = slaves[1].foo.findOne();
         return z && z.x == 1;
-    });
+    }, 'waiting for inserted document ' + tojson(doc) + ' on delayed slave', 120 * 1000);
 
     /************* Part 2 *******************/
 
