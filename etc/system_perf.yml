@@ -557,7 +557,6 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
-        setup: replica-2node.dr
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -601,6 +600,7 @@ tasks:
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
+        setup: replica-2node.dr
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
