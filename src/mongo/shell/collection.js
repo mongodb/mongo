@@ -680,7 +680,7 @@ DBCollection.prototype.createIndexes = function(keys, options) {
     }
 
     if (this.getMongo().writeMode() == "commands") {
-        for (i = 0; i++; i < indexSpecs.length) {
+        for (var i = 0; i < indexSpecs.length; i++) {
             delete (indexSpecs[i].ns);  // ns is passed to the first element in the command.
         }
         return this._db.runCommand({createIndexes: this.getName(), indexes: indexSpecs});
