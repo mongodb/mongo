@@ -6,6 +6,8 @@
 (function() {
     "use strict";
 
+    load('jstests/libs/override_methods/multiversion_override_balancer_control.js');
+
     var waitForIsMaster = function(conn) {
         assert.soon(function() {
             var res = conn.getDB('admin').runCommand({isMaster: 1});
@@ -14,23 +16,30 @@
     };
 
     var checkShardingStateInitialized = function(conn, configConnStr, shardName, clusterId) {
-        var res = conn.getDB('admin').runCommand({shardingState: 1});
-        assert.commandWorked(res);
-        assert(res.enabled);
-        assert.eq(configConnStr, res.configServer);
-        assert.eq(shardName, res.shardName);
-        assert(clusterId.equals(res.clusterId),
-               'cluster id: ' + tojson(clusterId) + ' != ' + tojson(res.clusterId));
+        assert.soon(function() {
+            var res = conn.getDB('admin').runCommand({shardingState: 1});
+            assert.commandWorked(res);
+            if (res.enabled && (configConnStr === res.configServer) &&
+                (shardName === res.shardName) && (clusterId.equals(res.clusterId))) {
+                return true;
+            }
+            return false;
+        });
     };
 
     var checkShardMarkedAsShardAware = function(mongosConn, shardName) {
-        var res = mongosConn.getDB('config').getCollection('shards').findOne({_id: shardName});
-        assert.neq(null, res, "Could not find new shard " + shardName + " in config.shards");
-        assert.eq(1, res.state);
+        assert.soon(function() {
+            var res = mongosConn.getDB('config').getCollection('shards').findOne({_id: shardName});
+            assert.neq(null, res, "Could not find new shard " + shardName + " in config.shards");
+            if (res.state && res.state === 1) {
+                return true;
+            }
+            return false;
+        });
     };
 
     // Create the cluster to test adding shards to.
-    var st = new ShardingTest({shards: 1});
+    var st = new ShardingTest({shards: 1, mongos: {s0: {binVersion: '3.2'}}});
     var clusterId = st.s.getDB('config').getCollection('version').findOne().clusterId;
 
     // Add a shard that is a standalone mongod.
@@ -38,7 +47,6 @@
     var standaloneConn = MongoRunner.runMongod({shardsvr: ''});
     waitForIsMaster(standaloneConn);
 
-    jsTest.log("Going to add standalone as shard: " + standaloneConn);
     var newShardName = "newShard";
     assert.commandWorked(st.s.adminCommand({addShard: standaloneConn.name, name: newShardName}));
     checkShardingStateInitialized(standaloneConn, st.configRS.getURL(), newShardName, clusterId);
@@ -53,7 +61,6 @@
     replTest.initiate();
     waitForIsMaster(replTest.getPrimary());
 
-    jsTest.log("Going to add replica set as shard: " + tojson(replTest));
     assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: replTest.getURL()}));
     checkShardingStateInitialized(
         replTest.getPrimary(), st.configRS.getURL(), replTest.getURL(), clusterId);
