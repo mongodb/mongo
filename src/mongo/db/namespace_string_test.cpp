@@ -202,35 +202,6 @@ TEST(NamespaceStringTest, DBHash) {
     ASSERT_NOT_EQUALS(nsDBHash("foo.d"), nsDBHash("food"));
 }
 
-#define testEqualsBothWays(X, Y)       \
-    ASSERT_TRUE(nsDBEquals((X), (Y))); \
-    ASSERT_TRUE(nsDBEquals((Y), (X)));
-#define testNotEqualsBothWays(X, Y)     \
-    ASSERT_FALSE(nsDBEquals((X), (Y))); \
-    ASSERT_FALSE(nsDBEquals((Y), (X)));
-
-TEST(NamespaceStringTest, DBEquals) {
-    testEqualsBothWays("foo", "foo");
-    testEqualsBothWays("foo", "foo.a");
-    testEqualsBothWays("foo.a", "foo.a");
-    testEqualsBothWays("foo.a", "foo.b");
-
-    testEqualsBothWays("", "");
-    testEqualsBothWays("", ".");
-    testEqualsBothWays("", ".x");
-
-    testNotEqualsBothWays("foo", "bar");
-    testNotEqualsBothWays("foo", "food");
-    testNotEqualsBothWays("foo.", "food");
-
-    testNotEqualsBothWays("", "x");
-    testNotEqualsBothWays("", "x.");
-    testNotEqualsBothWays("", "x.y");
-    testNotEqualsBothWays(".", "x");
-    testNotEqualsBothWays(".", "x.");
-    testNotEqualsBothWays(".", "x.y");
-}
-
 TEST(NamespaceStringTest, nsToDatabase1) {
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo.bar"));
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo"));

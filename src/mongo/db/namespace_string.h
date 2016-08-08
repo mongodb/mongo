@@ -35,6 +35,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -368,31 +369,20 @@ inline bool nsIsDbOnly(StringData ns) {
 }
 
 /**
- * NamespaceDBHash and NamespaceDBEquals allow you to do something like
- * unordered_map<std::string,int,NamespaceDBHash,NamespaceDBEquals>
- * and use the full namespace for the string
- * but comparisons are done only on the db piece
- */
-
-/**
  * this can change, do not store on disk
  */
 int nsDBHash(const std::string& ns);
 
-bool nsDBEquals(const std::string& a, const std::string& b);
-
-struct NamespaceDBHash {
-    int operator()(const std::string& ns) const {
-        return nsDBHash(ns);
-    }
-};
-
-struct NamespaceDBEquals {
-    bool operator()(const std::string& a, const std::string& b) const {
-        return nsDBEquals(a, b);
-    }
-};
-
 }  // namespace mongo
 
 #include "mongo/db/namespace_string-inl.h"
+
+MONGO_HASH_NAMESPACE_START
+template <>
+struct hash<mongo::NamespaceString> {
+    size_t operator()(const mongo::NamespaceString& nss) const {
+        mongo::NamespaceString::Hasher hasher;
+        return hasher(nss);
+    }
+};
+MONGO_HASH_NAMESPACE_END

@@ -17,8 +17,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Shard1:
     // Shard2:
 
-    var staticMongod1 = MongoRunner.runMongod({});  // For startParallelOps.
-    var staticMongod2 = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 3});
 
@@ -75,8 +74,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     // Start a migration between shard0 and shard1 on coll1 and then pause it
     pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
-    var joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+    var joinMoveChunk = moveChunkParallel(
+        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
     assert.commandFailed(
@@ -92,7 +91,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Finish migration
     unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
     assert.doesNotThrow(function() {
-        joinMoveChunk1();
+        joinMoveChunk();
     });
     assert.eq(0, shard0Coll1.count());
     assert.eq(1, shard1Coll1.count());
@@ -126,8 +125,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     // Start a migration between shard0 and shard1 on coll1, pause in steady state before commit
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.reachedSteadyState);
-    joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+    joinMoveChunk = moveChunkParallel(
+        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMoveChunkStep(shard0, moveChunkStepNames.reachedSteadyState);
 
     jsTest.log('Sending false commit command....');
@@ -142,7 +141,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Finish migration
     unpauseMoveChunkAtStep(shard0, moveChunkStepNames.reachedSteadyState);
     assert.doesNotThrow(function() {
-        joinMoveChunk1();
+        joinMoveChunk();
     });
     assert.eq(1, shard0Coll1.count());
     assert.eq(1, shard1Coll1.count());
@@ -174,8 +173,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // check
     pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
-    joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+    joinMoveChunk = moveChunkParallel(
+        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
     // Abort migration on donor side, recipient is unaware
@@ -192,13 +191,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
               "Failed to abort migration, current running ops: " + tojson(inProgressOps));
     unpauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     assert.throws(function() {
-        joinMoveChunk1();
+        joinMoveChunk();
     });
 
     // Start coll2 migration to shard2, pause recipient after delete step
     pauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
-    var joinMoveChunk2 = moveChunkParallel(
-        staticMongod2, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
+    joinMoveChunk = moveChunkParallel(
+        staticMongod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
     waitForMigrateStep(shard2, migrateStepNames.deletedPriorDataInRange);
 
     jsTest.log('Releasing coll1 migration recipient, whose clone command should fail....');
@@ -209,7 +208,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     jsTest.log('Finishing coll2 migration, which should succeed....');
     unpauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
     assert.doesNotThrow(function() {
-        joinMoveChunk2();
+        joinMoveChunk();
     });
     assert.eq(1,
               shard0Coll2.count(),
@@ -241,8 +240,8 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start coll1 migration to shard1: pause recipient after cloning, donor before interrupt check
     pauseMigrateAtStep(shard1, migrateStepNames.cloned);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
-    joinMoveChunk1 = moveChunkParallel(
-        staticMongod1, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+    joinMoveChunk = moveChunkParallel(
+        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.cloned);
 
     // Abort migration on donor side, recipient is unaware
@@ -259,13 +258,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
               "Failed to abort migration, current running ops: " + tojson(inProgressOps));
     unpauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     assert.throws(function() {
-        joinMoveChunk1();
+        joinMoveChunk();
     });
 
     // Start coll2 migration to shard2, pause recipient after cloning step
     pauseMigrateAtStep(shard2, migrateStepNames.cloned);
-    var joinMoveChunk2 = moveChunkParallel(
-        staticMongod2, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
+    joinMoveChunk = moveChunkParallel(
+        staticMongod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
     waitForMigrateStep(shard2, migrateStepNames.cloned);
 
     // Populate donor (shard0) xfermods log.
@@ -284,7 +283,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     jsTest.log('Finishing coll2 migration, which should succeed....');
     unpauseMigrateAtStep(shard2, migrateStepNames.cloned);
     assert.doesNotThrow(function() {
-        joinMoveChunk2();
+        joinMoveChunk();
     });
     assert.eq(1,
               shard0Coll2.count(),

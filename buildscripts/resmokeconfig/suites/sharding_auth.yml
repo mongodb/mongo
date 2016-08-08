@@ -19,6 +19,7 @@ selector:
     - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713
     - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
     - jstests/sharding/migration_ignore_interrupts.js                   # SERVER-21713
+    - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
     # TODO: Enable when SERVER-22672 is complete
     - jstests/sharding/printShardingStatus.js
 

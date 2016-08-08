@@ -47,8 +47,7 @@ namespace {
 
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using MigrationRequest = MigrationManager::MigrationRequest;
-using MigrationRequestVector = MigrationManager::MigrationRequestVector;
+using std::vector;
 
 const auto kShardId0 = ShardId("shard0");
 const auto kShardId1 = ShardId("shard1");
@@ -252,11 +251,8 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const MigrationRequestVector migrationRequests{
-        MigrationRequest(
-            MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false),
-        MigrationRequest(
-            MigrateInfo(chunk2.getNS(), kShardId3, chunk2), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1},
+                                                     {chunk2.getNS(), kShardId3, chunk2}};
 
     auto future = launchAsync([this, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -267,11 +263,11 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
-            ASSERT_OK(migrationStatuses.at(migrateInfo.migrateInfo.getName()));
+            ASSERT_OK(migrationStatuses.at(migrateInfo.getName()));
         }
     });
 
@@ -315,23 +311,10 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
         setUpChunk(collName2, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version2);
 
     // Going to request that these four chunks get migrated.
-    const MigrationRequestVector migrationRequests{
-        MigrationRequest(MigrateInfo(chunk1coll1.getNS(), kShardId1, chunk1coll1),
-                         0,
-                         kDefaultSecondaryThrottle,
-                         false),
-        MigrationRequest(MigrateInfo(chunk2coll1.getNS(), kShardId3, chunk2coll1),
-                         0,
-                         kDefaultSecondaryThrottle,
-                         false),
-        MigrationRequest(MigrateInfo(chunk1coll2.getNS(), kShardId1, chunk1coll2),
-                         0,
-                         kDefaultSecondaryThrottle,
-                         false),
-        MigrationRequest(MigrateInfo(chunk2coll2.getNS(), kShardId3, chunk2coll2),
-                         0,
-                         kDefaultSecondaryThrottle,
-                         false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1coll1.getNS(), kShardId1, chunk1coll1},
+                                                     {chunk2coll1.getNS(), kShardId3, chunk2coll1},
+                                                     {chunk1coll2.getNS(), kShardId1, chunk1coll2},
+                                                     {chunk2coll2.getNS(), kShardId3, chunk2coll2}};
 
     auto future = launchAsync([this, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -342,11 +325,11 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
-            ASSERT_OK(migrationStatuses.at(migrateInfo.migrateInfo.getName()));
+            ASSERT_OK(migrationStatuses.at(migrateInfo.getName()));
         }
     });
 
@@ -386,11 +369,8 @@ TEST_F(MigrationManagerTest, SameCollectionOldShardMigration) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const MigrationRequestVector migrationRequests{
-        MigrationRequest(
-            MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false),
-        MigrationRequest(
-            MigrateInfo(chunk2.getNS(), kShardId3, chunk2), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1},
+                                                     {chunk2.getNS(), kShardId3, chunk2}};
 
     auto future = launchAsync([this, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -401,11 +381,11 @@ TEST_F(MigrationManagerTest, SameCollectionOldShardMigration) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
-            ASSERT_OK(migrationStatuses.at(migrateInfo.migrateInfo.getName()));
+            ASSERT_OK(migrationStatuses.at(migrateInfo.getName()));
         }
     });
 
@@ -443,8 +423,7 @@ TEST_F(MigrationManagerTest, SameOldShardFailsToAcquireDistributedLockTwice) {
         setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     // Going to request that this chunk get migrated.
-    const MigrationRequestVector migrationRequests{MigrationRequest(
-        MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1}};
 
     auto future = launchAsync([this, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -454,12 +433,11 @@ TEST_F(MigrationManagerTest, SameOldShardFailsToAcquireDistributedLockTwice) {
         // Set up a dummy host for the source shard.
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
-            ASSERT_EQ(ErrorCodes::LockBusy,
-                      migrationStatuses.at(migrateInfo.migrateInfo.getName()));
+            ASSERT_EQ(ErrorCodes::LockBusy, migrationStatuses.at(migrateInfo.getName()));
         }
     });
 
@@ -504,11 +482,8 @@ TEST_F(MigrationManagerTest, SameCollectionTwoOldShardMigrations) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const MigrationRequestVector migrationRequests{
-        MigrationRequest(
-            MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false),
-        MigrationRequest(
-            MigrateInfo(chunk2.getNS(), kShardId3, chunk2), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1},
+                                                     {chunk2.getNS(), kShardId3, chunk2}};
 
     auto future = launchAsync([this, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -519,11 +494,11 @@ TEST_F(MigrationManagerTest, SameCollectionTwoOldShardMigrations) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
-            ASSERT_OK(migrationStatuses.at(migrateInfo.migrateInfo.getName()));
+            ASSERT_OK(migrationStatuses.at(migrateInfo.getName()));
         }
     });
 
@@ -571,22 +546,23 @@ TEST_F(MigrationManagerTest, FailToAcquireDistributedLock) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const MigrationRequestVector migrationRequests{
-        MigrationRequest(
-            MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false),
-        MigrationRequest(
-            MigrateInfo(chunk2.getNS(), kShardId3, chunk2), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1},
+                                                     {chunk2.getNS(), kShardId3, chunk2}};
+
+    shardTargeterMock(operationContext(), kShardId0)->setFindHostReturnValue(kShardHost0);
+    shardTargeterMock(operationContext(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
     // Take the distributed lock for the collection before scheduling via the MigrationManager.
     const std::string whyMessage("FailToAcquireDistributedLock unit-test taking distributed lock");
     DistLockManager::ScopedDistLock distLockStatus = unittest::assertGet(
         catalogClient()->distLock(operationContext(), chunk1.getNS(), whyMessage));
 
-    MigrationStatuses migrationStatuses =
-        _migrationManager->scheduleMigrations(operationContext(), migrationRequests);
+    MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+        operationContext(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
     for (const auto& migrateInfo : migrationRequests) {
-        ASSERT_EQ(ErrorCodes::LockBusy, migrationStatuses.at(migrateInfo.migrateInfo.getName()));
+        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+                  migrationStatuses.at(migrateInfo.getName()));
     }
 }
 
@@ -615,11 +591,8 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     // Going to request that these two chunks get migrated.
-    const MigrationRequestVector migrationRequests{
-        MigrationRequest(
-            MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false),
-        MigrationRequest(
-            MigrateInfo(chunk2.getNS(), kShardId3, chunk2), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1},
+                                                     {chunk2.getNS(), kShardId3, chunk2}};
 
     auto future = launchAsync([this, chunk1, chunk2, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -632,8 +605,8 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
             ->setFindHostReturnValue(
                 Status(ErrorCodes::ReplicaSetNotFound, "SourceShardNotFound generated error."));
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         ASSERT_OK(migrationStatuses.at(chunk1.getName()));
         ASSERT_EQ(ErrorCodes::ReplicaSetNotFound, migrationStatuses.at(chunk2.getName()));
@@ -664,8 +637,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
         setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     // Going to request that this chunk gets migrated.
-    const MigrationRequestVector migrationRequests{MigrationRequest(
-        MigrateInfo(chunk1.getNS(), kShardId1, chunk1), 0, kDefaultSecondaryThrottle, false)};
+    const std::vector<MigrateInfo> migrationRequests{{chunk1.getNS(), kShardId1, chunk1}};
 
     auto future = launchAsync([this, chunk1, migrationRequests] {
         Client::initThreadIfNotAlready("Test");
@@ -675,8 +647,8 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
         // up a dummy host for kShardHost0.
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
-        MigrationStatuses migrationStatuses =
-            _migrationManager->scheduleMigrations(txn.get(), migrationRequests);
+        MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
+            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         ASSERT_EQ(ErrorCodes::ChunkTooBig, migrationStatuses.at(chunk1.getName()));
     });

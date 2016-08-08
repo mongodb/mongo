@@ -155,37 +155,6 @@ inline int nsDBHash(const std::string& ns) {
     return hash;
 }
 
-inline bool nsDBEquals(const std::string& a, const std::string& b) {
-    for (size_t i = 0; i < a.size(); i++) {
-        if (a[i] == '.') {
-            // b has to either be done or a '.'
-
-            if (b.size() == i)
-                return true;
-
-            if (b[i] == '.')
-                return true;
-
-            return false;
-        }
-
-        // a is another character
-        if (b.size() == i)
-            return false;
-
-        if (b[i] != a[i])
-            return false;
-    }
-
-    // a is done
-    // make sure b is done
-    if (b.size() == a.size() || b[a.size()] == '.')
-        return true;
-
-    return false;
-}
-
-/* future : this doesn't need to be an inline. */
 inline std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
@@ -198,4 +167,5 @@ inline std::string NamespaceString::getSystemIndexesCollection() const {
 inline std::string NamespaceString::getCommandNS() const {
     return db().toString() + ".$cmd";
 }
-}
+
+}  // namespace mongo

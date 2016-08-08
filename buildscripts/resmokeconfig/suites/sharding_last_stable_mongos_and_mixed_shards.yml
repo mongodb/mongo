@@ -53,12 +53,13 @@ selector:
     - jstests/sharding/collation_targeting_inherited.js
     # Behavior change to addShard
     - jstests/sharding/addshard_idempotent.js
-
     # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
     - jstests/sharding/migration_failure.js
     - jstests/sharding/migration_with_source_ops.js
+    # Parallel migrations are not supported with 3.2 shards
+    - jstests/sharding/movechunk_parallel.js
 
 executor:
   js_test:

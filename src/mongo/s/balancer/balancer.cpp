@@ -44,7 +44,6 @@
 #include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/balancer/cluster_statistics_impl.h"
-#include "mongo/s/balancer/migration_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
@@ -238,15 +237,13 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
         return refreshStatus;
     }
 
-    MigrationManager migrationManager;
-    auto migrationStatuses = migrationManager.scheduleMigrations(
-        txn,
-        {MigrationManager::MigrationRequest(std::move(*migrateInfo),
-                                            balancerConfig->getMaxChunkSizeBytes(),
-                                            balancerConfig->getSecondaryThrottle(),
-                                            balancerConfig->waitForDelete())});
-
-    invariant(migrationStatuses.size() == 1);
+    // Wait for the migration to complete
+    Status migrationStatus =
+        _migrationManager.scheduleManualMigration(txn,
+                                                  *migrateInfo,
+                                                  balancerConfig->getMaxChunkSizeBytes(),
+                                                  balancerConfig->getSecondaryThrottle(),
+                                                  balancerConfig->waitForDelete());
 
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
     if (!scopedCMStatus.isOK()) {
@@ -257,7 +254,7 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
     ChunkManager* const cm = scopedCM.cm();
     cm->reload(txn);
 
-    return migrationStatuses.begin()->second;
+    return migrationStatus;
 }
 
 Status Balancer::moveSingleChunk(OperationContext* txn,
@@ -271,15 +268,13 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
         return moveAllowedStatus;
     }
 
-    MigrationManager migrationManager;
-    auto migrationStatuses = migrationManager.scheduleMigrations(
-        txn,
-        {MigrationManager::MigrationRequest(MigrateInfo(chunk.getNS(), newShardId, chunk),
-                                            maxChunkSizeBytes,
-                                            secondaryThrottle,
-                                            waitForDelete)});
-
-    invariant(migrationStatuses.size() == 1);
+    // Wait for the migration to complete
+    Status migrationStatus =
+        _migrationManager.scheduleManualMigration(txn,
+                                                  MigrateInfo(chunk.getNS(), newShardId, chunk),
+                                                  maxChunkSizeBytes,
+                                                  secondaryThrottle,
+                                                  waitForDelete);
 
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
     if (!scopedCMStatus.isOK()) {
@@ -290,7 +285,7 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
     ChunkManager* const cm = scopedCM.cm();
     cm->reload(txn);
 
-    return migrationStatuses.begin()->second;
+    return migrationStatus;
 }
 
 void Balancer::report(OperationContext* txn, BSONObjBuilder* builder) {
@@ -555,21 +550,14 @@ int Balancer::_moveChunks(OperationContext* txn,
         return 0;
     }
 
-    // Schedule all migrations in parallel
-    MigrationManager migrationManager;
-
-    MigrationManager::MigrationRequestVector migrationRequests;
-
-    for (const auto& migrateInfo : candidateChunks) {
-        migrationRequests.emplace_back(migrateInfo,
-                                       balancerConfig->getMaxChunkSizeBytes(),
-                                       balancerConfig->getSecondaryThrottle(),
-                                       balancerConfig->waitForDelete());
-    }
+    auto migrationStatuses =
+        _migrationManager.executeMigrationsForAutoBalance(txn,
+                                                          candidateChunks,
+                                                          balancerConfig->getMaxChunkSizeBytes(),
+                                                          balancerConfig->getSecondaryThrottle(),
+                                                          balancerConfig->waitForDelete());
 
     int numChunksProcessed = 0;
-
-    auto migrationStatuses = migrationManager.scheduleMigrations(txn, std::move(migrationRequests));
 
     for (const auto& migrationStatusEntry : migrationStatuses) {
         const Status& status = migrationStatusEntry.second;

@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/s/balancer/migration_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -216,6 +217,9 @@ private:
     // Balancer policy. Depends on the cluster statistics instance above so it should be created
     // after it and destroyed before it.
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
+
+    // Migration manager used to schedule and manage migrations
+    MigrationManager _migrationManager;
 };
 
 }  // namespace mongo
