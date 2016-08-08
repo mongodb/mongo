@@ -608,19 +608,6 @@ void MmapV1ExtentManager::freeListStats(OperationContext* txn,
     }
 }
 
-void MmapV1ExtentManager::printFreeList() const {
-    log() << "dump freelist " << _dbname << endl;
-
-    DiskLoc a = _getFreeListStart();
-    while (!a.isNull()) {
-        Extent* e = getExtent(a);
-        log() << "  extent " << a.toString() << " len:" << e->length
-              << " prev:" << e->xprev.toString() << endl;
-        a = e->xnext;
-    }
-
-    log() << "end freelist" << endl;
-}
 
 namespace {
 class CacheHintMadvise : public ExtentManager::CacheHint {
