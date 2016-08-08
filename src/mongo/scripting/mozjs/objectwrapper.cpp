@@ -552,7 +552,10 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
 
     if (isArray) {
         uint32_t length;
-        JS_GetArrayLength(cx, thisv, &length);
+        if (!JS_GetArrayLength(cx, thisv, &length)) {
+            throwCurrentJSException(
+                cx, ErrorCodes::JSInterpreterFailure, "Failure to get array length");
+        }
 
         if (!ids.reserve(length)) {
             throwCurrentJSException(
