@@ -118,10 +118,10 @@ sh.moveChunk = function(fullName, find, to) {
 };
 
 sh.setBalancerState = function(onOrNot) {
-    return assert.writeOK(
-        sh._getConfigDB().settings.update({_id: 'balancer'},
-                                          {$set: {stopped: onOrNot ? false : true}},
-                                          {upsert: true, writeConcern: {w: 'majority'}}));
+    return assert.writeOK(sh._getConfigDB().settings.update(
+        {_id: 'balancer'},
+        {$set: {stopped: onOrNot ? false : true}},
+        {upsert: true, writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
 sh.getBalancerState = function(configDB) {
