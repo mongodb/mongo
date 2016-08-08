@@ -306,9 +306,9 @@ void Socket::secureAccepted(SSLManagerInterface* ssl) {
     _sslManager = ssl;
 }
 
-std::string Socket::doSSLHandshake(const char* firstBytes, int len) {
+SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
     if (!_sslManager)
-        return "";
+        return SSLPeerInfo();
     fassert(16506, _fd != INVALID_SOCKET);
     if (_sslConnection.get()) {
         throw SocketException(SocketException::RECV_ERROR,

@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
@@ -114,9 +115,10 @@ Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfo
 struct RolesInfoArgs {
     std::vector<RoleName> roleNames;
     bool allForDB;
-    bool showPrivileges;
+    PrivilegeFormat privilegeFormat;
     bool showBuiltinRoles;
-    RolesInfoArgs() : allForDB(false), showPrivileges(false), showBuiltinRoles(false) {}
+    RolesInfoArgs()
+        : allForDB(false), privilegeFormat(PrivilegeFormat::kOmit), showBuiltinRoles(false) {}
 };
 
 /**

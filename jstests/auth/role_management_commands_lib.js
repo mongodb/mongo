@@ -278,6 +278,27 @@ function runAllRoleManagementCommandsTests(conn, writeConcern) {
 
         res = testUserAdmin.runCommand({rolesInfo: 1, showBuiltinRoles: 1});
         assert.eq(10, res.roles.length);
+
+        res = testUserAdmin.runCommand({rolesInfo: "testRole1", showPrivileges: 'asUserFragment'});
+        assert(res.userFragment);
+        assert.eq(1, res.userFragment.roles.length);
+        assert.eq([{role: "testRole1", db: "test"}], res.userFragment.roles);
+        assert.eq(2, res.userFragment.inheritedRoles.length);
+        assert.contains({role: "testRole1", db: "test"}, res.userFragment.inheritedRoles);
+        assert.contains({role: "read", db: "test"}, res.userFragment.inheritedRoles);
+        assert.gt(res.userFragment.inheritedPrivileges.length, 0);
+
+        res = testUserAdmin.runCommand(
+            {rolesInfo: ['testRole1', 'testRole2'], showPrivileges: 'asUserFragment'});
+        assert(res.userFragment);
+        assert.eq(2, res.userFragment.roles.length);
+        assert.contains({role: "testRole1", db: "test"}, res.userFragment.roles);
+        assert.contains({role: "testRole2", db: "test"}, res.userFragment.roles);
+        assert.eq(3, res.userFragment.inheritedRoles.length);
+        assert.contains({role: "testRole1", db: "test"}, res.userFragment.inheritedRoles);
+        assert.contains({role: "testRole2", db: "test"}, res.userFragment.inheritedRoles);
+        assert.contains({role: "read", db: "test"}, res.userFragment.inheritedRoles);
+        assert.gt(res.userFragment.inheritedPrivileges.length, 0);
     })();
 
     (function testDropRole() {

@@ -2619,6 +2619,13 @@ def doConfigure(myenv):
             """):
             conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_FIPS_MODE_SET')
 
+        if conf.CheckDeclaration(
+            "d2i_ASN1_SEQUENCE_ANY",
+            includes="""
+                #include <openssl/asn1.h>
+            """):
+            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS')
+
     else:
         env.Append( MONGO_CRYPTO=["tom"] )
 

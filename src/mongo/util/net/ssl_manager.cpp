@@ -58,6 +58,8 @@
 #include "mongo/util/text.h"
 
 #ifdef MONGO_CONFIG_SSL
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 #include <openssl/evp.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
@@ -88,6 +90,28 @@ const SSLParams& getSSLGlobalParams() {
 #endif
 
 namespace {
+
+// clang-format off
+#ifndef MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS
+// Copies of OpenSSL before 1.0.0 do not have ASN1_SEQUENCE_ANY, ASN1_SET_ANY, or the helper
+// functions which let us deserialize these objects. We must polyfill the definitions to interact
+// with ASN1 objects so stored.
+typedef STACK_OF(ASN1_TYPE) ASN1_SEQUENCE_ANY;
+
+ASN1_ITEM_TEMPLATE(ASN1_SEQUENCE_ANY) =
+    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0, ASN1_SEQUENCE_ANY, ASN1_ANY)
+ASN1_ITEM_TEMPLATE_END(ASN1_SEQUENCE_ANY)
+
+ASN1_ITEM_TEMPLATE(ASN1_SET_ANY) =
+    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SET_OF, 0, ASN1_SET_ANY, ASN1_ANY)
+ASN1_ITEM_TEMPLATE_END(ASN1_SET_ANY)
+
+IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SEQUENCE_ANY,
+                                            ASN1_SEQUENCE_ANY)
+IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN1_SET_ANY)
+; // clang format needs to see a semicolon or it will start formatting unrelated code
+#endif // MONGO_CONFIG_NEEDS_ASN1_ANY_DEFINITIONS
+// clang-format on
 
 /**
  * Multithreaded Support for SSL.
@@ -195,10 +219,10 @@ public:
 
     virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len);
 
-    virtual std::string parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
+    virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
                                                                   const std::string& remoteHost);
 
-    StatusWith<boost::optional<std::string>> parseAndValidatePeerCertificate(
+    StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
         SSL* conn, const std::string& remoteHost) final;
 
     virtual const SSLConfiguration& getSSLConfiguration() const {
@@ -220,6 +244,9 @@ public:
     virtual void SSL_free(SSLConnection* conn);
 
 private:
+    const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
+                                     mongodbRolesOID.shortDescription.c_str(),
+                                     mongodbRolesOID.longDescription.c_str());
     UniqueSSLContext _serverContext;  // SSL context for incoming connections
     UniqueSSLContext _clientContext;  // SSL context for outgoing connections
     std::string _password;
@@ -267,6 +294,9 @@ private:
     bool _parseAndValidateCertificate(const std::string& keyFile,
                                       std::string* subjectName,
                                       Date_t* serverNotAfter);
+
+
+    StatusWith<std::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
     /** @return true if was successful, otherwise false */
     bool _setupPEM(SSL_CTX* context, const std::string& keyFile, const std::string& password);
@@ -1089,7 +1119,7 @@ bool SSLManager::_hostNameMatch(const char* nameToMatch, const char* certHostNam
     }
 }
 
-StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertificate(
+StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
@@ -1127,10 +1157,16 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
     std::string peerSubjectName = getCertificateSubjectName(peerCert);
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
 
+    StatusWith<std::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
+    if (!swPeerCertificateRoles.isOK()) {
+        return swPeerCertificateRoles.getStatus();
+    }
+
     // If this is an SSL client context (on a MongoDB server or client)
     // perform hostname validation of the remote server
     if (remoteHost.empty()) {
-        return boost::make_optional(peerSubjectName);
+        return boost::make_optional(
+            SSLPeerInfo(peerSubjectName, std::move(swPeerCertificateRoles.getValue())));
     }
 
     // Try to match using the Subject Alternate Name, if it exists.
@@ -1188,10 +1224,11 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
         }
     }
 
-    return boost::make_optional(peerSubjectName);
+    return boost::make_optional(SSLPeerInfo(peerSubjectName, std::unordered_set<RoleName>()));
 }
 
-std::string SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
+
+SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
                                                                   const std::string& remoteHost) {
     auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost);
     // We can't use uassertStatusOK here because we need to throw a SocketException.
@@ -1199,7 +1236,128 @@ std::string SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConne
         throw SocketException(SocketException::CONNECT_ERROR,
                               swPeerSubjectName.getStatus().reason());
     }
-    return swPeerSubjectName.getValue().get_value_or("");
+    return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
+}
+
+StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
+    // exts is owned by the peerCert
+    STACK_OF(X509_EXTENSION)* exts = peerCert->cert_info->extensions;
+
+    int extCount = 0;
+    if (exts) {
+        extCount = sk_X509_EXTENSION_num(exts);
+    }
+
+    ASN1_OBJECT* rolesObj = OBJ_nid2obj(_rolesNid);
+
+    // Search all certificate extensions for our own
+    std::unordered_set<RoleName> roles;
+    for (int i = 0; i < extCount; i++) {
+        X509_EXTENSION* ex = sk_X509_EXTENSION_value(exts, i);
+        ASN1_OBJECT* obj = X509_EXTENSION_get_object(ex);
+
+        if (!OBJ_cmp(obj, rolesObj)) {
+            // We've found an extension which has our roles OID
+            ASN1_OCTET_STRING* data = X509_EXTENSION_get_data(ex);
+
+            /*
+             * MongoDBAuthorizationGrant ::= CHOICE {
+             *  MongoDBRole,
+             *  ...!UTF8String:"Unrecognized entity in MongoDBAuthorizationGrant"
+             * }
+             * MongoDBAuthorizationGrants ::= SET OF MongoDBAuthorizationGrant
+             */
+            // Extract the set of roles from our extension, and load them into an OpenSSL stack.
+            STACK_OF(ASN1_TYPE)* mongoDBAuthorizationGrants = nullptr;
+
+            // OpenSSL's parsing function will try and manipulate the pointer it's passed. If we
+            // passed it 'data->data' directly, it would modify structures owned by peerCert.
+            const unsigned char* dataBytes = data->data;
+            mongoDBAuthorizationGrants =
+                d2i_ASN1_SET_ANY(&mongoDBAuthorizationGrants, &dataBytes, data->length);
+            if (!mongoDBAuthorizationGrants) {
+                return Status(ErrorCodes::FailedToParse,
+                              "Failed to parse x509 authorization grants");
+            }
+            const auto grantGuard = MakeGuard([&mongoDBAuthorizationGrants]() {
+                sk_ASN1_TYPE_pop_free(mongoDBAuthorizationGrants, ASN1_TYPE_free);
+            });
+
+            /*
+             * MongoDBRole ::= SEQUENCE {
+             *  role     UTF8String,
+             *  database UTF8String
+             * }
+             */
+            // Loop through every role in the stack.
+            ASN1_TYPE* MongoDBRoleWrapped = nullptr;
+            while ((MongoDBRoleWrapped = sk_ASN1_TYPE_pop(mongoDBAuthorizationGrants))) {
+                const auto roleWrappedGuard =
+                    MakeGuard([MongoDBRoleWrapped]() { ASN1_TYPE_free(MongoDBRoleWrapped); });
+
+                if (MongoDBRoleWrapped->type == V_ASN1_SEQUENCE) {
+                    // Unwrap the ASN1Type into a STACK_OF(ASN1_TYPE)
+                    unsigned char* roleBytes = ASN1_STRING_data(MongoDBRoleWrapped->value.sequence);
+                    int roleBytesLength = ASN1_STRING_length(MongoDBRoleWrapped->value.sequence);
+                    ASN1_SEQUENCE_ANY* MongoDBRole = nullptr;
+                    MongoDBRole = d2i_ASN1_SEQUENCE_ANY(
+                        &MongoDBRole, (const unsigned char**)&roleBytes, roleBytesLength);
+                    if (!MongoDBRole) {
+                        return Status(ErrorCodes::FailedToParse,
+                                      "Failed to parse role in x509 authorization grant");
+                    }
+                    const auto roleGuard = MakeGuard(
+                        [&MongoDBRole]() { sk_ASN1_TYPE_pop_free(MongoDBRole, ASN1_TYPE_free); });
+
+                    if (sk_ASN1_TYPE_num(MongoDBRole) != 2) {
+                        return Status(ErrorCodes::FailedToParse,
+                                      "Role entity in MongoDBAuthorizationGrant must have exactly "
+                                      "2 sequence elements");
+                    }
+                    // Extract the subcomponents of the sequence, which are popped off the stack in
+                    // reverse order. Here, parse the role's database.
+                    ASN1_TYPE* roleComponent = sk_ASN1_TYPE_pop(MongoDBRole);
+                    const auto roleDBGuard =
+                        MakeGuard([roleComponent]() { ASN1_TYPE_free(roleComponent); });
+                    if (roleComponent->type != V_ASN1_UTF8STRING) {
+                        return Status(ErrorCodes::FailedToParse,
+                                      "database in MongoDBRole must be a UTF8 string");
+                    }
+                    std::string roleDB(
+                        reinterpret_cast<char*>(ASN1_STRING_data(roleComponent->value.utf8string)));
+
+                    // Parse the role's name.
+                    roleComponent = sk_ASN1_TYPE_pop(MongoDBRole);
+                    const auto roleNameGuard =
+                        MakeGuard([roleComponent]() { ASN1_TYPE_free(roleComponent); });
+                    if (roleComponent->type != V_ASN1_UTF8STRING) {
+                        return Status(ErrorCodes::FailedToParse,
+                                      "role in MongoDBRole must be a UTF8 string");
+                    }
+                    std::string roleName(
+                        reinterpret_cast<char*>(ASN1_STRING_data(roleComponent->value.utf8string)));
+
+                    // Construct a RoleName from the subcomponents
+                    roles.emplace(RoleName(roleName, roleDB));
+
+                } else {
+                    return Status(ErrorCodes::FailedToParse,
+                                  "Unrecognized entity in MongoDBAuthorizationGrant");
+                }
+            }
+        }
+    }
+
+    LOG(1) << "MONGODB-X509 authorization parsed the following roles from peer certificate: "
+           << [&roles]() {
+                  StringBuilder sb;
+                  std::for_each(roles.begin(), roles.end(), [&sb](const RoleName& role) {
+                      sb << role.toString();
+                  });
+                  return sb.str();
+              }();
+
+    return roles;
 }
 
 std::string SSLManagerInterface::getSSLErrorMessage(int code) {

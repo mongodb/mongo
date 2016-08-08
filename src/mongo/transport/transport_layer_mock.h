@@ -36,6 +36,7 @@
 #include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -86,7 +87,8 @@ public:
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    std::string getX509SubjectName(const Session& session) override;
+    SSLPeerInfo getX509PeerInfo(const Session& session) const override;
+    void setX509PeerInfo(const Session& session, SSLPeerInfo peerInfo);
     void registerTags(const Session& session) override;
 
     Stats sessionStats() override;
@@ -102,7 +104,11 @@ public:
     bool inShutdown() const;
 
 private:
-    std::unordered_map<Session::Id, std::unique_ptr<Session>> _sessions;
+    struct Connection {
+        std::unique_ptr<Session> session;
+        SSLPeerInfo peerInfo;
+    };
+    std::unordered_map<Session::Id, Connection> _sessions;
     bool _shutdown;
 };
 

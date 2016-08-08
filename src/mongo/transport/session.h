@@ -37,6 +37,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+struct SSLPeerInfo;
+
 namespace transport {
 
 class TransportLayer;
@@ -102,9 +105,9 @@ public:
     }
 
     /**
-     * Return the X509 subject name for this connection (SSL only).
+     * Return the X509 peer information for this connection (SSL only).
      */
-    std::string getX509SubjectName() const;
+    SSLPeerInfo getX509PeerInfo() const;
 
     /**
      * Set this session's tags. This Session will register

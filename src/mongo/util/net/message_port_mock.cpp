@@ -36,7 +36,7 @@ namespace mongo {
 
 using std::string;
 
-MessagingPortMock::MessagingPortMock() : AbstractMessagingPort() {}
+MessagingPortMock::MessagingPortMock() : AbstractMessagingPort(), _x509PeerInfo() {}
 MessagingPortMock::~MessagingPortMock() {}
 
 void MessagingPortMock::setTimeout(Milliseconds millis) {}
@@ -101,10 +101,10 @@ uint64_t MessagingPortMock::getSockCreationMicroSec() const {
     return 0;
 }
 
-void MessagingPortMock::setX509SubjectName(const std::string& x509SubjectName) {}
+void MessagingPortMock::setX509PeerInfo(SSLPeerInfo x509PeerInfo) {}
 
-std::string MessagingPortMock::getX509SubjectName() const {
-    return "mock";
+const SSLPeerInfo& MessagingPortMock::getX509PeerInfo() const {
+    return _x509PeerInfo;
 }
 
 void MessagingPortMock::setConnectionId(const long long connectionId) {}

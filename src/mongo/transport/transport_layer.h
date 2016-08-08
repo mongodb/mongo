@@ -154,10 +154,10 @@ public:
     virtual void registerTags(const Session& session) = 0;
 
     /**
-     * Return the stored X509 subject name for this session. If the session does not
-     * exist in this TransportLayer, returns "".
+     * Return the stored X509 peer information for this session. If the session does not
+     * exist in this TransportLayer, returns a default constructed object.
      */
-    virtual std::string getX509SubjectName(const Session& session) = 0;
+    virtual SSLPeerInfo getX509PeerInfo(const Session& session) const = 0;
 
     /**
      * Returns the number of sessions currently open in the transport layer.

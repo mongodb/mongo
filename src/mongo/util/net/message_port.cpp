@@ -70,7 +70,7 @@ MessagingPort::MessagingPort(double timeout, logger::LogSeverity ll)
     : MessagingPort(std::make_shared<Socket>(timeout, ll)) {}
 
 MessagingPort::MessagingPort(std::shared_ptr<Socket> sock)
-    : _x509SubjectName(), _connectionId(), _tag(), _psock(std::move(sock)) {
+    : _x509PeerInfo(), _connectionId(), _tag(), _psock(std::move(sock)) {
     SockAddr sa = _psock->remoteAddr();
     _remoteParsed = HostAndPort(sa.getAddr(), sa.getPort());
 }
@@ -127,9 +127,10 @@ bool MessagingPort::recv(Message& m) {
                 uassert(17132,
                         "SSL handshake received but server is started without SSL support",
                         sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
-                setX509SubjectName(
+                setX509PeerInfo(
                     _psock->doSSLHandshake(reinterpret_cast<const char*>(&header), sizeof(header)));
                 _psock->setHandshakeReceived();
+
                 goto again;
             }
             uassert(17189,
@@ -216,12 +217,12 @@ SockAddr MessagingPort::localAddr() const {
     return _psock->localAddr();
 }
 
-void MessagingPort::setX509SubjectName(const std::string& x509SubjectName) {
-    _x509SubjectName = x509SubjectName;
+void MessagingPort::setX509PeerInfo(SSLPeerInfo x509PeerInfo) {
+    _x509PeerInfo = std::move(x509PeerInfo);
 }
 
-std::string MessagingPort::getX509SubjectName() const {
-    return _x509SubjectName;
+const SSLPeerInfo& MessagingPort::getX509PeerInfo() const {
+    return _x509PeerInfo;
 }
 
 void MessagingPort::setConnectionId(const long long connectionId) {

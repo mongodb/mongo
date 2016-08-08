@@ -36,6 +36,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
@@ -219,50 +220,32 @@ public:
     ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly) const;
 
     /**
-     * Writes into "result" a document describing the named user and returns Status::OK().  The
-     * description includes the user credentials and customData, if present, the user's role
-     * membership and delegation information, a full list of the user's privileges, and a full
-     * list of the user's roles, including those roles held implicitly through other roles
-     * (indirect roles).  In the event that some of this information is inconsistent, the
-     * document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
-     *
-     * If the user does not exist, returns ErrorCodes::UserNotFound.
+     * Delegates method call to the underlying AuthzManagerExternalState.
      */
     Status getUserDescription(OperationContext* txn, const UserName& userName, BSONObj* result);
 
     /**
-     * Writes into "result" a document describing the named role and returns Status::OK().  The
-     * description includes the roles in which the named role has membership and a full list of
-     * the roles of which the named role is a member, including those roles memberships held
-     * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
-     * description documents will also include a full list of the role's privileges.
-     * In the event that some of this information is inconsistent, the document will contain a
-     * "warnings" array, with std::string messages describing inconsistencies.
-     *
-     * If the role does not exist, returns ErrorCodes::RoleNotFound.
+     * Delegates method call to the underlying AuthzManagerExternalState.
      */
     Status getRoleDescription(OperationContext* txn,
                               const RoleName& roleName,
-                              bool showPrivileges,
+                              PrivilegeFormat privilegeFormat,
                               BSONObj* result);
 
     /**
-     * Writes into "result" documents describing the roles that are defined on the given
-     * database. Each role description document includes the other roles in which the role has
-     * membership and a full list of the roles of which the named role is a member,
-     * including those roles memberships held implicitly through other roles (indirect roles).
-     * If showPrivileges is true, then the description documents will also include a full list
-     * of the role's privileges.  If showBuiltinRoles is true, then the result array will
-     * contain description documents for all the builtin roles for the given database, if it
-     * is false the result will just include user defined roles.
-     * In the event that some of the information in a given role description is inconsistent,
-     * the document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
+     * Delegates method call to the underlying AuthzManagerExternalState.
+     */
+    Status getRolesDescription(OperationContext* txn,
+                               const std::vector<RoleName>& roleName,
+                               PrivilegeFormat privilegeFormat,
+                               BSONObj* result);
+
+    /**
+     * Delegates method call to the underlying AuthzManagerExternalState.
      */
     Status getRoleDescriptionsForDB(OperationContext* txn,
                                     const std::string dbname,
-                                    bool showPrivileges,
+                                    PrivilegeFormat privilegeFormat,
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result);
 

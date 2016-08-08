@@ -38,15 +38,46 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
+#include "mongo/db/auth/user_document_parser.h"
+#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Returns the top level field which is expected to be returned by rolesInfo.
+ */
+std::string rolesFieldName(PrivilegeFormat showPrivileges) {
+    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
+        return "userFragment";
+    }
+    return "roles";
+}
+
+/**
+ * Attches a string representation of a PrivilegeFormat to the provided BSONObjBuilder.
+ */
+void addShowPrivilegesToBuilder(BSONObjBuilder* builder, PrivilegeFormat showPrivileges) {
+    if (showPrivileges == PrivilegeFormat::kShowSeparate) {
+        builder->append("showPrivileges", true);
+    } else if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
+        builder->append("showPrivileges", "asUserfragment");
+    } else {
+        builder->append("showPrivileges", false);
+    }
+}
+
+}  // namespace
 
 AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
 
@@ -88,59 +119,111 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
 Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn,
                                                            const UserName& userName,
                                                            BSONObj* result) {
-    BSONObj usersInfoCmd =
-        BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                            << userName.getUser()
-                                            << AuthorizationManager::USER_DB_FIELD_NAME
-                                            << userName.getDB()))
-                         << "showPrivileges"
-                         << true
-                         << "showCredentials"
-                         << true);
-    BSONObjBuilder builder;
-    const bool ok =
-        grid.catalogClient(txn)->runUserManagementReadCommand(txn, "admin", usersInfoCmd, &builder);
-    BSONObj cmdResult = builder.obj();
-    if (!ok) {
-        return getStatusFromCommandResult(cmdResult);
-    }
+    if (!shouldUseRolesFromConnection(txn, userName)) {
+        BSONObj usersInfoCmd =
+            BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                                                << userName.getUser()
+                                                << AuthorizationManager::USER_DB_FIELD_NAME
+                                                << userName.getDB()))
+                             << "showPrivileges"
+                             << true
+                             << "showCredentials"
+                             << true);
+        BSONObjBuilder builder;
+        const bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
+            txn, "admin", usersInfoCmd, &builder);
+        BSONObj cmdResult = builder.obj();
+        if (!ok) {
+            return getStatusFromCommandResult(cmdResult);
+        }
 
-    std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
-    if (foundUsers.size() == 0) {
-        return Status(ErrorCodes::UserNotFound, "User \"" + userName.toString() + "\" not found");
-    }
+        std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
+        if (foundUsers.size() == 0) {
+            return Status(ErrorCodes::UserNotFound,
+                          "User \"" + userName.toString() + "\" not found");
+        }
 
-    if (foundUsers.size() > 1) {
-        return Status(ErrorCodes::UserDataInconsistent,
-                      str::stream() << "Found multiple users on the \"" << userName.getDB()
-                                    << "\" database with name \""
-                                    << userName.getUser()
-                                    << "\"");
+        if (foundUsers.size() > 1) {
+            return Status(ErrorCodes::UserDataInconsistent,
+                          str::stream() << "Found multiple users on the \"" << userName.getDB()
+                                        << "\" database with name \""
+                                        << userName.getUser()
+                                        << "\"");
+        }
+        *result = foundUsers[0].Obj().getOwned();
+        return Status::OK();
+    } else {
+        // Obtain privilege information from the config servers for all roles acquired from the X509
+        // certificate.
+        BSONArrayBuilder userRolesBuilder;
+        for (const RoleName& role : txn->getClient()->session()->getX509PeerInfo().roles) {
+            userRolesBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+                                         << role.getRole()
+                                         << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                         << role.getDB()));
+        }
+        BSONArray providedRoles = userRolesBuilder.arr();
+
+        BSONObj rolesInfoCmd = BSON("rolesInfo" << providedRoles << "showPrivileges"
+                                                << "asUserFragment");
+
+        BSONObjBuilder cmdResultBuilder;
+        const bool cmdOk = grid.catalogClient(txn)->runUserManagementReadCommand(
+            txn, "admin", rolesInfoCmd, &cmdResultBuilder);
+        BSONObj cmdResult = cmdResultBuilder.obj();
+        if (!cmdOk || !cmdResult["userFragment"].ok()) {
+            return Status(ErrorCodes::FailedToParse,
+                          "Unable to get resolved X509 roles from config server: " +
+                              getStatusFromCommandResult(cmdResult).toString());
+        }
+        cmdResult = cmdResult["userFragment"].Obj().getOwned();
+        BSONElement userRoles = cmdResult["roles"];
+        BSONElement userInheritedRoles = cmdResult["inheritedRoles"];
+        BSONElement userInheritedPrivileges = cmdResult["inheritedPrivileges"];
+
+        if (userRoles.eoo() || userInheritedRoles.eoo() || userInheritedPrivileges.eoo() ||
+            !userRoles.isABSONObj() || !userInheritedRoles.isABSONObj() ||
+            !userInheritedPrivileges.isABSONObj()) {
+            return Status(
+                ErrorCodes::UserDataInconsistent,
+                "Recieved malformed response to request for X509 roles from config server");
+        }
+
+        *result = BSON("_id" << userName.getUser() << "user" << userName.getUser() << "db"
+                             << userName.getDB()
+                             << "credentials"
+                             << BSON("external" << true)
+                             << "roles"
+                             << BSONArray(cmdResult["roles"].Obj())
+                             << "inheritedRoles"
+                             << BSONArray(cmdResult["inheritedRoles"].Obj())
+                             << "inheritedPrivileges"
+                             << BSONArray(cmdResult["inheritedPrivileges"].Obj()));
+        return Status::OK();
     }
-    *result = foundUsers[0].Obj().getOwned();
-    return Status::OK();
 }
 
 Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn,
                                                            const RoleName& roleName,
-                                                           bool showPrivileges,
+                                                           PrivilegeFormat showPrivileges,
                                                            BSONObj* result) {
-    BSONObj rolesInfoCmd =
-        BSON("rolesInfo" << BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                            << roleName.getRole()
-                                            << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                            << roleName.getDB()))
-                         << "showPrivileges"
-                         << showPrivileges);
+    BSONObjBuilder rolesInfoCmd;
+    rolesInfoCmd.append("rolesInfo",
+                        BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+                                        << roleName.getRole()
+                                        << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                        << roleName.getDB())));
+    addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
+
     BSONObjBuilder builder;
-    const bool ok =
-        grid.catalogClient(txn)->runUserManagementReadCommand(txn, "admin", rolesInfoCmd, &builder);
+    const bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
+        txn, "admin", rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
     }
 
-    std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
+    std::vector<BSONElement> foundRoles = cmdResult[rolesFieldName(showPrivileges)].Array();
     if (foundRoles.size() == 0) {
         return Status(ErrorCodes::RoleNotFound, "Role \"" + roleName.toString() + "\" not found");
     }
@@ -155,23 +238,59 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn
     *result = foundRoles[0].Obj().getOwned();
     return Status::OK();
 }
+Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* txn,
+                                                            const std::vector<RoleName>& roles,
+                                                            PrivilegeFormat showPrivileges,
+                                                            BSONObj* result) {
+    BSONArrayBuilder rolesInfoCmdArray;
 
-Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContext* txn,
-                                                                 const std::string dbname,
-                                                                 bool showPrivileges,
-                                                                 bool showBuiltinRoles,
-                                                                 std::vector<BSONObj>* result) {
-    BSONObj rolesInfoCmd =
-        BSON("rolesInfo" << 1 << "showPrivileges" << showPrivileges << "showBuiltinRoles"
-                         << showBuiltinRoles);
+    for (const RoleName& roleName : roles) {
+        rolesInfoCmdArray << BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+                                  << roleName.getRole()
+                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                  << roleName.getDB());
+    }
+
+    BSONObjBuilder rolesInfoCmd;
+    rolesInfoCmd.append("rolesInfo", rolesInfoCmdArray.arr());
+    addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
+
     BSONObjBuilder builder;
-    const bool ok =
-        grid.catalogClient(txn)->runUserManagementReadCommand(txn, dbname, rolesInfoCmd, &builder);
+    const bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
+        txn, "admin", rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
     }
-    for (BSONObjIterator it(cmdResult["roles"].Obj()); it.more(); it.next()) {
+
+    std::vector<BSONElement> foundRoles = cmdResult[rolesFieldName(showPrivileges)].Array();
+    if (foundRoles.size() == 0) {
+        return Status(ErrorCodes::RoleNotFound, "Roles not found");
+    }
+
+    *result = foundRoles[0].Obj().getOwned();
+
+    return Status::OK();
+}
+Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContext* txn,
+                                                                 const std::string dbname,
+                                                                 PrivilegeFormat showPrivileges,
+                                                                 bool showBuiltinRoles,
+                                                                 std::vector<BSONObj>* result) {
+    BSONObjBuilder rolesInfoCmd;
+    rolesInfoCmd << "rolesInfo" << 1 << "showBuiltinRoles" << showBuiltinRoles;
+    addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
+
+    BSONObjBuilder builder;
+    const bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
+        txn, dbname, rolesInfoCmd.obj(), &builder);
+    BSONObj cmdResult = builder.obj();
+    if (!ok) {
+        return getStatusFromCommandResult(cmdResult);
+    }
+
+    for (BSONObjIterator it(cmdResult[rolesFieldName(showPrivileges)].Obj()); it.more();
+         it.next()) {
         result->push_back((*it).Obj().getOwned());
     }
     return Status::OK();

@@ -41,9 +41,13 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
+#include "mongo/util/net/message_port.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
@@ -235,6 +239,68 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT(clusterPrivilege.getActions().contains(ActionType::serverStatus));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
     authzManager->releaseUser(v2cluster);
+}
+
+TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
+    ServiceContextNoop serviceContext;
+    transport::TransportLayerMock transportLayer{};
+    transport::Session* session = transportLayer.createSession();
+    transportLayer.setX509PeerInfo(
+        *session,
+        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("readWrite", "test")}));
+    ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
+    ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
+
+    User* x509User;
+    ASSERT_OK(
+        authzManager->acquireUser(txn.get(), UserName("CN=mongodb.com", "$external"), &x509User));
+    ASSERT(x509User->isValid());
+
+    std::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
+                                               RoleName("readWrite", "test")};
+    RoleNameIterator roles = x509User->getRoles();
+    std::unordered_set<RoleName> acquiredRoles;
+    while (roles.more()) {
+        acquiredRoles.insert(roles.next());
+    }
+    ASSERT_TRUE(expectedRoles == acquiredRoles);
+
+    const User::ResourcePrivilegeMap& privileges = x509User->getPrivileges();
+    ASSERT_FALSE(privileges.empty());
+    auto privilegeIt = privileges.find(ResourcePattern::forDatabaseName("test"));
+    ASSERT(privilegeIt != privileges.end());
+    ASSERT(privilegeIt->second.includesAction(ActionType::insert));
+
+
+    authzManager->releaseUser(x509User);
+}
+
+TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
+    ServiceContextNoop serviceContext;
+    transport::TransportLayerMock transportLayer{};
+    transport::Session* session = transportLayer.createSession();
+    transportLayer.setX509PeerInfo(
+        *session,
+        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("write", "test")}));
+    ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
+    ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
+
+    User* x509User;
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(txn.get(), UserName("CN=10gen.com", "$external"), &x509User));
+}
+
+TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
+    ServiceContextNoop serviceContext;
+    transport::TransportLayerMock transportLayer{};
+    transport::Session* session = transportLayer.createSession();
+    transportLayer.setX509PeerInfo(*session, {});
+    ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
+    ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
+
+    User* x509User;
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(txn.get(), UserName("CN=mongodb.com", "$external"), &x509User));
 }
 
 /**

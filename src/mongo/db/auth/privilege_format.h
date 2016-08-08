@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2015 MongoDB Inc.
+*    Copyright (C) 2016 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,56 +28,15 @@
 
 #pragma once
 
-// Define to target byte order (1234 vs 4321)
-@mongo_config_byte_order@
 
-// Define if building a debug build
-@mongo_config_debug_build@
-
-// Defined if thread_local storage class is available
-@mongo_config_have_thread_local@
-
-// Defined if __declspec(thread) is available
-@mongo_config_have___declspec_thread@
-
-// Defined if GCC thread-local storage is available
-@mongo_config_have___thread@
-
-// Defined if execinfo.h and backtrace are available
-@mongo_config_have_execinfo_backtrace@
-
-// Defined if OpenSSL has the FIPS_mode_set function
-@mongo_config_have_fips_mode_set@
-
-// Defined if unitstd.h is available
-@mongo_config_have_header_unistd_h@
-
-// Defined if memset_s is available
-@mongo_config_have_memset_s@
-
-// Defined if a POSIX monotonic clock is available
-@mongo_config_have_posix_monotonic_clock@
-
-// Defined if std::is_trivially_copyable is available
-@mongo_config_have_std_is_trivially_copyable@
-
-// Defined if std::make_unique is available
-@mongo_config_have_std_make_unique@
-
-// Defined if std::align is available
-@mongo_config_have_std_align@
-
-// Defined if strnlen is available
-@mongo_config_have_strnlen@
-
-// Defined if building an optimized build
-@mongo_config_optimized_build@
-
-// Defined if SSL support is enabled
-@mongo_config_ssl@
-
-// Defined if OpenSSL has SEQUENCE_ANY
-@mongo_config_ssl_has_asn1_any_definitions@
-
-// Defined if WiredTiger storage engine is enabled
-@mongo_config_wiredtiger_enabled@
+namespace mongo {
+/**
+ * How user management functions should structure the BSON representation of privileges and roles.
+ */
+enum class PrivilegeFormat {
+    kOmit,               // Privileges should not be included in the BSON representation.
+    kShowSeparate,       // Privileges should be included, each as a separate entry.
+    kShowAsUserFragment  // Privileges and roles should all be collapsed together, and presented as
+                         // a fragment of a user document.
+};
+}  // namespace mongo

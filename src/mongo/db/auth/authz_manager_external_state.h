@@ -34,7 +34,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/functional.h"
@@ -80,11 +82,12 @@ public:
 
     /**
      * Writes into "result" a document describing the named user and returns Status::OK().  The
-     * description includes the user credentials, if present, the user's role membership and
-     * delegation information, a full list of the user's privileges, and a full list of the
-     * user's roles, including those roles held implicitly through other roles (indirect roles).
-     * In the event that some of this information is inconsistent, the document will contain a
-     * "warnings" array, with std::string messages describing inconsistencies.
+     * description includes the user credentials and customData, if present, the user's role
+     * membership and delegation information, a full list of the user's privileges, and a full
+     * list of the user's roles, including those roles held implicitly through other roles
+     * (indirect roles). In the event that some of this information is inconsistent, the
+     * document will contain a "warnings" array, with std::string messages describing
+     * inconsistencies.
      *
      * If the user does not exist, returns ErrorCodes::UserNotFound.
      */
@@ -93,37 +96,57 @@ public:
                                       BSONObj* result) = 0;
 
     /**
-     * Writes into "result" a document describing the named role and returns Status::OK().  The
-     * description includes the roles in which the named role has membership and a full list of
-     * the roles of which the named role is a member, including those roles memberships held
-     * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
-     * description documents will also include a full list of the role's privileges.
-     * In the event that some of this information is inconsistent, the document will contain a
-     * "warnings" array, with std::string messages describing inconsistencies.
+     * Writes into "result" a document describing the named role and returns Status::OK(). If
+     * showPrivileges is kOmit or kShowPrivileges, the description includes the roles which the
+     * named role is a member of, including those memberships held implicitly through other roles
+     * (indirect roles). If "showPrivileges" is kShowPrivileges, then the description documents
+     * will also include a full list of the role's privileges. If "showPrivileges" is
+     * kShowAsUserFragment, then the description returned will take the form of a partial user
+     * document, describing a hypothetical user which possesses the provided and implicit roles,
+     * and all inherited privileges. In the event that some of this information is inconsistent,
+     * the document will contain a "warnings" array, with std::string messages describing
+     * inconsistencies.
      *
      * If the role does not exist, returns ErrorCodes::RoleNotFound.
      */
     virtual Status getRoleDescription(OperationContext* txn,
                                       const RoleName& roleName,
-                                      bool showPrivileges,
+                                      PrivilegeFormat showPrivileges,
                                       BSONObj* result) = 0;
 
     /**
-     * Writes into "result" documents describing the roles that are defined on the given
-     * database. Each role description document includes the other roles in which the role has
-     * membership and a full list of the roles of which the named role is a member,
-     * including those roles memberships held implicitly through other roles (indirect roles).
-     * If showPrivileges is true, then the description documents will also include a full list
-     * of the role's privileges.  If showBuiltinRoles is true, then the result array will
-     * contain description documents for all the builtin roles for the given database, if it
-     * is false the result will just include user defined roles.
-     * In the event that some of the information in a given role description is inconsistent,
+     * Writes into "result" a document describing the named role is and returns Status::OK(). If
+     * showPrivileges is kOmit or kShowPrivileges, the description includes the roles which the
+     * named roles are a member of, including those memberships held implicitly through other roles
+     * (indirect roles). If "showPrivileges" is kShowPrivileges, then the description documents
+     * will also include a full list of the roles' privileges. If "showPrivileges" is
+     * kShowAsUserFragment, then the description returned will take the form of a partial user
+     * document, describing a hypothetical user which possesses the provided and implicit roles,
+     * and all inherited privileges. In the event that some of this information is inconsistent,
      * the document will contain a "warnings" array, with std::string messages describing
      * inconsistencies.
      */
+
+    virtual Status getRolesDescription(OperationContext* txn,
+                                       const std::vector<RoleName>& roles,
+                                       PrivilegeFormat showPrivileges,
+                                       BSONObj* result) = 0;
+
+    /**
+     * Writes into "result" documents describing the roles that are defined on the given
+     * database. If showPrivileges is kOmit or kShowPrivileges, then a vector of BSON documents are
+     * returned, where each document includes the other roles a particular role is a
+     * member of, including those role memberships held implicitly through other roles
+     * (indirect roles). If showPrivileges is kShowPrivileges, then the description documents
+     * will also include a full list of the roles' privileges. If showBuiltinRoles is true, then
+     * the result array will contain description documents for all the builtin roles for the given
+     * database, if it is false the result will just include user defined roles. In the event that
+     * some of the information in a given role description is inconsistent, the document will
+     * contain a "warnings" array, with std::string messages describing inconsistencies.
+     */
     virtual Status getRoleDescriptionsForDB(OperationContext* txn,
                                             const std::string dbname,
-                                            bool showPrivileges,
+                                            PrivilegeFormat showPrivileges,
                                             bool showBuiltinRoles,
                                             std::vector<BSONObj>* result) = 0;
 
@@ -141,6 +164,12 @@ public:
 
 protected:
     AuthzManagerExternalState();  // This class should never be instantiated directly.
+
+    /**
+     * Returns true if roles for this user were provided by the client, and can be obtained from
+     * the connection.
+     */
+    bool shouldUseRolesFromConnection(OperationContext* txn, const UserName& username);
 };
 
 }  // namespace mongo

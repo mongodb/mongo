@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 
 #include <openssl/err.h>
@@ -87,6 +88,24 @@ struct SSLConfiguration {
     bool hasCA = false;
 };
 
+/**
+ * Stores information about a globally unique OID.
+ */
+class ASN1OID {
+public:
+    ASN1OID(std::string identifier, std::string shortDescription, std::string longDescription)
+        : identifier(std::move(identifier)),
+          shortDescription(std::move(shortDescription)),
+          longDescription(std::move(longDescription)) {}
+
+    std::string identifier;        // An OID
+    std::string shortDescription;  // A brief description of the entity associated with the OID
+    std::string longDescription;   // A long form description of the entity associated with the OID
+};
+const ASN1OID mongodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
+                              "MongoRoles",
+                              "Sequence of MongoDB Database Roles");
+
 class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
     static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
@@ -116,7 +135,7 @@ public:
      * SocketException upon failure. New code should prefer the version that returns
      * a StatusWith instead.
      */
-    virtual std::string parseAndValidatePeerCertificateDeprecated(
+    virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(
         const SSLConnection* conn, const std::string& remoteHost) = 0;
 
     /**
@@ -162,9 +181,10 @@ public:
      * Fetches a peer certificate and validates it if it exists. If validation fails, but weak
      * validation is enabled, boost::none will be returned. If validation fails, and invalid
      * certificates are not allowed, a non-OK status will be returned. If validation is successful,
-     * an engaged optional containing the certificate's subject name will be returned.
+     * an engaged optional containing the certificate's subject name, and any roles acquired by
+     * X509 authorization will be returned.
      */
-    virtual StatusWith<boost::optional<std::string>> parseAndValidatePeerCertificate(
+    virtual StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
         SSL* ssl, const std::string& remoteHost) = 0;
 };
 
