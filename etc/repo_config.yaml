@@ -155,6 +155,7 @@ repos:
     component: multiverse
     architectures:
       - amd64
+      - arm64
     repos:
       - apt/ubuntu/dists/xenial/mongodb-org
 
@@ -279,5 +280,6 @@ repos:
       - amd64
       - ppc64el
       - s390x
+      - arm64
     repos:
       - apt/ubuntu/dists/xenial/mongodb-enterprise
