@@ -83,6 +83,7 @@ env.Library(
         'sharding_catalog_manager_impl.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',

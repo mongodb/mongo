@@ -121,24 +121,12 @@ void ShardingTestFixture::setUp() {
     auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
 
-    // Set up executor used for a few special operations during addShard.
-    auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
-    auto specialMockNet = specialNet.get();
-    auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
-    _addShardNetworkTestEnv = stdx::make_unique<NetworkTestEnv>(specialExec.get(), specialMockNet);
-    _executorForAddShard = specialExec.get();
-
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
     _distLockManager = uniqueDistLockManager.get();
     std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
         stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
     _catalogClient = catalogClient.get();
     catalogClient->startup();
-
-    std::unique_ptr<ShardingCatalogManagerImpl> catalogManager(
-        stdx::make_unique<ShardingCatalogManagerImpl>(_catalogClient, std::move(specialExec)));
-    _catalogManager = catalogManager.get();
-    catalogManager->startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "configRS", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
@@ -177,7 +165,7 @@ void ShardingTestFixture::setUp() {
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     grid.init(std::move(catalogClient),
-              std::move(catalogManager),
+              nullptr,
               stdx::make_unique<CatalogCache>(),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
@@ -188,7 +176,6 @@ void ShardingTestFixture::setUp() {
 
 void ShardingTestFixture::tearDown() {
     grid.getExecutorPool()->shutdownAndJoin();
-    grid.catalogManager()->shutDown(_opCtx.get());
     grid.catalogClient(_opCtx.get())->shutDown(_opCtx.get());
     grid.clearForUnitTests();
 
@@ -199,18 +186,12 @@ void ShardingTestFixture::tearDown() {
 }
 
 void ShardingTestFixture::shutdownExecutor() {
-    if (_executor) {
+    if (_executor)
         _executor->shutdown();
-        _executorForAddShard->shutdown();
-    }
 }
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
     return grid.catalogClient(_opCtx.get());
-}
-
-ShardingCatalogManager* ShardingTestFixture::catalogManager() const {
-    return grid.catalogManager();
 }
 
 ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {
@@ -260,10 +241,6 @@ OperationContext* ShardingTestFixture::operationContext() const {
 
 void ShardingTestFixture::onCommand(NetworkTestEnv::OnCommandFunction func) {
     _networkTestEnv->onCommand(func);
-}
-
-void ShardingTestFixture::onCommandForAddShard(NetworkTestEnv::OnCommandFunction func) {
-    _addShardNetworkTestEnv->onCommand(func);
 }
 
 void ShardingTestFixture::onCommandWithMetadata(
