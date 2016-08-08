@@ -73,10 +73,13 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 CollectionRangeDeleter::CollectionRangeDeleter(NamespaceString nss) : _nss(std::move(nss)) {}
 
 void CollectionRangeDeleter::run() {
+    const int maxDocumentsToDelete =
+        std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
+
     Client::initThread(getThreadName().c_str());
     ON_BLOCK_EXIT([&] { Client::destroy(); });
     auto txn = cc().makeOperationContext().get();
-    bool hasNextRangeToClean = cleanupNextRange(txn);
+    bool hasNextRangeToClean = cleanupNextRange(txn, maxDocumentsToDelete);
 
     // If there are more ranges to run, we add <this> back onto the task executor to run again.
     if (hasNextRangeToClean) {
@@ -87,11 +90,9 @@ void CollectionRangeDeleter::run() {
     }
 }
 
-bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
+bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn,
+                                              const int maxDocumentsToDelete) {
     int numDocumentsDeleted;
-    const int maxDocumentsToDelete =
-        std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
-
     {
         AutoGetCollection autoColl(txn, _nss, MODE_IX);
         Collection* collection = autoColl.getCollection();
@@ -100,16 +101,19 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
         }
 
         CollectionShardingState* shardingState = CollectionShardingState::get(txn, _nss);
-        MetadataManager& metadataManager = shardingState->_metadataManager;
+        MetadataManager* metadataManager = shardingState->getMetadataManager();
 
-        if (!_rangeInProgress && !metadataManager.hasRangesToClean()) {
+        if (!_rangeInProgress && !metadataManager->hasRangesToClean()) {
             // Nothing left to do
             return false;
         }
 
-        if (!_rangeInProgress || !metadataManager.isInRangesToClean(_rangeInProgress.get())) {
+        if (!_rangeInProgress || !metadataManager->isInRangesToClean(_rangeInProgress.get())) {
             // No valid chunk in progress, get a new one
-            _rangeInProgress = metadataManager.getNextRangeToClean();
+            if (!metadataManager->hasRangesToClean()) {
+                return false;
+            }
+            _rangeInProgress = metadataManager->getNextRangeToClean();
         }
 
         auto metadata = shardingState->getMetadata();
@@ -120,9 +124,9 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
         numDocumentsDeleted =
             _doDeletion(txn, collection, metadata->getKeyPattern(), maxDocumentsToDelete);
         if (numDocumentsDeleted <= 0) {
-            metadataManager.removeRangeToClean(_rangeInProgress.get());
+            metadataManager->removeRangeToClean(_rangeInProgress.get());
             _rangeInProgress = boost::none;
-            return true;
+            return metadataManager->hasRangesToClean();
         }
     }
 
@@ -173,20 +177,22 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
         return -1;
     }
 
-    std::unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                  collection,
-                                                                  desc,
-                                                                  min,
-                                                                  max,
-                                                                  false,
-                                                                  PlanExecutor::YIELD_MANUAL,
-                                                                  InternalPlanner::FORWARD,
-                                                                  InternalPlanner::IXSCAN_FETCH));
     int numDeleted = 0;
     while (numDeleted < maxDocumentsToDelete) {
         RecordId rloc;
         BSONObj obj;
         PlanExecutor::ExecState state;
+        std::unique_ptr<PlanExecutor> exec(
+            InternalPlanner::indexScan(txn,
+                                       collection,
+                                       desc,
+                                       min,
+                                       max,
+                                       false,
+                                       PlanExecutor::YIELD_MANUAL,
+                                       InternalPlanner::FORWARD,
+                                       InternalPlanner::IXSCAN_FETCH));
+
         state = exec->getNext(&obj, &rloc);
         if (PlanExecutor::IS_EOF == state) {
             break;

@@ -50,13 +50,13 @@ public:
 
     /**
      * Acquires the collection IX lock and checks whether there are new entries for the collection's
-     * rangesToClean structure.  If there are, deletes some small amount of entries and yields using
-     * the standard query yielding logic.
+     * rangesToClean structure.  If there are, deletes up to the specified number of entries and
+     * yields using the standard query yielding logic.
      *
      * Returns true if there are more entries in rangesToClean, false if there is no more progress
      * to be made.
      */
-    bool cleanupNextRange(OperationContext* txn);
+    bool cleanupNextRange(OperationContext* txn, const int maxDocumentsToDelete);
 
 private:
     /**

@@ -159,9 +159,13 @@ public:
 
     void onDeleteOp(OperationContext* txn, const DeleteState& deleteState);
 
-private:
-    friend class CollectionRangeDeleter;
+    /** Returns a pointer to the metadata manager for this collection. */
+    MetadataManager* getMetadataManager() {
+        return &_metadataManager;
+    }
 
+
+private:
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *
