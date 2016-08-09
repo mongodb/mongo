@@ -2208,7 +2208,6 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
                       "can only set maintenance mode on replica set members");
     }
 
-    Status result(ErrorCodes::InternalError, "didn't set status");
     LockGuard topoLock(_topoMutex);
     if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
         return Status(ErrorCodes::NotSecondary, "currently running for election");
