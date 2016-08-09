@@ -88,7 +88,7 @@ run=1
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
-	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg $wtarg2
+	LD_PRELOAD=/usr/local/lib/libtcmalloc.so LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg $wtarg2
 	if test "$?" -ne "0"; then
 		exit 1
 	fi
