@@ -1,7 +1,6 @@
 WiredTiger release 2.8.0, 2015-03-24
 ------------------------------------
 
-
 The WiredTiger 2.8.0 release contains new features, new supported platforms,
 minor API changes and bug fixes.
 

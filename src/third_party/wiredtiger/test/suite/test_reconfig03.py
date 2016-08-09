@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+#
+# Public Domain 2014-2016 MongoDB, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
+#
+# This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
+import fnmatch, os, time
+import wiredtiger, wttest
+from helper import simple_populate
+
+# test_reconfig03.py
+#    Test the connection reconfiguration operations used in the MongoDB
+#    test reconfigwt.js.
+class test_reconfig03(wttest.WiredTigerTestCase):
+    conn_config = 'log=(archive=false,enabled,file_max=100K,prealloc=false,zero_fill=false),checkpoint=(wait=1),cache_size=1G'
+    uri = "table:reconfig03"
+
+    # Reconfigure similar to MongoDB tests.  Sleep so that checkpoint
+    # can run after we've made modifications.
+    def test_reconfig03_mdb(self):
+        entries = 10000
+        simple_populate(self, self.uri, 'key_format=S', entries)
+        time.sleep(1)
+        self.conn.reconfigure("eviction_target=81")
+        simple_populate(self, self.uri, 'key_format=S', entries * 2)
+        time.sleep(1)
+        self.conn.reconfigure("cache_size=81M")
+        simple_populate(self, self.uri, 'key_format=S', entries * 3)
+        time.sleep(1)
+        self.conn.reconfigure("eviction_dirty_target=82")
+        simple_populate(self, self.uri, 'key_format=S', entries * 4)
+        time.sleep(1)
+        self.conn.reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)")
+
+if __name__ == '__main__':
+    wttest.run()
