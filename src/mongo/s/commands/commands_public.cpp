@@ -234,7 +234,7 @@ public:
         shared_ptr<DBConfig> conf = status.getValue();
 
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            shardIds.push_back(conf->getShardId(txn, fullns));
+            shardIds.push_back(conf->getPrimaryId());
         } else {
             Grid::get(txn)->shardRegistry()->getAllShardIds(&shardIds);
         }
@@ -624,8 +624,8 @@ public:
         uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
         uassert(13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo));
 
-        const ShardId& shardTo = confTo->getShardId(txn, fullnsTo);
-        const ShardId& shardFrom = confFrom->getShardId(txn, fullnsFrom);
+        auto shardTo = confTo->getPrimaryId();
+        auto shardFrom = confFrom->getPrimaryId();
 
         uassert(13137,
                 "Source and destination collections must be on same shard",

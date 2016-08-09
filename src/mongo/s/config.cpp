@@ -155,13 +155,6 @@ bool DBConfig::isSharded(const string& ns) {
     return i->second.isSharded();
 }
 
-const ShardId& DBConfig::getShardId(OperationContext* txn, const string& ns) {
-    uassert(28679, "ns can't be sharded", !isSharded(ns));
-
-    uassert(10178, "no primary!", grid.shardRegistry()->getShard(txn, _primaryId));
-    return _primaryId;
-}
-
 void DBConfig::invalidateNs(const std::string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
@@ -185,13 +178,13 @@ void DBConfig::enableSharding(OperationContext* txn) {
 }
 
 bool DBConfig::removeSharding(OperationContext* txn, const string& ns) {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+
     if (!_shardingEnabled) {
         warning() << "could not remove sharding for collection " << ns
                   << ", sharding not enabled for db";
         return false;
     }
-
-    stdx::lock_guard<stdx::mutex> lk(_lock);
 
     CollectionInfoMap::iterator i = _collections.find(ns);
 
@@ -680,7 +673,7 @@ void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
     dassert(shardIds);
 
     stdx::lock_guard<stdx::mutex> lk(_lock);
-    shardIds->insert(getPrimaryId());
+    shardIds->insert(_primaryId);
     for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end());
          it != end;
          ++it) {
@@ -698,6 +691,16 @@ void DBConfig::getAllShardedCollections(set<string>& namespaces) {
         if (i->second.isSharded())
             namespaces.insert(i->first);
     }
+}
+
+bool DBConfig::isShardingEnabled() {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+    return _shardingEnabled;
+}
+
+ShardId DBConfig::getPrimaryId() {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+    return _primaryId;
 }
 
 /* --- ConfigServer ---- */
