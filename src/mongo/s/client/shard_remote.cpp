@@ -174,8 +174,12 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
                                                  Milliseconds maxTimeMSOverride,
                                                  const BSONObj& cmdObj) {
 
-    const auto host =
-        _targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
+    if (getId() == "config") {
+        readPrefWithMinOpTime.minOpTime = grid.configOpTime();
+    }
+    const auto host = _targeter->findHost(readPrefWithMinOpTime,
+                                          RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!host.isOK()) {
         return Shard::HostWithResponse(boost::none, host.getStatus());
     }
@@ -187,7 +191,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
         host.getValue(),
         dbName,
         appendMaxTimeToCmdObj(maxTimeMSOverride, cmdObj),
-        _getMetadataForCommand(readPref),
+        _getMetadataForCommand(readPrefWithMinOpTime),
         txn,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 
@@ -238,8 +242,12 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    const auto host =
-        _targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+    invariant(getId() == "config");
+    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
+    readPrefWithMinOpTime.minOpTime = grid.configOpTime();
+
+    const auto host = _targeter->findHost(readPrefWithMinOpTime,
+                                          RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -326,7 +334,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
                     nss.db().toString(),
                     findCmdBuilder.done(),
                     fetcherCallback,
-                    _getMetadataForCommand(readPref),
+                    _getMetadataForCommand(readPrefWithMinOpTime),
                     maxTimeMS);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {

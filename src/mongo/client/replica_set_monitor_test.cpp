@@ -33,6 +33,7 @@
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
 
+
 namespace {
 
 using namespace mongo;
@@ -1314,6 +1315,7 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
 TEST(ReplicaSetMonitor, MaxStalenessMSMatch) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(
         ReadPreference::SecondaryOnly, TagSet(), Milliseconds(100000));
@@ -1341,7 +1343,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSMatch) {
                                         << hosts
                                         << "lastWrite"
                                         << BSON("lastWriteDate" << (nonStale ? lastWriteDateNonStale
-                                                                             : lastWriteDateStale))
+                                                                             : lastWriteDateStale)
+                                                                << "opTime"
+                                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1364,6 +1368,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSMatch) {
 TEST(ReplicaSetMonitor, MaxStalenessMSNoMatch) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
     BSONArray hosts = BSON_ARRAY("a"
@@ -1388,7 +1393,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoMatch) {
                                         << hosts
                                         << "lastWrite"
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
-                                                                            : lastWriteDateStale))
+                                                                            : lastWriteDateStale)
+                                                                << "opTime"
+                                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
 
@@ -1412,6 +1419,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoMatch) {
 TEST(ReplicaSetMonitor, MaxStalenessMSNoPrimaryMatch) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
     BSONArray hosts = BSON_ARRAY("a"
@@ -1437,7 +1445,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoPrimaryMatch) {
                                         << "lastWrite"
                                         << BSON("lastWriteDate"
                                                 << (isNonStale ? lastWriteDateNonStale
-                                                               : lastWriteDateStale))
+                                                               : lastWriteDateStale)
+                                                << "opTime"
+                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
 
@@ -1463,6 +1473,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoPrimaryMatch) {
 TEST(ReplicaSetMonitor, MaxStalenessMSAllFailed) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
     BSONArray hosts = BSON_ARRAY("a"
@@ -1488,7 +1499,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllFailed) {
                                         << "lastWrite"
                                         << BSON("lastWriteDate"
                                                 << (isNonStale ? lastWriteDateNonStale
-                                                               : lastWriteDateStale))
+                                                               : lastWriteDateStale)
+                                                << "opTime"
+                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
 
@@ -1513,6 +1526,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllFailed) {
 TEST(ReplicaSetMonitor, MaxStalenessMSAllButPrimaryFailed) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
     BSONArray hosts = BSON_ARRAY("a"
@@ -1537,7 +1551,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllButPrimaryFailed) {
                                         << hosts
                                         << "lastWrite"
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
-                                                                            : lastWriteDateStale))
+                                                                            : lastWriteDateStale)
+                                                                << "opTime"
+                                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1562,6 +1578,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllButPrimaryFailed) {
 TEST(ReplicaSetMonitor, MaxStalenessMSOneSecondaryFailed) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
     BSONArray hosts = BSON_ARRAY("a"
@@ -1586,7 +1603,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSOneSecondaryFailed) {
                                         << hosts
                                         << "lastWrite"
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
-                                                                            : lastWriteDateStale))
+                                                                            : lastWriteDateStale)
+                                                                << "opTime"
+                                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1607,9 +1626,10 @@ TEST(ReplicaSetMonitor, MaxStalenessMSOneSecondaryFailed) {
 /**
  * Success matching maxStalenessMS parameter when one secondary failed
  */
-TEST(ReplicaSetMonitor, MaxStalenessMSNonStaleeSecondaryMatched) {
+TEST(ReplicaSetMonitor, MaxStalenessMSNonStaleSecondaryMatched) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
+    repl::OpTime opTime{Timestamp{10, 10}, 10};
 
     const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
     BSONArray hosts = BSON_ARRAY("a"
@@ -1636,7 +1656,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNonStaleeSecondaryMatched) {
                                         << "lastWrite"
                                         << BSON("lastWriteDate"
                                                 << (isNonStale ? lastWriteDateNonStale
-                                                               : lastWriteDateStale))
+                                                               : lastWriteDateStale)
+                                                << "opTime"
+                                                << opTime.toBSON())
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1733,6 +1755,146 @@ TEST(ReplicaSetMonitor, MaxStalenessMSZeroNoLastWrite) {
     ASSERT(state->findNode(HostAndPort("c")));
 
     ASSERT(!state->getMatchingHost(secondary).empty());
+}
+
+/**
+ * Success matching minOpTime
+ */
+TEST(ReplicaSetMonitor, MinOpTimeMatched) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    Refresher refresher(state);
+
+    repl::OpTime minOpTimeSetting{Timestamp{10, 10}, 10};
+    repl::OpTime opTimeNonStale{Timestamp{10, 10}, 11};
+    repl::OpTime opTimeStale{Timestamp{10, 10}, 9};
+
+    ReadPreferenceSetting readPref(ReadPreference::Nearest, TagSet());
+    readPref.minOpTime = minOpTimeSetting;
+    BSONArray hosts = BSON_ARRAY("a"
+                                 << "b"
+                                 << "c");
+
+    // mock all replies
+    NextStep ns = refresher.getNextStep();
+    while (ns.step == NextStep::CONTACT_HOST) {
+        bool primary = ns.host.host() == "a";
+        bool isNonStale = ns.host.host() == "b";
+        BSONObj bson = BSON("setName"
+                            << "name"
+                            << "ismaster"
+                            << primary
+                            << "secondary"
+                            << !primary
+                            << "hosts"
+                            << hosts
+                            << "lastWrite"
+                            << BSON("opTime" << (isNonStale ? opTimeNonStale.toBSON()
+                                                            : opTimeStale.toBSON()))
+                            << "ok"
+                            << true);
+        refresher.receivedIsMaster(ns.host, -1, bson);
+        ns = refresher.getNextStep();
+    }
+
+    // Ensure that we have heard from all hosts and scan is done
+    ASSERT_EQUALS(ns.step, NextStep::DONE);
+    HostAndPort notStale = state->getMatchingHost(readPref);
+    ASSERT_EQUALS(notStale.host(), "b");
+}
+
+/**
+ * Failure matching minOpTime on primary for SecondaryOnly
+ */
+TEST(ReplicaSetMonitor, MinOpTimeNotMatched) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    Refresher refresher(state);
+
+    repl::OpTime minOpTimeSetting{Timestamp{10, 10}, 10};
+    repl::OpTime opTimeNonStale{Timestamp{10, 10}, 11};
+    repl::OpTime opTimeStale{Timestamp{10, 10}, 9};
+
+    ReadPreferenceSetting readPref(ReadPreference::SecondaryOnly, TagSet());
+    readPref.minOpTime = minOpTimeSetting;
+    BSONArray hosts = BSON_ARRAY("a"
+                                 << "b"
+                                 << "c");
+
+    // mock all replies
+    NextStep ns = refresher.getNextStep();
+    while (ns.step == NextStep::CONTACT_HOST) {
+        bool primary = ns.host.host() == "a";
+        bool isNonStale = ns.host.host() == "a";
+        BSONObj bson = BSON("setName"
+                            << "name"
+                            << "ismaster"
+                            << primary
+                            << "secondary"
+                            << !primary
+                            << "hosts"
+                            << hosts
+                            << "lastWrite"
+                            << BSON("opTime" << (isNonStale ? opTimeNonStale.toBSON()
+                                                            : opTimeStale.toBSON()))
+                            << "ok"
+                            << true);
+        refresher.receivedIsMaster(ns.host, -1, bson);
+        ns = refresher.getNextStep();
+    }
+
+    // Ensure that we have heard from all hosts and scan is done
+    ASSERT_EQUALS(ns.step, NextStep::DONE);
+    HostAndPort notStale = state->getMatchingHost(readPref);
+    ASSERT(notStale.host() != "a");
+}
+
+/**
+ * Ignore minOpTime if none is matched
+ */
+TEST(ReplicaSetMonitor, MinOpTimeIgnored) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    Refresher refresher(state);
+
+    repl::OpTime minOpTimeSetting{Timestamp{10, 10}, 10};
+    repl::OpTime opTimeStale{Timestamp{10, 10}, 9};
+
+    Date_t lastWriteDateStale = Date_t::now() - Seconds(1000);
+    Date_t lastWriteDateNonStale = Date_t::now() - Seconds(100);
+
+    ReadPreferenceSetting readPref(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
+    readPref.minOpTime = minOpTimeSetting;
+    BSONArray hosts = BSON_ARRAY("a"
+                                 << "b"
+                                 << "c");
+
+    // mock all replies
+    NextStep ns = refresher.getNextStep();
+    while (ns.step == NextStep::CONTACT_HOST) {
+        bool primary = ns.host.host() == "a";
+        bool isNonStale = ns.host.host() == "c";
+        BSONObj bson = BSON("setName"
+                            << "name"
+                            << "ismaster"
+                            << primary
+                            << "secondary"
+                            << !primary
+                            << "hosts"
+                            << hosts
+                            << "lastWrite"
+                            << BSON("lastWriteDate"
+                                    << (isNonStale || primary ? lastWriteDateNonStale
+                                                              : lastWriteDateStale)
+                                    << "opTime"
+                                    << opTimeStale.toBSON())
+                            << "ok"
+                            << true);
+        refresher.receivedIsMaster(ns.host, -1, bson);
+        ns = refresher.getNextStep();
+    }
+
+    // Ensure that we have heard from all hosts and scan is done
+    ASSERT_EQUALS(ns.step, NextStep::DONE);
+    HostAndPort notStale = state->getMatchingHost(readPref);
+    ASSERT_EQUALS(notStale.host(), "c");
 }
 
 

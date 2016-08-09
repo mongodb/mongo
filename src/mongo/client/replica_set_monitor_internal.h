@@ -80,6 +80,7 @@ struct ReplicaSetMonitor::IsMasterReply {
     HostAndPort host;
     int64_t latencyMicros;  // ignored if negative
     Date_t lastWriteDate{};
+    repl::OpTime opTime{};
 };
 
 struct ReplicaSetMonitor::SetState {
@@ -109,7 +110,12 @@ public:
          * not match: { "dc": "nyc", "rack": 2 }
          * not match: { "dc": "sf" }
          */
-        bool matches(const BSONObj& tag) const;
+        bool matches(const BSONObj&) const;
+
+        /**
+         *  Returns true if all of the tags in the tag set match node's tags
+         */
+        bool matches(const TagSet&) const;
 
         /**
          * Updates this Node based on information in reply. The reply must be from this host.
@@ -126,6 +132,7 @@ public:
         Date_t lastWriteDate{};            // from isMasterReply
         Date_t lastWriteDateUpdateTime{};  // set to the local system's time at the time of updating
                                            // lastWriteDate
+        repl::OpTime opTime{};             // from isMasterReply
     };
 
     typedef std::vector<Node> Nodes;

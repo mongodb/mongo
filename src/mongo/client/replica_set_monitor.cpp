@@ -39,6 +39,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/condition_variable.h"
@@ -97,6 +98,10 @@ StaticObserver staticObserver;
 
 bool isMaster(const Node& node) {
     return node.isMaster;
+}
+
+bool opTimeGreater(const Node* lhs, const Node* rhs) {
+    return lhs->opTime > rhs->opTime;
 }
 
 bool compareLatencies(const Node* lhs, const Node* rhs) {
@@ -847,6 +852,8 @@ void IsMasterReply::parse(const BSONObj& obj) {
             if (auto lastWrite = lastWriteField["lastWriteDate"]) {
                 lastWriteDate = lastWrite.date();
             }
+
+            uassertStatusOK(bsonExtractOpTimeField(lastWriteField, "opTime", &opTime));
         }
     } catch (const std::exception& e) {
         ok = false;
@@ -915,8 +922,11 @@ void Node::update(const IsMasterReply& reply) {
         }
     }
 
-    LOG(3) << "Updating " << host << " lastWriteDate to " << lastWriteDate;
+    LOG(3) << "Updating " << host << " lastWriteDate to " << reply.lastWriteDate;
     lastWriteDate = reply.lastWriteDate;
+
+    LOG(3) << "Updating " << host << " opTime to " << reply.opTime;
+    opTime = reply.opTime;
     lastWriteDateUpdateTime = Date_t::now();
 }
 
@@ -1032,13 +1042,35 @@ HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) con
                 }
 
                 // don't do more complicated selection if not needed
-                if (matchingNodes.empty())
+                if (matchingNodes.empty()) {
                     continue;
-                if (matchingNodes.size() == 1)
+                }
+                if (matchingNodes.size() == 1) {
                     return matchingNodes.front()->host;
+                }
 
-                // order by latency and don't consider hosts further than a threshold from the
-                // closest.
+                // Only consider nodes that satisfy the minOpTime
+                if (!criteria.minOpTime.isNull()) {
+                    std::sort(matchingNodes.begin(), matchingNodes.end(), opTimeGreater);
+                    for (size_t i = 0; i < matchingNodes.size(); i++) {
+                        if (matchingNodes[i]->opTime < criteria.minOpTime) {
+                            if (i == 0) {
+                                // If no nodes satisfy the minOpTime criteria, we ignore the
+                                // minOpTime requirement.
+                                break;
+                            }
+                            matchingNodes.erase(matchingNodes.begin() + i, matchingNodes.end());
+                            break;
+                        }
+                    }
+
+                    if (matchingNodes.size() == 1) {
+                        return matchingNodes.front()->host;
+                    }
+                }
+
+                // If there are multiple nodes satisfying the minOpTime, next order by latency
+                // and don't consider hosts further than a threshold from the closest.
                 std::sort(matchingNodes.begin(), matchingNodes.end(), compareLatencies);
                 for (size_t i = 1; i < matchingNodes.size(); i++) {
                     int64_t distance =
