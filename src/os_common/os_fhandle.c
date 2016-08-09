@@ -24,19 +24,19 @@ __fhandle_method_finalize(
 		    "a WT_FILE_HANDLE.%s method must be configured", #name)
 
 	WT_HANDLE_METHOD_REQ(close);
-	/* not required: fadvise */
-	/* not required: fallocate */
-	/* not required: fallocate_nolock */
+	/* not required: fh_advise */
+	/* not required: fh_extend */
+	/* not required: fh_extend_nolock */
 	WT_HANDLE_METHOD_REQ(fh_lock);
-	/* not required: map */
-	/* not required: map_discard */
-	/* not required: map_preload */
-	/* not required: map_unmap */
+	/* not required: fh_map */
+	/* not required: fh_map_discard */
+	/* not required: fh_map_preload */
+	/* not required: fh_unmap */
 	WT_HANDLE_METHOD_REQ(fh_read);
 	WT_HANDLE_METHOD_REQ(fh_size);
 	if (!readonly)
 		WT_HANDLE_METHOD_REQ(fh_sync);
-	/* not required: sync_nowait */
+	/* not required: fh_sync_nowait */
 	if (!readonly) {
 		WT_HANDLE_METHOD_REQ(fh_truncate);
 		WT_HANDLE_METHOD_REQ(fh_write);

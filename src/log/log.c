@@ -460,7 +460,7 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/*
 	 * If the user configured zero filling, pre-allocate the log file
-	 * manually.  Otherwise use either fallocate or ftruncate to create
+	 * manually.  Otherwise use the file extension method to create
 	 * and zero the log file based on what is available.
 	 */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL))
@@ -471,13 +471,8 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * We have exclusive access to the log file and there are no other
 	 * writes happening concurrently, so there are no locking issues.
 	 */
-	if ((ret = __wt_fallocate(
-	    session, fh, WT_LOG_FIRST_RECORD,
-	    conn->log_file_max - WT_LOG_FIRST_RECORD)) == 0)
-		return (0);
-	WT_RET_ERROR_OK(ret, ENOTSUP);
-
-	return (__wt_ftruncate(session, fh, conn->log_file_max));
+	ret = __wt_fextend(session, fh, conn->log_file_max);
+	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
 /*
@@ -990,8 +985,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 	/*
 	 * Truncate the log file to the given LSN.
 	 */
-	WT_ERR(__log_openfile(session,
-	    &log_fh, file_prefix, lsn->l.file, 0));
+	WT_ERR(__log_openfile(session, &log_fh, file_prefix, lsn->l.file, 0));
 	WT_ERR(__wt_ftruncate(session, log_fh, lsn->l.offset));
 	WT_ERR(__wt_fsync(session, log_fh, true));
 	WT_ERR(__wt_close(session, &log_fh));

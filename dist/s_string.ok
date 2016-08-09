@@ -629,6 +629,7 @@ fcntl
 fd
 fdatasync
 fdopen
+fextend
 ffc
 fflush
 ffs

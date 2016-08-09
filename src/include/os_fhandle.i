@@ -39,40 +39,32 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 }
 
 /*
- * __wt_fallocate --
+ * __wt_fextend --
  *	Extend a file.
  */
 static inline int
-__wt_fallocate(
-    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
+__wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
-	WT_DECL_RET;
 	WT_FILE_HANDLE *handle;
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
-	    "%s: handle-allocate: %" PRIuMAX " at %" PRIuMAX,
-	    fh->handle->name, (uintmax_t)len, (uintmax_t)offset));
+	    "%s: handle-extend: %" PRIuMAX " at %" PRIuMAX,
+	    fh->handle->name, (uintmax_t)offset));
 
 	/*
 	 * Our caller is responsible for handling any locking issues, all we
 	 * have to do is find a function to call.
-	 *
-	 * Be cautious, the underlying system might have configured the nolock
-	 * flavor, that failed, and we have to fallback to the locking flavor.
 	 */
 	handle = fh->handle;
-	if (handle->fh_allocate_nolock != NULL) {
-		if ((ret = handle->fh_allocate_nolock(
-		    handle, (WT_SESSION *)session, offset, len)) == 0)
-			return (0);
-		WT_RET_ERROR_OK(ret, ENOTSUP);
-	}
-	if (handle->fh_allocate != NULL)
-		return (handle->fh_allocate(
-		    handle, (WT_SESSION *)session, offset, len));
+	if (handle->fh_extend_nolock != NULL)
+		return (handle->fh_extend_nolock(
+		    handle, (WT_SESSION *)session, offset));
+	if (handle->fh_extend != NULL)
+		return (handle->fh_extend(
+		    handle, (WT_SESSION *)session, offset));
 	return (ENOTSUP);
 }
 
@@ -132,19 +124,28 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 
 /*
  * __wt_ftruncate --
- *	POSIX ftruncate.
+ *	Truncate a file.
  */
 static inline int
-__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
+	WT_FILE_HANDLE *handle;
+
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
 	WT_RET(__wt_verbose(session, WT_VERB_HANDLEOPS,
-	    "%s: handle-truncate: %" PRIuMAX,
-	    fh->handle->name, (uintmax_t)len));
+	    "%s: handle-truncate: %" PRIuMAX " at %" PRIuMAX,
+	    fh->handle->name, (uintmax_t)offset));
 
-	return (fh->handle->fh_truncate(
-	    fh->handle, (WT_SESSION *)session, len));
+	/*
+	 * Our caller is responsible for handling any locking issues, all we
+	 * have to do is find a function to call.
+	 */
+	handle = fh->handle;
+	if (handle->fh_truncate != NULL)
+		return (handle->fh_truncate(
+		    handle, (WT_SESSION *)session, offset));
+	return (ENOTSUP);
 }
 
 /*

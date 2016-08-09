@@ -701,7 +701,7 @@ directory_open:
 	if (!pfh->direct_io)
 		file_handle->fh_advise = __posix_file_advise;
 #endif
-	file_handle->fh_allocate = __wt_posix_file_fallocate;
+	file_handle->fh_extend = __wt_posix_file_extend;
 	file_handle->fh_lock = __posix_file_lock;
 #ifdef WORDS_BIGENDIAN
 	/*

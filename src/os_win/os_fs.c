@@ -526,9 +526,8 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	}
 
 	/*
-	 * Open a second handle to file to support allocation/truncation
-	 * concurrently with reads on the file. Writes would also move the file
-	 * pointer.
+	 * Open a second handle to file to support truncation concurrently with
+	 * reads on the file. Writes would also move the file pointer.
 	 */
 	if (!LF_ISSET(WT_FS_OPEN_READONLY)) {
 		win_fh->filehandle_secondary = CreateFileA(name, desired_access,
