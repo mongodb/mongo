@@ -203,8 +203,10 @@ DBCollection.prototype._massageObject = function(q) {
         return q;
 
     if (type == "string") {
-        if (q.length == 24)
-            return {_id: q};
+        // If the string is 24 hex characters, it is most likely an ObjectId.
+        if (/^[0-9a-fA-F]{24}$/.test(q)) {
+            return {_id: ObjectId(q)};
+        }
 
         return {$where: q};
     }
