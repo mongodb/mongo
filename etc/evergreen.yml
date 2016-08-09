@@ -448,15 +448,6 @@ functions:
 
   "run jepsen test" :
     - command: shell.exec
-      params:
-        working_dir: src/jepsen/mongodb
-        script: |
-          set -o verbose
-          set -o errexit
-          # Set/modify JVM heap space settings.
-          jvm_settings="\"-Xmx16g\"\n             \"-Xms16g\"\n             \"-Xmn4g\""
-          sed -i -e "s/\"-Xmx.*\"/$jvm_settings/" project.clj
-    - command: shell.exec
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
