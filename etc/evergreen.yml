@@ -2979,8 +2979,6 @@ buildvariants:
   - name: views_rs
   - name: views_rs_WT
   - name: push
-    distros:
-      - rhel70
 
 - name: linux-64-repeated-execution
   stepback: false
@@ -3991,7 +3989,6 @@ buildvariants:
   - name: views_rs
   - name: views_rs_WT
   - name: push
-
 
 - name: amazon
   display_name: SSL Amazon Linux
@@ -5168,9 +5165,6 @@ buildvariants:
   - name: views_rs
   - name: views_rs_WT
   - name: push
-    distros:
-      - rhel70
-
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0
@@ -5335,9 +5329,6 @@ buildvariants:
   - name: views_rs
   - name: views_rs_WT
   - name: push
-    distros:
-      - rhel70
-
 
 - name: rhel70
   display_name: SSL RHEL 7.0
@@ -5452,7 +5443,6 @@ buildvariants:
   - name: views_rs
   - name: views_rs_WT
   - name: push
-
 
 - name: enterprise-rhel-71-ppc64le
   display_name: Enterprise RHEL 7.1 PPC64LE
