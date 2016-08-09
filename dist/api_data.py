@@ -402,23 +402,25 @@ connection_runtime_config = [
                 min=1, max=20),
             ]),
     Config('eviction_dirty_target', '5', r'''
-        continue evicting until the cache has less dirty memory than the
-        value, as a percentage of the total cache size. Dirty pages will
-        only be evicted if the cache is full enough to trigger eviction''',
+        perform eviction in worker threads when the cache contains at least
+        this much dirty content, expressed as a percentage of the total cache
+        size.''',
         min=1, max=99),
     Config('eviction_dirty_trigger', '20', r'''
-        trigger eviction when the cache is using this much memory for dirty
-        content, as a percentage of the total cache size. This setting only
-        alters behavior if it is lower than eviction_trigger''',
+        trigger application threads to perform eviction when the cache contains
+        at least this much dirty content, expressed as a percentage of the
+        total cache size. This setting only alters behavior if it is lower than
+        eviction_trigger''',
         min=1, max=99),
     Config('eviction_target', '80', r'''
-        continue evicting until the cache has less total memory than the
-        value, as a percentage of the total cache size. Must be less than
-        \c eviction_trigger''',
+        perform eviction in worker threads when the cache contains at least
+        this much content, expressed as a percentage of the total cache size.
+        Must be less than \c eviction_trigger''',
         min=10, max=99),
     Config('eviction_trigger', '95', r'''
-        trigger eviction when the cache is using this much memory, as a
-        percentage of the total cache size''', min=10, max=99),
+        trigger application threads to perform eviction when the cache contains
+        at least this much content, expressed as a percentage of the
+        total cache size.''', min=10, max=99),
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
