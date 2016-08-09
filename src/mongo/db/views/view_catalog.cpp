@@ -48,7 +48,7 @@
 #include "mongo/util/log.h"
 
 namespace {
-bool enableViews = false;
+bool enableViews = true;
 }  // namespace
 
 namespace mongo {
