@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+const ValueComparator ValueComparator::kInstance{};
+
 bool ValueComparator::evaluate(Value::DeferredComparison deferredComparison) const {
     int cmp = Value::compare(deferredComparison.lhs, deferredComparison.rhs, _stringComparator);
     switch (deferredComparison.type) {

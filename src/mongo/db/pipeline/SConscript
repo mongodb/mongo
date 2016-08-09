@@ -351,8 +351,9 @@ env.CppUnitTest(
         'lookup_set_cache_test.cpp',
     ],
     LIBDEPS=[
-        'document_value',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        'document_value',
     ]
 )
 
