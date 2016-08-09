@@ -154,10 +154,21 @@ void* systemAllocate(std::size_t bytes) {
         fassertFailed(28832);
     }
 
+#if defined(MADV_DONTDUMP)
+    // We deliberately ignore the return value since if the Linux version is < 3.4, madvise
+    // will fail since MADV_DONTDUMP is not supported.
+    (void)madvise(ptr, bytes, MADV_DONTDUMP);
+#endif
+
     return ptr;
 }
 
 void systemDeallocate(void* ptr, std::size_t bytes) {
+#if defined(MADV_DONTDUMP) && defined(MADV_DODUMP)
+    // See comment above madvise in systemAllocate().
+    (void)madvise(ptr, bytes, MADV_DODUMP);
+#endif
+
     if (munlock(ptr, bytes) != 0) {
         severe() << errnoWithPrefix("Failed to munlock");
         fassertFailed(28833);
