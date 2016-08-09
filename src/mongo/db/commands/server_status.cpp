@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization_worker.h"
@@ -287,6 +288,7 @@ public:
     BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
         BSONObjBuilder b;
         networkCounter.append(b);
+        appendMessageCompressionStats(&b);
         return b.obj();
     }
 

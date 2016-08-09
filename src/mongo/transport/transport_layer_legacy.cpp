@@ -105,12 +105,14 @@ Ticket TransportLayerLegacy::sourceMessage(Session& session, Message* message, D
             return {ErrorCodes::HostUnreachable, "Recv failed"};
         }
 
+        networkCounter.hitPhysical(message->size(), 0);
         if (message->operation() == dbCompressed) {
             auto swm = compressorMgr.decompressMessage(*message);
             if (!swm.isOK())
                 return swm.getStatus();
             *message = swm.getValue();
         }
+        networkCounter.hitLogical(message->size(), 0);
         return Status::OK();
     };
 
@@ -149,11 +151,13 @@ Ticket TransportLayerLegacy::sinkMessage(Session& session,
     auto& compressorMgr = session.getCompressorManager();
     auto sinkCb = [&message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         try {
+            networkCounter.hitLogical(0, message.size());
             auto swm = compressorMgr.compressMessage(message);
             if (!swm.isOK())
                 return swm.getStatus();
             const auto& compressedMessage = swm.getValue();
             amp->say(compressedMessage);
+            networkCounter.hitPhysical(0, compressedMessage.size());
 
             return Status::OK();
         } catch (const SocketException& e) {
@@ -259,12 +263,8 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
         amp = conn->second.amp.get();
     }
 
-    amp->clearCounters();
-
     auto legacyTicket = checked_cast<LegacyTicket*>(getTicketImpl(ticket));
     auto res = legacyTicket->_fill(amp);
-
-    networkCounter.hit(amp->getBytesIn(), amp->getBytesOut());
 
     {
         stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);

@@ -106,6 +106,7 @@ env.Library(
     target='message_compressor',
     source=[
         'message_compressor_manager.cpp',
+        'message_compressor_metrics.cpp',
         'message_compressor_registry.cpp',
         'message_compressor_snappy.cpp',
     ],
@@ -126,3 +127,4 @@ env.CppUnitTest(
         'message_compressor',
     ]
 )
+

@@ -135,26 +135,46 @@ BSONObj OpCounters::getObj() const {
     return b.obj();
 }
 
-void NetworkCounter::hit(long long bytesIn, long long bytesOut) {
+void NetworkCounter::hitPhysical(long long bytesIn, long long bytesOut) {
     const int64_t MAX = 1ULL << 60;
 
     // don't care about the race as its just a counter
-    bool overflow = _bytesIn.loadRelaxed() > MAX || _bytesOut.loadRelaxed() > MAX;
+    bool overflow = _physicalBytesIn.loadRelaxed() > MAX || _physicalBytesOut.loadRelaxed() > MAX;
 
     if (overflow) {
-        _bytesIn.store(bytesIn);
-        _bytesOut.store(bytesOut);
+        _physicalBytesIn.store(bytesIn);
+        _physicalBytesOut.store(bytesOut);
+    } else {
+        _physicalBytesIn.fetchAndAdd(bytesIn);
+        _physicalBytesOut.fetchAndAdd(bytesOut);
+    }
+}
+
+void NetworkCounter::hitLogical(long long bytesIn, long long bytesOut) {
+    const int64_t MAX = 1ULL << 60;
+
+    // don't care about the race as its just a counter
+    bool overflow = _logicalBytesIn.loadRelaxed() > MAX || _logicalBytesOut.loadRelaxed() > MAX;
+
+    if (overflow) {
+        _logicalBytesIn.store(bytesIn);
+        _logicalBytesOut.store(bytesOut);
+        // The requests field only gets incremented here (and not in hitPhysical) because the
+        // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
+        // functions would double-count the number of operations.
         _requests.store(1);
     } else {
-        _bytesIn.fetchAndAdd(bytesIn);
-        _bytesOut.fetchAndAdd(bytesOut);
+        _logicalBytesIn.fetchAndAdd(bytesIn);
+        _logicalBytesOut.fetchAndAdd(bytesOut);
         _requests.fetchAndAdd(1);
     }
 }
 
 void NetworkCounter::append(BSONObjBuilder& b) {
-    b.append("bytesIn", static_cast<long long>(_bytesIn.loadRelaxed()));
-    b.append("bytesOut", static_cast<long long>(_bytesOut.loadRelaxed()));
+    b.append("bytesIn", static_cast<long long>(_logicalBytesIn.loadRelaxed()));
+    b.append("bytesOut", static_cast<long long>(_logicalBytesOut.loadRelaxed()));
+    b.append("physicalBytesIn", static_cast<long long>(_physicalBytesIn.loadRelaxed()));
+    b.append("physicalBytesOut", static_cast<long long>(_physicalBytesOut.loadRelaxed()));
     b.append("numRequests", static_cast<long long>(_requests.loadRelaxed()));
 }
 
