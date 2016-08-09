@@ -120,6 +120,9 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         if self.replset_config_options.get("configsvr", False):
             initiate_cmd_obj["replSetInitiate"]["configsvr"] = True
+        if self.replset_config_options.get("settings"):
+            replset_settings = self.replset_config_options["settings"]
+            initiate_cmd_obj["replSetInitiate"]["settings"] = replset_settings
 
         self.logger.info("Issuing replSetInitiate command...%s", initiate_cmd_obj)
         client.admin.command(initiate_cmd_obj)

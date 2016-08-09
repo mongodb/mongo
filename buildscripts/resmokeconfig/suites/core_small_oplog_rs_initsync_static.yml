@@ -31,3 +31,6 @@ executor:
           enableTestCommands: 1
       num_nodes: 2
       start_initial_sync_node: True
+      replset_config_options:
+        settings:
+          chainingAllowed: False
