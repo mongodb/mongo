@@ -65,7 +65,10 @@ namespace {
  * Constructs the BSON specification document for the given namespace, index key
  * and options.
  */
-BSONObj createIndexDoc(const string& ns, const BSONObj& keys, bool unique) {
+BSONObj createIndexDoc(const string& ns,
+                       const BSONObj& keys,
+                       const BSONObj& collation,
+                       bool unique) {
     BSONObjBuilder indexDoc;
     indexDoc.append("ns", ns);
     indexDoc.append("key", keys);
@@ -91,6 +94,10 @@ BSONObj createIndexDoc(const string& ns, const BSONObj& keys, bool unique) {
     }
 
     indexDoc.append("name", indexName.str());
+
+    if (!collation.isEmpty()) {
+        indexDoc.append("collation", collation);
+    }
 
     if (unique) {
         indexDoc.appendBool("unique", unique);
@@ -146,11 +153,12 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
 
 }  // namespace
 
-Status clusterCreateIndex(OperationContext* txn, const string& ns, BSONObj keys, bool unique) {
+Status clusterCreateIndex(
+    OperationContext* txn, const string& ns, BSONObj keys, BSONObj collation, bool unique) {
     const NamespaceString nss(ns);
     const std::string dbName = nss.db().toString();
 
-    BSONObj indexDoc = createIndexDoc(ns, keys, unique);
+    BSONObj indexDoc = createIndexDoc(ns, keys, collation, unique);
 
     // Go through the shard insert path
     std::unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());

@@ -56,6 +56,7 @@ private:
 /**
  * Used only for writes to the config server, config and admin databases.
  */
-Status clusterCreateIndex(OperationContext* txn, const std::string& ns, BSONObj keys, bool unique);
+Status clusterCreateIndex(
+    OperationContext* txn, const std::string& ns, BSONObj keys, BSONObj collation, bool unique);
 
 }  // namespace mongo
