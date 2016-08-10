@@ -226,15 +226,13 @@ void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationCon
 
 void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
-void ReplicationCoordinatorExternalStateMock::shardingOnDrainingStateHook(OperationContext* txn) {}
+void ReplicationCoordinatorExternalStateMock::drainModeHook(OperationContext* txn) {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToCancelFetcher() {
     _isApplierSignaledToCancelFetcher = true;
 }
-
-void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationContext* txn) {}
 
 void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
 

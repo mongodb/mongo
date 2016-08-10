@@ -57,6 +57,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -399,6 +400,26 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
             return;
         }
 
+        // Check if admin.system.version contains an invalid featureCompatibilityVersion.
+        // If a valid featureCompatibilityVersion is present, cache it as a server parameter.
+        if (dbName == "admin") {
+            if (Collection* versionColl =
+                    db->getCollection(FeatureCompatibilityVersion::kCollection)) {
+                BSONObj featureCompatibilityVersion;
+                if (Helpers::findOne(txn,
+                                     versionColl,
+                                     BSON("_id" << FeatureCompatibilityVersion::kParameterName),
+                                     featureCompatibilityVersion)) {
+                    auto version = FeatureCompatibilityVersion::parse(featureCompatibilityVersion);
+                    if (!version.isOK()) {
+                        severe() << version.getStatus();
+                        fassertFailedNoTrace(40283);
+                    }
+                    serverGlobalParams.featureCompatibilityVersion.store(version.getValue());
+                }
+            }
+        }
+
         // Major versions match, check indexes
         const string systemIndexes = db->name() + ".system.indexes";
 
@@ -729,6 +750,13 @@ static ExitCode _initAndListen(int listenPort) {
     PeriodicTask::startRunningPeriodicTasks();
 
     HostnameCanonicalizationWorker::start(getGlobalServiceContext());
+
+    if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
+        storageGlobalParams.engine != "devnull") {
+        ScopedTransaction transaction(startupOpCtx.get(), MODE_X);
+        Lock::GlobalWrite lk(startupOpCtx.get()->lockState());
+        FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get());
+    }
 
     uassertStatusOK(ShardingState::get(startupOpCtx.get())
                         ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));

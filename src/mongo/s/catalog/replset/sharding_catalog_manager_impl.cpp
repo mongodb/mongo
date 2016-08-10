@@ -44,6 +44,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -718,6 +719,30 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 
     if (maxSize > 0) {
         shardType.setMaxSizeMB(maxSize);
+    }
+
+    // If the minimum allowed version for the cluster is 3.4, set the featureCompatibilityVersion to
+    // 3.4 on the shard.
+    if (serverGlobalParams.featureCompatibilityVersion.load() ==
+        ServerGlobalParams::FeatureCompatibilityVersion_34) {
+        auto versionResponse =
+            _runCommandForAddShard(txn,
+                                   targeter.get(),
+                                   "admin",
+                                   BSON(FeatureCompatibilityVersion::kCommandName
+                                        << FeatureCompatibilityVersion::kVersion34));
+        if (!versionResponse.isOK()) {
+            return versionResponse.getStatus();
+        }
+
+        if (!versionResponse.getValue().commandStatus.isOK()) {
+            if (versionResponse.getStatus().code() == ErrorCodes::CommandNotFound) {
+                return Status(ErrorCodes::OperationFailed,
+                              "featureCompatibilityVersion for cluster is 3.4, cannot add a shard "
+                              "with version below 3.4");
+            }
+            return versionResponse.getValue().commandStatus;
+        }
     }
 
     auto commandRequest = createShardIdentityUpsertForAddShard(txn, shardType.getName());

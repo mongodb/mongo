@@ -84,10 +84,9 @@ public:
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void shardingOnStepDownHook();
-    virtual void shardingOnDrainingStateHook(OperationContext* txn);
+    virtual void drainModeHook(OperationContext* txn);
     virtual void signalApplierToChooseNewSyncSource();
     virtual void signalApplierToCancelFetcher();
-    virtual void dropAllTempCollections(OperationContext* txn);
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(SnapshotName newCommitPoint);
     virtual void forceSnapshotCreation();

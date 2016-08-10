@@ -235,8 +235,8 @@
     // --- listDatabases ---
 
     r = db.getMongo().getDBs();
-    assert.eq(2, r.databases.length, tojson(r));
-    assert.eq("number", typeof(r.totalSize), "listDatabases 2 : " + tojson(r));
+    assert.eq(3, r.databases.length, tojson(r));
+    assert.eq("number", typeof(r.totalSize), "listDatabases 3 : " + tojson(r));
 
     s.stop();
 

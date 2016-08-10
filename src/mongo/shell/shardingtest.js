@@ -1203,6 +1203,18 @@ var ShardingTest = function(params) {
     // Wait for master to be elected before starting mongos
     var csrsPrimary = this.configRS.getPrimary();
 
+    // If we have mixed version shards, set featureCompatibilityVersion=3.2 on the config servers.
+    if (jsTestOptions().shardMixedBinVersions) {
+        function setFeatureCompatibilityVersion() {
+            assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.2'}));
+        }
+        if (keyFile) {
+            authutil.asCluster(csrsPrimary, keyFile, setFeatureCompatibilityVersion);
+        } else {
+            setFeatureCompatibilityVersion();
+        }
+    }
+
     // If chunkSize has been requested for this test, write the configuration
     if (otherParams.chunkSize) {
         function setChunkSize() {

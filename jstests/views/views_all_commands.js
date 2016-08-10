@@ -62,6 +62,7 @@
         _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
         _configsvrMoveChunk: {skip: isAnInternalCommand},
         _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
+        _configsvrSetFeatureCompatibilityVersion: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
         _getUserCacheGeneration: {skip: isAnInternalCommand},
         _hashBSONElement: {skip: isAnInternalCommand},
@@ -368,6 +369,7 @@
         saslStart: {skip: isUnrelated},
         serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
         setCommittedSnapshot: {skip: isAnInternalCommand},
+        setFeatureCompatibilityVersion: {skip: isUnrelated},
         setParameter: {skip: isUnrelated},
         setShardVersion: {skip: isUnrelated},
         shardCollection: {

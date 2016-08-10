@@ -2733,6 +2733,23 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "setFeatureCompatibilityVersion",
+          command: {setFeatureCompatibilityVersion: "x"},
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
+                privileges: [{
+                    resource: {db: '$setFeatureCompatibilityVersion', collection: 'version'},
+                    actions: ['update']
+                }],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "setParameter",
           command: {setParameter: 1, quiet: 1},
           testcases: [

@@ -537,6 +537,10 @@ function assertDBsEq(db1, db2) {
     } else if (hash1.md5 != hash2.md5) {
         for (var i = 0; i < Math.min(collNames1.length, collNames2.length); i++) {
             var collName = collNames1[i];
+            if (collName.startsWith('system.')) {
+                // Skip system collections. These are not included in the dbhash before 3.3.10.
+                continue;
+            }
             if (hash1.collections[collName] !== hash2.collections[collName]) {
                 if (db1[collName].stats().capped) {
                     if (!db2[collName].stats().capped) {

@@ -4,23 +4,23 @@ var baseName = "jstests_preallocate";
 
 var m = MongoRunner.runMongod({});
 
-var getTotalNonLocalSize = function() {
-    var totalNonLocalDBSize = 0;
+var getTotalNonLocalNonAdminSize = function() {
+    var totalNonLocalNonAdminDBSize = 0;
     m.getDBs().databases.forEach(function(dbStats) {
-        // We accept the local database's space overhead.
-        if (dbStats.name == "local")
+        // We accept the local database's and admin database's space overhead.
+        if (dbStats.name == "local" || dbStats.name == "admin")
             return;
 
         // Databases with "sizeOnDisk=1" and "empty=true" dont' actually take up space o disk.
         // See SERVER-11051.
         if (dbStats.sizeOnDisk == 1 && dbStats.empty)
             return;
-        totalNonLocalDBSize += dbStats.sizeOnDisk;
+        totalNonLocalNonAdminDBSize += dbStats.sizeOnDisk;
     });
-    return totalNonLocalDBSize;
+    return totalNonLocalNonAdminDBSize;
 };
 
-assert.eq(0, getTotalNonLocalSize());
+assert.eq(0, getTotalNonLocalNonAdminSize());
 
 m.getDB(baseName).createCollection(baseName + "1");
 
@@ -30,17 +30,17 @@ if (m.getDB(baseName).serverBits() < 64)
     expectedMB /= 4;
 
 assert.soon(function() {
-    return getTotalNonLocalSize() >= expectedMB * 1024 * 1024;
+    return getTotalNonLocalNonAdminSize() >= expectedMB * 1024 * 1024;
 }, "\n\n\nFAIL preallocate.js expected second file to bring total size over " + expectedMB + "MB");
 
 MongoRunner.stopMongod(m);
 
 m = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: m.dbpath});
 
-size = getTotalNonLocalSize();
+size = getTotalNonLocalNonAdminSize();
 
 m.getDB(baseName).createCollection(baseName + "2");
 
 sleep(2000);  // give prealloc a chance
 
-assert.eq(size, getTotalNonLocalSize());
+assert.eq(size, getTotalNonLocalNonAdminSize());

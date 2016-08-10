@@ -465,6 +465,12 @@ void addClusterManagerPrivileges(PrivilegeVector* privileges) {
         privileges,
         Privilege(ResourcePattern::forExactNamespace(NamespaceString("config", "shards")),
                   writeActions));
+    // Fake collection used for setFeatureCompatibilityVersion permissions.
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forExactNamespace(
+                      NamespaceString("$setFeatureCompatibilityVersion", "version")),
+                  writeActions));
 }
 
 void addClusterAdminPrivileges(PrivilegeVector* privileges) {

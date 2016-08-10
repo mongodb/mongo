@@ -225,12 +225,11 @@ public:
     virtual void shardingOnStepDownHook() = 0;
 
     /**
-     * Called when the instance transitions to primary in order to notify a potentially sharded host
-     * to perform respective state changes, such as starting the balancer, etc.
+     * Called when the instance transitions to primary. Calls all drain mode hooks.
      *
      * Throws on errors.
      */
-    virtual void shardingOnDrainingStateHook(OperationContext* txn) = 0;
+    virtual void drainModeHook(OperationContext* txn) = 0;
 
     /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
@@ -241,14 +240,6 @@ public:
      * Notifies the bgsync to cancel the current oplog fetcher.
      */
     virtual void signalApplierToCancelFetcher() = 0;
-
-    /**
-     * Drops all temporary collections on all databases except "local".
-     *
-     * The implementation may assume that the caller has acquired the global exclusive lock
-     * for "txn".
-     */
-    virtual void dropAllTempCollections(OperationContext* txn) = 0;
 
     /**
      * Drops all snapshots and clears the "committed" snapshot.

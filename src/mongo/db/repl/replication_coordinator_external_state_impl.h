@@ -89,10 +89,9 @@ public:
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void shardingOnStepDownHook();
-    virtual void shardingOnDrainingStateHook(OperationContext* txn);
+    virtual void drainModeHook(OperationContext* txn);
     virtual void signalApplierToChooseNewSyncSource();
     virtual void signalApplierToCancelFetcher();
-    virtual void dropAllTempCollections(OperationContext* txn);
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(SnapshotName newCommitPoint) final;
     void forceSnapshotCreation() final;
@@ -123,6 +122,22 @@ private:
      * Stops data replication and returns with 'lock' locked.
      */
     void _stopDataReplication_inlock(OperationContext* txn, UniqueLock* lock);
+
+    /**
+     * Called when the instance transitions to primary in order to notify a potentially sharded host
+     * to perform respective state changes, such as starting the balancer, etc.
+     *
+     * Throws on errors.
+     */
+    void shardingOnDrainingStateHook(OperationContext* txn);
+
+    /**
+    * Drops all temporary collections on all databases except "local".
+    *
+    * The implementation may assume that the caller has acquired the global exclusive lock
+    * for "txn".
+    */
+    void dropAllTempCollections(OperationContext* txn);
 
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;

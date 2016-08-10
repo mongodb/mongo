@@ -33,10 +33,12 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
 
@@ -77,6 +79,12 @@ void OpObserver::onInserts(OperationContext* txn,
         }
     }
 
+    if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
+        for (auto it = begin; it != end; it++) {
+            FeatureCompatibilityVersion::onInsertOrUpdate(*it);
+        }
+    }
+
     logOpForDbHash(txn, ns);
     if (strstr(ns, ".system.js")) {
         Scope::storedFuncMod(txn);
@@ -109,6 +117,10 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     NamespaceString nss(args.ns);
     if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(txn, nss);
+    }
+
+    if (args.ns == FeatureCompatibilityVersion::kCollection) {
+        FeatureCompatibilityVersion::onInsertOrUpdate(args.updatedDoc);
     }
 }
 
@@ -149,6 +161,9 @@ void OpObserver::onDelete(OperationContext* txn,
     }
     if (ns.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(txn, ns);
+    }
+    if (ns.ns() == FeatureCompatibilityVersion::kCollection) {
+        FeatureCompatibilityVersion::onDelete(deleteState.idDoc);
     }
 }
 

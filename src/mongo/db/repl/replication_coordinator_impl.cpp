@@ -886,8 +886,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     _drainFinishedCond.notify_all();
     lk.unlock();
 
-    _externalState->shardingOnDrainingStateHook(txn);
-    _externalState->dropAllTempCollections(txn);
+    _externalState->drainModeHook(txn);
 
     // This is done for compatibility with PV0 replicas wrt how "n" ops are processed.
     if (isV1ElectionProtocol()) {

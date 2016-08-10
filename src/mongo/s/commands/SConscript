@@ -59,6 +59,7 @@ env.Library(
         'cluster_repair_database_cmd.cpp',
         'cluster_repl_set_get_status_cmd.cpp',
         'cluster_reset_error_cmd.cpp',
+        'cluster_set_feature_compatibility_version_cmd.cpp',
         'cluster_shard_collection_cmd.cpp',
         'cluster_shutdown_cmd.cpp',
         'cluster_split_cmd.cpp',

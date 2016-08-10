@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
@@ -521,6 +522,12 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     }
 
     ShardingState::get(getGlobalServiceContext())->clearCollectionMetadata();
+}
+
+void ReplicationCoordinatorExternalStateImpl::drainModeHook(OperationContext* txn) {
+    FeatureCompatibilityVersion::setIfCleanStartup(txn);
+    shardingOnDrainingStateHook(txn);
+    dropAllTempCollections(txn);
 }
 
 void ReplicationCoordinatorExternalStateImpl::shardingOnDrainingStateHook(OperationContext* txn) {
