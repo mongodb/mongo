@@ -557,34 +557,49 @@ bool scheduleWritesToOplog(OperationContext* txn,
 }
 
 /**
- * A caching functor that returns true if a namespace refers to a capped collection.
- * Collections that don't exist are implicitly not capped.
+ * Caches per-collection properties which are relevant for oplog application, so that they don't
+ * have to be retrieved repeatedly for each op.
  */
-class CachingCappedChecker {
+class CachedCollectionProperties {
 public:
-    bool operator()(OperationContext* txn, const StringMapTraits::HashedKey& ns) {
+    struct CollectionProperties {
+        bool isCapped = false;
+        const CollatorInterface* collator = nullptr;
+    };
+
+    CollectionProperties getCollectionProperties(OperationContext* txn,
+                                                 const StringMapTraits::HashedKey& ns) {
         auto it = _cache.find(ns);
         if (it != _cache.end()) {
             return it->second;
         }
 
-        bool isCapped = isCappedImpl(txn, ns.key());
-        _cache[ns] = isCapped;
-        return isCapped;
+        auto collProperties = getCollectionPropertiesImpl(txn, ns.key());
+        _cache[ns] = collProperties;
+        return collProperties;
     }
 
 private:
-    bool isCappedImpl(OperationContext* txn, StringData ns) {
+    CollectionProperties getCollectionPropertiesImpl(OperationContext* txn, StringData ns) {
+        CollectionProperties collProperties;
+
         Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IS);
         auto db = dbHolder().get(txn, ns);
-        if (!db)
-            return false;
+        if (!db) {
+            return collProperties;
+        }
 
         auto collection = db->getCollection(ns);
-        return collection && collection->isCapped();
+        if (!collection) {
+            return collProperties;
+        }
+
+        collProperties.isCapped = collection->isCapped();
+        collProperties.collator = collection->getDefaultCollator();
+        return collProperties;
     }
 
-    StringMap<bool> _cache;
+    StringMap<CollectionProperties> _cache;
 };
 
 // This only modifies the isForCappedCollection field on each op. It does not alter the ops vector
@@ -596,26 +611,36 @@ void fillWriterVectors(OperationContext* txn,
         getGlobalServiceContext()->getGlobalStorageEngine()->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
 
-    CachingCappedChecker isCapped;
+    CachedCollectionProperties collPropertiesCache;
 
     for (auto&& op : *ops) {
         StringMapTraits::HashedKey hashedNs(op.ns);
         uint32_t hash = hashedNs.hash();
 
-        // For doc locking engines, include the _id of the document in the hash so we get
-        // parallelism even if all writes are to a single collection. We can't do this for capped
-        // collections because the order of inserts is a guaranteed property, unlike for normal
-        // collections.
-        if (supportsDocLocking && op.isCrudOpType() && !isCapped(txn, hashedNs)) {
-            BSONElement id = op.getIdElement();
-            const size_t idHash = BSONElement::Hasher()(id);
-            MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
-        }
+        if (op.isCrudOpType()) {
+            auto collProperties = collPropertiesCache.getCollectionProperties(txn, hashedNs);
 
-        if (op.opType == "i" && isCapped(txn, hashedNs)) {
-            // Mark capped collection ops before storing them to ensure we do not attempt to bulk
-            // insert them.
-            op.isForCappedCollection = true;
+            // For doc locking engines, include the _id of the document in the hash so we get
+            // parallelism even if all writes are to a single collection.
+            //
+            // For capped collections, this is illegal, since capped collections must preserve
+            // insertion order.
+            //
+            // For collections with a non-simple default collation, this is also illegal, since we
+            // can't currently hash the _id BSONElement with respect to the collation.
+            // TODO SERVER-23990: Lift this restriction once there is a mechanism for
+            // collation-aware hashing of BSONElement.
+            if (supportsDocLocking && !collProperties.isCapped && !collProperties.collator) {
+                BSONElement id = op.getIdElement();
+                const size_t idHash = BSONElement::Hasher()(id);
+                MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
+            }
+
+            if (op.opType == "i" && collProperties.isCapped) {
+                // Mark capped collection ops before storing them to ensure we do not attempt to
+                // bulk insert them.
+                op.isForCappedCollection = true;
+            }
         }
 
         auto& writer = (*writerVectors)[hash % numWriters];
