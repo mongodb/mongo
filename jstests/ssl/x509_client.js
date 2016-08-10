@@ -70,9 +70,15 @@ function authAndTest(mongo) {
         "read without login");
 
     assert(!external.auth({user: INVALID_CLIENT_USER, mechanism: 'MONGODB-X509'}),
-           "authentication with invalid user failed");
+           "authentication with invalid user should fail");
     assert(external.auth({user: CLIENT_USER, mechanism: 'MONGODB-X509'}),
            "authentication with valid user failed");
+    assert(external.auth({mechanism: 'MONGODB-X509'}),
+           "authentication with valid client cert and no user field failed");
+    assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509', user: CLIENT_USER}).ok,
+           "runCommand authentication with valid client cert and user field failed");
+    assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509'}).ok,
+           "runCommand authentication with valid client cert and no user field failed");
 
     // Check that we can add a user and read data
     test.createUser(

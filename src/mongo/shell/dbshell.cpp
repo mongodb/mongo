@@ -647,7 +647,8 @@ int _main(int argc, char* argv[], char** envp) {
                          << escape(shellGlobalParams.gssapiServiceName) << "\";" << endl;
     }
 
-    if (!shellGlobalParams.nodb && shellGlobalParams.username.size()) {
+    if (!shellGlobalParams.nodb && (!shellGlobalParams.username.empty() ||
+                                    shellGlobalParams.authenticationMechanism == "MONGODB-X509")) {
         authStringStream << "var username = \"" << escape(shellGlobalParams.username) << "\";"
                          << endl;
         if (shellGlobalParams.usingPassword) {
@@ -660,11 +661,14 @@ int _main(int argc, char* argv[], char** envp) {
             authStringStream << "var authDb = db.getSiblingDB(\""
                              << escape(shellGlobalParams.authenticationDatabase) << "\");" << endl;
         }
-        authStringStream << "authDb._authOrThrow({ " << saslCommandUserFieldName << ": username ";
+
+        authStringStream << "authDb._authOrThrow({ ";
+        if (!shellGlobalParams.username.empty()) {
+            authStringStream << saslCommandUserFieldName << ": username ";
+        }
         if (shellGlobalParams.usingPassword) {
             authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
         }
-
         if (!shellGlobalParams.gssapiHostName.empty()) {
             authStringStream << ", " << saslCommandServiceHostnameFieldName << ": \""
                              << escape(shellGlobalParams.gssapiHostName) << '"' << endl;

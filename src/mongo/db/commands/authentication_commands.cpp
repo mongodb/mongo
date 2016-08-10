@@ -53,6 +53,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
@@ -161,8 +162,19 @@ bool CmdAuthenticate::run(OperationContext* txn,
         redactForLogging(&cmdToLog);
         log() << " authenticate db: " << dbname << " " << cmdToLog;
     }
+    std::string mechanism = cmdObj.getStringField("mechanism");
+    if (mechanism.empty()) {
+        mechanism = "MONGODB-CR";
+    }
+    UserName user;
+    if (mechanism == "MONGODB-X509" && !cmdObj.hasField("user")) {
+        Client* client = txn->getClient();
+        auto clientName = client->session()->getX509PeerInfo().subjectName;
+        user = UserName(clientName, dbname);
+    } else {
+        user = UserName(cmdObj.getStringField("user"), dbname);
+    }
 
-    UserName user(cmdObj.getStringField("user"), dbname);
     if (Command::testCommandsEnabled && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
@@ -171,10 +183,6 @@ bool CmdAuthenticate::run(OperationContext* txn,
         user = internalSecurity.user->getName();
     }
 
-    std::string mechanism = cmdObj.getStringField("mechanism");
-    if (mechanism.empty()) {
-        mechanism = "MONGODB-CR";
-    }
     Status status = _authenticate(txn, mechanism, user, cmdObj);
     audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
     if (!status.isOK()) {
