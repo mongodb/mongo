@@ -406,6 +406,9 @@ functions:
           git clone git@github.com:10gen/jepsen.git
           cd jepsen/jepsen
           git checkout mongodb-master
+          branch=$(git symbolic-ref --short HEAD)
+          commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
+          echo "Git branch: $branch, commit: $commit"
           lein install
     - command: shell.exec
       params:
