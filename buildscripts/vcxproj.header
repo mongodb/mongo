@@ -100,7 +100,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <ObjectFileName>Build/%(RelativeDir)/</ObjectFileName>
-      <AdditionalIncludeDirectories>src;src\mongo;src\third_party\mozjs-45\include;src\third_party\pcre-8.38;src\third_party\boost-1.60.0;src\third_party\snappy-1.1.3;src\third_party\s2;src\third_party\yaml-cpp-0.5.3\include;src\third_party\wiredtiger\src\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;src\mongo;src\third_party\mozjs-45\include;src\third_party\pcre-8.39;src\third_party\boost-1.60.0;src\third_party\snappy-1.1.3;src\third_party\s2;src\third_party\yaml-cpp-0.5.3\include;src\third_party\wiredtiger\src\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
       <!-- above is temp - NTDDI etc. should be configurable, not finished yet, this gets us compiling some for now. 
          <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
