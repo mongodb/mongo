@@ -204,6 +204,7 @@ class ShardedClusterFixture(interface.Fixture):
         mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
 
         mongod_options = copy.deepcopy(self.mongod_options)
+        mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard%d" % (index))
 
         return standalone.MongoDFixture(mongod_logger,
