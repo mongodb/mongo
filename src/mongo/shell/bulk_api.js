@@ -376,7 +376,7 @@ var _bulk_api_module = (function() {
         };
     };
 
-    BulkWriteError.prototype = new Error();
+    BulkWriteError.prototype = Object.create(Error.prototype);
     BulkWriteError.prototype.constructor = BulkWriteError;
 
     var getEmptyBulkResult = function() {
@@ -432,7 +432,7 @@ var _bulk_api_module = (function() {
         };
     };
 
-    WriteCommandError.prototype = new Error();
+    WriteCommandError.prototype = Object.create(Error.prototype);
     WriteCommandError.prototype.constructor = WriteCommandError;
 
     /**
@@ -441,6 +441,9 @@ var _bulk_api_module = (function() {
     var WriteError = function(err) {
         if (!(this instanceof WriteError))
             return new WriteError(err);
+
+        this.name = 'WriteError';
+        this.message = err.errmsg || 'unknown write error';
 
         // Define properties
         defineReadOnlyProperty(this, "code", err.code);
@@ -463,11 +466,15 @@ var _bulk_api_module = (function() {
         this.toString = function() {
             return "WriteError(" + tojson(err) + ")";
         };
+        this.stack = this.toString() + "\n" + (new Error().stack);
 
         this.shellPrint = function() {
             return this.toString();
         };
     };
+
+    WriteError.prototype = Object.create(Error.prototype);
+    WriteError.prototype.constructor = WriteError;
 
     /**
      * Wraps a write concern error
@@ -475,6 +482,9 @@ var _bulk_api_module = (function() {
     var WriteConcernError = function(err) {
         if (!(this instanceof WriteConcernError))
             return new WriteConcernError(err);
+
+        this.name = 'WriteConcernError';
+        this.message = err.errmsg || 'unknown write concern error';
 
         // Define properties
         defineReadOnlyProperty(this, "code", err.code);
@@ -491,11 +501,15 @@ var _bulk_api_module = (function() {
         this.toString = function() {
             return "WriteConcernError(" + tojson(err) + ")";
         };
+        this.stack = this.toString() + "\n" + (new Error().stack);
 
         this.shellPrint = function() {
             return this.toString();
         };
     };
+
+    WriteConcernError.prototype = Object.create(Error.prototype);
+    WriteConcernError.prototype.constructor = WriteConcernError;
 
     /**
      * Keeps the state of an unordered batch so we can rewrite the results
