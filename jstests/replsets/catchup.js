@@ -6,13 +6,13 @@ load("jstests/replsets/rslib.js");
 
     "use strict";
     var name = "catch_up";
-    var rst = new ReplSetTest({name: name, nodes: 3});
+    var rst = new ReplSetTest({name: name, nodes: 3, useBridge: true});
 
     rst.startSet();
     var conf = rst.getReplSetConfig();
     conf.settings = {
         heartbeatIntervalMillis: 500,
-        electionTimeoutMillis: 2000,
+        electionTimeoutMillis: 10000,
         catchUpTimeoutMillis: 10000
     };
     rst.initiate(conf);
@@ -46,9 +46,15 @@ load("jstests/replsets/rslib.js");
         jsTest.log("disable failpoint " + node.host);
         assert.commandWorked(
             node.adminCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}));
-        assert.commandWorked(
-            node.adminCommand({configureFailPoint: 'pauseRsBgSyncProducer', mode: 'off'}),
-            'Failed to disable pauseRsBgSyncProducer failpoint.');
+        try {
+            assert.commandWorked(
+                node.adminCommand({configureFailPoint: 'pauseRsBgSyncProducer', mode: 'off'}),
+                'Failed to disable pauseRsBgSyncProducer failpoint.');
+        } catch (ex) {
+            // Enable bgsync producer may cause rollback, which will close all connections
+            // including the one sending "configureFailPoint".
+            print("got exception when disabling fail point 'pauseRsBgSyncProducer': " + e);
+        }
     }
 
     function stepUp(node) {
@@ -157,8 +163,8 @@ load("jstests/replsets/rslib.js");
     // Wait until it catches up with the old primary.
     disableFailPoint(oldSecondaries[1]);
     awaitOpTime(oldSecondaries[1], latestOp.ts);
-    // Shutdown the old primary
-    rst.stop(oldPrimary);
+    // Disconnect the new primary and the old one.
+    oldPrimary.disconnect(newPrimary);
     // Disable the failpoint, the new primary should sync from the other secondary.
     disableFailPoint(newPrimary);
     assert.eq(newPrimary, rst.getPrimary());
