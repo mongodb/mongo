@@ -68,14 +68,11 @@ public:
      * Creates a new WT session on the specified connection.
      *
      * @param conn WT connection
-     * @param cachePartition If the session comes from the session cache, this indicates to
-     *          which partition it should be returned. Value of -1 means it doesn't come from
-     *          cache and that it should not be cached, but closed directly.
-     * @param epoch In which session cache cleanup epoch was this session instantiated. Value
-     *          of -1 means that this value is not necessary since the session will not be
-     *          cached.
+     * @param epoch In which session cache cleanup epoch was this session instantiated.
+     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, int epoch = -1);
+    WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch = 0, uint64_t cursorEpoch = 0);
+
     ~WiredTigerSession();
 
     WT_SESSION* getSession() const {
@@ -86,7 +83,7 @@ public:
 
     void releaseCursor(uint64_t id, WT_CURSOR* cursor);
 
-    void closeAllCursors();
+    void closeAllCursors(uint64_t cursorEpoch = 0);
 
     int cursorsOut() const {
         return _cursorsOut;
@@ -110,7 +107,13 @@ private:
         return _epoch;
     }
 
+    // Used internally by WiredTigerSessionCache
+    uint64_t _getCursorEpoch() const {
+        return _cursorEpoch;
+    }
+
     const uint64_t _epoch;
+    uint64_t _cursorEpoch;
     WT_SESSION* _session;  // owned
     CursorCache _cursors;  // owned
     uint64_t _cursorGen;
@@ -145,6 +148,12 @@ public:
      * release.
      */
     void closeAll();
+
+    /**
+     * Closes all cached cursors and ensures that previously opened cursors will be closed on
+     * release.
+     */
+    void closeAllCursors();
 
     /**
      * Transitions the cache to shutting down mode. Any already released sessions are freed and
@@ -191,6 +200,9 @@ private:
 
     // Bumped when all open sessions need to be closed
     AtomicUInt64 _epoch;  // atomic so we can check it outside of the lock
+
+    // Bumped when all open cursors need to be closed
+    AtomicUInt64 _cursorEpoch;  // atomic so we can check it outside of the lock
 
     // Counter and critical section mutex for waitUntilDurable
     AtomicUInt32 _lastSyncTime;
