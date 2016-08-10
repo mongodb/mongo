@@ -490,7 +490,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
                     str::stream() << "Collection is empty, ns: " << nss.ns()};
         }
         invariant(PlanExecutor::ADVANCED == state);
-        return doc;
+        return doc.getOwned();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, opStr, nss.ns());
     MONGO_UNREACHABLE;
