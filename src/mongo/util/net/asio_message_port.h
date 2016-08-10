@@ -105,9 +105,9 @@ public:
 
     long long getBytesOut() const override;
 
-    void setX509PeerInfo(SSLPeerInfo x509PeerInfo) override;
+    void setX509SubjectName(const std::string& x509SubjectName) override;
 
-    const SSLPeerInfo& getX509PeerInfo() const override;
+    std::string getX509SubjectName() const override;
 
     void setConnectionId(const long long connectionId) override;
 
@@ -140,7 +140,7 @@ private:
 
     bool _isEncrypted;
     bool _awaitingHandshake;
-    SSLPeerInfo _x509PeerInfo;
+    std::string _x509SubjectName;
 
     long long _bytesIn;
     long long _bytesOut;

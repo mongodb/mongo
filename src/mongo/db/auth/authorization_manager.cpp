@@ -422,26 +422,18 @@ Status AuthorizationManager::getUserDescription(OperationContext* txn,
 
 Status AuthorizationManager::getRoleDescription(OperationContext* txn,
                                                 const RoleName& roleName,
-                                                PrivilegeFormat privileges,
+                                                bool showPrivileges,
                                                 BSONObj* result) {
-    return _externalState->getRoleDescription(txn, roleName, privileges, result);
+    return _externalState->getRoleDescription(txn, roleName, showPrivileges, result);
 }
-
-Status AuthorizationManager::getRolesDescription(OperationContext* txn,
-                                                 const std::vector<RoleName>& roleName,
-                                                 PrivilegeFormat privileges,
-                                                 BSONObj* result) {
-    return _externalState->getRolesDescription(txn, roleName, privileges, result);
-}
-
 
 Status AuthorizationManager::getRoleDescriptionsForDB(OperationContext* txn,
                                                       const std::string dbname,
-                                                      PrivilegeFormat privileges,
+                                                      bool showPrivileges,
                                                       bool showBuiltinRoles,
                                                       vector<BSONObj>* result) {
     return _externalState->getRoleDescriptionsForDB(
-        txn, dbname, privileges, showBuiltinRoles, result);
+        txn, dbname, showPrivileges, showBuiltinRoles, result);
 }
 
 Status AuthorizationManager::acquireUser(OperationContext* txn,

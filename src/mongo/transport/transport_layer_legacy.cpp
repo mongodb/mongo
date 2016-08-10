@@ -117,16 +117,16 @@ Ticket TransportLayerLegacy::sourceMessage(Session& session, Message* message, D
     return Ticket(this, stdx::make_unique<LegacyTicket>(session, expiration, std::move(sourceCb)));
 }
 
-SSLPeerInfo TransportLayerLegacy::getX509PeerInfo(const Session& session) const {
+std::string TransportLayerLegacy::getX509SubjectName(const Session& session) {
     {
         stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
         auto conn = _connections.find(session.id());
         if (conn == _connections.end()) {
             // Return empty string if the session is not found
-            return SSLPeerInfo();
+            return "";
         }
 
-        return conn->second.sslPeerInfo.value_or(SSLPeerInfo());
+        return conn->second.x509SubjectName.value_or("");
     }
 }
 
@@ -274,10 +274,10 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
 
 #ifdef MONGO_CONFIG_SSL
         // If we didn't have an X509 subject name, see if we have one now
-        if (!conn->second.sslPeerInfo) {
-            auto info = amp->getX509PeerInfo();
-            if (info.subjectName != "") {
-                conn->second.sslPeerInfo = info;
+        if (!conn->second.x509SubjectName) {
+            auto name = amp->getX509SubjectName();
+            if (name != "") {
+                conn->second.x509SubjectName = name;
             }
         }
 #endif

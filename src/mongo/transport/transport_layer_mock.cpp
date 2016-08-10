@@ -109,13 +109,8 @@ void TransportLayerMock::asyncWait(Ticket&& ticket, TicketCallback callback) {
     callback(Status::OK());
 }
 
-SSLPeerInfo TransportLayerMock::getX509PeerInfo(const Session& session) const {
-    return _sessions.at(session.id()).peerInfo;
-}
-
-
-void TransportLayerMock::setX509PeerInfo(const Session& session, SSLPeerInfo peerInfo) {
-    _sessions[session.id()].peerInfo = std::move(peerInfo);
+std::string TransportLayerMock::getX509SubjectName(const Session& session) {
+    return session.getX509SubjectName();
 }
 
 TransportLayer::Stats TransportLayerMock::sessionStats() {
@@ -129,16 +124,16 @@ Session* TransportLayerMock::createSession() {
         stdx::make_unique<Session>(HostAndPort(), HostAndPort(), this);
     Session::Id sessionId = session->id();
 
-    _sessions[sessionId] = Connection{std::move(session), SSLPeerInfo()};
+    _sessions[sessionId] = std::move(session);
 
-    return _sessions[sessionId].session.get();
+    return _sessions[sessionId].get();
 }
 
 Session* TransportLayerMock::get(Session::Id id) {
     if (!owns(id))
         return nullptr;
 
-    return _sessions[id].session.get();
+    return _sessions[id].get();
 }
 
 bool TransportLayerMock::owns(Session::Id id) {
@@ -152,7 +147,7 @@ void TransportLayerMock::end(Session& session) {
 void TransportLayerMock::endAllSessions(Session::TagMask tags) {
     auto it = _sessions.begin();
     while (it != _sessions.end()) {
-        end(*it->second.session.get());
+        end(*it->second.get());
         it++;
     }
 }

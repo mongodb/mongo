@@ -152,25 +152,9 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
 Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
                                                           const UserName& userName,
                                                           BSONObj* result) {
-    Status status = Status::OK();
-
-    if (!shouldUseRolesFromConnection(txn, userName)) {
-        status = _getUserDocument(txn, userName, result);
-        if (!status.isOK())
-            return status;
-    } else {
-        // We are able to artifically construct the external user from the request
-        BSONArrayBuilder userRoles;
-        for (const RoleName& role : txn->getClient()->session()->getX509PeerInfo().roles) {
-            userRoles << BSON("role" << role.getRole() << "db" << role.getDB());
-        }
-        *result = BSON("_id" << userName.getUser() << "user" << userName.getUser() << "db"
-                             << userName.getDB()
-                             << "credentials"
-                             << BSON("external" << true)
-                             << "roles"
-                             << userRoles.arr());
-    }
+    Status status = _getUserDocument(txn, userName, result);
+    if (!status.isOK())
+        return status;
 
     BSONElement directRolesElement;
     status = bsonExtractTypedField(*result, "roles", Array, &directRolesElement);
@@ -257,55 +241,14 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* txn,
 
 Status AuthzManagerExternalStateLocal::getRoleDescription(OperationContext* txn,
                                                           const RoleName& roleName,
-                                                          PrivilegeFormat showPrivileges,
+                                                          bool showPrivileges,
                                                           BSONObj* result) {
-    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        mutablebson::Document resultDoc;
-        mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");
-        fassert(40271, resultDoc.root().pushBack(rolesElement));
-        addRoleNameObjectsToArrayElement(
-            rolesElement, makeRoleNameIteratorForContainer(std::vector<RoleName>{roleName}));
-        resolveUserRoles(&resultDoc, {roleName});
-        *result = resultDoc.getObject();
-        return Status::OK();
-    }
     stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
     return _getRoleDescription_inlock(roleName, showPrivileges, result);
 }
 
-Status AuthzManagerExternalStateLocal::getRolesDescription(OperationContext* txn,
-                                                           const std::vector<RoleName>& roles,
-                                                           PrivilegeFormat showPrivileges,
-                                                           BSONObj* result) {
-    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        mutablebson::Document resultDoc;
-        mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");
-        fassert(40272, resultDoc.root().pushBack(rolesElement));
-        addRoleNameObjectsToArrayElement(rolesElement, makeRoleNameIteratorForContainer(roles));
-        resolveUserRoles(&resultDoc, roles);
-        *result = resultDoc.getObject();
-        return Status::OK();
-    }
-
-    stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
-    BSONArrayBuilder resultBuilder;
-    for (const RoleName& role : roles) {
-        BSONObj roleDoc;
-        Status status = _getRoleDescription_inlock(role, showPrivileges, &roleDoc);
-        if (!status.isOK()) {
-            if (status.code() == ErrorCodes::RoleNotFound) {
-                continue;
-            }
-            return status;
-        }
-        resultBuilder << roleDoc;
-    }
-    *result = resultBuilder.arr();
-    return Status::OK();
-}
-
 Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName& roleName,
-                                                                  PrivilegeFormat showPrivileges,
+                                                                  bool showPrivileges,
                                                                   BSONObj* result) {
     if (!_roleGraph.roleExists(roleName))
         return Status(ErrorCodes::RoleNotFound, "No role named " + roleName.toString());
@@ -325,7 +268,7 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName
     mutablebson::Element privilegesElement = resultDoc.makeElementArray("privileges");
     mutablebson::Element inheritedPrivilegesElement =
         resultDoc.makeElementArray("inheritedPrivileges");
-    if (showPrivileges == PrivilegeFormat::kShowSeparate) {
+    if (showPrivileges) {
         fassert(17166, resultDoc.root().pushBack(privilegesElement));
     }
     mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
@@ -334,7 +277,7 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName
     if (_roleGraphState == roleGraphStateConsistent) {
         addRoleNameObjectsToArrayElement(inheritedRolesElement,
                                          _roleGraph.getIndirectSubordinates(roleName));
-        if (showPrivileges == PrivilegeFormat::kShowSeparate) {
+        if (showPrivileges) {
             addPrivilegeObjectsOrWarningsToArrayElement(
                 privilegesElement, warningsElement, _roleGraph.getDirectPrivileges(roleName));
 
@@ -343,7 +286,7 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName
 
             fassert(17323, resultDoc.root().pushBack(inheritedPrivilegesElement));
         }
-    } else if (showPrivileges == PrivilegeFormat::kShowSeparate) {
+    } else if (showPrivileges) {
         warningsElement.appendString(
             "", "Role graph state inconsistent; only direct privileges available.");
         addPrivilegeObjectsOrWarningsToArrayElement(
@@ -358,15 +301,11 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(const RoleName
 
 Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(OperationContext* txn,
                                                                 const std::string dbname,
-                                                                PrivilegeFormat showPrivileges,
+                                                                bool showPrivileges,
                                                                 bool showBuiltinRoles,
                                                                 vector<BSONObj>* result) {
-    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "Cannot get user fragment for all roles in a database");
-    }
-
     stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
+
     for (RoleNameIterator it = _roleGraph.getRolesForDatabase(dbname); it.more(); it.next()) {
         if (!showBuiltinRoles && _roleGraph.isBuiltinRole(it.get())) {
             continue;

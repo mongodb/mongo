@@ -51,7 +51,6 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 
@@ -149,9 +148,8 @@ void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
     return _asyncWait(std::move(ticket), std::move(callback));
 }
 
-SSLPeerInfo ServiceEntryPointTestSuite::MockTLHarness::getX509PeerInfo(
-    const Session& session) const {
-    return SSLPeerInfo("mock", {});
+std::string ServiceEntryPointTestSuite::MockTLHarness::getX509SubjectName(const Session& session) {
+    return "mock";
 }
 
 void ServiceEntryPointTestSuite::MockTLHarness::registerTags(const Session& session) {}

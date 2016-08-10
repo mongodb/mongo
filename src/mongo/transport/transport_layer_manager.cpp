@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 #include <limits>
 
@@ -62,8 +61,8 @@ void TransportLayerManager::asyncWait(Ticket&& ticket, TicketCallback callback) 
     return getTicketTransportLayer(ticket)->asyncWait(std::move(ticket), std::move(callback));
 }
 
-SSLPeerInfo TransportLayerManager::getX509PeerInfo(const Session& session) const {
-    return session.getX509PeerInfo();
+std::string TransportLayerManager::getX509SubjectName(const Session& session) {
+    return session.getX509SubjectName();
 }
 
 template <typename Callable>

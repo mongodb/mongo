@@ -64,7 +64,7 @@ public:
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    SSLPeerInfo getX509PeerInfo(const Session& session) const override;
+    std::string getX509SubjectName(const Session& session) override;
     void registerTags(const Session& session) override;
 
     Stats sessionStats() override;

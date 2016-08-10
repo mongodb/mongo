@@ -29,9 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 
@@ -39,14 +36,5 @@ stdx::function<std::unique_ptr<AuthzManagerExternalState>()> AuthzManagerExterna
 
 AuthzManagerExternalState::AuthzManagerExternalState() = default;
 AuthzManagerExternalState::~AuthzManagerExternalState() = default;
-
-bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* txn,
-                                                             const UserName& userName) {
-    return txn && txn->getClient() && txn->getClient()->session() &&
-        txn->getClient()->session()->getX509PeerInfo().subjectName == userName.getUser() &&
-        userName.getDB() == "$external" &&
-        !txn->getClient()->session()->getX509PeerInfo().roles.empty();
-}
-
 
 }  // namespace mongo
