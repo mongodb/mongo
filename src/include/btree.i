@@ -204,6 +204,7 @@ __wt_cache_page_byte_dirty_decr(
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
+	decr = 0;			/* [-Wconditional-uninitialized] */
 
 	/*
 	 * We don't have exclusive access and there are ways of decrementing the
