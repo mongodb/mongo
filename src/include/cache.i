@@ -78,21 +78,26 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_bytes_plus_overhead --
+ *	Apply the cache overhead to a size in bytes.
+ */
+static inline uint64_t
+__wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64_t sz)
+{
+	if (cache->overhead_pct != 0)
+		sz += (sz * (uint64_t)cache->overhead_pct) / 100;
+
+	return (sz);
+}
+
+/*
  * __wt_cache_bytes_inuse --
  *	Return the number of bytes in use.
  */
 static inline uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-	uint64_t bytes_inuse;
-
-	/* Adjust the cache size to take allocation overhead into account. */
-	bytes_inuse = cache->bytes_inmem;
-	if (cache->overhead_pct != 0)
-		bytes_inuse +=
-		    (bytes_inuse * (uint64_t)cache->overhead_pct) / 100;
-
-	return (bytes_inuse);
+	return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_inmem));
 }
 
 /*
@@ -102,14 +107,8 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_dirty_inuse(WT_CACHE *cache)
 {
-	uint64_t dirty_inuse;
-
-	dirty_inuse = cache->bytes_dirty_intl + cache->bytes_dirty_leaf;
-	if (cache->overhead_pct != 0)
-		dirty_inuse +=
-		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
-
-	return (dirty_inuse);
+	return (__wt_cache_bytes_plus_overhead(cache,
+	    cache->bytes_dirty_intl + cache->bytes_dirty_leaf));
 }
 
 /*
@@ -119,14 +118,7 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
 {
-	uint64_t dirty_inuse;
-
-	dirty_inuse = cache->bytes_dirty_leaf;
-	if (cache->overhead_pct != 0)
-		dirty_inuse +=
-		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
-
-	return (dirty_inuse);
+	return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_dirty_leaf));
 }
 
 /*
@@ -136,14 +128,7 @@ __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_bytes_image(WT_CACHE *cache)
 {
-	uint64_t bytes_image;
-
-	bytes_image = cache->bytes_image;
-	if (cache->overhead_pct != 0)
-		bytes_image +=
-		    (bytes_image * (uint64_t)cache->overhead_pct) / 100;
-
-	return (bytes_image);
+	return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_image));
 }
 
 /*
@@ -153,7 +138,7 @@ __wt_cache_bytes_image(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_bytes_other(WT_CACHE *cache)
 {
-	uint64_t bytes_image, bytes_inmem, bytes_other;
+	uint64_t bytes_image, bytes_inmem;
 
 	bytes_image = cache->bytes_image;
 	bytes_inmem = cache->bytes_inmem;
@@ -162,15 +147,8 @@ __wt_cache_bytes_other(WT_CACHE *cache)
 	 * The reads above could race with changes to the values, so protect
 	 * against underflow.
 	 */
-	if (bytes_image > bytes_inmem)
-		return (0);
-
-	bytes_other = bytes_inmem - bytes_image;
-	if (cache->overhead_pct != 0)
-		bytes_other +=
-		    (bytes_other * (uint64_t)cache->overhead_pct) / 100;
-
-	return (bytes_other);
+	return ((bytes_image > bytes_inmem) ? 0 :
+	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_image));
 }
 
 /*

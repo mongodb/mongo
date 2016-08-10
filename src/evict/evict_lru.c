@@ -1282,16 +1282,16 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	WT_REF *ref;
 	uint64_t btree_inuse, bytes_per_slot, cache_inuse;
 	uint64_t pages_seen, refs_walked;
-	uint32_t remaining_slots, target_pages, total_slots, walk_flags;
+	uint32_t remaining_slots, total_slots, walk_flags;
+	uint32_t target_pages_clean, target_pages_dirty, target_pages;
 	int internal_pages, restarts;
-	bool enough, modified;
+	bool modified;
 
 	conn = S2C(session);
 	btree = S2BT(session);
 	cache = conn->cache;
 	queue = &cache->evict_queues[queue_index];
 	internal_pages = restarts = 0;
-	enough = false;
 
 	/*
 	 * Figure out how many slots to fill from this tree.
@@ -1299,8 +1299,6 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 */
 	start = queue->evict_queue + *slotp;
 	remaining_slots = max_entries - *slotp;
-	btree_inuse = __wt_btree_bytes_inuse(session);
-	cache_inuse = __wt_cache_bytes_inuse(cache);
 	total_slots = max_entries - queue->evict_entries;
 
 	/*
@@ -1309,24 +1307,34 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 * slots so we assign all of the slots to a tree filling 99+% of the
 	 * cache (and only have to walk it once).
 	 */
-	bytes_per_slot = cache_inuse / total_slots;
-	target_pages = (uint32_t)(
-	    (btree_inuse + bytes_per_slot / 2) / bytes_per_slot);
+	if (FLD_ISSET(cache->state, WT_EVICT_STATE_CLEAN)) {
+		btree_inuse = __wt_btree_bytes_inuse(session);
+		cache_inuse = __wt_cache_bytes_inuse(cache);
+		bytes_per_slot = 1 + cache_inuse / total_slots;
+		target_pages_clean = (uint32_t)(
+		    (btree_inuse + bytes_per_slot / 2) / bytes_per_slot);
+	} else
+		target_pages_clean = 0;
+
+	if (FLD_ISSET(cache->state, WT_EVICT_STATE_DIRTY)) {
+		btree_inuse = __wt_btree_dirty_leaf_inuse(session);
+		cache_inuse = __wt_cache_dirty_leaf_inuse(cache);
+		bytes_per_slot = 1 + cache_inuse / total_slots;
+		target_pages_dirty = (uint32_t)(
+		    (btree_inuse + bytes_per_slot / 2) / bytes_per_slot);
+	} else
+		target_pages_dirty = 0;
+
+	target_pages = WT_MAX(target_pages_clean, target_pages_dirty);
+
 	if (target_pages == 0) {
 		/*
 		 * Randomly walk trees with a tiny fraction of the cache in
 		 * case there are so many trees that none of them use enough of
-		 * the cache to be allocated slots.
-		 *
-		 * Map a random number into the range [0..1], and if the result
-		 * is greater than the fraction of the cache used by this tree,
-		 * give up.  In other words, there is a small chance we will
-		 * visit trees that use a small fraction of the cache.  Arrange
-		 * this calculation to avoid overflow (e.g., don't multiply
-		 * anything by UINT32_MAX).
+		 * the cache to be allocated slots.  Walk small trees 1% of the
+		 * time.
 		 */
-		if (__wt_random(&session->rnd) / (double)UINT32_MAX >
-		    btree_inuse / (double)cache_inuse)
+		if (__wt_random(&session->rnd) > UINT32_MAX / 100)
 			return (0);
 		target_pages = 10;
 	}
@@ -1354,12 +1362,11 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 * case we are appending and only the last page in the file is live.
 	 */
 	for (evict = start, pages_seen = refs_walked = 0;
-	    evict < end && !enough && (ret == 0 || ret == WT_NOTFOUND);
+	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk_count(
 	    session, &btree->evict_ref, &refs_walked, walk_flags)) {
-		enough = refs_walked > cache->evict_max_refs_per_file;
 		if ((ref = btree->evict_ref) == NULL) {
-			if (++restarts == 2 || enough)
+			if (++restarts == 2)
 				break;
 			WT_STAT_FAST_CONN_INCR(
 			    session, cache_eviction_walks_started);
@@ -2013,9 +2020,8 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	 * Apply the overhead percentage so our total bytes are comparable with
 	 * the tracked value.
 	 */
-	if (conn->cache->overhead_pct != 0)
-		total_bytes +=
-		    (total_bytes * (uint64_t)conn->cache->overhead_pct) / 100;
+	total_bytes = __wt_cache_bytes_plus_overhead(conn->cache, total_bytes);
+
 	(void)fprintf(fp,
 	    "cache dump: "
 	    "total found = %" PRIu64 "MB vs tracked inuse %" PRIu64 "MB\n"
