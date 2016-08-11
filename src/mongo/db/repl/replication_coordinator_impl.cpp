@@ -611,7 +611,6 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             }
             _externalState->startSteadyStateReplication(txn, this);
         });
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
     } else {
         _externalState->startInitialSync([this, startCompleted]() {
             auto txn = cc().makeOperationContext();
