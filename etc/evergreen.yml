@@ -364,10 +364,14 @@ functions:
 
         cp mongodb*/bin/* .
 
-        if [ ${build_variant} = ubuntu1604 ] && [ ${enable_coredumps|false} = true ]; then
-          # Set the process to dump ELF headers (bit 4) and anonymous private mappings (bit 0).
-          echo 0x11 > /proc/self/coredump_filter
-          ulimit -c unlimited
+        if [ -f /proc/self/coredump_filter ]; then
+          # Set the shell process (and its children processes) to dump ELF headers (bit 4),
+          # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
+          echo 0x13 > /proc/self/coredump_filter
+
+          if [ ${build_variant} = ubuntu1604 ] && [ ${enable_coredumps|false} = true ]; then
+            ulimit -c unlimited
+          fi
         fi
 
         extra_args=""
