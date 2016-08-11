@@ -490,7 +490,7 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     source->_variables.reset(new Variables());
 
     source->injectExpressionContext(expCtx);
-    return std::move(source);
+    return source;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
