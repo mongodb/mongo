@@ -73,7 +73,7 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     _database = std::move(str.value);
 
     uassert(28636,
-            str::stream() << "Database parsed in OP_COMMAND message must be between"
+            str::stream() << "Database parsed in OP_COMMAND message must be between "
                           << kMinDatabaseLength
                           << " and "
                           << kMaxDatabaseLength
@@ -90,7 +90,7 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     _commandName = std::move(str.value);
 
     uassert(28637,
-            str::stream() << "Command name parsed in OP_COMMAND message must be between"
+            str::stream() << "Command name parsed in OP_COMMAND message must be between "
                           << kMinCommandNameLength
                           << " and "
                           << kMaxCommandNameLength
