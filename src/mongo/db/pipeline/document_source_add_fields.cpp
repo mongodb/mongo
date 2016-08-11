@@ -46,7 +46,7 @@ std::vector<intrusive_ptr<DocumentSource>> DocumentSourceAddFields::createFromBs
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
     // Confirm that the stage was called with an object.
-    uassert(40269,
+    uassert(40272,
             str::stream() << "$addFields specification stage must be an object, got "
                           << typeName(elem.type()),
             elem.type() == Object);
