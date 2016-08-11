@@ -52,7 +52,7 @@ load("jstests/replsets/rslib.js");
     print("start up rs");
     var rs = new ReplSetTest({"name": name, "nodes": 3});
     print("restart 0 with keyFile");
-    m = rs.restart(0, {"keyFile": key1_600});
+    m = rs.start(0, {"keyFile": key1_600, noCleanData: true});
     print("restart 1 with keyFile");
     rs.start(1, {"keyFile": key1_600});
     print("restart 2 with keyFile");
