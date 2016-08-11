@@ -74,6 +74,12 @@ namespace {
 const size_t kMallocMemoryLimit = 1024ul * 1024 * 1024 * 1.1;
 
 /**
+ * The threshold (as a fraction of the max) after which garbage collection will be run during
+ * interrupts.
+ */
+const double kInterruptGCThreshold = 0.8;
+
+/**
  * The number of bytes to allocate after which garbage collection is run
  */
 const int kMaxBytesBeforeGC = 8 * 1024 * 1024;
@@ -91,6 +97,9 @@ const int kStackChunkSize = 8192;
 stdx::mutex gRuntimeCreationMutex;
 bool gFirstRuntimeCreated = false;
 
+bool closeToMaxMemory() {
+    return mongo::sm::get_total_bytes() > (kInterruptGCThreshold * mongo::sm::get_max_bytes());
+}
 }  // namespace
 
 MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope;
@@ -188,7 +197,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     JS_SetInterruptCallback(scope->_runtime, nullptr);
     auto guard = MakeGuard([&]() { JS_SetInterruptCallback(scope->_runtime, _interruptCallback); });
 
-    if (scope->_pendingGC.load()) {
+    if (scope->_pendingGC.load() || closeToMaxMemory()) {
         scope->_pendingGC.store(false);
         JS_GC(scope->_runtime);
     } else {
