@@ -563,7 +563,7 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
             stdx::lock_guard<stdx::mutex> lk(_identToDropMutex);
             _identToDrop.push(uri);
         }
-        _sessionCache->closeAll();
+        _sessionCache->closeAllCursors();
         return false;
     }
 

@@ -422,7 +422,7 @@ int WiredTigerUtil::verifyTable(OperationContext* txn,
     // Try to close as much as possible to avoid EBUSY errors.
     WiredTigerRecoveryUnit::get(txn)->getSession(txn)->closeAllCursors();
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
-    sessionCache->closeAll();
+    sessionCache->closeAllCursors();
 
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(txn)->getSessionCache()->conn();

@@ -69,22 +69,23 @@ public:
      * Creates a new WT session on the specified connection.
      *
      * @param conn WT connection
-     * @param epoch In which session cache cleanup epoch was this session instantiated. Value
-     *          of -1 means that this value is not necessary since the session will not be
-     *          cached.
+     * @param epoch In which session cache cleanup epoch was this session instantiated.
+     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, int epoch = -1);
+    WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch = 0, uint64_t cursorEpoch = 0);
 
     /**
      * Creates a new WT session on the specified connection.
      *
      * @param conn WT connection
      * @param cache The WiredTigerSessionCache that owns this session.
-     * @param epoch In which session cache cleanup epoch was this session instantiated. Value
-     *          of -1 means that this value is not necessary since the session will not be
-     *          cached.
+     * @param epoch In which session cache cleanup epoch was this session instantiated.
+     * @param cursorEpoch In which cursor cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, int epoch = -1);
+    WiredTigerSession(WT_CONNECTION* conn,
+                      WiredTigerSessionCache* cache,
+                      uint64_t epoch = 0,
+                      uint64_t cursorEpoch = 0);
 
     ~WiredTigerSession();
 
@@ -120,7 +121,13 @@ private:
         return _epoch;
     }
 
+    // Used internally by WiredTigerSessionCache
+    uint64_t _getCursorEpoch() const {
+        return _cursorEpoch;
+    }
+
     const uint64_t _epoch;
+    uint64_t _cursorEpoch;
     WiredTigerSessionCache* _cache;  // not owned
     WT_SESSION* _session;            // owned
     CursorCache _cursors;            // owned
@@ -160,6 +167,12 @@ public:
     void closeAll();
 
     /**
+     * Closes all cached cursors and ensures that previously opened cursors will be closed on
+     * release.
+     */
+    void closeAllCursors();
+
+    /**
      * Transitions the cache to shutting down mode. Any already released sessions are freed and
      * any sessions released subsequently are leaked. Must be called while holding the global
      * lock in exclusive mode to avoid races with getSession.
@@ -187,6 +200,10 @@ public:
 
     void setJournalListener(JournalListener* jl);
 
+    uint64_t getCursorEpoch() const {
+        return _cursorEpoch.load();
+    }
+
 private:
     WiredTigerKVEngine* _engine;  // not owned, might be NULL
     WT_CONNECTION* _conn;         // not owned
@@ -204,6 +221,9 @@ private:
 
     // Bumped when all open sessions need to be closed
     AtomicUInt64 _epoch;  // atomic so we can check it outside of the lock
+
+    // Bumped when all open cursors need to be closed
+    AtomicUInt64 _cursorEpoch;  // atomic so we can check it outside of the lock
 
     // Counter and critical section mutex for waitUntilDurable
     AtomicUInt32 _lastSyncTime;

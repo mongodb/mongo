@@ -46,13 +46,22 @@
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, int epoch)
-    : _epoch(epoch), _session(NULL), _cursorGen(0), _cursorsCached(0), _cursorsOut(0) {
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
+    : _epoch(epoch),
+      _cursorEpoch(cursorEpoch),
+      _session(NULL),
+      _cursorGen(0),
+      _cursorsCached(0),
+      _cursorsOut(0) {
     invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
 }
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, int epoch)
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
+                                     WiredTigerSessionCache* cache,
+                                     uint64_t epoch,
+                                     uint64_t cursorEpoch)
     : _epoch(epoch),
+      _cursorEpoch(cursorEpoch),
       _cache(cache),
       _session(NULL),
       _cursorGen(0),
@@ -122,6 +131,7 @@ void WiredTigerSession::closeAllCursors() {
         }
     }
     _cursors.clear();
+    _cursorEpoch = _cache->getCursorEpoch();
 }
 
 namespace {
@@ -219,8 +229,18 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     _journalListener->onDurable(token);
 }
 
+void WiredTigerSessionCache::closeAllCursors() {
+    // Increment the cursor epoch so that all cursors from this epoch are closed.
+    _cursorEpoch.fetchAndAdd(1);
+
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
+        (*i)->closeAllCursors();
+    }
+}
+
 void WiredTigerSessionCache::closeAll() {
-    // Increment the epoch as we are now closing all sessions with this epoch
+    // Increment the epoch as we are now closing all sessions with this epoch.
     SessionCache swap;
 
     {
@@ -255,7 +275,8 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return UniqueWiredTigerSession(new WiredTigerSession(_conn, this, _epoch.load()));
+    return UniqueWiredTigerSession(
+        new WiredTigerSession(_conn, this, _epoch.load(), _cursorEpoch.load()));
 }
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
@@ -281,6 +302,11 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         invariantWTOK(ss->transaction_pinned_range(ss, &range));
         invariant(range == 0);
     }
+
+    // If the cursor epoch has moved on, close all cursors in the session.
+    uint64_t cursorEpoch = _cursorEpoch.load();
+    if (session->_getCursorEpoch() != cursorEpoch)
+        session->closeAllCursors();
 
     bool returnedToCache = false;
     uint64_t currentEpoch = _epoch.load();
