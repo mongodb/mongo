@@ -182,10 +182,10 @@ public:
      * wait() or asyncWait() will complete, but may return a failed Status.  This method is
      * asynchronous and will return after all sessions have been notified to end.
      *
-     * If a TagMask is provided, endAllSessions() will skip over sessions with matching
+     * If a non-empty TagMask is provided, endAllSessions() will skip over sessions with matching
      * tags and leave them open.
      */
-    virtual void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) = 0;
+    virtual void endAllSessions(Session::TagMask tags) = 0;
 
     /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active

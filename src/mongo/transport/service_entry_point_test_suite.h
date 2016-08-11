@@ -134,8 +134,7 @@ private:
         void registerTags(const transport::Session& session) override;
         Stats sessionStats() override;
         void end(transport::Session& session) override;
-        void endAllSessions(
-            transport::Session::TagMask tags = transport::Session::kEmptyTagMask) override;
+        void endAllSessions(transport::Session::TagMask tags) override;
         Status start() override;
         void shutdown() override;
 

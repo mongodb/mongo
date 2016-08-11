@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
@@ -54,10 +55,15 @@ public:
 
     void startSession(transport::Session&& session) override;
 
+    std::size_t getNumberOfActiveWorkerThreads() const {
+        return _nWorkers.load();
+    }
+
 private:
     void _sessionLoop(transport::Session* session);
 
     transport::TransportLayer* _tl;
+    AtomicWord<std::size_t> _nWorkers;
 };
 
 }  // namespace mongo

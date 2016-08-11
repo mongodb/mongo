@@ -155,7 +155,7 @@ public:
      * @param messageHandler the message handler to use for this server. Ownership
      *     of this object is passed to this server.
      */
-    void run(std::shared_ptr<ServiceEntryPoint> serviceEntryPoint) {
+    void run(ServiceEntryPoint* serviceEntryPoint) {
         if (_server) {
             return;
         }
@@ -217,8 +217,8 @@ public:
         _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
         _dummyServer = stdx::make_unique<DummyServer>(TARGET_PORT);
 
-        auto dummyHandler = std::make_shared<DummyServiceEntryPoint>();
-        _dummyServer->run(std::move(dummyHandler));
+        _dummyServicEntryPoint = stdx::make_unique<DummyServiceEntryPoint>();
+        _dummyServer->run(_dummyServicEntryPoint.get());
         DBClientConnection conn;
         Timer timer;
 
@@ -238,6 +238,7 @@ public:
     void tearDown() {
         ScopedDbConnection::clearPool();
         _dummyServer.reset();
+        _dummyServicEntryPoint.reset();
 
         globalConnPool.setMaxPoolSize(_maxPoolSizePerHost);
     }
@@ -303,6 +304,7 @@ private:
     }
 
     std::unique_ptr<DummyServer> _dummyServer;
+    std::unique_ptr<DummyServiceEntryPoint> _dummyServicEntryPoint;
     uint32_t _maxPoolSizePerHost;
 };
 

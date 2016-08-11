@@ -56,7 +56,7 @@ void TransportLayerLegacy::ListenerLegacy::accepted(std::unique_ptr<AbstractMess
 }
 
 TransportLayerLegacy::TransportLayerLegacy(const TransportLayerLegacy::Options& opts,
-                                           std::shared_ptr<ServiceEntryPoint> sep)
+                                           ServiceEntryPoint* sep)
     : _sep(sep),
       _listener(stdx::make_unique<ListenerLegacy>(
           opts,
@@ -236,7 +236,7 @@ void TransportLayerLegacy::shutdown() {
     _running.store(false);
     _listener->shutdown();
     _listenerThread.join();
-    endAllSessions();
+    endAllSessions(Session::kEmptyTagMask);
 }
 
 Status TransportLayerLegacy::_runTicket(Ticket ticket) {

@@ -231,9 +231,12 @@ static ExitCode runMongosServer() {
     opts.ipList = serverGlobalParams.bind_ip;
 
     auto sep =
-        std::make_shared<ServiceEntryPointMongos>(getGlobalServiceContext()->getTransportLayer());
+        stdx::make_unique<ServiceEntryPointMongos>(getGlobalServiceContext()->getTransportLayer());
+    auto sepPtr = sep.get();
 
-    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sep);
+    getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
+
+    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sepPtr);
     auto res = transportLayer->setup();
     if (!res.isOK()) {
         return EXIT_NET_ERROR;

@@ -164,7 +164,7 @@ Status TransportLayerMock::start() {
 void TransportLayerMock::shutdown() {
     if (!inShutdown()) {
         _shutdown = true;
-        endAllSessions();
+        endAllSessions(Session::kEmptyTagMask);
     }
 }
 

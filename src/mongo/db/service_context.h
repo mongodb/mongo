@@ -47,6 +47,7 @@ class AbstractMessagingPort;
 class Client;
 class OperationContext;
 class OpObserver;
+class ServiceEntryPoint;
 
 namespace transport {
 class Session;
@@ -318,6 +319,13 @@ public:
     transport::TransportLayer* getTransportLayer() const;
 
     /**
+     * Get the service entry point for the service context.
+     *
+     * See ServiceEntryPoint for more details.
+     */
+    ServiceEntryPoint* getServiceEntryPoint() const;
+
+    /**
      * Add a new TransportLayer to this service context. The new TransportLayer will
      * be added to the TransportLayerManager accessible via getTransportLayer().
      *
@@ -373,6 +381,11 @@ public:
      */
     void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
 
+    /**
+     * Binds the service entry point implementation to the service context
+     */
+    void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
+
 protected:
     ServiceContext();
 
@@ -400,6 +413,11 @@ private:
      * The TransportLayerManager.
      */
     std::unique_ptr<transport::TransportLayerManager> _transportLayerManager;
+
+    /**
+     * The service entry point
+     */
+    std::unique_ptr<ServiceEntryPoint> _serviceEntryPoint;
 
     /**
      * Vector of registered observers.

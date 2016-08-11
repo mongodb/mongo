@@ -541,10 +541,14 @@ static ExitCode _initAndListen(int listenPort) {
     options.port = listenPort;
     options.ipList = serverGlobalParams.bind_ip;
 
+    auto sep =
+        stdx::make_unique<ServiceEntryPointMongod>(getGlobalServiceContext()->getTransportLayer());
+    auto sepPtr = sep.get();
+
+    getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
+
     // Create, start, and attach the TL
-    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(
-        options,
-        std::make_shared<ServiceEntryPointMongod>(getGlobalServiceContext()->getTransportLayer()));
+    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(options, sepPtr);
     auto res = transportLayer->setup();
     if (!res.isOK()) {
         error() << "Failed to set up listener: " << res.toString();
@@ -996,7 +1000,6 @@ static void shutdownTask() {
         txn = uniqueTxn.get();
     }
 
-    getGlobalServiceContext()->getTransportLayer()->shutdown();
     log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
     ListeningSockets::get()->closeAll();
 
@@ -1011,38 +1014,45 @@ static void shutdownTask() {
         sr->shutdown();
     }
 #if __has_feature(address_sanitizer)
+    auto sep = static_cast<ServiceEntryPointMongod*>(serviceContext->getServiceEntryPoint());
 
-    // When running under address sanitizer, we get false positive leaks due to disorder around the
-    // lifecycle of a connection and request. When we are running under ASAN, we try a lot harder to
-    // dry up the server from active connections before going on to really shut down.
+    if (sep) {
+        // When running under address sanitizer, we get false positive leaks due to disorder around
+        // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
+        // harder to dry up the server from active connections before going on to really shut down.
 
-    log(LogComponent::kNetwork) << "shutdown: going to close all sockets because ASAN is active...";
+        log(LogComponent::kNetwork)
+            << "shutdown: going to close all sockets because ASAN is active...";
+        getGlobalServiceContext()->getTransportLayer()->shutdown();
 
-    // Close all sockets in a detached thread, and then wait for the number of active connections to
-    // reach zero. Give the detached background thread a 10 second deadline. If we haven't closed
-    // drained all active operations within that deadline, just keep going with shutdown: the OS
-    // will do it for us when the process terminates.
+        // Close all sockets in a detached thread, and then wait for the number of active
+        // connections to reach zero. Give the detached background thread a 10 second deadline. If
+        // we haven't closed drained all active operations within that deadline, just keep going
+        // with shutdown: the OS will do it for us when the process terminates.
 
-    stdx::packaged_task<void()> dryOutTask([] {
-        // There isn't currently a way to wait on the TicketHolder to have all its tickets back,
-        // unfortunately. So, busy wait in this detached thread.
-        while (true) {
-            const auto connected = Listener::globalTicketHolder.used();
-            if (connected == 0) {
-                log(LogComponent::kNetwork) << "shutdown: no active connections found...";
-                break;
+        stdx::packaged_task<void()> dryOutTask([sep] {
+            // There isn't currently a way to wait on the TicketHolder to have all its tickets back,
+            // unfortunately. So, busy wait in this detached thread.
+            while (true) {
+                const auto runningWorkers = sep->getNumberOfActiveWorkerThreads();
+
+                if (runningWorkers == 0) {
+                    log(LogComponent::kNetwork) << "shutdown: no running workers found...";
+                    break;
+                }
+                log(LogComponent::kNetwork) << "shutdown: still waiting on " << runningWorkers
+                                            << " active workers to drain... ";
+                mongo::sleepFor(Milliseconds(250));
             }
-            log(LogComponent::kNetwork) << "shutdown: still waiting on " << connected
-                                        << " active connections to drain... ";
-            mongo::sleepFor(Milliseconds(250));
-        }
-    });
+        });
 
-    auto dryNotification = dryOutTask.get_future();
-    stdx::thread(std::move(dryOutTask)).detach();
-    if (dryNotification.wait_for(Seconds(10).toSystemDuration()) != stdx::future_status::ready) {
-        log(LogComponent::kNetwork) << "shutdown: exhausted grace period for"
-                                    << " active connections to drain; continuing with shutdown... ";
+        auto dryNotification = dryOutTask.get_future();
+        stdx::thread(std::move(dryOutTask)).detach();
+        if (dryNotification.wait_for(Seconds(10).toSystemDuration()) !=
+            stdx::future_status::ready) {
+            log(LogComponent::kNetwork) << "shutdown: exhausted grace period for"
+                                        << " active workers to drain; continuing with shutdown... ";
+        }
     }
 
 #endif

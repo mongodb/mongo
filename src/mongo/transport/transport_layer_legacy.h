@@ -60,7 +60,7 @@ public:
         Options() : port(0), ipList("") {}
     };
 
-    TransportLayerLegacy(const Options& opts, std::shared_ptr<ServiceEntryPoint> sep);
+    TransportLayerLegacy(const Options& opts, ServiceEntryPoint* sep);
 
     ~TransportLayerLegacy();
 
@@ -84,7 +84,7 @@ public:
     Stats sessionStats() override;
 
     void end(Session& session) override;
-    void endAllSessions(transport::Session::TagMask tags = Session::kKeepOpen) override;
+    void endAllSessions(transport::Session::TagMask tags) override;
 
     void shutdown() override;
 
@@ -156,7 +156,7 @@ private:
         bool ended;
     };
 
-    std::shared_ptr<ServiceEntryPoint> _sep;
+    ServiceEntryPoint* _sep;
 
     std::unique_ptr<Listener> _listener;
     stdx::thread _listenerThread;

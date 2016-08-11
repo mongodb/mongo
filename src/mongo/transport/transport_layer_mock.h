@@ -97,7 +97,7 @@ public:
     Session* get(Session::Id id);
     bool owns(Session::Id id);
     void end(Session& session) override;
-    void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) override;
+    void endAllSessions(Session::TagMask tags) override;
 
     Status start() override;
     void shutdown() override;

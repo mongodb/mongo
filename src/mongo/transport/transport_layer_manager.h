@@ -70,7 +70,7 @@ public:
     Stats sessionStats() override;
 
     void end(Session& session) override;
-    void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) override;
+    void endAllSessions(Session::TagMask tags) override;
 
     Status start() override;
     void shutdown() override;

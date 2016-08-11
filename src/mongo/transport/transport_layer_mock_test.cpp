@@ -254,7 +254,7 @@ void assertEnded(std::vector<Session*> sessions) {
 // endAllSessions() ends all sessions
 TEST_F(TransportLayerMockTest, EndAllSessions) {
     std::vector<Session*> sessions = createSessions(tl());
-    tl()->endAllSessions();
+    tl()->endAllSessions(Session::kEmptyTagMask);
     assertEnded(sessions);
 }
 
