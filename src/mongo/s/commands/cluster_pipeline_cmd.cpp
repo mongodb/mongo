@@ -135,45 +135,49 @@ public:
         if (!pipeline.isOK()) {
             return appendCommandStatus(result, pipeline.getStatus());
         }
-        pipeline.getValue()->optimizePipeline();
 
         for (auto&& ns : pipeline.getValue()->getInvolvedCollections()) {
             uassert(
                 28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
+            // We won't try to execute anything on a mongos, but we still have to populate this map
+            // so that any $lookups etc will be able to have a resolved view definition. It's okay
+            // that this is incorrect, we will repopulate the real resolved namespace map on the
+            // mongod.
+            // TODO SERVER-25038 This should become unnecessary once we can get the involved
+            // namespaces before parsing.
+            mergeCtx->resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
         }
 
         if (!conf->isSharded(fullns)) {
             return aggPassthrough(txn, dbname, conf, cmdObj, result, options, errmsg);
         }
 
+        ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, fullns);
+
+        // If there was no collation specified, but there is a default collation for the collation,
+        // use that.
+        if (request.getValue().getCollation().isEmpty() && chunkMgr->getDefaultCollator()) {
+            mergeCtx->setCollator(chunkMgr->getDefaultCollator()->clone());
+        }
+
+        // Now that we know the collation we'll be using, inject the ExpressionContext and optimize.
+        // TODO SERVER-25038: this must happen before we parse the pipeline, since we can make
+        // string comparisons during parse time.
+        pipeline.getValue()->injectExpressionContext(mergeCtx);
+        pipeline.getValue()->optimizePipeline();
+
         // If the first $match stage is an exact match on the shard key (with a simple collation or
         // no string matching), we only have to send it to one shard, so send the command to that
         // shard.
         BSONObj firstMatchQuery = pipeline.getValue()->getInitialQuery();
-        ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, fullns);
         BSONObj shardKeyMatches;
         shardKeyMatches = uassertStatusOK(
             chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, firstMatchQuery));
         bool singleShard = false;
         if (!shardKeyMatches.isEmpty()) {
-
-            // Construct collator for targeting.
-            std::unique_ptr<CollatorInterface> collator;
-            if (!request.getValue().getCollation().isEmpty()) {
-                auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
-                                              ->makeFromBSON(request.getValue().getCollation());
-                if (!statusWithCollator.isOK()) {
-                    return appendCommandStatus(result, statusWithCollator.getStatus());
-                }
-                collator = std::move(statusWithCollator.getValue());
-            }
-
             try {
-                auto chunk = chunkMgr->findIntersectingChunk(
-                    txn,
-                    shardKeyMatches,
-                    !request.getValue().getCollation().isEmpty() ? collator.get()
-                                                                 : chunkMgr->getDefaultCollator());
+                auto chunk =
+                    chunkMgr->findIntersectingChunk(txn, shardKeyMatches, mergeCtx->getCollator());
                 singleShard = true;
             } catch (const MsgAssertionException& msg) {
                 if (msg.getCode() == ErrorCodes::ShardKeyNotFound) {
@@ -283,17 +287,14 @@ public:
 
         // Not propagating readConcern to merger since it doesn't do local reads.
 
-        // The merger needs the collection default collation, since it may not have the collection
-        // metadata.
-        if (!cmdObj.hasField("collation")) {
-            if (!chunkMgr->getDefaultCollator()) {
-                mergeCmd.setField("collation",
-                                  Value(BSON(CollationSpec::kLocaleField
-                                             << CollationSpec::kSimpleBinaryComparison)));
-            } else {
-                mergeCmd.setField("collation",
-                                  Value(chunkMgr->getDefaultCollator()->getSpec().toBSON()));
-            }
+        // If the user didn't specify a collation already, make sure there's a collation attached to
+        // the merge command, since the merging shard may not have the collection metadata.
+        if (mergeCmd.peek()["collation"].missing()) {
+            mergeCmd.setField("collation",
+                              mergeCtx->getCollator()
+                                  ? Value(mergeCtx->getCollator()->getSpec().toBSON())
+                                  : Value(Document{{CollationSpec::kLocaleField,
+                                                    CollationSpec::kSimpleBinaryComparison}}));
         }
 
         string outputNsOrEmpty;
