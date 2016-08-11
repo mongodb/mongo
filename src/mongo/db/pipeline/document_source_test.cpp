@@ -4822,7 +4822,7 @@ TEST_F(AddFieldsTest, ShouldErrorOnNonObjectSpec) {
                         << "foo");
     BSONElement specElement = spec.firstElement();
     ASSERT_THROWS_CODE(
-        DocumentSourceAddFields::createFromBson(specElement, ctx()), UserException, 40269);
+        DocumentSourceAddFields::createFromBson(specElement, ctx()), UserException, 40272);
 }
 
 // Verify that mutiple documents can be processed in a row with the addFields stage.
