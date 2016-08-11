@@ -57,9 +57,6 @@ const char* DocumentSourceGraphLookUp::getSourceName() const {
 boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
     pExpCtx->checkForInterrupt();
 
-    uassert(
-        40106, "from collection must have a unique _id index", _mongod->hasUniqueIdIndex(_from));
-
     if (_unwind) {
         return getNextUnwound();
     }
@@ -171,8 +168,17 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             // Query for all keys that were in the frontier and not in the cache, populating
             // '_frontier' for the next iteration of search.
 
-            auto pipeline = uassertStatusOK(_mongod->makePipeline({*matchStage}, _fromExpCtx));
+            // We've already allocated space for the trailing $match stage in '_fromPipeline'.
+            _fromPipeline.back() = *matchStage;
+            auto pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
             while (auto next = pipeline->output()->getNext()) {
+                uassert(40271,
+                        str::stream()
+                            << "Documents in the '"
+                            << _from.ns()
+                            << "' namespace must contain an _id for de-duplication in $graphLookup",
+                        !(*next)["_id"].missing());
+
                 BSONObj result = next->toBson();
                 shouldPerformAnotherQuery =
                     addToVisitedAndFrontier(result.getOwned(), depth) || shouldPerformAnotherQuery;
@@ -416,7 +422,17 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
 }
 
 void DocumentSourceGraphLookUp::doInjectExpressionContext() {
-    _fromExpCtx = pExpCtx->copyWith(_from);
+    auto it = pExpCtx->resolvedNamespaces.find(_from.coll());
+    invariant(it != pExpCtx->resolvedNamespaces.end());
+    const auto& resolvedNamespace = it->second;
+    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
+    _fromPipeline = resolvedNamespace.pipeline;
+
+    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
+    // we'll eventually construct from the input document.
+    _fromPipeline.reserve(_fromPipeline.size() + 1);
+    _fromPipeline.push_back(BSONObj());
+
     _frontier = pExpCtx->getValueComparator().makeUnorderedValueSet();
     _cache.setValueComparator(pExpCtx->getValueComparator());
 }
@@ -450,6 +466,32 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _maxDepth(maxDepth),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<BSONObj>()),
       _cache(expCtx->getValueComparator()) {}
+
+intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    NamespaceString fromNs,
+    std::string asField,
+    std::string connectFromField,
+    std::string connectToField,
+    intrusive_ptr<Expression> startWith,
+    boost::optional<BSONObj> additionalFilter,
+    boost::optional<FieldPath> depthField,
+    boost::optional<long long> maxDepth) {
+    intrusive_ptr<DocumentSourceGraphLookUp> source(
+        new DocumentSourceGraphLookUp(std::move(fromNs),
+                                      std::move(asField),
+                                      std::move(connectFromField),
+                                      std::move(connectToField),
+                                      std::move(startWith),
+                                      additionalFilter,
+                                      depthField,
+                                      maxDepth,
+                                      expCtx));
+    source->_variables.reset(new Variables());
+
+    source->injectExpressionContext(expCtx);
+    return std::move(source);
+}
 
 intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

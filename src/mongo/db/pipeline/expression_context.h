@@ -31,7 +31,9 @@
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
@@ -39,11 +41,20 @@
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
 struct ExpressionContext : public IntrusiveCounterUnsigned {
 public:
+    struct ResolvedNamespace {
+        ResolvedNamespace() = default;
+        ResolvedNamespace(NamespaceString ns, std::vector<BSONObj> pipeline);
+
+        NamespaceString ns;
+        std::vector<BSONObj> pipeline;
+    };
+
     ExpressionContext() = default;
 
     ExpressionContext(OperationContext* opCtx, const AggregationRequest& request);
@@ -88,6 +99,8 @@ public:
     // Collation requested by the user for this pipeline. Empty if the user did not request a
     // collation.
     BSONObj collation;
+
+    StringMap<ResolvedNamespace> resolvedNamespaces;
 
     static const int kInterruptCheckPeriod = 128;
     int interruptCounter = kInterruptCheckPeriod;  // when 0, check interruptStatus

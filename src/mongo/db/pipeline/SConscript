@@ -274,6 +274,19 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='document_source_graph_lookup_test',
+    source='document_source_graph_lookup_test.cpp',
+    LIBDEPS=[
+        'document_source',
+        'document_source_lookup',
+        'document_value_test_util',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+    ],
+)
+
 env.Library(
     target='document_source_facet',
     source=[

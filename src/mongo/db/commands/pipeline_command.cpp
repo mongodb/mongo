@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <deque>
 #include <vector>
 
 #include "mongo/base/init.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/views/view_sharding_check.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -160,6 +162,72 @@ bool handleCursorCommand(OperationContext* txn,
     appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
 
     return static_cast<bool>(cursor);
+}
+
+StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNamespaces(
+    OperationContext* txn,
+    const boost::intrusive_ptr<Pipeline>& pipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // We intentionally do not drop and reacquire our DB lock after resolving the view definition in
+    // order to prevent the definition for any view namespaces we've already resolved from changing.
+    // This is necessary to prevent a cycle from being formed among the view definitions cached in
+    // 'resolvedNamespaces' because we won't re-resolve a view namespace we've already encountered.
+    AutoGetDb autoDb(txn, expCtx->ns.db(), MODE_IS);
+    ViewCatalog* viewCatalog = autoDb.getDb() ? autoDb.getDb()->getViewCatalog() : nullptr;
+
+    const auto& pipelineInvolvedNamespaces = pipeline->getInvolvedCollections();
+    std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
+                                                        pipelineInvolvedNamespaces.end());
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+
+    while (!involvedNamespacesQueue.empty()) {
+        auto involvedNs = std::move(involvedNamespacesQueue.front());
+        involvedNamespacesQueue.pop_front();
+
+        if (resolvedNamespaces.find(involvedNs.coll()) != resolvedNamespaces.end()) {
+            continue;
+        }
+
+        if (viewCatalog && viewCatalog->lookup(txn, involvedNs.ns())) {
+            // If the database exists and 'involvedNs' refers to a view namespace, then we resolve
+            // its definition.
+            auto resolvedView = viewCatalog->resolveView(txn, involvedNs);
+            if (!resolvedView.isOK()) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "Failed to resolve view '" << involvedNs.ns() << "': "
+                                      << resolvedView.getStatus().toString()};
+            }
+
+            resolvedNamespaces[involvedNs.coll()] = {resolvedView.getValue().getNamespace(),
+                                                     resolvedView.getValue().getPipeline()};
+
+            // We parse the pipeline corresponding to the resolved view in case we must resolve
+            // other view namespaces that are also involved.
+            auto resolvedViewPipeline =
+                Pipeline::parse(resolvedView.getValue().getPipeline(), expCtx);
+            if (!resolvedViewPipeline.isOK()) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "Failed to parse definition for view '" << involvedNs.ns()
+                                      << "': "
+                                      << resolvedViewPipeline.getStatus().toString()};
+            }
+
+            const auto& resolvedViewInvolvedNamespaces =
+                resolvedViewPipeline.getValue()->getInvolvedCollections();
+            involvedNamespacesQueue.insert(involvedNamespacesQueue.end(),
+                                           resolvedViewInvolvedNamespaces.begin(),
+                                           resolvedViewInvolvedNamespaces.end());
+        } else {
+            // If the database exists and 'involvedNs' refers to a collection namespace, then we
+            // resolve it as an empty pipeline in order to read directly from the underlying
+            // collection. If the database doesn't exist, then we still resolve it as an empty
+            // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
+            // snapshot of the view catalog.
+            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+        }
+    }
+
+    return resolvedNamespaces;
 }
 
 /**
@@ -264,6 +332,12 @@ public:
             return appendCommandStatus(result, statusWithPipeline.getStatus());
         }
         auto pipeline = std::move(statusWithPipeline.getValue());
+
+        auto resolvedNamespaces = resolveInvolvedNamespaces(txn, pipeline, expCtx);
+        if (!resolvedNamespaces.isOK()) {
+            return appendCommandStatus(result, resolvedNamespaces.getStatus());
+        }
+        expCtx->resolvedNamespaces = std::move(resolvedNamespaces.getValue());
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
         unique_ptr<PlanExecutor> exec;

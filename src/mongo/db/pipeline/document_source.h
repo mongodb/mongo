@@ -369,8 +369,6 @@ public:
         virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                       const NamespaceString& ns) = 0;
 
-        virtual bool hasUniqueIdIndex(const NamespaceString& ns) const = 0;
-
         /**
          * Appends operation latency statistics for collection "nss" to "builder"
          */
@@ -1744,6 +1742,9 @@ private:
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
+    // The aggregation pipeline to perform against the '_fromNs' namespace.
+    std::vector<BSONObj> _fromPipeline;
+
     boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;
     boost::intrusive_ptr<DocumentSourceUnwind> _unwindSrc;
 
@@ -1788,6 +1789,17 @@ public:
     void doDetachFromOperationContext() final;
 
     void doReattachToOperationContext(OperationContext* opCtx) final;
+
+    static boost::intrusive_ptr<DocumentSourceGraphLookUp> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        NamespaceString fromNs,
+        std::string asField,
+        std::string connectFromField,
+        std::string connectToField,
+        boost::intrusive_ptr<Expression> startWith,
+        boost::optional<BSONObj> additionalFilter,
+        boost::optional<FieldPath> depthField,
+        boost::optional<long long> maxDepth);
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -1873,6 +1885,9 @@ private:
     // The ExpressionContext used when performing aggregation pipelines against the '_from'
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
+
+    // The aggregation pipeline to perform against the '_from' namespace.
+    std::vector<BSONObj> _fromPipeline;
 
     size_t _maxMemoryUsageBytes = 100 * 1024 * 1024;
 

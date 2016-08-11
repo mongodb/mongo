@@ -276,20 +276,6 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
     };
     assertErrorCode(local, pipeline, 40187, "cannot use $near inside $graphLookup at any depth");
 
-    // $graphLookup can only be performed on a collection that has a unique _id index.
-    db.createCollection("unindexed", {autoIndexId: false});
-
-    pipeline = {
-        $graphLookup: {
-            from: "unindexed",
-            as: "out",
-            startWith: "tmp",
-            connectFromField: "x",
-            connectToField: "y"
-        }
-    };
-    assertErrorCode(local, pipeline, 40106, "foreign collection did not have a unique _id index");
-
     // $graphLookup can only consume at most 100MB of memory.
     var foreign = db.foreign;
     foreign.drop();

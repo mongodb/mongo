@@ -35,6 +35,10 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
+ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
+                                                        std::vector<BSONObj> pipeline)
+    : ns(std::move(ns)), pipeline(std::move(pipeline)) {}
+
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const AggregationRequest& request)
     : isExplain(request.isExplain()),
       inShard(request.isFromRouter()),
@@ -85,6 +89,8 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns)
     if (_collator) {
         expCtx->setCollator(_collator->clone());
     }
+
+    expCtx->resolvedNamespaces = resolvedNamespaces;
 
     // Note that we intentionally skip copying the value of 'interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.

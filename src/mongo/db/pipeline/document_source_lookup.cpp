@@ -88,7 +88,7 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const vector<Value>& 
 boost::optional<Document> DocumentSourceLookUp::getNext() {
     pExpCtx->checkForInterrupt();
 
-    uassert(4567, "from collection cannot be sharded", !_mongod->isSharded(_fromNs));
+    uassert(4567, "from collection cannot be sharded", !_mongod->isSharded(_fromExpCtx->ns));
 
     if (!_additionalFilter && _matchSrc) {
         // We have internalized a $match, but have not yet computed the descended $match that should
@@ -112,7 +112,9 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
 
     auto matchStage =
         makeMatchStageFromInput(*input, _localField, _foreignFieldFieldName, BSONObj());
-    auto pipeline = uassertStatusOK(_mongod->makePipeline({matchStage}, _fromExpCtx));
+    // We've already allocated space for the trailing $match stage in '_fromPipeline'.
+    _fromPipeline.back() = matchStage;
+    auto pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
 
     std::vector<Value> results;
     int objsize = 0;
@@ -357,7 +359,9 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
         BSONObj filter = _additionalFilter.value_or(BSONObj());
         auto matchStage =
             makeMatchStageFromInput(*_input, _localField, _foreignFieldFieldName, filter);
-        _pipeline = uassertStatusOK(_mongod->makePipeline({matchStage}, _fromExpCtx));
+        // We've already allocated space for the trailing $match stage in '_fromPipeline'.
+        _fromPipeline.back() = matchStage;
+        _pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
 
         _cursorIndex = 0;
         _nextValue = _pipeline->output()->getNext();
@@ -440,7 +444,16 @@ DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker*
 }
 
 void DocumentSourceLookUp::doInjectExpressionContext() {
-    _fromExpCtx = pExpCtx->copyWith(_fromNs);
+    auto it = pExpCtx->resolvedNamespaces.find(_fromNs.coll());
+    invariant(it != pExpCtx->resolvedNamespaces.end());
+    const auto& resolvedNamespace = it->second;
+    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
+    _fromPipeline = resolvedNamespace.pipeline;
+
+    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
+    // we'll eventually construct from the input document.
+    _fromPipeline.reserve(_fromPipeline.size() + 1);
+    _fromPipeline.push_back(BSONObj());
 }
 
 void DocumentSourceLookUp::doDetachFromOperationContext() {
