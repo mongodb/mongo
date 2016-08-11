@@ -123,21 +123,11 @@ int ProgramRegistry::portForPid(ProcessId pid) const {
     return -1;
 }
 
-std::string ProgramRegistry::programName(ProcessId pid) const {
-    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    if (!isPidRegistered(pid)) {
-        // It could be that the program has attempted to log something before it was registered.
-        return "sh";
-    }
-    return _programNames.find(pid)->second;
-}
-
-void ProgramRegistry::registerProgram(ProcessId pid, int output, int port, std::string name) {
+void ProgramRegistry::registerProgram(ProcessId pid, int output, int port) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
     verify(!isPidRegistered(pid));
     _portToPidMap.emplace(port, pid);
     _outputs.emplace(pid, output);
-    _programNames.emplace(pid, name);
 }
 
 void ProgramRegistry::deleteProgram(ProcessId pid) {
@@ -147,7 +137,6 @@ void ProgramRegistry::deleteProgram(ProcessId pid) {
     }
     close(_outputs.find(pid)->second);
     _outputs.erase(pid);
-    _programNames.erase(pid);
     _portToPidMap.erase(portForPid(pid));
 }
 
@@ -199,11 +188,13 @@ void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
 
 ProgramRegistry& registry = *(new ProgramRegistry());
 
-void ProgramOutputMultiplexer::appendLine(int port, ProcessId pid, const char* line) {
+void ProgramOutputMultiplexer::appendLine(int port,
+                                          ProcessId pid,
+                                          const std::string& name,
+                                          const char* line) {
     stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
     uassert(28695, "program is terminating", !mongo::inShutdown());
     stringstream buf;
-    string name = registry.programName(pid);
     if (port > 0)
         buf << name << port << "| " << line;
     else
@@ -243,18 +234,9 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
         _name = "s";
     } else if (program == "mongobridge") {
         _name = "b";
+    } else {
+        _name = "sh";
     }
-
-#if 0
-            if (isMongosProgram == "mongos") {
-                _argv.push_back("valgrind");
-                _argv.push_back("--log-file=/tmp/mongos-%p.valgrind");
-                _argv.push_back("--leak-check=yes");
-                _argv.push_back("--suppressions=valgrind.suppressions");
-                //_argv.push_back("--error-exitcode=1");
-                _argv.push_back("--");
-            }
-#endif
 
     _argv.push_back(programPath.string());
 
@@ -360,7 +342,7 @@ void ProgramRunner::start() {
     launchProcess(pipeEnds[1]);  // sets _pid
 
     if (_port > 0)
-        registry.registerProgram(_pid, pipeEnds[1], _port, _name);
+        registry.registerProgram(_pid, pipeEnds[1], _port);
     else
         registry.registerProgram(_pid, pipeEnds[1]);
     _pipe = pipeEnds[0];
@@ -397,15 +379,15 @@ void ProgramRunner::operator()() {
             start[ret] = '\0';
             if (strlen(start) != unsigned(ret))
                 programOutputLogger.appendLine(
-                    _port, _pid, "WARNING: mongod wrote null bytes to output");
+                    _port, _pid, _name, "WARNING: mongod wrote null bytes to output");
             char* last = buf;
             for (char *i = strchr(buf, '\n'); i; last = i + 1, i = strchr(last, '\n')) {
                 *i = '\0';
-                programOutputLogger.appendLine(_port, _pid, last);
+                programOutputLogger.appendLine(_port, _pid, _name, last);
             }
             if (ret == 0) {
                 if (*last)
-                    programOutputLogger.appendLine(_port, _pid, last);
+                    programOutputLogger.appendLine(_port, _pid, _name, last);
                 close(_pipe);
                 break;
             }
