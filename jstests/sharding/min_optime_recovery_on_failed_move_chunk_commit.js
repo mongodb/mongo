@@ -1,5 +1,6 @@
 /**
  * Tests that the shard will update the min optime recovery document after startup.
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
