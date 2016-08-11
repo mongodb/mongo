@@ -312,9 +312,12 @@ functions:
 
         . ./${set_tools_gopath|set_gopath.sh}
 
+        sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
+        sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+
         for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
-             ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec $(git rev-parse HEAD) -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git --git-dir ../.git describe)" ${tooltags|} -o "../src/mongo-tools/$i${exe|}" $i/main/$i.go
-             echo $i;
+             ${gorootvars} go build ${tooltags|} -o "../src/mongo-tools/$i${exe|}" $i/main/$i.go
+             "../src/mongo-tools/$i${exe|}" --version
         done
 
   "do setup" :
