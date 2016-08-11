@@ -2,9 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/noPassthroughWithMongod/*.js
-    exclude_files:
-    # Disable reconfigwt.js until WT-2812 is fixed.
-    - jstests/noPassthroughWithMongod/reconfigwt.js
 
 executor:
   js_test:
