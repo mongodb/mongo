@@ -330,11 +330,11 @@ __win_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 }
 
 /*
- * __win_file_truncate --
- *	Truncate a file.
+ * __win_file_set_end --
+ *	Truncate or extend a file.
  */
 static int
-__win_file_truncate(
+__win_file_set_end(
     WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t len)
 {
 	DWORD windows_error;
@@ -349,13 +349,14 @@ __win_file_truncate(
 
 	if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE)
 		WT_RET_MSG(session, EINVAL,
-		    "%s: handle-truncate: read-only", file_handle->name);
+		    "%s: handle-set-end: no secondary handle",
+		    file_handle->name);
 
 	if (SetFilePointerEx(win_fh->filehandle_secondary,
 	    largeint, NULL, FILE_BEGIN) == FALSE) {
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s: handle-truncate: SetFilePointerEx: %s",
+		    "%s: handle-set-end: SetFilePointerEx: %s",
 		    file_handle->name,
 		    __wt_formatmessage(session, windows_error));
 		return (__wt_map_windows_error(windows_error));
@@ -366,7 +367,7 @@ __win_file_truncate(
 			return (EBUSY);
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s: handle-truncate: SetEndOfFile: %s",
+		    "%s: handle-set-end: SetEndOfFile: %s",
 		    file_handle->name,
 		    __wt_formatmessage(session, windows_error));
 		return (__wt_map_windows_error(windows_error));
@@ -526,8 +527,9 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	}
 
 	/*
-	 * Open a second handle to file to support truncation concurrently with
-	 * reads on the file. Writes would also move the file pointer.
+	 * Open a second handle to file to support file extension/truncation
+	 * concurrently with reads on the file. Writes would also move the
+	 * file pointer.
 	 */
 	if (!LF_ISSET(WT_FS_OPEN_READONLY)) {
 		win_fh->filehandle_secondary = CreateFileA(name, desired_access,
@@ -561,7 +563,11 @@ directory_open:
 	file_handle->fh_read = __win_file_read;
 	file_handle->fh_size = __win_file_size;
 	file_handle->fh_sync = __win_file_sync;
-	file_handle->fh_truncate = __win_file_truncate;
+
+	/* Extend and truncate share the same implementation. */
+	file_handle->fh_extend = __win_file_set_end;
+	file_handle->fh_truncate = __win_file_set_end;
+
 	file_handle->fh_write = __win_file_write;
 
 	*file_handlep = file_handle;
