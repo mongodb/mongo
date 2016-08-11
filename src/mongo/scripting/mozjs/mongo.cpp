@@ -470,8 +470,8 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
     if (!conn)
         uasserted(ErrorCodes::BadValue, "no connection");
 
-    if (args.length() != 5)
-        uasserted(ErrorCodes::BadValue, "copyDatabase needs 5 arg");
+    if (args.length() != 6)
+        uasserted(ErrorCodes::BadValue, "copyDatabase needs 6 arg");
 
     // copyDatabase(fromdb, todb, fromhost, username, password);
     std::string fromDb = ValueWriter(cx, args.get(0)).toString();
@@ -479,6 +479,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
     std::string fromHost = ValueWriter(cx, args.get(2)).toString();
     std::string user = ValueWriter(cx, args.get(3)).toString();
     std::string password = ValueWriter(cx, args.get(4)).toString();
+    bool slaveOk = ValueWriter(cx, args.get(5)).toBoolean();
 
     std::string hashedPwd = DBClientWithCommands::createPasswordDigest(user, password);
 
@@ -494,8 +495,9 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
                                << saslCommandMechanismFieldName
                                << "SCRAM-SHA-1");
 
-    BSONObj saslFollowupCommandPrefix =
-        BSON("copydb" << 1 << "fromhost" << fromHost << "fromdb" << fromDb << "todb" << toDb);
+    BSONObj saslFollowupCommandPrefix = BSON(
+        "copydb" << 1 << "fromhost" << fromHost << "fromdb" << fromDb << "todb" << toDb << "slaveOk"
+                 << slaveOk);
 
     BSONObj saslCommandPrefix = saslFirstCommandPrefix;
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
