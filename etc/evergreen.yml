@@ -713,27 +713,28 @@ post:
       script: |
         # For Jepsen tasks, archive the mongod log files.
         if [ -d jepsen ]; then
-          # Copy mongod.log from each LXC host for archive purposes. The log can reside in
-          # 1 of 2 places:
+          # Copy mongod.log & stdout.log from each LXC host for archive purposes. Note that
+          # stdout.log is also generated as a result of starting mongod.
+          # The logs can reside in 1 of 2 places:
           #   If the task completed: /root
           #   If the task failed to complete: /opt/mongodb
-          # There may be a mongod.log in both places, but the one in /opt/mongodb should override
-          # the one in /root, since the log in /root could be from a previous successful run.
+          # There may be logs in both places, but the ones in /opt/mongodb should override
+          # the ones in /root, since the logs in /root could be from a previous successful run.
           numVms=5
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
-            mongod_log=mongod-$hostn.log
-            for mongod_log_remote in /root/mongod.log /opt/mongodb/mongod.log
+            for log_dir in /root /opt/mongodb
             do
-              scp -q root@$hostn:$mongod_log_remote $mongod_log 2> /dev/null
-              if [ -f $mongod_log ]; then
-                echo "Copied $mongod_log_remote from $hostn to $mongod_log"
-              fi
+              for log in mongod.log stdout.log
+              do
+                outlog="$(echo $log | cut -f1 -d '.')-n$i.log"
+                scp -q root@$hostn:$log_dir/$log $outlog 2> /dev/null
+                if [ -f $outlog ]; then
+                  echo "Copied $log_dir/$log from $hostn to $outlog"
+                fi
+              done
             done
-            if [ ! -f $mongod_log ]; then
-              echo "No mongod.log from $hostn copied to $mongod_log"
-            fi
           done
         fi
   - command: archive.targz_pack
@@ -742,6 +743,7 @@ post:
       source_dir: "src"
       include:
         - "mongod*.log"
+        - "stdout*.log"
   - command: s3.put
     params:
       aws_key: ${aws_key}
