@@ -42,6 +42,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
@@ -109,6 +110,8 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balancer/balancer.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -978,6 +981,10 @@ static void shutdownTask() {
     if (serviceContext)
         serviceContext->setKillAllOperations();
 
+    ReplicaSetMonitor::shutdown();
+    if (auto sr = grid.shardRegistry()) {  // TODO: race: sr is a naked pointer
+        sr->shutdown();
+    }
 #if __has_feature(address_sanitizer)
 
     // When running under address sanitizer, we get false positive leaks due to disorder around the

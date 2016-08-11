@@ -426,6 +426,10 @@ void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
     hosts.done();
 }
 
+void ReplicaSetMonitor::shutdown() {
+    globalRSMonitorManager.shutdown();
+}
+
 void ReplicaSetMonitor::cleanup() {
     globalRSMonitorManager.removeAllMonitors();
     asyncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();

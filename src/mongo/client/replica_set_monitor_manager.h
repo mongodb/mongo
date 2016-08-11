@@ -72,9 +72,14 @@ public:
     void removeMonitor(StringData setName);
 
     /**
-     * Removes and destroys all replica set monitors.
+     * Removes and destroys all replica set monitors. Should be used for unit tests only.
      */
     void removeAllMonitors();
+
+    /**
+     * Shuts down _taskExecutor.
+     */
+    void shutdown();
 
     /**
      * Reports information about the replica sets tracked by us, for diagnostic purposes.
@@ -95,6 +100,9 @@ private:
 
     // Executor for monitoring replica sets.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
+
+    // set to true when shutdown has been called.
+    bool _isShutdown{false};
 };
 
 }  // namespace mongo

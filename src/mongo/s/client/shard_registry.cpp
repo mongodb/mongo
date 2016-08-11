@@ -85,11 +85,15 @@ ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
     : _shardFactory(std::move(shardFactory)), _initConfigServerCS(configServerCS) {}
 
 ShardRegistry::~ShardRegistry() {
-    if (_executor) {
+    shutdown();
+}
+
+void ShardRegistry::shutdown() {
+    if (_executor && !_isShutdown) {
         LOG(1) << "Shutting down task executor for reloading shard registry";
         _executor->shutdown();
         _executor->join();
-        _executor.reset();
+        _isShutdown = true;
     }
 }
 

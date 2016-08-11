@@ -205,9 +205,14 @@ public:
     /**
      * Permanently stops all monitoring on replica sets and clears all cached information
      * as well. As a consequence, NEVER call this if you have other threads that have a
-     * DBClientReplicaSet instance.
+     * DBClientReplicaSet instance. This method should be used for unit test only.
      */
     static void cleanup();
+
+    /**
+     * Permanently stops all monitoring on replica sets.
+     */
+    static void shutdown();
 
     //
     // internal types (defined in replica_set_monitor_internal.h)

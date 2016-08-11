@@ -60,7 +60,9 @@ using executor::ThreadPoolTaskExecutor;
 
 ReplicaSetMonitorManager::ReplicaSetMonitorManager() {}
 
-ReplicaSetMonitorManager::~ReplicaSetMonitorManager() = default;
+ReplicaSetMonitorManager::~ReplicaSetMonitorManager() {
+    shutdown();
+}
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -77,7 +79,8 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     invariant(connStr.type() == ConnectionString::SET);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (!_taskExecutor) {
+    // do not restart taskExecutor if is in shutdown
+    if (!_taskExecutor && !_isShutdown) {
         // construct task executor
         auto net = executor::makeNetworkInterface("ReplicaSetMonitor-TaskExecutor");
         auto netPtr = net.get();
@@ -122,6 +125,17 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
         _monitors.erase(it);
+    }
+}
+
+
+void ReplicaSetMonitorManager::shutdown() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_taskExecutor && !_isShutdown) {
+        LOG(1) << "Shutting down task executor used for monitoring replica sets";
+        _taskExecutor->shutdown();
+        _taskExecutor->join();
+        _isShutdown = true;
     }
 }
 
