@@ -1424,35 +1424,22 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		    internal_pages >= (int)(evict - start) / 2)
 			continue;
 
+		/*
+		 * If the oldest transaction hasn't changed since the last time
+		 * this page was written, it's unlikely we can make progress.
+		 * Similarly, if the most recent update on the page is not yet
+		 * globally visible, eviction will fail.  These heuristics
+		 * attempt to avoid repeated attempts to evict the same page.
+		 */
+		mod = page->modify;
+		if (modified &&
+		    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
+		    !__wt_txn_visible_all(session, mod->update_txn)))
+			continue;
+
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, ref, NULL))
 			continue;
-
-		/*
-		 * Note: take care with ordering: if we detected that
-		 * the page is modified above, we expect mod != NULL.
-		 */
-		mod = page->modify;
-
-		/*
-		 * Additional tests if eviction is likely to succeed.
-		 *
-		 * If eviction is stuck or we are helping with forced eviction,
-		 * try anyway: maybe a transaction that was running last time
-		 * we wrote the page has since rolled back, or we can help the
-		 * checkpoint complete sooner. Additionally, being stuck will
-		 * configure lookaside table writes in reconciliation, allowing
-		 * us to evict pages we can't usually evict.
-		 */
-		if (!FLD_ISSET(cache->state, WT_EVICT_STATE_AGGRESSIVE)) {
-			/*
-			 * If the page is clean but has modifications that
-			 * appear too new to evict, skip it.
-			 */
-			if (!modified && mod != NULL &&
-			    !__wt_txn_visible_all(session, mod->rec_max_txn))
-				continue;
-		}
 
 		WT_ASSERT(session, evict->ref == NULL);
 		if (!__evict_push_candidate(session, queue, evict, ref))
