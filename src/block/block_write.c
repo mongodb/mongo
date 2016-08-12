@@ -15,6 +15,20 @@
 int
 __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 {
+	WT_DECL_RET;
+
+	WT_RET(__wt_verbose(session,
+	    WT_VERB_BLOCK, "truncate file to %" PRIuMAX, (uintmax_t)len));
+
+	/*
+	 * Truncate requires serialization, we depend on our caller for that.
+	 *
+	 * Truncation isn't a requirement of the block manager, it's only used
+	 * to conserve disk space. Regardless of the underlying file system
+	 * call's result, the in-memory understanding of the file size changes.
+	 */
+	block->size = block->extend_size = len;
+
 	/*
 	 * Backups are done by copying files outside of WiredTiger, potentially
 	 * by system utilities. We cannot truncate the file during the backup
@@ -26,18 +40,16 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 	 * targeted solution at some point.
 	 */
 	if (S2C(session)->hot_backup)
-		return (EBUSY);
+		return (0);
 
 	/*
-	 * Additionally, the truncate might fail if there's a file mapping (if
-	 * there's an open checkpoint on the file), in which case the underlying
-	 * function returns EBUSY.
+	 * The truncate may fail temporarily or permanently (for example, there
+	 * may be a file mapping if there's an open checkpoint on the file on a
+	 * POSIX system, in which case the underlying function returns EBUSY).
+	 * It's OK, we don't have to be able to truncate files.
 	 */
-	WT_RET(__wt_ftruncate(session, block->fh, len));
-
-	block->size = block->extend_size = len;
-
-	return (0);
+	ret = __wt_ftruncate(session, block->fh, len);
+	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
 /*

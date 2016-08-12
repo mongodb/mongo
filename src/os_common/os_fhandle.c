@@ -37,10 +37,9 @@ __fhandle_method_finalize(
 	if (!readonly)
 		WT_HANDLE_METHOD_REQ(fh_sync);
 	/* not required: fh_sync_nowait */
-	if (!readonly) {
-		WT_HANDLE_METHOD_REQ(fh_truncate);
+	/* not required: fh_truncate */
+	if (!readonly)
 		WT_HANDLE_METHOD_REQ(fh_write);
-	}
 
 	return (0);
 }

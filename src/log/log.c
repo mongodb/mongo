@@ -984,9 +984,23 @@ __log_truncate(WT_SESSION_IMPL *session,
 
 	/*
 	 * Truncate the log file to the given LSN.
+	 *
+	 * It's possible the underlying file system doesn't support truncate
+	 * (there are existing examples), which is fine, but we don't want to
+	 * repeatedly do the setup work just to find that out every time. Check
+	 * before doing work, and if there's a not-supported error, turn off
+	 * future truncates.
 	 */
+	if (F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP))
+		return (0);
 	WT_ERR(__log_openfile(session, &log_fh, file_prefix, lsn->l.file, 0));
-	WT_ERR(__wt_ftruncate(session, log_fh, lsn->l.offset));
+	if ((ret = __wt_ftruncate(session, log_fh, lsn->l.offset)) != 0) {
+		if (ret == ENOTSUP) {
+			F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
+			ret = 0;
+		}
+		goto err;
+	}
 	WT_ERR(__wt_fsync(session, log_fh, true));
 	WT_ERR(__wt_close(session, &log_fh));
 

@@ -353,8 +353,7 @@ __wt_log_truncate_files(
 		backup_file = WT_CURSOR_BACKUP_ID(cursor);
 	WT_ASSERT(session, backup_file <= log->alloc_lsn.l.file);
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
-	    "log_truncate_files: Archive once up to %" PRIu32,
-	    backup_file));
+	    "log_truncate_files: Archive once up to %" PRIu32, backup_file));
 
 	WT_RET(__wt_writelock(session, log->log_archive_lock));
 	locked = true;
@@ -429,12 +428,14 @@ __log_file_server(void *arg)
 				 */
 				WT_ERR(__wt_fsync(session, close_fh, true));
 				/*
-				 * We want to make sure the file size reflects
-				 * actual data and has minimal pre-allocated
-				 * zeroed space.
+				 * We want to have the file size reflect actual
+				 * data with minimal pre-allocated zeroed space.
+				 * The underlying file system may not support
+				 * truncate, which is OK, it's just more work
+				 * during cursor traversal.
 				 */
-				WT_ERR(__wt_ftruncate(session,
-				    close_fh, close_end_lsn.l.offset));
+				WT_ERR_ERROR_OK(__wt_ftruncate(session,
+				    close_fh, close_end_lsn.l.offset), ENOTSUP);
 				WT_SET_LSN(&close_end_lsn,
 				    close_end_lsn.l.file + 1, 0);
 				__wt_spin_lock(session, &log->log_sync_lock);

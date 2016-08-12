@@ -137,18 +137,9 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * that was done when the checkpoint was first written (re-writing the
 	 * checkpoint might possibly make it relevant here, but it's unlikely
 	 * enough I don't bother).
-	 *
-	 * If in-memory, we don't read or write the object, and the truncate
-	 * will unnecessarily allocate buffer space.
 	 */
-	if (!checkpoint && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
-		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
-		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
-
-		/* The truncate might fail, and that's OK. */
-		WT_ERR_BUSY_OK(
-		    __wt_block_truncate(session, block, ci->file_size));
-	}
+	if (!checkpoint)
+		WT_ERR(__wt_block_truncate(session, block, ci->file_size));
 
 	if (0) {
 err:		/*
@@ -190,9 +181,7 @@ __wt_block_checkpoint_unload(
 	 * checkpoints.
 	 */
 	if (!checkpoint) {
-		/* The truncate might fail, and that's OK. */
-		WT_TRET_BUSY_OK(
-		    __wt_block_truncate(session, block, block->size));
+		WT_TRET(__wt_block_truncate(session, block, block->size));
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);

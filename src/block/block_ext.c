@@ -1336,7 +1336,7 @@ __wt_block_extlist_truncate(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
-	wt_off_t orig, size;
+	wt_off_t size;
 
 	/*
 	 * Check if the last available extent is at the end of the file, and if
@@ -1353,21 +1353,11 @@ __wt_block_extlist_truncate(
 	 * the cached file size, and that can't happen until after the extent
 	 * list removal succeeds.)
 	 */
-	orig = block->size;
 	size = ext->off;
 	WT_RET(__block_off_remove(session, block, el, size, NULL));
-	block->size = size;
 
-	/*
-	 * Truncate the file. The truncate might fail, and that's OK, we simply
-	 * ignore those blocks.
-	 */
-	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
-	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
-	    (intmax_t)orig, (intmax_t)size));
-	WT_RET_BUSY_OK(__wt_block_truncate(session, block, size));
-
-	return (0);
+	/* Truncate the file. */
+	return (__wt_block_truncate(session, block, size));
 }
 
 /*
