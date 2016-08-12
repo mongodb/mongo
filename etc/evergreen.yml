@@ -2904,6 +2904,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -3307,6 +3308,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu1204
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -3423,6 +3425,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu1404
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -3542,6 +3545,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu1604
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -3984,6 +3988,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: amazon
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -4070,6 +4075,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: amazon
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5063,6 +5069,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: rhel62
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     requires:
@@ -5263,6 +5270,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: rhel70
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
   - name: audit
@@ -5315,6 +5323,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: rhel62
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5432,6 +5441,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: rhel70
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5827,6 +5837,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu1204
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5881,6 +5892,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu1404
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -5938,6 +5950,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: ubuntu1604
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6108,6 +6121,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: suse12
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6254,6 +6268,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: suse12
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6371,6 +6386,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: suse11
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6513,6 +6529,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: suse11
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6627,6 +6644,7 @@ buildvariants:
     tooltags: -gccgoflags "-lsocket -lnsl"
     compile_flags: CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc" OBJCOPY=/opt/mongodbtoolchain/bin/objcopy
     num_jobs_available: $(kstat cpu | sort -u | grep -c "^module")
+    use_scons_cache: true
   tasks:
   - name: compile
   - name: aggregation
@@ -6721,6 +6739,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian71
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6775,6 +6794,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian81
     repo_edition: enterprise
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6828,6 +6848,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian71
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6947,6 +6968,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian81
     repo_edition: org
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
