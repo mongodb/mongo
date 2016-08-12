@@ -390,9 +390,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	return (0);
 
 err:	if (group != NULL)
-		(void)group->close(group);
+		testutil_check(group->close(group));
 	if (scan != NULL)
-		(void)scan->close(scan);
+		testutil_check(scan->close(scan));
 
 	fprintf(stderr,
 	    "invalid thread configuration or scan error: %.*s\n",

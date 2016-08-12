@@ -192,7 +192,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	 */
 	if (cfg->truncate_single_ops) {
 		while ((ret = cursor->next(cursor)) == 0) {
-			cursor->get_key(cursor, &next_key);
+			testutil_check(cursor->get_key(cursor, &next_key));
 			if (strcmp(next_key, truncate_item->key) == 0)
 				break;
 			if ((ret = cursor->remove(cursor)) != 0) {

@@ -61,7 +61,7 @@ __wt_global_once(void)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debugging code the compiler might optimize out. */
-	(void)__wt_breakpoint();
+	__wt_breakpoint();
 #endif
 }
 
@@ -97,10 +97,14 @@ __wt_library_init(void)
  * __wt_breakpoint --
  *	A simple place to put a breakpoint, if you need one.
  */
-int
+void
 __wt_breakpoint(void)
 {
-	return (0);
+	/*
+	 * Yield the processor (just to keep the compiler from optimizing the
+	 * function out).
+	 */
+	__wt_yield();
 }
 
 /*

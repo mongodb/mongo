@@ -52,6 +52,7 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
 static inline int
 __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 #ifdef HAVE_VERBOSE
 	WT_DECL_RET;

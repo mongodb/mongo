@@ -2558,7 +2558,7 @@ drop_all_tables(CONFIG *cfg)
 		    "Error opening a session on %s", cfg->home);
 		return (ret);
 	}
-	(void)__wt_epoch(NULL, &start);
+	testutil_check(__wt_epoch(NULL, &start));
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->drop(
 		    session, cfg->uris[i], NULL)) != 0) {
@@ -2567,7 +2567,7 @@ drop_all_tables(CONFIG *cfg)
 			goto err;
 		}
 	}
-	(void)__wt_epoch(NULL, &stop);
+	testutil_check(__wt_epoch(NULL, &stop));
 	msecs = WT_TIMEDIFF_MS(stop, start);
 	lprintf(cfg, 0, 1,
 	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",

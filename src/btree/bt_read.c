@@ -323,10 +323,10 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 		return (__wt_leaf_page_can_split(session, page));
 
 	/* Trigger eviction on the next page release. */
-	(void)__wt_page_evict_soon(session, ref);
+	WT_IGNORE_RET(__wt_page_evict_soon(session, ref));
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
-	(void)__wt_txn_update_oldest(session, 0);
+	WT_IGNORE_RET(__wt_txn_update_oldest(session, 0));
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, ref, NULL));
@@ -605,8 +605,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 					 * are holding a hazard pointer to the
 					 * page already.
 					 */
-					(void)__wt_page_evict_soon(
-					    session, ref);
+					WT_IGNORE_RET(
+					    __wt_page_evict_soon(session, ref));
 				else
 					__wt_cache_read_gen_new(session, page);
 			} else if (!LF_ISSET(WT_READ_NO_GEN))

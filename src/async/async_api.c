@@ -89,7 +89,7 @@ setup:	op->format = af;
 
 err:
 	if (c != NULL)
-		(void)c->close(c);
+		WT_TRET(c->close(c));
 	__wt_free(session, af->uri);
 	__wt_free(session, af->config);
 	__wt_free(session, af->key_format);

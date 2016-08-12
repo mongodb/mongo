@@ -173,7 +173,7 @@ else
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([	 ,]\)u_quad\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
-	    -e 's/(void) \([a-zA-Z_]\)/(void)\1/' \
+	    -e 's/[	 ](void) \([a-zA-Z_]\)/(void)\1/' \
 	    -e '/for /!s/;;$/;/' \
 	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \

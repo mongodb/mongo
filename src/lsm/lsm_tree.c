@@ -1028,7 +1028,7 @@ err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	if (ret != 0) {
 		if (chunk != NULL) {
-			(void)__wt_schema_drop(session, chunk->uri, NULL);
+			WT_TRET(__wt_schema_drop(session, chunk->uri, NULL));
 			__wt_free(session, chunk);
 		}
 		/*
