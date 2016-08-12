@@ -259,6 +259,16 @@ public:
      */
     Status initializeShardingAwarenessIfNeeded(OperationContext* txn);
 
+    /**
+     * Check if a command is one of the whitelisted commands that can be accepted with shardVersion
+     * information before this node is sharding aware, because the command initializes sharding
+     * awareness.
+     */
+    static bool commandInitializesShardingAwareness(const std::string& commandName) {
+        return _commandsThatInitializeShardingAwareness.find(commandName) !=
+            _commandsThatInitializeShardingAwareness.end();
+    }
+
 private:
     friend class ScopedRegisterMigration;
 
@@ -371,6 +381,10 @@ private:
 
     // The id for the cluster this shard belongs to.
     OID _clusterId;
+
+    // A whitelist of sharding commands that are allowed when running with --shardsvr but not yet
+    // shard aware, because they initialize sharding awareness.
+    static const std::set<std::string> _commandsThatInitializeShardingAwareness;
 
     // Function for initializing the external sharding state components not owned here.
     GlobalInitFunc _globalInit;

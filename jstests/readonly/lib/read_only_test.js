@@ -67,6 +67,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
         jsTest.log("restarting shards...");
         try {
             for (var i = 0; i < this.nShards; ++i) {
+                // TODO(esha): add shardsvr: "" option when this test is re-enabled in SERVER-25549
                 var opts = {queryableBackupMode: "", dbpath: this.paths[i]};
 
                 assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());

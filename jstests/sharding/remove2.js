@@ -118,7 +118,7 @@ rst1.stopSet();
 print("Sleeping for 20 seconds to let the other shard's ReplicaSetMonitor time out");
 sleep(20000);  // 1 failed check should take 10 seconds, sleep for 20 just to be safe
 
-rst1.startSet();
+rst1.startSet({restart: true});
 rst1.initiate();
 rst1.awaitReplication();
 
@@ -166,7 +166,7 @@ print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetM
 sleep(60000);
 
 var rst2 = new ReplSetTest({name: rst1.name, nodes: 2, useHostName: true});
-rst2.startSet();
+rst2.startSet({shardsvr: ""});
 rst2.initiate();
 rst2.awaitReplication();
 
@@ -186,7 +186,7 @@ rst2.stopSet();
 print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetMonitors");
 sleep(60000);
 
-rst1.startSet();
+rst1.startSet({restart: true});
 rst1.initiate();
 rst1.awaitReplication();
 
