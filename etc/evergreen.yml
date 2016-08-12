@@ -4414,7 +4414,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     ext: zip
-    use_scons_cache: false
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -4611,7 +4611,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
-    use_scons_cache: false
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
@@ -6071,7 +6071,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     ext: zip
-    use_scons_cache: false
+    use_scons_cache: true
   tasks:
   - name: compile
     distros:
