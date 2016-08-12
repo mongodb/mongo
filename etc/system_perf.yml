@@ -358,9 +358,15 @@ tasks:
           set -o verbose
           ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
+          mkdir -p mongodb/jstests/hooks
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
+          if [ -d jstests/hooks ]
+          then
+            echo "Fetching JS test DB correctness checks from directory jstests/hooks"
+            cp -a jstests/hooks/* mongodb/jstests/hooks
+          fi
           tar cvf mongodb.tar mongodb
           gzip mongodb.tar
     - command: s3.put
