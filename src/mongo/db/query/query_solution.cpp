@@ -541,6 +541,15 @@ bool IndexScanNode::hasField(const string& field) const {
         return false;
     }
 
+    // If the index has a non-simple collation and we have collation keys inside 'field', then this
+    // index scan does not provide that field (and the query cannot be covered).
+    if (index.collator) {
+        std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
+        if (collatedFields.find(field) != collatedFields.end()) {
+            return false;
+        }
+    }
+
     BSONObjIterator it(index.keyPattern);
     while (it.more()) {
         if (field == it.next().fieldName()) {

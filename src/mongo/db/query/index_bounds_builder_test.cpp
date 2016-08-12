@@ -1538,7 +1538,7 @@ TEST(IndexBoundsBuilderTest, TranslateEqualityToStringWithMockCollator) {
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
         oil.intervals[0].compare(Interval(fromjson("{'': 'oof', '': 'oof'}"), true, true)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateEqualityToNonStringWithMockCollator) {
@@ -1578,7 +1578,7 @@ TEST(IndexBoundsBuilderTest, TranslateNotEqualToStringWithMockCollator) {
     // Bounds should be [MinKey, "rab"), ("rab", MaxKey].
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 2U);
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 
     {
         BSONObjBuilder bob;
@@ -1635,7 +1635,7 @@ TEST(IndexBoundsBuilderTest, TranslateLTEToStringWithMockCollator) {
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(fromjson("{'': '', '': 'oof'}"), true, true)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateLTEToNumberWithMockCollator) {
@@ -1676,7 +1676,7 @@ TEST(IndexBoundsBuilderTest, TranslateLTStringWithMockCollator) {
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(fromjson("{'': '', '': 'oof'}"), true, false)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateLTNumberWithMockCollator) {
@@ -1718,7 +1718,7 @@ TEST(IndexBoundsBuilderTest, TranslateGTStringWithMockCollator) {
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
         oil.intervals[0].compare(Interval(fromjson("{'': 'oof', '': {}}"), false, false)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateGTNumberWithMockCollator) {
@@ -1759,7 +1759,7 @@ TEST(IndexBoundsBuilderTest, TranslateGTEToStringWithMockCollator) {
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(fromjson("{'': 'oof', '': {}}"), true, false)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateGTEToNumberWithMockCollator) {
@@ -1805,7 +1805,7 @@ TEST(IndexBoundsBuilderTest, SimplePrefixRegexWithMockCollator) {
     ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
 }
 
-TEST(IndexBoundsBuilderTest, NotWithMockCollatorIsInexactFetch) {
+TEST(IndexBoundsBuilderTest, NotWithMockCollatorIsExact) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     IndexEntry testIndex = IndexEntry(BSONObj());
     testIndex.collator = &collator;
@@ -1823,10 +1823,10 @@ TEST(IndexBoundsBuilderTest, NotWithMockCollatorIsInexactFetch) {
                   oil.intervals[0].compare(Interval(minKeyIntObj(3), true, false)));
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[1].compare(Interval(maxKeyIntObj(3), false, true)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
-TEST(IndexBoundsBuilderTest, ExistsTrueWithMockCollatorAndSparseIsInexactFetch) {
+TEST(IndexBoundsBuilderTest, ExistsTrueWithMockCollatorAndSparseIsExact) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     IndexEntry testIndex = IndexEntry(BSONObj());
     testIndex.collator = &collator;
@@ -1844,7 +1844,7 @@ TEST(IndexBoundsBuilderTest, ExistsTrueWithMockCollatorAndSparseIsInexactFetch) 
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, ExistsFalseWithMockCollatorIsInexactFetch) {
@@ -1887,7 +1887,7 @@ TEST(IndexBoundsBuilderTest, TypeStringIsInexactFetch) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
 }
 
-TEST(IndexBoundsBuilderTest, InWithStringAndCollatorIsInexactFetch) {
+TEST(IndexBoundsBuilderTest, InWithStringAndCollatorIsExact) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     IndexEntry testIndex = IndexEntry(BSONObj());
     testIndex.collator = &collator;
@@ -1905,10 +1905,10 @@ TEST(IndexBoundsBuilderTest, InWithStringAndCollatorIsInexactFetch) {
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
         oil.intervals[0].compare(Interval(fromjson("{'': 'oof', '': 'oof'}"), true, true)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
-TEST(IndexBoundsBuilderTest, InWithNumberAndStringAndCollatorIsInexactFetch) {
+TEST(IndexBoundsBuilderTest, InWithNumberAndStringAndCollatorIsExact) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     IndexEntry testIndex = IndexEntry(BSONObj());
     testIndex.collator = &collator;
@@ -1928,7 +1928,7 @@ TEST(IndexBoundsBuilderTest, InWithNumberAndStringAndCollatorIsInexactFetch) {
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
         oil.intervals[1].compare(Interval(fromjson("{'': 'oof', '': 'oof'}"), true, true)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, InWithRegexAndCollatorIsInexactFetch) {

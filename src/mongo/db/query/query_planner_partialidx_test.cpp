@@ -455,7 +455,7 @@ TEST_F(QueryPlannerTest, PartialIndexStringComparisonMatchingCollators) {
         fromjson("{find: 'testns', filter: {a: 'abc'}, collation: {locale: 'reverse'}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {a: 'abc'}, collation: {locale: 'reverse'}, node: {ixscan: "
+        "{fetch: {filter: null, collation: {locale: 'reverse'}, node: {ixscan: "
         "{filter: null, pattern: {a: 1}, "
         "bounds: {a: [['cba', 'cba', true, true]]}}}}}");
 

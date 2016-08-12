@@ -57,13 +57,6 @@ namespace {
 // Tightness rules are shared for $lt, $lte, $gt, $gte.
 IndexBoundsBuilder::BoundsTightness getInequalityPredicateTightness(const BSONElement& dataElt,
                                                                     const IndexEntry& index) {
-    // TODO SERVER-23093: Right now we consider a string comparison in the presence of a
-    // collator to be inexact fetch, since such queries cannot be covered. Although it is
-    // necessary to fetch the keyed documents, it is not necessary to reapply the filter.
-    if (CollationIndexKey::shouldUseCollationIndexKey(dataElt, index.collator)) {
-        return IndexBoundsBuilder::INEXACT_FETCH;
-    }
-
     if (dataElt.isSimpleType() || dataElt.type() == BSONType::BinData) {
         return IndexBoundsBuilder::EXACT;
     }
@@ -330,15 +323,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         // return INEXACT_FETCH. Consider a multikey index on 'a' with document {a: [1, 2, 3]} and
         // query {a: {$ne: 3}}.  If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then we
         // would erroneously return the document!
-        //
-        // If the index has a collator, then complementing the bounds generally results in strings
-        // being in-bounds. Such index bounds cannot be used in a covered plan, since we should
-        // never return collator comparison keys to the user. As such, we must make the bounds
-        // INEXACT_FETCH in this case.
-        //
-        // TODO SERVER-23093: Although it is necessary to fetch the keyed documents, it is not
-        // necessary to reapply the filter.
-        if (index.multikey || index.collator) {
+        if (index.multikey) {
             *tightnessOut = INEXACT_FETCH;
         }
     } else if (MatchExpression::EXISTS == expr->matchType()) {
@@ -362,13 +347,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         // {a:{ $exists:false }} - sparse indexes cannot be used at all.
         //
         // Noted in SERVER-12869, in case this ever changes some day.
-        //
-        // Bounds are always INEXACT_FETCH if there is a collator on the index, since the bounds
-        // include collator-generated sort keys that shouldn't be returned to the user.
-        //
-        // TODO SERVER-23093: Although it is necessary to fetch the keyed documents when there is a
-        // collator, it is not necessary to reapply the filter.
-        if (index.sparse && !index.collator) {
+        if (index.sparse) {
             // A sparse, compound index on { a:1, b:1 } will include entries
             // for all of the following documents:
             //    { a:1 }, { b:1 }, { a:1, b:1 }
@@ -829,14 +808,6 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
 
         verify(dataObj.isOwned());
         oil->intervals.push_back(makePointInterval(dataObj));
-
-        // TODO SERVER-23093: Right now we consider a string comparison in the presence of a
-        // collator to be inexact fetch, since such queries cannot be covered. Although it is
-        // necessary to fetch the keyed documents, it is not necessary to reapply the filter.
-        if (CollationIndexKey::shouldUseCollationIndexKey(data, index.collator)) {
-            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
-            return;
-        }
 
         if (dataObj.firstElement().isNull() || isHashed) {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
