@@ -1115,9 +1115,6 @@ else:
     env['MONGO_ALLOCATOR'] = get_option('allocator')
 
 if has_option("cache"):
-    if has_option("release"):
-        env.FatalError(
-            "Using the experimental --cache option is not permitted for --release builds")
     if has_option("gcov"):
         env.FatalError("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
     env.CacheDir(str(env.Dir(cacheDir)))
