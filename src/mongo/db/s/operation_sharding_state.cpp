@@ -54,6 +54,11 @@ void OperationShardingState::initializeShardVersion(NamespaceString nss,
                                                     const BSONElement& shardVersionElt) {
     invariant(!hasShardVersion());
 
+    if (nss.isSystemDotIndexes()) {
+        setShardVersion(std::move(nss), ChunkVersion::IGNORED());
+        return;
+    }
+
     if (shardVersionElt.eoo() || shardVersionElt.type() != BSONType::Array) {
         return;
     }
@@ -84,6 +89,7 @@ ChunkVersion OperationShardingState::getShardVersion(const NamespaceString& nss)
 void OperationShardingState::setShardVersion(NamespaceString nss, ChunkVersion newVersion) {
     // This currently supports only setting the shard version for one namespace.
     invariant(!_hasVersion || _ns == nss);
+    invariant(!nss.isSystemDotIndexes() || ChunkVersion::isIgnoredVersion(newVersion));
 
     _ns = std::move(nss);
     _shardVersion = std::move(newVersion);

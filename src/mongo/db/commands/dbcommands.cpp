@@ -1433,30 +1433,19 @@ void Command::execCommand(OperationContext* txn,
             oss.initializeShardVersion(commandNS, extractedFields[kShardVersionFieldIdx]);
 
             auto shardingState = ShardingState::get(txn);
-
-            if (oss.hasShardVersion()) {
-                if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-                    uassertStatusOK(
-                        {ErrorCodes::IllegalOperation,
-                         "Cannot accept sharding commands if not started with --shardsvr"});
-                } else if (!shardingState->enabled()) {
-                    // TODO(esha): Once 3.4 ships, we no longer need to support initializing
-                    // sharding awareness through commands, so just reject all sharding commands.
-                    if (!shardingState->commandInitializesShardingAwareness(
-                            request.getCommandName().toString())) {
-                        uassertStatusOK({ErrorCodes::IllegalOperation,
-                                         str::stream()
-                                             << "Received a command with sharding chunk version "
-                                                "information but this node is not sharding aware: "
-                                             << request.getCommandArgs().jsonString()});
-                    }
-                }
-            }
-
             if (shardingState->enabled()) {
                 // TODO(spencer): Do this unconditionally once all nodes are sharding aware
                 // by default.
                 uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(txn));
+            } else {
+                massert(
+                    34422,
+                    str::stream()
+                        << "Received a command with sharding chunk version information but this "
+                           "node is not sharding aware: "
+                        << request.getCommandArgs().jsonString(),
+                    !oss.hasShardVersion() ||
+                        ChunkVersion::isIgnoredVersion(oss.getShardVersion(commandNS)));
             }
         }
 

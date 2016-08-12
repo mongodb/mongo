@@ -28,7 +28,7 @@
 
     st.restartMongos(0);
 
-    replTest.startSet({restart: true});
+    replTest.startSet({oplogSize: 10});
     replTest.initiate();
     replTest.awaitSecondaryNodes();
 

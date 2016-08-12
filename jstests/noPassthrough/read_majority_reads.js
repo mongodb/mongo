@@ -206,8 +206,7 @@
         }
     }
 
-    var mongod = MongoRunner.runMongod(
-        {setParameter: 'testingSnapshotBehaviorInIsolation=true', shardsvr: ""});
+    var mongod = MongoRunner.runMongod({setParameter: 'testingSnapshotBehaviorInIsolation=true'});
     assert.neq(
         null,
         mongod,

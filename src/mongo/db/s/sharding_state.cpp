@@ -118,9 +118,6 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
 
 }  // namespace
 
-const std::set<std::string> ShardingState::_commandsThatInitializeShardingAwareness{
-    "_recvChunkStart", "mergeChunks", "moveChunk", "setShardVersion", "splitChunk"};
-
 ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
