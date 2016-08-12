@@ -117,9 +117,12 @@ private:
  * in the cluster.
  */
 void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
+
+    auto&& vii = VersionInfoInterface::instance();
+
     bool isMultiVersion = false;
     for (const auto& stat : clusterStats) {
-        if (!isSameMajorVersion(stat.mongoVersion.c_str())) {
+        if (!vii.isSameMajorVersion(stat.mongoVersion.c_str())) {
             isMultiVersion = true;
             break;
         }
@@ -130,7 +133,7 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
         return;
 
     StringBuilder sb;
-    sb << "Multi version cluster detected. Local version: " << versionString
+    sb << "Multi version cluster detected. Local version: " << vii.version()
        << ", shard versions: ";
 
     for (const auto& stat : clusterStats) {

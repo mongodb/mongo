@@ -125,6 +125,7 @@ dbtest = env.Program(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         "$BUILD_DIR/mongo/util/concurrency/rwlock",
         "$BUILD_DIR/mongo/util/net/network",
+        "$BUILD_DIR/mongo/util/version_impl",
         "mocklib",
         "testframework",
     ],

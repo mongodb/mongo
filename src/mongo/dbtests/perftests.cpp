@@ -226,17 +226,18 @@ public:
                 }
 
                 {
+                    auto&& vii = VersionInfoInterface::instance();
                     bob inf;
-                    inf.append("version", versionString);
+                    inf.append("version", vii.version());
                     if (sizeof(int*) == 4)
                         inf.append("bits", 32);
                     DEV inf.append("DEBUG", true);
 #if defined(_WIN32)
                     inf.append("os", "win");
 #endif
-                    inf.append("git", gitVersion());
+                    inf.append("git", vii.gitVersion());
 #ifdef MONGO_CONFIG_SSL
-                    inf.append("OpenSSL", openSSLVersion());
+                    inf.append("OpenSSL", vii.openSSLVersion());
 #endif
                     inf.append("boost", BOOST_VERSION);
                     b.append("info", inf.obj());

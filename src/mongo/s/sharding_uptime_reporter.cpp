@@ -84,7 +84,7 @@ void ShardingUptimeReporter::reportStatus(OperationContext* txn, bool isBalancer
     mType.setPing(jsTime());
     mType.setUptime(_timer.seconds());
     mType.setWaiting(!isBalancerActive);
-    mType.setMongoVersion(versionString);
+    mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
 
     try {
         Grid::get(txn)->catalogClient(txn)->updateConfigDocument(

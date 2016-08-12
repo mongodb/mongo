@@ -255,9 +255,12 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap);
  */
 MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
     BSONObjBuilder soMap;
-    soMap << "mongodbVersion" << versionString;
-    soMap << "gitVersion" << gitVersion();
-    soMap << "compiledModules" << compiledModules();
+
+    auto&& vii = VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback);
+    soMap << "mongodbVersion" << vii.version();
+    soMap << "gitVersion" << vii.gitVersion();
+    soMap << "compiledModules" << vii.modules();
+
     struct utsname unameData;
     if (!uname(&unameData)) {
         BSONObjBuilder unameBuilder(soMap.subobjStart("uname"));

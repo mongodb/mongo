@@ -95,7 +95,7 @@ public:
              int,  // options
              std::string& errmsg,
              BSONObjBuilder& result) {
-        appendBuildInfo(result);
+        VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(&result);
         return true;
     }

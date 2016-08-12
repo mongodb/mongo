@@ -676,8 +676,9 @@ void Explain::generateServerInfo(BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverInfo"));
     out->append("host", getHostNameCached());
     out->appendNumber("port", serverGlobalParams.port);
-    out->append("version", versionString);
-    out->append("gitVersion", gitVersion());
+    auto&& vii = VersionInfoInterface::instance();
+    out->append("version", vii.version());
+    out->append("gitVersion", vii.gitVersion());
     serverBob.doneFast();
 }
 

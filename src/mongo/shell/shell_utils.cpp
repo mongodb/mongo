@@ -174,7 +174,7 @@ BSONObj isAddressSanitizerActive(const BSONObj& a, void* data) {
 BSONObj getBuildInfo(const BSONObj& a, void* data) {
     uassert(16822, "getBuildInfo accepts no arguments", a.nFields() == 0);
     BSONObjBuilder b;
-    appendBuildInfo(b);
+    VersionInfoInterface::instance().appendBuildInfo(&b);
     return BSON("" << b.done());
 }
 

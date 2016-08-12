@@ -106,7 +106,7 @@ public:
         result.append("host", prettyHostName());
         result.append("advisoryHostFQDNs", canonicalizer->getCanonicalizedFQDNs());
 
-        result.append("version", versionString);
+        result.append("version", VersionInfoInterface::instance().version());
         result.append("process", serverGlobalParams.binaryName);
         result.append("pid", ProcessId::getCurrent().asLongLong());
         result.append("uptime", (double)(time(0) - serverGlobalParams.started));

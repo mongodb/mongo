@@ -243,6 +243,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/transport/transport_layer_legacy',
         '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
 

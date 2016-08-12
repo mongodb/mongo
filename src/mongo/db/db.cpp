@@ -188,7 +188,7 @@ static void logStartup(OperationContext* txn) {
 
 
     BSONObjBuilder buildinfo(toLog.subobjStart("buildinfo"));
-    appendBuildInfo(buildinfo);
+    VersionInfoInterface::instance().appendBuildInfo(&buildinfo);
     appendStorageEngineList(&buildinfo);
     buildinfo.doneFast();
 
@@ -509,7 +509,7 @@ static ExitCode _initAndListen(int listenPort) {
     DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
 #if defined(_WIN32)
-    printTargetMinOS();
+    VersionInfoInterface::instance().logTargetMinOS();
 #endif
 
     logProcessDetails();

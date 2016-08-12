@@ -725,8 +725,10 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
             bob.append("hostInfo", sb.str());
         }
 
+        auto versionString = VersionInfoInterface::instance().version();
+
         Status serializeStatus = ClientMetadata::serialize(
-            "MongoDB Internal Client", mongo::versionString, applicationName, &bob);
+            "MongoDB Internal Client", versionString, applicationName, &bob);
         if (!serializeStatus.isOK()) {
             return serializeStatus;
         }

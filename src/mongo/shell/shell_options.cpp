@@ -218,13 +218,14 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
 
 bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args) {
+    auto&& vii = VersionInfoInterface::instance();
     if (params.count("version") || params.count("help")) {
         setPlainConsoleLogger();
-        log() << mongoShellVersion();
+        log() << mongoShellVersion(vii);
         if (params.count("help")) {
             log() << getMongoShellHelp(args[0], moe::startupOptions);
         } else {
-            printBuildInfo();
+            vii.logBuildInfo();
         }
         return false;
     }

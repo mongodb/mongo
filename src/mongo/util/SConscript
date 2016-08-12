@@ -15,6 +15,16 @@ env.SConscript(
 )
 
 env.Library(
+    target='version_impl',
+    source=[
+        'version_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
     target='intrusive_counter',
     source=[
         'intrusive_counter.cpp',

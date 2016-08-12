@@ -600,7 +600,7 @@ int _main(int argc, char* argv[], char** envp) {
     }
 
     if (!mongo::serverGlobalParams.quiet)
-        cout << mongoShellVersion() << endl;
+        cout << mongoShellVersion(VersionInfoInterface::instance()) << endl;
 
     mongo::StartupTest::runTests();
 

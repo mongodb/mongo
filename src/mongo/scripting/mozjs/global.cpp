@@ -86,12 +86,13 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void GlobalInfo::Functions::version::call(JSContext* cx, JS::CallArgs args) {
+    auto versionString = VersionInfoInterface::instance().version();
     ValueReader(cx, args.rval()).fromStringData(versionString);
 }
 
 void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
     BSONObjBuilder b;
-    appendBuildInfo(b);
+    VersionInfoInterface::instance().appendBuildInfo(&b);
     ValueReader(cx, args.rval()).fromBSON(b.obj(), nullptr, false);
 }
 

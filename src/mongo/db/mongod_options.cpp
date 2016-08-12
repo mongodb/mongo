@@ -599,8 +599,9 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     }
     if (params.count("version") && params["version"].as<bool>() == true) {
         setPlainConsoleLogger();
-        log() << mongodVersion() << endl;
-        printBuildInfo();
+        auto&& vii = VersionInfoInterface::instance();
+        log() << mongodVersion(vii);
+        vii.logBuildInfo();
         return false;
     }
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {

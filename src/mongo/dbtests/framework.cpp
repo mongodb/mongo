@@ -86,7 +86,6 @@ int runDbTests(int argc, char** argv) {
         });
 
     srand((unsigned)frameworkGlobalParams.seed);
-    printBuildInfo();
 
     checked_cast<ServiceContextMongoD*>(globalServiceContext)->createLockFile();
     globalServiceContext->initializeGlobalStorageEngine();
