@@ -57,7 +57,6 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
-#include "mongo/db/s/metadata_manager.h"
 
 namespace mongo {
 namespace {
