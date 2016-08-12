@@ -542,6 +542,10 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::enqueueWork
     return StatusWith<CallbackHandle>(work.callback);
 }
 
+void ReplicationExecutor::waitForDBWork_forTest() {
+    _dblockTaskRunner.join();
+}
+
 ReplicationExecutor::WorkItem::WorkItem() : generation(0U), isNetworkOperation(false) {}
 
 ReplicationExecutor::Event::Event(ReplicationExecutor* executor, const EventList::iterator& iter)

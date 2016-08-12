@@ -959,6 +959,11 @@ protected:
                 net->blackHole(noi);
             }
             net->runReadyNetworkOperations();
+            // Successful elections need to write the last vote to disk, which is done by DB worker.
+            // Wait until DB worker finishes its job to ensure the synchronization with the
+            // executor.
+            getReplExec()->waitForDBWork_forTest();
+            net->runReadyNetworkOperations();
             hasReadyRequests = net->hasReadyRequests();
             getNet()->exitNetwork();
         }

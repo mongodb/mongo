@@ -196,6 +196,14 @@ public:
      */
     int64_t nextRandomInt64(int64_t limit);
 
+    /**
+     * Wait until DB worker thread is not active. Test only.
+     *
+     * Usually NetworkInterfaceMock::runReadyNetworkOperations() is called before and after this
+     * function to ensure the synchronization of executor thread and DB worker thread.
+     */
+    void waitForDBWork_forTest();
+
 private:
     class Callback;
     class Event;
