@@ -78,10 +78,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 namespace repl {
@@ -1162,7 +1161,10 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
                                                           const ReadConcernArgs& settings) {
     // We should never wait for replication if we are holding any locks, because this can
     // potentially block for long time while doing network activity.
-    invariant(!txn->lockState()->isLocked());
+    if (txn->lockState()->isLocked()) {
+        return {ErrorCodes::IllegalOperation,
+                "Waiting for replication not allowed while holding a lock"};
+    }
 
     const bool isMajorityReadConcern =
         settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
@@ -1585,9 +1587,13 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     const OpTime& opTime,
     SnapshotName minSnapshot,
     const WriteConcernOptions& writeConcern) {
-    // We should never wait for writes to replicate if we are holding any locks, because the this
-    // can potentially block for long time while doing network activity.
-    invariant(!txn->lockState()->isLocked());
+    // We should never wait for replication if we are holding any locks, because this can
+    // potentially block for long time while doing network activity.
+    if (txn->lockState()->isLocked()) {
+        return StatusAndDuration({ErrorCodes::IllegalOperation,
+                                  "Waiting for replication not allowed while holding a lock"},
+                                 Milliseconds(timer->millis()));
+    }
 
     const Mode replMode = getReplicationMode();
     if (replMode == modeNone) {
