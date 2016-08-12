@@ -1010,6 +1010,7 @@ public:
      */
     class TransformerInterface {
     public:
+        virtual ~TransformerInterface() = default;
         virtual Document applyTransformation(Document input) = 0;
         virtual void optimize() = 0;
         virtual Document serialize(bool explain) const = 0;
