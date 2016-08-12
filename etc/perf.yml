@@ -139,10 +139,10 @@ functions:
           set -o verbose
           source ./venv/bin/activate
           # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
-          # `log_analysis: true` as a var to this function. The following line will select the
+          # `reports_analysis: true` as a var to this function. The following line will select the
           # appropriate flags if it's `true`.
-          log_analysis_flags="--log-analysis . --perf-file perf-3.2/perf.json"
-          cmd_flags=$([ "${log_analysis}" = "true" ] && echo "$log_analysis_flags" || echo "")
+          reports_analysis_flags="--reports-analysis . --perf-file perf-3.2/perf.json"
+          cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
 
           python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.0.9-Baseline --overrideFile ../dsi/analysis/v3.2/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
@@ -223,7 +223,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: where
   depends_on:
   - variant: linux-wt-standalone
@@ -239,7 +239,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: update
   depends_on:
   - variant: linux-wt-standalone
@@ -255,7 +255,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: insert
   depends_on:
   - variant: linux-wt-standalone
@@ -271,7 +271,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: geo
   depends_on:
   - variant: linux-wt-standalone
@@ -287,7 +287,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: misc
   depends_on:
   - variant: linux-wt-standalone
@@ -303,7 +303,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: singleThreaded
   depends_on:
   - variant: linux-wt-standalone
@@ -319,7 +319,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: singleThreaded-wt-repl-comp
   depends_on:
     - name : compile
