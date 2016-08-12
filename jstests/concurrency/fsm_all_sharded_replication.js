@@ -47,6 +47,7 @@ var blacklist = [
     'convert_to_capped_collection_index.js',  // convertToCapped can't be run on mongos processes
     'findAndModify_remove_queue.js',          // remove cannot be {} for findAndModify
     'findAndModify_update_collscan.js',       // findAndModify requires a shard key
+    'findAndModify_update_grow.js',           // can cause OOM kills on test hosts
     'findAndModify_update_queue.js',          // findAndModify requires a shard key
     'group.js',                // the group command cannot be issued against a sharded cluster
     'group_cond.js',           // the group command cannot be issued against a sharded cluster
