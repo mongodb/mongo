@@ -2,6 +2,10 @@ selector:
   js_test:
     roots:
       - jstests/readonly/*.js
+    exclude_files:
+      # TODO: re-enable in SERVER-25549
+      - jstests/readonly/find.js
+      - jstests/readonly/get_more.js
 
 executor:
   js_test:

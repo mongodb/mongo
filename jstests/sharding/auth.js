@@ -66,7 +66,7 @@
     login(adminUser);
 
     var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true});
-    d1.startSet({keyFile: "jstests/libs/key2"});
+    d1.startSet({keyFile: "jstests/libs/key2", shardsvr: ""});
     d1.initiate();
 
     print("d1 initiated");
@@ -97,7 +97,7 @@
     print("start rs w/correct key");
 
     d1.stopSet();
-    d1.startSet({keyFile: "jstests/libs/key1"});
+    d1.startSet({keyFile: "jstests/libs/key1", restart: true});
     d1.initiate();
 
     var master = d1.getPrimary();
@@ -147,7 +147,7 @@
     logout(testUser);
 
     var d2 = new ReplSetTest({name: "d2", nodes: 3, useHostName: true});
-    d2.startSet({keyFile: "jstests/libs/key1"});
+    d2.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
     d2.initiate();
     d2.awaitSecondaryNodes();
 

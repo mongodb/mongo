@@ -5,27 +5,27 @@
         new ShardingTest({name: "add_shard2", shards: 1, mongos: 1, other: {useHostname: true}});
 
     // Start two new instances, which will be used for shards
-    var conn1 = MongoRunner.runMongod({useHostname: true});
-    var conn2 = MongoRunner.runMongod({useHostname: true});
+    var conn1 = MongoRunner.runMongod({useHostname: true, shardsvr: ""});
+    var conn2 = MongoRunner.runMongod({useHostname: true, shardsvr: ""});
 
     var rs1 = new ReplSetTest({"name": "add_shard2_rs1", nodes: 3});
-    rs1.startSet();
+    rs1.startSet({shardsvr: ""});
     rs1.initiate();
     var master1 = rs1.getPrimary();
 
     var rs2 = new ReplSetTest({"name": "add_shard2_rs2", nodes: 3});
-    rs2.startSet();
+    rs2.startSet({shardsvr: ""});
     rs2.initiate();
     var master2 = rs2.getPrimary();
 
     // replica set with set name = 'config'
     var rs3 = new ReplSetTest({'name': 'config', nodes: 3});
-    rs3.startSet();
+    rs3.startSet({shardsvr: ""});
     rs3.initiate();
 
     // replica set with set name = 'admin'
     var rs4 = new ReplSetTest({'name': 'admin', nodes: 3});
-    rs4.startSet();
+    rs4.startSet({shardsvr: ""});
     rs4.initiate();
 
     // replica set with configsvr: true should *not* be allowed to be added as a shard

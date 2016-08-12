@@ -454,13 +454,14 @@ var ReplSetTest = function(opts) {
      * Starts each node in the replica set with the given options.
      *
      * @param options - The options passed to {@link MongoRunner.runMongod}
+     * @param restart - If true and no options are provided, each node is restarted with its
+     * existing options.
      */
-    this.startSet = function(options) {
+    this.startSet = function(options, restart) {
         print("ReplSetTest starting set");
-
         var nodes = [];
         for (var n = 0; n < this.ports.length; n++) {
-            nodes.push(this.start(n, options));
+            nodes.push(this.start(n, options, restart));
         }
 
         this.nodes = nodes;
