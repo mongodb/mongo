@@ -231,7 +231,7 @@
 
         // Add new hidden node to replSetTest
         var hiddenCfg =
-            {restart: true, oplogSize: 1024, dbpath: hiddenDbpath, replSet: replSetName};
+            {noCleanData: true, oplogSize: 1024, dbpath: hiddenDbpath, replSet: replSetName};
         rst.add(hiddenCfg);
         var hiddenHost = rst.nodes[numNodes].host;
 

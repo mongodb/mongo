@@ -914,7 +914,12 @@ var ReplSetTest = function(opts) {
             options.binVersion = MongoRunner.versionIterator(options.binVersion);
         }
 
-        options = Object.merge(defaults, options);
+        // If restarting a node, use its existing options as the defaults.
+        if ((options && options.restart) || restart) {
+            options = Object.merge(this.nodes[n].fullOptions, options);
+        } else {
+            options = Object.merge(defaults, options);
+        }
         options = Object.merge(options, this.nodeOptions["n" + n]);
         delete options.rsConfig;
 
@@ -983,12 +988,15 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Restarts a db without clearing the data directory by default.  If the server is not
-     * stopped first, this function will not work.
+     * Restarts a db without clearing the data directory by default, and using the node(s)'s
+     * original startup options by default.
      *
      * Option { startClean : true } forces clearing the data directory.
      * Option { auth : Object } object that contains the auth details for admin credentials.
      *   Should contain the fields 'user' and 'pwd'
+     *
+     * In order not to use the original startup options, use stop() (or stopSet()) followed by
+     * start() (or startSet()) without passing restart: true as part of the options.
      *
      * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
      */
