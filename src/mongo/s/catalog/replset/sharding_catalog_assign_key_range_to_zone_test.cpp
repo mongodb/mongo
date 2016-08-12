@@ -104,8 +104,8 @@ public:
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(ns, tagDoc.getNS());
-        ASSERT_EQ(range.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(range.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(range.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(range.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName, tagDoc.getTag());
     }
 
@@ -304,8 +304,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxAlignsWithExistingMinShouldSucce
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(BSON("x" << 2), tagDoc.getMinKey());
-        ASSERT_EQ(BSON("x" << 4), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 2), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 4), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 
@@ -321,8 +321,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxAlignsWithExistingMinShouldSucce
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 }
@@ -384,8 +384,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
     {
@@ -398,8 +398,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedCollection.getNs().ns(), tagDoc.getNS());
-        ASSERT_EQ(BSON("x" << 5), tagDoc.getMinKey());
-        ASSERT_EQ(BSON("x" << 7), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 5), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 7), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 }
@@ -472,8 +472,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinAlignsWithExistingMaxShouldSucce
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 
@@ -487,8 +487,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinAlignsWithExistingMaxShouldSucce
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(BSON("x" << 8), tagDoc.getMinKey());
-        ASSERT_EQ(BSON("x" << 10), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 8), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 10), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 }
@@ -610,8 +610,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(ns, tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 
@@ -627,8 +627,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 }
@@ -662,8 +662,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(ns, tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 
@@ -679,8 +679,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
 
         auto tagDoc = tagDocStatus.getValue();
         ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
-        ASSERT_EQ(existingRange.getMin(), tagDoc.getMinKey());
-        ASSERT_EQ(existingRange.getMax(), tagDoc.getMaxKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
+        ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
 }

@@ -136,7 +136,7 @@ public:
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, true));
         ASSERT_EQUALS(string("b"), ret.firstElement().fieldName());
         // Cross check with findOne() returning location.
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, true)).value());
     }
@@ -152,7 +152,7 @@ public:
         // Check findOne() returning object, allowing unindexed scan.
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, false));
         // Check findOne() returning location, allowing unindexed scan.
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, false)).value());
 
@@ -166,7 +166,7 @@ public:
         // Check findOne() returning object, requiring indexed scan with index.
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, true));
         // Check findOne() returning location, requiring indexed scan with index.
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, true)).value());
     }
@@ -208,7 +208,7 @@ public:
         BSONObj ret;
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, false));
         ASSERT(ret.isEmpty());
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, false)).value());
     }
@@ -1730,8 +1730,8 @@ namespace queryobjecttests {
 class names1 {
 public:
     void run() {
-        ASSERT_EQUALS(BSON("x" << 1), QUERY("query" << BSON("x" << 1)).getFilter());
-        ASSERT_EQUALS(BSON("x" << 1), QUERY("$query" << BSON("x" << 1)).getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), QUERY("query" << BSON("x" << 1)).getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), QUERY("$query" << BSON("x" << 1)).getFilter());
     }
 };
 }

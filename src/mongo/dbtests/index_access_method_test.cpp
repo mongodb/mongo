@@ -194,14 +194,14 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
     for (auto&& obj : diff.first) {
         ASSERT(left.find(obj) != left.end());
         // Make sure it's not in the intersection.
-        ASSERT(obj != BSON("" << 1));
-        ASSERT(obj != BSON("" << 4));
+        ASSERT_BSONOBJ_NE(obj, BSON("" << 1));
+        ASSERT_BSONOBJ_NE(obj, BSON("" << 4));
     }
     for (auto&& obj : diff.second) {
         ASSERT(right.find(obj) != right.end());
         // Make sure it's not in the intersection.
-        ASSERT(obj != BSON("" << 1));
-        ASSERT(obj != BSON("" << 4));
+        ASSERT_BSONOBJ_NE(obj, BSON("" << 1));
+        ASSERT_BSONOBJ_NE(obj, BSON("" << 4));
     }
 }
 

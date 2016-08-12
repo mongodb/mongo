@@ -97,7 +97,7 @@ void assertOnlyRecord(OperationContext* txn, const NamespaceString& nss, const B
 
     auto record = cursor->next();
     ASSERT(record);
-    ASSERT_EQ(data, record->data.releaseToBson());
+    ASSERT_BSONOBJ_EQ(data, record->data.releaseToBson());
 
     ASSERT(!cursor->next());
 }

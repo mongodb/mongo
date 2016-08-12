@@ -125,7 +125,7 @@ void testTransform(const char* specStr,
     // Finally, we compare the projected object.
     const BSONObj& obj = wsm.obj.value();
     BSONObj expectedObj = fromjson(expectedObjStr);
-    if (obj != expectedObj) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(obj != expectedObj)) {
         mongoutils::str::stream ss;
         ss << "transform() test failed: unexpected projected object."
            << "\nprojection spec: " << specStr << "\nquery: " << queryStr
@@ -303,7 +303,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredNormal) {
                                     "{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
                                     IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr));
     BSONObj expectedOut = BSON("a" << 5 << "b" << BSON("" << 5));
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredOverwrite) {
@@ -312,7 +312,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredOverwrite) {
                                     "{_id: 0, a: 1, a: {$meta: 'sortKey'}}",
                                     IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr));
     BSONObj expectedOut = BSON("a" << BSON("" << 5));
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredAdditionalData) {
@@ -321,7 +321,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredAdditionalData) {
         "{_id: 0, a: 1, b: {$meta: 'sortKey'}, c: 1}",
         IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr));
     BSONObj expectedOut = BSON("a" << 5 << "c" << 6 << "b" << BSON("" << 5));
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound) {
@@ -330,7 +330,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound) {
         "{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
         IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr));
     BSONObj expectedOut = BSON("a" << 5 << "b" << BSON("" << 5 << "" << 6));
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound2) {
@@ -340,7 +340,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound2) {
         IndexKeyDatum(
             BSON("a" << 1 << "b" << 1 << "c" << 1), BSON("" << 5 << "" << 6 << "" << 4), nullptr));
     BSONObj expectedOut = BSON("a" << 5 << "c" << 4 << "b" << BSON("" << 5 << "" << 6));
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound3) {
@@ -351,7 +351,7 @@ TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound3) {
                       BSON("" << 5 << "" << 6 << "" << 4 << "" << 9000),
                       nullptr));
     BSONObj expectedOut = BSON("c" << 4 << "d" << 9000 << "b" << BSON("" << 6 << "" << 4));
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 }  // namespace

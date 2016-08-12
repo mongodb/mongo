@@ -87,8 +87,8 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     // MergedChunk should have range [chunkMin, chunkMax]
     auto mergedChunk = uassertStatusOK(ChunkType::fromBSON(chunksVector.front()));
-    ASSERT_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_EQ(chunkMax, mergedChunk.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
     {
         // Check for increment on mergedChunk's minor version
@@ -150,8 +150,8 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
 
     // MergedChunk should have range [chunkMin, chunkMax]
     auto mergedChunk = uassertStatusOK(ChunkType::fromBSON(chunksVector.front()));
-    ASSERT_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_EQ(chunkMax, mergedChunk.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
     {
         // Check for increment on mergedChunk's minor version
@@ -217,8 +217,8 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
     // MergedChunk should have range [chunkMin, chunkMax]
     auto mergedChunk = uassertStatusOK(ChunkType::fromBSON(chunksVector.front()));
-    ASSERT_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_EQ(chunkMax, mergedChunk.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
     {
         // Check for minor increment on collection version
@@ -280,8 +280,8 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
 
     // MergedChunk should have range [chunkMin, chunkMax]
     auto mergedChunk = uassertStatusOK(ChunkType::fromBSON(chunksVector.front()));
-    ASSERT_EQ(chunkMin, mergedChunk.getMin());
-    ASSERT_EQ(chunkMax, mergedChunk.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
     {
         // Check for increment on mergedChunk's minor version
@@ -291,8 +291,8 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
 
     // OtherChunk should have been left alone
     auto foundOtherChunk = uassertStatusOK(ChunkType::fromBSON(chunksVector.back()));
-    ASSERT_EQ(otherChunk.getMin(), foundOtherChunk.getMin());
-    ASSERT_EQ(otherChunk.getMax(), foundOtherChunk.getMax());
+    ASSERT_BSONOBJ_EQ(otherChunk.getMin(), foundOtherChunk.getMin());
+    ASSERT_BSONOBJ_EQ(otherChunk.getMax(), foundOtherChunk.getMax());
 }
 
 TEST_F(MergeChunkTest, NonExistingNamespace) {

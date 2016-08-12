@@ -31,6 +31,8 @@
 #include <map>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/ns_targeter.h"
 
@@ -43,9 +45,12 @@ class Shard;
 struct ChunkVersion;
 
 struct TargeterStats {
+    TargeterStats()
+        : chunkSizeDelta(SimpleBSONObjComparator::kInstance.makeOrderedBSONObjMap<int>()) {}
+
     // Map of chunk shard minKey -> approximate delta. This is used for deciding
     // whether a chunk might need splitting or not.
-    std::map<BSONObj, int> chunkSizeDelta;
+    BSONObj::ComparatorInterface::BSONObjMap<int> chunkSizeDelta;
 };
 
 /**

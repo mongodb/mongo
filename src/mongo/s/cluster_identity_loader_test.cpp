@@ -76,7 +76,7 @@ public:
     void expectConfigVersionLoad(StatusWith<OID> result) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), "config.version");
@@ -84,7 +84,7 @@ public:
             auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), "config.version");
-            ASSERT_EQ(query->getFilter(), BSONObj());
+            ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
             ASSERT_FALSE(query->getLimit().is_initialized());
 
             if (result.isOK()) {

@@ -130,7 +130,7 @@ protected:
             ::mongo::log() << "expected: " << expected.toString() << ", got: " << got.toString()
                            << endl;
         }
-        ASSERT_EQUALS(expected, got);
+        ASSERT_BSONOBJ_EQ(expected, got);
     }
     BSONObj oneOp() const {
         return _client.findOne(cllNS(), BSONObj());

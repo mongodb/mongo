@@ -32,6 +32,8 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
+#include <algorithm>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
@@ -58,11 +60,21 @@ std::string dumpKeyset(const BSONObjSet& objs) {
 }
 
 bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
-    if (expectedKeys != actualKeys) {
+    if (expectedKeys.size() != actualKeys.size()) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
     }
+
+    if (!std::equal(expectedKeys.begin(),
+                    expectedKeys.end(),
+                    actualKeys.begin(),
+                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
+    }
+
     return true;
 }
 

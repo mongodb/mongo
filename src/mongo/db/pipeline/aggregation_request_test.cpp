@@ -60,9 +60,9 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_TRUE(request.isCursorCommand());
     ASSERT_EQ(request.getBatchSize().get(), 10);
-    ASSERT_EQ(request.getCollation(),
-              BSON("locale"
-                   << "en_US"));
+    ASSERT_BSONOBJ_EQ(request.getCollation(),
+                      BSON("locale"
+                           << "en_US"));
 }
 
 //

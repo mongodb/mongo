@@ -32,6 +32,7 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
+#include <algorithm>
 #include <iostream>
 
 #include "mongo/db/json.h"
@@ -78,6 +79,21 @@ std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
     return ss.str();
 }
 
+bool keysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
+    if (expectedKeys.size() != actualKeys.size()) {
+        return false;
+    }
+
+    if (!std::equal(expectedKeys.begin(),
+                    expectedKeys.end(),
+                    actualKeys.begin(),
+                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+        return false;
+    }
+
+    return true;
+}
+
 bool testKeygen(const BSONObj& kp,
                 const BSONObj& obj,
                 const BSONObjSet& expectedKeys,
@@ -115,7 +131,7 @@ bool testKeygen(const BSONObj& kp,
     //
     // Step 3: check that the results match the expected result.
     //
-    bool match = (expectedKeys == actualKeys);
+    bool match = keysetsEqual(expectedKeys, actualKeys);
     if (!match) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);

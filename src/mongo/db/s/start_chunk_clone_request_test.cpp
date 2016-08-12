@@ -71,9 +71,9 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
             .toString(),
         request.getFromShardConnectionString().toString());
     ASSERT_EQ("shard0002", request.getToShardId());
-    ASSERT_EQ(BSON("Key" << -100), request.getMinKey());
-    ASSERT_EQ(BSON("Key" << 100), request.getMaxKey());
-    ASSERT_EQ(BSON("Key" << 1), request.getShardKeyPattern());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -100), request.getMinKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 1), request.getShardKeyPattern());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
 }

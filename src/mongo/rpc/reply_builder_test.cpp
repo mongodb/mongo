@@ -96,8 +96,8 @@ TEST(CommandReplyBuilder, MemAccess) {
 
     rpc::CommandReply parsed(&msg);
 
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
-    ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
 }
 
 TEST(LegacyReplyBuilder, MemAccess) {
@@ -110,8 +110,8 @@ TEST(LegacyReplyBuilder, MemAccess) {
 
     rpc::LegacyReply parsed(&msg);
 
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
-    ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
 }
 
 template <typename T>
@@ -147,7 +147,7 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
 
     T parsed(&msg);
 
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
     if (replyBuilder.getProtocol() != rpc::Protocol::kOpQuery) {
         ASSERT_TRUE(parsed.getOutputDocs() == outputDocRange);
     }

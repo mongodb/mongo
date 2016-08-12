@@ -70,7 +70,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyAppendsElementWithNullC
     BSONObj dataObj = BSON("test" << 1);
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), nullptr, &out);
-    ASSERT_EQ(out.obj(), BSON("" << 1));
+    ASSERT_BSONOBJ_EQ(out.obj(), BSON("" << 1));
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendReversesStringWithReverseMockCollator) {
@@ -79,9 +79,9 @@ TEST(CollationIndexKeyTest, CollationAwareAppendReversesStringWithReverseMockCol
                            << "string");
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
-    ASSERT_EQ(out.obj(),
-              BSON(""
-                   << "gnirts"));
+    ASSERT_BSONOBJ_EQ(out.obj(),
+                      BSON(""
+                           << "gnirts"));
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesEmptyComparisonKey) {
@@ -96,7 +96,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesEmptyComparis
 
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
-    ASSERT_EQ(out.obj(), expectedObj);
+    ASSERT_BSONOBJ_EQ(out.obj(), expectedObj);
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesWithEmbeddedNullByte) {
@@ -111,7 +111,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlySerializesWithEmbeddedN
 
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
-    ASSERT_EQ(out.obj(), expectedObj);
+    ASSERT_BSONOBJ_EQ(out.obj(), expectedObj);
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesSimpleEmbeddedObject) {
@@ -123,7 +123,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesSimpleEmbeddedO
 
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
-    ASSERT_EQ(out.obj(), expected);
+    ASSERT_BSONOBJ_EQ(out.obj(), expected);
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesSimpleEmbeddedArray) {
@@ -135,7 +135,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesSimpleEmbeddedA
 
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
-    ASSERT_EQ(out.obj(), expected);
+    ASSERT_BSONOBJ_EQ(out.obj(), expected);
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesComplexNesting) {
@@ -151,7 +151,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesComplexNesting)
 
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
-    ASSERT_EQ(out.obj(), expected);
+    ASSERT_BSONOBJ_EQ(out.obj(), expected);
 }
 
 }  // namespace

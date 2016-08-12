@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/query_request.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
+
 namespace mongo {
 
 using std::unique_ptr;
@@ -286,8 +288,9 @@ Status ParsedProjection::make(const BSONObj& spec,
             // $meta sortKey should not be checked as a part of _requiredFields, since it can
             // potentially produce a covered projection as long as the sort key is covered.
             if (BSONType::Object == elt.type()) {
-                dassert(elt.Obj() == BSON("$meta"
-                                          << "sortKey"));
+                dassert(
+                    SimpleBSONObjComparator::kInstance.evaluate(elt.Obj() == BSON("$meta"
+                                                                                  << "sortKey")));
                 continue;
             }
             if (elt.trueValue()) {

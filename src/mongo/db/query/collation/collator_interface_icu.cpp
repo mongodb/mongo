@@ -71,6 +71,10 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) const {
     MONGO_UNREACHABLE;
 }
 
+int CollatorInterfaceICU::compare(const BSONObj& left, const BSONObj& right) const {
+    return left.woCompare(right, BSONObj(), true, this);
+}
+
 CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(
     StringData stringData) const {
     // A StringPiece is ICU's StringData. They are logically the same abstraction.

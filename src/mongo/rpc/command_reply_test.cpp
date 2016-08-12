@@ -99,17 +99,17 @@ TEST_F(ReplyTest, ParseAllFields) {
 
     rpc::CommandReply opCmdReply{buildMessage()};
 
-    ASSERT_EQUALS(opCmdReply.getMetadata(), metadata);
-    ASSERT_EQUALS(opCmdReply.getCommandReply(), commandReply);
+    ASSERT_BSONOBJ_EQ(opCmdReply.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(opCmdReply.getCommandReply(), commandReply);
 
     auto outputDocRange = opCmdReply.getOutputDocs();
     auto outputDocRangeIter = outputDocRange.begin();
 
-    ASSERT_EQUALS(*outputDocRangeIter, outputDoc1);
+    ASSERT_BSONOBJ_EQ(*outputDocRangeIter, outputDoc1);
     // can't use assert equals since we don't have an op to print the iter.
     ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
     ++outputDocRangeIter;
-    ASSERT_EQUALS(*outputDocRangeIter, outputDoc2);
+    ASSERT_BSONOBJ_EQ(*outputDocRangeIter, outputDoc2);
     ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
     ++outputDocRangeIter;
 

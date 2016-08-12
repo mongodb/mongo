@@ -36,6 +36,7 @@
 #include <map>
 #include <set>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -143,14 +144,16 @@ bool isChunkMapValid(const ChunkMap& chunkMap) {
          ++it) {
         ChunkMap::const_iterator last = boost::prior(it);
 
-        if (!(it->second->getMin() == last->second->getMax())) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(it->second->getMin() !=
+                                                        last->second->getMax())) {
             log() << last->second->toString();
             log() << it->second->toString();
             log() << it->second->getMin();
             log() << last->second->getMax();
         }
 
-        ENSURE(it->second->getMin() == last->second->getMax());
+        ENSURE(SimpleBSONObjComparator::kInstance.evaluate(it->second->getMin() ==
+                                                           last->second->getMax()));
     }
 
     return true;
@@ -395,7 +398,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         shardIds->push_back(primaryShardId);
     } else {
         // make sure points are unique and ordered
-        set<BSONObj> orderedPts;
+        auto orderedPts = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
         for (unsigned i = 0; i < initPoints->size(); ++i) {
             BSONObj pt = (*initPoints)[i];
             orderedPts.insert(pt);
@@ -783,7 +786,8 @@ ChunkManager::ChunkRangeMap ChunkManager::_constructRanges(const ChunkMap& chunk
         if (insertResult.first != chunkRangeMap.begin()) {
             // Make sure there are no gaps in the ranges
             insertResult.first--;
-            invariant(insertResult.first->first == rangeMin);
+            invariant(
+                SimpleBSONObjComparator::kInstance.evaluate(insertResult.first->first == rangeMin));
         }
     }
 

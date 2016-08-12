@@ -78,7 +78,7 @@ public:
         }
 
         // Check that the expected documents remain.
-        ASSERT_EQUALS(expected(), docs(&txn));
+        ASSERT_BSONOBJ_EQ(expected(), docs(&txn));
     }
 
 private:

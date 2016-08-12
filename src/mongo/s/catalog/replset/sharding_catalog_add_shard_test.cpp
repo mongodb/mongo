@@ -106,8 +106,8 @@ protected:
         onCommandForAddShard([&, target, isMasterResponse](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
-            ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+            ASSERT_BSONOBJ_EQ(request.cmdObj, BSON("isMaster" << 1));
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return isMasterResponse;
         });
@@ -117,8 +117,8 @@ protected:
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
-            ASSERT_EQ(request.cmdObj, BSON("listDatabases" << 1));
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+            ASSERT_BSONOBJ_EQ(request.cmdObj, BSON("listDatabases" << 1));
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             BSONArrayBuilder arr;
             for (const auto& db : dbs) {
@@ -200,8 +200,8 @@ protected:
             for (; itActual != actualUpdates.end(); itActual++, itExpected++) {
                 ASSERT_EQ((*itExpected)->getUpsert(), (*itActual)->getUpsert());
                 ASSERT_EQ((*itExpected)->getMulti(), (*itActual)->getMulti());
-                ASSERT_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
-                ASSERT_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
+                ASSERT_BSONOBJ_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
+                ASSERT_BSONOBJ_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
             }
 
             BatchedCommandResponse response;
@@ -246,8 +246,8 @@ protected:
             for (; itActual != actualUpdates.end(); itActual++, itExpected++) {
                 ASSERT_EQ((*itExpected)->getUpsert(), (*itActual)->getUpsert());
                 ASSERT_EQ((*itExpected)->getMulti(), (*itActual)->getMulti());
-                ASSERT_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
-                ASSERT_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
+                ASSERT_BSONOBJ_EQ((*itExpected)->getQuery(), (*itActual)->getQuery());
+                ASSERT_BSONOBJ_EQ((*itExpected)->getUpdateExpr(), (*itActual)->getUpdateExpr());
             }
 
             return statusToReturn;
@@ -342,7 +342,7 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                         << "majority"
                                         << "wtimeout"
                                         << 15000));
-    ASSERT_EQUALS(
+    ASSERT_BSONOBJ_EQ(
         expectedBSON,
         catalogManager()->createShardIdentityUpsertForAddShard(operationContext(), shardName));
 }

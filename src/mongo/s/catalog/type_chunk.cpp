@@ -35,6 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -61,7 +62,7 @@ const char kMaxKey[] = "max";
 
 ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
     : _minKey(std::move(minKey)), _maxKey(std::move(maxKey)) {
-    dassert(_minKey < _maxKey);
+    dassert(SimpleBSONObjComparator::kInstance.evaluate(_minKey < _maxKey));
 }
 
 StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
@@ -91,7 +92,7 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
         }
     }
 
-    if (minKey.Obj() >= maxKey.Obj()) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(minKey.Obj() >= maxKey.Obj())) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "min: " << minKey.Obj() << " should be less than max: "
                               << maxKey.Obj()};

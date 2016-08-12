@@ -32,6 +32,7 @@
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -138,7 +139,8 @@ public:
         const std::list<BSONObj>& originalIndexes) final {
         Lock::GlobalWrite globalLock(_ctx->opCtx->lockState());
 
-        if (originalCollectionOptions != getCollectionOptions(targetNs)) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(originalCollectionOptions !=
+                                                        getCollectionOptions(targetNs))) {
             return {ErrorCodes::CommandFailed,
                     str::stream() << "collection options of target collection " << targetNs.ns()
                                   << " changed during processing. Original options: "
@@ -146,7 +148,13 @@ public:
                                   << ", new options: "
                                   << getCollectionOptions(targetNs)};
         }
-        if (originalIndexes != _client.getIndexSpecs(targetNs.ns())) {
+
+        auto currentIndexes = _client.getIndexSpecs(targetNs.ns());
+        if (originalIndexes.size() != currentIndexes.size() ||
+            !std::equal(originalIndexes.begin(),
+                        originalIndexes.end(),
+                        currentIndexes.begin(),
+                        SimpleBSONObjComparator::kInstance.makeEqualTo())) {
             return {ErrorCodes::CommandFailed,
                     str::stream() << "indexes of target collection " << targetNs.ns()
                                   << " changed during processing."};

@@ -35,6 +35,7 @@
 #include <limits>
 #include <string>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -136,6 +137,56 @@ TEST(UnitTestSelfTest, TestStreamingIntoFailures) {
 TEST(UnitTestSelfTest, TestNoDoubleEvaluation) {
     int i = 0;
     ASSERT_TEST_FAILS_MATCH(ASSERT_EQ(0, ++i), "(0 == 1)");
+}
+
+TEST(UnitTestSelfTest, BSONObjEQ) {
+    ASSERT_BSONOBJ_EQ(BSON("foo"
+                           << "bar"),
+                      BSON("foo"
+                           << "bar"));
+}
+
+TEST(UnitTestSelfTest, BSONObjNE) {
+    ASSERT_BSONOBJ_NE(BSON("foo"
+                           << "bar"),
+                      BSON("foo"
+                           << "baz"));
+}
+
+TEST(UnitTestSelfTest, BSONObjLT) {
+    ASSERT_BSONOBJ_LT(BSON("foo"
+                           << "bar"),
+                      BSON("foo"
+                           << "baz"));
+}
+
+TEST(UnitTestSelfTest, BSONObjLTE) {
+    ASSERT_BSONOBJ_LTE(BSON("foo"
+                            << "bar"),
+                       BSON("foo"
+                            << "baz"));
+    ASSERT_BSONOBJ_LTE(BSON("foo"
+                            << "bar"),
+                       BSON("foo"
+                            << "bar"));
+}
+
+TEST(UnitTestSelfTest, BSONObjGT) {
+    ASSERT_BSONOBJ_GT(BSON("foo"
+                           << "baz"),
+                      BSON("foo"
+                           << "bar"));
+}
+
+TEST(UnitTestSelfTest, BSONObjGTE) {
+    ASSERT_BSONOBJ_GTE(BSON("foo"
+                            << "baz"),
+                       BSON("foo"
+                            << "bar"));
+    ASSERT_BSONOBJ_GTE(BSON("foo"
+                            << "bar"),
+                       BSON("foo"
+                            << "bar"));
 }
 
 DEATH_TEST(DeathTestSelfTest, TestDeath, "Invariant failure false") {

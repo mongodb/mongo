@@ -1512,11 +1512,12 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
-    ASSERT_EQUALS(lastCommittedOpTime.toBSON(), rsStatus["optimes"]["lastCommittedOpTime"].Obj());
+    ASSERT_BSONOBJ_EQ(lastCommittedOpTime.toBSON(),
+                      rsStatus["optimes"]["lastCommittedOpTime"].Obj());
     {
         const auto optimes = rsStatus["optimes"].Obj();
-        ASSERT_EQUALS(readConcernMajorityOpTime.toBSON(),
-                      optimes["readConcernMajorityOpTime"].Obj());
+        ASSERT_BSONOBJ_EQ(readConcernMajorityOpTime.toBSON(),
+                          optimes["readConcernMajorityOpTime"].Obj());
         ASSERT_EQUALS(oplogProgress.getTimestamp(), optimes["appliedOpTime"].timestamp());
         ASSERT_EQUALS((oplogDurable).getTimestamp(), optimes["durableOpTime"].timestamp());
     }

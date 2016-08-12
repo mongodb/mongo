@@ -136,7 +136,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
         [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) {
             validateCalled = true;
             hostCorrectForValidate = (remoteHost == testHost());
-            replyCorrectForValidate = (isMasterReply.data == isMasterReplyData);
+            replyCorrectForValidate = SimpleBSONObjComparator::kInstance.evaluate(
+                isMasterReply.data == isMasterReplyData);
             return Status::OK();
         },
         [&](const HostAndPort& remoteHost) {
@@ -147,8 +148,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
             handleReplyCalled = true;
             hostCorrectForRequest = (remoteHost == testHost());
-            gotExpectedReply =
-                (expectedResponse.data == response.data);  // Don't bother checking all fields.
+            gotExpectedReply = SimpleBSONObjComparator::kInstance.evaluate(
+                expectedResponse.data == response.data);  // Don't bother checking all fields.
             return Status::OK();
         }));
 
@@ -189,7 +190,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
         net().enterNetwork();
         ASSERT(net().hasReadyRequests());
         auto req = net().getNextReadyRequest();
-        ASSERT(req->getRequest().cmdObj == expectedRequest.cmdObj);
+        ASSERT_BSONOBJ_EQ(req->getRequest().cmdObj, expectedRequest.cmdObj);
         net().scheduleResponse(req, net().now(), expectedResponse);
         net().runReadyNetworkOperations();
         net().exitNetwork();
@@ -206,7 +207,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
         net().enterNetwork();
         ASSERT(net().hasReadyRequests());
         auto actualCommand = net().getNextReadyRequest();
-        ASSERT(actualCommand->getRequest().cmdObj == actualCommandExpected.cmdObj);
+        ASSERT_BSONOBJ_EQ(actualCommand->getRequest().cmdObj, actualCommandExpected.cmdObj);
         net().scheduleResponse(actualCommand, net().now(), actualResponseExpected);
         net().runReadyNetworkOperations();
         net().exitNetwork();

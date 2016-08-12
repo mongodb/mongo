@@ -67,10 +67,10 @@ TEST_F(ShardingCatalogClientAppendDbStatsTest, BasicAppendDBStats) {
     });
 
     onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(kReplSecondaryOkMetadata, request.metadata);
+        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
         ASSERT_EQ("admin", request.dbname);
-        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
+        ASSERT_BSONOBJ_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
         return fromjson(R"({
             databases: [

@@ -92,6 +92,10 @@ int CollatorInterfaceMock::compare(StringData left, StringData right) const {
     MONGO_UNREACHABLE;
 }
 
+int CollatorInterfaceMock::compare(const BSONObj& left, const BSONObj& right) const {
+    return left.woCompare(right, BSONObj(), true, this);
+}
+
 CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
     StringData stringData) const {
     switch (_mockType) {

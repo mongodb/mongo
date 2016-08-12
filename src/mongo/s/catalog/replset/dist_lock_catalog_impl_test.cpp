@@ -216,7 +216,7 @@ TEST_F(DistLockCatalogFixture, BasicPing) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson(R"({
                 ok: 1,
@@ -370,7 +370,7 @@ TEST_F(DistLockCatalogFixture, GrabLockNoOp) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson("{ ok: 1, value: null }");
     });
@@ -418,7 +418,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson(R"({
                 lastErrorObject: {
@@ -682,7 +682,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockNoOp) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson("{ ok: 1, value: null }");
     });
@@ -735,7 +735,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson(R"({
                 lastErrorObject: {
@@ -924,7 +924,7 @@ TEST_F(DistLockCatalogFixture, BasicUnlock) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson(R"({
                 ok: 1,
@@ -957,7 +957,7 @@ TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson(R"({
                 ok: 1,
@@ -1101,15 +1101,15 @@ TEST_F(DistLockCatalogFixture, BasicUnlockAll) {
         BatchedUpdateRequest batchRequest;
         ASSERT(batchRequest.parseBSON("config", request.cmdObj, &errmsg));
         ASSERT_EQUALS(LocksType::ConfigNS, batchRequest.getNS().toString());
-        ASSERT_EQUALS(BSON("w" << 1 << "wtimeout" << 0), batchRequest.getWriteConcern());
+        ASSERT_BSONOBJ_EQ(BSON("w" << 1 << "wtimeout" << 0), batchRequest.getWriteConcern());
         auto updates = batchRequest.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
         auto update = updates.front();
         ASSERT_FALSE(update->getUpsert());
         ASSERT_TRUE(update->getMulti());
-        ASSERT_EQUALS(BSON(LocksType::process("processID")), update->getQuery());
-        ASSERT_EQUALS(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))),
-                      update->getUpdateExpr());
+        ASSERT_BSONOBJ_EQ(BSON(LocksType::process("processID")), update->getQuery());
+        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))),
+                          update->getUpdateExpr());
 
         return BSON("ok" << 1);
     });
@@ -1161,7 +1161,7 @@ TEST_F(DistLockCatalogFixture, BasicGetServerInfo) {
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         ASSERT_EQUALS(dummyHost, request.target);
         ASSERT_EQUALS("admin", request.dbname);
-        ASSERT_EQUALS(BSON("serverStatus" << 1 << "maxTimeMS" << 30000), request.cmdObj);
+        ASSERT_BSONOBJ_EQ(BSON("serverStatus" << 1 << "maxTimeMS" << 30000), request.cmdObj);
 
         return fromjson(R"({
                 localTime: { $date: "2015-05-26T13:06:27.293Z" },
@@ -1307,7 +1307,7 @@ TEST_F(DistLockCatalogFixture, BasicStopPing) {
                 maxTimeMS: 30000
             })"));
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
         return fromjson(R"({
                 ok: 1,
@@ -1439,29 +1439,28 @@ TEST_F(DistLockCatalogFixture, BasicGetPing) {
         ASSERT_EQUALS(ping, pingDoc.getPing());
     });
 
-    onFindCommand(
-        [](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(dummyHost, request.target);
-            ASSERT_EQUALS("config", request.dbname);
+    onFindCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
 
-            const auto& findCmd = request.cmdObj;
-            ASSERT_EQUALS("lockpings", findCmd["find"].str());
-            ASSERT_EQUALS(BSON("_id"
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQUALS("lockpings", findCmd["find"].str());
+        ASSERT_BSONOBJ_EQ(BSON("_id"
                                << "test"),
                           findCmd["filter"].Obj());
-            ASSERT_EQUALS(1, findCmd["limit"].numberLong());
-            checkReadConcern(findCmd);
+        ASSERT_EQUALS(1, findCmd["limit"].numberLong());
+        checkReadConcern(findCmd);
 
-            BSONObj pingDoc(fromjson(R"({
+        BSONObj pingDoc(fromjson(R"({
                 _id: "test",
                 ping: { $date: "2015-05-26T13:06:27.293Z" }
             })"));
 
-            std::vector<BSONObj> result;
-            result.push_back(pingDoc);
+        std::vector<BSONObj> result;
+        result.push_back(pingDoc);
 
-            return result;
-        });
+        return result;
+    });
 
     future.timed_get(kFutureTimeout);
 }
@@ -1534,7 +1533,7 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
 
         const auto& findCmd = request.cmdObj;
         ASSERT_EQUALS("locks", findCmd["find"].str());
-        ASSERT_EQUALS(BSON("ts" << OID("555f99712c99a78c5b083358")), findCmd["filter"].Obj());
+        ASSERT_BSONOBJ_EQ(BSON("ts" << OID("555f99712c99a78c5b083358")), findCmd["filter"].Obj());
         ASSERT_EQUALS(1, findCmd["limit"].numberLong());
         checkReadConcern(findCmd);
 
@@ -1613,29 +1612,28 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
         ASSERT_EQUALS(ts, lockDoc.getLockID());
     });
 
-    onFindCommand(
-        [](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(dummyHost, request.target);
-            ASSERT_EQUALS("config", request.dbname);
+    onFindCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
 
-            const auto& findCmd = request.cmdObj;
-            ASSERT_EQUALS("locks", findCmd["find"].str());
-            ASSERT_EQUALS(BSON("_id"
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQUALS("locks", findCmd["find"].str());
+        ASSERT_BSONOBJ_EQ(BSON("_id"
                                << "abc"),
                           findCmd["filter"].Obj());
-            ASSERT_EQUALS(1, findCmd["limit"].numberLong());
-            checkReadConcern(findCmd);
+        ASSERT_EQUALS(1, findCmd["limit"].numberLong());
+        checkReadConcern(findCmd);
 
-            BSONObj lockDoc(fromjson(R"({
+        BSONObj lockDoc(fromjson(R"({
                 _id: "abc",
                 state: 2,
                 ts: ObjectId("555f99712c99a78c5b083358")
             })"));
 
-            std::vector<BSONObj> result;
-            result.push_back(lockDoc);
-            return result;
-        });
+        std::vector<BSONObj> result;
+        result.push_back(lockDoc);
+        return result;
+    });
 
     future.timed_get(kFutureTimeout);
 }

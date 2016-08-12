@@ -69,8 +69,8 @@ TEST(MoveChunkRequest, Roundtrip) {
     ASSERT_EQ(kTestConnectionString.toString(), request.getConfigServerCS().toString());
     ASSERT_EQ(ShardId("shard0001"), request.getFromShardId());
     ASSERT_EQ(ShardId("shard0002"), request.getToShardId());
-    ASSERT_EQ(BSON("Key" << -100), request.getMinKey());
-    ASSERT_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -100), request.getMinKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 100), request.getMaxKey());
     ASSERT(request.hasChunkVersion());
     ASSERT_EQ(chunkVersion, request.getChunkVersion());
     ASSERT_EQ(1024, request.getMaxChunkSizeBytes());
@@ -107,8 +107,8 @@ TEST(MoveChunkRequest, BackwardsCompatibilityNoChunkVersionAndDefaults) {
     ASSERT_EQ(kTestConnectionString.toString(), request.getConfigServerCS().toString());
     ASSERT_EQ(ShardId("shard0001"), request.getFromShardId());
     ASSERT_EQ(ShardId("shard0002"), request.getToShardId());
-    ASSERT_EQ(BSON("Key" << -1), request.getMinKey());
-    ASSERT_EQ(BSON("Key" << 1), request.getMaxKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -1), request.getMinKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 1), request.getMaxKey());
     ASSERT(!request.hasChunkVersion());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               request.getSecondaryThrottle().getSecondaryThrottle());

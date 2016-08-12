@@ -1514,13 +1514,14 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
-    ASSERT_EQUALS(lastCommittedOpTime.toBSON(), rsStatus["optimes"]["lastCommittedOpTime"].Obj());
+    ASSERT_BSONOBJ_EQ(lastCommittedOpTime.toBSON(),
+                      rsStatus["optimes"]["lastCommittedOpTime"].Obj());
     {
         const auto optimes = rsStatus["optimes"].Obj();
-        ASSERT_EQUALS(readConcernMajorityOpTime.toBSON(),
-                      optimes["readConcernMajorityOpTime"].Obj());
-        ASSERT_EQUALS(oplogProgress.toBSON(), optimes["appliedOpTime"].Obj());
-        ASSERT_EQUALS((oplogDurable).toBSON(), optimes["durableOpTime"].Obj());
+        ASSERT_BSONOBJ_EQ(readConcernMajorityOpTime.toBSON(),
+                          optimes["readConcernMajorityOpTime"].Obj());
+        ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), optimes["appliedOpTime"].Obj());
+        ASSERT_BSONOBJ_EQ((oplogDurable).toBSON(), optimes["durableOpTime"].Obj());
     }
     std::vector<BSONElement> memberArray = rsStatus["members"].Array();
     ASSERT_EQUALS(4U, memberArray.size());
@@ -1551,7 +1552,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                   member1Status["stateStr"].String());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), member1Status["uptime"].numberInt());
-    ASSERT_EQUALS(oplogProgress.toBSON(), member1Status["optime"].Obj());
+    ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), member1Status["optime"].Obj());
     ASSERT_TRUE(member1Status.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   member1Status["optimeDate"].Date());
@@ -1581,13 +1582,13 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
     ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(), selfStatus["stateStr"].str());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), selfStatus["uptime"].numberInt());
-    ASSERT_EQUALS(oplogProgress.toBSON(), selfStatus["optime"].Obj());
+    ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), selfStatus["optime"].Obj());
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());
 
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
-    ASSERT_EQUALS(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
+    ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
 
     // TODO(spencer): Test electionTime and pingMs are set properly
 }

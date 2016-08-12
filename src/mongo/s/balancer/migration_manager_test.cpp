@@ -211,8 +211,8 @@ void MigrationManagerTest::expectMoveChunkCommand(const ChunkType& chunk,
         ASSERT_OK(moveChunkRequestWithStatus.getStatus());
 
         ASSERT_EQ(chunk.getNS(), moveChunkRequestWithStatus.getValue().getNss().ns());
-        ASSERT_EQ(chunk.getMin(), moveChunkRequestWithStatus.getValue().getMinKey());
-        ASSERT_EQ(chunk.getMax(), moveChunkRequestWithStatus.getValue().getMaxKey());
+        ASSERT_BSONOBJ_EQ(chunk.getMin(), moveChunkRequestWithStatus.getValue().getMinKey());
+        ASSERT_BSONOBJ_EQ(chunk.getMax(), moveChunkRequestWithStatus.getValue().getMaxKey());
         ASSERT_EQ(chunk.getShard(), moveChunkRequestWithStatus.getValue().getFromShardId());
 
         ASSERT_EQ(toShardId, moveChunkRequestWithStatus.getValue().getToShardId());

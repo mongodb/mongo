@@ -49,8 +49,8 @@ TEST(UpdateZoneKeyRangeRequest, BasicValidMongosAssignCommand) {
 
     auto request = requestStatus.getValue();
     ASSERT_EQ("foo.bar", request.getNS().ns());
-    ASSERT_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_EQ(BSON("x" << 100), request.getRange().getMax());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_FALSE(request.isRemove());
     ASSERT_EQ("z", request.getZoneName());
 }
@@ -66,8 +66,8 @@ TEST(UpdateZoneKeyRangeRequest, BasicValidMongosRemoveCommand) {
 
     auto request = requestStatus.getValue();
     ASSERT_EQ("foo.bar", request.getNS().ns());
-    ASSERT_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_EQ(BSON("x" << 100), request.getRange().getMax());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_TRUE(request.isRemove());
 }
 
@@ -102,7 +102,7 @@ TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandFor
             max: { x: 100 },
             zone: "z"
         })BSON");
-    ASSERT_EQ(expectedObj, configCmdObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
 }
 
 TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
@@ -126,7 +126,7 @@ TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandFor
             max: { x: 100 },
             zone: null
         })BSON");
-    ASSERT_EQ(expectedObj, configCmdObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
 }
 
 
@@ -227,8 +227,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
 
     auto request = requestStatus.getValue();
     ASSERT_EQ("foo.bar", request.getNS().ns());
-    ASSERT_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_EQ(BSON("x" << 100), request.getRange().getMax());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_FALSE(request.isRemove());
     ASSERT_EQ("z", request.getZoneName());
 }
@@ -244,8 +244,8 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
 
     auto request = requestStatus.getValue();
     ASSERT_EQ("foo.bar", request.getNS().ns());
-    ASSERT_EQ(BSON("x" << 1), request.getRange().getMin());
-    ASSERT_EQ(BSON("x" << 100), request.getRange().getMax());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_TRUE(request.isRemove());
 }
 
@@ -280,7 +280,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigComma
             max: { x: 100 },
             zone: "z"
         })BSON");
-    ASSERT_EQ(expectedObj, configCmdObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
 }
 
 TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
@@ -304,7 +304,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, CommandBuilderShouldAlwaysCreateConfigComma
             max: { x: 100 },
             zone: null
         })BSON");
-    ASSERT_EQ(expectedObj, configCmdObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, configCmdObj);
 }
 
 

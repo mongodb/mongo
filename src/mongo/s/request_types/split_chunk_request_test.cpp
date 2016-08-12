@@ -56,7 +56,7 @@ TEST(SplitChunkRequest, BasicValidConfigCommand) {
     ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT(ChunkRange(BSON("a" << 1), BSON("a" << 10)) == request.getChunkRange());
-    ASSERT_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
     ASSERT_EQ("shard0000", request.getShardName());
 }
 
@@ -77,8 +77,8 @@ TEST(SplitChunkRequest, ValidWithMultipleSplits) {
     ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
     ASSERT(ChunkRange(BSON("a" << 1), BSON("a" << 10)) == request.getChunkRange());
-    ASSERT_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
-    ASSERT_EQ(BSON("a" << 7), request.getSplitPoints().at(1));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 5), request.getSplitPoints().at(0));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 7), request.getSplitPoints().at(1));
     ASSERT_EQ("shard0000", request.getShardName());
 }
 
@@ -107,7 +107,7 @@ TEST(SplitChunkRequest, ConfigCommandtoBSON) {
     auto request = assertGet(SplitChunkRequest::parseFromConfigCommand(serializedRequest));
     auto requestToBSON = request.toConfigCommandBSON(writeConcernObj);
 
-    ASSERT_EQ(cmdBuilder.obj(), requestToBSON);
+    ASSERT_BSONOBJ_EQ(cmdBuilder.obj(), requestToBSON);
 }
 
 TEST(SplitChunkRequest, MissingNamespaceErrors) {

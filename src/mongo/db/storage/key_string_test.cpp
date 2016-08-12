@@ -85,7 +85,7 @@ TEST_F(KeyStringTest, Simple1) {
     BSONObj a = BSON("" << 5);
     BSONObj b = BSON("" << 6);
 
-    ASSERT_LESS_THAN(a, b);
+    ASSERT_BSONOBJ_LT(a, b);
 
     ASSERT_LESS_THAN(KeyString(version, a, ALL_ASCENDING, RecordId()),
                      KeyString(version, b, ALL_ASCENDING, RecordId()));
@@ -96,7 +96,7 @@ TEST_F(KeyStringTest, Simple1) {
         const BSONObj _orig = x;                       \
         const KeyString _ks(version, _orig, order);    \
         const BSONObj _converted = toBson(_ks, order); \
-        ASSERT_EQ(_converted, _orig);                  \
+        ASSERT_BSONOBJ_EQ(_converted, _orig);          \
         ASSERT(_converted.binaryEqual(_orig));         \
     } while (0)
 
@@ -106,27 +106,27 @@ TEST_F(KeyStringTest, Simple1) {
         ROUNDTRIP_ORDER(version, x, ONE_DESCENDING); \
     } while (0)
 
-#define COMPARES_SAME(_v, _x, _y)              \
-    do {                                       \
-        KeyString _xKS(_v, _x, ONE_ASCENDING); \
-        KeyString _yKS(_v, _y, ONE_ASCENDING); \
-        if (_x == _y) {                        \
-            ASSERT_EQUALS(_xKS, _yKS);         \
-        } else if (_x < _y) {                  \
-            ASSERT_LESS_THAN(_xKS, _yKS);      \
-        } else {                               \
-            ASSERT_LESS_THAN(_yKS, _xKS);      \
-        }                                      \
-                                               \
-        _xKS.resetToKey(_x, ONE_DESCENDING);   \
-        _yKS.resetToKey(_y, ONE_DESCENDING);   \
-        if (_x == _y) {                        \
-            ASSERT_EQUALS(_xKS, _yKS);         \
-        } else if (_x < _y) {                  \
-            ASSERT_GREATER_THAN(_xKS, _yKS);   \
-        } else {                               \
-            ASSERT_GREATER_THAN(_yKS, _xKS);   \
-        }                                      \
+#define COMPARES_SAME(_v, _x, _y)                                          \
+    do {                                                                   \
+        KeyString _xKS(_v, _x, ONE_ASCENDING);                             \
+        KeyString _yKS(_v, _y, ONE_ASCENDING);                             \
+        if (SimpleBSONObjComparator::kInstance.evaluate(_x == _y)) {       \
+            ASSERT_EQUALS(_xKS, _yKS);                                     \
+        } else if (SimpleBSONObjComparator::kInstance.evaluate(_x < _y)) { \
+            ASSERT_LESS_THAN(_xKS, _yKS);                                  \
+        } else {                                                           \
+            ASSERT_LESS_THAN(_yKS, _xKS);                                  \
+        }                                                                  \
+                                                                           \
+        _xKS.resetToKey(_x, ONE_DESCENDING);                               \
+        _yKS.resetToKey(_y, ONE_DESCENDING);                               \
+        if (SimpleBSONObjComparator::kInstance.evaluate(_x == _y)) {       \
+            ASSERT_EQUALS(_xKS, _yKS);                                     \
+        } else if (SimpleBSONObjComparator::kInstance.evaluate(_x < _y)) { \
+            ASSERT_GREATER_THAN(_xKS, _yKS);                               \
+        } else {                                                           \
+            ASSERT_GREATER_THAN(_yKS, _xKS);                               \
+        }                                                                  \
     } while (0)
 
 TEST_F(KeyStringTest, ActualBytesDouble) {
@@ -433,9 +433,9 @@ TEST_F(KeyStringTest, Timestamp) {
         ROUNDTRIP(version, b);
         ROUNDTRIP(version, c);
 
-        ASSERT_LESS_THAN(a, b);
-        ASSERT_LESS_THAN(b, c);
-        ASSERT_LESS_THAN(c, d);
+        ASSERT_BSONOBJ_LT(a, b);
+        ASSERT_BSONOBJ_LT(b, c);
+        ASSERT_BSONOBJ_LT(c, d);
 
         KeyString ka(version, a, ALL_ASCENDING);
         KeyString kb(version, b, ALL_ASCENDING);
@@ -1047,7 +1047,8 @@ void perfTest(KeyString::Version version, const Numbers& numbers) {
         micros = t.micros();
     }
 
-    auto minmax = std::minmax_element(numbers.begin(), numbers.end());
+    auto minmax = std::minmax_element(
+        numbers.begin(), numbers.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
 
     log() << 1E3 * micros / static_cast<double>(iters * numbers.size()) << " ns per "
           << mongo::KeyString::versionToString(version) << " roundtrip"

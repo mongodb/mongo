@@ -69,7 +69,7 @@ void assertRoundTrips(const Document& document1) {
     BSONObj obj1 = toBson(document1);
     Document document2 = fromBson(obj1);
     BSONObj obj2 = toBson(document2);
-    ASSERT_EQUALS(obj1, obj2);
+    ASSERT_BSONOBJ_EQ(obj1, obj2);
     ASSERT_DOCUMENT_EQ(document1, document2);
 }
 
@@ -407,7 +407,7 @@ public:
         const Document doc2 = fromBson(obj);
 
         // logical equality
-        ASSERT_EQUALS(obj, obj2);
+        ASSERT_BSONOBJ_EQ(obj, obj2);
         ASSERT_DOCUMENT_EQ(doc, doc2);
 
         // binary equality
@@ -567,7 +567,7 @@ void assertRoundTrips(const Value& value1) {
     BSONObj obj1 = toBson(value1);
     Value value2 = fromBson(obj1);
     BSONObj obj2 = toBson(value2);
-    ASSERT_EQUALS(obj1, obj2);
+    ASSERT_BSONOBJ_EQ(obj1, obj2);
     ASSERT_VALUE_EQ(value1, value2);
     ASSERT_EQUALS(value1.getType(), value2.getType());
 }
@@ -1428,9 +1428,9 @@ public:
         Value(4.4).addToBsonObj(&bob, "a");
         Value(22).addToBsonObj(&bob, "b");
         Value("astring").addToBsonObj(&bob, "c");
-        ASSERT_EQUALS(BSON("a" << 4.4 << "b" << 22 << "c"
-                               << "astring"),
-                      bob.obj());
+        ASSERT_BSONOBJ_EQ(BSON("a" << 4.4 << "b" << 22 << "c"
+                                   << "astring"),
+                          bob.obj());
     }
 };
 
@@ -1442,7 +1442,7 @@ public:
         Value(4.4).addToBsonArray(&bab);
         Value(22).addToBsonArray(&bab);
         Value("astring").addToBsonArray(&bab);
-        ASSERT_EQUALS(BSON_ARRAY(4.4 << 22 << "astring"), bab.arr());
+        ASSERT_BSONOBJ_EQ(BSON_ARRAY(4.4 << 22 << "astring"), bab.arr());
     }
 };
 

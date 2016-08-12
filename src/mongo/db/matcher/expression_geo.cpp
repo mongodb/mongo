@@ -31,6 +31,7 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/log.h"
@@ -385,7 +386,7 @@ bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
     if (path() != realOther->path())
         return false;
 
-    return _rawObj == realOther->_rawObj;
+    return SimpleBSONObjComparator::kInstance.evaluate(_rawObj == realOther->_rawObj);
 }
 
 std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
@@ -442,7 +443,7 @@ bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {
     if (path() != realOther->path())
         return false;
 
-    return _rawObj == realOther->_rawObj;
+    return SimpleBSONObjComparator::kInstance.evaluate(_rawObj == realOther->_rawObj);
 }
 
 std::unique_ptr<MatchExpression> GeoNearMatchExpression::shallowClone() const {

@@ -1063,6 +1063,6 @@ TEST(MultiTags, NearestMultiTagsNoMatch) {
 
 TEST(TagSet, DefaultConstructorMatchesAll) {
     TagSet tags;
-    ASSERT_EQUALS(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
+    ASSERT_BSONOBJ_EQ(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
 }
 }

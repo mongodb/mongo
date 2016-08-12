@@ -26,28 +26,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/query/collation/collator_factory_mock.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 
 namespace mongo {
 
-StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON(
-    const BSONObj& spec) {
-    if (SimpleBSONObjComparator::kInstance.evaluate(
-            spec == BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison))) {
-        return {nullptr};
+/**
+ * A BSONObj comparator that has simple binary compare semantics.
+ */
+class SimpleBSONObjComparator final : public BSONObj::ComparatorInterface {
+public:
+    // Global simple comparator for stateless BSONObj comparisons. BSONObj comparisons that require
+    // database logic, such as collations, much instantiate their own comparator.
+    static const SimpleBSONObjComparator kInstance;
+
+    int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
+        return lhs.woCompare(rhs, BSONObj(), true, nullptr);
     }
-    auto collator =
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-    return {std::move(collator)};
-}
+};
 
 }  // namespace mongo

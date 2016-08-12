@@ -706,7 +706,7 @@ public:
         member = getNextResult(&ws, ms.get());
         ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_OBJ);
         ASSERT_EQ(member->recordId, *it);
-        ASSERT_EQ(member->obj.value(), BSON("_id" << 4 << "a" << 4));
+        ASSERT_BSONOBJ_EQ(member->obj.value(), BSON("_id" << 4 << "a" << 4));
         ++it;
 
         // Doc {a: 5} gets invalidated by an update.
@@ -715,14 +715,14 @@ public:
         // Invalidated doc {a: 5} should still get returned.
         member = getNextResult(&ws, ms.get());
         ASSERT_EQ(member->getState(), WorkingSetMember::OWNED_OBJ);
-        ASSERT_EQ(member->obj.value(), BSON("_id" << 5 << "a" << 5));
+        ASSERT_BSONOBJ_EQ(member->obj.value(), BSON("_id" << 5 << "a" << 5));
         ++it;
 
         // We correctly dedup the invalidated doc and return {a: 6} next.
         member = getNextResult(&ws, ms.get());
         ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_OBJ);
         ASSERT_EQ(member->recordId, *it);
-        ASSERT_EQ(member->obj.value(), BSON("_id" << 6 << "a" << 6));
+        ASSERT_BSONOBJ_EQ(member->obj.value(), BSON("_id" << 6 << "a" << 6));
     }
 
 private:

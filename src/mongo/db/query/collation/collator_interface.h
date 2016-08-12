@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {
@@ -46,7 +47,8 @@ namespace mongo {
  *
  * Does not throw exceptions.
  */
-class CollatorInterface : public StringData::ComparatorInterface {
+class CollatorInterface : public StringData::ComparatorInterface,
+                          public BSONObj::ComparatorInterface {
     MONGO_DISALLOW_COPYING(CollatorInterface);
 
 public:
@@ -99,6 +101,8 @@ public:
      * equal w.r.t. the collation.
      */
     virtual int compare(StringData left, StringData right) const = 0;
+
+    virtual int compare(const BSONObj& left, const BSONObj& right) const = 0;
 
     /**
      * Hashes the string such that strings which are equal under this collation also have equal

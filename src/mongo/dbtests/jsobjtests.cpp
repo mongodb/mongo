@@ -569,7 +569,7 @@ public:
             ASSERT(tmp.valid());
             ASSERT(tmp.hasField("a"));
             ASSERT(!tmp.hasField("b"));
-            ASSERT(tmp == BSON("a" << 1));
+            ASSERT_BSONOBJ_EQ(tmp, BSON("a" << 1));
 
             bb << "b" << 2;
             BSONObj obj = bb.obj();
@@ -577,7 +577,7 @@ public:
             ASSERT(obj.valid());
             ASSERT(obj.hasField("a"));
             ASSERT(obj.hasField("b"));
-            ASSERT(obj == BSON("a" << 1 << "b" << 2));
+            ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 2));
         }
         {
             BSONObjBuilder bb;
@@ -587,7 +587,7 @@ public:
             ASSERT(tmp.valid());
             ASSERT(tmp.hasField("a"));
             ASSERT(!tmp.hasField("b"));
-            ASSERT(tmp == BSON("a" << BSON("$gt" << 1)));
+            ASSERT_BSONOBJ_EQ(tmp, BSON("a" << BSON("$gt" << 1)));
 
             bb << "b" << LT << 2;
             BSONObj obj = bb.obj();
@@ -596,7 +596,7 @@ public:
             ASSERT(obj.valid());
             ASSERT(obj.hasField("a"));
             ASSERT(obj.hasField("b"));
-            ASSERT(obj == BSON("a" << BSON("$gt" << 1) << "b" << BSON("$lt" << 2)));
+            ASSERT_BSONOBJ_EQ(obj, BSON("a" << BSON("$gt" << 1) << "b" << BSON("$lt" << 2)));
         }
         {
             BSONObjBuilder bb(32);
@@ -606,7 +606,7 @@ public:
             ASSERT(tmp.valid());
             ASSERT(tmp.hasField("a"));
             ASSERT(!tmp.hasField("b"));
-            ASSERT(tmp == BSON("a" << 1));
+            ASSERT_BSONOBJ_EQ(tmp, BSON("a" << 1));
 
             // force a realloc
             BSONArrayBuilder arr;
@@ -939,11 +939,11 @@ public:
             BSONObj C = c.obj();
 
             // test that nulls are ok within bson strings
-            ASSERT(!(A == B));
-            ASSERT(A > B);
+            ASSERT_BSONOBJ_NE(A, B);
+            ASSERT_BSONOBJ_GT(A, B);
 
-            ASSERT(!(B == C));
-            ASSERT(C > B);
+            ASSERT_BSONOBJ_NE(B, C);
+            ASSERT_BSONOBJ_GT(C, B);
 
             // check iteration is ok
             ASSERT(B["z"].Bool() && A["z"].Bool() && C["z"].Bool());
@@ -979,7 +979,7 @@ public:
             BSONObj foo = BSON("foo" << 1);
             b.appendAs(foo.firstElement(), "bar");
         }
-        ASSERT_EQUALS(BSON("bar" << 1), b.done());
+        ASSERT_BSONOBJ_EQ(BSON("bar" << 1), b.done());
     }
 };
 
@@ -1388,8 +1388,8 @@ public:
         ASSERT_EQUALS(oid.asDateT(), now);
         ASSERT_EQUALS(min.asDateT(), now);
         ASSERT_EQUALS(max.asDateT(), now);
-        ASSERT_LT(BSON("" << min), BSON("" << oid));
-        ASSERT_GT(BSON("" << max), BSON("" << oid));
+        ASSERT_BSONOBJ_LT(BSON("" << min), BSON("" << oid));
+        ASSERT_BSONOBJ_GT(BSON("" << max), BSON("" << oid));
     }
 };
 
@@ -1853,8 +1853,8 @@ public:
 
 struct NestedDottedConversions {
     void t(const BSONObj& nest, const BSONObj& dot) {
-        ASSERT_EQUALS(nested2dotted(nest), dot);
-        ASSERT_EQUALS(nest, dotted2nested(dot));
+        ASSERT_BSONOBJ_EQ(nested2dotted(nest), dot);
+        ASSERT_BSONOBJ_EQ(nest, dotted2nested(dot));
     }
 
     void run() {
@@ -1927,7 +1927,7 @@ struct BSONArrayBuilderTest {
         BSONObj obj = objb.obj();
         BSONArray arr = arrb.arr();
 
-        ASSERT_EQUALS(obj, arr);
+        ASSERT_BSONOBJ_EQ(obj, arr);
 
         BSONObj o = BSON("obj" << obj << "arr" << arr << "arr2" << BSONArray(obj) << "regex"
                                << BSONRegEx("reg", "x"));
@@ -1954,7 +1954,7 @@ struct ArrayMacroTest {
                                                        << "baz"
                                                        << "qux")));
 
-        ASSERT_EQUALS(arr, obj);
+        ASSERT_BSONOBJ_EQ(arr, obj);
         ASSERT_EQUALS(arr["2"].type(), Object);
         ASSERT_EQUALS(arr["2"].embeddedObject()["foo"].type(), Array);
     }
@@ -2141,7 +2141,7 @@ public:
             char* crap = (char*)mongoMalloc(x.objsize());
             memcpy(crap, x.objdata(), x.objsize());
             BSONObj y(crap);
-            ASSERT_EQUALS(x, y);
+            ASSERT_BSONOBJ_EQ(x, y);
             free(crap);
         }
 
@@ -2218,7 +2218,7 @@ public:
         BSONObj y = BSON("a" << BSON("b" << 1.0));
         keyTest(x);
         keyTest(y);
-        ASSERT_EQUALS(x, y);
+        ASSERT_BSONOBJ_EQ(x, y);
         ASSERT_EQUALS(0, x.woCompare(y));
     }
 };
@@ -2249,7 +2249,7 @@ public:
             ASSERT_EQUALS(3, i.next().numberInt());
             ASSERT(!i.more());
 
-            ASSERT_EQUALS(BSON("x" << 1 << "y" << 2 << "z" << 3), b.obj());
+            ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "y" << 2 << "z" << 3), b.obj());
         }
     }
 };
@@ -2279,13 +2279,13 @@ public:
         BSONObj e = BSON("a" << 4);
         BSONObj f = BSON("a" << 4);
 
-        ASSERT(!(a < b));
-        ASSERT(a <= b);
-        ASSERT(a < c);
+        ASSERT(!SimpleBSONObjComparator::kInstance.evaluate((a < b)));
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(a <= b));
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(a < c));
 
-        ASSERT(f > d);
-        ASSERT(f >= e);
-        ASSERT(!(f > e));
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(f > d));
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(f >= e));
+        ASSERT(!(SimpleBSONObjComparator::kInstance.evaluate(f > e)));
     }
 };
 

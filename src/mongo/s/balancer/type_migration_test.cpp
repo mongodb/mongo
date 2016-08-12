@@ -75,7 +75,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
 
     BSONObj obj = builder.obj();
 
-    ASSERT_EQUALS(obj, migrationType.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, migrationType.toBSON());
 }
 
 TEST(MigrationTypeTest, FromAndToBSON) {
@@ -94,7 +94,7 @@ TEST(MigrationTypeTest, FromAndToBSON) {
     BSONObj obj = builder.obj();
 
     MigrationType migrationType = assertGet(MigrationType::fromBSON(obj));
-    ASSERT_EQUALS(obj, migrationType.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, migrationType.toBSON());
 }
 
 TEST(MigrationTypeTest, MissingRequiredNamespaceField) {

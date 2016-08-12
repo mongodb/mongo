@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -271,7 +272,7 @@ public:
             // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel,
             // to be removed at the end. If a key appears more times than entries allowed on a
             // chunk, we issue a warning and split on the following key.
-            set<BSONObj> tooFrequentKeys;
+            auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
             splitKeys.push_back(dps::extractElementsBasedOnTemplate(
                 prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
 
@@ -371,9 +372,8 @@ public:
         }
 
         // Make sure splitKeys is in ascending order
-        std::sort(splitKeys.begin(),
-                  splitKeys.end(),
-                  [](const BSONObj& lhs, const BSONObj& rhs) -> bool { return lhs < rhs; });
+        std::sort(
+            splitKeys.begin(), splitKeys.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
         result.append("splitKeys", splitKeys);
         return true;
     }

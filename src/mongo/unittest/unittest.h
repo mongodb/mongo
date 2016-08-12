@@ -46,6 +46,7 @@
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"

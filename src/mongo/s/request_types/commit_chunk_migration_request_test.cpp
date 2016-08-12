@@ -74,11 +74,11 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
     ASSERT_EQ(kNamespaceString, request.getNss());
     ASSERT_EQ(kShardId0, request.getFromShard());
     ASSERT_EQ(kShardId1, request.getToShard());
-    ASSERT_EQ(kKey0, request.getMigratedChunkRange().getMin());
-    ASSERT_EQ(kKey1, request.getMigratedChunkRange().getMax());
+    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunkRange().getMin());
+    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunkRange().getMax());
     ASSERT(request.hasControlChunkRange());
-    ASSERT_EQ(kKey2, request.getControlChunkRange().getMin());
-    ASSERT_EQ(kKey3, request.getControlChunkRange().getMax());
+    ASSERT_BSONOBJ_EQ(kKey2, request.getControlChunkRange().getMin());
+    ASSERT_BSONOBJ_EQ(kKey3, request.getControlChunkRange().getMax());
 }
 
 TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
@@ -99,8 +99,8 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     ASSERT_EQ(kNamespaceString, request.getNss());
     ASSERT_EQ(kShardId0, request.getFromShard());
     ASSERT_EQ(kShardId1, request.getToShard());
-    ASSERT_EQ(kKey0, request.getMigratedChunkRange().getMin());
-    ASSERT_EQ(kKey1, request.getMigratedChunkRange().getMax());
+    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunkRange().getMin());
+    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunkRange().getMax());
     ASSERT(!request.hasControlChunkRange());
 }
 

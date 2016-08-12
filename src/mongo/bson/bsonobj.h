@@ -95,6 +95,31 @@ typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMSet;
  */
 class BSONObj {
 public:
+    // Declared in bsonobj_comparator_interface.h.
+    class ComparatorInterface;
+
+    /**
+     * Operator overloads for relops return a DeferredComparison which can subsequently be evaluated
+     * by a BSONObj::ComparatorInterface.
+     */
+    struct DeferredComparison {
+        enum class Type {
+            kLT,
+            kLTE,
+            kEQ,
+            kGT,
+            kGTE,
+            kNE,
+        };
+
+        DeferredComparison(Type type, const BSONObj& lhs, const BSONObj& rhs)
+            : type(type), lhs(lhs), rhs(rhs) {}
+
+        Type type;
+        const BSONObj& lhs;
+        const BSONObj& rhs;
+    };
+
     static const char kMinBSONLength = 5;
 
     /** Construct an empty BSONObj -- that is, {}. */
@@ -394,6 +419,15 @@ public:
     /** Alternative output format */
     std::string hexDump() const;
 
+    //
+    // Comparison API.
+    //
+    // BSONObj instances can be compared either using woCompare() or via operator overloads. Most
+    // callers should prefer operator overloads. Note that the operator overloads return a
+    // DeferredComparison, which must be subsequently evaluated by a BSONObj::ComparatorInterface.
+    // See bsonobj_comparator_interface.h for details.
+    //
+
     /**wo='well ordered'.  fields must be in same order in each object.
        Ordering is with respect to the signs of the elements
        and allows ascending / descending key mixing.
@@ -416,17 +450,28 @@ public:
                   bool considerFieldName = true,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
-    bool operator<(const BSONObj& other) const {
-        return woCompare(other) < 0;
+    DeferredComparison operator<(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLT, *this, other);
     }
-    bool operator<=(const BSONObj& other) const {
-        return woCompare(other) <= 0;
+
+    DeferredComparison operator<=(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLTE, *this, other);
     }
-    bool operator>(const BSONObj& other) const {
-        return woCompare(other) > 0;
+
+    DeferredComparison operator>(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGT, *this, other);
     }
-    bool operator>=(const BSONObj& other) const {
-        return woCompare(other) >= 0;
+
+    DeferredComparison operator>=(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGTE, *this, other);
+    }
+
+    DeferredComparison operator==(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kEQ, *this, other);
+    }
+
+    DeferredComparison operator!=(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kNE, *this, other);
     }
 
     bool equal(const BSONObj& r) const;
@@ -504,13 +549,6 @@ public:
 
     /** true unless corrupt */
     bool valid() const;
-
-    bool operator==(const BSONObj& other) const {
-        return equal(other);
-    }
-    bool operator!=(const BSONObj& other) const {
-        return !operator==(other);
-    }
 
     enum MatchType {
         Equality = 0,

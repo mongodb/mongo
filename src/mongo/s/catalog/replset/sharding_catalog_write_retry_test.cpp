@@ -174,7 +174,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
         ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
             assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
-        ASSERT_EQ(BSON("_id" << 1), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{objToInsert};
     });
@@ -212,7 +212,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
         ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
             assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
-        ASSERT_EQ(BSON("_id" << 1), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>();
     });
@@ -250,7 +250,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
         ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
             assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
-        ASSERT_EQ(BSON("_id" << 1), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{BSON("_id" << 1 << "Value"
                                           << "TestValue has changed")};
@@ -309,7 +309,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
         ASSERT_EQ(request.target, kTestHosts[0]);
         auto query =
             assertGet(QueryRequest::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
-        ASSERT_EQ(BSON("_id" << 1), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{objToInsert};
     });

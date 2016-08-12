@@ -99,7 +99,7 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
 
 /** Check binary equality, ensuring use of the same numeric types. */
 static void assertBinaryEqual(const BSONObj& expected, const BSONObj& actual) {
-    ASSERT_EQUALS(expected, actual);
+    ASSERT_BSONOBJ_EQ(expected, actual);
     ASSERT(expected.binaryEqual(actual));
 }
 
@@ -212,13 +212,13 @@ protected:
              ++i) {
             dependenciesBson << *i;
         }
-        ASSERT_EQUALS(expectedDependencies, dependenciesBson.arr());
+        ASSERT_BSONOBJ_EQ(expectedDependencies, dependenciesBson.arr());
         ASSERT_EQUALS(false, dependencies.needWholeDocument);
         ASSERT_EQUALS(false, dependencies.getNeedTextScore());
     }
 
     void assertContents(const intrusive_ptr<Testable>& expr, const BSONArray& expectedContents) {
-        ASSERT_EQUALS(constify(BSON("$testable" << expectedContents)), expressionToBson(expr));
+        ASSERT_BSONOBJ_EQ(constify(BSON("$testable" << expectedContents)), expressionToBson(expr));
     }
 
     void addOperandArrayToExpr(const intrusive_ptr<Testable>& expr, const BSONArray& operands) {
@@ -276,14 +276,14 @@ TEST_F(ExpressionNaryTest, ValidateObjectExpressionDependency) {
 
 TEST_F(ExpressionNaryTest, SerializationToBsonObj) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(nullptr, Value(5)));
-    ASSERT_EQUALS(BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
-                  BSON("foo" << _notAssociativeNorCommutative->serialize(false)));
+    ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
+                      BSON("foo" << _notAssociativeNorCommutative->serialize(false)));
 }
 
 TEST_F(ExpressionNaryTest, SerializationToBsonArr) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(nullptr, Value(5)));
-    ASSERT_EQUALS(constify(BSON_ARRAY(BSON("$testable" << BSON_ARRAY(5)))),
-                  BSON_ARRAY(_notAssociativeNorCommutative->serialize(false)));
+    ASSERT_BSONOBJ_EQ(constify(BSON_ARRAY(BSON("$testable" << BSON_ARRAY(5)))),
+                      BSON_ARRAY(_notAssociativeNorCommutative->serialize(false)));
 }
 
 // Verify that the internal operands are optimized
@@ -303,7 +303,7 @@ TEST_F(ExpressionNaryTest, AllConstantOperandOptimization) {
     assertContents(_notAssociativeNorCommutative, spec);
     intrusive_ptr<Expression> optimized = _notAssociativeNorCommutative->optimize();
     ASSERT(_notAssociativeNorCommutative != optimized);
-    ASSERT_EQUALS(BSON("$const" << BSON_ARRAY(1 << 2)), expressionToBson(optimized));
+    ASSERT_BSONOBJ_EQ(BSON("$const" << BSON_ARRAY(1 << 2)), expressionToBson(optimized));
 }
 
 // Verify that the optimization of grouping constant and non-constant operands
@@ -917,7 +917,7 @@ public:
     void run() {
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd();
         populateOperands(expression);
-        ASSERT_EQUALS(expectedResult(), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate(Document())));
     }
 
 protected:
@@ -932,7 +932,7 @@ public:
     void run() {
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd();
         expression->addOperand(ExpressionConstant::create(nullptr, Value(2)));
-        ASSERT_EQUALS(BSON("" << 2), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(BSON("" << 2), toBson(expression->evaluate(Document())));
     }
 };
 
@@ -1198,12 +1198,12 @@ public:
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
-        ASSERT_EQUALS(BSON("" << expectedResult()),
-                      toBson(expression->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(expression->evaluate(fromBson(BSON("a" << 1)))));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_EQUALS(BSON("" << expectedResult()),
-                      toBson(optimized->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)))));
     }
 
 protected:
@@ -1222,9 +1222,9 @@ public:
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_EQUALS(expectedOptimized(), expressionToBson(optimized));
+        ASSERT_BSONOBJ_EQ(expectedOptimized(), expressionToBson(optimized));
     }
 
 protected:
@@ -1579,7 +1579,7 @@ public:
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_EQUALS(constify(expectedOptimized()), expressionToBson(optimized));
+        ASSERT_BSONOBJ_EQ(constify(expectedOptimized()), expressionToBson(optimized));
     }
 
 protected:
@@ -1612,12 +1612,12 @@ public:
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
         // Check expression spec round trip.
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         // Check evaluation result.
-        ASSERT_EQUALS(expectedResult(), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate(Document())));
         // Check that the result is the same after optimizing.
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_EQUALS(expectedResult(), toBson(optimized->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(optimized->evaluate(Document())));
     }
 
 protected:
@@ -2575,12 +2575,12 @@ public:
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
-        ASSERT_EQUALS(BSON("" << expectedResult()),
-                      toBson(expression->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(expression->evaluate(fromBson(BSON("a" << 1)))));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_EQUALS(BSON("" << expectedResult()),
-                      toBson(optimized->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)))));
     }
 
 protected:
@@ -2597,9 +2597,9 @@ public:
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_EQUALS(expectedOptimized(), expressionToBson(optimized));
+        ASSERT_BSONOBJ_EQ(expectedOptimized(), expressionToBson(optimized));
     }
 
 protected:
@@ -3400,8 +3400,8 @@ private:
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
-        ASSERT_EQUALS(constify(spec), expressionToBson(expression));
-        ASSERT_EQUALS(BSON("" << expectedResult), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(constify(spec), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult), toBson(expression->evaluate(Document())));
     }
 };
 
@@ -3528,8 +3528,8 @@ public:
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
-        ASSERT_EQUALS(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
     }
 
 protected:
@@ -3785,8 +3785,8 @@ public:
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
-        ASSERT_EQUALS(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
     }
 
 protected:
@@ -3844,8 +3844,8 @@ public:
         VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
         expression->injectExpressionContext(expCtx);
-        ASSERT_EQUALS(constify(spec()), expressionToBson(expression));
-        ASSERT_EQUALS(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
     }
 
 protected:

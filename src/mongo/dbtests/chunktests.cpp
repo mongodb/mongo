@@ -94,7 +94,7 @@ public:
         for (const ShardId& shardId : shardIds) {
             b << shardId;
         }
-        ASSERT_EQUALS(expectedShardNames(), b.arr());
+        ASSERT_BSONOBJ_EQ(expectedShardNames(), b.arr());
     }
 
 protected:

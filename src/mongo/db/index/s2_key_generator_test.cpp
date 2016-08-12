@@ -26,9 +26,13 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index/expression_keys_private.h"
+
+#include <algorithm>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index/expression_params.h"
@@ -36,6 +40,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongo;
@@ -69,11 +74,23 @@ std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
     return ss.str();
 }
 
-void assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
-    if (expectedKeys != actualKeys) {
-        FAIL(str::stream() << "Expected: " << dumpKeyset(expectedKeys) << ", Actual: "
-                           << dumpKeyset(actualKeys));
+bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
+    if (expectedKeys.size() != actualKeys.size()) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
     }
+
+    if (!std::equal(expectedKeys.begin(),
+                    expectedKeys.end(),
+                    actualKeys.begin(),
+                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
+    }
+
+    return true;
 }
 
 void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,

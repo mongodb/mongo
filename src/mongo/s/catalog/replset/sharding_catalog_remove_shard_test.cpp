@@ -155,7 +155,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
@@ -167,8 +167,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
 
         ASSERT_FALSE(update->getUpsert());
         ASSERT_FALSE(update->getMulti());
-        ASSERT_EQUALS(BSON(ShardType::name() << shardName), update->getQuery());
-        ASSERT_EQUALS(BSON("$set" << BSON(ShardType::draining(true))), update->getUpdateExpr());
+        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), update->getQuery());
+        ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(ShardType::draining(true))), update->getUpdateExpr());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -180,14 +180,14 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(ShardType::ConfigNS, query->ns());
-        ASSERT_EQ(BSONObj(), query->getFilter());
-        ASSERT_EQ(BSONObj(), query->getSort());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -329,7 +329,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         BatchedDeleteRequest actualBatchedDelete;
         std::string errmsg;
@@ -340,7 +340,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         auto deleteOp = deletes.front();
 
         ASSERT_EQUALS(0, deleteOp->getLimit());
-        ASSERT_EQUALS(BSON(ShardType::name() << shardName), deleteOp->getQuery());
+        ASSERT_BSONOBJ_EQ(BSON(ShardType::name() << shardName), deleteOp->getQuery());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -352,14 +352,14 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(ShardType::ConfigNS, query->ns());
-        ASSERT_EQ(BSONObj(), query->getFilter());
-        ASSERT_EQ(BSONObj(), query->getSort());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);

@@ -84,13 +84,13 @@ TEST(FTDCFileTest, TestFileBasicMetadata) {
 
     BSONObj doc1a = std::get<1>(reader.next());
 
-    ASSERT_TRUE(doc1 == doc1a);
+    ASSERT_BSONOBJ_EQ(doc1, doc1a);
 
     ASSERT_OK(reader.hasNext());
 
     BSONObj doc2a = std::get<1>(reader.next());
 
-    ASSERT_TRUE(doc2 == doc2a);
+    ASSERT_BSONOBJ_EQ(doc2, doc2a);
 
     auto sw = reader.hasNext();
     ASSERT_OK(sw);
@@ -135,13 +135,13 @@ TEST(FTDCFileTest, TestFileBasicCompress) {
 
     BSONObj doc1a = std::get<1>(reader.next());
 
-    ASSERT_TRUE(doc1 == doc1a);
+    ASSERT_BSONOBJ_EQ(doc1, doc1a);
 
     ASSERT_OK(reader.hasNext());
 
     BSONObj doc2a = std::get<1>(reader.next());
 
-    ASSERT_TRUE(doc2 == doc2a);
+    ASSERT_BSONOBJ_EQ(doc2, doc2a);
 
     auto sw = reader.hasNext();
     ASSERT_OK(sw);

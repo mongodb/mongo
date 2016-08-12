@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
@@ -275,8 +276,8 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
         const auto& query = queryResult.getValue();
         ASSERT_EQ(query->ns(), ShardType::ConfigNS);
 
-        ASSERT_EQ(query->getFilter(), BSONObj());
-        ASSERT_EQ(query->getSort(), BSONObj());
+        ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
+        ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -310,7 +311,7 @@ void ShardingTestFixture::expectInserts(const NamespaceString& nss,
         auto itExpected = expected.begin();
 
         for (; itInserted != inserted.end(); itInserted++, itExpected++) {
-            ASSERT_EQ(*itExpected, *itInserted);
+            ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
         }
 
         BatchedCommandResponse response;
@@ -336,7 +337,7 @@ void ShardingTestFixture::expectConfigCollectionCreate(const HostAndPort& config
                                   << 15000)
                           << "maxTimeMS"
                           << 30000);
-        ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedCreateCmd, request.cmdObj);
 
         return response;
     });
@@ -366,7 +367,7 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
 
         ASSERT_EQUALS(operationContext()->getClient()->clientAddress(true),
                       actualChangeLog.getClientAddr());
-        ASSERT_EQUALS(detail, actualChangeLog.getDetails());
+        ASSERT_BSONOBJ_EQ(detail, actualChangeLog.getDetails());
         ASSERT_EQUALS(ns, actualChangeLog.getNS());
         ASSERT_EQUALS(network()->getHostName(), actualChangeLog.getServer());
         ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
@@ -412,7 +413,7 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
                                                  const CollectionType& coll) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(expectedHost, request.target);
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedUpdateRequest actualBatchedUpdate;
@@ -425,8 +426,9 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
 
         ASSERT_TRUE(update->getUpsert());
         ASSERT_FALSE(update->getMulti());
-        ASSERT_EQUALS(update->getQuery(), BSON(CollectionType::fullNs(coll.getNs().toString())));
-        ASSERT_EQUALS(update->getUpdateExpr(), coll.toBSON());
+        ASSERT_BSONOBJ_EQ(update->getQuery(),
+                          BSON(CollectionType::fullNs(coll.getNs().toString())));
+        ASSERT_BSONOBJ_EQ(update->getUpdateExpr(), coll.toBSON());
 
         BatchedCommandResponse response;
         response.setOk(true);
@@ -442,7 +444,7 @@ void ShardingTestFixture::expectSetShardVersion(const HostAndPort& expectedHost,
                                                 const ChunkVersion& expectedChunkVersion) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(expectedHost, request.target);
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
         SetShardVersionRequest ssv =
             assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
@@ -474,7 +476,7 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
             auto queryElem = request.cmdObj["query"];
             ASSERT_TRUE(queryElem.eoo() || queryElem.Obj().isEmpty());
         } else {
-            ASSERT_EQUALS(expectedQuery, request.cmdObj["query"].Obj());
+            ASSERT_BSONOBJ_EQ(expectedQuery, request.cmdObj["query"].Obj());
         }
 
         if (response.isOK()) {

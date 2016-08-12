@@ -69,7 +69,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ASSERT_OK(chunkDocStatus.getStatus());
 
     auto chunkDoc = chunkDocStatus.getValue();
-    ASSERT_EQ(chunkSplitPoint, chunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
     // Check for increment on first chunkDoc's minor version
     ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
@@ -80,7 +80,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ASSERT_OK(otherChunkDocStatus.getStatus());
 
     auto otherChunkDoc = otherChunkDocStatus.getValue();
-    ASSERT_EQ(chunkMax, otherChunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMax, otherChunkDoc.getMax());
 
     // Check for increment on second chunkDoc's minor version
     ASSERT_EQ(origVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
@@ -118,7 +118,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_OK(chunkDocStatus.getStatus());
 
     auto chunkDoc = chunkDocStatus.getValue();
-    ASSERT_EQ(chunkSplitPoint, chunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
     // Check for increment on first chunkDoc's minor version
     ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
@@ -129,7 +129,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_OK(midChunkDocStatus.getStatus());
 
     auto midChunkDoc = midChunkDocStatus.getValue();
-    ASSERT_EQ(chunkSplitPoint2, midChunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint2, midChunkDoc.getMax());
 
     // Check for increment on second chunkDoc's minor version
     ASSERT_EQ(origVersion.majorVersion(), midChunkDoc.getVersion().majorVersion());
@@ -140,7 +140,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_OK(lastChunkDocStatus.getStatus());
 
     auto lastChunkDoc = lastChunkDocStatus.getValue();
-    ASSERT_EQ(chunkMax, lastChunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMax, lastChunkDoc.getMax());
 
     {
         // Check for increment on third chunkDoc's minor version
@@ -189,7 +189,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ASSERT_OK(chunkDocStatus.getStatus());
 
     auto chunkDoc = chunkDocStatus.getValue();
-    ASSERT_EQ(chunkSplitPoint, chunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkSplitPoint, chunkDoc.getMax());
 
     // Check for increment based on the competing chunk version
     ASSERT_EQ(competingVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
@@ -200,7 +200,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ASSERT_OK(otherChunkDocStatus.getStatus());
 
     auto otherChunkDoc = otherChunkDocStatus.getValue();
-    ASSERT_EQ(chunkMax, otherChunkDoc.getMax());
+    ASSERT_BSONOBJ_EQ(chunkMax, otherChunkDoc.getMax());
 
     // Check for increment based on the competing chunk version
     ASSERT_EQ(competingVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());

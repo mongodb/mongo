@@ -168,7 +168,7 @@ public:
             static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
         ASSERT(stats);
         ASSERT_TRUE(stats->isMultiKey);
-        ASSERT_EQUALS(stats->keyPattern, BSON("x" << 1));
+        ASSERT_BSONOBJ_EQ(stats->keyPattern, BSON("x" << 1));
     }
 };
 
@@ -188,10 +188,10 @@ public:
         // Expect to get key {'': 5} and then key {'': 6}.
         WorkingSetMember* member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 5));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 5));
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 6));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         // Save state and insert a few indexed docs.
         ixscan->saveState();
@@ -201,7 +201,7 @@ public:
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 10));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 10));
 
         WorkingSetID id;
         ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));
@@ -225,7 +225,7 @@ public:
         // Expect to get key {'': 6}.
         WorkingSetMember* member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 6));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         // Save state and insert an indexed doc.
         ixscan->saveState();
@@ -234,7 +234,7 @@ public:
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 7));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 7));
 
         WorkingSetID id;
         ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));
@@ -258,7 +258,7 @@ public:
         // Expect to get key {'': 6}.
         WorkingSetMember* member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 6));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         // Save state and insert an indexed doc.
         ixscan->saveState();
@@ -288,10 +288,10 @@ public:
         // Expect to get key {'': 10} and then {'': 8}.
         WorkingSetMember* member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 10));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 10));
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 8));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 8));
 
         // Save state and insert an indexed doc.
         ixscan->saveState();
@@ -302,7 +302,7 @@ public:
         // Ensure that we don't erroneously return {'': 9} or {'':3}.
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
-        ASSERT_EQ(member->keyData[0].keyData, BSON("" << 6));
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         WorkingSetID id;
         ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));

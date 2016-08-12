@@ -70,9 +70,9 @@ void ValidateDocumentList(const std::vector<BSONObj>& docs1, const std::vector<B
     auto bi = docs2.begin();
 
     while (ai != docs1.end() && bi != docs2.end()) {
-        if (!(*ai == *bi)) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(*ai != *bi)) {
             std::cout << *ai << " vs " << *bi << std::endl;
-            ASSERT_TRUE(*ai == *bi);
+            ASSERT_BSONOBJ_EQ(*ai, *bi);
         }
         ++ai;
         ++bi;

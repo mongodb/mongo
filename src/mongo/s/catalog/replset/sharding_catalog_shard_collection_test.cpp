@@ -93,7 +93,7 @@ public:
     void expectGetDatabase(const DatabaseType& expectedDb) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
@@ -101,8 +101,8 @@ public:
             auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(DatabaseType::ConfigNS, query->ns());
-            ASSERT_EQ(BSON(DatabaseType::name(expectedDb.getName())), query->getFilter());
-            ASSERT_EQ(BSONObj(), query->getSort());
+            ASSERT_BSONOBJ_EQ(BSON(DatabaseType::name(expectedDb.getName())), query->getFilter());
+            ASSERT_BSONOBJ_EQ(BSONObj(), query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -121,7 +121,7 @@ public:
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS("config", request.dbname);
 
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;
@@ -138,8 +138,8 @@ public:
             // generated OID so just check that the field exists and is *a* OID.
             ASSERT_EQUALS(jstOID, chunkObj[ChunkType::DEPRECATED_epoch()].type());
             ASSERT_EQUALS(expectedChunk.getNS(), chunkObj[ChunkType::ns()].String());
-            ASSERT_EQUALS(expectedChunk.getMin(), chunkObj[ChunkType::min()].Obj());
-            ASSERT_EQUALS(expectedChunk.getMax(), chunkObj[ChunkType::max()].Obj());
+            ASSERT_BSONOBJ_EQ(expectedChunk.getMin(), chunkObj[ChunkType::min()].Obj());
+            ASSERT_BSONOBJ_EQ(expectedChunk.getMax(), chunkObj[ChunkType::max()].Obj());
             ASSERT_EQUALS(expectedChunk.getShard(), chunkObj[ChunkType::shard()].String());
 
             actualVersion = ChunkVersion::fromBSON(chunkObj);
@@ -157,7 +157,7 @@ public:
     void expectReloadChunks(const std::string& ns, const vector<ChunkType>& chunks) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
@@ -168,8 +168,8 @@ public:
             BSONObj expectedSort = BSON(ChunkType::DEPRECATED_lastmod() << 1);
 
             ASSERT_EQ(ChunkType::ConfigNS, query->ns());
-            ASSERT_EQ(expectedQuery, query->getFilter());
-            ASSERT_EQ(expectedSort, query->getSort());
+            ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
+            ASSERT_BSONOBJ_EQ(expectedSort, query->getSort());
             ASSERT_FALSE(query->getLimit().is_initialized());
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -189,7 +189,7 @@ public:
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS("config", request.dbname);
 
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BatchedUpdateRequest actualBatchedUpdate;
             std::string errmsg;
@@ -201,9 +201,9 @@ public:
 
             ASSERT_TRUE(update->getUpsert());
             ASSERT_FALSE(update->getMulti());
-            ASSERT_EQUALS(BSON(CollectionType::fullNs(expectedCollection.getNs().toString())),
-                          update->getQuery());
-            ASSERT_EQUALS(expectedCollection.toBSON(), update->getUpdateExpr());
+            ASSERT_BSONOBJ_EQ(BSON(CollectionType::fullNs(expectedCollection.getNs().toString())),
+                              update->getQuery());
+            ASSERT_BSONOBJ_EQ(expectedCollection.toBSON(), update->getUpdateExpr());
 
             BatchedCommandResponse response;
             response.setOk(true);
@@ -764,15 +764,16 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS("splitVector", cmdName);
         ASSERT_EQUALS(ns, request.cmdObj["splitVector"].String());  // splitVector uses full ns
 
-        ASSERT_EQUALS(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
-        ASSERT_EQUALS(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
-        ASSERT_EQUALS(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
+        ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
+        ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
+        ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
         ASSERT_EQUALS(64 * 1024 * 1024ULL,
                       static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
-        ASSERT_EQUALS(rpc::ServerSelectionMetadata(true, boost::none).toBSON(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                          request.metadata);
 
         return BSON("ok" << 1 << "splitKeys"
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));

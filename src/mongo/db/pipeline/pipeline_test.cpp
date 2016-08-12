@@ -1071,7 +1071,7 @@ TEST(PipelineInitialSource, GeoNearInitialQuery) {
     intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(
         &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
     auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
-    ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 1));
 }
 
 TEST(PipelineInitialSource, MatchInitialQuery) {
@@ -1081,7 +1081,7 @@ TEST(PipelineInitialSource, MatchInitialQuery) {
         &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
 
     auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
-    ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 4));
+    ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 4));
 }
 
 TEST(PipelineInitialSource, ParseCollation) {

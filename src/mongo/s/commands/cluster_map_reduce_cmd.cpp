@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
@@ -325,7 +326,7 @@ public:
         BSONObjBuilder shardResultsB;
         BSONObjBuilder shardCountsB;
         map<string, int64_t> countsMap;
-        set<BSONObj> splitPts;
+        auto splitPts = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
 
         {
             bool ok = true;
@@ -509,7 +510,7 @@ public:
                 confOut->getChunkManager(txn, outputCollNss.ns(), true /* force */);
             }
 
-            map<BSONObj, int> chunkSizes;
+            auto chunkSizes = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = grid.catalogClient(txn)->distLock(

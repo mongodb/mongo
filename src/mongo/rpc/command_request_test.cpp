@@ -91,17 +91,17 @@ TEST(CommandRequest, ParseAllFields) {
 
     ASSERT_EQUALS(opCmd.getCommandName(), commandName);
     ASSERT_EQUALS(opCmd.getDatabase(), database);
-    ASSERT_EQUALS(opCmd.getMetadata(), metadata);
-    ASSERT_EQUALS(opCmd.getCommandArgs(), commandArgs);
+    ASSERT_BSONOBJ_EQ(opCmd.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(opCmd.getCommandArgs(), commandArgs);
 
     auto inputDocRange = opCmd.getInputDocs();
     auto inputDocRangeIter = inputDocRange.begin();
 
-    ASSERT_EQUALS(*inputDocRangeIter, inputDoc1);
+    ASSERT_BSONOBJ_EQ(*inputDocRangeIter, inputDoc1);
     // can't use assert equals since we don't have an op to print the iter.
     ASSERT_FALSE(inputDocRangeIter == inputDocRange.end());
     ++inputDocRangeIter;
-    ASSERT_EQUALS(*inputDocRangeIter, inputDoc2);
+    ASSERT_BSONOBJ_EQ(*inputDocRangeIter, inputDoc2);
     ASSERT_FALSE(inputDocRangeIter == inputDocRange.end());
     ++inputDocRangeIter;
 

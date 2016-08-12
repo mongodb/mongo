@@ -34,6 +34,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/audit.h"
@@ -352,7 +353,8 @@ public:
 
             for (list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
                 BSONObj idx = *it;
-                if (idx["key"].embeddedObject() == proposedKey) {
+                if (SimpleBSONObjComparator::kInstance.evaluate(idx["key"].embeddedObject() ==
+                                                                proposedKey)) {
                     eqQueryResult = idx;
                     break;
                 }
@@ -457,7 +459,9 @@ public:
                 current += intervalSize;
             }
 
-            sort(allSplits.begin(), allSplits.end());
+            sort(allSplits.begin(),
+                 allSplits.end(),
+                 SimpleBSONObjComparator::kInstance.makeLessThan());
 
             // 1. the initial splits define the "big chunks" that we will subdivide later
             int lastIndex = -1;

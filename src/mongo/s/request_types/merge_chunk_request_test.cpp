@@ -51,9 +51,9 @@ TEST(MergeChunkRequest, BasicValidConfigCommand) {
              << "shard0000")));
     ASSERT_EQ(NamespaceString("TestDB", "TestColl"), request.getNamespace());
     ASSERT_EQ(OID("7fffffff0000000000000001"), request.getEpoch());
-    ASSERT_EQ(BSON("a" << 1), request.getChunkBoundaries().at(0));
-    ASSERT_EQ(BSON("a" << 5), request.getChunkBoundaries().at(1));
-    ASSERT_EQ(BSON("a" << 10), request.getChunkBoundaries().at(2));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), request.getChunkBoundaries().at(0));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 5), request.getChunkBoundaries().at(1));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 10), request.getChunkBoundaries().at(2));
     ASSERT_EQ("shard0000", request.getShardName());
 }
 
@@ -79,7 +79,7 @@ TEST(MergeChunkRequest, ConfigCommandtoBSON) {
     auto request = assertGet(MergeChunkRequest::parseFromConfigCommand(serializedRequest));
     auto requestToBSON = request.toConfigCommandBSON(writeConcernObj);
 
-    ASSERT_EQ(cmdBuilder.obj(), requestToBSON);
+    ASSERT_BSONOBJ_EQ(cmdBuilder.obj(), requestToBSON);
 }
 
 TEST(MergeChunkRequest, MissingNameSpaceErrors) {

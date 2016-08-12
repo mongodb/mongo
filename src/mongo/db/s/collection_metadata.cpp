@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/collection_metadata.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/stdx/memory.h"
@@ -576,7 +577,7 @@ void CollectionMetadata::fillRanges() {
             max = currMax;
             continue;
         }
-        if (max == currMin) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(max == currMin)) {
             max = currMax;
             continue;
         }

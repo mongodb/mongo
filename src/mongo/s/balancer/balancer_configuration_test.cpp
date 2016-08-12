@@ -66,7 +66,7 @@ protected:
      */
     void expectSettingsQuery(StringData key, StatusWith<boost::optional<BSONObj>> result) {
         onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), "config.settings");
@@ -74,7 +74,7 @@ protected:
             auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), "config.settings");
-            ASSERT_EQ(query->getFilter(), BSON("_id" << key));
+            ASSERT_BSONOBJ_EQ(query->getFilter(), BSON("_id" << key));
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 

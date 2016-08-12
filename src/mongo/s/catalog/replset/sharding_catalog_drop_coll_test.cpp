@@ -91,11 +91,11 @@ public:
         onCommand([this, shard](const RemoteCommandRequest& request) {
             ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
             ASSERT_EQ(_dropNS.db(), request.dbname);
-            ASSERT_EQ(BSON("drop" << _dropNS.coll() << "writeConcern"
-                                  << BSON("w" << 0 << "wtimeout" << 0)),
-                      request.cmdObj);
+            ASSERT_BSONOBJ_EQ(BSON("drop" << _dropNS.coll() << "writeConcern"
+                                          << BSON("w" << 0 << "wtimeout" << 0)),
+                              request.cmdObj);
 
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ns" << _dropNS.ns() << "ok" << 1);
         });
@@ -103,7 +103,7 @@ public:
 
     void expectRemoveChunksAndMarkCollectionDropped() {
         onCommand([this](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
             ASSERT_EQ(_configHost, request.target);
             ASSERT_EQ("config", request.dbname);
 
@@ -114,7 +114,7 @@ public:
                 maxTimeMS: 30000
             })"));
 
-            ASSERT_EQ(expectedCmd, request.cmdObj);
+            ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
 
             return BSON("n" << 1 << "ok" << 1);
         });
@@ -137,9 +137,9 @@ public:
         onCommand([shard](const RemoteCommandRequest& request) {
             ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
             ASSERT_EQ("admin", request.dbname);
-            ASSERT_EQ(BSON("unsetSharding" << 1), request.cmdObj);
+            ASSERT_BSONOBJ_EQ(BSON("unsetSharding" << 1), request.cmdObj);
 
-            ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("n" << 1 << "ok" << 1);
         });
@@ -216,11 +216,11 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     onCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort(shard1().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
-        ASSERT_EQ(
+        ASSERT_BSONOBJ_EQ(
             BSON("drop" << dropNS().coll() << "writeConcern" << BSON("w" << 0 << "wtimeout" << 0)),
             request.cmdObj);
 
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });
@@ -228,11 +228,11 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     onCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort(shard2().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
-        ASSERT_EQ(
+        ASSERT_BSONOBJ_EQ(
             BSON("drop" << dropNS().coll() << "writeConcern" << BSON("w" << 0 << "wtimeout" << 0)),
             request.cmdObj);
 
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });

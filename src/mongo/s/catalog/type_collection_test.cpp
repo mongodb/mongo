@@ -62,10 +62,10 @@ TEST(CollectionType, Basic) {
     ASSERT(coll.getNs() == NamespaceString{"db.coll"});
     ASSERT_EQUALS(coll.getEpoch(), oid);
     ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
-    ASSERT_EQUALS(coll.getKeyPattern().toBSON(), BSON("a" << 1));
-    ASSERT_EQUALS(coll.getDefaultCollation(),
-                  BSON("locale"
-                       << "fr_CA"));
+    ASSERT_BSONOBJ_EQ(coll.getKeyPattern().toBSON(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(coll.getDefaultCollation(),
+                      BSON("locale"
+                           << "fr_CA"));
     ASSERT_EQUALS(coll.getUnique(), true);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
     ASSERT_EQUALS(coll.getDropped(), false);
@@ -95,7 +95,7 @@ TEST(CollectionType, MissingDefaultCollationParses) {
 
     CollectionType coll = status.getValue();
     ASSERT_TRUE(coll.validate().isOK());
-    ASSERT_EQUALS(coll.getDefaultCollation(), BSONObj());
+    ASSERT_BSONOBJ_EQ(coll.getDefaultCollation(), BSONObj());
 }
 
 TEST(CollectionType, DefaultCollationSerializesCorrectly) {
@@ -113,9 +113,9 @@ TEST(CollectionType, DefaultCollationSerializesCorrectly) {
     CollectionType coll = status.getValue();
     ASSERT_TRUE(coll.validate().isOK());
     BSONObj serialized = coll.toBSON();
-    ASSERT_EQUALS(serialized["defaultCollation"].Obj(),
-                  BSON("locale"
-                       << "fr_CA"));
+    ASSERT_BSONOBJ_EQ(serialized["defaultCollation"].Obj(),
+                      BSON("locale"
+                           << "fr_CA"));
 }
 
 TEST(CollectionType, MissingDefaultCollationIsNotSerialized) {
@@ -172,7 +172,7 @@ TEST(CollectionType, Pre22Format) {
     ASSERT(coll.getNs() == NamespaceString{"db.coll"});
     ASSERT(!coll.getEpoch().isSet());
     ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
-    ASSERT_EQUALS(coll.getKeyPattern().toBSON(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(coll.getKeyPattern().toBSON(), BSON("a" << 1));
     ASSERT_EQUALS(coll.getUnique(), false);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
     ASSERT_EQUALS(coll.getDropped(), false);

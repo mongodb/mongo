@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
@@ -77,7 +77,7 @@ struct OplogEntry {
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);
 
 inline bool operator==(const OplogEntry& lhs, const OplogEntry& rhs) {
-    return lhs.raw == rhs.raw;
+    return SimpleBSONObjComparator::kInstance.evaluate(lhs.raw == rhs.raw);
 }
 
 }  // namespace repl

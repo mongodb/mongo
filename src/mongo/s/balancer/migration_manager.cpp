@@ -34,6 +34,7 @@
 
 #include <memory>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
@@ -282,7 +283,8 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
     invariant(chunk);
 
     // If the chunk is not found exactly as requested, the caller must have stale data
-    if (chunk->getMin() != migrateInfo.minKey || chunk->getMax() != migrateInfo.maxKey) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(chunk->getMin() != migrateInfo.minKey) ||
+        SimpleBSONObjComparator::kInstance.evaluate(chunk->getMax() != migrateInfo.maxKey)) {
         return std::make_shared<Notification<Status>>(Status(
             ErrorCodes::IncompatibleShardingMetadata,
             stream() << "Chunk " << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()

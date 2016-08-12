@@ -30,6 +30,7 @@
 
 #include "mongo/executor/remote_command_response.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -99,7 +100,9 @@ bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
     if (this == &rhs) {
         return true;
     }
-    return data == rhs.data && metadata == rhs.metadata && elapsedMillis == rhs.elapsedMillis;
+    SimpleBSONObjComparator bsonComparator;
+    return bsonComparator.evaluate(data == rhs.data) &&
+        bsonComparator.evaluate(metadata == rhs.metadata) && elapsedMillis == rhs.elapsedMillis;
 }
 
 bool RemoteCommandResponse::operator!=(const RemoteCommandResponse& rhs) const {

@@ -51,7 +51,7 @@ TEST(CountRequest, ParseDefaults) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
 
     // Defaults
     ASSERT_EQUALS(countRequest.getLimit(), 0);
@@ -84,11 +84,11 @@ TEST(CountRequest, ParseComplete) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
-    ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
-    ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getHint(), fromjson("{ b : 5 }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
 TEST(CountRequest, ParseWithExplain) {
@@ -106,7 +106,7 @@ TEST(CountRequest, ParseWithExplain) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
 
     // Defaults
     ASSERT_EQUALS(countRequest.getLimit(), 0);
@@ -139,11 +139,11 @@ TEST(CountRequest, ParseNegativeLimit) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
-    ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
-    ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getHint(), fromjson("{ b : 5 }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
 TEST(CountRequest, FailParseMissingNS) {
@@ -201,7 +201,7 @@ TEST(CountRequest, ToBSON) {
                  "  hint : { b : 5 },"
                  "  collation : { locale : 'en_US' } },"));
 
-    ASSERT_EQUALS(actualObj, expectedObj);
+    ASSERT_BSONOBJ_EQ(actualObj, expectedObj);
 }
 
 }  // namespace

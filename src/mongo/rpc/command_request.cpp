@@ -37,6 +37,7 @@
 #include "mongo/base/data_type_string_data.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/object_check.h"
@@ -136,9 +137,10 @@ DocumentRange CommandRequest::getInputDocs() const {
 }
 
 bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
-    return std::tie(
-               lhs._database, lhs._commandName, lhs._metadata, lhs._commandArgs, lhs._inputDocs) ==
-        std::tie(rhs._database, rhs._commandName, rhs._metadata, rhs._commandArgs, rhs._inputDocs);
+    return (lhs._database == rhs._database) && (lhs._commandName == rhs._commandName) &&
+        SimpleBSONObjComparator::kInstance.evaluate(lhs._metadata == rhs._metadata) &&
+        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs) &&
+        (lhs._inputDocs == rhs._inputDocs);
 }
 
 bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {

@@ -26,28 +26,45 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/query/collation/collator_factory_mock.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
+
+/**
+ * BSON comparison utility macro. Do not use directly.
+ */
+#define ASSERT_BSON_COMPARISON(NAME, a, b) \
+    ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
+
+/**
+ * Use to compare two instances of type BSONObj under the default comparator in unit tests.
+ */
+#define ASSERT_BSONOBJ_EQ(a, b) ASSERT_BSON_COMPARISON(BSONObjEQ, a, b)
+#define ASSERT_BSONOBJ_LT(a, b) ASSERT_BSON_COMPARISON(BSONObjLT, a, b)
+#define ASSERT_BSONOBJ_LTE(a, b) ASSERT_BSON_COMPARISON(BSONObjLTE, a, b)
+#define ASSERT_BSONOBJ_GT(a, b) ASSERT_BSON_COMPARISON(BSONObjGT, a, b)
+#define ASSERT_BSONOBJ_GTE(a, b) ASSERT_BSON_COMPARISON(BSONObjGTE, a, b)
+#define ASSERT_BSONOBJ_NE(a, b) ASSERT_BSON_COMPARISON(BSONObjNE, a, b)
 
 namespace mongo {
+namespace unittest {
 
-StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON(
-    const BSONObj& spec) {
-    if (SimpleBSONObjComparator::kInstance.evaluate(
-            spec == BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison))) {
-        return {nullptr};
-    }
-    auto collator =
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-    return {std::move(collator)};
-}
+#define DECLARE_BSON_CMP_FUNC(BSONTYPE, NAME)                          \
+    void assertComparison_##BSONTYPE##NAME(const std::string& theFile, \
+                                           unsigned theLine,           \
+                                           StringData aExpression,     \
+                                           StringData bExpression,     \
+                                           const BSONTYPE& aValue,     \
+                                           const BSONTYPE& bValue);
 
+DECLARE_BSON_CMP_FUNC(BSONObj, EQ);
+DECLARE_BSON_CMP_FUNC(BSONObj, LT);
+DECLARE_BSON_CMP_FUNC(BSONObj, LTE);
+DECLARE_BSON_CMP_FUNC(BSONObj, GT);
+DECLARE_BSON_CMP_FUNC(BSONObj, GTE);
+DECLARE_BSON_CMP_FUNC(BSONObj, NE);
+#undef DECLARE_BSON_CMP_FUNC
+
+}  // namespace unittest
 }  // namespace mongo

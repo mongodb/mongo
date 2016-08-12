@@ -1309,10 +1309,10 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0);
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2);
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
-    ASSERT_EQUALS(progress.getObjectField("initialSyncAttempts"), BSONObj());
+    ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
     ASSERT_EQUALS(progress.getIntField("appliedOps"), 0);
-    ASSERT_EQUALS(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
+    ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
     // Play rest of the failed round of responses.
     setResponses({failedResponses.begin() + 1, failedResponses.end()});
@@ -1331,7 +1331,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
     ASSERT_EQUALS(progress.getIntField("appliedOps"), 0);
-    ASSERT_EQUALS(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
+    ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
     BSONObj attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1);
@@ -1354,13 +1354,14 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
     ASSERT_EQUALS(progress.getIntField("appliedOps"), 4);
-    ASSERT_EQUALS(progress.getObjectField("databases"),
-                  fromjson(str::stream() << "{databasesCloned: 1, a: {collections: 1, "
-                                            "clonedCollections: 1, start: new Date(1406851200000), "
-                                            "end: new Date(1406851200000), elapsedMillis: 0, "
-                                            "'a.a': {documents: 1, indexes: 1, fetchedBatches: 1, "
-                                            "start: new Date(1406851200000), end: new "
-                                            "Date(1406851200000), elapsedMillis: 0}}}"));
+    ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
+                      fromjson(str::stream()
+                               << "{databasesCloned: 1, a: {collections: 1, "
+                                  "clonedCollections: 1, start: new Date(1406851200000), "
+                                  "end: new Date(1406851200000), elapsedMillis: 0, "
+                                  "'a.a': {documents: 1, indexes: 1, fetchedBatches: 1, "
+                                  "start: new Date(1406851200000), end: new "
+                                  "Date(1406851200000), elapsedMillis: 0}}}"));
 
     attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1);

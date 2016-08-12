@@ -70,7 +70,7 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
                             << -1)));
 
     BSONObj serializedObj = builder.obj();
-    ASSERT_EQ(expectedObj, serializedObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
 
     auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj);
     ASSERT_OK(cloneStatus.getStatus());
@@ -85,7 +85,7 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     clonedMetadata.writeToMetadata(&clonedBuilder);
 
     BSONObj clonedSerializedObj = clonedBuilder.obj();
-    ASSERT_EQ(expectedObj, clonedSerializedObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, clonedSerializedObj);
 }
 
 }  // unnamed namespace

@@ -64,9 +64,9 @@ TEST(ChangeLogType, Valid) {
     ASSERT_EQUALS(logEntry.getTime(), Date_t::fromMillisSinceEpoch(1));
     ASSERT_EQUALS(logEntry.getWhat(), "split");
     ASSERT_EQUALS(logEntry.getNS(), "test.test");
-    ASSERT_EQUALS(logEntry.getDetails(),
-                  BSON("dummy"
-                       << "info"));
+    ASSERT_BSONOBJ_EQ(logEntry.getDetails(),
+                      BSON("dummy"
+                           << "info"));
 }
 
 TEST(ChangeLogType, MissingChangeId) {

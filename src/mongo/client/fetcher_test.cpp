@@ -271,8 +271,8 @@ TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToCo
         &getExecutor(), source, "db", findCmdObj, doNothingCallback, metadataObj, timeout);
 
     ASSERT_EQUALS(source, fetcher->getSource());
-    ASSERT_EQUALS(findCmdObj, fetcher->getCommandObject());
-    ASSERT_EQUALS(metadataObj, fetcher->getMetadataObject());
+    ASSERT_BSONOBJ_EQ(findCmdObj, fetcher->getCommandObject());
+    ASSERT_BSONOBJ_EQ(metadataObj, fetcher->getMetadataObject());
     ASSERT_EQUALS(timeout, fetcher->getTimeout());
 
     ASSERT_OK(fetcher->schedule());
@@ -287,8 +287,8 @@ TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToCo
     }
 
     ASSERT_EQUALS(source, request.target);
-    ASSERT_EQUALS(findCmdObj, request.cmdObj);
-    ASSERT_EQUALS(metadataObj, request.metadata);
+    ASSERT_BSONOBJ_EQ(findCmdObj, request.cmdObj);
+    ASSERT_BSONOBJ_EQ(metadataObj, request.metadata);
     ASSERT_EQUALS(timeout, request.timeout);
 }
 
@@ -561,7 +561,7 @@ TEST_F(FetcherTest, FetchOneDocument) {
     ASSERT_EQUALS(0, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
@@ -590,7 +590,7 @@ TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
     ASSERT_EQUALS(0, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_FALSE(fetcher->inShutdown_forTest());
 }
 
@@ -626,7 +626,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_EQUALS(elapsedMillis, Milliseconds(100));
     ASSERT_TRUE(first);
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -648,7 +648,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc2, documents.front());
+    ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_EQUALS(elapsedMillis, Milliseconds(200));
     ASSERT_FALSE(first);
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -669,7 +669,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
     ASSERT_EQUALS(0, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc3, documents.front());
+    ASSERT_BSONOBJ_EQ(doc3, documents.front());
     ASSERT_EQUALS(elapsedMillis, Milliseconds(300));
     ASSERT_FALSE(first);
     ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
@@ -696,7 +696,7 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     const BSONObj doc2 = BSON("_id" << 2);
@@ -713,7 +713,7 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc2, documents.front());
+    ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     fetcher->shutdown();
@@ -782,7 +782,7 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     const BSONObj doc2 = BSON("_id" << 2);
@@ -800,7 +800,7 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc2, documents.front());
+    ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     getExecutor().shutdown();
@@ -840,7 +840,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     executor::RemoteCommandRequest request;
@@ -898,7 +898,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     const BSONObj doc2 = BSON("_id" << 2);
@@ -918,7 +918,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc2, documents.front());
+    ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
 
     {
@@ -964,7 +964,7 @@ void shutdownDuringSecondBatch(const StatusWith<Fetcher::QueryResponse>& fetchRe
     ASSERT_OK(fetchResult.getStatus());
     Fetcher::QueryResponse batchData = fetchResult.getValue();
     ASSERT_EQUALS(1U, batchData.documents.size());
-    ASSERT_EQUALS(doc2, batchData.documents.front());
+    ASSERT_BSONOBJ_EQ(doc2, batchData.documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == *nextAction);
     ASSERT(getMoreBob);
     getMoreBob->append("getMore", batchData.cursorId);
@@ -996,7 +996,7 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     const BSONObj doc2 = BSON("_id" << 2);
@@ -1065,7 +1065,7 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
     ASSERT_EQUALS(1U, documents.size());
-    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
 
     rs = ResponseStatus(ErrorCodes::OperationFailed, "getMore failed", Milliseconds(0));

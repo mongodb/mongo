@@ -32,6 +32,8 @@
 #include <tuple>
 #include <utility>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
+
 namespace mongo {
 
 using std::string;
@@ -100,8 +102,9 @@ bool IndexBounds::operator==(const IndexBounds& other) const {
     }
 
     if (this->isSimpleRange) {
-        return std::tie(this->startKey, this->endKey, this->endKeyInclusive) ==
-            std::tie(other.startKey, other.endKey, other.endKeyInclusive);
+        return SimpleBSONObjComparator::kInstance.evaluate(this->startKey == other.startKey) &&
+            SimpleBSONObjComparator::kInstance.evaluate(this->endKey == other.endKey) &&
+            (this->endKeyInclusive == other.endKeyInclusive);
     }
 
     if (this->fields.size() != other.fields.size()) {

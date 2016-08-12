@@ -96,8 +96,8 @@ void checkUpconvert(const BSONObj& legacyCommand,
         return bob.obj();
     };
 
-    ASSERT_EQ(upconvertedCommand, upconvertedCommandBob.done());
-    ASSERT_EQ(sorted(upconvertedMetadata), sorted(upconvertedMetadataBob.done()));
+    ASSERT_BSONOBJ_EQ(upconvertedCommand, upconvertedCommandBob.done());
+    ASSERT_BSONOBJ_EQ(sorted(upconvertedMetadata), sorted(upconvertedMetadataBob.done()));
 }
 
 TEST(ServerSelectionMetadata, UpconvertValidMetadata) {

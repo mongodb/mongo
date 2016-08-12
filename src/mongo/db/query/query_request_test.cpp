@@ -231,7 +231,7 @@ TEST(QueryRequestTest, AllowTailableWithNaturalSort) {
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue()->isTailable());
-    ASSERT_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
+    ASSERT_BSONOBJ_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
 }
 
 TEST(QueryRequestTest, IsIsolatedReturnsTrueWithIsolated) {
@@ -398,9 +398,9 @@ TEST(QueryRequestTest, ParseFromCommandHintAsString) {
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
     BSONObj hintObj = qr->getHint();
-    ASSERT_EQUALS(BSON("$hint"
-                       << "foo_1"),
-                  hintObj);
+    ASSERT_BSONOBJ_EQ(BSON("$hint"
+                           << "foo_1"),
+                      hintObj);
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidSortProj) {
@@ -824,7 +824,7 @@ TEST(QueryRequestTest, ParseFromCommandSkipIsZero) {
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
-    ASSERT_EQ(BSON("a" << 3), qr->getFilter());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 3), qr->getFilter());
     ASSERT_FALSE(qr->getSkip());
 }
 
@@ -848,7 +848,7 @@ TEST(QueryRequestTest, ParseFromCommandLimitIsZero) {
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
-    ASSERT_EQ(BSON("a" << 3), qr->getFilter());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 3), qr->getFilter());
     ASSERT_FALSE(qr->getLimit());
 }
 

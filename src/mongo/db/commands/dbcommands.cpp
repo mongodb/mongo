@@ -37,6 +37,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -1500,7 +1501,8 @@ bool Command::run(OperationContext* txn,
         result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
-        dassert(txn->getWriteConcern().toBSON() == wcResult.getValue().toBSON());
+        dassert(SimpleBSONObjComparator::kInstance.evaluate(txn->getWriteConcern().toBSON() ==
+                                                            wcResult.getValue().toBSON()));
 
         WriteConcernResult res;
         auto waitForWCStatus =

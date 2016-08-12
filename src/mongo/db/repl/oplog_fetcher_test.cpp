@@ -208,8 +208,8 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(
 
     auto request = processNetworkResponse(response);
 
-    ASSERT_EQUALS(oplogFetcher.getCommandObject_forTest(), request.cmdObj);
-    ASSERT_EQUALS(oplogFetcher.getMetadataObject_forTest(), request.metadata);
+    ASSERT_BSONOBJ_EQ(oplogFetcher.getCommandObject_forTest(), request.cmdObj);
+    ASSERT_BSONOBJ_EQ(oplogFetcher.getMetadataObject_forTest(), request.metadata);
 
     oplogFetcher.shutdown();
     oplogFetcher.join();
@@ -296,8 +296,8 @@ TEST_F(
                                [](Status, OpTimeWithHash) {})
                       .getCommandObject_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
-    ASSERT_EQUALS(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
-                  cmdObj["filter"].Obj());
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
+                      cmdObj["filter"].Obj());
     ASSERT_EQUALS(dataReplicatorExternalState->currentTerm, cmdObj["term"].numberLong());
     _checkDefaultCommandObjectFields(cmdObj);
 }
@@ -316,8 +316,8 @@ TEST_F(
                                [](Status, OpTimeWithHash) {})
                       .getCommandObject_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
-    ASSERT_EQUALS(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
-                  cmdObj["filter"].Obj());
+    ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.opTime.getTimestamp())),
+                      cmdObj["filter"].Obj());
     ASSERT_FALSE(cmdObj.hasField("term"));
     _checkDefaultCommandObjectFields(cmdObj);
 }
@@ -346,9 +346,9 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                                     enqueueDocumentsFn,
                                     [](Status, OpTimeWithHash) {})
                            .getMetadataObject_forTest();
-    ASSERT_EQUALS(BSON(rpc::ServerSelectionMetadata::fieldName()
-                       << BSON(rpc::ServerSelectionMetadata::kSecondaryOkFieldName << 1)),
-                  metadataObj);
+    ASSERT_BSONOBJ_EQ(BSON(rpc::ServerSelectionMetadata::fieldName()
+                           << BSON(rpc::ServerSelectionMetadata::kSecondaryOkFieldName << 1)),
+                      metadataObj);
 }
 
 TEST_F(OplogFetcherTest, RemoteCommandTimeoutShouldEqualElectionTimeout) {
@@ -556,8 +556,8 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldExcludeFirstDocumentInFirstBatchWhenE
         {makeCursorResponse(0, documents), rpc::makeEmptyMetadata(), Milliseconds(0)});
 
     ASSERT_EQUALS(2U, lastEnqueuedDocuments.size());
-    ASSERT_EQUALS(secondEntry, lastEnqueuedDocuments[0]);
-    ASSERT_EQUALS(thirdEntry, lastEnqueuedDocuments[1]);
+    ASSERT_BSONOBJ_EQ(secondEntry, lastEnqueuedDocuments[0]);
+    ASSERT_BSONOBJ_EQ(thirdEntry, lastEnqueuedDocuments[1]);
 
     ASSERT_EQUALS(3U, lastEnqueuedDocumentsInfo.networkDocumentCount);
     ASSERT_EQUALS(size_t(firstEntry.objsize() + secondEntry.objsize() + thirdEntry.objsize()),
@@ -677,7 +677,7 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionPro
     processNetworkResponse(makeCursorResponse(cursorId, {firstEntry, secondEntry}), true);
 
     ASSERT_EQUALS(1U, lastEnqueuedDocuments.size());
-    ASSERT_EQUALS(secondEntry, lastEnqueuedDocuments[0]);
+    ASSERT_BSONOBJ_EQ(secondEntry, lastEnqueuedDocuments[0]);
 
     // Set cursor ID to 0 in getMore response to indicate no more data available.
     auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.opTime.getTerm()}, 300);
@@ -690,8 +690,8 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionPro
                   request.cmdObj.getIntField("maxTimeMS"));
 
     ASSERT_EQUALS(2U, lastEnqueuedDocuments.size());
-    ASSERT_EQUALS(thirdEntry, lastEnqueuedDocuments[0]);
-    ASSERT_EQUALS(fourthEntry, lastEnqueuedDocuments[1]);
+    ASSERT_BSONOBJ_EQ(thirdEntry, lastEnqueuedDocuments[0]);
+    ASSERT_BSONOBJ_EQ(fourthEntry, lastEnqueuedDocuments[1]);
 
     oplogFetcher.shutdown();
     oplogFetcher.join();

@@ -564,8 +564,10 @@ public:
                 ++numResults;
                 WorkingSetMember* member = ws.get(id);
                 ASSERT(member->hasObj());
-                ASSERT(member->obj.value() == BSON("_id" << 1 << "a" << 1 << "b" << 2) ||
-                       member->obj.value() == BSON("_id" << 3 << "a" << 1 << "c" << 3));
+                ASSERT(SimpleBSONObjComparator::kInstance.evaluate(
+                           member->obj.value() == BSON("_id" << 1 << "a" << 1 << "b" << 2)) ||
+                       SimpleBSONObjComparator::kInstance.evaluate(
+                           member->obj.value() == BSON("_id" << 3 << "a" << 1 << "c" << 3)));
             }
         }
 

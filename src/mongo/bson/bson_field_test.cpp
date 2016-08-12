@@ -36,31 +36,31 @@ using mongo::BSONObj;
 TEST(Assignment, Simple) {
     BSONField<int> x("x");
     BSONObj o = BSON(x << 5);
-    ASSERT_EQUALS(BSON("x" << 5), o);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 5), o);
 }
 
 TEST(Make, Simple) {
     BSONField<int> x("x");
     BSONObj o = BSON(x.make(5));
-    ASSERT_EQUALS(BSON("x" << 5), o);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 5), o);
 }
 
 TEST(Query, GreaterThan) {
     BSONField<int> x("x");
     BSONObj o = BSON(x(5));
-    ASSERT_EQUALS(BSON("x" << 5), o);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 5), o);
 
     o = BSON(x.gt(5));
-    ASSERT_EQUALS(BSON("x" << BSON("$gt" << 5)), o);
+    ASSERT_BSONOBJ_EQ(BSON("x" << BSON("$gt" << 5)), o);
 }
 
 TEST(Query, NotEqual) {
     BSONField<int> x("x");
     BSONObj o = BSON(x(10));
-    ASSERT_EQUALS(BSON("x" << 10), o);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 10), o);
 
     o = BSON(x.ne(5));
-    ASSERT_EQUALS(BSON("x" << BSON("$ne" << 5)), o);
+    ASSERT_BSONOBJ_EQ(BSON("x" << BSON("$ne" << 5)), o);
 }
 
 }  // unnamed namespace

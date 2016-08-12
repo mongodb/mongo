@@ -4,19 +4,21 @@ Import("env")
 
 env.Library(target="unittest",
             source=[
+                'bson_test_util.cpp',
                 'death_test.cpp',
                 'temp_dir.cpp',
                 'unittest.cpp',
                 'unittest_helpers.cpp',
             ],
-            LIBDEPS=['$BUILD_DIR/mongo/util/foundation',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/util/foundation',
+                '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ])
 
 env.Library("unittest_main", ['unittest_main.cpp'],
             LIBDEPS=[
                 'unittest',
-                '$BUILD_DIR/mongo/base',
                  ])
 
 env.Library(target="integration_test_main",

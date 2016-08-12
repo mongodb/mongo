@@ -32,6 +32,7 @@
 
 #include "mongo/s/balancer/balancer_policy.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/util/log.h"
@@ -112,9 +113,12 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
     if (minIntersect != maxIntersect) {
         invariant(minIntersect != _zoneRanges.end());
         const auto& intersectingRange =
-            (minIntersect->second.min < range.max) ? minIntersect->second : maxIntersect->second;
+            (SimpleBSONObjComparator::kInstance.evaluate(minIntersect->second.min < range.max))
+            ? minIntersect->second
+            : maxIntersect->second;
 
-        if (intersectingRange.min == range.min && intersectingRange.max == range.max &&
+        if (SimpleBSONObjComparator::kInstance.evaluate(intersectingRange.min == range.min) &&
+            SimpleBSONObjComparator::kInstance.evaluate(intersectingRange.max == range.max) &&
             intersectingRange.zone == range.zone) {
             return Status::OK();
         }
@@ -128,8 +132,8 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
     // Check for containment
     if (minIntersect != _zoneRanges.end()) {
         const ZoneRange& nextRange = minIntersect->second;
-        if (range.max > nextRange.min) {
-            invariant(range.max < nextRange.max);
+        if (SimpleBSONObjComparator::kInstance.evaluate(range.max > nextRange.min)) {
+            invariant(SimpleBSONObjComparator::kInstance.evaluate(range.max < nextRange.max));
             return {ErrorCodes::RangeOverlapConflict,
                     str::stream() << "Zone range: " << range.toString()
                                   << " is overlapping with existing: "
@@ -159,7 +163,8 @@ string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
     const ZoneRange& intersectRange = minIntersect->second;
 
     // Check for containment
-    if (intersectRange.min <= chunk.getMin() && chunk.getMax() <= intersectRange.max) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(intersectRange.min <= chunk.getMin()) &&
+        SimpleBSONObjComparator::kInstance.evaluate(chunk.getMax() <= intersectRange.max)) {
         return intersectRange.zone;
     }
 

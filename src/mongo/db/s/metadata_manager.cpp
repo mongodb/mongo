@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/metadata_manager.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/sharding_state.h"
@@ -216,7 +217,7 @@ void MetadataManager::forgetReceive(const ChunkRange& range) {
         invariant(it != _receivingChunks.end());
 
         // Verify entire ChunkRange is identical, not just the min key.
-        invariant(it->second == range.getMax());
+        invariant(SimpleBSONObjComparator::kInstance.evaluate(it->second == range.getMax()));
 
         _receivingChunks.erase(it);
     }
@@ -362,8 +363,9 @@ void MetadataManager::_removeRangeToClean_inlock(const ChunkRange& range, Status
         --it;
     }
 
-    for (; it != _rangesToClean.end() && it->first < range.getMax();) {
-        if (it->second.getMax() <= range.getMin()) {
+    for (; it != _rangesToClean.end() &&
+         SimpleBSONObjComparator::kInstance.evaluate(it->first < range.getMax());) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(it->second.getMax() <= range.getMin())) {
             ++it;
             continue;
         }
@@ -374,11 +376,11 @@ void MetadataManager::_removeRangeToClean_inlock(const ChunkRange& range, Status
         BSONObj oldMax = it->second.getMax();
         it->second.complete(deletionStatus);
         _rangesToClean.erase(it++);
-        if (oldMin < range.getMin()) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(oldMin < range.getMin())) {
             _addRangeToClean_inlock(ChunkRange(oldMin, range.getMin()));
         }
 
-        if (oldMax > range.getMax()) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(oldMax > range.getMax())) {
             _addRangeToClean_inlock(ChunkRange(range.getMax(), oldMax));
         }
     }

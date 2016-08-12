@@ -53,7 +53,7 @@ TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
     for (int i = 1; i < 10; ++i) {
         auto result = cursor.next();
         ASSERT(result.isOK());
-        ASSERT_EQ(*result.getValue().getResult(), BSON("a" << i));
+        ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << i));
         ASSERT_EQ(cursor.getNumReturnedSoFar(), i);
     }
     // Now check that if nothing is fetched the getNumReturnedSoFar stays the same.
@@ -73,7 +73,7 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
     cursor.queueResult(BSON("a" << 2));
     cursor.queueResult(BSON("a" << 3));
@@ -81,17 +81,17 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
-    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
 
     auto thirdResult = cursor.next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
-    ASSERT_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
+    ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
     auto fourthResult = cursor.next();
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().getResult());
-    ASSERT_EQ(*fourthResult.getValue().getResult(), BSON("a" << 4));
+    ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSON("a" << 4));
 
     auto fifthResult = cursor.next();
     ASSERT_OK(fifthResult.getStatus());
@@ -118,7 +118,7 @@ TEST(ClusterClientCursorImpl, CursorPropagatesViewDefinition) {
     ASSERT_OK(result.getStatus());
     ASSERT(!result.getValue().getResult());
     ASSERT(result.getValue().getViewDefinition());
-    ASSERT_EQ(*result.getValue().getViewDefinition(), viewDef);
+    ASSERT_BSONOBJ_EQ(*result.getValue().getViewDefinition(), viewDef);
 }
 
 TEST(ClusterClientCursorImpl, RemotesExhausted) {
@@ -133,13 +133,13 @@ TEST(ClusterClientCursorImpl, RemotesExhausted) {
     auto firstResult = cursor.next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto secondResult = cursor.next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
-    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto thirdResult = cursor.next();

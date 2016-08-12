@@ -104,7 +104,7 @@ public:
 
         // Compare the results against what we expect.
         BSONObj expectedObj = fromjson(expectedStr);
-        ASSERT_EQ(outputObj, expectedObj);
+        ASSERT_BSONOBJ_EQ(outputObj, expectedObj);
     }
 
 protected:

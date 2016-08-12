@@ -356,7 +356,7 @@ TEST_F(MetadataManagerTest, BeginReceiveWithOverlappingRange) {
 
     const auto it = copyOfPending.find(BSON("key" << 5));
     ASSERT(it != copyOfPending.end());
-    ASSERT_EQ(it->second, BSON("key" << 35));
+    ASSERT_BSONOBJ_EQ(it->second, BSON("key" << 35));
 }
 
 TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
@@ -382,8 +382,8 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
     ASSERT_EQ(manager.getActiveMetadata()->getChunks().size(), 1UL);
 
     const auto chunkEntry = manager.getActiveMetadata()->getChunks().begin();
-    ASSERT_EQ(BSON("key" << 20), chunkEntry->first);
-    ASSERT_EQ(BSON("key" << 30), chunkEntry->second);
+    ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
+    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second);
 }
 
 // Tests membership functions for _rangesToClean

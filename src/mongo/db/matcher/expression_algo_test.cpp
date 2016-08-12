@@ -815,8 +815,8 @@ TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
-    ASSERT_EQUALS(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
 }
 
 TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
@@ -837,8 +837,8 @@ TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
-    ASSERT_EQUALS(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
@@ -855,7 +855,7 @@ TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
     BSONObjBuilder firstBob;
     splitExpr.first->serialize(&firstBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{$nor: [{$and: [{x: {$gt: 4}}]}]}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{$and: [{x: {$gt: 4}}]}]}"));
     ASSERT_FALSE(splitExpr.second);
 }
 
@@ -874,7 +874,7 @@ TEST(SplitMatchExpression, OrWithOnlyIndependentChildrenIsNotSplittable) {
     splitExpr.second->serialize(&bob);
 
     ASSERT_FALSE(splitExpr.first);
-    ASSERT_EQUALS(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
@@ -898,8 +898,8 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
-    ASSERT_EQUALS(
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
+    ASSERT_BSONOBJ_EQ(
         secondBob.obj(),
         fromjson("{$and: [{$nor: [{$and: [{x: {$size: 2}}]}]}, {$nor: [{x: {$gt: 4}}, {$and: "
                  "[{$nor: [{$and: [{x: "

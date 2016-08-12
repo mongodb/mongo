@@ -436,8 +436,8 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto& res = deferred.get();
     ASSERT(res.elapsedMillis);
     uassertStatusOK(res.status);
-    ASSERT_EQ(res.data, expectedCommandReply);
-    ASSERT_EQ(res.metadata, expectedMetadata);
+    ASSERT_BSONOBJ_EQ(res.data, expectedCommandReply);
+    ASSERT_BSONOBJ_EQ(res.metadata, expectedMetadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -780,7 +780,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     // Simulate user command.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_EQ(commandRequest, request.cmdObj);
+                               ASSERT_BSONOBJ_EQ(commandRequest, request.cmdObj);
 
                                RemoteCommandResponse response;
                                response.data = commandReply;
@@ -792,9 +792,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto& result = deferred.get();
 
     ASSERT(result.isOK());
-    ASSERT(result.data == commandReply);
+    ASSERT_BSONOBJ_EQ(result.data, commandReply);
     ASSERT(result.elapsedMillis);
-    ASSERT(result.metadata == metadata);
+    ASSERT_BSONOBJ_EQ(result.metadata, metadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -829,7 +829,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
             handleReplyCalled = true;
             handleReplyArgumentCorrect =
-                (response.data == hookCommandReply) && (response.metadata == hookReplyMetadata);
+                SimpleBSONObjComparator::kInstance.evaluate(response.data == hookCommandReply) &&
+                SimpleBSONObjComparator::kInstance.evaluate(response.metadata == hookReplyMetadata);
             return handleReplyError;
         }));
 
@@ -850,8 +851,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_EQ(request.cmdObj, hookCommandRequest);
-                               ASSERT_EQ(request.metadata, hookRequestMetadata);
+                               ASSERT_BSONOBJ_EQ(request.cmdObj, hookCommandRequest);
+                               ASSERT_BSONOBJ_EQ(request.metadata, hookRequestMetadata);
 
                                RemoteCommandResponse response;
                                response.data = hookCommandReply;

@@ -36,6 +36,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -1070,7 +1071,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
                 invariant(_oplogBuffer->tryPop(txn.get(), &op));
-                dassert(ops.back().raw == op);
+                dassert(SimpleBSONObjComparator::kInstance.evaluate(ops.back().raw == op));
             }
 
             // Otherwise, apply what we have so far and come back for the command.
@@ -1113,7 +1114,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
         ops.push_back(std::move(entry));
         totalBytes += ops.back().raw.objsize();
         invariant(_oplogBuffer->tryPop(txn.get(), &op));
-        dassert(ops.back().raw == op);
+        dassert(SimpleBSONObjComparator::kInstance.evaluate(ops.back().raw == op));
     }
     return std::move(ops);
 }

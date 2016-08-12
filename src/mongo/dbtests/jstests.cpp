@@ -736,7 +736,7 @@ public:
 
         ASSERT(s->exec((string) "y = " + outString, "foo2", false, true, false));
         BSONObj out = s->getObject("y");
-        ASSERT_EQUALS(in, out);
+        ASSERT_BSONOBJ_EQ(in, out);
     }
 };
 
@@ -847,7 +847,7 @@ public:
 
         ASSERT(s->exec((string) "y = " + outString, "foo2", false, true, false));
         BSONObj out = s->getObject("y");
-        ASSERT_EQUALS(in, out);
+        ASSERT_BSONOBJ_EQ(in, out);
     }
 };
 
@@ -2183,7 +2183,7 @@ public:
         {
             BSONObjBuilder b;
             s->append(b, "z", "x");
-            ASSERT_EQUALS(BSON("z" << 5), b.obj());
+            ASSERT_BSONOBJ_EQ(BSON("z" << 5), b.obj());
         }
 
         s->invokeSafe("x = function(){ return 17; }", 0, 0);

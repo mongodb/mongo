@@ -444,10 +444,10 @@ TEST_F(CollectionClonerTest, BeginCollection) {
     ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
 
     ASSERT_EQUALS(nss.ns(), collNss.ns());
-    ASSERT_EQUALS(options.toBSON(), collOptions.toBSON());
+    ASSERT_BSONOBJ_EQ(options.toBSON(), collOptions.toBSON());
     ASSERT_EQUALS(specs.size(), collIndexSpecs.size());
     for (std::vector<BSONObj>::size_type i = 0; i < specs.size(); ++i) {
-        ASSERT_EQUALS(specs[i], collIndexSpecs[i]);
+        ASSERT_BSONOBJ_EQ(specs[i], collIndexSpecs[i]);
     }
 
     // Cloner is still active because it has to read the documents from the source collection.

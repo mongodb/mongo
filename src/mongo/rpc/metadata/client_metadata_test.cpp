@@ -87,7 +87,7 @@ TEST(ClientMetadatTest, TestLoopbackTest) {
                                   << BSON(kType << "c" << kName << "d" << kArchitecture << "e"
                                                 << kVersion
                                                 << "f")));
-        ASSERT_EQUALS(obj, outDoc);
+        ASSERT_BSONOBJ_EQ(obj, outDoc);
     }
 
     // Serialize without application name
@@ -104,7 +104,7 @@ TEST(ClientMetadatTest, TestLoopbackTest) {
                 kDriver << BSON(kName << "a" << kVersion << "b") << kOperatingSystem
                         << BSON(kType << "c" << kName << "d" << kArchitecture << "e" << kVersion
                                       << "f")));
-        ASSERT_EQUALS(obj, outDoc);
+        ASSERT_BSONOBJ_EQ(obj, outDoc);
     }
 
     // Serialize with the os information automatically computed

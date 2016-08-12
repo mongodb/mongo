@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_set.h"
@@ -912,7 +913,8 @@ public:
 
         uassert(13408,
                 "keyPattern must equal shard key",
-                cm->getShardKeyPattern().toBSON() == keyPattern);
+                SimpleBSONObjComparator::kInstance.evaluate(cm->getShardKeyPattern().toBSON() ==
+                                                            keyPattern));
         uassert(13405,
                 str::stream() << "min value " << min << " does not have shard key",
                 cm->getShardKeyPattern().isShardKey(min));
@@ -1376,7 +1378,8 @@ public:
 
         shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
         massert(13091, "how could chunk manager be null!", cm);
-        if (cm->getShardKeyPattern().toBSON() == BSON("files_id" << 1)) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(cm->getShardKeyPattern().toBSON() ==
+                                                        BSON("files_id" << 1))) {
             BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
             vector<Strategy::CommandResult> results;
@@ -1388,7 +1391,8 @@ public:
 
             result.appendElements(res);
             return res["ok"].trueValue();
-        } else if (cm->getShardKeyPattern().toBSON() == BSON("files_id" << 1 << "n" << 1)) {
+        } else if (SimpleBSONObjComparator::kInstance.evaluate(cm->getShardKeyPattern().toBSON() ==
+                                                               BSON("files_id" << 1 << "n" << 1))) {
             int n = 0;
             BSONObj lastResult;
 

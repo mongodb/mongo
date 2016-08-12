@@ -126,7 +126,7 @@ TEST(CommandWriteOpsParsers, SingleInsert) {
     ASSERT(!op.bypassDocumentValidation);
     ASSERT(!op.continueOnError);
     ASSERT_EQ(op.documents.size(), 1u);
-    ASSERT_EQ(op.documents[0], obj);
+    ASSERT_BSONOBJ_EQ(op.documents[0], obj);
 }
 
 TEST(CommandWriteOpsParsers, EmptyMultiInsertFails) {
@@ -145,8 +145,8 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
     ASSERT(!op.bypassDocumentValidation);
     ASSERT(!op.continueOnError);
     ASSERT_EQ(op.documents.size(), 2u);
-    ASSERT_EQ(op.documents[0], obj0);
-    ASSERT_EQ(op.documents[1], obj1);
+    ASSERT_BSONOBJ_EQ(op.documents[0], obj0);
+    ASSERT_BSONOBJ_EQ(op.documents[1], obj1);
 }
 
 TEST(CommandWriteOpsParsers, Update) {
@@ -169,9 +169,9 @@ TEST(CommandWriteOpsParsers, Update) {
             ASSERT(!op.bypassDocumentValidation);
             ASSERT_EQ(op.continueOnError, false);
             ASSERT_EQ(op.updates.size(), 1u);
-            ASSERT_EQ(op.updates[0].query, query);
-            ASSERT_EQ(op.updates[0].update, update);
-            ASSERT_EQ(op.updates[0].collation, collation);
+            ASSERT_BSONOBJ_EQ(op.updates[0].query, query);
+            ASSERT_BSONOBJ_EQ(op.updates[0].update, update);
+            ASSERT_BSONOBJ_EQ(op.updates[0].collation, collation);
             ASSERT_EQ(op.updates[0].upsert, upsert);
             ASSERT_EQ(op.updates[0].multi, multi);
         }
@@ -193,8 +193,8 @@ TEST(CommandWriteOpsParsers, Remove) {
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, false);
         ASSERT_EQ(op.deletes.size(), 1u);
-        ASSERT_EQ(op.deletes[0].query, query);
-        ASSERT_EQ(op.deletes[0].collation, collation);
+        ASSERT_BSONOBJ_EQ(op.deletes[0].query, query);
+        ASSERT_BSONOBJ_EQ(op.deletes[0].collation, collation);
         ASSERT_EQ(op.deletes[0].multi, multi);
     }
 }
@@ -268,7 +268,7 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, continueOnError);
         ASSERT_EQ(op.documents.size(), 1u);
-        ASSERT_EQ(op.documents[0], obj);
+        ASSERT_BSONOBJ_EQ(op.documents[0], obj);
     }
 }
 
@@ -295,8 +295,8 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, continueOnError);
         ASSERT_EQ(op.documents.size(), 2u);
-        ASSERT_EQ(op.documents[0], obj0);
-        ASSERT_EQ(op.documents[1], obj1);
+        ASSERT_BSONOBJ_EQ(op.documents[0], obj0);
+        ASSERT_BSONOBJ_EQ(op.documents[1], obj1);
     }
 }
 
@@ -313,8 +313,8 @@ TEST(LegacyWriteOpsParsers, Update) {
             ASSERT(!op.bypassDocumentValidation);
             ASSERT_EQ(op.continueOnError, false);
             ASSERT_EQ(op.updates.size(), 1u);
-            ASSERT_EQ(op.updates[0].query, query);
-            ASSERT_EQ(op.updates[0].update, update);
+            ASSERT_BSONOBJ_EQ(op.updates[0].query, query);
+            ASSERT_BSONOBJ_EQ(op.updates[0].update, update);
             ASSERT_EQ(op.updates[0].upsert, upsert);
             ASSERT_EQ(op.updates[0].multi, multi);
         }
@@ -332,7 +332,7 @@ TEST(LegacyWriteOpsParsers, Remove) {
         ASSERT(!op.bypassDocumentValidation);
         ASSERT_EQ(op.continueOnError, false);
         ASSERT_EQ(op.deletes.size(), 1u);
-        ASSERT_EQ(op.deletes[0].query, query);
+        ASSERT_BSONOBJ_EQ(op.deletes[0].query, query);
         ASSERT_EQ(op.deletes[0].multi, multi);
     }
 }

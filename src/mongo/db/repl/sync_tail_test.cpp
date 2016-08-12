@@ -274,7 +274,7 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
         ASSERT_FALSE(txn->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(db);
-        ASSERT_EQUALS(op, theOperation);
+        ASSERT_BSONOBJ_EQ(op, theOperation);
         ASSERT_FALSE(convertUpdateToUpsert);
         return Status::OK();
     };
@@ -333,7 +333,7 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
         ASSERT_FALSE(txn->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(db);
-        ASSERT_EQUALS(op, theOperation);
+        ASSERT_BSONOBJ_EQ(op, theOperation);
         ASSERT_TRUE(convertUpdateToUpsert);
         return Status::OK();
     };
@@ -393,7 +393,7 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
         ASSERT_FALSE(txn->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(db);
-        ASSERT_EQUALS(op, theOperation);
+        ASSERT_BSONOBJ_EQ(op, theOperation);
         ASSERT_FALSE(convertUpdateToUpsert);
         return Status::OK();
     };
@@ -429,7 +429,7 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
         ASSERT_TRUE(txn->lockState()->isW());
         ASSERT_TRUE(txn->writesAreReplicated());
         ASSERT_FALSE(documentValidationDisabled(txn));
-        ASSERT_EQUALS(op, theOperation);
+        ASSERT_BSONOBJ_EQ(op, theOperation);
         return Status::OK();
     };
     ASSERT_TRUE(_txn->writesAreReplicated());
@@ -593,8 +593,8 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     stdx::lock_guard<stdx::mutex> lock(mutex);
     ASSERT_EQUALS(2U, operationsWrittenToOplog.size());
     ASSERT_EQUALS(NamespaceString(rsOplogName), nssForInsert);
-    ASSERT_EQUALS(op1.raw, operationsWrittenToOplog[0]);
-    ASSERT_EQUALS(op2.raw, operationsWrittenToOplog[1]);
+    ASSERT_BSONOBJ_EQ(op1.raw, operationsWrittenToOplog[0]);
+    ASSERT_BSONOBJ_EQ(op2.raw, operationsWrittenToOplog[1]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
@@ -719,8 +719,8 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     ASSERT_EQUALS(BSONType::Array, operationsApplied[2].o.type());
     auto group1 = operationsApplied[2].o.Array();
     ASSERT_EQUALS(2U, group1.size());
-    ASSERT_EQUALS(insertOp1a.o.Obj(), group1[0].Obj());
-    ASSERT_EQUALS(insertOp1b.o.Obj(), group1[1].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp1a.o.Obj(), group1[0].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp1b.o.Obj(), group1[1].Obj());
 
     // Check grouped insert operations in namespace "nss2".
     ASSERT_EQUALS(insertOp2a.getOpTime(), operationsApplied[3].getOpTime());
@@ -728,8 +728,8 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     ASSERT_EQUALS(BSONType::Array, operationsApplied[3].o.type());
     auto group2 = operationsApplied[3].o.Array();
     ASSERT_EQUALS(2U, group2.size());
-    ASSERT_EQUALS(insertOp2a.o.Obj(), group2[0].Obj());
-    ASSERT_EQUALS(insertOp2b.o.Obj(), group2[1].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp2a.o.Obj(), group2[0].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp2b.o.Obj(), group2[1].Obj());
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
@@ -776,7 +776,7 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
     ASSERT_EQUALS(limit, groupedInsertDocuments.size());
     for (std::size_t i = 0; i < limit; ++i) {
         const auto& insertOp = insertOps[i];
-        ASSERT_EQUALS(insertOp.o.Obj(), groupedInsertDocuments[i].Obj());
+        ASSERT_BSONOBJ_EQ(insertOp.o.Obj(), groupedInsertDocuments[i].Obj());
     }
 
     // (limit + 1)-th insert operations should not be included in group of first (limit) inserts.
@@ -882,8 +882,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
 
     OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
-    ASSERT_EQUALS(doc3, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(doc1, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(doc3, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
@@ -901,7 +901,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
     // with the OplogInterfaceLocal class.
     OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
-    ASSERT_EQUALS(updatedDocument, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 

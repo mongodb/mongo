@@ -397,7 +397,7 @@ TEST_F(
         processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::BadValue) << "errmsg"
                                          << "Unexpected field durableOpTime in UpdateInfoArgs"),
                                true);
-    ASSERT_EQUALS(expectedNewStyleCommandRequest, commandRequest);
+    ASSERT_BSONOBJ_EQ(expectedNewStyleCommandRequest, commandRequest);
 
     // Update command object should match old style (pre-3.2.4).
     auto expectedOldStyleCommandRequest = unittest::assertGet(prepareReplSetUpdatePositionCommandFn(
@@ -408,7 +408,7 @@ TEST_F(
                   << "newer config"
                   << "configVersion"
                   << posUpdater->getConfigVersion() + 1));
-    ASSERT_EQUALS(expectedOldStyleCommandRequest, commandRequest);
+    ASSERT_BSONOBJ_EQ(expectedOldStyleCommandRequest, commandRequest);
 
     ASSERT_TRUE(reporter->isActive());
 }
@@ -543,7 +543,7 @@ TEST_F(ReporterTest,
         processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::BadValue) << "errmsg"
                                          << "Unexpected field durableOpTime in UpdateInfoArgs"),
                                true);
-    ASSERT_EQUALS(expectedNewStyleCommandRequest, commandRequest);
+    ASSERT_BSONOBJ_EQ(expectedNewStyleCommandRequest, commandRequest);
 
     auto expectedOldStyleCommandRequest = unittest::assertGet(prepareReplSetUpdatePositionCommandFn(
         ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle));
@@ -551,8 +551,8 @@ TEST_F(ReporterTest,
     commandRequest = processNetworkResponse(BSON("ok" << 1));
 
     // Update command object should match old style (pre-3.2.2).
-    ASSERT_NOT_EQUALS(expectedNewStyleCommandRequest, expectedOldStyleCommandRequest);
-    ASSERT_EQUALS(expectedOldStyleCommandRequest, commandRequest);
+    ASSERT_BSONOBJ_NE(expectedNewStyleCommandRequest, expectedOldStyleCommandRequest);
+    ASSERT_BSONOBJ_EQ(expectedOldStyleCommandRequest, commandRequest);
 
     reporter->shutdown();
 

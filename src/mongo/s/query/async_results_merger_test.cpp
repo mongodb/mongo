@@ -256,17 +256,17 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
 
     ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -291,17 +291,17 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
 
     ASSERT_FALSE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -321,13 +321,13 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
 
     ASSERT_FALSE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 10}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 10}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 7}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 7}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 9}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 9}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -343,7 +343,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
 
     ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 11}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 11}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -370,23 +370,23 @@ TEST_F(AsyncResultsMergerTest, ClusterFindSorted) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3, $sortKey: {'': 3}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3, $sortKey: {'': 3}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4, $sortKey: {'': 4}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 4, $sortKey: {'': 4}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 5, $sortKey: {'': 5}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 5, $sortKey: {'': 5}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 6, $sortKey: {'': 6}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 6, $sortKey: {'': 6}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 8, $sortKey: {'': 8}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 8, $sortKey: {'': 8}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 9, $sortKey: {'': 9}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 9, $sortKey: {'': 9}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -413,13 +413,17 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 3}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 3}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 4}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 4}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 5}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 6}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 6}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -434,11 +438,14 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 7}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 7}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 7}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 7}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 8}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 8}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -453,11 +460,14 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 9}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 9}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 10}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 10}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 10}}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 10}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -484,23 +494,23 @@ TEST_F(AsyncResultsMergerTest, ClusterFindCompoundSortKey) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 10, '': 11}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 10, '': 11}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 10, '': 12}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 10, '': 12}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 4, '': 4}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 4, '': 4}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{$sortKey: {'': 4, '': 20}}"),
-              *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: {'': 4, '': 20}}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -561,7 +571,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -584,7 +594,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -613,7 +623,7 @@ TEST_F(AsyncResultsMergerTest, ReceivedViewDefinitionFromShard) {
 
     auto outputPipeline = (*viewDef)["pipeline"];
     ASSERT(!outputPipeline.eoo());
-    ASSERT_EQ(fromjson(inputPipeline), outputPipeline.Obj());
+    ASSERT_BSONOBJ_EQ(fromjson(inputPipeline), outputPipeline.Obj());
 
     auto outputNs = (*viewDef)["ns"];
     ASSERT(!outputNs.eoo());
@@ -637,13 +647,13 @@ TEST_F(AsyncResultsMergerTest, ExistingCursors) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -667,13 +677,13 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -690,9 +700,9 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -707,9 +717,9 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 7}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 7}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     // Kill cursor before deleting it, as the second remote cursor has not been exhausted. We don't
     // wait on 'killEvent' here, as the blackholed request's callback will only run on shutdown of
@@ -734,11 +744,11 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_FALSE(arm->ready());
 
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -833,9 +843,9 @@ TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 
@@ -940,7 +950,7 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
                                   << "testcoll"
                                   << "cursors"
                                   << BSON_ARRAY(CursorId(123)));
-    ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+    ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     // Ensure that we properly signal both those waiting for the kill, and those waiting for more
     // results to be ready.
@@ -963,9 +973,9 @@ TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
 
     // First batch received.
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     // This will schedule a getMore on cursor id 123.
     ASSERT_FALSE(arm->ready());
@@ -987,7 +997,7 @@ TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
                                   << "testcoll"
                                   << "cursors"
                                   << BSON_ARRAY(CursorId(123)));
-    ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+    ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     // Ensure that we properly signal both those waiting for the kill, and those waiting for more
     // results to be ready.
@@ -1042,9 +1052,9 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     // In the tailable case, we expect EOF after every batch.
     ASSERT_TRUE(arm->ready());
@@ -1064,7 +1074,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
 
     ASSERT_TRUE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
     ASSERT_FALSE(arm->remotesExhausted());
@@ -1136,9 +1146,9 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_FALSE(arm->ready());
 
     responses.clear();
@@ -1157,7 +1167,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -1172,7 +1182,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     ASSERT_FALSE(arm->ready());
 
     BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
-    ASSERT_EQ(cmdRequestMetadata, rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    ASSERT_BSONOBJ_EQ(cmdRequestMetadata, rpc::ServerSelectionMetadata(true, boost::none).toBSON());
 
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
@@ -1181,7 +1191,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }
@@ -1209,9 +1219,9 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1230,7 +1240,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1263,9 +1273,9 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1301,7 +1311,7 @@ TEST_F(AsyncResultsMergerTest, RetryOnNotMasterNoSlaveOkSingleNode) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
@@ -1364,7 +1374,7 @@ TEST_F(AsyncResultsMergerTest, RetryOnHostUnreachableAllowPartialResults) {
     ASSERT_TRUE(arm->ready());
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
@@ -1385,7 +1395,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 
@@ -1400,7 +1410,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
                                             << "testcoll"
                                             << "maxTimeMS"
                                             << 789);
-    ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+    ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     responses.clear();
     std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
@@ -1410,7 +1420,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }

@@ -349,7 +349,7 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
     ASSERT_EQUALS("admin", noi->getRequest().dbname);
-    ASSERT_EQUALS(hbArgs.toBSON(), noi->getRequest().cmdObj);
+    ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
     getNet()->scheduleResponse(
         noi, startDate + Milliseconds(10), ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
     getNet()->runUntil(startDate + Milliseconds(10));
@@ -380,7 +380,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
     ASSERT_EQUALS("admin", noi->getRequest().dbname);
-    ASSERT_EQUALS(hbArgs.toBSON(), noi->getRequest().cmdObj);
+    ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
     ReplSetHeartbeatResponse hbResp;
     hbResp.setConfigVersion(0);
     getNet()->scheduleResponse(

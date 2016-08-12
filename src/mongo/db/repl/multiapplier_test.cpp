@@ -171,7 +171,7 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, callbackResult);
     ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
+    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
@@ -208,7 +208,7 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
 
     ASSERT_EQUALS(multiApplyError, callbackResult);
     ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
+    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCallbackStatus) {
@@ -246,7 +246,7 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
 
     ASSERT_EQUALS(multiApplyError, callbackResult);
     ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
+    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(
@@ -286,12 +286,12 @@ TEST_F(
 
     ASSERT_TRUE(multiApplyTxn);
     ASSERT_EQUALS(1U, operationsToApply.size());
-    ASSERT_EQUALS(operations[0].raw, operationsToApply[0].raw);
+    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsToApply[0].raw);
 
     ASSERT_OK(callbackResult);
     ASSERT_EQUALS(operations.back().getOpTime().getTimestamp(), callbackResult.getValue());
     ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
+    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
     ASSERT_FALSE(callbackTxn);
 }
 

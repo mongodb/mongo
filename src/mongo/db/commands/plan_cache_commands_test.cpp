@@ -156,10 +156,10 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
 
     vector<BSONObj> shapes = getShapes(planCache);
     ASSERT_EQUALS(shapes.size(), 1U);
-    ASSERT_EQUALS(shapes[0].getObjectField("query"), cq->getQueryObj());
-    ASSERT_EQUALS(shapes[0].getObjectField("sort"), cq->getQueryRequest().getSort());
-    ASSERT_EQUALS(shapes[0].getObjectField("projection"), cq->getQueryRequest().getProj());
-    ASSERT_EQUALS(shapes[0].getObjectField("collation"), cq->getCollator()->getSpec().toBSON());
+    ASSERT_BSONOBJ_EQ(shapes[0].getObjectField("query"), cq->getQueryObj());
+    ASSERT_BSONOBJ_EQ(shapes[0].getObjectField("sort"), cq->getQueryRequest().getSort());
+    ASSERT_BSONOBJ_EQ(shapes[0].getObjectField("projection"), cq->getQueryRequest().getProj());
+    ASSERT_BSONOBJ_EQ(shapes[0].getObjectField("collation"), cq->getCollator()->getSpec().toBSON());
 }
 
 /**
@@ -337,8 +337,14 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     BSONObj shapeB = BSON(
         "query" << cqB->getQueryObj() << "sort" << cqB->getQueryRequest().getSort() << "projection"
                 << cqB->getQueryRequest().getProj());
-    ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeA) != shapesBefore.end());
-    ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeB) != shapesBefore.end());
+    ASSERT_TRUE(
+        std::find_if(shapesBefore.begin(), shapesBefore.end(), [&shapeA](const BSONObj& obj) {
+            return SimpleBSONObjComparator::kInstance.evaluate(shapeA == obj);
+        }) != shapesBefore.end());
+    ASSERT_TRUE(
+        std::find_if(shapesBefore.begin(), shapesBefore.end(), [&shapeB](const BSONObj& obj) {
+            return SimpleBSONObjComparator::kInstance.evaluate(shapeB == obj);
+        }) != shapesBefore.end());
 
     // Drop {b: 1} from cache. Make sure {a: 1} is still in cache afterwards.
     BSONObjBuilder bob;
@@ -347,7 +353,7 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
         txn.get(), &planCache, nss.ns(), BSON("query" << cqB->getQueryObj())));
     vector<BSONObj> shapesAfter = getShapes(planCache);
     ASSERT_EQUALS(shapesAfter.size(), 1U);
-    ASSERT_EQUALS(shapesAfter[0], shapeA);
+    ASSERT_BSONOBJ_EQ(shapesAfter[0], shapeA);
 }
 
 TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
@@ -393,9 +399,15 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
                                               << cqCollation->getQueryRequest().getProj()
                                               << "collation"
                                               << cqCollation->getCollator()->getSpec().toBSON());
-    ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shape) != shapesBefore.end());
-    ASSERT_TRUE(std::find(shapesBefore.begin(), shapesBefore.end(), shapeWithCollation) !=
-                shapesBefore.end());
+    ASSERT_TRUE(
+        std::find_if(shapesBefore.begin(), shapesBefore.end(), [&shape](const BSONObj& obj) {
+            return SimpleBSONObjComparator::kInstance.evaluate(shape == obj);
+        }) != shapesBefore.end());
+    ASSERT_TRUE(
+        std::find_if(
+            shapesBefore.begin(), shapesBefore.end(), [&shapeWithCollation](const BSONObj& obj) {
+                return SimpleBSONObjComparator::kInstance.evaluate(shapeWithCollation == obj);
+            }) != shapesBefore.end());
 
     // Drop query with collation from cache. Make other query is still in cache afterwards.
     BSONObjBuilder bob;
@@ -403,7 +415,7 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
     ASSERT_OK(PlanCacheClear::clear(txn.get(), &planCache, nss.ns(), shapeWithCollation));
     vector<BSONObj> shapesAfter = getShapes(planCache);
     ASSERT_EQUALS(shapesAfter.size(), 1U);
-    ASSERT_EQUALS(shapesAfter[0], shape);
+    ASSERT_BSONOBJ_EQ(shapesAfter[0], shape);
 }
 
 /**

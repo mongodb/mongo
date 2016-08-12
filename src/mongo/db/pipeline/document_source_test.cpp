@@ -134,50 +134,50 @@ public:
             const char* array[] = {"a", "b"};  // basic
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
         }
         {
             const char* array[] = {"a", "ab"};  // prefixed but not subfield
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "ab" << 1 << "_id" << 0));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "ab" << 1 << "_id" << 0));
         }
         {
             const char* array[] = {"a", "b", "a.b"};  // a.b included by a
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
         }
         {
             const char* array[] = {"a", "_id"};  // _id now included
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
         }
         {
             const char* array[] = {"a", "_id.a"};  // still include whole _id (SERVER-7502)
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
         }
         {
             const char* array[] = {"a", "_id", "_id.a"};  // handle both _id and subfield
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("a" << 1 << "_id" << 1));
         }
         {
             const char* array[] = {"a", "_id", "_id_a"};  // _id prefixed but non-subfield
             DepsTracker deps;
             deps.fields = arrayToSet(array);
-            ASSERT_EQUALS(deps.toProjection(), BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
         }
         {
             const char* array[] = {"a"};  // fields ignored with needWholeDocument
             DepsTracker deps;
             deps.fields = arrayToSet(array);
             deps.needWholeDocument = true;
-            ASSERT_EQUALS(deps.toProjection(), BSONObj());
+            ASSERT_BSONOBJ_EQ(deps.toProjection(), BSONObj());
         }
         {
             const char* array[] = {"a"};  // needTextScore with needWholeDocument
@@ -185,14 +185,15 @@ public:
             deps.fields = arrayToSet(array);
             deps.needWholeDocument = true;
             deps.setNeedTextScore(true);
-            ASSERT_EQUALS(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
+            ASSERT_BSONOBJ_EQ(deps.toProjection(),
+                              BSON(Document::metaFieldTextScore << metaTextScore));
         }
         {
             const char* array[] = {"a"};  // needTextScore without needWholeDocument
             DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
             deps.fields = arrayToSet(array);
             deps.setNeedTextScore(true);
-            ASSERT_EQUALS(
+            ASSERT_BSONOBJ_EQ(
                 deps.toProjection(),
                 BSON(Document::metaFieldTextScore << metaTextScore << "a" << 1 << "_id" << 0));
         }
@@ -402,7 +403,7 @@ TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {
     Document input = DOC("local" << 1);
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$eq: 1}}, {}]}}"));
+    ASSERT_BSONOBJ_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$eq: 1}}, {}]}}"));
 }
 
 TEST(MakeMatchStageFromInput, RegexValueUsesEqQuery) {
@@ -410,9 +411,10 @@ TEST(MakeMatchStageFromInput, RegexValueUsesEqQuery) {
     Document input = DOC("local" << Value(regex));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(matchStage,
-              BSON("$match" << BSON("$and" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << regex))
-                                                         << BSONObj()))));
+    ASSERT_BSONOBJ_EQ(
+        matchStage,
+        BSON("$match" << BSON(
+                 "$and" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << regex)) << BSONObj()))));
 }
 
 TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
@@ -420,7 +422,7 @@ TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
     Document input = DOC("local" << Value(inputArray));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$in: [1, 2]}}, {}]}}"));
+    ASSERT_BSONOBJ_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$in: [1, 2]}}, {}]}}"));
 }
 
 TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
@@ -429,13 +431,14 @@ TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
     Document input = DOC("local" << Value(inputArray));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_EQ(matchStage,
-              BSON("$match" << BSON(
-                       "$and" << BSON_ARRAY(
-                           BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
-                                                    << BSON("foreign" << BSON("$eq" << regex))
-                                                    << BSON("foreign" << BSON("$eq" << Value(2)))))
-                           << BSONObj()))));
+    ASSERT_BSONOBJ_EQ(
+        matchStage,
+        BSON("$match" << BSON(
+                 "$and" << BSON_ARRAY(
+                     BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
+                                              << BSON("foreign" << BSON("$eq" << regex))
+                                              << BSON("foreign" << BSON("$eq" << Value(2)))))
+                     << BSONObj()))));
 }
 
 }  // namespace DocumentSourceLookUp
@@ -485,7 +488,7 @@ private:
         BSONElement specElement = spec.firstElement();
         intrusive_ptr<DocumentSource> generated =
             DocumentSourceGroup::createFromBson(specElement, ctx());
-        ASSERT_EQUALS(spec, toBson(generated));
+        ASSERT_BSONOBJ_EQ(spec, toBson(generated));
     }
     intrusive_ptr<DocumentSource> _group;
     TempDir _tempDir;
@@ -513,7 +516,7 @@ public:
         boost::optional<Document> next = group()->getNext();
         ASSERT(bool(next));
         // The constant _id value from the $group spec is passed through.
-        ASSERT_EQUALS(expected(), next->toBson());
+        ASSERT_BSONOBJ_EQ(expected(), next->toBson());
     }
 
 protected:
@@ -803,7 +806,7 @@ protected:
             bsonResultSet << i->second;
         }
         // Check the result set.
-        ASSERT_EQUALS(expectedResultSet(), bsonResultSet.arr());
+        ASSERT_BSONOBJ_EQ(expectedResultSet(), bsonResultSet.arr());
     }
 };
 
@@ -1419,8 +1422,8 @@ TEST_F(ProjectStageTest, ShouldOptimizeInnerExpressions) {
     // The $and should have been replaced with its only argument.
     vector<Value> serializedArray;
     project()->serializeToArray(serializedArray);
-    ASSERT_EQUALS(serializedArray[0].getDocument().toBson(),
-                  fromjson("{$project: {_id: true, a: {$const: true}}}"));
+    ASSERT_BSONOBJ_EQ(serializedArray[0].getDocument().toBson(),
+                      fromjson("{$project: {_id: true, a: {$const: true}}}"));
 };
 
 TEST_F(ProjectStageTest, ShouldErrorOnNonObjectSpec) {
@@ -1882,7 +1885,7 @@ private:
     void checkBsonRepresentation(const BSONObj& spec) {
         Value serialized = static_cast<DocumentSourceSample*>(sample())->serialize(false);
         auto generatedSpec = serialized.getDocument().toBson();
-        ASSERT_EQUALS(spec, generatedSpec);
+        ASSERT_BSONOBJ_EQ(spec, generatedSpec);
     }
 };
 
@@ -2161,7 +2164,7 @@ private:
         vector<Value> arr;
         _sort->serializeToArray(arr);
         BSONObj generatedSpec = arr[0].getDocument().toBson();
-        ASSERT_EQUALS(spec, generatedSpec);
+        ASSERT_BSONOBJ_EQ(spec, generatedSpec);
     }
     intrusive_ptr<DocumentSource> _sort;
 };
@@ -2178,7 +2181,7 @@ public:
         {  // pre-limit checks
             vector<Value> arr;
             sort()->serializeToArray(arr);
-            ASSERT_EQUALS(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
+            ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
 
             ASSERT(sort()->getShardSource() == NULL);
             ASSERT(sort()->getMergeSource() != NULL);
@@ -2242,7 +2245,7 @@ public:
             bsonResultSet << *i;
         }
         // Check the result set.
-        ASSERT_EQUALS(expectedResultSet(), bsonResultSet.arr());
+        ASSERT_BSONOBJ_EQ(expectedResultSet(), bsonResultSet.arr());
     }
 
 protected:
@@ -2695,7 +2698,7 @@ private:
             bsonResultSet << *i;
         }
         // Check the result set.
-        ASSERT_EQUALS(expectedResults, bsonResultSet.arr());
+        ASSERT_BSONOBJ_EQ(expectedResults, bsonResultSet.arr());
     }
 
     /**
@@ -2706,8 +2709,8 @@ private:
         vector<Value> arr;
         _unwind->serializeToArray(arr);
         BSONObj generatedSpec = Value(arr[0]).getDocument().toBson();
-        ASSERT_EQUALS(expectedSerialization(preserveNullAndEmptyArrays, includeArrayIndex),
-                      generatedSpec);
+        ASSERT_BSONOBJ_EQ(expectedSerialization(preserveNullAndEmptyArrays, includeArrayIndex),
+                          generatedSpec);
     }
 
     BSONObj expectedSerialization(bool preserveNullAndEmptyArrays, bool includeArrayIndex) const {
@@ -3356,7 +3359,7 @@ public:
     void test(string input, string safePortion) {
         try {
             intrusive_ptr<DocumentSourceMatch> match = makeMatch(input);
-            ASSERT_EQUALS(match->redactSafePortion(), fromjson(safePortion));
+            ASSERT_BSONOBJ_EQ(match->redactSafePortion(), fromjson(safePortion));
         } catch (...) {
             unittest::log() << "Problem with redactSafePortion() of: " << input;
             throw;
@@ -3612,60 +3615,61 @@ public:
         Pipeline::SourceContainer container;
 
         // Check initial state
-        ASSERT_EQUALS(match1->getQuery(), BSON("a" << 1));
-        ASSERT_EQUALS(match2->getQuery(), BSON("b" << 1));
-        ASSERT_EQUALS(match3->getQuery(), BSON("c" << 1));
+        ASSERT_BSONOBJ_EQ(match1->getQuery(), BSON("a" << 1));
+        ASSERT_BSONOBJ_EQ(match2->getQuery(), BSON("b" << 1));
+        ASSERT_BSONOBJ_EQ(match3->getQuery(), BSON("c" << 1));
 
         container.push_back(match1);
         container.push_back(match2);
         match1->optimizeAt(container.begin(), &container);
 
         ASSERT_EQUALS(container.size(), 1U);
-        ASSERT_EQUALS(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
+        ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
 
         container.push_back(match3);
         match1->optimizeAt(container.begin(), &container);
         ASSERT_EQUALS(container.size(), 1U);
-        ASSERT_EQUALS(match1->getQuery(),
-                      fromjson("{'$and': [{'$and': [{a:1}, {b:1}]},"
-                               "{c:1}]}"));
+        ASSERT_BSONOBJ_EQ(match1->getQuery(),
+                          fromjson("{'$and': [{'$and': [{a:1}, {b:1}]},"
+                                   "{c:1}]}"));
     }
 };
 
 TEST(ObjectForMatch, ShouldExtractTopLevelFieldIfDottedFieldNeeded) {
     Document input(fromjson("{a: 1, b: {c: 1, d: 1}}"));
     BSONObj expected = fromjson("{b: {c: 1, d: 1}}");
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.c"}));
+    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.c"}));
 }
 
 TEST(ObjectForMatch, ShouldExtractEntireArray) {
     Document input(fromjson("{a: [1, 2, 3], b: 1}"));
     BSONObj expected = fromjson("{a: [1, 2, 3]}");
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"a"}));
+    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"a"}));
 }
 
 TEST(ObjectForMatch, ShouldOnlyAddPrefixedFieldOnceIfTwoDottedSubfields) {
     Document input(fromjson("{a: 1, b: {c: 1, f: {d: {e: 1}}}}"));
     BSONObj expected = fromjson("{b: {c: 1, f: {d: {e: 1}}}}");
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.f", "b.f.d.e"}));
+    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"b.f", "b.f.d.e"}));
 }
 
 TEST(ObjectForMatch, MissingFieldShouldNotAppearInResult) {
     Document input(fromjson("{a: 1}"));
     BSONObj expected;
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"b", "c"}));
+    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"b", "c"}));
 }
 
 TEST(ObjectForMatch, ShouldSerializeNothingIfNothingIsNeeded) {
     Document input(fromjson("{a: 1, b: {c: 1}}"));
     BSONObj expected;
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, std::set<std::string>{}));
+    ASSERT_BSONOBJ_EQ(expected,
+                      DocumentSourceMatch::getObjectForMatch(input, std::set<std::string>{}));
 }
 
 TEST(ObjectForMatch, ShouldExtractEntireArrayFromPrefixOfDottedField) {
     Document input(fromjson("{a: [{b: 1}, {b: 2}], c: 1}"));
     BSONObj expected = fromjson("{a: [{b: 1}, {b: 2}]}");
-    ASSERT_EQUALS(expected, DocumentSourceMatch::getObjectForMatch(input, {"a.b"}));
+    ASSERT_BSONOBJ_EQ(expected, DocumentSourceMatch::getObjectForMatch(input, {"a.b"}));
 }
 
 
@@ -4812,8 +4816,8 @@ TEST_F(AddFieldsTest, OptimizesInnerExpressions) {
     // The $and should have been replaced with its only argument.
     vector<Value> serializedArray;
     addFields()->serializeToArray(serializedArray);
-    ASSERT_EQUALS(serializedArray[0].getDocument().toBson(),
-                  fromjson("{$addFields: {a: {$const: true}}}"));
+    ASSERT_BSONOBJ_EQ(serializedArray[0].getDocument().toBson(),
+                      fromjson("{$addFields: {a: {$const: true}}}"));
 }
 
 // Verify that the addFields stage requires a valid object specification.

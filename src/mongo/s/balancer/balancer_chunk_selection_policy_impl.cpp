@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -49,7 +50,7 @@
 
 namespace mongo {
 
-using ChunkMinimumsSet = std::set<BSONObj>;
+using ChunkMinimumsSet = BSONObj::ComparatorInterface::BSONObjSet;
 using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
 using SplitInfoVector = BalancerChunkSelectionPolicy::SplitInfoVector;
 using std::shared_ptr;
@@ -65,7 +66,7 @@ namespace {
 StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDistributionInfo(
     OperationContext* txn, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
     ShardToChunksMap shardToChunksMap;
-    ChunkMinimumsSet chunkMinimums;
+    ChunkMinimumsSet chunkMinimums = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
 
     // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
     // be accounted for

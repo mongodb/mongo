@@ -118,7 +118,7 @@ TEST_F(ClusterCursorManagerTest, RegisterCursor) {
     auto nextResult = pinnedCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
     ASSERT(nextResult.getValue().getResult());
-    ASSERT_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
     nextResult = pinnedCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
     ASSERT_TRUE(nextResult.getValue().isEOF());
@@ -149,7 +149,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorBasic) {
     auto nextResult = checkedOutCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
     ASSERT(nextResult.getValue().getResult());
-    ASSERT_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), *nextResult.getValue().getResult());
     nextResult = checkedOutCursor.getValue().next();
     ASSERT_OK(nextResult.getStatus());
     ASSERT_TRUE(nextResult.getValue().isEOF());
@@ -175,7 +175,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorMultipleCursors) {
         auto nextResult = pinnedCursor.getValue().next();
         ASSERT_OK(nextResult.getStatus());
         ASSERT(nextResult.getValue().getResult());
-        ASSERT_EQ(BSON("a" << i), *nextResult.getValue().getResult());
+        ASSERT_BSONOBJ_EQ(BSON("a" << i), *nextResult.getValue().getResult());
         nextResult = pinnedCursor.getValue().next();
         ASSERT_OK(nextResult.getStatus());
         ASSERT_TRUE(nextResult.getValue().isEOF());

@@ -102,13 +102,13 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
 TEST(SortKeyGeneratorTest, SortKeyNormal) {
     BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, a: 5}", "", nullptr);
     BSONObj expectedOut = BSON("" << 5);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyNormal2) {
     BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", "", nullptr);
     BSONObj expectedOut = BSON("" << 6);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyString) {
@@ -116,28 +116,28 @@ TEST(SortKeyGeneratorTest, SortKeyString) {
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", "", nullptr);
     BSONObj expectedOut = BSON(""
                                << "thing2");
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCompound) {
     BSONObj actualOut = extractSortKey(
         "{a: 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", "", nullptr);
     BSONObj expectedOut = BSON("" << 99 << "" << 16);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyEmbedded) {
     BSONObj actualOut = extractSortKey(
         "{'c.a': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: {a: 4}, b: 16}", "", nullptr);
     BSONObj expectedOut = BSON("" << 4 << "" << 16);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyArray) {
     BSONObj actualOut = extractSortKey(
         "{'c': 1, b: 1}", "{_id: 0, z: 'thing1', a: 99, c: [2, 4, 1], b: 16}", "", nullptr);
     BSONObj expectedOut = BSON("" << 1 << "" << 16);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCoveredNormal) {
@@ -145,7 +145,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredNormal) {
     BSONObj actualOut = extractSortKeyCovered(
         "{a: 1}", IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr), collator);
     BSONObj expectedOut = BSON("" << 5);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCoveredEmbedded) {
@@ -155,7 +155,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredEmbedded) {
         IndexKeyDatum(BSON("a.c" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr),
         collator);
     BSONObj expectedOut = BSON("" << 5);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCoveredCompound) {
@@ -165,7 +165,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound) {
         IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr),
         collator);
     BSONObj expectedOut = BSON("" << 5 << "" << 6);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCoveredCompound2) {
@@ -176,7 +176,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound2) {
                                                             nullptr),
                                               collator);
     BSONObj expectedOut = BSON("" << 5 << "" << 6);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyCoveredCompound3) {
@@ -188,7 +188,7 @@ TEST(SortKeyGeneratorTest, SortKeyCoveredCompound3) {
                                             nullptr),
                               collator);
     BSONObj expectedOut = BSON("" << 6 << "" << 4);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
@@ -197,14 +197,14 @@ TEST(SortKeyGeneratorTest, ExtractStringSortKeyWithCollatorUsesComparisonKey) {
         extractSortKey("{a: 1}", "{_id: 0, z: 'thing1', a: 'thing2', b: 16}", "", &collator);
     BSONObj expectedOut = BSON(""
                                << "2gniht");
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, CollatorHasNoEffectWhenExtractingNonStringSortKey) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut = extractSortKey("{a: 1}", "{_id: 0, z: 10, a: 6, b: 16}", "", &collator);
     BSONObj expectedOut = BSON("" << 6);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
@@ -217,14 +217,14 @@ TEST(SortKeyGeneratorTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
                                               &collator);
     BSONObj expectedOut = BSON(""
                                << "foo");
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysUsesTheQueryPredicate) {
     BSONObj actualOut =
         extractSortKey("{a: -1}", "{_id: 0, a: [1, 2, 3, 4]}", "{a: {$lt: 3}}", nullptr);
     BSONObj expectedOut = BSON("" << 2);
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
@@ -233,7 +233,7 @@ TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysRespectsCollation) {
         extractSortKey("{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", "", &collator);
     BSONObj expectedOut = BSON(""
                                << "ayy");
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysWithPredicateRespectsCollation) {
@@ -242,7 +242,7 @@ TEST(SortKeyGeneratorTest, EnsureSortKeyGenerationForArraysWithPredicateRespects
         "{a: 1}", "{_id: 0, a: ['aaz', 'zza', 'yya', 'zzb']}", "{a: {$gt: 'yya'}}", &collator);
     BSONObj expectedOut = BSON(""
                                << "azz");
-    ASSERT_EQ(actualOut, expectedOut);
+    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
 }  // namespace

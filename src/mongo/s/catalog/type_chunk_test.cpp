@@ -137,8 +137,8 @@ TEST(ChunkType, CorrectContents) {
     ChunkType chunk = chunkRes.getValue();
 
     ASSERT_EQUALS(chunk.getNS(), "test.mycol");
-    ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
-    ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
+    ASSERT_BSONOBJ_EQ(chunk.getMin(), BSON("a" << 10));
+    ASSERT_BSONOBJ_EQ(chunk.getMax(), BSON("a" << 20));
     ASSERT_EQUALS(chunk.getVersion().toLong(), chunkVersion.toLong());
     ASSERT_EQUALS(chunk.getVersion().epoch(), chunkVersion.epoch());
     ASSERT_EQUALS(chunk.getShard(), "shard0001");
@@ -161,8 +161,8 @@ TEST(ChunkType, Pre22Format) {
 
     ASSERT_OK(chunk.validate());
     ASSERT_EQUALS(chunk.getNS(), "test.mycol");
-    ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
-    ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
+    ASSERT_BSONOBJ_EQ(chunk.getMin(), BSON("a" << 10));
+    ASSERT_BSONOBJ_EQ(chunk.getMax(), BSON("a" << 20));
     ASSERT_EQUALS(chunk.getVersion().toLong(), 1ULL);
     ASSERT(!chunk.getVersion().epoch().isSet());
     ASSERT_EQUALS(chunk.getShard(), "shard0001");
@@ -180,8 +180,8 @@ TEST(ChunkRange, BasicBSONParsing) {
     ASSERT_OK(parseStatus.getStatus());
 
     auto chunkRange = parseStatus.getValue();
-    ASSERT_EQ(BSON("x" << 0), chunkRange.getMin());
-    ASSERT_EQ(BSON("x" << 10), chunkRange.getMax());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 0), chunkRange.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 10), chunkRange.getMax());
 }
 
 TEST(ChunkRange, MinGreaterThanMaxShouldError) {

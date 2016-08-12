@@ -38,7 +38,7 @@ namespace mongo {
 void checkRoundTrip(const CollectionOptions& options1) {
     CollectionOptions options2;
     options2.parse(options1.toBSON());
-    ASSERT_EQUALS(options1.toBSON(), options2.toBSON());
+    ASSERT_BSONOBJ_EQ(options1.toBSON(), options2.toBSON());
 }
 
 TEST(CollectionOptions, SimpleRoundTrip) {
@@ -77,13 +77,13 @@ TEST(CollectionOptions, Validator) {
     ASSERT_NOT_OK(options.parse(fromjson("{validator: 'notAnObject'}")));
 
     ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
-    ASSERT_EQ(options.validator, fromjson("{a: 1}"));
+    ASSERT_BSONOBJ_EQ(options.validator, fromjson("{a: 1}"));
 
     options.validator = fromjson("{b: 1}");
-    ASSERT_EQ(options.toBSON()["validator"].Obj(), fromjson("{b: 1}"));
+    ASSERT_BSONOBJ_EQ(options.toBSON()["validator"].Obj(), fromjson("{b: 1}"));
 
     options.reset();
-    ASSERT_EQ(options.validator, BSONObj());
+    ASSERT_BSONOBJ_EQ(options.validator, BSONObj());
     ASSERT(!options.toBSON()["validator"]);
 }
 
@@ -201,7 +201,7 @@ TEST(CollectionOptions, FailToParseCollationThatIsAnEmptyObject) {
 TEST(CollectionOptions, CollationFieldParsesCorrectly) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
-    ASSERT_EQ(options.collation, fromjson("{locale: 'en'}"));
+    ASSERT_BSONOBJ_EQ(options.collation, fromjson("{locale: 'en'}"));
     ASSERT_TRUE(options.isValid());
     ASSERT_OK(options.validate());
 }
@@ -209,7 +209,7 @@ TEST(CollectionOptions, CollationFieldParsesCorrectly) {
 TEST(CollectionOptions, ParsedCollationObjShouldBeOwned) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
-    ASSERT_EQ(options.collation, fromjson("{locale: 'en'}"));
+    ASSERT_BSONOBJ_EQ(options.collation, fromjson("{locale: 'en'}"));
     ASSERT_TRUE(options.collation.isOwned());
 }
 
@@ -239,14 +239,14 @@ TEST(CollectionOptions, ViewParsesCorrectly) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{viewOn: 'c', pipeline: [{$match: {}}]}")));
     ASSERT_EQ(options.viewOn, "c");
-    ASSERT_EQ(options.pipeline, fromjson("[{$match: {}}]"));
+    ASSERT_BSONOBJ_EQ(options.pipeline, fromjson("[{$match: {}}]"));
 }
 
 TEST(CollectionOptions, ViewParsesCorrectlyWithoutPipeline) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{viewOn: 'c'}")));
     ASSERT_EQ(options.viewOn, "c");
-    ASSERT_EQ(options.pipeline, BSONObj());
+    ASSERT_BSONOBJ_EQ(options.pipeline, BSONObj());
 }
 
 TEST(CollectionOptions, PipelineFieldRequiresViewOn) {

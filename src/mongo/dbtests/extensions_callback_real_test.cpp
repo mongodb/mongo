@@ -256,7 +256,7 @@ TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeHaveSameBSONRepr
     BSONObjBuilder builder2;
     expr2->serialize(&builder2);
 
-    ASSERT_EQ(builder1.obj(), builder2.obj());
+    ASSERT_BSONOBJ_EQ(builder1.obj(), builder2.obj());
 }
 
 TEST_F(ExtensionsCallbackRealTest,
@@ -275,7 +275,7 @@ TEST_F(ExtensionsCallbackRealTest,
     BSONObjBuilder builder2;
     expr2->serialize(&builder2);
 
-    ASSERT_NE(builder1.obj(), builder2.obj());
+    ASSERT_BSONOBJ_NE(builder1.obj(), builder2.obj());
 }
 
 TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeAreEquivalent) {

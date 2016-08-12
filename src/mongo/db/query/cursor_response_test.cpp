@@ -50,8 +50,8 @@ TEST(CursorResponseTest, parseFromBSONFirstBatch) {
     ASSERT_EQ(response.getCursorId(), CursorId(123));
     ASSERT_EQ(response.getNSS().ns(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
-    ASSERT_EQ(response.getBatch()[0], BSON("_id" << 1));
-    ASSERT_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONNextBatch) {
@@ -68,8 +68,8 @@ TEST(CursorResponseTest, parseFromBSONNextBatch) {
     ASSERT_EQ(response.getCursorId(), CursorId(123));
     ASSERT_EQ(response.getNSS().ns(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
-    ASSERT_EQ(response.getBatch()[0], BSON("_id" << 1));
-    ASSERT_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
@@ -86,8 +86,8 @@ TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
     ASSERT_EQ(response.getCursorId(), CursorId(0));
     ASSERT_EQ(response.getNSS().ns(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
-    ASSERT_EQ(response.getBatch()[0], BSON("_id" << 1));
-    ASSERT_EQ(response.getBatch()[1], BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
@@ -219,7 +219,7 @@ TEST(CursorResponseTest, toBSONInitialResponse) {
                                    << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                       << "ok"
                       << 1.0);
-    ASSERT_EQ(responseObj, expectedResponse);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
 TEST(CursorResponseTest, toBSONSubsequentResponse) {
@@ -233,7 +233,7 @@ TEST(CursorResponseTest, toBSONSubsequentResponse) {
                                    << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                       << "ok"
                       << 1.0);
-    ASSERT_EQ(responseObj, expectedResponse);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
 TEST(CursorResponseTest, addToBSONInitialResponse) {
@@ -251,7 +251,7 @@ TEST(CursorResponseTest, addToBSONInitialResponse) {
                                    << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                       << "ok"
                       << 1.0);
-    ASSERT_EQ(responseObj, expectedResponse);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
 TEST(CursorResponseTest, addToBSONSubsequentResponse) {
@@ -269,7 +269,7 @@ TEST(CursorResponseTest, addToBSONSubsequentResponse) {
                                    << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                       << "ok"
                       << 1.0);
-    ASSERT_EQ(responseObj, expectedResponse);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
 }  // namespace

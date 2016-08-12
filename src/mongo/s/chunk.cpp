@@ -32,6 +32,7 @@
 
 #include "mongo/s/chunk.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
@@ -264,7 +265,7 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
 
     // Normally, we'd have a sound split point here if the chunk is not empty.
     // It's also a good place to sanity check.
-    if (_min == splitPoints.front()) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(_min == splitPoints.front())) {
         string msg(str::stream() << "not splitting chunk " << toString() << ", split point "
                                  << splitPoints.front()
                                  << " is exactly on chunk bounds");
@@ -272,7 +273,7 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
         return Status(ErrorCodes::CannotSplit, msg);
     }
 
-    if (_max == splitPoints.back()) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(_max == splitPoints.back())) {
         string msg(str::stream() << "not splitting chunk " << toString() << ", split point "
                                  << splitPoints.back()
                                  << " is exactly on chunk bounds");
