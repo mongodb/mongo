@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/user_management_commands_parser.h"
 
 #include <algorithm>
@@ -50,25 +52,6 @@ namespace mongo {
 namespace auth {
 
 using std::vector;
-
-/**
- * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
- * the write confirmation.
- */
-Status _extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern) {
-    BSONElement writeConcernElement;
-    Status status = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
-    if (!status.isOK()) {
-        if (status.code() == ErrorCodes::NoSuchKey) {
-            *writeConcern = BSONObj();
-            return Status::OK();
-        }
-        return status;
-    }
-    *writeConcern = writeConcernElement.Obj().getOwned();
-    ;
-    return Status::OK();
-}
 
 Status _checkNoExtraFields(const BSONObj& cmdObj,
                            StringData cmdName,
@@ -212,11 +195,6 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
     validFieldNames.insert("maxTimeMS");
 
     Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
     if (!status.isOK()) {
         return status;
     }
@@ -497,11 +475,6 @@ Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
         return status;
     }
 
-    status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
-    if (!status.isOK()) {
-        return status;
-    }
-
     // Parse role name
     std::string roleName;
     status = bsonExtractStringField(cmdObj, cmdName, &roleName);
@@ -634,11 +607,6 @@ Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
         return status;
     }
 
-    status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
-    if (!status.isOK()) {
-        return status;
-    }
-
     status = bsonExtractStringFieldWithDefault(
         cmdObj, "tempUsersCollection", "", &parsedArgs->usersCollName);
     if (!status.isOK()) {
@@ -708,11 +676,6 @@ Status parseAuthSchemaUpgradeCommand(const BSONObj& cmdObj,
                                                 << steps);
     }
     parsedArgs->maxSteps = static_cast<int>(steps);
-
-    status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
-    if (!status.isOK()) {
-        return status;
-    }
 
     return Status::OK();
 }

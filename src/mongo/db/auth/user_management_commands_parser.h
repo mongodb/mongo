@@ -52,7 +52,6 @@ struct CreateOrUpdateUserArgs {
     BSONObj customData;
     bool hasRoles;
     std::vector<RoleName> roles;
-    BSONObj writeConcern;
 
     CreateOrUpdateUserArgs() : hasHashedPassword(false), hasCustomData(false), hasRoles(false) {}
 };
@@ -133,7 +132,7 @@ struct CreateOrUpdateRoleArgs {
     std::vector<RoleName> roles;
     bool hasPrivileges;
     PrivilegeVector privileges;
-    BSONObj writeConcern;
+
     CreateOrUpdateRoleArgs() : hasRoles(false), hasPrivileges(false) {}
 };
 
@@ -202,7 +201,7 @@ struct MergeAuthzCollectionsArgs {
     std::string rolesCollName;
     std::string db;
     bool drop;
-    BSONObj writeConcern;
+
     MergeAuthzCollectionsArgs() : drop(false) {}
 };
 
@@ -220,7 +219,6 @@ Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
 struct AuthSchemaUpgradeArgs {
     int maxSteps = 3;
     bool shouldUpgradeShards = true;
-    BSONObj writeConcern;
 };
 
 /**
