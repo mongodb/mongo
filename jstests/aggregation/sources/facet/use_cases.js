@@ -5,6 +5,7 @@
     "use strict";
     const dbName = "test";
     const collName = jsTest.name();
+    const testNs = dbName + "." + collName;
 
     Random.setRandomSeed();
 
@@ -23,7 +24,7 @@
      *   screenSize: <double>
      * }
      */
-    function generateRandomDocument() {
+    function generateRandomDocument(docId) {
         const manufacturers =
             ["Sony", "Samsung", "LG", "Panasonic", "Mitsubishi", "Vizio", "Toshiba", "Sharp"];
         const minPrice = 100;
@@ -32,30 +33,42 @@
         const maxScreenSize = 40;
 
         return {
+            _id: docId,
             manufacturer: randomChoice(manufacturers),
             price: Random.randInt(maxPrice - minPrice + 1) + minPrice,
             screenSize: Random.randInt(maxScreenSize - minScreenSize + 1) + minScreenSize,
         };
     }
 
-    function doExecutionTest(conn) {
+    /**
+     * Inserts 'nDocs' documents into collection given by 'dbName' and 'collName'. Documents will
+     * have _ids in the range [0, nDocs).
+     */
+    function populateData(conn, nDocs) {
         var coll = conn.getDB(dbName).getCollection(collName);
-        coll.drop();
+        coll.remove({});  // Don't drop the collection, since it might be sharded.
 
-        const nDocs = 1000 * 10;
         var bulk = coll.initializeUnorderedBulkOp();
         for (var i = 0; i < nDocs; i++) {
-            const doc = generateRandomDocument();
+            const doc = generateRandomDocument(i);
             bulk.insert(doc);
         }
         assert.writeOK(bulk.execute());
+    }
 
+    function doExecutionTest(conn) {
+        var coll = conn.getDB(dbName).getCollection(collName);
         //
         // Compute the most common manufacturers, and the number of TVs in each price range.
         //
 
         // First compute each separately, to make sure we have the correct results.
-        const manufacturerPipe = [{$sortByCount: "$manufacturer"}];
+        const manufacturerPipe = [
+            {$sortByCount: "$manufacturer"},
+            // Sort by count and then by _id in case there are two manufacturers with an equal
+            // count.
+            {$sort: {count: -1, _id: 1}},
+        ];
         const bucketedPricePipe = [
             {
               $bucket: {groupBy: "$price", boundaries: [0, 500, 1000, 1500, 2000], default: 2000},
@@ -91,11 +104,14 @@
     }
 
     // Test against the standalone started by resmoke.py.
+    const nDocs = 1000 * 10;
     const conn = db.getMongo();
+    populateData(conn, nDocs);
     doExecutionTest(conn);
 
     // Test against a sharded cluster.
     const st = new ShardingTest({shards: 2});
+    populateData(st.s0, nDocs);
     doExecutionTest(st.s0);
 
     // Test that $facet stage propagates information about involved collections, preventing users
@@ -139,6 +155,19 @@
     }));
     assert.eq(
         28769, res.code, "Expected aggregation to fail due to $lookup on a sharded collection");
+
+    // Then run the assertions against a sharded collection.
+    assert.commandWorked(st.admin.runCommand({enableSharding: dbName}));
+    assert.commandWorked(st.admin.runCommand({shardCollection: testNs, key: {_id: 1}}));
+
+    // Make sure there is a chunk on each shard, so that our aggregations are targeted to multiple
+    // shards.
+    assert.commandWorked(st.admin.runCommand({split: testNs, middle: {_id: nDocs / 2}}));
+    assert.commandWorked(st.admin.runCommand({moveChunk: testNs, find: {_id: 0}, to: "shard0000"}));
+    assert.commandWorked(
+        st.admin.runCommand({moveChunk: testNs, find: {_id: nDocs - 1}, to: "shard0001"}));
+
+    doExecutionTest(st.s0);
 
     st.stop();
 }());

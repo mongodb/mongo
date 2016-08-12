@@ -57,7 +57,8 @@ class Pipeline;
  * TODO SERVER-24154: Should inherit from SplittableDocumentSource so that it can split in a sharded
  * cluster.
  */
-class DocumentSourceFacet final : public DocumentSourceNeedsMongod {
+class DocumentSourceFacet final : public DocumentSourceNeedsMongod,
+                                  public SplittableDocumentSource {
 public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -94,6 +95,16 @@ public:
      * Sets 'source' as the source of '_teeBuffer'.
      */
     void setSource(DocumentSource* source) final;
+
+    /**
+     * The $facet stage must be run on the merging shard.
+     */
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
+        return this;
+    }
 
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final;

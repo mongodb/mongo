@@ -2003,13 +2003,23 @@ private:
  * The $bucketAuto stage takes a user-specified number of buckets and automatically determines
  * boundaries such that the values are approximately equally distributed between those buckets.
  */
-class DocumentSourceBucketAuto final : public DocumentSource {
+class DocumentSourceBucketAuto final : public DocumentSource, public SplittableDocumentSource {
 public:
     Value serialize(bool explain = false) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     boost::optional<Document> getNext() final;
     void dispose() final;
     const char* getSourceName() const final;
+
+    /**
+     * The $bucketAuto stage must be run on the merging shard.
+     */
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
+        return this;
+    }
 
     static const uint64_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
