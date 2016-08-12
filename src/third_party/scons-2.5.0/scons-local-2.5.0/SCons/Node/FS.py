@@ -1125,9 +1125,9 @@ class LocalFS(object):
     def chmod(self, path, mode):
         return os.chmod(path, mode)
     def copy(self, src, dst):
-        return _copy(src, dest)
+        return _copy(src, dst)
     def copy2(self, src, dst):
-        return _copy2(src, dest)
+        return _copy2(src, dst)
     def exists(self, path):
         return os.path.exists(path)
     def getmtime(self, path):
