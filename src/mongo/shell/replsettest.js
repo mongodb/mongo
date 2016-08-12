@@ -915,14 +915,15 @@ var ReplSetTest = function(opts) {
         }
 
         // If restarting a node, use its existing options as the defaults.
-        options.restart = options.restart || restart;
-        if (options.restart) {
+        if ((options && options.restart) || restart) {
             options = Object.merge(this.nodes[n].fullOptions, options);
         } else {
             options = Object.merge(defaults, options);
         }
         options = Object.merge(options, this.nodeOptions["n" + n]);
         delete options.rsConfig;
+
+        options.restart = options.restart || restart;
 
         var pathOpts = {node: n, set: this.name};
         options.pathOpts = Object.merge(options.pathOpts || {}, pathOpts);
