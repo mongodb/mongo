@@ -98,47 +98,32 @@ std::string DatabasesCloner::toString() const {
 }
 
 void DatabasesCloner::join() {
-    UniqueLock lk(_mutex);
-    if (!_active) {
-        return;
+    if (auto listDatabaseScheduler = _getListDatabasesScheduler()) {
+        listDatabaseScheduler->join();
     }
 
-    std::vector<std::shared_ptr<DatabaseCloner>> clonersToWaitOn;
-    for (auto&& cloner : _databaseCloners) {
-        if (cloner && cloner->isActive()) {
-            clonersToWaitOn.push_back(cloner);
-        }
-    }
-
-    lk.unlock();
-    for (auto&& cloner : clonersToWaitOn) {
+    auto databaseCloners = _getDatabaseCloners();
+    for (auto&& cloner : databaseCloners) {
         cloner->join();
     }
-    lk.lock();
 }
 
 void DatabasesCloner::shutdown() {
-    UniqueLock lk(_mutex);
-    if (!_active)
-        return;
-    _active = false;
-    _setStatus_inlock({ErrorCodes::CallbackCanceled, "Initial Sync Cancelled."});
-    _cancelCloners_inlock(lk);
-}
-
-void DatabasesCloner::_cancelCloners_inlock(UniqueLock& lk) {
-    std::vector<std::shared_ptr<DatabaseCloner>> clonersToCancel;
-    for (auto&& cloner : _databaseCloners) {
-        if (cloner && cloner->isActive()) {
-            clonersToCancel.push_back(cloner);
-        }
+    if (auto listDatabaseScheduler = _getListDatabasesScheduler()) {
+        listDatabaseScheduler->shutdown();
     }
 
-    lk.unlock();
-    for (auto&& cloner : clonersToCancel) {
+    auto databaseCloners = _getDatabaseCloners();
+    for (auto&& cloner : databaseCloners) {
         cloner->shutdown();
     }
-    lk.lock();
+
+    LockGuard lk(_mutex);
+    if (!_active) {
+        return;
+    }
+    _active = false;
+    _setStatus_inlock({ErrorCodes::CallbackCanceled, "Initial Sync Cancelled."});
 }
 
 bool DatabasesCloner::isActive() {
@@ -291,6 +276,16 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
             _failed_inlock(lk);
         }
     }
+}
+
+std::vector<std::shared_ptr<DatabaseCloner>> DatabasesCloner::_getDatabaseCloners() const {
+    LockGuard lock(_mutex);
+    return _databaseCloners;
+}
+
+RemoteCommandRetryScheduler* DatabasesCloner::_getListDatabasesScheduler() const {
+    LockGuard lock(_mutex);
+    return _listDBsScheduler.get();
 }
 
 void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::string& name) {

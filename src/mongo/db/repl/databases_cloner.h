@@ -96,6 +96,16 @@ public:
 
 private:
     /**
+     * Returns a copy of the database cloners.
+     */
+    std::vector<std::shared_ptr<DatabaseCloner>> _getDatabaseCloners() const;
+
+    /**
+     * Returns scheduler for listDatabases (null if not created).
+     */
+    RemoteCommandRetryScheduler* _getListDatabasesScheduler() const;
+
+    /**
      *  Setting the status to not-OK will stop the process
      */
     void _setStatus_inlock(Status s);
@@ -104,8 +114,6 @@ private:
      * Will fail the cloner, unlock and call the completion function.
      */
     void _failed_inlock(UniqueLock& lk);
-
-    void _cancelCloners_inlock(UniqueLock& lk);
 
     /** Called each time a database clone is finished */
     void _onEachDBCloneFinish(const Status& status, const std::string& name);
@@ -125,17 +133,18 @@ private:
     mutable stdx::mutex _mutex;                         // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
-    OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
-    HostAndPort _source;               // (R) The source to use, until we get an error
-    bool _active = false;              // (M) false until we start
-    std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;  // (M) database cloners by name
+    OldThreadPool* _dbWorkThreadPool;      // (R) db worker thread pool for collection cloning.
+    HostAndPort _source;                   // (R) The source to use, until we get an error
+    bool _active = false;                  // (M) false until we start
     std::size_t _currentClonerIndex = 0U;  // (M) Index of currently active database cloner.
-    std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
-    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;            // (M)
+    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.
     const OnFinishFn _finishFn;            // (R) function called when finished.
     StorageInterface* _storage;            // (R)
+
+    std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
+    std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;   // (M) database cloners by name
 };
 
 
