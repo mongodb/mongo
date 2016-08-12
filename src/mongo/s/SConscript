@@ -45,6 +45,7 @@ env.Library(
 env.Library(
     target='common',
     source=[
+        'balancer/type_migration.cpp',
         'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',
         'catalog/type_chunk.cpp',
@@ -114,6 +115,7 @@ env.Library(
         'config_server_test_fixture.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/executor/network_test_env',
@@ -147,6 +149,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_common_test',
     source=[
+        'balancer/type_migration_test.cpp',
         'catalog/type_changelog_test.cpp',
         'catalog/type_chunk_test.cpp',
         'catalog/type_collection_test.cpp',
@@ -256,6 +259,7 @@ env.Library(
         'balancer/cluster_statistics.cpp',
         'balancer/cluster_statistics_impl.cpp',
         'balancer/migration_manager.cpp',
+        'balancer/scoped_migration_request.cpp',
         'catalog/catalog_cache.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
@@ -270,6 +274,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/lasterror',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         'catalog/replset/sharding_catalog_client_impl',
@@ -347,9 +352,9 @@ env.CppUnitTest(
     target='migration_manager_test',
     source=[
         'balancer/migration_manager_test.cpp',
+        'balancer/scoped_migration_request_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/util/version_impl',
         'config_server_test_fixture',
         'coreshard',

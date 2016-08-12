@@ -116,7 +116,6 @@ env.CppUnitTest(
         'sharding_catalog_merge_chunk_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
     ]
 )

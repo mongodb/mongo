@@ -54,6 +54,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer/balancer_policy.h"
+#include "mongo/s/balancer/type_migration.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -1410,6 +1411,17 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_lastmod_1 index on config db"
+                                    << causedBy(result));
+    }
+
+    result = configShard->createIndexOnConfig(
+        txn,
+        NamespaceString(MigrationType::ConfigNS),
+        BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
+        unique);
+    if (!result.isOK()) {
+        return Status(result.code(),
+                      str::stream() << "couldn't create ns_1_min_1 index on config.migrations"
                                     << causedBy(result));
     }
 
