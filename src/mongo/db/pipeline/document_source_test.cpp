@@ -1522,7 +1522,9 @@ protected:
     virtual void createReplaceRoot(const BSONObj& replaceRoot) {
         BSONObj spec = BSON("$replaceRoot" << replaceRoot);
         BSONElement specElement = spec.firstElement();
-        _replaceRoot = DocumentSourceReplaceRoot::createFromBson(specElement, ctx());
+        auto replaceRootStages = DocumentSourceReplaceRoot::createFromBson(specElement, ctx());
+        invariant(replaceRootStages.size() == 1UL);
+        _replaceRoot = replaceRootStages[0];
         _replaceRoot->setSource(source());
     }
 
@@ -1721,7 +1723,9 @@ class ReplaceRootSpec : public Mock::Base, public unittest::Test {
 public:
     intrusive_ptr<DocumentSource> createReplaceRoot(BSONObj replaceRootSpec) {
         auto specElem = replaceRootSpec.firstElement();
-        return DocumentSourceReplaceRoot::createFromBson(specElem, ctx());
+        auto replaceRootStages = DocumentSourceReplaceRoot::createFromBson(specElem, ctx());
+        invariant(replaceRootStages.size() == 1UL);
+        return replaceRootStages[0];
     }
 
     BSONObj createSpec(BSONObj spec) {
@@ -1731,6 +1735,15 @@ public:
     BSONObj createFullSpec(BSONObj spec) {
         return BSON("$replaceRoot" << BSON("newRoot" << spec));
     }
+};
+
+// Also enforced by an invariant in the test constructor.
+TEST_F(ReplaceRootSpec, CreatesVectorOfOneDocumentSource) {
+    BSONObj spec = BSON("$replaceRoot" << BSON("newRoot"
+                                               << "$a"));
+    auto replaceRootStage = DocumentSourceReplaceRoot::createFromBson(spec.firstElement(), ctx());
+
+    ASSERT_EQUALS(replaceRootStage.size(), 1UL);
 };
 
 // Verify that the creation of a $replaceRoot stage requires an object specification

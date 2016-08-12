@@ -1005,8 +1005,6 @@ public:
      * serialization and reporting and returning dependencies. The parser must also provide
      * implementations for optimizing and adding the expression context, even if those functions do
      * nothing.
-     *
-     * SERVER-25509 Make $replaceRoot use this framework.
      */
     class TransformerInterface {
     public:
@@ -1136,41 +1134,21 @@ private:
 
 /*
  * $replaceRoot takes an object containing only an expression in the newRoot field, and replaces
- * each incoming document with the result of evaluating that expression.
- * Throws an error if the given expression is not an object, and returns an empty document if the
- * expression evaluates to the "missing" Value.
+ * each incoming document with the result of evaluating that expression. Throws an error if the
+ * given expression is not an object or if the expression evaluates to the "missing" Value. This
+ * is implemented as an alias of DocumentSourceSingleDocumentTransformation.
  */
-class DocumentSourceReplaceRoot final : public DocumentSource {
+class DocumentSourceReplaceRoot final {
 public:
-    // virtuals from DocumentSource
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
-    boost::intrusive_ptr<DocumentSource> optimize() final;
-    Value serialize(bool explain = false) const final;
-    GetDepsReturn getDependencies(DepsTracker* deps) const;
-
-    /**
-     * Since every document that is input to this stage is output as one document (and the documents
-     * that have invalid objects throw an error), we can move skip and limit ahead of this stage.
-     * If we decide to skip documents that don't have the desired field, we will no longer
-     * be able to move skip and limit ahead of this stage.
-     */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
-
     /**
      * Creates a new replaceRoot DocumentSource from the BSON specification of the $replaceRoot
      * stage.
      */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
+    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    DocumentSourceReplaceRoot(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                              const boost::intrusive_ptr<Expression> expr);
-
-    std::unique_ptr<Variables> _variables;
-    boost::intrusive_ptr<Expression> _newRoot;
+    DocumentSourceReplaceRoot() = default;
 };
 
 class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {

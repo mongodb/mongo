@@ -41,39 +41,33 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSourceReplaceRoot::DocumentSourceReplaceRoot(
-    const intrusive_ptr<ExpressionContext>& pExpCtx, const intrusive_ptr<Expression> expr)
-    : DocumentSource(pExpCtx), _newRoot(expr) {}
+/**
+ * This class implements the transformation logic for the $replaceRoot stage.
+ */
+class ReplaceRootTransformation final
+    : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
 
-REGISTER_DOCUMENT_SOURCE(replaceRoot, DocumentSourceReplaceRoot::createFromBson);
+public:
+    ReplaceRootTransformation() {}
 
-const char* DocumentSourceReplaceRoot::getSourceName() const {
-    return "$replaceRoot";
-}
+    Document applyTransformation(Document input) {
+        // Extract subdocument in the form of a Value.
+        _variables->setRoot(input);
+        Value newRoot = _newRoot->evaluate(_variables.get());
 
-boost::optional<Document> DocumentSourceReplaceRoot::getNext() {
-    pExpCtx->checkForInterrupt();
-
-    // Get the next input document.
-    boost::optional<Document> input = pSource->getNext();
-    if (!input) {
-        return boost::none;
-    }
-
-    // Extract subdocument in the form of a Value.
-    _variables->setRoot(*input);
-    Value newRoot = _newRoot->evaluate(_variables.get());
-
-    // The newRoot expression must evaluate to a valid Value.
-    uassert(40232,
-            str::stream()
-                << " 'newRoot' argument to $replaceRoot stage must evaluate to a valid Value, "
-                << "try ensuring that your field path(s) exist by prepending a "
-                << "$match: {<path>: $exists} aggregation stage.",
+        // The newRoot expression must evaluate to a valid Value.
+        uassert(
+            40232,
+            str::stream() << " 'newRoot' argument "
+                          << " to $replaceRoot stage must be able to be evaluated by the document "
+                          << input.toString()
+                          << ", try ensuring that your field path(s) exist by prepending a "
+                          << "$match: {<path>: $exists} aggregation stage.",
             !newRoot.missing());
 
-    // The newRoot expression, if it exists, must evaluate to an object.
-    uassert(40228,
+        // The newRoot expression, if it exists, must evaluate to an object.
+        uassert(
+            40228,
             str::stream()
                 << " 'newRoot' argument to $replaceRoot stage must evaluate to an object, but got "
                 << typeName(newRoot.getType())
@@ -81,75 +75,83 @@ boost::optional<Document> DocumentSourceReplaceRoot::getNext() {
                 << "$match: {<path>: {$type: 'object'}} aggregation stage.",
             newRoot.getType() == Object);
 
-    // Turn the value into a document.
-    return newRoot.getDocument();
-}
-
-Pipeline::SourceContainer::iterator DocumentSourceReplaceRoot::optimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    invariant(*itr == this);
-
-    auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
-
-    if (nextSkip || nextLimit) {
-        std::swap(*itr, *std::next(itr));
-        return itr == container->begin() ? itr : std::prev(itr);
+        // Turn the value into a document.
+        return newRoot.getDocument();
     }
-    return std::next(itr);
-}
 
-intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::optimize() {
-    _newRoot = _newRoot->optimize();
-    return this;
-}
+    // Optimize the newRoot expression.
+    void optimize() {
+        _newRoot->optimize();
+    }
 
-// Serialize the expression at newRoot too.
-Value DocumentSourceReplaceRoot::serialize(bool explain) const {
-    return Value(Document{{getSourceName(), Document{{"newRoot", _newRoot->serialize(explain)}}}});
-}
+    Document serialize(bool explain) const {
+        return Document{{"newRoot", _newRoot->serialize(explain)}};
+    }
 
-intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
+    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const {
+        _newRoot->addDependencies(deps);
+        // This stage will replace the entire document with a new document, so any existing fields
+        // will be replaced and cannot be required as dependencies.
+        return DocumentSource::EXHAUSTIVE_FIELDS;
+    }
+
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+        _newRoot->injectExpressionContext(pExpCtx);
+    }
+
+    // Create the replaceRoot transformer. Uasserts on invalid input.
+    static std::unique_ptr<ReplaceRootTransformation> create(const BSONElement& spec) {
+
+        // Confirm that the stage was called with an object.
+        uassert(40229,
+                str::stream() << "expected an object as specification for $replaceRoot stage, got "
+                              << typeName(spec.type()),
+                spec.type() == Object);
+
+        // Create the pointer, parse the stage, and return.
+        std::unique_ptr<ReplaceRootTransformation> parsedReplaceRoot =
+            stdx::make_unique<ReplaceRootTransformation>();
+        parsedReplaceRoot->parse(spec);
+        return parsedReplaceRoot;
+    }
+
+    // Check for valid replaceRoot options, and populate internal state variables.
+    void parse(const BSONElement& spec) {
+        // We need a VariablesParseState in order to parse the 'newRoot' expression.
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
+
+        // Get the options from this stage. Currently the only option is newRoot.
+        for (auto&& argument : spec.Obj()) {
+            const StringData argName = argument.fieldNameStringData();
+
+            if (argName == "newRoot") {
+                // Allows for field path, object, and other expressions.
+                _newRoot = Expression::parseOperand(argument, vps);
+            } else {
+                uasserted(40230,
+                          str::stream() << "unrecognized option to $replaceRoot stage: " << argName
+                                        << ", only valid option is 'newRoot'.");
+            }
+        }
+
+        // Check that there was a new root specified.
+        uassert(40231, "no newRoot specified for the $replaceRoot stage", _newRoot);
+        _variables = stdx::make_unique<Variables>(idGenerator.getIdCount());
+    }
+
+private:
+    std::unique_ptr<Variables> _variables;
+    boost::intrusive_ptr<Expression> _newRoot;
+};
+
+REGISTER_DOCUMENT_SOURCE_ALIAS(replaceRoot, DocumentSourceReplaceRoot::createFromBson);
+
+std::vector<intrusive_ptr<DocumentSource>> DocumentSourceReplaceRoot::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
 
-    // We need a VariablesParseState in order to parse the 'newRoot' expression.
-    intrusive_ptr<Expression> expr;
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
-
-    // Confirm that the stage was called with an object.
-    uassert(40229,
-            str::stream() << "expected an object as specification for $replaceRoot stage, got "
-                          << typeName(elem.type()),
-            elem.type() == Object);
-
-    // Get the options from this stage. Currently the only option is newRoot.
-    for (auto&& argument : elem.Obj()) {
-        const StringData argName = argument.fieldNameStringData();
-
-        if (argName == "newRoot") {
-            // Allows for field path, object, and other expressions.
-            expr = Expression::parseOperand(argument, vps);
-        } else {
-            uasserted(40230,
-                      str::stream() << "unrecognized option to $replaceRoot stage: " << argName
-                                    << ", only valid option is 'newRoot'.");
-        }
-    }
-
-    // Check that there was a new root specified.
-    uassert(40231, "no newRoot specified for the $replaceRoot stage", expr);
-
-    // Create the ReplaceRoot aggregation stage.
-    intrusive_ptr<DocumentSourceReplaceRoot> source = new DocumentSourceReplaceRoot(pExpCtx, expr);
-    source->_variables.reset(new Variables(idGenerator.getIdCount()));
-    return source;
+    return {new DocumentSourceSingleDocumentTransformation(
+        pExpCtx, ReplaceRootTransformation::create(elem), "$replaceRoot")};
 }
 
-DocumentSource::GetDepsReturn DocumentSourceReplaceRoot::getDependencies(DepsTracker* deps) const {
-    _newRoot->addDependencies(deps);
-    // This stage will replace the entire document with a new document, so any existing fields will
-    // be replaced and cannot be required as dependencies.
-    return EXHAUSTIVE_FIELDS;
-}
 }  // namespace mongo
