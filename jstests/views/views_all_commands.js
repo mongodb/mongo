@@ -19,9 +19,8 @@
  *      view named "view", built on top of a collection named "collection". A command can also be a
  *      function that takes a db handle as argument and handles pass/failure checking internally.
  *
- *  runOnDb
- *      Specifies the database against which to run db.runCommand(). If not specified, defaults to
- *      "test".
+ *  isAdminCommand
+ *      If true, will execute 'command' against the admin db.
  *
  *  skip
  *      A string that, if present, causes the test runner to skip running this command altogether.
@@ -33,12 +32,12 @@
  *      commands are expected to succeed.
  *
  *  setup
- *      A function that will be run before the command is executed. It takes a handle to a
- *      connection object as its single argument.
+ *      A function that will be run before the command is executed. It takes a handle to the 'test'
+ *      database as its single argument.
  *
  *  teardown
- *      A function that will be run after the command is executed. It takes a handle to a connection
- *      object as its single argument.
+ *      A function that will be run after the command is executed. It takes a handle to the 'test'
+ *      database as its single argument.
  *
  *  skipSharded
  *      If true, do not run this command on a mongos.
@@ -74,15 +73,21 @@
         _recvChunkStart: {skip: isAnInternalCommand},
         _recvChunkStatus: {skip: isAnInternalCommand},
         _transferMods: {skip: isAnInternalCommand},
+        addShard: {skip: isUnrelated},
+        addShardToZone: {skip: isUnrelated},
         aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}]}},
         appendOplogNote: {skip: isUnrelated},
         applyOps: {
             command: {applyOps: [{op: "i", o: {_id: 1}, ns: "test.view"}]},
             expectFailure: true,
+            skipSharded: true,
         },
         authSchemaUpgrade: {skip: isUnrelated},
         authenticate: {skip: isUnrelated},
         availableQueryOptions: {skip: isAnInternalCommand},
+        balancerStart: {skip: isUnrelated},
+        balancerStatus: {skip: isUnrelated},
+        balancerStop: {skip: isUnrelated},
         buildInfo: {skip: isUnrelated},
         captrunc: {
             command: {captrunc: "view", n: 2, inc: false},
@@ -98,7 +103,7 @@
         },
         collMod: {command: {collMod: "view", viewOn: "other", pipeline: []}},
         collStats: {command: {collStats: "view"}, skip: "TODO(SERVER-24568)"},
-        compact: {command: {compact: "view", force: true}, expectFailure: true},
+        compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
         configureFailPoint: {skip: isUnrelated},
         connPoolStats: {skip: isUnrelated},
         connPoolSync: {skip: isUnrelated},
@@ -181,15 +186,17 @@
             command: {emptycapped: "view"},
             expectFailure: true,
         },
+        enableSharding: {skip: "Tested as part of shardCollection"},
         eval: {skip: isUnrelated},
         explain: {command: {explain: {count: "view"}}},
         features: {skip: isUnrelated},
         filemd5: {skip: isUnrelated},
-        find: {skip: "tested in views/views_find.js"},
+        find: {skip: "tested in views/views_find.js & views/views_sharded.js"},
         findAndModify: {
             command: {findAndModify: "view", query: {a: 1}, update: {$set: {a: 2}}},
             expectFailure: true
         },
+        flushRouterConfig: {skip: isUnrelated},
         forceerror: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
@@ -216,7 +223,7 @@
         getShardMap: {skip: isUnrelated},
         getShardVersion: {
             command: {getShardVersion: "test.view"},
-            runOnDb: "admin",
+            isAdminCommand: true,
             expectFailure: true,
             skip: "TODO(SERVER-24764)"
         },
@@ -263,6 +270,7 @@
         hostInfo: {skip: isUnrelated},
         insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
         invalidateUserCache: {skip: isUnrelated},
+        isdbgrid: {skip: isUnrelated},
         isMaster: {skip: isUnrelated},
         journalLatencyTest: {skip: isUnrelated},
         killCursors: {skip: "TODO(SERVER-24771)"},
@@ -271,6 +279,7 @@
         listCommands: {skip: isUnrelated},
         listDatabases: {skip: isUnrelated},
         listIndexes: {command: {listIndexes: "view"}, expectFailure: true},
+        listShards: {skip: isUnrelated},
         lockInfo: {skip: isUnrelated},
         logApplicationMessage: {skip: isUnrelated},
         logRotate: {skip: isUnrelated},
@@ -284,14 +293,16 @@
         "mapreduce.shardedfinish": {skip: isAnInternalCommand},
         mergeChunks: {
             command: {mergeChunks: "test.view", bounds: [{x: 0}, {x: 10}]},
-            runOnDb: "admin",
-            skip: isAnInternalCommand,
+            isAdminCommand: true,
+            skip: "TODO(SERVER-24764) Confirm/add correct mongoS error handling.",
         },
         moveChunk: {
             command: {moveChunk: "test.view"},
-            runOnDb: "admin",
-            skip: isAnInternalCommand,
+            isAdminCommand: true,
+            skip: "TODO(SERVER-24764) Confirm/add correct mongoS error handling.",
         },
+        movePrimary: {skip: "TODO(SERVER-24764) Add test for views"},
+        netstat: {skip: isAnInternalCommand},
         parallelCollectionScan: {command: {parallelCollectionScan: "view"}, expectFailure: true},
         ping: {command: {ping: 1}},
         planCacheClear: {command: {planCacheClear: "view"}, expectFailure: true},
@@ -303,14 +314,16 @@
         planCacheSetFilter: {command: {planCacheSetFilter: "view"}, expectFailure: true},
         profile: {skip: isUnrelated},
         reIndex: {command: {reIndex: "view"}, expectFailure: true},
+        removeShard: {skip: isUnrelated},
+        removeShardFromZone: {skip: isUnrelated},
         renameCollection: [
             {
-              runOnDb: "admin",
+              isAdminCommand: true,
               command: {renameCollection: "test.view", to: "test.otherview"},
               expectFailure: true,
             },
             {
-              runOnDb: "admin",
+              isAdminCommand: true,
               command: {renameCollection: "test.collection", to: "test.view"},
               expectFailure: ErrorCodes.NamespaceExists,
             }
@@ -357,14 +370,25 @@
         setCommittedSnapshot: {skip: isAnInternalCommand},
         setParameter: {skip: isUnrelated},
         setShardVersion: {skip: isUnrelated},
+        shardCollection: {
+            command: {shardCollection: "test.view", key: {_id: 1}},
+            setup: function(conn) {
+                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+            },
+            skipStandalone: true,
+            expectFailure: true,
+            isAdminCommand: true,
+            skip: "TODO(SERVER-24764) Add view check to mongoS"
+        },
         shardConnPoolStats: {skip: isUnrelated},
         shardingState: {skip: isUnrelated},
         shutdown: {skip: isUnrelated},
         sleep: {skip: isUnrelated},
-        splitChunk: {skip: isAnInternalCommand},
-        splitVector: {skip: isAnInternalCommand},
+        split: {skip: "TODO(SERVER-24764) Test that split on view fails"},
+        splitChunk: {skip: "TODO(SERVER-24764) Test that split on view fails"},
+        splitVector: {skip: "TODO(SERVER-24764) Test that split on view fails"},
         stageDebug: {skip: isAnInternalCommand},
-        top: {command: {top: "view"}, runOnDb: "admin", skip: "TODO(SERVER-24568)"},
+        top: {command: {top: "view"}, isAdminCommand: true, skip: "TODO(SERVER-24568)"},
         touch: {
             command: {touch: "view", data: true},
             expectFailure: true,
@@ -385,6 +409,7 @@
             }
         },
         updateUser: {skip: isUnrelated},
+        updateZoneKeyRange: {skip: isUnrelated},
         usersInfo: {skip: isUnrelated},
         validate: {command: {validate: "view"}, skip: "TODO(SERVER-24768)"},
         whatsmyuri: {skip: isUnrelated}
@@ -406,63 +431,85 @@
             assert.commandFailedWithCode(res, code, msg);
     };
 
-    // Are we on a mongos?
-    let dbgridRes = db.adminCommand({isdbgrid: 1});
-    const isMongos = (dbgridRes.ok === 1 && dbgridRes.isdbgrid === 1);
+    function runTests(db) {
+        // Are we on a mongos?
+        var isMaster = db.runCommand("ismaster");
+        assert.commandWorked(isMaster);
+        var isMongos = (isMaster.msg === "isdbgrid");
 
-    // Obtain a list of all commands.
-    let res = db.runCommand({listCommands: 1});
-    assert.commandWorked(res);
+        // Obtain a list of all commands.
+        let res = db.runCommand({listCommands: 1});
+        assert.commandWorked(res);
 
-    let commands = Object.keys(res.commands);
-    for (let command of commands) {
-        let test = viewsCommandTests[command];
-        assert(test !== undefined,
-               "Coverage failure: must explicitly define a views test for " + command);
+        let commands = Object.keys(res.commands);
+        for (let command of commands) {
+            let test = viewsCommandTests[command];
+            assert(test !== undefined,
+                   "Coverage failure: must explicitly define a views test for " + command);
 
-        if (!(test instanceof Array))
-            test = [test];
-        let subtest_nr = 0;
-        for (let subtest of test) {
-            // Tests can be explicitly skipped. Print the name of the skipped test, as well as the
-            // reason why.
-            if (subtest.skip !== undefined) {
-                print("Skipping " + command + ": " + subtest.skip);
-                continue;
+            if (!(test instanceof Array))
+                test = [test];
+            let subtest_nr = 0;
+            for (let subtest of test) {
+                // Tests can be explicitly skipped. Print the name of the skipped test, as well as
+                // the reason why.
+                if (subtest.skip !== undefined) {
+                    print("Skipping " + command + ": " + subtest.skip);
+                    continue;
+                }
+
+                let dbHandle = db.getSiblingDB("test");
+                let commandHandle = dbHandle;
+
+                // Skip tests depending on sharding configuration.
+                if (subtest.skipSharded && isMongos) {
+                    print("Skipping " + command + ": not applicable to mongoS");
+                    continue;
+                }
+
+                if (subtest.skipStandalone && !isMongos) {
+                    print("Skipping " + command + ": not applicable to mongoD");
+                    continue;
+                }
+
+                // Perform test setup, and call any additional setup callbacks provided by the test.
+                // All tests assume that there exists a view named 'view' that is backed by
+                // 'collection'.
+                assert.commandWorked(dbHandle.dropDatabase());
+                assert.commandWorked(dbHandle.runCommand({create: "view", viewOn: "collection"}));
+                assert.writeOK(dbHandle.collection.insert({x: 1}));
+                if (subtest.setup !== undefined)
+                    subtest.setup(dbHandle);
+
+                // Execute the command. Print the command name for the first subtest, as otherwise
+                // it may be hard to figure out what command caused a failure.
+                if (!subtest_nr++)
+                    print("Testing " + command);
+
+                if (subtest.isAdminCommand)
+                    commandHandle = db.getSiblingDB("admin");
+
+                if (subtest.expectFailure)
+                    assertCommandOrWriteFailed(commandHandle.runCommand(subtest.command),
+                                               subtest.expectFailure,
+                                               tojson(subtest.command));
+                else if (subtest.command instanceof Function)
+                    subtest.command(commandHandle);
+                else
+                    assert.commandWorked(commandHandle.runCommand(subtest.command),
+                                         tojson(subtest.command));
+
+                if (subtest.teardown !== undefined)
+                    subtest.teardown(dbHandle);
             }
-            let dbName = (subtest.runOnDb === undefined) ? "test" : subtest.runOnDb;
-            let dbHandle = db.getSiblingDB(dbName);
-
-            // Skip tests depending on sharding configuration.
-            if (subtest.skipSharded && isMongos)
-                continue;
-            if (subtest.skipStandalone && !isMongos)
-                continue;
-
-            // Perform test setup, and call any additional setup callbacks provided by the test. All
-            // tests assume that there exists a view named 'view' that is backed by 'collection'.
-            assert.commandWorked(dbHandle.dropDatabase());
-            assert.commandWorked(dbHandle.runCommand({create: "view", viewOn: "collection"}));
-            assert.writeOK(dbHandle.collection.insert({x: 1}));
-            if (subtest.setup !== undefined)
-                subtest.setup(dbHandle);
-
-            // Execute the command. Print the command name for the first subtest, as otherwise it
-            // may be hard to figure out what command caused a failure.
-            if (!subtest_nr++)
-                print("Testing " + command);
-
-            if (subtest.expectFailure)
-                assertCommandOrWriteFailed(dbHandle.runCommand(subtest.command),
-                                           subtest.expectFailure,
-                                           tojson(subtest.command));
-            else if (subtest.command instanceof Function)
-                subtest.command(dbHandle);
-            else
-                assert.commandWorked(dbHandle.runCommand(subtest.command), tojson(subtest.command));
-
-            if (subtest.teardown !== undefined)
-                subtest.teardown(dbHandle);
         }
     }
+
+    // Run tests against mongoD.
+    runTests(db.getSiblingDB("test"));
+
+    // Run tests against mongoS.
+    var st = new ShardingTest({shards: 2});
+    runTests(st.s.getDB("test"));
+    st.stop();
 }());
