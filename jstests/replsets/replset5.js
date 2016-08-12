@@ -11,7 +11,7 @@ load("jstests/replsets/rslib.js");
     // Initiate set with default for write concern
     var config = replTest.getReplSetConfig();
     config.settings = {};
-    config.settings.getLastErrorDefaults = {'w': 3, 'wtimeout': 20000};
+    config.settings.getLastErrorDefaults = {'w': 3, 'wtimeout': 5 * 60 * 1000};
     config.settings.heartbeatTimeoutSecs = 15;
     // Prevent node 2 from becoming primary, as we will attempt to set it to hidden later.
     config.members[2].priority = 0;
@@ -25,7 +25,7 @@ load("jstests/replsets/rslib.js");
 
     // Initial replication
     master.getDB("barDB").bar.save({a: 1});
-    replTest.awaitReplication();
+    replTest.awaitReplication(5 * 60 * 1000);
 
     // These writes should be replicated immediately
     var docNum = 5000;
