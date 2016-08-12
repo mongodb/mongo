@@ -3818,6 +3818,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
     packager_distro: ubuntu1604
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -3896,6 +3897,7 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: s390x
     packager_distro: ubuntu1604
+    repo_edition: enterprise
   tasks:
   - name: compile
     distros:
