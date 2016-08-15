@@ -201,7 +201,18 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        status = getGlobalReplicationCoordinator()->processReplSetGetStatus(&result);
+        bool includeInitialSync = false;
+        Status initialSyncStatus =
+            bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", false, &includeInitialSync);
+        if (!initialSyncStatus.isOK()) {
+            return appendCommandStatus(result, initialSyncStatus);
+        }
+
+        auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
+        if (includeInitialSync) {
+            responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
+        }
+        status = getGlobalReplicationCoordinator()->processReplSetGetStatus(&result, responseStyle);
         return appendCommandStatus(result, status);
     }
 

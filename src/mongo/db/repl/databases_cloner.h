@@ -63,6 +63,15 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
  */
 class DatabasesCloner {
 public:
+    struct Stats {
+        size_t databasesCloned = 0U;
+        std::vector<DatabaseCloner::Stats> databaseStats;
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
+    };
+
     using IncludeDbFilterFn = stdx::function<bool(const BSONObj& dbInfo)>;
     using OnFinishFn = stdx::function<void(const Status&)>;
     DatabasesCloner(StorageInterface* si,
@@ -78,6 +87,7 @@ public:
     bool isActive();
     void join();
     void shutdown();
+    DatabasesCloner::Stats getStats() const;
 
     /**
      * Returns the status after completion. If multiple error occur, only one is recorded/returned.
@@ -133,10 +143,9 @@ private:
     mutable stdx::mutex _mutex;                         // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
-    OldThreadPool* _dbWorkThreadPool;      // (R) db worker thread pool for collection cloning.
-    HostAndPort _source;                   // (R) The source to use, until we get an error
-    bool _active = false;                  // (M) false until we start
-    std::size_t _currentClonerIndex = 0U;  // (M) Index of currently active database cloner.
+    OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
+    HostAndPort _source;               // (R) The source to use, until we get an error
+    bool _active = false;              // (M) false until we start
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.
@@ -145,6 +154,7 @@ private:
 
     std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
     std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;   // (M) database cloners by name
+    Stats _stats;                                                    // (M)
 };
 
 

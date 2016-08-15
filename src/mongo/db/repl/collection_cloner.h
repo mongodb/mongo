@@ -61,6 +61,7 @@ class CollectionCloner : public BaseCloner {
 
 public:
     struct Stats {
+        std::string ns;
         Date_t start;
         Date_t end;
         size_t documents{0};
@@ -69,6 +70,7 @@ public:
 
         std::string toString() const;
         BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
     };
     /**
      * Type of function to schedule storage interface tasks with the executor.

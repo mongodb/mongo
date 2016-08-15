@@ -249,7 +249,8 @@ void ReplicationCoordinatorMock::processReplSetMetadata(const rpc::ReplSetMetada
 
 void ReplicationCoordinatorMock::cancelAndRescheduleElectionTimeout() {}
 
-Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
+Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder*,
+                                                           ReplSetGetStatusResponseStyle) {
     return Status::OK();
 }
 

@@ -178,6 +178,28 @@ struct DataReplicatorOptions {
  */
 class DataReplicator {
 public:
+    struct InitialSyncAttemptInfo {
+        int durationMillis;
+        Status status;
+        HostAndPort syncSource;
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
+    };
+
+    struct Stats {
+        size_t failedInitialSyncAttempts;
+        size_t maxFailedInitialSyncAttempts;
+        Date_t initialSyncStart;
+        Date_t initialSyncEnd;
+        std::vector<DataReplicator::InitialSyncAttemptInfo> initialSyncAttemptInfos;
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
+    };
+
     DataReplicator(DataReplicatorOptions opts,
                    std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
                    StorageInterface* storage);
@@ -242,6 +264,12 @@ public:
 
     std::string getDiagnosticString() const;
 
+    /**
+     * Returns stats about the progress of initial sync. If initial sync is not in progress it
+     * returns summary statistics for what occurred during initial sync.
+     */
+    BSONObj getInitialSyncProgress() const;
+
     // For testing only
 
     void _resetState_inlock(OperationContext* txn, OpTimeWithHash lastAppliedOpTime);
@@ -282,6 +310,8 @@ private:
     void _doNextActions_InitialSync_inlock();
     void _doNextActions_Rollback_inlock();
     void _doNextActions_Steady_inlock();
+
+    BSONObj _getInitialSyncProgress_inlock() const;
 
     // Applies up till the specified Timestamp and pauses automatic application
     Timestamp _applyUntilAndPause(Timestamp);
@@ -348,6 +378,7 @@ private:
     Event _onShutdown;                                                          // (M)
     Timestamp _rollbackCommonOptime;                                            // (MX)
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;                       // (M)
+    Stats _stats;                                                               // (M)
 };
 
 }  // namespace repl

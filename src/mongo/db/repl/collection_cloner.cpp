@@ -128,6 +128,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
     uassertStatusOK(options.validate());
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
     uassert(ErrorCodes::BadValue, "storage interface cannot be null", storageInterface);
+    _stats.ns = _sourceNss.ns();
 }
 
 CollectionCloner::~CollectionCloner() {
@@ -435,16 +436,24 @@ std::string CollectionCloner::Stats::toString() const {
 
 BSONObj CollectionCloner::Stats::toBSON() const {
     BSONObjBuilder bob;
-    bob.appendNumber("documents", documents);
-    bob.appendNumber("indexes", indexes);
-    bob.appendNumber("fetchedBatches", fetchBatches);
-    bob.appendDate("start", start);
-    bob.appendDate("end", end);
-    auto elapsed = end - start;
-    long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
-    bob.appendNumber("elapsedMillis", elapsedMillis);
+    bob.append("ns", ns);
+    append(&bob);
     return bob.obj();
 }
 
+void CollectionCloner::Stats::append(BSONObjBuilder* builder) const {
+    builder->appendNumber("documents", documents);
+    builder->appendNumber("indexes", indexes);
+    builder->appendNumber("fetchedBatches", fetchBatches);
+    if (start != Date_t()) {
+        builder->appendDate("start", start);
+        if (end != Date_t()) {
+            builder->appendDate("end", end);
+            auto elapsed = end - start;
+            long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
+            builder->appendNumber("elapsedMillis", elapsedMillis);
+        }
+    }
+}
 }  // namespace repl
 }  // namespace mongo
