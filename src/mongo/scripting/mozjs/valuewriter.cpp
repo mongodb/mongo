@@ -351,6 +351,8 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             if (scope->getProto<BinDataInfo>().getJSClass() == jsclass) {
                 auto str = static_cast<std::string*>(JS_GetPrivate(obj));
 
+                uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
+
                 auto binData = base64::decode(*str);
 
                 b->appendBinData(sd,
