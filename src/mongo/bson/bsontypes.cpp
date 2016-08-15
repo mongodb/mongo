@@ -95,6 +95,10 @@ const char* typeName(BSONType type) {
     }
 }
 
+std::ostream& operator<<(std::ostream& stream, BSONType type) {
+    return stream << typeName(type);
+}
+
 bool isValidBSONType(int type) {
     switch (type) {
         case MinKey:
