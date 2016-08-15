@@ -50,7 +50,7 @@ load("jstests/replsets/rslib.js");
             assert.commandWorked(
                 node.adminCommand({configureFailPoint: 'pauseRsBgSyncProducer', mode: 'off'}),
                 'Failed to disable pauseRsBgSyncProducer failpoint.');
-        } catch (ex) {
+        } catch (e) {
             // Enable bgsync producer may cause rollback, which will close all connections
             // including the one sending "configureFailPoint".
             print("got exception when disabling fail point 'pauseRsBgSyncProducer': " + e);
