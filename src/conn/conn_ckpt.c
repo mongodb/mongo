@@ -38,6 +38,15 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 	if (conn->ckpt_usecs != 0 ||
 	    (conn->ckpt_logsize != 0 &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
+		/*
+		 * If checkpointing based on log data, use a minimum of the
+		 * log file size.  The logging subsystem has already been
+		 * initialized.
+		 */
+		if (conn->ckpt_logsize != 0 &&
+		    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+			conn->ckpt_logsize = WT_MAX(
+			    conn->ckpt_logsize, conn->log_file_max);
 		/* Checkpoints are incompatible with in-memory configuration */
 		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
 		if (cval.val != 0)

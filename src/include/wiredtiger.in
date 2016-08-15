@@ -1785,7 +1785,8 @@ struct __wt_connection {
 	 * Enabling the checkpoint server uses a session from the configured
 	 * session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log
-	 * record bytes to be written to the log between each checkpoint.  A
+	 * record bytes to be written to the log between each checkpoint.  If
+	 * non-zero\, this value will use a minimum of the log file size.  A
 	 * database can configure both log_size and wait to set an upper bound
 	 * for checkpoints; setting this value above 0 configures periodic
 	 * checkpoints., an integer between 0 and 2GB; default \c 0.}
@@ -2203,14 +2204,14 @@ struct __wt_connection {
  * checkpoint server uses a session from the configured session_max., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
- * bytes to be written to the log between each checkpoint.  A database can
- * configure both log_size and wait to set an upper bound for checkpoints;
- * setting this value above 0 configures periodic checkpoints., an integer
- * between 0 and 2GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
- * seconds to wait between each checkpoint; setting this value above 0
- * configures periodic checkpoints., an integer between 0 and 100000; default \c
- * 0.}
+ * bytes to be written to the log between each checkpoint.  If non-zero\, this
+ * value will use a minimum of the log file size.  A database can configure both
+ * log_size and wait to set an upper bound for checkpoints; setting this value
+ * above 0 configures periodic checkpoints., an integer between 0 and 2GB;
+ * default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between
+ * each checkpoint; setting this value above 0 configures periodic checkpoints.,
+ * an integer between 0 and 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}

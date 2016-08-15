@@ -375,7 +375,8 @@ connection_runtime_config = [
         type='category', subconfig=[
         Config('log_size', '0', r'''
             wait for this amount of log record bytes to be written to
-                the log between each checkpoint.  A database can configure
+                the log between each checkpoint.  If non-zero, this value will
+                use a minimum of the log file size.  A database can configure
                 both log_size and wait to set an upper bound for checkpoints;
                 setting this value above 0 configures periodic checkpoints''',
             min='0', max='2GB'),
