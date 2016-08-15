@@ -74,6 +74,7 @@ env.Library(
         "lock_server_status_section.cpp",
         "range_deleter_server_status.cpp",
         "snapshots.cpp",
+        'storage_stats.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

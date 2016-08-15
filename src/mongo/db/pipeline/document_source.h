@@ -379,6 +379,13 @@ public:
                                         BSONObjBuilder* builder) const = 0;
 
         /**
+         * Appends storage statistics for collection "nss" to "builder"
+         */
+        virtual Status appendStorageStats(const NamespaceString& nss,
+                                          const BSONObj& param,
+                                          BSONObjBuilder* builder) const = 0;
+
+        /**
          * Gets the collection options for the collection given by 'nss'.
          */
         virtual BSONObj getCollectionOptions(const NamespaceString& nss) = 0;
@@ -1994,7 +2001,8 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    bool _latencySpecified = false;
+    // The raw object given to $collStats containing user specified options.
+    BSONObj _collStatsSpec;
     bool _finished = false;
 };
 

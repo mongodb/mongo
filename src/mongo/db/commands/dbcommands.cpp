@@ -89,6 +89,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
@@ -965,20 +966,6 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        int scale = 1;
-        if (jsobj["scale"].isNumber()) {
-            scale = jsobj["scale"].numberInt();
-            if (scale <= 0) {
-                errmsg = "scale has to be >= 1";
-                return false;
-            }
-        } else if (jsobj["scale"].trueValue()) {
-            errmsg = "scale has to be a number >= 1";
-            return false;
-        }
-
-        bool verbose = jsobj["verbose"].trueValue();
-
         const NamespaceString nss(parseNs(dbname, jsobj));
 
         if (nss.coll().empty()) {
@@ -986,59 +973,12 @@ public:
             return false;
         }
 
-        AutoGetCollectionForRead ctx(txn, nss);
-        if (!ctx.getDb()) {
-            errmsg = "Database [" + nss.db().toString() + "] not found.";
-            return false;
-        }
-
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            errmsg = "Collection [" + nss.toString() + "] not found.";
-            return false;
-        }
-
         result.append("ns", nss.ns());
-
-        long long size = collection->dataSize(txn) / scale;
-        long long numRecords = collection->numRecords(txn);
-        result.appendNumber("count", numRecords);
-        result.appendNumber("size", size);
-        if (numRecords)
-            result.append("avgObjSize", collection->averageObjectSize(txn));
-
-        result.appendNumber("storageSize",
-                            static_cast<long long>(collection->getRecordStore()->storageSize(
-                                txn, &result, verbose ? 1 : 0)) /
-                                scale);
-
-        collection->getRecordStore()->appendCustomStats(txn, &result, scale);
-
-        IndexCatalog* indexCatalog = collection->getIndexCatalog();
-        result.append("nindexes", indexCatalog->numIndexesReady(txn));
-
-        // indexes
-        BSONObjBuilder indexDetails;
-
-        IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(txn, false);
-        while (i.more()) {
-            const IndexDescriptor* descriptor = i.next();
-            IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
-            invariant(iam);
-
-            BSONObjBuilder bob;
-            if (iam->appendCustomStats(txn, &bob, scale)) {
-                indexDetails.append(descriptor->indexName(), bob.obj());
-            }
+        Status status = appendCollectionStorageStats(txn, nss, jsobj, &result);
+        if (!status.isOK()) {
+            errmsg = status.reason();
+            return false;
         }
-
-        result.append("indexDetails", indexDetails.done());
-
-        BSONObjBuilder indexSizes;
-        long long indexSize = collection->getIndexSize(txn, &indexSizes, scale);
-
-        result.appendNumber("totalIndexSize", indexSize / scale);
-        result.append("indexSizes", indexSizes.obj());
 
         return true;
     }

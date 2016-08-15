@@ -57,6 +57,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -116,6 +117,12 @@ public:
 
     void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const final {
         Top::get(_ctx->opCtx->getServiceContext()).appendLatencyStats(nss.ns(), builder);
+    }
+
+    Status appendStorageStats(const NamespaceString& nss,
+                              const BSONObj& param,
+                              BSONObjBuilder* builder) const final {
+        return appendCollectionStorageStats(_ctx->opCtx, nss, param, builder);
     }
 
     BSONObj getCollectionOptions(const NamespaceString& nss) final {

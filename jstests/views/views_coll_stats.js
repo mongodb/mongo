@@ -57,4 +57,10 @@
     checkCollStatsBelongTo(viewsDB["a"].aggregate().next(), "b");
     checkCollStatsBelongTo(viewsDB["b"].aggregate().next(), "c");
     clear();
+
+    // Assert that attempting to retrieve storageStats fails.
+    makeView("a", "b");
+    assert.commandFailedWithCode(
+        viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {storageStats: {}}}]}),
+        ErrorCodes.CommandNotSupportedOnView);
 }());

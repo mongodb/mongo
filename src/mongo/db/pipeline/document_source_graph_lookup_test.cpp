@@ -89,6 +89,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status appendStorageStats(const NamespaceString& nss,
+                              const BSONObj& param,
+                              BSONObjBuilder* builder) const final {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }

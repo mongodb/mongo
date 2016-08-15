@@ -54,16 +54,24 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     for (const auto& elem : specElem.embeddedObject()) {
         StringData fieldName = elem.fieldNameStringData();
 
-        if (fieldName == "latencyStats") {
+        if ("latencyStats" == fieldName) {
             uassert(40167,
-                    str::stream() << "latencyStats argument must be an object, but found: " << elem,
+                    str::stream() << "latencyStats argument must be an object, but got " << elem
+                                  << " of type "
+                                  << typeName(elem.type()),
                     elem.type() == BSONType::Object);
-            collStats->_latencySpecified = true;
+        } else if ("storageStats" == fieldName) {
+            uassert(40279,
+                    str::stream() << "storageStats argument must be an object, but got " << elem
+                                  << " of type "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Object);
         } else {
             uasserted(40168, str::stream() << "unrecognized option to $collStats: " << fieldName);
         }
     }
 
+    collStats->_collStatsSpec = specElem.Obj().getOwned();
     return collStats;
 }
 
@@ -75,10 +83,23 @@ boost::optional<Document> DocumentSourceCollStats::getNext() {
     _finished = true;
 
     BSONObjBuilder builder;
-
+    builder.append("ns", pExpCtx->ns.ns());
     builder.appendDate("localTime", jsTime());
-    if (_latencySpecified) {
+    if (_collStatsSpec.hasField("latencyStats")) {
         _mongod->appendLatencyStats(pExpCtx->ns, &builder);
+    }
+
+    if (_collStatsSpec.hasField("storageStats")) {
+        // If the storageStats field exists, it must have been validated as an object when parsing.
+        BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
+        Status status = _mongod->appendStorageStats(
+            pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder);
+        storageBuilder.doneFast();
+        if (!status.isOK()) {
+            uasserted(40280,
+                      str::stream() << "Unable to retrieve storageStats in $collStats stage: "
+                                    << status.reason());
+        }
     }
 
     return Document(builder.obj());
@@ -89,10 +110,7 @@ bool DocumentSourceCollStats::isValidInitialSource() const {
 }
 
 Value DocumentSourceCollStats::serialize(bool explain) const {
-    if (_latencySpecified) {
-        return Value(DOC(getSourceName() << DOC("latencyStats" << Document())));
-    }
-    return Value(DOC(getSourceName() << Document()));
+    return Value(Document{{getSourceName(), _collStatsSpec}});
 }
 
 }  // namespace mongo
