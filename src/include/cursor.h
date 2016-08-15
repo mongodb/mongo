@@ -425,6 +425,7 @@ struct __wt_cursor_metadata {
 	WT_CURSOR iface;
 
 	WT_CURSOR *file_cursor;		/* Queries of regular metadata */
+	WT_CURSOR *create_cursor;	/* Extra cursor for create option */
 
 #define	WT_MDC_CREATEONLY	0x01
 #define	WT_MDC_ONMETADATA	0x02
