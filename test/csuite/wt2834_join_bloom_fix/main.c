@@ -165,7 +165,8 @@ void *populate(TEST_OPTS *opts)
 {
 	WT_CURSOR *maincur;
 	WT_SESSION *session;
-	int balance, i, flag, key, post;
+	uint32_t key;
+	int balance, i, flag, post;
 	WT_RAND_STATE rnd;
 
 	testutil_check(__wt_random_init_seed(NULL, &rnd));
