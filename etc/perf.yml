@@ -150,7 +150,7 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline 3.3.0-Baseline 3.3.3-Baseline 3.0.6-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --project_id performance --task_name ${task_name} --variant {build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.8-Baseline 3.3.10-Baseline 3.0.12-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --project_id performance --task_name ${task_name} --variant {build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"
@@ -170,7 +170,7 @@ functions:
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
 
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.2.1-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.2.8-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
