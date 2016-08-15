@@ -201,7 +201,7 @@ StatusWith<std::unique_ptr<CollectionMetadata>> CollectionMetadata::cloneSplit(
         // Check that the split key is valid
         if (!rangeContains(minKey, maxKey, split)) {
             return {ErrorCodes::IllegalOperation,
-                    stream() << "cannot split chunk " << rangeToString(minKey, maxKey) << " at key "
+                    stream() << "Cannot split chunk " << rangeToString(minKey, maxKey) << " at key "
                              << split};
         }
 

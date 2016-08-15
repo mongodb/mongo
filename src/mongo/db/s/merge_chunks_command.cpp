@@ -324,6 +324,9 @@ bool mergeChunks(OperationContext* txn,
     ChunkVersion mergeVersion = metadata->getCollVersion();
     mergeVersion.incMinor();
 
+    // Ensure that the newly applied chunks would result in a correct metadata state
+    auto metadataAfterMerge = uassertStatusOK(metadata->cloneMerge(minKey, maxKey, mergeVersion));
+
     Status applyOpsStatus = runApplyOpsCmd(txn, chunksToMerge, shardVersion, mergeVersion);
     if (!applyOpsStatus.isOK()) {
         warning() << applyOpsStatus;
@@ -339,10 +342,7 @@ bool mergeChunks(OperationContext* txn,
         AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
         auto css = CollectionShardingState::get(txn, nss);
-
-        std::unique_ptr<CollectionMetadata> cloned(
-            fassertStatusOK(40222, css->getMetadata()->cloneMerge(minKey, maxKey, mergeVersion)));
-        css->refreshMetadata(txn, std::move(cloned));
+        css->refreshMetadata(txn, std::move(metadataAfterMerge));
     }
 
     //

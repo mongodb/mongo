@@ -255,31 +255,22 @@ public:
             return false;
         }
 
-        ChunkVersion cmdVersion;
-        {
-            // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
-            // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
-            OID cmdEpoch;
-            auto& oss = OperationShardingState::get(txn);
-            if (oss.hasShardVersion()) {
-                cmdVersion = oss.getShardVersion(nss);
-                cmdEpoch = cmdVersion.epoch();
-            } else {
-                BSONElement epochElem(cmdObj["epoch"]);
-                if (epochElem.type() == jstOID) {
-                    cmdEpoch = epochElem.OID();
-                }
-            }
+        const auto& oss = OperationShardingState::get(txn);
+        uassert(ErrorCodes::InvalidOptions, "collection version is missing", oss.hasShardVersion());
 
-            if (cmdEpoch != shardVersion.epoch()) {
-                std::string msg = str::stream() << "splitChunk cannot split chunk "
-                                                << "[" << min << "," << max << "), "
-                                                << "collection may have been dropped. "
-                                                << "current epoch: " << shardVersion.epoch()
-                                                << ", cmd epoch: " << cmdEpoch;
-                warning() << msg;
-                throw SendStaleConfigException(nss.toString(), msg, cmdVersion, shardVersion);
-            }
+        // Even though the splitChunk command transmits a value in the operation's shardVersion
+        // field, this value does not actually contain the shard version, but the global collection
+        // version.
+        ChunkVersion expectedCollectionVersion = oss.getShardVersion(nss);
+        if (expectedCollectionVersion.epoch() != shardVersion.epoch()) {
+            std::string msg = str::stream() << "splitChunk cannot split chunk "
+                                            << "[" << min << "," << max << "), "
+                                            << "collection may have been dropped. "
+                                            << "current epoch: " << shardVersion.epoch()
+                                            << ", cmd epoch: " << expectedCollectionVersion.epoch();
+            warning() << msg;
+            throw SendStaleConfigException(
+                nss.toString(), msg, expectedCollectionVersion, shardVersion);
         }
 
         ScopedCollectionMetadata collMetadata;
@@ -305,7 +296,8 @@ public:
                                             << "[" << min << "," << max << ")"
                                             << " to split, the chunk boundaries may be stale";
             warning() << msg;
-            throw SendStaleConfigException(nss.toString(), msg, cmdVersion, shardVersion);
+            throw SendStaleConfigException(
+                nss.toString(), msg, expectedCollectionVersion, shardVersion);
         }
 
         log() << "splitChunk accepted at version " << shardVersion;
@@ -402,6 +394,20 @@ public:
             preCond.append(b.obj());
         }
 
+        // NOTE: The newShardVersion resulting from this split is higher than any other chunk
+        // version, so it's also implicitly the newCollVersion
+        ChunkVersion newShardVersion = collVersion;
+
+        // Increment the minor version once, splitChunk increments once per split point
+        // (resulting in the correct final shard/collection version)
+        //
+        // TODO: Revisit this interface, it's a bit clunky
+        newShardVersion.incMinor();
+
+        // Ensure that the newly applied chunks would result in a correct metadata state
+        auto metadataAfterSplit =
+            uassertStatusOK(collMetadata->cloneSplit(min, max, splitKeys, newShardVersion));
+
         //
         // 4. apply the batch of updates to remote and local metadata
         //
@@ -421,20 +427,7 @@ public:
             AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
             auto css = CollectionShardingState::get(txn, nss);
-
-            // NOTE: The newShardVersion resulting from this split is higher than any other chunk
-            // version, so it's also implicitly the newCollVersion
-            ChunkVersion newShardVersion = collVersion;
-
-            // Increment the minor version once, splitChunk increments once per split point
-            // (resulting in the correct final shard/collection version)
-            //
-            // TODO: Revisit this interface, it's a bit clunky
-            newShardVersion.incMinor();
-
-            std::unique_ptr<CollectionMetadata> cloned(fassertStatusOK(
-                40221, css->getMetadata()->cloneSplit(min, max, splitKeys, newShardVersion)));
-            css->refreshMetadata(txn, std::move(cloned));
+            css->refreshMetadata(txn, std::move(metadataAfterSplit));
         }
 
         //

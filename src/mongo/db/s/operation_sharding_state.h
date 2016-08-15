@@ -116,7 +116,7 @@ private:
     void _clear();
 
     bool _hasVersion = false;
-    ChunkVersion _shardVersion;
+    ChunkVersion _shardVersion{ChunkVersion::UNSHARDED()};
     NamespaceString _ns;
 
     // This value will only be non-null if version check during the operation execution failed due
