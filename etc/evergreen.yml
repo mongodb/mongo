@@ -7,7 +7,7 @@
 # expansions, the corresponding value is used. If the key can
 # not be found, the default is used.
 #
-# Arbitrary expansions can be specified in the YAML cofiguration
+# Arbitrary expansions can be specified in the YAML configuration
 # files in the following places:
 # - The 'expansions' field for buildvariants (branch file)
 # - The 'expansions' field for distros (distros file)
@@ -931,7 +931,7 @@ tasks:
             burn_in_args="--baseCommit=HEAD~1"
           fi
           # Capture a list of new and modified tests.
-          ${python|python} buildscripts/burn_in_tests.py --reportFile=jstests/new_tests.json --noExec $burn_in_args
+          ${python|python} buildscripts/burn_in_tests.py --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
 
           # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
           sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
@@ -1047,7 +1047,7 @@ tasks:
           ${python|python} ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
-  name: burn_in_tests_WT
+  name: burn_in_tests
   depends_on:
   - name: compile
   commands:
@@ -5075,11 +5075,11 @@ buildvariants:
   tasks:
   - name: compile
     requires:
-    - name: burn_in_tests_WT
+    - name: burn_in_tests
     distros:
     - rhel62-large
   - name: lint
-  - name: burn_in_tests_WT
+  - name: burn_in_tests
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese

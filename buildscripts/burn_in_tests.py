@@ -11,7 +11,10 @@ import json
 import optparse
 import os.path
 import subprocess
+import re
 import sys
+import yaml
+
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -31,27 +34,35 @@ def parse_command_line():
     parser.add_option("--baseCommit", dest="base_commit",
                       help="The base commit to compare to for determining changes.")
 
+    parser.add_option("--buildVariant", dest="buildvariant",
+                      help="The buildvariant the tasks will execute on. \
+                            Required when generating the JSON file with test executor information")
+
     parser.add_option("--noExec", dest="no_exec", action="store_true",
                       help="Do not run resmoke loop on new tests.")
 
     parser.add_option("--reportFile", dest="report_file",
-                      help="Write a JSON file with test executor information.")
+                      help="Write a JSON file with test results.")
 
-    parser.add_option("--skipEnterpriseSuites", dest="no_enterprise", action="store_true",
-                      help="Do not run against enterprise specific executors.")
-
-    parser.add_option("--testListFile", dest="tests_file", metavar="TESTLIST",
+    parser.add_option("--testListFile", dest="test_list_file", metavar="TESTLIST",
                       help="Load a JSON file with tests to run.")
+
+    parser.add_option("--testListOutfile", dest="test_list_outfile",
+                      help="Write a JSON file with test executor information.")
 
     # The executor_file and suite_files defaults are required to make the
     # suite resolver work correctly.
     parser.set_defaults(base_commit=None,
                         branch="master",
+                        buildvariant=None,
+                        evergreen_file="etc/evergreen.yml",
                         executor_file="with_server",
                         max_revisions=25,
                         no_exec=False,
-                        no_enterprise=False,
-                        suite_files=None)
+                        report_file="report.json",
+                        suite_files=None,
+                        test_list_file=None,
+                        test_list_outfile=None)
 
     # This disables argument parsing on the first unrecognized parameter. This allows us to pass
     # a complete resmoke.py command line without accidentally parsing its options.
@@ -188,6 +199,63 @@ def create_executor_list(suites):
     return memberships
 
 
+def create_buildvariant_list(evergreen_file):
+    """
+    Parses etc/evergreen.yml. Returns a list of buildvariants.
+    """
+
+    with open(evergreen_file, "r") as f:
+        evg = yaml.load(f)
+
+    return [li["name"] for li in evg["buildvariants"]]
+
+
+def create_task_list(evergreen_file, buildvariant, suites):
+    """
+    Parses etc/evergreen.yml to find associated tasks for the specified buildvariant
+    and suites. Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
+    {'jsCore_small_oplog':
+        {'resmoke_args': '--suites=core_small_oplog --storageEngine=mmapv1',
+         'tests': ['jstests/core/all2.js', 'jstests/core/all3.js']}
+    }
+    """
+
+    # Check if buildvariant is in the evergreen_file.
+    buildvariants = create_buildvariant_list(evergreen_file)
+    if buildvariant not in buildvariants:
+        print "Buildvariant", buildvariant, "not found in", evergreen_file
+        sys.exit(1)
+
+    with open(evergreen_file, "r") as f:
+        evg = yaml.load(f)
+
+    # Find all the task names for the specified buildvariant.
+    variant_tasks = [li["name"] for li in next(item for item in evg["buildvariants"]
+                                               if item["name"] == buildvariant)["tasks"]]
+
+    # Find all the buildvariant task's resmoke_args.
+    variant_task_args = {}
+    for task in [a for a in evg["tasks"] if a["name"] in variant_tasks]:
+        for command in task["commands"]:
+            if ("func" in command and command["func"] == "run tests" and
+                "vars" in command and "resmoke_args" in command["vars"]):
+                variant_task_args[task["name"]] = command["vars"]["resmoke_args"]
+
+    # Create the list of tasks to run for the specified suite.
+    tasks_to_run = {}
+    for suite in suites.keys():
+        for task_name, task_arg in variant_task_args.items():
+            # Find the resmoke_args for matching suite names.
+            # Change the --suites to --executor
+            if (re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg) or
+                re.compile('--executor=' + suite + '(?:\s+|$)').match(task_arg)):
+                tasks_to_run[task_name] = {
+                    "resmoke_args": task_arg.replace("--suites", "--executor"),
+                    "tests": suites[suite]}
+
+    return tasks_to_run
+
+
 def _write_report_file(tests_by_executor, pathname):
     """
     Writes out a JSON file containing the tests_by_executor dict.  This should
@@ -230,14 +298,19 @@ def main():
         args = ["python", "buildscripts/resmoke.py", "--repeat=2"]
 
     # Load the dict of tests to run.
-    if values.tests_file:
-        tests_by_executor = _load_tests_file(values.tests_file)
+    if values.test_list_file:
+        tests_by_task = _load_tests_file(values.test_list_file)
         # If there are no tests to run, carry on.
-        if tests_by_executor is None:
+        if tests_by_task is None:
             sys.exit(0)
 
     # Run the executor finder.
     else:
+        if values.buildvariant is None:
+            print "Option buildVariant must be specified to find changed tests.\n", \
+                  "Select from the following: \n" \
+                  "\t", "\n\t".join(sorted(create_buildvariant_list(values.evergreen_file)))
+            sys.exit(1)
         changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions)
         # If there are no changed tests, exit cleanly.
         if not changed_tests:
@@ -245,46 +318,27 @@ def main():
             sys.exit(0)
         suites = resmokelib.parser.get_suites(values, changed_tests)
         tests_by_executor = create_executor_list(suites)
-        if values.report_file is not None:
-            _write_report_file(tests_by_executor, values.report_file)
+        tests_by_task = create_task_list(values.evergreen_file, values.buildvariant, tests_by_executor)
+        if values.test_list_outfile is not None:
+            _write_report_file(tests_by_task, values.test_list_outfile)
 
     # If we're not in noExec mode, run the tests.
     if not values.no_exec:
         test_results = {"failures": 0, "results": []}
 
-        # This is a temporary workaround until we have better exclusion semantics.  Check for
-        # enterprise executors and the existence of the ekf2 file in the enterprise modules dir.
-        executor_black_list = ["audit", "ese", "rlp", "sasl", "snmp"]
-        ekf2_file = "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
-        for executor in sorted(tests_by_executor):
-            for bl_entry in executor_black_list:
-                if bl_entry in executor:
-                    if values.no_enterprise:
-                        tests_by_executor.pop(executor)
-                        print "Skipping executor", executor
-                    elif not os.path.isfile(ekf2_file):
-                        print "The mongo enterprise module is not installed.", \
-                              "You may specify the --skipEnterpriseSuites flag to skip these" \
-                              "test executors, or run against an enterprise build."
-                        sys.exit(1)
-                    else:
-                        # We have the files to run enterprise executors.
-                        break
-
-        for executor in sorted(tests_by_executor):
-            test_names = tests_by_executor[executor]
+        for task in sorted(tests_by_task):
             try:
-                subprocess.check_call(" ".join(args) +
-                                      " --executor " + executor + " " +
-                                      " ".join(test_names), shell=True)
+                subprocess.check_call(" ".join(args) + " " +
+                                      tests_by_task[task]["resmoke_args"] + " " +
+                                      " ".join(tests_by_task[task]["tests"]), shell=True)
             except subprocess.CalledProcessError as err:
-                print "Resmoke returned an error with executor:", executor
-                _save_report_data(test_results, "report.json")
-                _write_report_file(test_results, "report.json")
+                print "Resmoke returned an error with task:", task
+                _save_report_data(test_results, values.report_file)
+                _write_report_file(test_results, values.report_file)
                 sys.exit(err.returncode)
 
-            _save_report_data(test_results, "report.json")
-        _write_report_file(test_results, "report.json")
+            _save_report_data(test_results, values.report_file)
+        _write_report_file(test_results, values.report_file)
 
     sys.exit(0)
 
