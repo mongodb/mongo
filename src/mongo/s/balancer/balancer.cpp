@@ -242,11 +242,11 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
 
     // Wait for the migration to complete
     Status migrationStatus =
-        _migrationManager.scheduleManualMigration(txn,
-                                                  *migrateInfo,
-                                                  balancerConfig->getMaxChunkSizeBytes(),
-                                                  balancerConfig->getSecondaryThrottle(),
-                                                  balancerConfig->waitForDelete());
+        _migrationManager.executeManualMigration(txn,
+                                                 *migrateInfo,
+                                                 balancerConfig->getMaxChunkSizeBytes(),
+                                                 balancerConfig->getSecondaryThrottle(),
+                                                 balancerConfig->waitForDelete());
 
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
     if (!scopedCMStatus.isOK()) {
@@ -273,11 +273,11 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
 
     // Wait for the migration to complete
     Status migrationStatus =
-        _migrationManager.scheduleManualMigration(txn,
-                                                  MigrateInfo(chunk.getNS(), newShardId, chunk),
-                                                  maxChunkSizeBytes,
-                                                  secondaryThrottle,
-                                                  waitForDelete);
+        _migrationManager.executeManualMigration(txn,
+                                                 MigrateInfo(chunk.getNS(), newShardId, chunk),
+                                                 maxChunkSizeBytes,
+                                                 secondaryThrottle,
+                                                 waitForDelete);
 
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
     if (!scopedCMStatus.isOK()) {

@@ -90,11 +90,11 @@ public:
      *
      * Returns the status of the migration.
      */
-    Status scheduleManualMigration(OperationContext* txn,
-                                   const MigrateInfo& migrateInfo,
-                                   uint64_t maxChunkSizeBytes,
-                                   const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                   bool waitForDelete);
+    Status executeManualMigration(OperationContext* txn,
+                                  const MigrateInfo& migrateInfo,
+                                  uint64_t maxChunkSizeBytes,
+                                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
+                                  bool waitForDelete);
 
 private:
     /**
@@ -127,41 +127,15 @@ private:
      * Contains the runtime state for a single collection. This class does not have concurrency
      * control of its own and relies on the migration manager's mutex.
      */
-    class CollectionMigrationsState {
-    public:
+    struct CollectionMigrationsState {
         CollectionMigrationsState(DistLockHandle distLockHandle);
         ~CollectionMigrationsState();
 
-        /**
-         * Registers a new migration with this state tracker. Must be followed by a call to
-         * completeMigration with the returned handle.
-         */
-        MigrationsList::iterator addMigration(Migration migration);
-
-        /**
-         * Must be called exactly once, as a follow-up to an addMigration call, with the iterator
-         * returned from it. Removes the specified migration entry from the migrations list and sets
-         * its notification status.
-         *
-         * Returns true if this is the last migration for this collection, in which case it is the
-         * caller's responsibility to free the collection distributed lock and get rid of the object
-         * by removing it from the owning map.
-         */
-        bool completeMigration(MigrationsList::iterator it, Status status);
-
-        /**
-         * Retrieves the dist lock handle corresponding to the dist lock held for this collection.
-         */
-        const DistLockHandle& getDistLockHandle() const {
-            return _distLockHandle;
-        }
-
-    private:
-        // Dist lock handle, which should be released at destruction time
-        DistLockHandle _distLockHandle;
+        // Dist lock handle, which must be released at destruction time.
+        const DistLockHandle distLockHandle;
 
         // Contains a set of migrations which are currently active for this namespace.
-        MigrationsList _migrations;
+        MigrationsList migrations;
     };
 
     using CollectionMigrationsStateMap =
@@ -194,6 +168,16 @@ private:
     void _scheduleWithDistLock(OperationContext* txn,
                                const HostAndPort& targetHost,
                                Migration migration);
+
+    /**
+     * Used internally for migrations scheduled with the distributed lock acquired by the config
+     * server. Called exactly once for each scheduled migration, it will signal the migration in the
+     * passed iterator and if this is the last migration for the collection will free the collection
+     * distributed lock.
+     */
+    void _completeWithDistLock(OperationContext* txn,
+                               MigrationsList::iterator itMigration,
+                               Status status);
 
     /**
      * Immediately schedules the specified migration without attempting to acquire the collection

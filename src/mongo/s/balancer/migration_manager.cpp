@@ -180,7 +180,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
     return migrationStatuses;
 }
 
-Status MigrationManager::scheduleManualMigration(
+Status MigrationManager::executeManualMigration(
     OperationContext* txn,
     const MigrateInfo& migrateInfo,
     uint64_t maxChunkSizeBytes,
@@ -272,7 +272,7 @@ void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
 
     executor::TaskExecutor* const executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     auto it = _activeMigrationsWithDistLock.find(nss);
     if (it == _activeMigrationsWithDistLock.end()) {
@@ -291,9 +291,9 @@ void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
 
     auto collectionMigrationState = &it->second;
 
-    // Add ourselves to the list of migrations on this collection so we can call completeMigration
-    // both in the scheduleRemoteCommand and in the callback failure cases
-    auto itMigration = collectionMigrationState->addMigration(std::move(migration));
+    // Add ourselves to the list of migrations on this collection
+    collectionMigrationState->migrations.push_front(std::move(migration));
+    auto itMigration = collectionMigrationState->migrations.begin();
 
     const RemoteCommandRequest remoteRequest(
         targetHost, NamespaceString::kAdminDb.toString(), itMigration->moveChunkCmdObj, txn);
@@ -307,17 +307,10 @@ void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
                 ON_BLOCK_EXIT([&] { Client::destroy(); });
                 auto txn = cc().makeOperationContext();
 
-                const NamespaceString nss(itMigration->nss);
-
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-                if (collectionMigrationState->completeMigration(
-                        itMigration,
-                        extractMigrationStatusFromRemoteCommandResponse(args.response))) {
-                    Grid::get(txn.get())->catalogClient(txn.get())->getDistLockManager()->unlock(
-                        txn.get(), collectionMigrationState->getDistLockHandle());
-                    _activeMigrationsWithDistLock.erase(nss);
-                }
+                _completeWithDistLock(
+                    txn.get(),
+                    itMigration,
+                    extractMigrationStatusFromRemoteCommandResponse(args.response));
             });
 
     if (callbackHandleWithStatus.isOK()) {
@@ -325,12 +318,37 @@ void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
         return;
     }
 
-    if (collectionMigrationState->completeMigration(
-            itMigration, std::move(callbackHandleWithStatus.getStatus()))) {
+    // The completion routine takes its own lock
+    lock.unlock();
+
+    _completeWithDistLock(txn, itMigration, std::move(callbackHandleWithStatus.getStatus()));
+}
+
+void MigrationManager::_completeWithDistLock(OperationContext* txn,
+                                             MigrationsList::iterator itMigration,
+                                             Status status) {
+    const NamespaceString nss(itMigration->nss);
+
+    // Make sure to signal the notification last, after the distributed lock is freed, so that we
+    // don't have the race condition where a subsequently scheduled migration finds the dist lock
+    // still acquired.
+    auto notificationToSignal = itMigration->completionNotification;
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    auto it = _activeMigrationsWithDistLock.find(nss);
+    invariant(it != _activeMigrationsWithDistLock.end());
+
+    auto collectionMigrationState = &it->second;
+    collectionMigrationState->migrations.erase(itMigration);
+
+    if (collectionMigrationState->migrations.empty()) {
         Grid::get(txn)->catalogClient(txn)->getDistLockManager()->unlock(
-            txn, collectionMigrationState->getDistLockHandle());
-        _activeMigrationsWithDistLock.erase(nss);
+            txn, collectionMigrationState->distLockHandle);
+        _activeMigrationsWithDistLock.erase(it);
     }
+
+    notificationToSignal->set(status);
 }
 
 void MigrationManager::_scheduleWithoutDistLock(OperationContext* txn,
@@ -338,8 +356,8 @@ void MigrationManager::_scheduleWithoutDistLock(OperationContext* txn,
                                                 Migration migration) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    auto itMigration = _activeMigrationsWithoutDistLock.emplace(
-        _activeMigrationsWithoutDistLock.begin(), std::move(migration));
+    _activeMigrationsWithoutDistLock.push_front(std::move(migration));
+    auto itMigration = _activeMigrationsWithoutDistLock.begin();
 
     executor::TaskExecutor* const executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
 
@@ -356,13 +374,13 @@ void MigrationManager::_scheduleWithoutDistLock(OperationContext* txn,
                 _activeMigrationsWithoutDistLock.erase(itMigration);
             });
 
-    if (!callbackHandleWithStatus.isOK()) {
-        itMigration->completionNotification->set(std::move(callbackHandleWithStatus.getStatus()));
-        _activeMigrationsWithoutDistLock.erase(itMigration);
+    if (callbackHandleWithStatus.isOK()) {
+        itMigration->callbackHandle = std::move(callbackHandleWithStatus.getValue());
         return;
     }
 
-    itMigration->callbackHandle = std::move(callbackHandleWithStatus.getValue());
+    itMigration->completionNotification->set(std::move(callbackHandleWithStatus.getStatus()));
+    _activeMigrationsWithoutDistLock.erase(itMigration);
 }
 
 MigrationManager::Migration::Migration(NamespaceString inNss, BSONObj inMoveChunkCmdObj)
@@ -375,25 +393,11 @@ MigrationManager::Migration::~Migration() {
 }
 
 MigrationManager::CollectionMigrationsState::CollectionMigrationsState(
-    DistLockHandle distLockHandle)
-    : _distLockHandle(std::move(distLockHandle)) {}
+    DistLockHandle inDistLockHandle)
+    : distLockHandle(std::move(inDistLockHandle)) {}
 
 MigrationManager::CollectionMigrationsState::~CollectionMigrationsState() {
-    invariant(_migrations.empty());
-}
-
-MigrationManager::MigrationsList::iterator
-MigrationManager::CollectionMigrationsState::addMigration(Migration migration) {
-    return _migrations.emplace(_migrations.begin(), std::move(migration));
-}
-
-bool MigrationManager::CollectionMigrationsState::completeMigration(MigrationsList::iterator it,
-                                                                    Status status) {
-    it->completionNotification->set(status);
-
-    _migrations.erase(it);
-
-    return _migrations.empty();
+    invariant(migrations.empty());
 }
 
 }  // namespace mongo
