@@ -61,7 +61,7 @@ Status emptyCapped(OperationContext* txn, const NamespaceString& collectionName)
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while truncating collection "
+                      str::stream() << "Not primary while truncating collection: "
                                     << collectionName.ns());
     }
 
@@ -70,9 +70,29 @@ Status emptyCapped(OperationContext* txn, const NamespaceString& collectionName)
 
     Collection* collection = db->getCollection(collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "emptyCapped not supported on view: " << collectionName.ns(),
+            str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !db->getViewCatalog()->lookup(txn, collectionName.ns()));
     massert(28584, "no such collection", collection);
+
+    if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot truncate a system collection: "
+                                    << collectionName.ns());
+    }
+
+    if (NamespaceString::virtualized(collectionName.ns())) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot truncate a virtual collection: "
+                                    << collectionName.ns());
+    }
+
+    if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+         repl::ReplicationCoordinator::modeNone) &&
+        collectionName.isOplog()) {
+        return Status(ErrorCodes::OplogOperationUnsupported,
+                      str::stream() << "Cannot truncate a live oplog while replicating: "
+                                    << collectionName.ns());
+    }
 
     BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
