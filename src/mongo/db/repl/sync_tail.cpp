@@ -174,10 +174,14 @@ public:
 
 protected:
     void _recordApplied(const OpTime& newOpTime) {
+        // We have to use setMyLastAppliedOpTimeForward since this thread races with
+        // ReplicationExternalStateImpl::onTransitionToPrimary.
         _replCoord->setMyLastAppliedOpTimeForward(newOpTime);
     }
 
     void _recordDurable(const OpTime& newOpTime) {
+        // We have to use setMyLastDurableOpTimeForward since this thread races with
+        // ReplicationExternalStateImpl::onTransitionToPrimary.
         _replCoord->setMyLastDurableOpTimeForward(newOpTime);
     }
 
@@ -225,8 +229,6 @@ ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
 }
 
 void ApplyBatchFinalizerForJournal::record(const OpTime& newOpTime) {
-    // We have to use setMyLastAppliedOpTimeForward since this thread races with
-    // logTransitionToPrimaryToOplog.
     _recordApplied(newOpTime);
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -256,8 +258,6 @@ void ApplyBatchFinalizerForJournal::_run() {
 
         auto txn = cc().makeOperationContext();
         txn->recoveryUnit()->waitUntilDurable();
-        // We have to use setMyLastDurableOpTimeForward since this thread races with
-        // logTransitionToPrimaryToOplog.
         _recordDurable(latestOpTime);
     }
 }
@@ -635,10 +635,7 @@ OpTime SyncTail::multiApply(OperationContext* txn, MultiApplier::Operations ops)
 }
 
 namespace {
-void tryToGoLiveAsASecondary(OperationContext* txn,
-                             ReplicationCoordinator* replCoord,
-                             const BatchBoundaries& minValidBoundaries,
-                             const OpTime& lastWriteOpTime) {
+void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* replCoord) {
     if (replCoord->isInPrimaryOrSecondaryState()) {
         return;
     }
@@ -659,19 +656,8 @@ void tryToGoLiveAsASecondary(OperationContext* txn,
         return;
     }
 
-    // If an apply batch is active then we cannot transition.
-    if (!minValidBoundaries.start.isNull()) {
-        LOG(1) << "Can't go live (tryToGoLiveAsASecondary) as there is an active apply batch.";
-        return;
-    }
-
-    // Must have applied/written to minvalid, so return if not.
-    // -- If 'lastWriteOpTime' is null/uninitialized then we can't transition.
-    // -- If 'lastWriteOpTime' is less than the end of the last batch then we can't transition.
-    if (lastWriteOpTime.isNull() || minValidBoundaries.end > lastWriteOpTime) {
-        log() << "Can't go live (tryToGoLiveAsASecondary) as last written optime ("
-              << lastWriteOpTime
-              << ") is null or greater than minvalid: " << minValidBoundaries.end;
+    // We can't go to SECONDARY until we reach minvalid.
+    if (replCoord->getMyLastAppliedOpTime() < StorageInterface::get(txn)->getMinValid(txn)) {
         return;
     }
 
@@ -786,12 +772,8 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
             ? new ApplyBatchFinalizerForJournal(replCoord)
             : new ApplyBatchFinalizer(replCoord)};
 
-    auto minValidBoundaries = StorageInterface::get(&txn)->getMinValid(&txn);
-    OpTime originalEndOpTime(minValidBoundaries.end);
-    OpTime lastWriteOpTime{replCoord->getMyLastAppliedOpTime()};
     while (!shouldShutdown()) {
-
-        tryToGoLiveAsASecondary(&txn, replCoord, minValidBoundaries, lastWriteOpTime);
+        tryToGoLiveAsASecondary(&txn, replCoord);
 
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
@@ -799,77 +781,50 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
         if (ops.empty())
             continue;  // Try again.
 
-        const BSONObj lastOp = ops.back().raw;
-
-        if (lastOp.isEmpty()) {
+        if (ops.front().raw.isEmpty()) {
             // This means that the network thread has coalesced and we have processed all of its
             // data.
             invariant(ops.getCount() == 1);
             if (replCoord->isWaitingForApplierToDrain()) {
                 replCoord->signalDrainComplete(&txn);
             }
-
-            // Reset some values when triggered in case it was from a rollback.
-            minValidBoundaries = StorageInterface::get(&txn)->getMinValid(&txn);
-            lastWriteOpTime = replCoord->getMyLastAppliedOpTime();
-            originalEndOpTime = minValidBoundaries.end;
-
             continue;  // This wasn't a real op. Don't try to apply it.
         }
 
-        const auto lastOpTime = fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp));
-        if (lastWriteOpTime >= lastOpTime) {
-            // Error for the oplog to go back in time.
+        // Extract some info from ops that we'll need after releasing the batch below.
+        const size_t opsInBatch = ops.getCount();
+        const auto firstOpTimeInBatch =
+            fassertStatusOK(40299, OpTime::parseFromOplogEntry(ops.front().raw));
+        const auto lastOpTimeInBatch =
+            fassertStatusOK(28773, OpTime::parseFromOplogEntry(ops.back().raw));
+
+        // Make sure the oplog doesn't go back in time or repeat an entry.
+        if (firstOpTimeInBatch <= replCoord->getMyLastAppliedOpTime()) {
             fassert(34361,
                     Status(ErrorCodes::OplogOutOfOrder,
                            str::stream() << "Attempted to apply an oplog entry ("
-                                         << lastOpTime.toString()
-                                         << ") which is not greater than our lastWrittenOptime ("
-                                         << lastWriteOpTime.toString()
+                                         << firstOpTimeInBatch.toString()
+                                         << ") which is not greater than our last applied OpTime ("
+                                         << replCoord->getMyLastAppliedOpTime().toString()
                                          << ")."));
         }
 
-        // Set minValid to the last OpTime that needs to be applied, in this batch or from the
-        // (last) failed batch, whichever is larger.
-        // This will cause this node to go into RECOVERING state
-        // if we should crash and restart before updating finishing.
-        const auto& start = lastWriteOpTime;
 
-
-        // Take the max of the first endOptime (if we recovered) and the end of our batch.
-
-        // Setting end to the max of originalEndOpTime and lastOpTime (the end of the batch)
-        // ensures that we keep pushing out the point where we can become consistent
-        // and allow reads. If we recover and end up doing smaller batches we must pass the
-        // originalEndOpTime before we are good.
-        //
-        // For example:
-        // batch apply, 20-40, end = 40
-        // batch failure,
-        // restart
-        // batch apply, 20-25, end = max(25, 40) = 40
-        // batch apply, 25-45, end = 45
-        const OpTime end(std::max(originalEndOpTime, lastOpTime));
-
-        // This write will not journal/checkpoint.
-        StorageInterface::get(&txn)->setMinValid(&txn, {start, end});
-
-        const size_t opsInBatch = ops.getCount();
-        lastWriteOpTime = multiApply(&txn, ops.releaseBatch());
-        if (lastWriteOpTime.isNull()) {
+        const bool fail = multiApply(&txn, ops.releaseBatch()).isNull();
+        if (fail) {
             // fassert if oplog application failed for any reasons other than shutdown.
-            error() << "Failed to apply " << opsInBatch << " operations - batch start:" << start
-                    << " end:" << end;
+            error() << "Failed to apply " << opsInBatch
+                    << " operations - batch start:" << firstOpTimeInBatch
+                    << " end:" << lastOpTimeInBatch;
             fassert(34360, inShutdownStrict());
             // Return without setting minvalid in the case of shutdown.
             return;
         }
 
-        setNewTimestamp(lastWriteOpTime.getTimestamp());
-        StorageInterface::get(&txn)->setMinValid(&txn, end, DurableRequirement::None);
-        minValidBoundaries.start = {};
-        minValidBoundaries.end = end;
-        finalizer->record(lastWriteOpTime);
+        // Update various things that care about our last applied optime.
+        setNewTimestamp(lastOpTimeInBatch.getTimestamp());
+        StorageInterface::get(&txn)->setAppliedThrough(&txn, lastOpTimeInBatch);
+        finalizer->record(lastOpTimeInBatch);
     }
 }
 
@@ -1275,6 +1230,8 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         prefetchOps(ops, workerPool);
     }
 
+    auto storage = StorageInterface::get(txn);
+
     LOG(2) << "replication batch size is " << ops.size();
     // We must grab this because we're going to grab write locks later.
     // We hold this mutex the entire time we're writing; it doesn't matter
@@ -1299,6 +1256,7 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         std::vector<MultiApplier::OperationPtrs> writerVectors;
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
+        storage->setOplogDeleteFromPoint(txn, ops.front().ts.timestamp());
         const bool multiThreadedOplogWrites = scheduleWritesToOplog(txn, workerPool, ops);
         if (multiThreadedOplogWrites) {
             // Use all threads for oplog application.
@@ -1309,6 +1267,21 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         }
 
         fillWriterVectors(txn, &ops, &writerVectors);
+
+        workerPool->join();
+
+        // We must check this before altering the MinValid document because setting inShutdown may
+        // have caused the oplog writers to abort early. This code (and its duplicate below) will go
+        // away once SERVER-25071 is done and clean shutdown drains the apply queue.
+        if (inShutdownStrict()) {
+            log() << "Cannot apply operations due to shutdown in progress";
+            return {ErrorCodes::InterruptedAtShutdown,
+                    "Cannot apply operations due to shutdown in progress"};
+        }
+
+        storage->setOplogDeleteFromPoint(txn, Timestamp());
+        storage->setMinValidToAtLeast(txn, ops.back().getOpTime());
+
         applyOps(&writerVectors, workerPool, applyOperation);
     }
 

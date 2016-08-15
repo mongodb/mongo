@@ -74,7 +74,7 @@ public:
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual OldThreadPool* getDbWorkThreadPool() const override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
-    virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
+    virtual OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx);
@@ -89,7 +89,6 @@ public:
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void shardingOnStepDownHook();
-    virtual void drainModeHook(OperationContext* txn);
     virtual void signalApplierToChooseNewSyncSource();
     virtual void signalApplierToCancelFetcher();
     void dropAllSnapshots() final;
@@ -129,7 +128,7 @@ private:
      *
      * Throws on errors.
      */
-    void shardingOnDrainingStateHook(OperationContext* txn);
+    void shardingOnTransitionToPrimaryHook(OperationContext* txn);
 
     /**
     * Drops all temporary collections on all databases except "local".

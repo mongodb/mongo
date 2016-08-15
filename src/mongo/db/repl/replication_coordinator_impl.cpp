@@ -448,7 +448,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
         fassertFailedNoTrace(28545);
     }
 
-    // Returns the last optime from the oplog, possibly truncating first if we need to recover.
+    // Read the last op from the oplog after cleaning up any partially applied batches.
     _externalState->cleanUpLastApplyBatch(txn);
     auto lastOpTimeStatus = _externalState->loadLastOpTime(txn);
 
@@ -856,7 +856,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     //     _isWaitingForDrainToComplete, set the flag allowing non-local database writes and
     //     drop the mutex.  At this point, no writes can occur from other threads, due to the
     //     global exclusive lock.
-    // 4.) Drop all temp collections.
+    // 4.) Drop all temp collections, and log the drops to the oplog.
     // 5.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
     //     consider to be committed.
     // 6.) Drop the global exclusive lock.
@@ -868,40 +868,42 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     // external writes will be processed.  This is important so that a new temp collection isn't
     // introduced on the new primary before we drop all the temp collections.
 
+    // When we go to drop all temp collections, we must replicate the drops.
+    invariant(txn->writesAreReplicated());
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (!_isWaitingForDrainToComplete) {
         return;
     }
+
     lk.unlock();
-
     ScopedTransaction transaction(txn, MODE_X);
+    // Block step downs even after we unlock lk.
     Lock::GlobalWrite globalWriteLock(txn->lockState());
-
     lk.lock();
+
     if (!_isWaitingForDrainToComplete) {
         return;
     }
+    invariant(!_isCatchingUp);
     _isWaitingForDrainToComplete = false;
-    _canAcceptNonLocalWrites = true;
     _drainFinishedCond.notify_all();
-    lk.unlock();
 
-    _externalState->drainModeHook(txn);
-
-    // This is done for compatibility with PV0 replicas wrt how "n" ops are processed.
-    if (isV1ElectionProtocol()) {
-        _externalState->logTransitionToPrimaryToOplog(txn);
+    if (!_getMemberState_inlock().primary()) {
+        // We must have decided not to transition to primary while waiting for the applier to drain.
+        // Skip the rest of this function since it should only be done when really transitioning.
+        return;
     }
 
-    StatusWith<OpTime> lastOpTime = _externalState->loadLastOpTime(txn);
-    fassertStatusOK(28665, lastOpTime.getStatus());
-    _setFirstOpTimeOfMyTerm(lastOpTime.getValue());
+    _canAcceptNonLocalWrites = true;
 
-    lk.lock();
-    // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
-    // our election in logTransitionToPrimaryToOplog(), above.
-    _updateLastCommittedOpTime_inlock();
     lk.unlock();
+    _setFirstOpTimeOfMyTerm(_externalState->onTransitionToPrimary(txn, isV1ElectionProtocol()));
+    lk.lock();
+
+    // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
+    // our election in onTransitionToPrimary(), above.
+    _updateLastCommittedOpTime_inlock();
 
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
 }

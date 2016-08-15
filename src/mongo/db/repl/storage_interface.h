@@ -48,21 +48,6 @@ class OperationContext;
 
 namespace repl {
 
-struct BatchBoundaries {
-    BatchBoundaries(const OpTime s, const OpTime e) : start(s), end(e) {}
-    bool operator==(const BatchBoundaries& rhs) const;
-    std::string toString() const;
-    OpTime start;
-    OpTime end;
-};
-
-std::ostream& operator<<(std::ostream& stream, const BatchBoundaries& boundaries);
-
-enum class DurableRequirement {
-    None,    // Does not require any durability of the write.
-    Strong,  // Requires journal or checkpoint write.
-};
-
 /**
  * Storage interface used by the replication system to interact with storage.
  * This interface provides seperation of concerns and a place for mocking out test
@@ -137,29 +122,40 @@ public:
     virtual void clearInitialSyncFlag(OperationContext* txn) = 0;
 
     /**
-     * Returns the bounds of the current apply batch, if active. If start is null/missing, and
-     * end is equal to the last oplog entry then we are in a consistent state and ready for reads.
-     */
-    virtual BatchBoundaries getMinValid(OperationContext* txn) const = 0;
-
-    /**
      * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
      * consider the dataset consistent.
-     *
-     * This is called when a batch finishes.
-     *
-     * Wait for durable writes (which will block on journaling/checkpointing) when specified.
-     *
      */
-    virtual void setMinValid(OperationContext* txn,
-                             const OpTime& endOpTime,
-                             const DurableRequirement durReq) = 0;
+    virtual void setMinValid(OperationContext* txn, const OpTime& minValid) = 0;
+    virtual OpTime getMinValid(OperationContext* txn) const = 0;
 
     /**
-     * The bounds indicate an apply is active and we are not in a consistent state to allow reads
-     * or transition from a non-visible state to primary/secondary.
+     * Sets minValid only if it is not already higher than endOpTime.
+     * Warning, this compares the term and timestamp independently. Do not use if the current
+     * minValid could be from the other fork of a rollback.
      */
-    virtual void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) = 0;
+    virtual void setMinValidToAtLeast(OperationContext* txn, const OpTime& endOpTime) = 0;
+
+    /**
+     * On startup all oplog entries with a value >= the oplog delete from point should be deleted.
+     * If null, no documents should be deleted.
+     */
+    virtual void setOplogDeleteFromPoint(OperationContext* txn, const Timestamp& timestamp) = 0;
+    virtual Timestamp getOplogDeleteFromPoint(OperationContext* txn) = 0;
+
+    /**
+     * The applied through point is a persistent record of where we've applied through. If null, the
+     * applied through point is the top of the oplog.
+     */
+    virtual void setAppliedThrough(OperationContext* txn, const OpTime& optime) = 0;
+
+    /**
+     * You should probably be calling ReplicationCoordinator::getLastAppliedOpTime() instead.
+     *
+     * This reads the value from storage which isn't always updated when the ReplicationCoordinator
+     * is.
+     */
+    virtual OpTime getAppliedThrough(OperationContext* txn) = 0;
+
 
     // Collection creation and population for initial sync.
     /**

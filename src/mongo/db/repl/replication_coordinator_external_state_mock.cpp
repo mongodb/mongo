@@ -226,8 +226,6 @@ void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationCon
 
 void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
-void ReplicationCoordinatorExternalStateMock::drainModeHook(OperationContext* txn) {}
-
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToCancelFetcher() {
@@ -288,8 +286,12 @@ void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val
     _isReadCommittedSupported = val;
 }
 
-void ReplicationCoordinatorExternalStateMock::logTransitionToPrimaryToOplog(OperationContext* txn) {
-    _lastOpTime = OpTime(Timestamp(1, 0), 1);
+OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* txn,
+                                                                      bool isV1ElectionProtocol) {
+    if (isV1ElectionProtocol) {
+        _lastOpTime = OpTime(Timestamp(1, 0), 1);
+    }
+    return fassertStatusOK(40297, _lastOpTime);
 }
 
 }  // namespace repl

@@ -154,10 +154,9 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             log() << "our last optime : " << lastOpTimeFetched;
             log() << "oldest available is " << oldestOpTimeSeen;
             log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-            StorageInterface::get(txn)->setMinValid(txn, {lastOpTimeFetched, oldestOpTimeSeen});
             auto status = replCoord->setMaintenanceMode(true);
             if (!status.isOK()) {
-                warning() << "Failed to transition into maintenance mode.";
+                warning() << "Failed to transition into maintenance mode: " << status;
             }
             bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
             if (!worked) {

@@ -1019,6 +1019,7 @@ env.Library(
         'roll_back_local_operations.cpp',
     ],
     LIBDEPS=[
+        'optime',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/foundation',
     ],

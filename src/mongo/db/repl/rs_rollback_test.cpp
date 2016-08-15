@@ -147,7 +147,8 @@ void RSRollbackTest::setUp() {
     StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceMock>());
 
     setOplogCollectionName();
-    repl::StorageInterface::get(_txn.get())->setMinValid(_txn.get(), {OpTime{}, OpTime{}});
+    repl::StorageInterface::get(_txn.get())->setAppliedThrough(_txn.get(), OpTime{});
+    repl::StorageInterface::get(_txn.get())->setMinValid(_txn.get(), OpTime{});
 }
 
 void RSRollbackTest::tearDown() {
@@ -161,8 +162,9 @@ void noSleep(Seconds seconds) {}
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
     repl::StorageInterface::get(_txn.get())
-        ->setMinValid(_txn.get(),
-                      {OpTime(Timestamp(Seconds(0), 0), 0), OpTime(Timestamp(Seconds(1), 0), 0)});
+        ->setAppliedThrough(_txn.get(), OpTime(Timestamp(Seconds(0), 0), 0));
+    repl::StorageInterface::get(_txn.get())
+        ->setMinValid(_txn.get(), OpTime(Timestamp(Seconds(1), 0), 0));
     auto status = syncRollback(_txn.get(),
                                OplogInterfaceMock(kEmptyMockOperations),
                                RollbackSourceMock(std::unique_ptr<OplogInterface>(

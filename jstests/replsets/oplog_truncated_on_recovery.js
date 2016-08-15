@@ -50,18 +50,24 @@
     log(primaryOpTime);
 
     // Set the start of the failed batch
+    // TODO this test should restart in stand-alone mode to futz with the state rather than trying
+    // to do it on a running primary.
 
     jsTest.log("future TS: " + tojson(farFutureTS) + ", date:" + tsToDate(farFutureTS));
+    var divergedTS = new Timestamp(primaryOpTime.ts.t, primaryOpTime.ts.i + 1);
     // We do an update in case there is a minvalid document on the primary already.
     // If the doc doesn't exist then upsert:true will create it, and the writeConcern ensures
     // that update returns details of the write, like whether an update or insert was performed.
-    log(assert.writeOK(
-        minvalidColl.update({},
-                            {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime},
-                            {upsert: true, writeConcern: {w: 1}})));
+    log(assert.writeOK(minvalidColl.update({},
+                                           {
+                                             ts: farFutureTS,
+                                             t: NumberLong(-1),
+                                             begin: primaryOpTime,
+                                             oplogDeleteFromPoint: divergedTS
+                                           },
+                                           {upsert: true, writeConcern: {w: 1}})));
 
     // Insert a diverged oplog entry that will be truncated after restart.
-    var divergedTS = new Timestamp(primaryOpTime.ts.t, primaryOpTime.ts.i + 1);
     log(assert.writeOK(localDB.oplog.rs.insert(
         {_id: 0, ts: divergedTS, op: "n", h: NumberLong(0), t: NumberLong(-1)})));
     log(localDB.oplog.rs.find().toArray());

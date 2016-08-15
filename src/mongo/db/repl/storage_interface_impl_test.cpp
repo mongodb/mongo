@@ -274,9 +274,9 @@ TEST_F(StorageInterfaceImplTest, GetMinValidAfterSettingInitialSyncFlagWorks) {
     storageInterface.setInitialSyncFlag(txn.get());
     ASSERT_TRUE(storageInterface.getInitialSyncFlag(txn.get()));
 
-    auto minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_TRUE(minValid.end.isNull());
+    ASSERT(storageInterface.getMinValid(txn.get()).isNull());
+    ASSERT(storageInterface.getAppliedThrough(txn.get()).isNull());
+    ASSERT(storageInterface.getOplogDeleteFromPoint(txn.get()).isNull());
 }
 
 TEST_F(StorageInterfaceImplTest, MinValid) {
@@ -285,18 +285,30 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     StorageInterfaceImpl storageInterface(nss);
     auto txn = getClient()->makeOperationContext();
 
-    // MinValid boundaries should be {null optime, null optime} after initializing a new storage
-    // engine.
-    auto minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_TRUE(minValid.end.isNull());
+    // MinValid boundaries should all be null after initializing a new storage engine.
+    ASSERT(storageInterface.getMinValid(txn.get()).isNull());
+    ASSERT(storageInterface.getAppliedThrough(txn.get()).isNull());
+    ASSERT(storageInterface.getOplogDeleteFromPoint(txn.get()).isNull());
 
     // Setting min valid boundaries should affect getMinValid() result.
     OpTime startOpTime({Seconds(123), 0}, 1LL);
     OpTime endOpTime({Seconds(456), 0}, 1LL);
-    storageInterface.setMinValid(txn.get(), {startOpTime, endOpTime});
-    minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_EQUALS(BatchBoundaries(startOpTime, endOpTime), minValid);
+    storageInterface.setAppliedThrough(txn.get(), startOpTime);
+    storageInterface.setMinValid(txn.get(), endOpTime);
+    storageInterface.setOplogDeleteFromPoint(txn.get(), endOpTime.getTimestamp());
+
+    ASSERT_EQ(storageInterface.getAppliedThrough(txn.get()), startOpTime);
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), endOpTime);
+    ASSERT_EQ(storageInterface.getOplogDeleteFromPoint(txn.get()), endOpTime.getTimestamp());
+
+
+    // setMinValid always changes minValid, but setMinValidToAtLeast only does if higher.
+    storageInterface.setMinValid(txn.get(), startOpTime);  // Forcibly lower it.
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), startOpTime);
+    storageInterface.setMinValidToAtLeast(txn.get(), endOpTime);  // Higher than current (sets it).
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), endOpTime);
+    storageInterface.setMinValidToAtLeast(txn.get(), startOpTime);  // Lower than current (no-op).
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), endOpTime);
 
     // Check min valid document using storage engine interface.
     auto minValidDocument = getMinValidDocument(txn.get(), nss);
@@ -306,6 +318,9 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
                   unittest::assertGet(OpTime::parseFromOplogEntry(
                       minValidDocument[StorageInterfaceImpl::kBeginFieldName].Obj())));
     ASSERT_EQUALS(endOpTime, unittest::assertGet(OpTime::parseFromOplogEntry(minValidDocument)));
+    ASSERT_EQUALS(
+        endOpTime.getTimestamp(),
+        minValidDocument[StorageInterfaceImpl::kOplogDeleteFromPointFieldName].timestamp());
 
     // Recovery unit will be owned by "txn".
     RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
@@ -313,19 +328,11 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
 
     // Set min valid without waiting for the changes to be durable.
     OpTime endOpTime2({Seconds(789), 0}, 1LL);
-    storageInterface.setMinValid(txn.get(), endOpTime2, DurableRequirement::None);
-    minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_EQUALS(endOpTime2, minValid.end);
+    storageInterface.setMinValid(txn.get(), endOpTime2);
+    storageInterface.setAppliedThrough(txn.get(), {});
+    ASSERT_EQUALS(storageInterface.getAppliedThrough(txn.get()), OpTime());
+    ASSERT_EQUALS(storageInterface.getMinValid(txn.get()), endOpTime2);
     ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
-
-    // Set min valid and wait for the changes to be durable.
-    OpTime endOpTime3({Seconds(999), 0}, 1LL);
-    storageInterface.setMinValid(txn.get(), endOpTime3, DurableRequirement::Strong);
-    minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_EQUALS(endOpTime3, minValid.end);
-    ASSERT_TRUE(recoveryUnit->waitUntilDurableCalled);
 }
 
 TEST_F(StorageInterfaceImplTest, SnapshotSupported) {

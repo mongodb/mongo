@@ -136,9 +136,16 @@ public:
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config) = 0;
 
     /**
-     * Writes a message about our transition to primary to the oplog.
+     * Called as part of the process of transitioning to primary. See the call site in
+     * ReplicationCoordinatorImpl for details about when and how it is called.
+     *
+     * Among other things, this writes a message about our transition to primary to the oplog if
+     * isV1 and and returns the optime of that message. If !isV1, returns the optime of the last op
+     * in the oplog.
+     *
+     * Throws on errors.
      */
-    virtual void logTransitionToPrimaryToOplog(OperationContext* txn) = 0;
+    virtual OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) = 0;
 
     /**
      * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
@@ -223,13 +230,6 @@ public:
      * primary again in the future it will recover its state from a clean slate.
      */
     virtual void shardingOnStepDownHook() = 0;
-
-    /**
-     * Called when the instance transitions to primary. Calls all drain mode hooks.
-     *
-     * Throws on errors.
-     */
-    virtual void drainModeHook(OperationContext* txn) = 0;
 
     /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.

@@ -302,12 +302,9 @@ void BackgroundSync::_produce(OperationContext* txn) {
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
         log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-
-        StorageInterface::get(txn)->setMinValid(
-            txn, {lastOpTimeFetched, syncSourceResp.earliestOpTimeSeen});
         auto status = _replCoord->setMaintenanceMode(true);
         if (!status.isOK()) {
-            warning() << "Failed to transition into maintenance mode.";
+            warning() << "Failed to transition into maintenance mode: " << status;
         }
         bool worked = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
         if (!worked) {
@@ -340,6 +337,13 @@ void BackgroundSync::_produce(OperationContext* txn) {
         if (!_replCoord->isCatchingUp()) {
             _replCoord->signalUpstreamUpdater();
         }
+    }
+
+    // Set the applied point if unset. This is most likely the first time we've established a sync
+    // source since stepping down or otherwise clearing the applied point. We need to set this here,
+    // before the OplogWriter gets a chance to append to the oplog.
+    if (StorageInterface::get(txn)->getAppliedThrough(txn).isNull()) {
+        StorageInterface::get(txn)->setAppliedThrough(txn, _replCoord->getMyLastAppliedOpTime());
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
@@ -442,13 +446,13 @@ void BackgroundSync::_produce(OperationContext* txn) {
         }
         // check that we are at minvalid, otherwise we cannot roll back as we may be in an
         // inconsistent state
-        BatchBoundaries boundaries = StorageInterface::get(txn)->getMinValid(txn);
-        if (!boundaries.start.isNull() || boundaries.end > lastApplied) {
+        const auto minValid = StorageInterface::get(txn)->getMinValid(txn);
+        if (lastApplied < minValid) {
             fassertNoTrace(18750,
                            Status(ErrorCodes::UnrecoverableRollbackError,
                                   str::stream() << "need to rollback, but in inconsistent state. "
                                                 << "minvalid: "
-                                                << boundaries.end.toString()
+                                                << minValid.toString()
                                                 << " > our last optime: "
                                                 << lastApplied.toString()));
         }

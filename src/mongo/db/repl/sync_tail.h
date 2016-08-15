@@ -123,6 +123,10 @@ public:
         bool empty() const {
             return _batch.empty();
         }
+        const OplogEntry& front() const {
+            invariant(!_batch.empty());
+            return _batch.front();
+        }
         const OplogEntry& back() const {
             invariant(!_batch.empty());
             return _batch.back();

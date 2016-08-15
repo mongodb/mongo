@@ -55,21 +55,40 @@ void StorageInterfaceMock::clearInitialSyncFlag(OperationContext* txn) {
     _initialSyncFlag = false;
 }
 
-BatchBoundaries StorageInterfaceMock::getMinValid(OperationContext* txn) const {
+OpTime StorageInterfaceMock::getMinValid(OperationContext* txn) const {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    return _minValidBoundaries;
+    return _minValid;
 }
 
-void StorageInterfaceMock::setMinValid(OperationContext* txn,
-                                       const OpTime& endOpTime,
-                                       const DurableRequirement durReq) {
+void StorageInterfaceMock::setMinValid(OperationContext* txn, const OpTime& minValid) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _minValidBoundaries = {OpTime(), endOpTime};
+    _minValid = minValid;
 }
 
-void StorageInterfaceMock::setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) {
+void StorageInterfaceMock::setMinValidToAtLeast(OperationContext* txn, const OpTime& minValid) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _minValidBoundaries = boundaries;
+    _minValid = std::max(_minValid, minValid);
+}
+
+void StorageInterfaceMock::setOplogDeleteFromPoint(OperationContext* txn,
+                                                   const Timestamp& timestamp) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    _oplogDeleteFromPoint = timestamp;
+}
+
+Timestamp StorageInterfaceMock::getOplogDeleteFromPoint(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    return _oplogDeleteFromPoint;
+}
+
+void StorageInterfaceMock::setAppliedThrough(OperationContext* txn, const OpTime& optime) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    _appliedThrough = optime;
+}
+
+OpTime StorageInterfaceMock::getAppliedThrough(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    return _appliedThrough;
 }
 
 Status CollectionBulkLoaderMock::init(OperationContext* txn,

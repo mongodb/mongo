@@ -75,6 +75,7 @@ namespace repl {
 const char StorageInterfaceImpl::kDefaultMinValidNamespace[] = "local.replset.minvalid";
 const char StorageInterfaceImpl::kInitialSyncFlagFieldName[] = "doingInitialSync";
 const char StorageInterfaceImpl::kBeginFieldName[] = "begin";
+const char StorageInterfaceImpl::kOplogDeleteFromPointFieldName[] = "oplogDeleteFromPoint";
 
 namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
@@ -100,135 +101,139 @@ NamespaceString StorageInterfaceImpl::getMinValidNss() const {
     return _minValidNss;
 }
 
-bool StorageInterfaceImpl::getInitialSyncFlag(OperationContext* txn) const {
+BSONObj StorageInterfaceImpl::getMinValidDocument(OperationContext* txn) const {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IS);
         Lock::DBLock dblk(txn->lockState(), _minValidNss.db(), MODE_IS);
         Lock::CollectionLock lk(txn->lockState(), _minValidNss.ns(), MODE_IS);
-        BSONObj mv;
-        bool found = Helpers::getSingleton(txn, _minValidNss.ns().c_str(), mv);
-
-        if (found) {
-            const auto flag = mv[kInitialSyncFlagFieldName].trueValue();
-            LOG(3) << "return initial flag value of " << flag;
-            return flag;
-        }
-        LOG(3) << "return initial flag value of false";
-        return false;
+        BSONObj doc;
+        bool found = Helpers::getSingleton(txn, _minValidNss.ns().c_str(), doc);
+        invariant(found || doc.isEmpty());
+        return doc;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::getInitialSyncFlag", _minValidNss.ns());
+        txn, "StorageInterfaceImpl::getMinValidDocument", _minValidNss.ns());
 
     MONGO_UNREACHABLE;
 }
 
-void StorageInterfaceImpl::setInitialSyncFlag(OperationContext* txn) {
+void StorageInterfaceImpl::updateMinValidDocument(OperationContext* txn,
+                                                  const BSONObj& updateSpec) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
+        // For now this needs to be MODE_X because it sometimes creates the collection.
         Lock::DBLock dblk(txn->lockState(), _minValidNss.db(), MODE_X);
-        Helpers::putSingleton(txn, _minValidNss.ns().c_str(), BSON("$set" << kInitialSyncFlag));
+        Helpers::putSingleton(txn, _minValidNss.ns().c_str(), updateSpec);
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::setInitialSyncFlag", _minValidNss.ns());
+        txn, "StorageInterfaceImpl::updateMinValidDocument", _minValidNss.ns());
+}
 
-    txn->recoveryUnit()->waitUntilDurable();
+bool StorageInterfaceImpl::getInitialSyncFlag(OperationContext* txn) const {
+    const BSONObj doc = getMinValidDocument(txn);
+    const auto flag = doc[kInitialSyncFlagFieldName].trueValue();
+    LOG(3) << "returning initial sync flag value of " << flag;
+    return flag;
+}
+
+void StorageInterfaceImpl::setInitialSyncFlag(OperationContext* txn) {
     LOG(3) << "setting initial sync flag";
+    updateMinValidDocument(txn, BSON("$set" << kInitialSyncFlag));
+    txn->recoveryUnit()->waitUntilDurable();
 }
 
 void StorageInterfaceImpl::clearInitialSyncFlag(OperationContext* txn) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        // TODO: Investigate correctness of taking MODE_IX for DB/Collection locks
-        Lock::DBLock dblk(txn->lockState(), _minValidNss.db(), MODE_X);
-        Helpers::putSingleton(txn, _minValidNss.ns().c_str(), BSON("$unset" << kInitialSyncFlag));
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::clearInitialSyncFlag", _minValidNss.ns());
+    LOG(3) << "clearing initial sync flag";
 
     auto replCoord = repl::ReplicationCoordinator::get(txn);
+    OpTime time = replCoord->getMyLastAppliedOpTime();
+    updateMinValidDocument(
+        txn,
+        BSON("$unset" << kInitialSyncFlag << "$set"
+                      << BSON("ts" << time.getTimestamp() << "t" << time.getTerm()
+                                   << kBeginFieldName
+                                   << time.toBSON())));
+
     if (getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
-        OpTime time = replCoord->getMyLastAppliedOpTime();
         txn->recoveryUnit()->waitUntilDurable();
         replCoord->setMyLastDurableOpTime(time);
     }
-    LOG(3) << "clearing initial sync flag";
 }
 
-BatchBoundaries StorageInterfaceImpl::getMinValid(OperationContext* txn) const {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IS);
-        Lock::DBLock dblk(txn->lockState(), _minValidNss.db(), MODE_IS);
-        Lock::CollectionLock lk(txn->lockState(), _minValidNss.ns(), MODE_IS);
-        BSONObj mv;
-        bool found = Helpers::getSingleton(txn, _minValidNss.ns().c_str(), mv);
-        if (found) {
-            auto status = OpTime::parseFromOplogEntry(mv.getObjectField(kBeginFieldName));
-            OpTime start(status.isOK() ? status.getValue() : OpTime{});
-            const auto opTimeStatus = OpTime::parseFromOplogEntry(mv);
-            // If any of the keys (fields) are missing from the minvalid document, we return
-            // empty.
-            if (opTimeStatus == ErrorCodes::NoSuchKey) {
-                return BatchBoundaries{{}, {}};
-            }
-
-            if (!opTimeStatus.isOK()) {
-                error() << "Error parsing minvalid entry: " << mv
-                        << ", with status:" << opTimeStatus.getStatus();
-            }
-            OpTime end(fassertStatusOK(40052, opTimeStatus));
-            LOG(3) << "returning minvalid: " << start.toString() << "(" << start.toBSON() << ") -> "
-                   << end.toString() << "(" << end.toBSON() << ")";
-
-            return BatchBoundaries(start, end);
-        }
-        LOG(3) << "returning empty minvalid";
-        return BatchBoundaries{{}, {}};
+OpTime StorageInterfaceImpl::getMinValid(OperationContext* txn) const {
+    const BSONObj doc = getMinValidDocument(txn);
+    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc);
+    // If any of the keys (fields) are missing from the minvalid document, we return
+    // a null OpTime.
+    if (opTimeStatus == ErrorCodes::NoSuchKey) {
+        return {};
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::getMinValid", _minValidNss.ns());
+
+    if (!opTimeStatus.isOK()) {
+        severe() << "Error parsing minvalid entry: " << doc
+                 << ", with status:" << opTimeStatus.getStatus();
+        fassertFailedNoTrace(40052);
+    }
+
+    OpTime minValid = opTimeStatus.getValue();
+    LOG(3) << "returning minvalid: " << minValid.toString() << "(" << minValid.toBSON() << ")";
+
+    return minValid;
 }
 
-void StorageInterfaceImpl::setMinValid(OperationContext* txn,
-                                       const OpTime& endOpTime,
-                                       const DurableRequirement durReq) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dblk(txn->lockState(), _minValidNss.db(), MODE_X);
-        Helpers::putSingleton(
-            txn,
-            _minValidNss.ns().c_str(),
-            BSON("$set" << BSON("ts" << endOpTime.getTimestamp() << "t" << endOpTime.getTerm())
-                        << "$unset"
-                        << BSON(kBeginFieldName << 1)));
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::setMinValid", _minValidNss.ns());
-
-    if (durReq == DurableRequirement::Strong) {
-        txn->recoveryUnit()->waitUntilDurable();
-    }
-    LOG(3) << "setting minvalid: " << endOpTime.toString() << "(" << endOpTime.toBSON() << ")";
+void StorageInterfaceImpl::setMinValid(OperationContext* txn, const OpTime& minValid) {
+    LOG(3) << "setting minvalid to exactly: " << minValid.toString() << "(" << minValid.toBSON()
+           << ")";
+    updateMinValidDocument(
+        txn, BSON("$set" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
 }
 
-void StorageInterfaceImpl::setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) {
-    const OpTime& start(boundaries.start);
-    const OpTime& end(boundaries.end);
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dblk(txn->lockState(), _minValidNss.db(), MODE_X);
-        Helpers::putSingleton(txn,
-                              _minValidNss.ns().c_str(),
-                              BSON("$set" << BSON("ts" << end.getTimestamp() << "t" << end.getTerm()
-                                                       << kBeginFieldName
-                                                       << start.toBSON())));
+void StorageInterfaceImpl::setMinValidToAtLeast(OperationContext* txn, const OpTime& minValid) {
+    LOG(3) << "setting minvalid to at least: " << minValid.toString() << "(" << minValid.toBSON()
+           << ")";
+    updateMinValidDocument(
+        txn, BSON("$max" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
+}
+
+void StorageInterfaceImpl::setOplogDeleteFromPoint(OperationContext* txn,
+                                                   const Timestamp& timestamp) {
+    LOG(3) << "setting oplog delete from point to: " << timestamp.toStringPretty();
+    updateMinValidDocument(txn, BSON("$set" << BSON(kOplogDeleteFromPointFieldName << timestamp)));
+}
+
+Timestamp StorageInterfaceImpl::getOplogDeleteFromPoint(OperationContext* txn) {
+    const BSONObj doc = getMinValidDocument(txn);
+    Timestamp out = {};
+    if (auto field = doc[kOplogDeleteFromPointFieldName]) {
+        out = field.timestamp();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        txn, "StorageInterfaceImpl::setMinValid", _minValidNss.ns());
-    // NOTE: No need to ensure durability here since starting a batch isn't a problem unless
-    // writes happen after, in which case this marker (minvalid) will be written already.
-    LOG(3) << "setting minvalid: " << boundaries.start.toString() << "("
-           << boundaries.start.toBSON() << ") -> " << boundaries.end.toString() << "("
-           << boundaries.end.toBSON() << ")";
+
+    LOG(3) << "returning oplog delete from point: " << out;
+    return out;
+}
+
+void StorageInterfaceImpl::setAppliedThrough(OperationContext* txn, const OpTime& optime) {
+    LOG(3) << "setting appliedThrough to: " << optime.toString() << "(" << optime.toBSON() << ")";
+    if (optime.isNull()) {
+        updateMinValidDocument(txn, BSON("$unset" << BSON(kBeginFieldName << 1)));
+    } else {
+        updateMinValidDocument(txn, BSON("$set" << BSON(kBeginFieldName << optime.toBSON())));
+    }
+}
+
+OpTime StorageInterfaceImpl::getAppliedThrough(OperationContext* txn) {
+    const BSONObj doc = getMinValidDocument(txn);
+    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc.getObjectField(kBeginFieldName));
+    if (!opTimeStatus.isOK()) {
+        // Return null OpTime on any parse failure, including if "begin" is missing.
+        return {};
+    }
+
+    OpTime appliedThrough = opTimeStatus.getValue();
+    LOG(3) << "returning appliedThrough: " << appliedThrough.toString() << "("
+           << appliedThrough.toBSON() << ")";
+
+    return appliedThrough;
 }
 
 StatusWith<std::unique_ptr<CollectionBulkLoader>>

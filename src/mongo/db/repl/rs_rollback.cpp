@@ -159,7 +159,7 @@ struct FixUpInfo {
     set<string> collectionsToResyncData;
     set<string> collectionsToResyncMetadata;
 
-    Timestamp commonPoint;
+    OpTime commonPoint;
     RecordId commonPointOurDiskloc;
 
     int rbid;  // remote server's current rollback sequence #
@@ -391,9 +391,12 @@ void syncFixUp(OperationContext* txn,
 
     // we have items we are writing that aren't from a point-in-time.  thus best not to come
     // online until we get to that point in freshness.
+    // TODO this is still wrong because we don't record that we are in rollback, and we can't really
+    // recover.
     OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValid));
     log() << "minvalid=" << minValid;
-    StorageInterface::get(txn)->setMinValid(txn, {OpTime{}, minValid});
+    StorageInterface::get(txn)->setAppliedThrough(txn, {});  // Use top of oplog.
+    StorageInterface::get(txn)->setMinValid(txn, minValid);
 
     // any full collection resyncs required?
     if (!fixUpInfo.collectionsToResyncData.empty() ||
@@ -498,8 +501,8 @@ void syncFixUp(OperationContext* txn,
             } else {
                 OpTime minValid = fassertStatusOK(28775, OpTime::parseFromOplogEntry(newMinValid));
                 log() << "minvalid=" << minValid;
-                const OpTime start{fixUpInfo.commonPoint, OpTime::kUninitializedTerm};
-                StorageInterface::get(txn)->setMinValid(txn, {start, minValid});
+                StorageInterface::get(txn)->setMinValid(txn, minValid);
+                StorageInterface::get(txn)->setAppliedThrough(txn, fixUpInfo.commonPoint);
             }
         } catch (const DBException& e) {
             err = "can't get/set minvalid: ";
@@ -769,7 +772,7 @@ void syncFixUp(OperationContext* txn,
     log() << "rollback 6";
 
     // clean up oplog
-    LOG(2) << "rollback truncate oplog after " << fixUpInfo.commonPoint.toStringPretty();
+    LOG(2) << "rollback truncate oplog after " << fixUpInfo.commonPoint.toString();
     {
         const NamespaceString oplogNss(rsOplogName);
         ScopedTransaction transaction(txn, MODE_IX);
