@@ -319,8 +319,6 @@ void DBClientCursor::dataReceived(bool& retry, string& host) {
 
 /** If true, safe to call next().  Requests more from server if necessary. */
 bool DBClientCursor::more() {
-    _assertIfNull();
-
     if (!_putBack.empty())
         return true;
 
@@ -338,7 +336,6 @@ bool DBClientCursor::more() {
 }
 
 BSONObj DBClientCursor::next() {
-    DEV _assertIfNull();
     if (!_putBack.empty()) {
         BSONObj ret = _putBack.top();
         _putBack.pop();

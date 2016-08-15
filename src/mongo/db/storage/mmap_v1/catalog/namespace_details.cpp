@@ -97,7 +97,6 @@ NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* txn,
     Namespace fullns(ns);
     Namespace extrans(fullns.extraName(i));  // throws UserException if ns name too long
 
-    massert(10350, "allocExtra: base ns missing?", this);
     massert(10351, "allocExtra: extra already exists", ni.details(extrans) == 0);
 
     Extra temp;
