@@ -77,6 +77,9 @@ MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
 // Failpoint which causes the initial sync function to hang before copying databases.
 MONGO_FP_DECLARE(initialSyncHangBeforeCopyingDatabases);
 
+// Failpoint which causes the initial sync function to hang before finishing.
+MONGO_FP_DECLARE(initialSyncHangBeforeFinish);
+
 // Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
 // operation.
 MONGO_FP_DECLARE(initialSyncHangBeforeGettingMissingDocument);
@@ -732,6 +735,16 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         lk.lock();
     }
 
+    if (MONGO_FAIL_POINT(initialSyncHangBeforeFinish)) {
+        lk.unlock();
+        // This log output is used in js tests so please leave it.
+        log() << "initial sync - initialSyncHangBeforeFinish fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangBeforeFinish)) {
+            mongo::sleepsecs(1);
+        }
+        lk.lock();
+    }
     _reporterPaused = false;
     _fetcherPaused = false;
     _applierPaused = false;
