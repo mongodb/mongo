@@ -386,7 +386,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -464,7 +465,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -578,6 +580,32 @@ TEST_F(AddShardTest, AddMongosAsShard) {
     future.timed_get(kFutureTimeout);
 }
 
+// Attempt to add a pre-v3.4 mongod.
+TEST_F(AddShardTest, AddVersion32Shard) {
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+    std::string expectedShardName = "StandaloneShard";
+
+    auto future = launchAsync([this, &expectedShardName, &shardTarget] {
+        Client::initThreadIfNotAlready();
+        auto status = catalogManager()->addShard(
+            operationContext(), &expectedShardName, ConnectionString(shardTarget), 100);
+        ASSERT_EQUALS(ErrorCodes::IncompatibleServerVersion, status);
+    });
+
+    // The maxWireVersion indicates that this is a v3.2 shard.
+    BSONObj commandResponse =
+        BSON("ok" << 1 << "ismaster" << true << "maxWireVersion" << WireVersion::FIND_COMMAND);
+    expectIsMaster(shardTarget, commandResponse);
+
+    future.timed_get(kFutureTimeout);
+}
+
 // A replica set name was found for the host but no name was provided with the host.
 TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
@@ -598,7 +626,9 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     });
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
-                                        << "myOtherSet");
+                                        << "myOtherSet"
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
@@ -625,7 +655,8 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host did not return a set name");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
@@ -653,7 +684,9 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
     });
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
-                                        << "myOtherSet");
+                                        << "myOtherSet"
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
@@ -684,7 +717,9 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "config"
                                         << "configsvr"
-                                        << true);
+                                        << true
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
@@ -717,7 +752,9 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
                                         << "hosts"
-                                        << hosts.arr());
+                                        << hosts.arr()
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
@@ -751,7 +788,9 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
                                         << "hosts"
-                                        << hosts.arr());
+                                        << hosts.arr()
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kFutureTimeout);
@@ -798,7 +837,9 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
                                         << "hosts"
-                                        << hosts.arr());
+                                        << hosts.arr()
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getName())});
@@ -843,7 +884,9 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
                                         << "hosts"
-                                        << hosts.arr());
+                                        << hosts.arr()
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -903,7 +946,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
                                         << "hosts"
-                                        << hosts.arr());
+                                        << hosts.arr()
+                                        << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -971,7 +1016,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true);
+    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -1398,7 +1444,9 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB()));
     });
-    expectIsMaster(shardTarget, BSON("ok" << 1 << "ismaster" << true));
+    expectIsMaster(shardTarget,
+                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future1.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1413,7 +1461,9 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB() + 100));
     });
-    expectIsMaster(shardTarget, BSON("ok" << 1 << "ismaster" << true));
+    expectIsMaster(shardTarget,
+                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future2.timed_get(kFutureTimeout);
 
     // Adding the same host but as part of a replica set should fail.
@@ -1435,7 +1485,9 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                    BSON("ok" << 1 << "ismaster" << true << "setName"
                              << "mySet"
                              << "hosts"
-                             << BSON_ARRAY(shardTarget.toString())));
+                             << BSON_ARRAY(shardTarget.toString())
+                             << "maxWireVersion"
+                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future3.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1450,7 +1502,9 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                               existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(shardTarget, BSON("ok" << 1 << "ismaster" << true));
+    expectIsMaster(shardTarget,
+                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future4.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1467,7 +1521,9 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(shardTarget, BSON("ok" << 1 << "ismaster" << true));
+    expectIsMaster(shardTarget,
+                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future5.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1504,7 +1560,9 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                          << "mySet"
                                          << "hosts"
                                          << BSON_ARRAY("host1:12345"
-                                                       << "host2:12345"));
+                                                       << "host2:12345")
+                                         << "maxWireVersion"
+                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
 
     // Adding the same connection string with a different shard name should fail.
     std::string differentName = "anotherShardName";
@@ -1559,7 +1617,9 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // ensure that even if the user changed the replica set shard to a standalone, you
     // can't change the sharded cluster's notion of the shard from replica set to standalone just
     // by calling addShard.
-    expectIsMaster(shardTarget, BSON("ok" << 1 << "ismaster" << true));
+    expectIsMaster(shardTarget,
+                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future3.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1591,7 +1651,9 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     BSONObj differentRSIsMasterResponse =
         BSON("ok" << 1 << "ismaster" << true << "setName" << differentSetName << "hosts"
                   << BSON_ARRAY("host1:12345"
-                                << "host2:12345"));
+                                << "host2:12345")
+                  << "maxWireVersion"
+                  << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     // Make it get past the validation check (even though if you really tried to add a replica set
     // with the wrong name it would report the other name in the ismaster response here and thus
     // would fail the validation check) to ensure that even if you manually change the shard's

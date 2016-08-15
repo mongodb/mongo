@@ -186,6 +186,7 @@ error_code("ClientMetadataAppNameTooLarge", 184)
 error_code("ClientMetadataDocumentTooLarge", 185)
 error_code("ClientMetadataCannotBeMutated", 186)
 error_code("LinearizableReadConcernError", 187)
+error_code("IncompatibleServerVersion", 188)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

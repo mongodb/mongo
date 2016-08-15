@@ -51,6 +51,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -96,14 +97,6 @@ const Seconds kDefaultFindHostMaxWaitTime(20);
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimarySelector(ReadPreference::PrimaryOnly);
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
-
-/**
- * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
- * requests).
- * TODO: Currently only taken during addShard requests, this should also be taken in X mode during
- * removeShard, once removeShard is moved to run on the config server primary instead of on mongos.
- */
-Lock::ResourceMutex kShardMembershipLock;
 
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
@@ -407,8 +400,8 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
     const std::string* shardProposedName,
     const ConnectionString& connectionString) {
 
-    // Check for mongos and older version mongod connections, and whether the hosts
-    // can be found for the user specified replset.
+    // Check if the node being added is a mongos or a version of mongod too old to speak the current
+    // communication protocol.
     auto swCommandResponse =
         _runCommandForAddShard(txn, targeter.get(), "admin", BSON("isMaster" << 1));
     if (!swCommandResponse.isOK()) {
@@ -440,10 +433,38 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
 
     auto resIsMaster = std::move(swCommandResponse.getValue().response);
 
+    // Check that the node being added is a new enough version.
+    // If we're running this code, that means the mongos that the addShard request originated from
+    // must be at least version 3.4 (since 3.2 mongoses don't know about the _configsvrAddShard
+    // command).  Since it is illegal to have v3.4 mongoses with v3.2 shards, we should reject
+    // adding any shards that are not v3.4.  We can determine this by checking that the
+    // maxWireVersion reported in isMaster is at least COMMANDS_ACCEPT_WRITE_CONCERN.
+    // TODO(SERVER-25623): This approach won't work to prevent v3.6 mongoses from adding v3.4
+    // shards, so we'll have to rethink this during the 3.5 development cycle.
+
+    long long maxWireVersion;
+    Status status = bsonExtractIntegerField(resIsMaster, "maxWireVersion", &maxWireVersion);
+    if (!status.isOK()) {
+        return Status(status.code(),
+                      str::stream() << "isMaster returned invalid 'maxWireVersion' "
+                                    << "field when attempting to add "
+                                    << connectionString.toString()
+                                    << " as a shard: "
+                                    << status.reason());
+    }
+    if (maxWireVersion < WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN) {
+        return Status(ErrorCodes::IncompatibleServerVersion,
+                      str::stream() << "Cannot add " << connectionString.toString()
+                                    << " as a shard because we detected a mongod with server "
+                                       "version older than 3.4.0.  It is invalid to add v3.2 and "
+                                       "older shards through a v3.4 mongos.");
+    }
+
+
     // Check whether there is a master. If there isn't, the replica set may not have been
     // initiated. If the connection is a standalone, it will return true for isMaster.
     bool isMaster;
-    Status status = bsonExtractBooleanField(resIsMaster, "ismaster", &isMaster);
+    status = bsonExtractBooleanField(resIsMaster, "ismaster", &isMaster);
     if (!status.isOK()) {
         return Status(status.code(),
                       str::stream() << "isMaster returned invalid 'ismaster' "
@@ -643,7 +664,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     }
 
     // Only one addShard operation can be in progress at a time.
-    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(txn->lockState(), _kShardMembershipLock);
 
     // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shard{

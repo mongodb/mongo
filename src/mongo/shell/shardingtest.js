@@ -727,8 +727,10 @@ var ShardingTest = function(params) {
     /**
      * Stops and restarts a mongos process.
      *
-     * If opts is specified, the new mongos is started using those options. Otherwise, it is started
-     * with its previous parameters.
+     * If 'opts' is not specified, starts the mongos with its previous parameters.  If 'opts' is
+     * specified and 'opts.restart' is false or missing, starts mongos with the parameters specified
+     * in 'opts'.  If opts is specified and 'opts.restart' is true, merges the previous options
+     * with the options specified in 'opts', with the options in 'opts' taking precedence.
      *
      * Warning: Overwrites the old s (if n = 0) admin, config, and sn member variables.
      */
@@ -759,6 +761,10 @@ var ShardingTest = function(params) {
             });
 
             this._mongos[n] = new MongoBridge(bridgeOptions);
+        }
+
+        if (opts.restart) {
+            opts = Object.merge(mongos.fullOptions, opts);
         }
 
         var newConn = MongoRunner.runMongos(opts);

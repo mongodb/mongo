@@ -314,6 +314,16 @@ private:
      * taking this.
      */
     Lock::ResourceMutex _kChunkOpLock;
+
+    /**
+     * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
+     * requests).
+     * TODO: Currently only taken during addShard requests, this should also be taken in X mode
+     * during removeShard, once removeShard is moved to run on the config server primary instead of
+     * on mongos.  At that point we should also change any operations that expect the shard not to
+     * be removed while they are running (such as removeShardFromZone) to take this in shared mode.
+     */
+    Lock::ResourceMutex _kShardMembershipLock;
 };
 
 }  // namespace mongo
