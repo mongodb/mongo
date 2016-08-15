@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <iosfwd>
-
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
@@ -118,11 +116,6 @@ enum BSONType {
  * returns the name of the argument's type
  */
 const char* typeName(BSONType type);
-
-/**
- * Prints the name of the argument's type to the given stream.
- */
-std::ostream& operator<<(std::ostream& stream, BSONType type);
 
 /**
  * Returns whether or not 'type' can be converted to a valid BSONType.
