@@ -119,7 +119,7 @@ private:
     /**
      * Pops an entry off the buffer in a lock.
      */
-    bool _doPop_inlock(OperationContext* txn, Value* value);
+    bool _pop_inlock(OperationContext* txn, Value* value);
 
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;

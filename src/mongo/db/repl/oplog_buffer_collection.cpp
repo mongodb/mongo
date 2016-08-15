@@ -35,6 +35,7 @@
 #include <iterator>
 #include <numeric>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
@@ -45,8 +46,8 @@ namespace repl {
 
 namespace {
 
-const char kDefaultOplogCollectionNamespace[] = "local.temp_oplog_buffer";
-const char kOplogEntryFieldName[] = "entry";
+const StringData kDefaultOplogCollectionNamespace = "local.temp_oplog_buffer"_sd;
+const StringData kOplogEntryFieldName = "entry"_sd;
 const StringData kIdIdxName = "_id_"_sd;
 
 }  // namespace
@@ -167,7 +168,7 @@ bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
     if (_count == 0) {
         return false;
     }
-    return _doPop_inlock(txn, value);
+    return _pop_inlock(txn, value);
 }
 
 bool OplogBufferCollection::blockingPeek(OperationContext* txn,
@@ -203,7 +204,7 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
     return value;
 }
 
-bool OplogBufferCollection::_doPop_inlock(OperationContext* txn, Value* value) {
+bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
     // If there is a sentinel, and it was pushed right after the last BSONObj to be popped was
     // pushed, then we pop off a sentinel instead and decrease the count by 1.
     if (!_sentinels.empty() && (_lastPoppedTimestamp == _sentinels.front())) {
