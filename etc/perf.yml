@@ -144,7 +144,7 @@ functions:
           reports_analysis_flags="--reports-analysis . --perf-file perf-3.2/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
 
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.0.9-Baseline --overrideFile ../dsi/analysis/v3.2/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.0.12-Baseline --overrideFile ../dsi/analysis/v3.2/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
