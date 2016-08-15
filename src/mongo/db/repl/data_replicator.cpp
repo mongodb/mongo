@@ -575,6 +575,11 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     _exec->waitForEvent(initialSyncFinishEvent);
 
     log() << "Initial sync finished applying oplog entries.";
+    lk.lock();
+    if (!_initialSyncState->status.isOK()) {
+        return _initialSyncState->status;
+    }
+    lk.unlock();
 
     // Check for roll back, and fail if so.
     auto hasHadRollbackResponse = rollbackChecker.hasHadRollback();
@@ -743,6 +748,9 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
 
 void DataReplicator::_onDataClonerFinish(const Status& status, HostAndPort syncSource) {
     log() << "data clone finished, status: " << status.toString();
+    if (status.code() == ErrorCodes::CallbackCanceled) {
+        return;
+    }
     if (!status.isOK()) {
         // Initial sync failed during cloning of databases
         error() << "Failed to clone data due to '" << status << "'";

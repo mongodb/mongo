@@ -1045,6 +1045,59 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
     verifySync(getNet(), ErrorCodes::CallbackCanceled);
 }
 
+TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
+    const Responses responses = {
+        {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+        // get latest oplog ts
+        {"find",
+         fromjson(
+             str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                              "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                           << OplogEntry::kOplogVersion
+                           << ", op:'i', o:{_id:1, a:1}}]}}")},
+        // oplog fetcher find
+        {"find",
+         fromjson(
+             str::stream() << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                              "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                           << OplogEntry::kOplogVersion
+                           << ", op:'i', o:{_id:1, a:1}}]}}")},
+        // Clone Start
+        // listDatabases
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
+    };
+
+    startSync(0);
+
+    numGetMoreOplogEntriesMax = 6;
+
+    setResponses(responses);
+    playResponses(false);
+    log() << "done playing responses - both oplog fetcher and databases cloner are active";
+
+    {
+        auto net = getNet();
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        // Blackhole requests until we see a getMore.
+        while (!isOplogGetMore(noi)) {
+            log() << "Blackholing non-getMore request: " << noi->getRequest();
+            net->blackHole(noi);
+            ASSERT_TRUE(net->hasReadyRequests());
+            noi = net->getNextReadyRequest();
+        }
+        log() << "Sending error response to getMore";
+        net->scheduleErrorResponse(noi, {ErrorCodes::OperationFailed, "dead cursor"});
+        net->runReadyNetworkOperations();
+    }
+
+    // Shut executor down and wait for initial sync thread to return with final status.
+    getExecutor().shutdown();
+
+    verifySync(getNet(), ErrorCodes::OperationFailed);
+}
+
 TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
     const Responses responses =
         {
