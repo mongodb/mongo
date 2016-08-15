@@ -275,7 +275,8 @@ bool ReplicationCoordinatorMock::getMaintenanceMode() {
     return false;
 }
 
-Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
+Status ReplicationCoordinatorMock::processReplSetSyncFrom(OperationContext* txn,
+                                                          const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
     // TODO
     return Status::OK();

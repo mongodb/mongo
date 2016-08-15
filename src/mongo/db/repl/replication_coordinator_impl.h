@@ -231,7 +231,8 @@ public:
 
     virtual bool getMaintenanceMode() override;
 
-    virtual Status processReplSetSyncFrom(const HostAndPort& target,
+    virtual Status processReplSetSyncFrom(OperationContext* txn,
+                                          const HostAndPort& target,
                                           BSONObjBuilder* resultObj) override;
 
     virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) override;

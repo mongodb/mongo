@@ -585,7 +585,8 @@ class CmdReplSetSyncFrom : public ReplSetCommand {
 public:
     virtual void help(stringstream& help) const {
         help << "{ replSetSyncFrom : \"host:port\" }\n";
-        help << "Change who this member is syncing from.";
+        help << "Change who this member is syncing from. Note: This will interrupt and restart an "
+                "existing initial sync with the specified member.";
     }
     CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") {}
     virtual bool run(OperationContext* txn,
@@ -603,9 +604,9 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        return appendCommandStatus(
-            result,
-            getGlobalReplicationCoordinator()->processReplSetSyncFrom(targetHostAndPort, &result));
+        return appendCommandStatus(result,
+                                   getGlobalReplicationCoordinator()->processReplSetSyncFrom(
+                                       txn, targetHostAndPort, &result));
     }
 
 private:

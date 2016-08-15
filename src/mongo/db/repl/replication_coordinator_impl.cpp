@@ -2243,14 +2243,22 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
     return Status::OK();
 }
 
-Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const HostAndPort& target,
+Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* txn,
+                                                          const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
-    // TODO: Do resync if _inInitialSync.
     Status result(ErrorCodes::InternalError, "didn't set status in prepareSyncFromResponse");
-    LockGuard topoLock(_topoMutex);
-    LockGuard lk(_mutex);
-    auto opTime = _getMyLastAppliedOpTime_inlock();
-    _topCoord->prepareSyncFromResponse(target, opTime, resultObj, &result);
+    {
+        LockGuard topoLock(_topoMutex);
+        LockGuard lk(_mutex);
+        auto opTime = _getMyLastAppliedOpTime_inlock();
+        _topCoord->prepareSyncFromResponse(target, opTime, resultObj, &result);
+    }
+
+    // If we are in the middle of an initial sync, restart with the specified member.
+    if (result.isOK() && _dr && _dr->getState() == DataReplicatorState::InitialSync) {
+        return resyncData(txn, false);
+    }
+
     return result;
 }
 

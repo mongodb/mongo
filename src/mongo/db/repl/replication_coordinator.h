@@ -513,7 +513,9 @@ public:
      * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
      * couldn't otherwise.
      */
-    virtual Status processReplSetSyncFrom(const HostAndPort& target, BSONObjBuilder* resultObj) = 0;
+    virtual Status processReplSetSyncFrom(OperationContext* txn,
+                                          const HostAndPort& target,
+                                          BSONObjBuilder* resultObj) = 0;
 
     /**
      * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj'
