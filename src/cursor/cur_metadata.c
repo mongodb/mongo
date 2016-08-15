@@ -155,8 +155,9 @@ err:	__wt_free(session, value);
  * but also check for the internal version of the URI.
  */
 #define	WT_KEY_IS_METADATA(key)						\
+	((key)->size > 0 &&						\
 	(WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) ||\
-	 WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1))
+	 WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
 
 /*
  * __curmetadata_metadata_search --
