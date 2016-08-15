@@ -145,6 +145,7 @@ static const char *list[] = {
 	",statistics_log=(wait=37)",
 	",statistics_log=(wait=0)",
 
+#ifdef HAVE_VERBOSE
 	",verbose=(\"api\")",
 	",verbose=(\"block\")",
 	",verbose=(\"checkpoint\")",
@@ -172,6 +173,7 @@ static const char *list[] = {
 	",verbose=(\"version\")",
 	",verbose=(\"write\")",
 	",verbose=()"
+#endif
 };
 
 static int
