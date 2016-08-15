@@ -603,7 +603,13 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
 
             lk.lock();
             _dr.reset();
-            fassertStatusOK(40088, status);
+            if (!_inShutdown) {
+                fassertStatusOK(40088, status);
+            } else if (!status.isOK()) {
+                log() << "Initial Sync failed during shutdown due to " << status.getStatus();
+                return;
+            }
+
             const auto lastApplied = status.getValue();
             _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
             lk.unlock();
