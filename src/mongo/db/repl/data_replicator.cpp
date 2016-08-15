@@ -34,9 +34,11 @@
 
 #include <algorithm>
 
+#include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -98,6 +100,16 @@ using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 // The number of retries for the find command.
 const size_t numFindRetries = 3;
+
+Counter64 initialSyncFailedAttempts;
+Counter64 initialSyncFailures;
+Counter64 initialSyncCompletes;
+ServerStatusMetricField<Counter64> displaySSInitialSyncFailedAttempts(
+    "repl.initialSync.failedAttempts", &initialSyncFailedAttempts);
+ServerStatusMetricField<Counter64> displaySSInitialSyncFailures("repl.initialSync.failures",
+                                                                &initialSyncFailures);
+ServerStatusMetricField<Counter64> displaySSInitialSyncCompleted("repl.initialSync.completed",
+                                                                 &initialSyncCompletes);
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
@@ -760,6 +772,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         }
 
         ++_stats.failedInitialSyncAttempts;
+        initialSyncFailedAttempts.increment();
 
         error() << "Initial sync attempt failed -- attempts left: "
                 << (_stats.maxFailedInitialSyncAttempts - _stats.failedInitialSyncAttempts)
@@ -772,6 +785,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
                 " have been exhausted for initial sync.";
             severe() << err;
 
+            initialSyncFailures.increment();
             _setState_inlock(DataReplicatorState::Uninitialized);
             _stats.initialSyncEnd = _exec->now();
             log() << "Initial Sync Statistics: " << _getInitialSyncProgress_inlock();
@@ -796,6 +810,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     _opts.setMyLastOptime(_lastApplied.opTime);
     log() << "initial sync done; took " << _stats.initialSyncEnd - _stats.initialSyncStart
           << " milliseconds.";
+    initialSyncCompletes.increment();
     return _lastApplied;
 }
 
