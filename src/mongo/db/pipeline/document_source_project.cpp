@@ -41,19 +41,14 @@ using boost::intrusive_ptr;
 using parsed_aggregation_projection::ParsedAggregationProjection;
 using parsed_aggregation_projection::ProjectionType;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(project, DocumentSourceProject::createFromBson);
+REGISTER_DOCUMENT_SOURCE(project, DocumentSourceProject::createFromBson);
 
-intrusive_ptr<DocumentSource> DocumentSourceProject::create(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(15969, "$project specification must be an object", elem.type() == Object);
 
     return new DocumentSourceSingleDocumentTransformation(
         expCtx, ParsedAggregationProjection::create(elem.Obj()), "$project");
-}
-
-std::vector<intrusive_ptr<DocumentSource>> DocumentSourceProject::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    return {DocumentSourceProject::create(elem, expCtx)};
 }
 
 }  // namespace mongo

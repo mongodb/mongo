@@ -145,13 +145,13 @@ private:
     boost::intrusive_ptr<Expression> _newRoot;
 };
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(replaceRoot, DocumentSourceReplaceRoot::createFromBson);
+REGISTER_DOCUMENT_SOURCE(replaceRoot, DocumentSourceReplaceRoot::createFromBson);
 
-std::vector<intrusive_ptr<DocumentSource>> DocumentSourceReplaceRoot::createFromBson(
+intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
 
-    return {new DocumentSourceSingleDocumentTransformation(
-        pExpCtx, ReplaceRootTransformation::create(elem), "$replaceRoot")};
+    return new DocumentSourceSingleDocumentTransformation(
+        pExpCtx, ReplaceRootTransformation::create(elem), "$replaceRoot");
 }
 
 }  // namespace mongo

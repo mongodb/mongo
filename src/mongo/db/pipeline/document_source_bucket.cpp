@@ -33,7 +33,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(bucket, DocumentSourceBucket::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(bucket, DocumentSourceBucket::createFromBson);
 
 namespace {
 intrusive_ptr<ExpressionConstant> getExpressionConstant(BSONElement expressionElem,

@@ -38,7 +38,7 @@ using boost::intrusive_ptr;
 using std::vector;
 using std::string;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(count, DocumentSourceCount::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(count, DocumentSourceCount::createFromBson);
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -66,7 +66,7 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONObj projectObj = BSON("$project" << BSON("_id" << 0 << elemString << 1));
 
     auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
-    auto projectSource = DocumentSourceProject::create(projectObj.firstElement(), pExpCtx);
+    auto projectSource = DocumentSourceProject::createFromBson(projectObj.firstElement(), pExpCtx);
 
     return {groupSource, projectSource};
 }

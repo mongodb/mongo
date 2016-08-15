@@ -74,6 +74,10 @@ class RecordCursor;
  * Registers a DocumentSource to have the name 'key'. When a stage with name '$key' is found,
  * 'parser' will be called to construct a DocumentSource.
  *
+ * This can also be used for stages like $project and $addFields which share common functionality
+ * in the unregistered DocumentSourceSingleDocumentTransformation, or for any future single-stage
+ * aliases.
+ *
  * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
  * 'createFromBson', you would add this line:
  * REGISTER_DOCUMENT_SOURCE(foo, DocumentSourceFoo::createFromBson);
@@ -89,14 +93,14 @@ class RecordCursor;
     }
 
 /**
- * Registers an alias to have the name 'key'. When a stage with name '$key' is found,
- * 'parser' will be called to construct a vector of DocumentSources.
+ * Registers a multi-stage alias to have the single name 'key'. When a stage with name '$key' is
+ * found, 'parser' will be called to construct a vector of DocumentSources.
  *
  * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
  * 'createFromBson', you would add this line:
- * REGISTER_DOCUMENT_SOURCE_ALIAS(foo, DocumentSourceFoo::createFromBson);
+ * REGISTER_MULTI_STAGE_ALIAS(foo, DocumentSourceFoo::createFromBson);
  */
-#define REGISTER_DOCUMENT_SOURCE_ALIAS(key, parser)                              \
+#define REGISTER_MULTI_STAGE_ALIAS(key, parser)                                  \
     MONGO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
         DocumentSource::registerParser("$" #key, (parser));                      \
         return Status::OK();                                                     \
@@ -1136,7 +1140,7 @@ private:
  * $replaceRoot takes an object containing only an expression in the newRoot field, and replaces
  * each incoming document with the result of evaluating that expression. Throws an error if the
  * given expression is not an object or if the expression evaluates to the "missing" Value. This
- * is implemented as an alias of DocumentSourceSingleDocumentTransformation.
+ * is implemented as an extension of DocumentSourceSingleDocumentTransformation.
  */
 class DocumentSourceReplaceRoot final {
 public:
@@ -1144,7 +1148,7 @@ public:
      * Creates a new replaceRoot DocumentSource from the BSON specification of the $replaceRoot
      * stage.
      */
-    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
@@ -1949,12 +1953,7 @@ private:
  */
 class DocumentSourceProject final {
 public:
-    // Since $project was once a DocumentSource, other stages that use it expect a pointer instead
-    // of a vector. Use the create function to get a single stage.
-    static boost::intrusive_ptr<DocumentSource> create(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
@@ -1967,7 +1966,7 @@ private:
  */
 class DocumentSourceAddFields final {
 public:
-    static std::vector<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

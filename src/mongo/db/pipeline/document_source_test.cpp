@@ -1378,7 +1378,7 @@ protected:
     void createProject(const BSONObj& projection) {
         BSONObj spec = BSON("$project" << projection);
         BSONElement specElement = spec.firstElement();
-        _project = DocumentSourceProject::create(specElement, ctx());
+        _project = DocumentSourceProject::createFromBson(specElement, ctx());
     }
 
     DocumentSource* project() {
@@ -1522,9 +1522,7 @@ protected:
     virtual void createReplaceRoot(const BSONObj& replaceRoot) {
         BSONObj spec = BSON("$replaceRoot" << replaceRoot);
         BSONElement specElement = spec.firstElement();
-        auto replaceRootStages = DocumentSourceReplaceRoot::createFromBson(specElement, ctx());
-        invariant(replaceRootStages.size() == 1UL);
-        _replaceRoot = replaceRootStages[0];
+        _replaceRoot = DocumentSourceReplaceRoot::createFromBson(specElement, ctx());
         _replaceRoot->setSource(source());
     }
 
@@ -1722,10 +1720,9 @@ TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
 class ReplaceRootSpec : public Mock::Base, public unittest::Test {
 public:
     intrusive_ptr<DocumentSource> createReplaceRoot(BSONObj replaceRootSpec) {
-        auto specElem = replaceRootSpec.firstElement();
-        auto replaceRootStages = DocumentSourceReplaceRoot::createFromBson(specElem, ctx());
-        invariant(replaceRootStages.size() == 1UL);
-        return replaceRootStages[0];
+        auto specElement = replaceRootSpec.firstElement();
+        return DocumentSourceReplaceRoot::createFromBson(specElement, ctx());
+        ;
     }
 
     BSONObj createSpec(BSONObj spec) {
@@ -1735,15 +1732,6 @@ public:
     BSONObj createFullSpec(BSONObj spec) {
         return BSON("$replaceRoot" << BSON("newRoot" << spec));
     }
-};
-
-// Also enforced by an invariant in the test constructor.
-TEST_F(ReplaceRootSpec, CreatesVectorOfOneDocumentSource) {
-    BSONObj spec = BSON("$replaceRoot" << BSON("newRoot"
-                                               << "$a"));
-    auto replaceRootStage = DocumentSourceReplaceRoot::createFromBson(spec.firstElement(), ctx());
-
-    ASSERT_EQUALS(replaceRootStage.size(), 1UL);
 };
 
 // Verify that the creation of a $replaceRoot stage requires an object specification
@@ -4780,7 +4768,7 @@ protected:
     void createAddFields(const BSONObj& fieldsToAdd) {
         BSONObj spec = BSON("$addFields" << fieldsToAdd);
         BSONElement specElement = spec.firstElement();
-        _addFields = DocumentSourceAddFields::createFromBson(specElement, ctx())[0];
+        _addFields = DocumentSourceAddFields::createFromBson(specElement, ctx());
         addFields()->setSource(_mock.get());
     }
 

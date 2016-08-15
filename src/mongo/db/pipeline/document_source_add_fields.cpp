@@ -40,9 +40,9 @@ namespace mongo {
 using boost::intrusive_ptr;
 using parsed_aggregation_projection::ParsedAddFields;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(addFields, DocumentSourceAddFields::createFromBson);
+REGISTER_DOCUMENT_SOURCE(addFields, DocumentSourceAddFields::createFromBson);
 
-std::vector<intrusive_ptr<DocumentSource>> DocumentSourceAddFields::createFromBson(
+intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
     // Confirm that the stage was called with an object.
@@ -52,7 +52,7 @@ std::vector<intrusive_ptr<DocumentSource>> DocumentSourceAddFields::createFromBs
             elem.type() == Object);
 
     // Create the AddFields aggregation stage.
-    return {new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAddFields::create(elem.Obj()), "$addFields")};
+    return new DocumentSourceSingleDocumentTransformation(
+        expCtx, ParsedAddFields::create(elem.Obj()), "$addFields");
 };
 }
