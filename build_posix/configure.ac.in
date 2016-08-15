@@ -227,6 +227,7 @@ AM_COND_IF([LEVELDB],
 AC_CONFIG_FILES([
 	Makefile
 	wiredtiger.h:src/include/wiredtiger.in
+	wiredtiger_ext.h:src/include/wiredtiger_ext.h
 	wiredtiger.pc:build_posix/wiredtiger.pc.in
 ])
 AC_OUTPUT
