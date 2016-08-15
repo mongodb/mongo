@@ -447,8 +447,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
     ASSERT_NOT_EQUALS(opTime.getTerm(), getTopoCoord().getTerm());
 
     BSONObjBuilder statusBuilder;
-    ASSERT_OK(getReplCoord()->processReplSetGetStatus(
-        &statusBuilder, ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic));
+    ASSERT_OK(getReplCoord()->processReplSetGetStatus(&statusBuilder));
     auto statusObj = statusBuilder.obj();
     unittest::log() << "replica set status = " << statusObj;
 

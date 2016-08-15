@@ -2071,17 +2071,7 @@ StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionComm
     return cmdBuilder.obj();
 }
 
-Status ReplicationCoordinatorImpl::processReplSetGetStatus(
-    BSONObjBuilder* response, ReplSetGetStatusResponseStyle responseStyle) {
-
-    BSONObj initialSyncProgress;
-    if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSync) {
-        LockGuard lk(_mutex);
-        if (_dr) {
-            initialSyncProgress = _dr->getInitialSyncProgress();
-        }
-    }
-
+Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
     LockGuard topoLock(_topoMutex);
 
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
@@ -2092,8 +2082,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             getMyLastAppliedOpTime(),
             getMyLastDurableOpTime(),
             getLastCommittedOpTime(),
-            getCurrentCommittedSnapshotOpTime(),
-            initialSyncProgress},
+            getCurrentCommittedSnapshotOpTime()},
         response,
         &result);
     return result;

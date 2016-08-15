@@ -143,7 +143,7 @@ public:
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
-    virtual Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle);
+    virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
     virtual void fillIsMasterForReplSet(IsMasterResponse* result);
 
