@@ -210,14 +210,15 @@ void ConfigServerTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    grid.init(std::move(catalogClient),
-              std::move(catalogManager),
-              stdx::make_unique<CatalogCache>(),
-              std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(serviceContext->getPreciseClockSource()),
-              stdx::make_unique<BalancerConfiguration>(),
-              std::move(executorPool),
-              _mockNetwork);
+    Grid::get(operationContext())
+        ->init(std::move(catalogClient),
+               std::move(catalogManager),
+               stdx::make_unique<CatalogCache>(),
+               std::move(shardRegistry),
+               stdx::make_unique<ClusterCursorManager>(serviceContext->getPreciseClockSource()),
+               stdx::make_unique<BalancerConfiguration>(),
+               std::move(executorPool),
+               _mockNetwork);
 
     _catalogClient->startup();
     _catalogManager->startup();
@@ -229,10 +230,10 @@ void ConfigServerTestFixture::setUp() {
 }
 
 void ConfigServerTestFixture::tearDown() {
-    grid.getExecutorPool()->shutdownAndJoin();
-    grid.catalogManager()->shutDown(_opCtx.get());
-    grid.catalogClient(_opCtx.get())->shutDown(_opCtx.get());
-    grid.clearForUnitTests();
+    Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
+    Grid::get(operationContext())->catalogManager()->shutDown(_opCtx.get());
+    Grid::get(operationContext())->catalogClient(_opCtx.get())->shutDown(_opCtx.get());
+    Grid::get(operationContext())->clearForUnitTests();
 
     _opCtx.reset();
     _client.reset();
@@ -248,11 +249,11 @@ void ConfigServerTestFixture::shutdownExecutor() {
 }
 
 ShardingCatalogClient* ConfigServerTestFixture::catalogClient() const {
-    return grid.catalogClient(_opCtx.get());
+    return Grid::get(operationContext())->catalogClient(_opCtx.get());
 }
 
 ShardingCatalogManager* ConfigServerTestFixture::catalogManager() const {
-    return grid.catalogManager();
+    return Grid::get(operationContext())->catalogManager();
 }
 
 ShardingCatalogClientImpl* ConfigServerTestFixture::getCatalogClient() const {
@@ -260,9 +261,7 @@ ShardingCatalogClientImpl* ConfigServerTestFixture::getCatalogClient() const {
 }
 
 ShardRegistry* ConfigServerTestFixture::shardRegistry() const {
-    invariant(grid.shardRegistry());
-
-    return grid.shardRegistry();
+    return Grid::get(operationContext())->shardRegistry();
 }
 
 RemoteCommandTargeterFactoryMock* ConfigServerTestFixture::targeterFactory() const {
@@ -272,10 +271,7 @@ RemoteCommandTargeterFactoryMock* ConfigServerTestFixture::targeterFactory() con
 }
 
 std::shared_ptr<Shard> ConfigServerTestFixture::getConfigShard() const {
-    auto shardRegistry = grid.shardRegistry();
-    invariant(shardRegistry);
-
-    return shardRegistry->getConfigShard();
+    return shardRegistry()->getConfigShard();
 }
 
 executor::NetworkInterfaceMock* ConfigServerTestFixture::network() const {

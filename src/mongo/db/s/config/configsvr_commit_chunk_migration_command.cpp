@@ -122,8 +122,8 @@ public:
                                  << shard);
         // Must use kLocalReadConcern because using majority will set a flag on the recovery unit
         // that conflicts with the subsequent writes in the CommitChunkMigration command.
-        auto findResponse =
-            uassertStatusOK(grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        auto findResponse = uassertStatusOK(
+            Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                 txn,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 repl::ReadConcernLevel::kLocalReadConcern,
@@ -242,8 +242,8 @@ public:
 
         // Must use kLocalReadConcern because using majority will set a flag on the recovery unit
         // that conflicts with the subsequent writes.
-        auto findResponse =
-            uassertStatusOK(grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        auto findResponse = uassertStatusOK(
+            Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                 txn,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 repl::ReadConcernLevel::kLocalReadConcern,
@@ -272,18 +272,20 @@ public:
             newControlChunkRange = commitChunkMigrationRequest.getControlChunkRange();
         }
 
-        auto applyOpsCommandResponse = grid.shardRegistry()->getConfigShard()->runCommand(
-            txn,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.db().toString(),
-            makeCommitChunkApplyOpsCommand(nss,
-                                           commitChunkMigrationRequest.getMigratedChunkRange(),
-                                           newControlChunkRange,
-                                           newMigratedChunkVersion,
-                                           newControlChunkVersion,
-                                           commitChunkMigrationRequest.getToShard().toString(),
-                                           commitChunkMigrationRequest.getFromShard().toString()),
-            Shard::RetryPolicy::kIdempotent);
+        auto applyOpsCommandResponse =
+            Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+                txn,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                nss.db().toString(),
+                makeCommitChunkApplyOpsCommand(
+                    nss,
+                    commitChunkMigrationRequest.getMigratedChunkRange(),
+                    newControlChunkRange,
+                    newMigratedChunkVersion,
+                    newControlChunkVersion,
+                    commitChunkMigrationRequest.getToShard().toString(),
+                    commitChunkMigrationRequest.getFromShard().toString()),
+                Shard::RetryPolicy::kIdempotent);
 
         if (!applyOpsCommandResponse.isOK()) {
             return appendCommandStatus(result, applyOpsCommandResponse.getStatus());

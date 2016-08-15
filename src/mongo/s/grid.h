@@ -41,6 +41,7 @@ class ShardingCatalogClient;
 class ShardingCatalogManager;
 class ClusterCursorManager;
 class OperationContext;
+class ServiceContext;
 class ShardRegistry;
 
 namespace executor {
@@ -58,8 +59,9 @@ public:
     ~Grid();
 
     /**
-     * Retrieves the instance of Grid associated with the current service context.
+     * Retrieves the instance of Grid associated with the current service/operation context.
      */
+    static Grid* get(ServiceContext* serviceContext);
     static Grid* get(OperationContext* operationContext);
 
     /**
@@ -171,7 +173,7 @@ private:
 
     // Network interface being used by the fixed executor in _executorPool.  Used for asking
     // questions about the network configuration, such as getting the current server's hostname.
-    executor::NetworkInterface* _network;
+    executor::NetworkInterface* _network{nullptr};
 
     // Protects _configOpTime.
     mutable stdx::mutex _mutex;
@@ -183,9 +185,11 @@ private:
     // Deprecated. This is only used on mongos, and once addShard is solely handled by the configs,
     // it can be deleted.
     // Can 'localhost' be used in shard addresses?
-    bool _allowLocalShard;
+    bool _allowLocalShard{true};
 };
 
+// Reference to the global Grid instance. Do not use in new code. Use one of the Grid::get methods
+// instead.
 extern Grid grid;
 
 }  // namespace mongo

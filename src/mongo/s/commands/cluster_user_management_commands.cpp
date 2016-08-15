@@ -92,7 +92,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogClient(txn)->runUserManagementWriteCommand(
+        return Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
     }
 
@@ -136,7 +136,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -186,7 +186,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -227,7 +227,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -275,7 +275,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -323,7 +323,7 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -368,7 +368,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogClient(txn)->runUserManagementReadCommand(txn, dbname, cmdObj, &result);
+        return Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
+            txn, dbname, cmdObj, &result);
     }
 
 } cmdUsersInfo;
@@ -402,7 +403,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogClient(txn)->runUserManagementWriteCommand(
+        return Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
     }
 
@@ -437,7 +438,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -478,7 +479,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -519,7 +520,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -560,7 +561,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -601,7 +602,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -645,7 +646,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -690,7 +691,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogClient(txn)->runUserManagementWriteCommand(
+        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -735,7 +736,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogClient(txn)->runUserManagementReadCommand(txn, dbname, cmdObj, &result);
+        return Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
+            txn, dbname, cmdObj, &result);
     }
 
 } cmdRolesInfo;
@@ -824,7 +826,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogClient(txn)->runUserManagementWriteCommand(
+        return Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
             txn, getName(), dbname, cmdObj, &result);
     }
 
@@ -845,7 +847,7 @@ Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, BSONObjBuilder
     const BSONObj cmdObj = cmdObjBuilder.done();
 
     // Upgrade each shard in turn, stopping on first failure.
-    auto shardRegistry = grid.shardRegistry();
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
     shardRegistry->reload(txn);
     vector<ShardId> shardIds;
     shardRegistry->getAllShardIds(&shardIds);
@@ -915,7 +917,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         // Run the authSchemaUpgrade command on the config servers
-        if (!grid.catalogClient(txn)->runUserManagementWriteCommand(
+        if (!Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
                 txn, getName(), dbname, cmdObj, &result)) {
             return false;
         }

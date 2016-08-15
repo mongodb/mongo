@@ -152,7 +152,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                              std::shared_ptr<Shard> primary,
                                              std::vector<BSONObj>* results,
                                              BSONObj* viewDefinition) {
-    auto shardRegistry = grid.shardRegistry();
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
 
     // Get the set of shards on which we will run the query.
     std::vector<std::shared_ptr<Shard>> shards;
@@ -284,7 +284,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     // Register the cursor with the cursor manager.
-    auto cursorManager = grid.getCursorManager();
+    auto cursorManager = Grid::get(txn)->getCursorManager();
     const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
                                          : ClusterCursorManager::CursorType::NamespaceNotSharded;
     const auto cursorLifetime = query.getQueryRequest().isNoCursorTimeout()
@@ -314,7 +314,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                               << query.getQueryRequest().getProj()};
     }
 
-    auto dbConfig = grid.catalogCache()->getDatabase(txn, query.nss().db().toString());
+    auto dbConfig = Grid::get(txn)->catalogCache()->getDatabase(txn, query.nss().db().toString());
     if (dbConfig.getStatus() == ErrorCodes::NamespaceNotFound) {
         // If the database doesn't exist, we successfully return an empty result set without
         // creating a cursor.
@@ -372,7 +372,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
                                                    const GetMoreRequest& request) {
-    auto cursorManager = grid.getCursorManager();
+    auto cursorManager = Grid::get(txn)->getCursorManager();
 
     auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid, txn);
     if (!pinnedCursor.isOK()) {

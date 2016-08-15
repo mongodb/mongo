@@ -164,20 +164,21 @@ void ShardingTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    grid.init(std::move(catalogClient),
-              nullptr,
-              stdx::make_unique<CatalogCache>(),
-              std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
-              stdx::make_unique<BalancerConfiguration>(),
-              std::move(executorPool),
-              _mockNetwork);
+    Grid::get(operationContext())
+        ->init(std::move(catalogClient),
+               nullptr,
+               stdx::make_unique<CatalogCache>(),
+               std::move(shardRegistry),
+               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
+               stdx::make_unique<BalancerConfiguration>(),
+               std::move(executorPool),
+               _mockNetwork);
 }
 
 void ShardingTestFixture::tearDown() {
-    grid.getExecutorPool()->shutdownAndJoin();
-    grid.catalogClient(_opCtx.get())->shutDown(_opCtx.get());
-    grid.clearForUnitTests();
+    Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
+    Grid::get(operationContext())->catalogClient(_opCtx.get())->shutDown(_opCtx.get());
+    Grid::get(operationContext())->clearForUnitTests();
 
     _transportSession.reset();
     _opCtx.reset();
@@ -191,7 +192,7 @@ void ShardingTestFixture::shutdownExecutor() {
 }
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
-    return grid.catalogClient(_opCtx.get());
+    return Grid::get(operationContext())->catalogClient(_opCtx.get());
 }
 
 ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {
@@ -199,9 +200,7 @@ ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {
 }
 
 ShardRegistry* ShardingTestFixture::shardRegistry() const {
-    invariant(grid.shardRegistry());
-
-    return grid.shardRegistry();
+    return Grid::get(operationContext())->shardRegistry();
 }
 
 RemoteCommandTargeterFactoryMock* ShardingTestFixture::targeterFactory() const {
@@ -382,7 +381,7 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
         const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
         const std::string oidPiece = changeId.substr(lastDash + 1);
 
-        ASSERT_EQUALS(grid.getNetwork()->getHostName(), serverPiece);
+        ASSERT_EQUALS(Grid::get(operationContext())->getNetwork()->getHostName(), serverPiece);
         ASSERT_EQUALS(timestamp.toString(), timePiece);
 
         OID generatedOID;
@@ -450,7 +449,7 @@ void ShardingTestFixture::expectSetShardVersion(const HostAndPort& expectedHost,
 
         ASSERT(!ssv.isInit());
         ASSERT(ssv.isAuthoritative());
-        ASSERT_EQ(grid.shardRegistry()->getConfigServerConnectionString().toString(),
+        ASSERT_EQ(shardRegistry()->getConfigServerConnectionString().toString(),
                   ssv.getConfigServer().toString());
         ASSERT_EQ(expectedShard.getHost(), ssv.getShardConnectionString().toString());
         ASSERT_EQ(expectedNs.toString(), ssv.getNS().ns());

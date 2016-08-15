@@ -172,8 +172,8 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                 // Figure out what host we need to dispatch our targeted batch
                 bool resolvedHost = true;
                 const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-                auto shard =
-                    grid.shardRegistry()->getShard(txn, nextBatch->getEndpoint().shardName);
+                auto shard = Grid::get(txn)->shardRegistry()->getShard(
+                    txn, nextBatch->getEndpoint().shardName);
 
                 if (!shard) {
                     Status status = Status(ErrorCodes::ShardNotFound,
