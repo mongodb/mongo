@@ -22,6 +22,9 @@ noinst_PROGRAMS += test_wt2592_join_schema
 test_wt2719_reconfig_SOURCES = wt2719_reconfig/main.c
 noinst_PROGRAMS += test_wt2719_reconfig
 
+test_wt2834_join_bloom_fix_SOURCES = wt2834_join_bloom_fix/main.c
+noinst_PROGRAMS += test_wt2834_join_bloom_fix
+
 # Run this during a "make check" smoke test.
 TESTS = $(noinst_PROGRAMS)
 LOG_COMPILER = $(TEST_WRAPPER)
