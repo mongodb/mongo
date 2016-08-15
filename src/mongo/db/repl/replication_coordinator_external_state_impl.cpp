@@ -650,7 +650,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnTransitionToPrimaryHook(
                                                << causedBy(status)));
         }
 
-        if (status != ErrorCodes::AlreadyInitialized) {
+        if (status.isOK()) {
             // Load the clusterId into memory. Use local readConcern, since we can't use majority
             // readConcern in drain mode because the global lock prevents replication. This is
             // safe, since if the clusterId write is rolled back, any writes that depend on it will

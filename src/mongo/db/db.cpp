@@ -669,85 +669,51 @@ static ExitCode _initAndListen(int listenPort) {
         web.detach();
     }
 
-    {
 #ifndef _WIN32
-        mongo::signalForkSuccess();
+    mongo::signalForkSuccess();
 #endif
-        AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
-        if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
-            Status status = authindex::verifySystemIndexes(startupOpCtx.get());
-            if (!status.isOK()) {
-                log() << status.reason();
-                exitCleanly(EXIT_NEED_UPGRADE);
-            }
-
-            // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
-            int foundSchemaVersion;
-            status = globalAuthzManager->getAuthorizationVersion(startupOpCtx.get(),
-                                                                 &foundSchemaVersion);
-            if (!status.isOK()) {
-                log() << "Auth schema version is incompatible: "
-                      << "User and role management commands require auth data to have "
-                      << "at least schema version " << AuthorizationManager::schemaVersion26Final
-                      << " but startup could not verify schema version: " << status.toString()
-                      << endl;
-                exitCleanly(EXIT_NEED_UPGRADE);
-            }
-            if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
-                log() << "Auth schema version is incompatible: "
-                      << "User and role management commands require auth data to have "
-                      << "at least schema version " << AuthorizationManager::schemaVersion26Final
-                      << " but found " << foundSchemaVersion << ". In order to upgrade "
-                      << "the auth schema, first downgrade MongoDB binaries to version "
-                      << "2.6 and then run the authSchemaUpgrade command." << endl;
-                exitCleanly(EXIT_NEED_UPGRADE);
-            }
-        } else if (globalAuthzManager->isAuthEnabled()) {
-            error() << "Auth must be disabled when starting without auth schema validation";
-            exitCleanly(EXIT_BADOPTIONS);
-        } else {
-            // If authSchemaValidation is disabled and server is running without auth,
-            // warn the user and continue startup without authSchema metadata checks.
-            log() << startupWarningsLog;
-            log() << "** WARNING: Startup auth schema validation checks are disabled for the "
-                     "database."
-                  << startupWarningsLog;
-            log() << "**          This mode should only be used to manually repair corrupted auth "
-                     "data."
-                  << startupWarningsLog;
+    AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
+    if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
+        Status status = authindex::verifySystemIndexes(startupOpCtx.get());
+        if (!status.isOK()) {
+            log() << status.reason();
+            exitCleanly(EXIT_NEED_UPGRADE);
         }
 
-        if (!storageGlobalParams.readOnly) {
-            logStartup(startupOpCtx.get());
-
-            getDeleter()->startWorkers();
-
-            restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
-
-            repl::getGlobalReplicationCoordinator()->startup(startupOpCtx.get());
-
-            const unsigned long long missingRepl =
-                checkIfReplMissingFromCommandLine(startupOpCtx.get());
-            if (missingRepl) {
-                log() << startupWarningsLog;
-                log() << "** WARNING: mongod started without --replSet yet " << missingRepl
-                      << " documents are present in local.system.replset" << startupWarningsLog;
-                log() << "**          Restart with --replSet unless you are doing maintenance and "
-                      << " no other clients are connected." << startupWarningsLog;
-                log() << "**          The TTL collection monitor will not start because of this."
-                      << startupWarningsLog;
-                log() << "**         ";
-                log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
-                log() << startupWarningsLog;
-            } else {
-                startTTLBackgroundJob();
-            }
+        // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
+        int foundSchemaVersion;
+        status =
+            globalAuthzManager->getAuthorizationVersion(startupOpCtx.get(), &foundSchemaVersion);
+        if (!status.isOK()) {
+            log() << "Auth schema version is incompatible: "
+                  << "User and role management commands require auth data to have "
+                  << "at least schema version " << AuthorizationManager::schemaVersion26Final
+                  << " but startup could not verify schema version: " << status.toString() << endl;
+            exitCleanly(EXIT_NEED_UPGRADE);
         }
+        if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
+            log() << "Auth schema version is incompatible: "
+                  << "User and role management commands require auth data to have "
+                  << "at least schema version " << AuthorizationManager::schemaVersion26Final
+                  << " but found " << foundSchemaVersion << ". In order to upgrade "
+                  << "the auth schema, first downgrade MongoDB binaries to version "
+                  << "2.6 and then run the authSchemaUpgrade command." << endl;
+            exitCleanly(EXIT_NEED_UPGRADE);
+        }
+    } else if (globalAuthzManager->isAuthEnabled()) {
+        error() << "Auth must be disabled when starting without auth schema validation";
+        exitCleanly(EXIT_BADOPTIONS);
+    } else {
+        // If authSchemaValidation is disabled and server is running without auth,
+        // warn the user and continue startup without authSchema metadata checks.
+        log() << startupWarningsLog;
+        log() << "** WARNING: Startup auth schema validation checks are disabled for the "
+                 "database."
+              << startupWarningsLog;
+        log() << "**          This mode should only be used to manually repair corrupted auth "
+                 "data."
+              << startupWarningsLog;
     }
-
-    startClientCursorMonitor();
-
-    PeriodicTask::startRunningPeriodicTasks();
 
     HostnameCanonicalizationWorker::start(getGlobalServiceContext());
 
@@ -762,7 +728,14 @@ static ExitCode _initAndListen(int listenPort) {
                         ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
 
     if (!storageGlobalParams.readOnly) {
+        logStartup(startupOpCtx.get());
+
         startFTDC();
+
+        getDeleter()->startWorkers();
+
+        restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
+
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
             if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
@@ -775,7 +748,31 @@ static ExitCode _initAndListen(int listenPort) {
                                                        kDistLockProcessIdForConfigServer));
             Balancer::create(startupOpCtx->getServiceContext());
         }
+
+        repl::getGlobalReplicationCoordinator()->startup(startupOpCtx.get());
+
+        const unsigned long long missingRepl =
+            checkIfReplMissingFromCommandLine(startupOpCtx.get());
+        if (missingRepl) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: mongod started without --replSet yet " << missingRepl
+                  << " documents are present in local.system.replset" << startupWarningsLog;
+            log() << "**          Restart with --replSet unless you are doing maintenance and "
+                  << " no other clients are connected." << startupWarningsLog;
+            log() << "**          The TTL collection monitor will not start because of this."
+                  << startupWarningsLog;
+            log() << "**         ";
+            log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
+            log() << startupWarningsLog;
+        } else {
+            startTTLBackgroundJob();
+        }
     }
+
+
+    startClientCursorMonitor();
+
+    PeriodicTask::startRunningPeriodicTasks();
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
