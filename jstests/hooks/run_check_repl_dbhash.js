@@ -68,6 +68,10 @@
             assert.commandWorked(master.adminCommand({fsync: 1, lock: 1}),
                                  'failed to re-lock the primary');
         };
+
+        this.checkReplicatedDataHashes = function() {
+            ReplSetTest({nodes: 0}).checkReplicatedDataHashes.apply(this, arguments);
+        };
     };
 
     var startTime = Date.now();
@@ -78,18 +82,12 @@
     assert(primaryInfo.ismaster,
            'shell is not connected to the primary or master node: ' + tojson(primaryInfo));
 
-    var rst;
     var cmdLineOpts = db.adminCommand('getCmdLineOpts');
     assert.commandWorked(cmdLineOpts);
     var isMasterSlave = cmdLineOpts.parsed.master === true;
-    if (isMasterSlave) {
-        rst = new MasterSlaveDBHashTest(db.getMongo().host);
-    } else {
-        rst = new ReplSetTest(db.getMongo().host);
-    }
-
-    load('jstests/hooks/check_repl_dbhash.js');
-    checkDBHashes(rst);
+    var testFixture = isMasterSlave ? new MasterSlaveDBHashTest(db.getMongo().host)
+                                    : new ReplSetTest(db.getMongo().host);
+    testFixture.checkReplicatedDataHashes();
 
     var totalTime = Date.now() - startTime;
     print('Finished consistency checks of cluster in ' + totalTime + ' ms.');
