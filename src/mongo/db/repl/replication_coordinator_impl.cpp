@@ -606,6 +606,13 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             fassertStatusOK(40088, status);
             const auto lastApplied = status.getValue();
             _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
+            lk.unlock();
+
+            // Clear maint. mode.
+            while (getMaintenanceMode()) {
+                setMaintenanceMode(false);
+            }
+
             if (startCompleted) {
                 startCompleted();
             }
