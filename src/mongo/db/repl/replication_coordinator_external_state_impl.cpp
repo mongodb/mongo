@@ -214,6 +214,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldApplier = std::move(_applierThread);
     auto oldInitSyncThread = std::move(_initialSyncThread);
     if (oldSSF) {
+        log() << "Stopping replication reporter thread";
         _syncSourceFeedback.shutdown();
     }
     lock->unlock();
@@ -224,10 +225,12 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     }
 
     if (oldBgSync) {
+        log() << "Stopping replication fetcher thread";
         oldBgSync->shutdown(txn);
     }
 
     if (oldApplier) {
+        log() << "Stopping replication applier thread";
         oldApplier->shutdown();
         oldApplier->join();
     }
@@ -278,6 +281,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
         _stopDataReplication_inlock(txn, &lk);
 
         if (_snapshotThread) {
+            log() << "Stopping replication snapshot thread";
             _snapshotThread->shutdown();
         }
 
