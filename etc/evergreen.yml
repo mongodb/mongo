@@ -478,8 +478,14 @@ post:
       optional: true
   - command: shell.exec
     params:
+      working_dir: src
       script: |
-        rm -rf ~/.aws
+        # removes files from the (local) scons cache when it's over a
+        # threshold, to the $prune_ratio percentage. Ideally override
+        # these default values in the distro config in evergreen.
+        if [ -d "${scons_cache_path}" ]; then
+            ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+        fi
   - command: shell.exec
     params:
       system_log: true
@@ -504,6 +510,10 @@ post:
         else
           echo "No OOM (Out of memory) killed processes detected"
         fi
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf ~/.aws
   - command: shell.cleanup
 
 timeout:
@@ -572,7 +582,7 @@ tasks:
           set -o verbose
 
           rm -rf ${install_directory|/data/mongo-install-directory}
-          ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -697,7 +707,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${scons|scons} ${compile_flags|} --stack-size=1024 lint
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
