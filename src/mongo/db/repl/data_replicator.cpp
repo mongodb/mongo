@@ -1459,6 +1459,9 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
                         syncSource = _syncSource;
                         _syncSource = HostAndPort();
                     }
+                    log() << "Blacklisting " << syncSource << " due to fetcher error: '" << status
+                          << "' for " << _opts.blacklistSyncSourcePenaltyForNetworkConnectionError
+                          << " until: " << until;
                     _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
                 }
             }
@@ -1487,6 +1490,9 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
             _oplogFetcher.reset();
             _fetcherPaused = false;
         }
+        log() << "Blacklisting host: " << syncSource << " during rollback due to error: '"
+              << rollbackStatus << "' for " << _opts.blacklistSyncSourcePenaltyForOplogStartMissing
+              << " until: " << until;
         _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
     } else {
         // Go back to steady sync after a successful rollback.

@@ -3206,21 +3206,33 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
                                 work,
                                 rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                                 Milliseconds(30000));
-        candidateProber.schedule();
+        Status scheduleStatus = candidateProber.schedule();
+
+        if (!scheduleStatus.isOK()) {
+            error() << "Error scheduling fetcher to evaluate host as sync source, host:"
+                    << candidate << ", error: " << scheduleStatus;
+            continue;
+        }
+
         candidateProber.join();
 
         if (!queryStatus.isOK()) {
             // We got an error.
-            LOG(2) << "Unable to connect to " << candidate
-                   << " to read operations: " << queryStatus;
-            blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
+            const auto blacklistDuration = Seconds{10};
+            const auto until = Date_t::now() + blacklistDuration;
+            log() << "Blacklisting " << candidate << " due to error: '" << queryStatus << "' for "
+                  << blacklistDuration << " until: " << until;
+            blacklistSyncSource(candidate, until);
             continue;
         }
 
         if (firstObjFound.isEmpty()) {
             // Remote oplog is empty.
-            LOG(2) << "Remote oplog on " << candidate << " is empty";
-            blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
+            const auto blacklistDuration = Seconds{10};
+            const auto until = Date_t::now() + blacklistDuration;
+            log() << "Blacklisting due to empty first document from host " << candidate << " for "
+                  << blacklistDuration << " until: " << until;
+            blacklistSyncSource(candidate, until);
             continue;
         }
 
@@ -3231,9 +3243,20 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
         if (!lastOpTimeFetched.isNull() &&
             lastOpTimeFetched.getTimestamp() < remoteEarliestOpTime.getTimestamp()) {
             // We're too stale to use this sync source.
-            blacklistSyncSource(candidate, Date_t::now() + Minutes(1));
+            const auto blacklistDuration = Minutes{1};
+            const auto until = Date_t::now() + Minutes(1);
+
+            log() << "Blacklisting " << candidate
+                  << " because our last fetched optime: " << lastOpTimeFetched
+                  << " is before their earliest optime: " << remoteEarliestOpTime << " for "
+                  << blacklistDuration << " until: " << until;
+
+            blacklistSyncSource(candidate, until);
             if (earliestOpTimeSeen.getTimestamp() > remoteEarliestOpTime.getTimestamp()) {
-                log() << "we are too stale to use " << candidate << " as a sync source";
+                log() << "we are too stale to use " << candidate
+                      << " as a sync source since our last fetcherd optime: " << lastOpTimeFetched
+                      << " is less than " << remoteEarliestOpTime << " which is greater than "
+                      << earliestOpTimeSeen;
                 earliestOpTimeSeen = remoteEarliestOpTime;
             }
             continue;
