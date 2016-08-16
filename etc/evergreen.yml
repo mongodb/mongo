@@ -4305,7 +4305,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: windows-64-2k8
   display_name: Windows 2008R2
@@ -4419,7 +4419,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: windows-64-2k8-debug
   display_name: "! Windows 2008R2 DEBUG"
@@ -4611,7 +4611,7 @@ buildvariants:
   - name: views_rs_WT
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: enterprise-windows-64-inmem
   display_name: Enterprise Windows (inMemory)
@@ -4766,7 +4766,7 @@ buildvariants:
   - name: sslSpecial
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 ###########################################
 #             OSX buildvariants           #
@@ -4873,7 +4873,7 @@ buildvariants:
   - name: views_rs_WT
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: osx-107-ssl
   display_name: SSL OS X 10.7
@@ -4971,7 +4971,7 @@ buildvariants:
   - name: unittests
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: osx-107-debug
   display_name: "* OS X 10.7 DEBUG"
@@ -5067,7 +5067,7 @@ buildvariants:
   - name: views_rs_WT
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 ###########################################
 #          Redhat buildvariants           #
@@ -5280,7 +5280,7 @@ buildvariants:
   - enterprise
   - mongo-tools
   run_on:
-  - rhel70
+  - rhel70-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -5299,6 +5299,8 @@ buildvariants:
     use_scons_cache: true
   tasks:
   - name: compile
+    distros:
+    - rhel70
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -5451,7 +5453,7 @@ buildvariants:
   modules:
   - mongo-tools
   run_on:
-  - rhel70
+  - rhel70-small
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -5530,13 +5532,29 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: concurrency
+    distros:
+    - rhel70
   - name: concurrency_WT
+    distros:
+    - rhel70
   - name: concurrency_replication
+    distros:
+    - rhel70
   - name: concurrency_replication_WT
+    distros:
+    - rhel70
   - name: concurrency_sharded
+    distros:
+    - rhel70
   - name: concurrency_sharded_WT
+    distros:
+    - rhel70
   - name: concurrency_simultaneous
+    distros:
+    - rhel70
   - name: concurrency_simultaneous_WT
+    distros:
+    - rhel70
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -5699,7 +5717,7 @@ buildvariants:
   - name: views_rs_WT
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -5835,7 +5853,7 @@ buildvariants:
   - name: views_WT_rs
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -6740,7 +6758,7 @@ buildvariants:
   - name: views_WT_rs
   - name: push
     distros:
-    - rhel70
+    - rhel70-small
 
 ###########################################
 #          Debian buildvariants           #
