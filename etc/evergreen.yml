@@ -102,7 +102,7 @@ variables:
   - func: "run jstestfuzz"
   - *run_jstestfuzz_tests
 
-
+# buildvariants in this list have debug symbols which are uploaded to s3.
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
   - enterprise-osx-107
@@ -110,14 +110,16 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-72-s390x
-  - enterprise-ubuntu1604-s390x
   - enterprise-suse11-64
+  - enterprise-suse11-s390x
   - enterprise-suse12-64
+  - enterprise-suse12-s390x
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1604-ppc64le
+  - enterprise-ubuntu1604-s390x
   - enterprise-debian71-64
   - enterprise-debian81-64
   - linux-64
@@ -138,34 +140,6 @@ variables:
   - osx-107-ssl
   - osx-107
 
-
-- &packaging_variants
-  - enterprise-linux-64-amazon-ami
-  - enterprise-rhel-62-64-bit
-  - enterprise-rhel-70-64-bit
-  - enterprise-rhel-71-ppc64le
-  - enterprise-rhel-72-s390x
-  - enterprise-ubuntu1604-s390x
-  - enterprise-suse11-64
-  - enterprise-suse12-64
-  - enterprise-ubuntu1204-64
-  - enterprise-ubuntu1404-64
-  - enterprise-ubuntu1604-64
-  - enterprise-ubuntu1604-arm64
-  - enterprise-ubuntu1604-ppc64le
-  - enterprise-debian71-64
-  - enterprise-debian81-64
-  - rhel62
-  - rhel70
-  - suse11
-  - suse12
-  - ubuntu1204
-  - ubuntu1404
-  - ubuntu1604
-  - ubuntu1604-arm64
-  - amazon
-  - debian71
-  - debian81
 
 #######################################
 #            Functions                #
@@ -3853,7 +3827,7 @@ buildvariants:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2 libcrypto)" -tags 'sasl ssl'
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
