@@ -69,11 +69,19 @@ MONGO_INITIALIZER_GROUP(BeginStartupOptionValidation,
                         ("EndStartupOptionValidation"))
 MONGO_INITIALIZER_GROUP(EndStartupOptionValidation,
                         ("BeginStartupOptionValidation"),
+                        ("BeginStartupOptionSetup"))
+
+/* Groups for option setup */
+MONGO_INITIALIZER_GROUP(BeginStartupOptionSetup,
+                        ("EndStartupOptionValidation"),
+                        ("EndStartupOptionSetup"))
+MONGO_INITIALIZER_GROUP(EndStartupOptionSetup,
+                        ("BeginStartupOptionSetup"),
                         ("BeginStartupOptionStorage"))
 
 /* Groups for option storage */
 MONGO_INITIALIZER_GROUP(BeginStartupOptionStorage,
-                        ("EndStartupOptionValidation"),
+                        ("EndStartupOptionSetup"),
                         ("EndStartupOptionStorage"))
 MONGO_INITIALIZER_GROUP(EndStartupOptionStorage,
                         ("BeginStartupOptionStorage"),

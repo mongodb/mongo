@@ -399,6 +399,7 @@ env.Library(
         "dbwebserver.cpp",
         "initialize_server_global_state.cpp",
         "server_extra_log_context.cpp",
+        "server_options_init.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver",

@@ -69,7 +69,7 @@ MONGO_INITIALIZER_GENERAL(MongosOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
 (InitializerContext* context) {
-    Status ret = storeMongosOptions(moe::startupOptionsParsed, context->args());
+    Status ret = storeMongosOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;

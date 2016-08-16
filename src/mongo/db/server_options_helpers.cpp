@@ -449,7 +449,7 @@ namespace {
 // Helpers for option storage
 Status setupBinaryName(const std::vector<std::string>& argv) {
     if (argv.empty()) {
-        return Status(ErrorCodes::InternalError, "Cannot get binary name: argv array is empty");
+        return Status(ErrorCodes::UnknownError, "Cannot get binary name: argv array is empty");
     }
 
     // setup binary name
@@ -463,13 +463,13 @@ Status setupBinaryName(const std::vector<std::string>& argv) {
 
 Status setupCwd() {
     // setup cwd
-    char buffer[1024];
-#ifdef _WIN32
-    verify(_getcwd(buffer, 1000));
-#else
-    verify(getcwd(buffer, 1000));
-#endif
-    serverGlobalParams.cwd = buffer;
+    boost::system::error_code ec;
+    boost::filesystem::path cwd = boost::filesystem::current_path(ec);
+    if (ec) {
+        return Status(ErrorCodes::UnknownError,
+                      "Cannot get current working directory: " + ec.message());
+    }
+    serverGlobalParams.cwd = cwd.string();
     return Status::OK();
 }
 
@@ -730,7 +730,7 @@ Status canonicalizeServerOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-Status storeServerOptions(const moe::Environment& params, const std::vector<std::string>& args) {
+Status setupServerOptions(const std::vector<std::string>& args) {
     Status ret = setupBinaryName(args);
     if (!ret.isOK()) {
         return ret;
@@ -746,7 +746,11 @@ Status storeServerOptions(const moe::Environment& params, const std::vector<std:
         return ret;
     }
 
-    ret = setParsedOpts(params);
+    return Status::OK();
+}
+
+Status storeServerOptions(const moe::Environment& params) {
+    Status ret = setParsedOpts(params);
     if (!ret.isOK()) {
         return ret;
     }

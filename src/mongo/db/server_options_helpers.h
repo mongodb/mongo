@@ -62,7 +62,21 @@ Status validateServerOptions(const moe::Environment& params);
  */
 Status canonicalizeServerOptions(moe::Environment* params);
 
-Status storeServerOptions(const moe::Environment& params, const std::vector<std::string>& args);
+/**
+ * Sets up the global server state necessary to be able to store the server options, based on how
+ * the server was started.
+ *
+ * For example, saves the current working directory in serverGlobalParams.cwd so that relative paths
+ * in server options can be interpreted correctly.
+ */
+Status setupServerOptions(const std::vector<std::string>& args);
+
+/**
+ * Store the given parsed params in global server state.
+ *
+ * For example, sets the serverGlobalParams.port variable based on the net.port config parameter.
+ */
+Status storeServerOptions(const moe::Environment& params);
 
 void printCommandLineOpts();
 

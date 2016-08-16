@@ -175,8 +175,8 @@ Status canonicalizeMongosOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args) {
-    Status ret = storeServerOptions(params, args);
+Status storeMongosOptions(const moe::Environment& params) {
+    Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
     }
