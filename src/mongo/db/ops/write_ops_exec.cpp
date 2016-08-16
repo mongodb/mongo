@@ -167,7 +167,7 @@ private:
 };
 
 void assertCanWrite_inlock(OperationContext* txn, const NamespaceString& ns) {
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while writing to " << ns.ns(),
             repl::ReplicationCoordinator::get(txn->getServiceContext())->canAcceptWritesFor(ns));
     CollectionShardingState::get(txn, ns)->checkShardVersionOrThrow(txn);

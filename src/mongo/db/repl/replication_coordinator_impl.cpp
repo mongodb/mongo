@@ -1625,9 +1625,9 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     }
 
     if (replMode == modeReplSet && !_memberState.primary()) {
-        return StatusAndDuration(
-            Status(ErrorCodes::NotMaster, "Not master while waiting for replication"),
-            Milliseconds(timer->millis()));
+        return StatusAndDuration(Status(ErrorCodes::PrimarySteppedDown,
+                                        "Primary stepped down while waiting for replication"),
+                                 Milliseconds(timer->millis()));
     }
 
     if (writeConcern.wMode.empty()) {
@@ -1651,11 +1651,10 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
         }
 
         if (replMode == modeReplSet && !_getMemberState_inlock().primary()) {
-            return StatusAndDuration(Status(ErrorCodes::NotMaster,
-                                            "Not master anymore while waiting for replication"
-                                            " - this most likely means that a step down"
-                                            " occurred while waiting for replication"),
-                                     elapsed);
+            return StatusAndDuration(
+                Status(ErrorCodes::PrimarySteppedDown,
+                       "Not primary anymore while waiting for replication - primary stepped down"),
+                elapsed);
         }
 
         if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout &&

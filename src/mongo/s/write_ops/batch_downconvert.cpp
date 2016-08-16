@@ -90,7 +90,7 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
                // 2.6 Error codes
                ||
                code == ErrorCodes::NotMaster || code == ErrorCodes::UnknownReplWriteConcern ||
-               code == ErrorCodes::WriteConcernFailed) {
+               code == ErrorCodes::WriteConcernFailed || code == ErrorCodes::PrimarySteppedDown) {
         // Write concern errors that get returned as regular errors (result may not be ok: 1.0)
         errors->wcError.reset(new WriteConcernErrorDetail());
         errors->wcError->setErrCode(ErrorCodes::fromInt(code));

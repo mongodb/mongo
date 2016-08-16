@@ -655,7 +655,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenRunningAwaitReplicationAgainstASec
     // Node should fail to awaitReplication when not primary.
     ReplicationCoordinator::StatusAndDuration statusAndDur =
         getReplCoord()->awaitReplication(txn.get(), time, writeConcern);
-    ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, statusAndDur.status);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsOkWhenRunningAwaitReplicationAgainstPrimaryWithWZero) {
@@ -1321,7 +1321,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWrite
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
     getReplCoord()->stepDown(txn.get(), true, Milliseconds(0), Milliseconds(1000));
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
-    ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, statusAndDur.status);
     awaiter.reset();
 }
 

@@ -1010,7 +1010,7 @@ Status UpdateStage::restoreUpdateState() {
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::PrimarySteppedDown,
                       str::stream() << "Demoted from primary while performing update on "
                                     << nsString.ns());
     }

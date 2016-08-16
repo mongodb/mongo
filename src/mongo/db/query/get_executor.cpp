@@ -704,7 +704,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
 
     if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::PrimarySteppedDown,
                       str::stream() << "Not primary while removing from " << nss.ns());
     }
 
@@ -870,7 +870,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::PrimarySteppedDown,
                       str::stream() << "Not primary while performing update on " << nsString.ns());
     }
 

@@ -279,7 +279,7 @@ void Cloner::copy(OperationContext* txn,
                      options);
     }
 
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
                           << " to "
                           << to_collection.ns()
@@ -311,7 +311,7 @@ void Cloner::copyIndexes(OperationContext* txn,
         }
     }
 
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while copying indexes from " << from_collection.ns()
                           << " to "
                           << to_collection.ns()
@@ -382,7 +382,7 @@ bool Cloner::copyCollection(OperationContext* txn,
     ScopedTransaction transaction(txn, MODE_IX);
     Lock::DBLock dbWrite(txn->lockState(), dbname, MODE_X);
 
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
             !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss));

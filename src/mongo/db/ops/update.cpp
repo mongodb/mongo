@@ -94,7 +94,7 @@ UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& re
                 !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
             if (userInitiatedWritesAndNotPrimary) {
-                uassertStatusOK(Status(ErrorCodes::NotMaster,
+                uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
                                        str::stream() << "Not primary while creating collection "
                                                      << nsString.ns()
                                                      << " during upsert"));

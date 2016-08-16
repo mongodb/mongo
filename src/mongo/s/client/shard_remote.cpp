@@ -137,7 +137,8 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
         return;
 
     if (ErrorCodes::isNotMasterError(remoteCommandStatus.code()) ||
-        (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange)) {
+        (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange) ||
+        (remoteCommandStatus == ErrorCodes::PrimarySteppedDown)) {
         _targeter->markHostNotMaster(remoteHost);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         _targeter->markHostUnreachable(remoteHost);
