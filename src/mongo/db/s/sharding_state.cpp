@@ -61,6 +61,7 @@ namespace mongo {
 
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -374,52 +375,6 @@ bool ShardingState::forgetPending(OperationContext* txn,
 
     _collMetadata[ns] = cloned;
     return true;
-}
-
-void ShardingState::splitChunk(OperationContext* txn,
-                               const string& ns,
-                               const BSONObj& min,
-                               const BSONObj& max,
-                               const vector<BSONObj>& splitKeys,
-                               ChunkVersion version) {
-    invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    CollectionMetadataMap::const_iterator it = _collMetadata.find(ns);
-    verify(it != _collMetadata.end());
-
-    ChunkType chunk;
-    chunk.setMin(min);
-    chunk.setMax(max);
-    string errMsg;
-
-    shared_ptr<CollectionMetadata> cloned(
-        it->second->cloneSplit(chunk, splitKeys, version, &errMsg));
-    // uassert to match old behavior, TODO: report errors w/o throwing
-    uassert(16857, errMsg, NULL != cloned.get());
-
-    _collMetadata[ns] = cloned;
-}
-
-void ShardingState::mergeChunks(OperationContext* txn,
-                                const string& ns,
-                                const BSONObj& minKey,
-                                const BSONObj& maxKey,
-                                ChunkVersion mergedVersion) {
-    invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    CollectionMetadataMap::const_iterator it = _collMetadata.find(ns);
-    verify(it != _collMetadata.end());
-
-    string errMsg;
-
-    shared_ptr<CollectionMetadata> cloned(
-        it->second->cloneMerge(minKey, maxKey, mergedVersion, &errMsg));
-    // uassert to match old behavior, TODO: report errors w/o throwing
-    uassert(17004, errMsg, NULL != cloned.get());
-
-    _collMetadata[ns] = cloned;
 }
 
 bool ShardingState::inCriticalMigrateSection() {
@@ -932,6 +887,19 @@ shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string
     } else {
         return it->second;
     }
+}
+
+void ShardingState::exchangeCollectionMetadata(OperationContext* txn,
+                                               const NamespaceString& nss,
+                                               unique_ptr<CollectionMetadata> newMetadata) {
+    invariant(txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    CollectionMetadataMap::iterator it = _collMetadata.find(nss.ns());
+    invariant(it != _collMetadata.end());
+
+    it->second = std::move(newMetadata);
 }
 
 /**

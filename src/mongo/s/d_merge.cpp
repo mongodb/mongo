@@ -50,7 +50,8 @@ namespace mongo {
 
 using std::shared_ptr;
 using std::string;
-using mongoutils::str::stream;
+using std::unique_ptr;
+using str::stream;
 
 static Status runApplyOpsCmd(OperationContext* txn,
                              const std::vector<ChunkType>&,
@@ -226,6 +227,12 @@ bool mergeChunks(OperationContext* txn,
         }
     }
 
+    // Ensure that the newly applied chunks would result in a correct metadata state
+    string mergeErrMsg;
+    unique_ptr<CollectionMetadata> cloned(
+        metadata->cloneMerge(minKey, maxKey, mergeVersion, &mergeErrMsg));
+    uassert(ErrorCodes::IllegalOperation, mergeErrMsg, cloned.get());
+
     //
     // Run apply ops command
     //
@@ -244,7 +251,7 @@ bool mergeChunks(OperationContext* txn,
         Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_IX);
         Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_X);
 
-        shardingState->mergeChunks(txn, nss.ns(), minKey, maxKey, mergeVersion);
+        shardingState->exchangeCollectionMetadata(txn, nss, std::move(cloned));
     }
 
     //

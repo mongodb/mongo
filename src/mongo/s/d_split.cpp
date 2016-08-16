@@ -826,6 +826,21 @@ public:
             preCond.append(b.obj());
         }
 
+        // NOTE: The newShardVersion resulting from this split is higher than any
+        // other chunk version, so it's also implicitly the newCollVersion
+        ChunkVersion newShardVersion = collVersion;
+
+        // Increment the minor version once, splitChunk increments once per split point
+        // (resulting in the correct final shard/collection version)
+        //
+        // TODO: Revisit this interface, it's a bit clunky
+        newShardVersion.incMinor();
+
+        string errMsg;
+        unique_ptr<CollectionMetadata> cloned(
+            collMetadata->cloneSplit(origChunk, splitKeys, newShardVersion, &errMsg));
+        uassert(ErrorCodes::IllegalOperation, errMsg, cloned.get());
+
         //
         // 4. apply the batch of updates to remote and local metadata
         //
@@ -845,17 +860,7 @@ public:
             Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_IX);
             Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_X);
 
-            // NOTE: The newShardVersion resulting from this split is higher than any
-            // other chunk version, so it's also implicitly the newCollVersion
-            ChunkVersion newShardVersion = collVersion;
-
-            // Increment the minor version once, splitChunk increments once per split point
-            // (resulting in the correct final shard/collection version)
-            //
-            // TODO: Revisit this interface, it's a bit clunky
-            newShardVersion.incMinor();
-
-            shardingState->splitChunk(txn, nss.ns(), min, max, splitKeys, newShardVersion);
+            shardingState->exchangeCollectionMetadata(txn, nss, std::move(cloned));
         }
 
         //
