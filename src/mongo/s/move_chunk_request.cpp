@@ -38,6 +38,7 @@ namespace {
 
 const char kMoveChunk[] = "moveChunk";
 const char kEpoch[] = "epoch";
+const char kChunkVersion[] = "chunkVersion";
 const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardId[] = "fromShard";
 const char kToShardId[] = "toShard";
@@ -105,6 +106,16 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
     }
 
     {
+        auto statusWithChunkVersion =
+            ChunkVersion::parseFromBSONWithFieldForCommands(obj, kChunkVersion);
+        if (statusWithChunkVersion.isOK()) {
+            request._chunkVersion = std::move(statusWithChunkVersion.getValue());
+        } else if (statusWithChunkVersion != ErrorCodes::NoSuchKey) {
+            return statusWithChunkVersion.getStatus();
+        }
+    }
+
+    {
         Status status =
             bsonExtractBooleanFieldWithDefault(obj, kWaitForDelete, false, &request._waitForDelete);
         if (!status.isOK()) {
@@ -135,11 +146,12 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
 
 void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
                                        const NamespaceString& nss,
-                                       const ChunkVersion& shardVersion,
+                                       ChunkVersion collectionVersion,
                                        const ConnectionString& configServerConnectionString,
                                        const ShardId& fromShardId,
                                        const ShardId& toShardId,
                                        const ChunkRange& range,
+                                       ChunkVersion chunkVersion,
                                        int64_t maxChunkSizeBytes,
                                        const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                        bool waitForDelete,
@@ -148,12 +160,13 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     invariant(nss.isValid());
 
     builder->append(kMoveChunk, nss.ns());
-    shardVersion.appendForCommands(builder);
-    builder->append(kEpoch, shardVersion.epoch());
+    collectionVersion.appendForCommands(builder);
+    builder->append(kEpoch, collectionVersion.epoch());
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());
     range.append(builder);
+    chunkVersion.appendWithFieldForCommands(builder, kChunkVersion);
     builder->append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     secondaryThrottle.append(builder);
     builder->append(kWaitForDelete, waitForDelete);

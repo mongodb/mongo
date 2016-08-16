@@ -531,6 +531,7 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
                                                                  splitInfo.collectionVersion,
                                                                  splitInfo.minKey,
                                                                  splitInfo.maxKey,
+                                                                 splitInfo.chunkVersion,
                                                                  splitInfo.splitKeys);
         if (!splitStatus.isOK()) {
             warning() << "Failed to enforce tag range for chunk " << redact(splitInfo.toString())

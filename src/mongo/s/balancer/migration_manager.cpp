@@ -247,6 +247,7 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
         migrateInfo.from,
         migrateInfo.to,
         ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),
+        chunk->getLastmod(),
         maxChunkSizeBytes,
         secondaryThrottle,
         waitForDelete,
