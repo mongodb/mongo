@@ -62,13 +62,16 @@ class DatabaseCloner : public BaseCloner {
 
 public:
     struct Stats {
+        std::string dbname;
         Date_t start;
         Date_t end;
         size_t collections{0};
         size_t clonedCollections{0};
+        std::vector<CollectionCloner::Stats> collectionStats;
 
         std::string toString() const;
         BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
     };
 
     /**
@@ -137,6 +140,8 @@ public:
     void join() override;
 
     DatabaseCloner::Stats getStats() const;
+
+    std::string getDBName() const;
 
     //
     // Testing only functions below.

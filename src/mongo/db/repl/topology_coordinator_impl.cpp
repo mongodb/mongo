@@ -1513,6 +1513,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsS
     const Date_t now = rsStatusArgs.now;
     const OpTime& lastOpApplied = rsStatusArgs.lastOpApplied;
     const OpTime& lastOpDurable = rsStatusArgs.lastOpDurable;
+    const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
 
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
@@ -1665,6 +1666,9 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsS
     appendOpTime(&optimes, "durableOpTime", lastOpDurable, _rsConfig.getProtocolVersion());
     response->append("optimes", optimes.obj());
 
+    if (!initialSyncStatus.isEmpty()) {
+        response->append("initialSyncStatus", initialSyncStatus);
+    }
 
     response->append("members", membersOut);
     *result = Status::OK();

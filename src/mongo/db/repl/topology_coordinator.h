@@ -249,6 +249,7 @@ public:
         const OpTime& lastOpDurable;
         const OpTime& lastCommittedOpTime;
         const OpTime& readConcernMajorityOpTime;
+        const BSONObj& initialSyncStatus;
     };
 
     // produce a reply to a status request

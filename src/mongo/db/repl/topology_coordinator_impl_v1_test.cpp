@@ -1449,6 +1449,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     OpTime oplogDurable(Timestamp(3, 4), 1);
     OpTime lastCommittedOpTime(Timestamp(2, 3), 6);
     OpTime readConcernMajorityOpTime(Timestamp(4, 5), 7);
+    BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
     std::string setName = "mySet";
 
     ReplSetHeartbeatResponse hb;
@@ -1503,7 +1504,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
             oplogProgress,
             oplogDurable,
             lastCommittedOpTime,
-            readConcernMajorityOpTime},
+            readConcernMajorityOpTime,
+            initialSyncStatus},
         &statusBuilder,
         &resultStatus);
     ASSERT_OK(resultStatus);
@@ -1585,6 +1587,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                   selfStatus["optimeDate"].Date());
 
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
+    ASSERT_EQUALS(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
 
     // TODO(spencer): Test electionTime and pingMs are set properly
 }
@@ -1618,7 +1621,8 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhe
             oplogProgress,
             oplogProgress,
             OpTime(),
-            OpTime()},
+            OpTime(),
+            BSONObj()},
         &statusBuilder,
         &resultStatus);
     ASSERT_NOT_OK(resultStatus);
@@ -4387,7 +4391,8 @@ public:
                                                    OpTime(Timestamp(100, 0), 0),
                                                    OpTime(Timestamp(100, 0), 0),
                                                    OpTime(),
-                                                   OpTime()},
+                                                   OpTime(),
+                                                   BSONObj()},
             &statusBuilder,
             &resultStatus);
         ASSERT_OK(resultStatus);
@@ -4470,7 +4475,8 @@ public:
                                                    OpTime(Timestamp(100, 0), 0),
                                                    OpTime(Timestamp(100, 0), 0),
                                                    OpTime(),
-                                                   OpTime()},
+                                                   OpTime(),
+                                                   BSONObj()},
             &statusBuilder,
             &resultStatus);
         ASSERT_OK(resultStatus);
@@ -4518,7 +4524,8 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, NodeDoesNotRetryHeartbeatsAfterFailing
                                                OpTime(Timestamp(100, 0), 0),
                                                OpTime(Timestamp(100, 0), 0),
                                                OpTime(),
-                                               OpTime()},
+                                               OpTime(),
+                                               BSONObj()},
         &statusBuilder,
         &resultStatus);
     ASSERT_OK(resultStatus);
@@ -4578,7 +4585,8 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
                                                OpTime(Timestamp(100, 0), 0),
                                                OpTime(Timestamp(100, 0), 0),
                                                OpTime(),
-                                               OpTime()},
+                                               OpTime(),
+                                               BSONObj()},
         &statusBuilder,
         &resultStatus);
     ASSERT_OK(resultStatus);

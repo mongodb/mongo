@@ -58,6 +58,7 @@ struct InitialSyncState {
     Timestamp stopTimestamp;   // Referred to as minvalid, or the place we can transition states.
     Event finishEvent;         // event fired on completion, either successful or not.
     Status status;             // final status, only valid after the finishEvent fires.
+    Timer timer;               // Timer for timing how long each initial sync attempt takes.
     size_t fetchedMissingDocs = 0;
     size_t appliedOps = 0;
 };

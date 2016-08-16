@@ -212,7 +212,8 @@ public:
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
-    virtual Status processReplSetGetStatus(BSONObjBuilder* result) override;
+    virtual Status processReplSetGetStatus(BSONObjBuilder* result,
+                                           ReplSetGetStatusResponseStyle responseStyle) override;
 
     virtual void fillIsMasterForReplSet(IsMasterResponse* result) override;
 
@@ -1322,7 +1323,7 @@ private:
     // Storage interface used by data replicator.
     StorageInterface* _storage;  // (PS)
     // Data Replicator used to replicate data
-    std::unique_ptr<DataReplicator> _dr;  // (S)
+    std::unique_ptr<DataReplicator> _dr;  // (M)
 
     // Hands out the next snapshot name.
     AtomicUInt64 _snapshotNameGenerator;  // (S)
