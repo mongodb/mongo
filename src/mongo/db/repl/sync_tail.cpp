@@ -702,31 +702,27 @@ private:
         OperationContext& txn = *txnPtr;
         const auto replCoord = ReplicationCoordinator::get(&txn);
         const auto fastClockSource = txn.getServiceContext()->getFastClockSource();
+        const auto oplogMaxSize = fassertStatusOK(
+            40301,
+            StorageInterface::get(&txn)->getOplogMaxSize(&txn, NamespaceString(rsOplogName)));
+
+        // Batches are limited to 10% of the oplog.
+        BatchLimits batchLimits;
+        batchLimits.bytes = std::min(oplogMaxSize / 10, size_t(replBatchLimitBytes));
 
         while (!_inShutdown.load()) {
-            const auto batchStartTime = fastClockSource->now();
             const auto slaveDelay = replCoord->getSlaveDelaySecs();
-            const auto slaveDelayLimit = (slaveDelay > Seconds(0)) ? (batchStartTime - slaveDelay)
-                                                                   : boost::optional<Date_t>();
+            batchLimits.slaveDelayLatestTimestamp = (slaveDelay > Seconds(0))
+                ? (fastClockSource->now() - slaveDelay)
+                : boost::optional<Date_t>();
+
+            // Check this once per batch since users can change it at runtime.
+            batchLimits.ops = replBatchLimitOperations.load();
 
             OpQueue ops;
-            // tryPopAndWaitForMore returns true when we need to end a batch early
-            while (!_inShutdown.load()) {
-                if (_syncTail->tryPopAndWaitForMore(&txn, &ops, slaveDelayLimit)) {
-                    break;  // We need to end this batch early, even if there is more room.
-                }
-
-                if (!ops.empty()) {
-                    // apply replication batch limits
-                    const auto batchDuration = fastClockSource->now() - batchStartTime;
-                    if (durationCount<Seconds>(batchDuration) >= replBatchLimitSeconds)
-                        break;
-                    if (ops.getCount() >= size_t(replBatchLimitOperations))
-                        break;
-                    if (ops.getBytes() >= replBatchLimitBytes)
-                        break;
-                }
-                // keep fetching more ops as long as we haven't hit any batch-ending conditions
+            // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
+            while (!_inShutdown.load() &&
+                   !_syncTail->tryPopAndWaitForMore(&txn, &ops, batchLimits)) {
             }
 
             // For pausing replication in tests
@@ -833,11 +829,11 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
 // Batch should end early if we encounter a command, or if
 // there are no further ops in the bgsync queue to read.
 // This function also blocks 1 second waiting for new ops to appear in the bgsync
-// queue.  We can't block forever because there are maintenance things we need
-// to periodically check in the loop.
+// queue.  We don't block forever so that we can periodically check for things like shutdown or
+// reconfigs.
 bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
                                     SyncTail::OpQueue* ops,
-                                    boost::optional<Date_t> slaveDelayLimit) {
+                                    const BatchLimits& limits) {
     {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
@@ -852,7 +848,15 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
 
             return true;
         }
-        ops->emplace_back(std::move(op));
+
+        // If this op would put us over the byte limit don't include it unless the batch is empty.
+        // We allow single-op batches to exceed the byte limit so that large ops are able to be
+        // processed.
+        if (!ops->empty() && (ops->getBytes() + size_t(op.objsize())) > limits.bytes) {
+            return true;  // Return before wasting time parsing the op.
+        }
+
+        ops->emplace_back(std::move(op));  // Parses the op in-place.
     }
 
     auto& entry = ops->back();
@@ -874,7 +878,9 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
         }
     }
 
-    if (slaveDelayLimit && entry.ts.timestampTime() > *slaveDelayLimit) {
+    if (limits.slaveDelayLatestTimestamp &&
+        entry.ts.timestampTime() > *limits.slaveDelayLatestTimestamp) {
+
         ops->pop_back();  // Don't do this op yet.
         if (ops->empty()) {
             // Sleep if we've got nothing to do. Only sleep for 1 second at a time to allow
@@ -907,8 +913,8 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
     // We are going to apply this Op.
     _networkQueue->consume(txn);
 
-    // Go back for more ops
-    return false;
+    // Go back for more ops, unless we've hit the limit.
+    return ops->getCount() >= limits.ops;
 }
 
 void SyncTail::setHostname(const std::string& hostname) {

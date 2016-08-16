@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
@@ -351,6 +352,21 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* txn) {
 Status StorageInterfaceImpl::createOplog(OperationContext* txn, const NamespaceString& nss) {
     mongo::repl::createOplog(txn, nss.ns(), true);
     return Status::OK();
+}
+
+StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* txn,
+                                                         const NamespaceString& nss) {
+    AutoGetCollectionForRead collection(txn, nss);
+    if (!collection.getCollection()) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Your oplog doesn't exist: " << nss.ns()};
+    }
+
+    const auto options = collection.getCollection()->getCatalogEntry()->getCollectionOptions(txn);
+    if (!options.capped)
+        return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
+
+    return options.cappedSize;
 }
 
 Status StorageInterfaceImpl::createCollection(OperationContext* txn,

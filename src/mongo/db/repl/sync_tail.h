@@ -156,17 +156,24 @@ public:
         size_t _bytes;
     };
 
+    struct BatchLimits {
+        size_t bytes = replBatchLimitBytes;
+        size_t ops = replBatchLimitOperations.load();
+
+        // If provided, the batch will not include any operations with timestamps after this point.
+        // This is intended for implementing slaveDelay, so it should be some number of seconds
+        // before now.
+        boost::optional<Date_t> slaveDelayLatestTimestamp = {};
+    };
+
     /**
      * Attempts to pop an OplogEntry off the BGSync queue and add it to ops.
      *
-     * If slaveDelayLimit is provided, only operations with a timestamp <= the provided Date_t will
-     * be included in the batch. Returns true if the (possibly empty) batch in ops should be ended
-     * and a new one started. If ops is empty on entry and nothing can be added yet, will wait up to
-     * a second before returning.
+     * Returns true if the (possibly empty) batch in ops should be ended and a new one started.
+     * If ops is empty on entry and nothing can be added yet, will wait up to a second before
+     * returning true.
      */
-    bool tryPopAndWaitForMore(OperationContext* txn,
-                              OpQueue* ops,
-                              boost::optional<Date_t> slaveDelayLimit = {});
+    bool tryPopAndWaitForMore(OperationContext* txn, OpQueue* ops, const BatchLimits& limits);
 
     /**
      * Fetch a single document referenced in the operation from the sync source.

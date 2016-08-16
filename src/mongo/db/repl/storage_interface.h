@@ -193,6 +193,15 @@ public:
     virtual Status createOplog(OperationContext* txn, const NamespaceString& nss) = 0;
 
     /**
+     * Returns the configured maximum size of the oplog.
+     *
+     * Implementations are allowed to be "fuzzy" and delete documents when the actual size is
+     * slightly above or below this, so callers should not rely on its exact value.
+     */
+    virtual StatusWith<size_t> getOplogMaxSize(OperationContext* txn,
+                                               const NamespaceString& nss) = 0;
+
+    /**
      * Creates a collection.
      */
     virtual Status createCollection(OperationContext* txn,

@@ -161,6 +161,10 @@ public:
         return createOplogFn(txn, nss);
     };
 
+    StatusWith<size_t> getOplogMaxSize(OperationContext* txn, const NamespaceString& nss) override {
+        return 1024 * 1024 * 1024;
+    }
+
     Status createCollection(OperationContext* txn,
                             const NamespaceString& nss,
                             const CollectionOptions& options) override {
