@@ -226,8 +226,8 @@
             rst.start(secondary.nodeId, {}, true);
         }
 
-        // Wait up to 60 seconds until restarted node is in state secondary
-        rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY, 60 * 1000);
+        // Wait up to 5 minutes until restarted node is in state secondary.
+        rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
 
         // Add new hidden node to replSetTest
         var hiddenCfg =
