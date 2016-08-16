@@ -35,7 +35,7 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
 		wt_session, file_handle->name, &file_size));
 	len = (size_t)file_size;
 
-	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
+	__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-map: %" WT_SIZET_FMT " bytes", file_handle->name, len);
 
 	mapped_cookie = CreateFileMappingA(
@@ -85,7 +85,7 @@ __wt_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
 	win_fh = (WT_FILE_HANDLE_WIN *)file_handle;
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	(void)__wt_verbose(session, WT_VERB_HANDLEOPS,
+	__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-unmap: %" WT_SIZET_FMT " bytes",
 	    file_handle->name, length);
 

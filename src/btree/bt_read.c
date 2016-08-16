@@ -323,7 +323,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 		return (__wt_leaf_page_can_split(session, page));
 
 	/* Trigger eviction on the next page release. */
-	WT_IGNORE_RET(__wt_page_evict_soon(session, ref));
+	__wt_page_evict_soon(session, ref);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
 	WT_IGNORE_RET(__wt_txn_update_oldest(session, 0));
@@ -599,14 +599,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			page = ref->page;
 			if (page->read_gen == WT_READGEN_NOTSET) {
 				if (evict_soon)
-					/*
-					 * Ignore error returns, since the
-					 * evict soon call is advisory and we
-					 * are holding a hazard pointer to the
-					 * page already.
-					 */
-					WT_IGNORE_RET(
-					    __wt_page_evict_soon(session, ref));
+					__wt_page_evict_soon(session, ref);
 				else
 					__wt_cache_read_gen_new(session, page);
 			} else if (!LF_ISSET(WT_READ_NO_GEN))

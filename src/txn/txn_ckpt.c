@@ -493,10 +493,10 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session,
 	 * Get time diff in microseconds.
 	 */
 	msec = WT_TIMEDIFF_MS(stop, *start);
-	WT_RET(__wt_verbose(session,
+	__wt_verbose(session,
 	    WT_VERB_CHECKPOINT, "time: %" PRIu64 " us, gen: %" PRIu64
 	    ": Full database checkpoint %s",
-	    msec, S2C(session)->txn_global.checkpoint_gen, msg));
+	    msec, S2C(session)->txn_global.checkpoint_gen, msg);
 
 	/* Update the timestamp so we are reporting intervals. */
 	memcpy(start, &stop, sizeof(*start));
@@ -659,7 +659,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * This allows ordinary visibility checks to move forward because
 	 * checkpoints often take a long time and only write to the metadata.
 	 */
-	WT_ERR(__wt_writelock(session, txn_global->scan_rwlock));
+	__wt_writelock(session, txn_global->scan_rwlock);
 	txn_global->checkpoint_txnid = txn->id;
 	txn_global->checkpoint_pinned = WT_MIN(txn->id, txn->snap_min);
 
@@ -679,7 +679,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * details).
 	 */
 	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
-	WT_ERR(__wt_writeunlock(session, txn_global->scan_rwlock));
+	__wt_writeunlock(session, txn_global->scan_rwlock);
 
 	/*
 	 * Unblock updates -- we can figure out that any updates to clean pages
@@ -718,7 +718,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Mark all trees as open for business (particularly eviction). */
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_presync));
-	WT_ERR(__wt_evict_server_wake(session));
+	__wt_evict_server_wake(session);
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "committing transaction", &verb_timer));
@@ -1102,7 +1102,7 @@ __checkpoint_lock_tree(WT_SESSION_IMPL *session,
 	 * Hold the lock until we're done (blocking hot backups from starting),
 	 * we don't want to race with a future hot backup.
 	 */
-	WT_ERR(__wt_readlock(session, conn->hot_backup_lock));
+	__wt_readlock(session, conn->hot_backup_lock);
 	hot_backup_locked = true;
 	if (conn->hot_backup)
 		WT_CKPT_FOREACH(ckptbase, ckpt) {
@@ -1176,8 +1176,7 @@ __checkpoint_lock_tree(WT_SESSION_IMPL *session,
 	WT_ASSERT(session,
 	    !is_checkpoint || !F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS));
 
-	hot_backup_locked = false;
-	WT_ERR(__wt_readunlock(session, conn->hot_backup_lock));
+	__wt_readunlock(session, conn->hot_backup_lock);
 
 	WT_ASSERT(session, btree->ckpt == NULL);
 	btree->ckpt = ckptbase;
@@ -1185,7 +1184,7 @@ __checkpoint_lock_tree(WT_SESSION_IMPL *session,
 	return (0);
 
 err:	if (hot_backup_locked)
-		WT_TRET(__wt_readunlock(session, conn->hot_backup_lock));
+		__wt_readunlock(session, conn->hot_backup_lock);
 
 	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
@@ -1483,7 +1482,7 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 	 * progress.  Without this, application threads will be stalled
 	 * until the eviction server next wakes.
 	 */
-	WT_TRET(__wt_evict_server_wake(session));
+	__wt_evict_server_wake(session);
 
 	return (ret);
 }

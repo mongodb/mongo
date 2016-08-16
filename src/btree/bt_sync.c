@@ -206,7 +206,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 		WT_ERR(__wt_epoch(session, &end));
-		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of internal\n\t"
@@ -214,7 +214,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
-		    WT_TIMEDIFF_MS(end, start)));
+		    WT_TIMEDIFF_MS(end, start));
 	}
 
 err:	/* On error, clear any left-over tree walk. */

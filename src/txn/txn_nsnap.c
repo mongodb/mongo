@@ -256,7 +256,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
 
-	WT_RET(__wt_readlock(session, txn_global->nsnap_rwlock));
+	__wt_readlock(session, txn_global->nsnap_rwlock);
 	TAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
 		if (WT_STRING_MATCH(nsnap->name, nameval->str, nameval->len)) {
 			txn->snap_min = txn_state->snap_min = nsnap->snap_min;
@@ -268,7 +268,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 			F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 			break;
 		}
-	WT_RET(__wt_readunlock(session, txn_global->nsnap_rwlock));
+	__wt_readunlock(session, txn_global->nsnap_rwlock);
 
 	if (nsnap == NULL)
 		WT_RET_MSG(session, EINVAL,

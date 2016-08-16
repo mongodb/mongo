@@ -320,7 +320,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 		return (0);
 
 	obsolete = __wt_update_obsolete_check(session, page, upd->next);
-	WT_RET(__wt_fair_unlock(session, &page->page_lock));
+	__wt_fair_unlock(session, &page->page_lock);
 	if (obsolete != NULL)
 		__wt_update_obsolete_free(session, page, obsolete);
 

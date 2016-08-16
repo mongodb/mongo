@@ -154,9 +154,10 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-	WT_UNUSED(session);
+	WT_DECL_RET;
 
-	(void)pthread_mutex_lock(&t->lock);
+	if ((ret = pthread_mutex_lock(&t->lock)) != 0)
+		WT_PANIC_MSG(session, ret, "pthread_mutex_lock: %s", t->name);
 }
 #endif
 
@@ -167,15 +168,13 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-	WT_UNUSED(session);
+	WT_DECL_RET;
 
-	(void)pthread_mutex_unlock(&t->lock);
+	if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
+		WT_PANIC_MSG(session, ret, "pthread_mutex_unlock: %s", t->name);
 }
 
 #elif SPINLOCK_TYPE == SPINLOCK_MSVC
-
-#define	WT_SPINLOCK_REGISTER		-1
-#define	WT_SPINLOCK_REGISTER_FAILED	-2
 
 /*
  * __wt_spin_init --
@@ -184,13 +183,18 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
-	WT_UNUSED(session);
+	DWORD windows_error;
+
+	if (InitializeCriticalSectionAndSpinCount(&t->lock, 4000) == 0) {
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: InitializeCriticalSectionAndSpinCount: %s",
+		    name, __wt_formatmessage(session, windows_error));
+		return (__wt_map_windows_error(windows_error));
+	}
 
 	t->name = name;
 	t->initialized = 1;
-
-	InitializeCriticalSectionAndSpinCount(&t->lock, 4000);
-
 	return (0);
 }
 
@@ -279,7 +283,7 @@ __wt_fair_trylock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
  * __wt_fair_lock --
  *	Get a lock.
  */
-static inline int
+static inline void
 __wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 {
 	uint16_t ticket;
@@ -311,15 +315,13 @@ __wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 	 * lock see consistent data.
 	 */
 	WT_READ_BARRIER();
-
-	return (0);
 }
 
 /*
  * __wt_fair_unlock --
  *	Release a shared lock.
  */
-static inline int
+static inline void
 __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 {
 	WT_UNUSED(session);
@@ -334,8 +336,6 @@ __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 	 * We have exclusive access - the update does not need to be atomic.
 	 */
 	++lock->fair_lock_owner;
-
-	return (0);
 }
 
 #ifdef HAVE_DIAGNOSTIC

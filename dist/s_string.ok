@@ -159,6 +159,7 @@ INMEM
 INTL
 ISA
 ITEMs
+InitializeCriticalSectionAndSpinCount
 Inline
 Intra
 Ippokratis

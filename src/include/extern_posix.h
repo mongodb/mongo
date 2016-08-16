@@ -13,8 +13,8 @@ extern int __wt_posix_map_preload(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, co
 extern int __wt_posix_map_discard(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *map, size_t length, void *mapped_cookie) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_posix_unmap(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *mapped_region, size_t len, void *mapped_cookie) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, bool is_signalled, WT_CONDVAR **condp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_cond_wait_signal( WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_cond_wait_signal( WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled);
+extern void __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_once(void (*init_routine)(void)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_get_vm_pagesize(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

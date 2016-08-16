@@ -156,9 +156,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	size_t bufsize;
 	uint32_t page_cksum;
 
-	WT_RET(__wt_verbose(session, WT_VERB_READ,
+	__wt_verbose(session, WT_VERB_READ,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    (uintmax_t)offset, size, cksum));
+	    (uintmax_t)offset, size, cksum);
 
 	WT_STAT_FAST_CONN_INCR(session, block_read);
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_read, size);

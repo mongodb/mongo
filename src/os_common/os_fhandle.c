@@ -187,7 +187,7 @@ __open_verbose(
 	if (tmp->size != 0)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ")"));
 
-	ret = __wt_verbose(session, WT_VERB_FILEOPS,
+	__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: file-open: type %s%s",
 	    name, file_type_tag, tmp->size == 0 ? "" : (char *)tmp->data);
 
@@ -300,8 +300,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	*fhp = NULL;
 
 	/* Track handle-close as a file operation, so open and close match. */
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_FILEOPS, "%s: file-close", fh->name));
+	__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-close", fh->name);
 
 	/*
 	 * If the reference count hasn't gone to 0, or if it's an in-memory

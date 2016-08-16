@@ -227,9 +227,9 @@ __backup_start(
 	 * could start a hot backup that would race with an already-started
 	 * checkpoint.
 	 */
-	WT_RET(__wt_writelock(session, conn->hot_backup_lock));
+	__wt_writelock(session, conn->hot_backup_lock);
 	conn->hot_backup = true;
-	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
+	__wt_writeunlock(session, conn->hot_backup_lock);
 
 	/* We're the lock holder, we own cleanup. */
 	F_SET(cb, WT_CURBACKUP_LOCKER);
@@ -342,9 +342,9 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_TRET(__wt_backup_file_remove(session));
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
-	WT_TRET(__wt_writelock(session, conn->hot_backup_lock));
+	__wt_writelock(session, conn->hot_backup_lock);
 	conn->hot_backup = false;
-	WT_TRET(__wt_writeunlock(session, conn->hot_backup_lock));
+	__wt_writeunlock(session, conn->hot_backup_lock);
 
 	return (ret);
 }

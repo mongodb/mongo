@@ -17,8 +17,8 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 {
 	WT_DECL_RET;
 
-	WT_RET(__wt_verbose(session,
-	    WT_VERB_BLOCK, "truncate file to %" PRIuMAX, (uintmax_t)len));
+	__wt_verbose(session,
+	    WT_VERB_BLOCK, "truncate file to %" PRIuMAX, (uintmax_t)len);
 
 	/*
 	 * Truncate requires serialization, we depend on our caller for that.
@@ -363,9 +363,9 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_STAT_FAST_CONN_INCRV(
 		    session, block_byte_write_checkpoint, align_size);
 
-	WT_RET(__wt_verbose(session, WT_VERB_WRITE,
+	__wt_verbose(session, WT_VERB_WRITE,
 	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
-	    (uintmax_t)offset, (uintmax_t)align_size, cksum));
+	    (uintmax_t)offset, (uintmax_t)align_size, cksum);
 
 	*offsetp = offset;
 	*sizep = WT_STORE_SIZE(align_size);

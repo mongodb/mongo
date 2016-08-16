@@ -42,10 +42,10 @@ err:	__wt_free(session, cond);
 
 /*
  * __wt_cond_wait_signal --
- *	Wait on a mutex, optionally timing out.  If we get it
- *	before the time out period expires, let the caller know.
+ *	Wait on a mutex, optionally timing out.  If we get it before the time
+ * out period expires, let the caller know.
  */
-int
+void
 __wt_cond_wait_signal(
     WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled)
 {
@@ -58,15 +58,15 @@ __wt_cond_wait_signal(
 	/* Fast path if already signalled. */
 	*signalled = true;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
-		return (0);
+		return;
 
 	/*
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
 	if (session != NULL) {
-		WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-		    "wait %s cond (%p)", cond->name, cond));
+		__wt_verbose(
+		    session, WT_VERB_MUTEX, "wait %s", cond->name, cond);
 		WT_STAT_FAST_CONN_INCR(session, cond_wait);
 	}
 
@@ -96,20 +96,21 @@ __wt_cond_wait_signal(
 		ret = 0;
 	}
 
-	(void)__wt_atomic_subi32(&cond->waiters, 1);
+err:	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
-err:	if (locked)
+	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
 	if (ret == 0)
-		return (0);
-	WT_RET_MSG(session, ret, "pthread_cond_wait");
+		return;
+
+	WT_PANIC_MSG(session, ret, "pthread_cond_wait: %s", cond->name);
 }
 
 /*
  * __wt_cond_signal --
  *	Signal a waiting thread.
  */
-int
+void
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	WT_DECL_RET;
@@ -122,12 +123,11 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	 * This function MUST handle a NULL session handle.
 	 */
 	if (session != NULL)
-		WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-		    "signal %s cond (%p)", cond->name, cond));
+		__wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
 	/* Fast path if already signalled. */
 	if (cond->waiters == -1)
-		return (0);
+		return;
 
 	if (cond->waiters > 0 || !__wt_atomic_casi32(&cond->waiters, 0, -1)) {
 		WT_ERR(pthread_mutex_lock(&cond->mtx));
@@ -138,8 +138,9 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 err:	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
 	if (ret == 0)
-		return (0);
-	WT_RET_MSG(session, ret, "pthread_cond_broadcast");
+		return;
+
+	WT_PANIC_MSG(session, ret, "pthread_cond_broadcast: %s", cond->name);
 }
 
 /*

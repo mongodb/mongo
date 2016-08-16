@@ -282,8 +282,7 @@ switch_and_jump:	/* Switching to a forward roll. */
 			 * the tracking cache.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(
-				    __wt_readlock(session, btree->ovfl_lock));
+				__wt_readlock(session, btree->ovfl_lock);
 				copy = WT_ROW_KEY_COPY(rip);
 				if (!__wt_row_leaf_key_info(page, copy,
 				    NULL, &cell, &keyb->data, &keyb->size)) {
@@ -291,8 +290,7 @@ switch_and_jump:	/* Switching to a forward roll. */
 					ret = __wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, unpack, keyb);
 				}
-				WT_TRET(
-				    __wt_readunlock(session, btree->ovfl_lock));
+				__wt_readunlock(session, btree->ovfl_lock);
 				WT_ERR(ret);
 				break;
 			}

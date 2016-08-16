@@ -124,7 +124,7 @@ __wt_rwlock_alloc(
 {
 	WT_RWLOCK *rwlock;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name));
+	__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name);
 
 	WT_RET(__wt_calloc_one(session, &rwlock));
 
@@ -143,8 +143,6 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new, old;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
@@ -172,15 +170,13 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  * __wt_readlock --
  *	Get a shared lock.
  */
-int
+void
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	WT_DIAGNOSTIC_YIELD;
@@ -220,21 +216,18 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock see consistent data.
 	 */
 	WT_READ_BARRIER();
-
-	return (0);
 }
 
 /*
  * __wt_readunlock --
  *	Release a shared lock.
  */
-int
+void
 __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
+	WT_UNUSED(session);
 
 	l = &rwlock->rwlock;
 
@@ -243,8 +236,6 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * sure we don't race).
 	 */
 	(void)__wt_atomic_add16(&l->s.writers, 1);
-
-	return (0);
 }
 
 /*
@@ -256,8 +247,6 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new, old;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
@@ -282,15 +271,13 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  * __wt_writelock --
  *	Wait to get an exclusive lock.
  */
-int
+void
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
@@ -319,21 +306,18 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock see consistent data.
 	 */
 	WT_READ_BARRIER();
-
-	return (0);
 }
 
 /*
  * __wt_writeunlock --
  *	Release an exclusive lock.
  */
-int
+void
 __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: writeunlock %s", rwlock->name));
+	WT_UNUSED(session);
 
 	/*
 	 * Ensure that all updates made while the lock was held are visible to
@@ -356,27 +340,24 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	l->i.wr = new.i.wr;
 
 	WT_DIAGNOSTIC_YIELD;
-
-	return (0);
 }
 
 /*
  * __wt_rwlock_destroy --
  *	Destroy a read/write lock.
  */
-int
+void
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
 	WT_RWLOCK *rwlock;
 
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
 	if (rwlock == NULL)
-		return (0);
+		return;
 	*rwlockp = NULL;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: destroy %s", rwlock->name));
+	__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: destroy %s", rwlock->name);
 
 	__wt_free(session, rwlock);
-	return (0);
 }

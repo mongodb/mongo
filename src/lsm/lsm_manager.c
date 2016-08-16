@@ -358,7 +358,7 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 	 */
 	for (i = 1; i < manager->lsm_workers; i++) {
 		WT_ASSERT(session, manager->lsm_worker_cookies[i].tid != 0);
-		WT_TRET(__wt_cond_signal(session, manager->work_cond));
+		__wt_cond_signal(session, manager->work_cond);
 		WT_TRET(__wt_thread_join(
 		    session, manager->lsm_worker_cookies[i].tid));
 	}
@@ -431,7 +431,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
-				WT_ERR(__wt_verbose(session,
+				__wt_verbose(session,
 				    WT_VERB_LSM_MANAGER,
 				    "MGR %s: queue %" PRIu32 " mod %d "
 				    "nchunks %" PRIu32
@@ -442,7 +442,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    lsm_tree->modified, lsm_tree->nchunks,
 				    lsm_tree->flags,
 				    lsm_tree->merge_aggressiveness,
-				    pushms, fillms));
+				    pushms, fillms);
 				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
@@ -617,10 +617,8 @@ int
 __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
     uint32_t type, uint32_t flags, WT_LSM_TREE *lsm_tree)
 {
-	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *entry;
-	bool pushed;
 
 	manager = &S2C(session)->lsm_manager;
 
@@ -655,9 +653,8 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	pushed = false;
-	WT_ERR(__wt_epoch(session, &lsm_tree->work_push_ts));
-	WT_ERR(__wt_calloc_one(session, &entry));
+	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
+	WT_RET(__wt_calloc_one(session, &entry));
 	entry->type = type;
 	entry->flags = flags;
 	entry->lsm_tree = lsm_tree;
@@ -672,12 +669,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	else
 		LSM_PUSH_ENTRY(&manager->appqh,
 		    &manager->app_lock, lsm_work_queue_app);
-	pushed = true;
 
-	WT_ERR(__wt_cond_signal(session, manager->work_cond));
+	__wt_cond_signal(session, manager->work_cond);
 	return (0);
-err:
-	if (!pushed)
-		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
-	return (ret);
 }
