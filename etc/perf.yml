@@ -41,14 +41,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.2/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.2/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
@@ -59,8 +59,8 @@ functions:
           set -v
           chmod +x mongod
           chmod +x mongo
-          git clone https://github.com/mongodb/mongo-perf perf-3.2
-          cd perf-3.2
+          git clone https://github.com/mongodb/mongo-perf perf
+          cd perf
           git checkout r20160805
     - command: shell.exec
       params:
@@ -141,10 +141,11 @@ functions:
           # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
           # `reports_analysis: true` as a var to this function. The following line will select the
           # appropriate flags if it's `true`.
-          reports_analysis_flags="--reports-analysis . --perf-file perf-3.2/perf.json"
+          reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
-
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.0.12-Baseline --overrideFile ../dsi/analysis/v3.2/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
+          REFTAG="3.0.12-Baseline"
+          OVERRIDE="../dsi/analysis/v3.2/perf_override.json" # Note use of v3.2 here cannot use ${project} perf
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
@@ -162,14 +163,14 @@ functions:
           set -e
           set -v
           source ./venv/bin/activate
-          cd perf-3.2
+          cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
           ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
     - command: "json.send"
       params:
         name: "perf"
-        file: "src/perf-3.2/perf.json"
+        file: "src/perf/perf.json"
 
 tasks:
 - name: compile
@@ -193,7 +194,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf-3.2/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -203,7 +204,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongo
-        remote_file: perf-3.2/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -704,7 +705,7 @@ buildvariants:
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
     mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --wiredTigerCacheSizeGB 16"
-
+    project: &project perf-3.2
   run_on:
   - "centos6-perf"
   tasks:
@@ -728,7 +729,7 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false"
-
+    project: *project
   run_on:
   - "centos6-perf"
   tasks:
@@ -749,7 +750,7 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false "
-
+    project: *project
   run_on:
   - "centos6-perf"
   tasks:
@@ -766,7 +767,7 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
-
+    project: *project
   run_on:
   - "centos6-perf"
   tasks:
@@ -778,6 +779,8 @@ buildvariants:
 - name: linux-wt-repl-compare
   display_name: 1-Node ReplSet Linux WT Comparison Standalone
   batchtime: 360 # 6 hours
+  expansions:
+    project: *project
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -790,6 +793,8 @@ buildvariants:
 - name: linux-mmap-repl-compare
   display_name: 1-Node ReplSet Linux MMAPv1 Comparison Standalone
   batchtime: 360 # 6 hours
+  expansions:
+    project: *project
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -802,6 +807,8 @@ buildvariants:
 - name: linux-wt-mmap-standalone-compare
   display_name: Standalone Linux WT Comparison MMAPv1
   batchtime: 90 # 1.5 hours
+  expansions:
+    project: *project
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -817,6 +824,8 @@ buildvariants:
 - name: linux-wt-mmap-repl-compare
   display_name: 1-Node ReplSet Linux WT Comparison MMAPv1
   batchtime: 360 # 6 hours
+  expansions:
+    project: *project
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
