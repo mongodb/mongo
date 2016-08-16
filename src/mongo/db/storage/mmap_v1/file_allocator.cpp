@@ -472,12 +472,9 @@ void FileAllocator::run(FileAllocator* fa) {
     }
 }
 
-FileAllocator* FileAllocator::_instance = 0;
-
 FileAllocator* FileAllocator::get() {
-    if (!_instance)
-        _instance = new FileAllocator();
-    return _instance;
+    static FileAllocator instance;
+    return &instance;
 }
 
 }  // namespace mongo

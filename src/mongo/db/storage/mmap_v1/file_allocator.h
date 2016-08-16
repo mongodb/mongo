@@ -100,8 +100,6 @@ private:
     static unsigned long long _uniqueNumber;
 
     bool _failed;
-
-    static FileAllocator* _instance;
 };
 
 }  // namespace mongo
