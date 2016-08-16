@@ -1093,5 +1093,25 @@ TEST(QueryRequestTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
     ASSERT_EQ(maxTime.getValue(), 300);
 }
 
+TEST(QueryRequestTest, ConvertToAggregationFailsWithNoWantMore) {
+    QueryRequest qr(testns);
+    qr.setWantMore(false);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationFailsWithNoWantMoreAndLimit) {
+    QueryRequest qr(testns);
+    qr.setWantMore(false);
+    qr.setLimit(7);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationSucceedsWithNoWantMoreLimitOne) {
+    QueryRequest qr(testns);
+    qr.setWantMore(false);
+    qr.setLimit(1);
+    ASSERT_OK(qr.asAggregationCommand());
+}
+
 }  // namespace mongo
 }  // namespace

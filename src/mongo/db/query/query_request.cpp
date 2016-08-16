@@ -922,11 +922,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kMaxField << " not supported in aggregation."};
     }
-    if (!_wantMore) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kSingleBatchField
-                              << " not supported in aggregation."};
-    }
     if (_maxScan != 0) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kMaxScanField << " not supported in aggregation."};
@@ -978,6 +973,13 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_ntoreturn) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Cannot convert to an aggregation if ntoreturn is set."};
+    }
+    // The aggregation command normally does not support the 'singleBatch' option, but we make a
+    // special exception if 'limit' is set to 1.
+    if (!_wantMore && _limit.value_or(0) != 1LL) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kSingleBatchField
+                              << " not supported in aggregation."};
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.

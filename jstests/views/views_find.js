@@ -72,4 +72,10 @@
     assert.commandFailedWithCode(
         viewsDB.runCommand({find: "identityView", projection: {arr: {$elemMatch: {x: 1}}}}),
         ErrorCodes.InvalidPipelineOperator);
+
+    // Views can support a "findOne" if singleBatch: true and limit: 1.
+    assertFindResultEq({find: "identityView", filter: {state: "NY"}, singleBatch: true, limit: 1},
+                       [{_id: "New York", state: "NY", pop: 7}]);
+    assert.eq(viewsDB.identityView.findOne({_id: "San Francisco"}),
+              {_id: "San Francisco", state: "CA", pop: 4});
 }());
