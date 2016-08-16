@@ -152,7 +152,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                                                          const Timestamp& lastTimestampApplied) {
     // If we are not a member of the current replica set configuration, no sync source is valid.
     if (_selfIndex == -1) {
-        LOG(2) << "Cannot sync from any members because we are not in the replica set config";
+        LOG(1) << "Cannot sync from any members because we are not in the replica set config";
         return HostAndPort();
     }
 
@@ -181,17 +181,17 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
     // If we are only allowed to sync from the primary, set that
     if (!_rsConfig.isChainingAllowed()) {
         if (_currentPrimaryIndex == -1) {
-            LOG(1) << "Cannot select sync source because chaining is"
+            LOG(1) << "Cannot select a sync source because chaining is"
                       " not allowed and primary is unknown/down";
             _syncSource = HostAndPort();
             return _syncSource;
         } else if (_memberIsBlacklisted(*_currentPrimaryMember(), now)) {
-            LOG(1) << "Cannot select sync source because chaining is"
-                      "not allowed and primary is not currently accepting our updates";
+            LOG(1) << "Cannot select primary member as sync source because they are blacklisted:"
+                   << _currentPrimaryMember()->getHostAndPort();
             _syncSource = HostAndPort();
             return _syncSource;
         } else {
-            _syncSource = _rsConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();
+            _syncSource = _currentPrimaryMember()->getHostAndPort();
             std::string msg(str::stream() << "syncing from primary: " << _syncSource.toString());
             log() << msg << rsLog;
             setMyHeartbeatMessage(now, msg);
@@ -238,54 +238,78 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             if (itIndex == _selfIndex) {
                 continue;
             }
+
+            const MemberConfig& itMemberConfig(_rsConfig.getMemberAt(itIndex));
+
             // Candidate must be up to be considered.
             if (!it->up()) {
+                LOG(2) << "Cannot select sync source because it is not up: "
+                       << itMemberConfig.getHostAndPort();
                 continue;
             }
             // Candidate must be PRIMARY or SECONDARY state to be considered.
             if (!it->getState().readable()) {
+                LOG(2) << "Cannot select sync source because it is not readable: "
+                       << itMemberConfig.getHostAndPort();
                 continue;
             }
-
-            const MemberConfig& itMemberConfig(_rsConfig.getMemberAt(itIndex));
 
             // Things to skip on the first attempt.
             if (attempts == 0) {
                 // Candidate must be a voter if we are a voter.
                 if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
+                    LOG(2) << "Cannot select sync source voting differences: "
+                           << itMemberConfig.getHostAndPort();
                     continue;
                 }
                 // Candidates must not be hidden.
                 if (itMemberConfig.isHidden()) {
+                    LOG(2) << "Cannot select sync source because it is hidden: "
+                           << itMemberConfig.getHostAndPort();
                     continue;
                 }
                 // Candidates cannot be excessively behind.
                 if (it->getAppliedOpTime() < oldestSyncOpTime) {
+                    LOG(2) << "Cannot select sync source because it is older than us: "
+                           << itMemberConfig.getHostAndPort();
                     continue;
                 }
                 // Candidate must not have a configured delay larger than ours.
                 if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay()) {
+                    LOG(2) << "Cannot select sync source with slaveDelay differences: "
+                           << itMemberConfig.getHostAndPort();
                     continue;
                 }
             }
             // Candidate must build indexes if we build indexes, to be considered.
             if (_selfConfig().shouldBuildIndexes()) {
                 if (!itMemberConfig.shouldBuildIndexes()) {
+                    LOG(2) << "Cannot select sync source with shouldBuildIndex differences: "
+                           << itMemberConfig.getHostAndPort();
+
                     continue;
                 }
             }
             // only consider candidates that are ahead of where we are
             if (it->getAppliedOpTime().getTimestamp() <= lastTimestampApplied) {
+                LOG(1) << "Cannot select sync source behind our last applied optime: "
+                       << itMemberConfig.getHostAndPort();
                 continue;
             }
             // Candidate cannot be more latent than anything we've already considered.
             if ((closestIndex != -1) &&
                 (_getPing(itMemberConfig.getHostAndPort()) >
                  _getPing(_rsConfig.getMemberAt(closestIndex).getHostAndPort()))) {
+                LOG(2) << "Cannot select sync source which is older than the best candidate: "
+                       << itMemberConfig.getHostAndPort();
+
                 continue;
             }
             // Candidate cannot be blacklisted.
             if (_memberIsBlacklisted(itMemberConfig, now)) {
+                LOG(1) << "Cannot select sync source which is blacklisted: "
+                       << itMemberConfig.getHostAndPort();
+
                 continue;
             }
             // This candidate has passed all tests; set 'closestIndex'

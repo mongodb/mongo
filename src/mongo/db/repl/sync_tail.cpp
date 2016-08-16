@@ -680,6 +680,7 @@ void tryToGoLiveAsASecondary(OperationContext* txn,
     Lock::GlobalRead readLock(txn->lockState());
 
     if (replCoord->getMaintenanceMode()) {
+        LOG(1) << "Can't go live (tryToGoLiveAsASecondary) as maintenance mode is active.";
         // we're not actually going live
         return;
     }
@@ -687,11 +688,13 @@ void tryToGoLiveAsASecondary(OperationContext* txn,
     // Only state RECOVERING can transition to SECONDARY.
     MemberState state(replCoord->getMemberState());
     if (!state.recovering()) {
+        LOG(2) << "Can't go live (tryToGoLiveAsASecondary) as state != recovering.";
         return;
     }
 
     // If an apply batch is active then we cannot transition.
     if (!minValidBoundaries.start.isNull()) {
+        LOG(1) << "Can't go live (tryToGoLiveAsASecondary) as there is an active apply batch.";
         return;
     }
 
@@ -699,6 +702,9 @@ void tryToGoLiveAsASecondary(OperationContext* txn,
     // -- If 'lastWriteOpTime' is null/uninitialized then we can't transition.
     // -- If 'lastWriteOpTime' is less than the end of the last batch then we can't transition.
     if (lastWriteOpTime.isNull() || minValidBoundaries.end > lastWriteOpTime) {
+        log() << "Can't go live (tryToGoLiveAsASecondary) as last written optime ("
+              << lastWriteOpTime
+              << ") is null or greater than minvalid: " << minValidBoundaries.end;
         return;
     }
 

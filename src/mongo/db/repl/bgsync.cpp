@@ -304,7 +304,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
         if (_replCoord->isCatchingUp()) {
             warning() << "Too stale to catch up.";
             log() << "Our newest OpTime : " << lastOpTimeFetched;
-            log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
+            log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen
+                  << " from " << syncSourceResp.getSyncSource();
             sleepsecs(1);
             return;
         }

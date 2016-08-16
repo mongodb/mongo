@@ -3254,7 +3254,7 @@ SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
             blacklistSyncSource(candidate, until);
             if (earliestOpTimeSeen.getTimestamp() > remoteEarliestOpTime.getTimestamp()) {
                 log() << "we are too stale to use " << candidate
-                      << " as a sync source since our last fetcherd optime: " << lastOpTimeFetched
+                      << " as a sync source since our last fetcher optime: " << lastOpTimeFetched
                       << " is less than " << remoteEarliestOpTime << " which is greater than "
                       << earliestOpTimeSeen;
                 earliestOpTimeSeen = remoteEarliestOpTime;
