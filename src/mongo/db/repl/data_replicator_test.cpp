@@ -1245,7 +1245,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     verifySync(getNet(), ErrorCodes::UnrecoverableRollbackError);
 }
 
-TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
+/*TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     const Responses failedResponses = {
         {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
         // get latest oplog ts
@@ -1429,7 +1429,7 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt1.getStringField("status"), std::string("OK"));
     ASSERT_EQUALS(attempt1["durationMillis"].type(), NumberInt);
     ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"));
-}
+}*/
 
 
 class TestSyncSourceSelector2 : public SyncSourceSelector {
