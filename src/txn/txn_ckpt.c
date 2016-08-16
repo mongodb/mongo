@@ -555,6 +555,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Reset the maximum page size seen by eviction. */
 	conn->cache->evict_max_page_size = 0;
 
+	/* Initialize the verbose tracking timer */
+	WT_ERR(__wt_epoch(session, &verb_timer));
+
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
 	 *
