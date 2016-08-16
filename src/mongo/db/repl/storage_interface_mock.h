@@ -43,6 +43,10 @@ public:
     virtual ~StorageInterfaceMock();
 
     OperationContext* createOperationContext() override;
+
+    StatusWith<size_t> getOplogMaxSize(OperationContext* txn, const NamespaceString& nss) override {
+        return 1024 * 1024 * 1024;
+    }
 };
 
 }  // namespace repl

@@ -54,17 +54,6 @@ env.Library('storage_interface',
             ])
 
 env.Library(
-    target='storage_interface_impl',
-    source=[
-        'storage_interface_impl.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
-        '$BUILD_DIR/mongo/db/service_context',
-        'storage_interface',
-        ])
-
-env.Library(
     target='replication_executor',
     source=[
         'replication_executor.cpp',
@@ -217,6 +206,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'repl_coordinator_global',
+        'storage_interface',
     ],
     LIBDEPS_TAGS=[
         # Many undefined symbols in sync_tail.cpp

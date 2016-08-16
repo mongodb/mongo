@@ -50,6 +50,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_initialsync.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -118,7 +119,8 @@ void runSyncThread() {
 
             /* we have some data.  continue tailing. */
             SyncTail tail(BackgroundSync::get(), multiSyncApply);
-            tail.oplogApplication();
+            StorageInterfaceImpl storageInterface;
+            tail.oplogApplication(&storageInterface);
         } catch (...) {
             std::terminate();
         }

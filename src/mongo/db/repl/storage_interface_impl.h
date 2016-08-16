@@ -43,6 +43,7 @@ public:
     virtual ~StorageInterfaceImpl();
 
     OperationContext* createOperationContext() override;
+    StatusWith<size_t> getOplogMaxSize(OperationContext* txn, const NamespaceString& nss) override;
 };
 
 }  // namespace repl

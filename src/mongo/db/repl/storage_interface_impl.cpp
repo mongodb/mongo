@@ -33,7 +33,10 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
@@ -48,6 +51,21 @@ OperationContext* StorageInterfaceImpl::createOperationContext() {
         AuthorizationSession::get(*ClientBasic::getCurrent())->grantInternalAuthorization();
     }
     return new OperationContextImpl();
+}
+
+StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* txn,
+                                                         const NamespaceString& nss) {
+    AutoGetCollectionForRead collection(txn, nss);
+    if (!collection.getCollection()) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Your oplog doesn't exist: " << nss.ns()};
+    }
+
+    const auto options = collection.getCollection()->getCatalogEntry()->getCollectionOptions(txn);
+    if (!options.capped)
+        return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
+
+    return options.cappedSize;
 }
 
 }  // namespace repl
