@@ -116,8 +116,8 @@ typedef struct {
  * an initialization in wtperf.c in the default_cfg.
  */
 struct __config {			/* Configuration structure */
-	const char *home;		/* WiredTiger home */
-	const char *monitor_dir;	/* Monitor output dir */
+	char *home;			/* WiredTiger home */
+	char *monitor_dir;		/* Monitor output dir */
 	char *partial_config;		/* Config string for partial logging */
 	char *reopen_config;		/* Config string for conn reopen */
 	char *base_uri;			/* Object URI */
@@ -259,9 +259,9 @@ struct __config_thread {		/* Per-thread structure */
 };
 
 void	 cleanup_truncate_config(CONFIG *);
-int	 config_assign(CONFIG *, const CONFIG *);
 int	 config_compress(CONFIG *);
 void	 config_free(CONFIG *);
+int	 config_copy(CONFIG *, const CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);

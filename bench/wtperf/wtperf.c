@@ -29,9 +29,11 @@
 #include "wtperf.h"
 
 /* Default values. */
+#define	DEFAULT_HOME		"WT_TEST"
+#define	DEFAULT_MONITOR_DIR	"WT_TEST"
 static const CONFIG default_cfg = {
-	"WT_TEST",			/* home */
-	"WT_TEST",			/* monitor dir */
+	NULL,				/* home */
+	NULL,				/* monitor dir */
 	NULL,				/* partial logging */
 	NULL,				/* reopen config */
 	NULL,				/* base_uri */
@@ -1944,13 +1946,12 @@ start_all_runs(CONFIG *cfg)
 {
 	CONFIG *next_cfg, **configs;
 	pthread_t *threads;
-	size_t cmd_len, home_len, i;
+	size_t home_len, i;
 	int ret, t_ret;
-	char *cmd_buf, *new_home;
+	char *new_home;
 
 	ret = 0;
 	configs = NULL;
-	cmd_buf = NULL;
 
 	if (cfg->database_count == 1)
 		return (start_run(cfg));
@@ -1962,24 +1963,25 @@ start_all_runs(CONFIG *cfg)
 	threads = dcalloc(cfg->database_count, sizeof(pthread_t));
 
 	home_len = strlen(cfg->home);
-	cmd_len = (home_len * 2) + 30; /* Add some slop. */
-	cmd_buf = dcalloc(cmd_len, 1);
 	for (i = 0; i < cfg->database_count; i++) {
 		next_cfg = dcalloc(1, sizeof(CONFIG));
 		configs[i] = next_cfg;
-		if ((ret = config_assign(next_cfg, cfg)) != 0)
+		if ((ret = config_copy(next_cfg, cfg)) != 0)
 			goto err;
 
 		/* Setup a unique home directory for each database. */
 		new_home = dmalloc(home_len + 5);
 		snprintf(new_home, home_len + 5, "%s/D%02d", cfg->home, (int)i);
+		free(next_cfg->home);
 		next_cfg->home = new_home;
 
 		/* If the monitor dir is default, update it too. */
-		if (strcmp(cfg->monitor_dir, cfg->home) == 0)
-			next_cfg->monitor_dir = new_home;
+		if (strcmp(cfg->monitor_dir, cfg->home) == 0) {
+			free(next_cfg->monitor_dir);
+			next_cfg->monitor_dir = dstrdup(new_home);
+		}
 
-		/* If creating the sub-database, recreate it's home */
+		/* If creating the sub-database, recreate its home */
 		if (cfg->create != 0)
 			recreate_dir(next_cfg->home);
 
@@ -1991,22 +1993,19 @@ start_all_runs(CONFIG *cfg)
 	}
 
 	/* Wait for threads to finish. */
-	for (i = 0; i < cfg->database_count; i++) {
+	for (i = 0; i < cfg->database_count; i++)
 		if ((t_ret = pthread_join(threads[i], NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
 			if (ret == 0)
 				ret = t_ret;
 		}
-	}
 
 err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++) {
-		free((char *)configs[i]->home);
 		config_free(configs[i]);
 		free(configs[i]);
 	}
 	free(configs);
 	free(threads);
-	free(cmd_buf);
 
 	return (ret);
 }
@@ -2199,10 +2198,10 @@ main(int argc, char *argv[])
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
 	memset(cfg, 0, sizeof(*cfg));
-	if (config_assign(cfg, &default_cfg))
+	if (config_copy(cfg, &default_cfg))
 		goto err;
-
-	TAILQ_INIT(&cfg->config_head);
+	cfg->home = dstrdup(DEFAULT_HOME);
+	cfg->monitor_dir = dstrdup(DEFAULT_MONITOR_DIR);
 
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
@@ -2219,10 +2218,12 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'h':
-			cfg->home = __wt_optarg;
+			free(cfg->home);
+			cfg->home = dstrdup(__wt_optarg);
 			break;
 		case 'm':
-			cfg->monitor_dir = __wt_optarg;
+			free(cfg->monitor_dir);
+			cfg->monitor_dir = dstrdup(__wt_optarg);
 			monitor_set = true;
 			break;
 		case 'O':
@@ -2248,8 +2249,10 @@ main(int argc, char *argv[])
 	 * If the user did not specify a monitor directory then set the
 	 * monitor directory to the home dir.
 	 */
-	if (!monitor_set)
-		cfg->monitor_dir = cfg->home;
+	if (!monitor_set) {
+		free(cfg->monitor_dir);
+		cfg->monitor_dir = dstrdup(cfg->home);
+	}
 
 	/* Parse configuration settings from configuration file. */
 	if (config_opts != NULL && config_opt_file(cfg, config_opts) != 0)
