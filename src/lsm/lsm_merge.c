@@ -404,7 +404,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		    ", generation %" PRIu32,
 		    lsm_tree->name,
 		    start_chunk, end_chunk, dest_id, record_count, generation);
-		for (verb = start_chunk; verb <= end_chunk; verb++)
+		for (verb = start_chunk; verb < end_chunk + 1; verb++)
 			__wt_verbose(session, WT_VERB_LSM,
 			    "Merging %s: Chunk[%u] id %" PRIu32
 			    ", gen: %" PRIu32
