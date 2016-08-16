@@ -57,4 +57,6 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
     assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard2.shardName}).itcount());
     assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard3.shardName}).itcount());
+
+    st.stop();
 })();

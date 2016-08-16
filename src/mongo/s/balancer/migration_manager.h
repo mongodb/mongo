@@ -40,12 +40,14 @@
 #include "mongo/s/balancer/balancer_policy.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
 
 class OperationContext;
+class ServiceContext;
 class Status;
 template <typename T>
 class StatusWith;
@@ -63,7 +65,7 @@ class MigrationManager {
     MONGO_DISALLOW_COPYING(MigrationManager);
 
 public:
-    MigrationManager();
+    MigrationManager(ServiceContext* serviceContext);
     ~MigrationManager();
 
     /**
@@ -96,7 +98,30 @@ public:
                                   const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                   bool waitForDelete);
 
+    /**
+     * Non-blocking method, which puts the migration manager in a state where new migrations can be
+     * scheduled (kEnabled). May only be called if the manager is in the kStopped state.
+     */
+    void enableMigrations();
+
+    /**
+     * Non-blocking method, which puts the manager in a state where all subsequently scheduled
+     * migrations will immediately fail (without ever getting scheduled) and all active ones will be
+     * cancelled. It has no effect if the migration manager is not enabled.
+     */
+    void interruptAndDisableMigrations();
+
+    /**
+     * Blocking method, which waits for any currently scheduled migrations to complete. Must be
+     * called after interruptAndDisableMigrations has been called in order to be able to re-enable
+     * migrations again.
+     */
+    void drainActiveMigrations();
+
 private:
+    // The current state of the migration manager
+    enum State { kEnabled, kStopping, kStopped };
+
     /**
      * Tracks the execution state of a single migration.
      */
@@ -165,9 +190,9 @@ private:
      * The distributed lock is acquired before scheduling the first migration for the collection and
      * is only released when all active migrations on the collection have finished.
      */
-    void _scheduleWithDistLock(OperationContext* txn,
-                               const HostAndPort& targetHost,
-                               Migration migration);
+    void _scheduleWithDistLock_inlock(OperationContext* txn,
+                                      const HostAndPort& targetHost,
+                                      Migration migration);
 
     /**
      * Used internally for migrations scheduled with the distributed lock acquired by the config
@@ -175,9 +200,9 @@ private:
      * passed iterator and if this is the last migration for the collection will free the collection
      * distributed lock.
      */
-    void _completeWithDistLock(OperationContext* txn,
-                               MigrationsList::iterator itMigration,
-                               Status status);
+    void _completeWithDistLock_inlock(OperationContext* txn,
+                                      MigrationsList::iterator itMigration,
+                                      Status status);
 
     /**
      * Immediately schedules the specified migration without attempting to acquire the collection
@@ -187,12 +212,27 @@ private:
      * returned by the shard, which only happens with legacy 3.2 shards that take the collection
      * distributed lock themselves.
      */
-    void _scheduleWithoutDistLock(OperationContext* txn,
-                                  const HostAndPort& targetHost,
-                                  Migration migration);
+    void _scheduleWithoutDistLock_inlock(OperationContext* txn,
+                                         const HostAndPort& targetHost,
+                                         Migration migration);
+
+    /**
+     * If the state of the migration manager is kStopping checks whether there are any outstanding
+     * scheduled requests and if there aren't any signals the 'stopped' conditional variable.
+     */
+    void _checkDrained_inlock();
+
+    // The service context under which this migration manager runs
+    ServiceContext* const _serviceContext;
 
     // Protects the class state below
     stdx::mutex _mutex;
+
+    // Start the migration manager as stopped
+    State _state{kStopped};
+
+    // Condition variable, which is signaled when the migration manager has no more active requests
+    stdx::condition_variable _stoppedCondVar;
 
     // Holds information about each collection's distributed lock and active migrations via a
     // CollectionMigrationState object.

@@ -145,11 +145,12 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
 
 }  // namespace
 
-Balancer::Balancer()
+Balancer::Balancer(ServiceContext* serviceContext)
     : _balancedLastTime(0),
       _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()),
       _chunkSelectionPolicy(
-          stdx::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())) {}
+          stdx::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())),
+      _migrationManager(serviceContext) {}
 
 Balancer::~Balancer() {
     // The balancer thread must have been stopped
@@ -159,7 +160,7 @@ Balancer::~Balancer() {
 
 void Balancer::create(ServiceContext* serviceContext) {
     invariant(!getBalancer(serviceContext));
-    getBalancer(serviceContext) = stdx::make_unique<Balancer>();
+    getBalancer(serviceContext) = stdx::make_unique<Balancer>(serviceContext);
 }
 
 Balancer* Balancer::get(ServiceContext* serviceContext) {
@@ -179,6 +180,10 @@ Status Balancer::startThread(OperationContext* txn) {
         case kStopped:
             invariant(!_thread.joinable());
             _state = kRunning;
+
+            // Allow new migrations to be scheduled
+            _migrationManager.enableMigrations();
+
             _thread = stdx::thread([this] { _mainThread(); });
         // Intentional fall through
         case kRunning:
@@ -191,6 +196,10 @@ Status Balancer::startThread(OperationContext* txn) {
 void Balancer::stopThread() {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
     if (_state == kRunning) {
+        // Stop any active migrations and prevent any new migrations from getting scheduled
+        _migrationManager.interruptAndDisableMigrations();
+
+        // Request the balancer thread to stop
         _state = kStopping;
         _condVar.notify_all();
     }
@@ -208,6 +217,9 @@ void Balancer::joinThread() {
 
     if (_thread.joinable()) {
         _thread.join();
+
+        // Wait for any scheduled migrations to finish draining
+        _migrationManager.drainActiveMigrations();
 
         stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
         _state = kStopped;
@@ -414,7 +426,7 @@ void Balancer::_mainThread() {
         }
     }
 
-    log() << "CSRS balancer is stopped";
+    log() << "CSRS balancer is now stopped";
 }
 
 bool Balancer::_stopRequested() {

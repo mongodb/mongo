@@ -116,7 +116,8 @@ StatusWith<DistLockHandle> acquireDistLock(OperationContext* txn, const Namespac
 
 }  // namespace
 
-MigrationManager::MigrationManager() = default;
+MigrationManager::MigrationManager(ServiceContext* serviceContext)
+    : _serviceContext(serviceContext) {}
 
 MigrationManager::~MigrationManager() {
     // The migration manager must be completely quiesced at destruction time
@@ -195,6 +196,58 @@ Status MigrationManager::executeManualMigration(
         ->get();
 }
 
+void MigrationManager::enableMigrations() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_state == kStopped);
+    _state = kEnabled;
+}
+
+void MigrationManager::interruptAndDisableMigrations() {
+    executor::TaskExecutor* const executor =
+        Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (_state != kEnabled) {
+        return;
+    }
+
+    _state = kStopping;
+
+    // Interrupt any active migrations with dist lock
+    for (auto& cmsEntry : _activeMigrationsWithDistLock) {
+        auto* cms = &cmsEntry.second;
+
+        for (auto& migration : cms->migrations) {
+            if (migration.callbackHandle) {
+                executor->cancel(*migration.callbackHandle);
+            }
+        }
+    }
+
+    // Interrupt any active migrations without dist lock
+    for (auto& migration : _activeMigrationsWithoutDistLock) {
+        if (migration.callbackHandle) {
+            executor->cancel(*migration.callbackHandle);
+        }
+    }
+
+    _checkDrained_inlock();
+}
+
+void MigrationManager::drainActiveMigrations() {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+
+    if (_state == kStopped)
+        return;
+    invariant(_state == kStopping);
+
+    _stoppedCondVar.wait(lock, [this] {
+        return _activeMigrationsWithDistLock.empty() && _activeMigrationsWithoutDistLock.empty();
+    });
+
+    _state = kStopped;
+}
+
 shared_ptr<Notification<Status>> MigrationManager::_schedule(
     OperationContext* txn,
     const MigrateInfo& migrateInfo,
@@ -203,6 +256,17 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
     bool waitForDelete) {
     const NamespaceString nss(migrateInfo.ns);
+
+    // Ensure we are not stopped in order to avoid doing the extra work
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_state != kEnabled) {
+            return std::make_shared<Notification<Status>>(
+                Status(ErrorCodes::Interrupted,
+                       "Migration cannot be executed because the balancer is not running"));
+        }
+    }
+
 
     // Sanity checks that the chunk being migrated is actually valid. These will be repeated at the
     // shard as well, but doing them here saves an extra network call, which might otherwise fail.
@@ -253,27 +317,33 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
         waitForDelete,
         shardTakesCollectionDistLock);
 
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    if (_state != kEnabled) {
+        return std::make_shared<Notification<Status>>(
+            Status(ErrorCodes::Interrupted,
+                   "Migration cannot be executed because the balancer is not running"));
+    }
+
     Migration migration(nss, builder.obj());
 
     auto retVal = migration.completionNotification;
 
     if (shardTakesCollectionDistLock) {
-        _scheduleWithoutDistLock(txn, hostStatus.getValue(), std::move(migration));
+        _scheduleWithoutDistLock_inlock(txn, hostStatus.getValue(), std::move(migration));
     } else {
-        _scheduleWithDistLock(txn, hostStatus.getValue(), std::move(migration));
+        _scheduleWithDistLock_inlock(txn, hostStatus.getValue(), std::move(migration));
     }
 
     return retVal;
 }
 
-void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
-                                             const HostAndPort& targetHost,
-                                             Migration migration) {
-    const NamespaceString nss(migration.nss);
-
+void MigrationManager::_scheduleWithDistLock_inlock(OperationContext* txn,
+                                                    const HostAndPort& targetHost,
+                                                    Migration migration) {
     executor::TaskExecutor* const executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
 
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    const NamespaceString nss(migration.nss);
 
     auto it = _activeMigrationsWithDistLock.find(nss);
     if (it == _activeMigrationsWithDistLock.end()) {
@@ -308,7 +378,8 @@ void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
                 ON_BLOCK_EXIT([&] { Client::destroy(); });
                 auto txn = cc().makeOperationContext();
 
-                _completeWithDistLock(
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                _completeWithDistLock_inlock(
                     txn.get(),
                     itMigration,
                     extractMigrationStatusFromRemoteCommandResponse(args.response));
@@ -319,23 +390,18 @@ void MigrationManager::_scheduleWithDistLock(OperationContext* txn,
         return;
     }
 
-    // The completion routine takes its own lock
-    lock.unlock();
-
-    _completeWithDistLock(txn, itMigration, std::move(callbackHandleWithStatus.getStatus()));
+    _completeWithDistLock_inlock(txn, itMigration, std::move(callbackHandleWithStatus.getStatus()));
 }
 
-void MigrationManager::_completeWithDistLock(OperationContext* txn,
-                                             MigrationsList::iterator itMigration,
-                                             Status status) {
+void MigrationManager::_completeWithDistLock_inlock(OperationContext* txn,
+                                                    MigrationsList::iterator itMigration,
+                                                    Status status) {
     const NamespaceString nss(itMigration->nss);
 
     // Make sure to signal the notification last, after the distributed lock is freed, so that we
     // don't have the race condition where a subsequently scheduled migration finds the dist lock
     // still acquired.
     auto notificationToSignal = itMigration->completionNotification;
-
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto it = _activeMigrationsWithDistLock.find(nss);
     invariant(it != _activeMigrationsWithDistLock.end());
@@ -347,20 +413,19 @@ void MigrationManager::_completeWithDistLock(OperationContext* txn,
         Grid::get(txn)->catalogClient(txn)->getDistLockManager()->unlock(
             txn, collectionMigrationState->distLockHandle);
         _activeMigrationsWithDistLock.erase(it);
+        _checkDrained_inlock();
     }
 
     notificationToSignal->set(status);
 }
 
-void MigrationManager::_scheduleWithoutDistLock(OperationContext* txn,
-                                                const HostAndPort& targetHost,
-                                                Migration migration) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+void MigrationManager::_scheduleWithoutDistLock_inlock(OperationContext* txn,
+                                                       const HostAndPort& targetHost,
+                                                       Migration migration) {
+    executor::TaskExecutor* const executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
 
     _activeMigrationsWithoutDistLock.push_front(std::move(migration));
     auto itMigration = _activeMigrationsWithoutDistLock.begin();
-
-    executor::TaskExecutor* const executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
 
     const RemoteCommandRequest remoteRequest(
         targetHost, NamespaceString::kAdminDb.toString(), itMigration->moveChunkCmdObj, txn);
@@ -369,10 +434,15 @@ void MigrationManager::_scheduleWithoutDistLock(OperationContext* txn,
         executor->scheduleRemoteCommand(
             remoteRequest,
             [this, itMigration](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                auto notificationToSignal = itMigration->completionNotification;
+
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
-                itMigration->completionNotification->set(
-                    extractMigrationStatusFromRemoteCommandResponse(args.response));
+
                 _activeMigrationsWithoutDistLock.erase(itMigration);
+                _checkDrained_inlock();
+
+                notificationToSignal->set(
+                    extractMigrationStatusFromRemoteCommandResponse(args.response));
             });
 
     if (callbackHandleWithStatus.isOK()) {
@@ -380,8 +450,23 @@ void MigrationManager::_scheduleWithoutDistLock(OperationContext* txn,
         return;
     }
 
-    itMigration->completionNotification->set(std::move(callbackHandleWithStatus.getStatus()));
+    auto notificationToSignal = itMigration->completionNotification;
+
     _activeMigrationsWithoutDistLock.erase(itMigration);
+    _checkDrained_inlock();
+
+    notificationToSignal->set(std::move(callbackHandleWithStatus.getStatus()));
+}
+
+void MigrationManager::_checkDrained_inlock() {
+    if (_state == kEnabled) {
+        return;
+    }
+    invariant(_state == kStopping);
+
+    if (_activeMigrationsWithDistLock.empty() && _activeMigrationsWithoutDistLock.empty()) {
+        _stoppedCondVar.notify_all();
+    }
 }
 
 MigrationManager::Migration::Migration(NamespaceString inNss, BSONObj inMoveChunkCmdObj)

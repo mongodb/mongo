@@ -146,10 +146,13 @@ private:
 
 void MigrationManagerTest::setUp() {
     ConfigServerTestFixture::setUp();
-    _migrationManager = stdx::make_unique<MigrationManager>();
+    _migrationManager = stdx::make_unique<MigrationManager>(getServiceContext());
+    _migrationManager->enableMigrations();
 }
 
 void MigrationManagerTest::tearDown() {
+    _migrationManager->interruptAndDisableMigrations();
+    _migrationManager->drainActiveMigrations();
     _migrationManager.reset();
     ConfigServerTestFixture::tearDown();
 }
@@ -655,6 +658,105 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
 
     // Expect only one moveChunk command to be called.
     expectMoveChunkCommand(chunk1, kShardId1, false, BSON("ok" << 0 << "chunkTooBig" << true));
+
+    // Run the MigrationManager code.
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(MigrationManagerTest, InterruptMigration) {
+    // Set up one shard in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
+
+    // Set up the database and collection as sharded in the metadata.
+    std::string dbName = "foo";
+    std::string collName = "foo.bar";
+    ChunkVersion version(2, 0, OID::gen());
+
+    setUpDatabase(dbName, kShardId0);
+    setUpCollection(collName, version);
+
+    // Set up a single chunk in the metadata.
+    ChunkType chunk1 =
+        setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+
+    auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
+        // Scheduling a moveChunk command requires finding a host to which to send the command. Set
+        // up a dummy host for kShardHost0.
+        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+
+        ASSERT_NOT_OK(_migrationManager->executeManualMigration(
+            txn.get(), {chunk1.getNS(), kShardId1, chunk1}, 0, kDefaultSecondaryThrottle, false));
+    });
+
+    // Wait till the move chunk request gets sent and pretend that it is stuck by never responding
+    // to the request
+    network()->enterNetwork();
+    network()->blackHole(network()->getNextReadyRequest());
+    network()->exitNetwork();
+
+    // Now that the migration request is 'pending', try to cancel the migration manager. This should
+    // succeed.
+    _migrationManager->interruptAndDisableMigrations();
+
+    // Ensure that cancellations get processed
+    network()->enterNetwork();
+    network()->runReadyNetworkOperations();
+    network()->exitNetwork();
+
+    // Ensure that the previously scheduled migration is cancelled
+    future.timed_get(kFutureTimeout);
+
+    // Ensure that no new migrations can be scheduled
+    ASSERT_NOT_OK(_migrationManager->executeManualMigration(operationContext(),
+                                                            {chunk1.getNS(), kShardId1, chunk1},
+                                                            0,
+                                                            kDefaultSecondaryThrottle,
+                                                            false));
+
+    // Ensure there are no active migrations left
+    _migrationManager->drainActiveMigrations();
+}
+
+TEST_F(MigrationManagerTest, RestartMigrationManager) {
+    // Set up one shard in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
+
+    // Set up the database and collection as sharded in the metadata.
+    std::string dbName = "foo";
+    std::string collName = "foo.bar";
+    ChunkVersion version(2, 0, OID::gen());
+
+    setUpDatabase(dbName, kShardId0);
+    setUpCollection(collName, version);
+
+    // Set up a single chunk in the metadata.
+    ChunkType chunk1 =
+        setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+
+    // Go through the lifecycle of the migration manager
+    _migrationManager->interruptAndDisableMigrations();
+    _migrationManager->drainActiveMigrations();
+    _migrationManager->enableMigrations();
+
+    auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
+        // Scheduling a moveChunk command requires finding a host to which to send the command. Set
+        // up a dummy host for kShardHost0.
+        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+
+        ASSERT_OK(_migrationManager->executeManualMigration(
+            txn.get(), {chunk1.getNS(), kShardId1, chunk1}, 0, kDefaultSecondaryThrottle, false));
+    });
+
+    // Expect only one moveChunk command to be called.
+    expectMoveChunkCommand(chunk1, kShardId1, false, Status::OK());
 
     // Run the MigrationManager code.
     future.timed_get(kFutureTimeout);

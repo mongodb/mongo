@@ -58,7 +58,7 @@ class Balancer {
     MONGO_DISALLOW_COPYING(Balancer);
 
 public:
-    Balancer();
+    Balancer(ServiceContext* serviceContext);
     ~Balancer();
 
     /**
