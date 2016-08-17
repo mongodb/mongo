@@ -584,9 +584,10 @@ struct __wt_page {
 
 	/*
 	 * Used to protect and co-ordinate splits for internal pages and
-	 * reconciliation for all pages.
+	 * reconciliation for all pages. Only used to co-ordinate among the
+	 * uncommon cases that require exclusive access to a page.
 	 */
-	WT_FAIR_LOCK page_lock;
+	WT_RWLOCK page_lock;
 
 	/*
 	 * The page's read generation acts as an LRU value for each page in the

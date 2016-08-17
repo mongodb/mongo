@@ -667,6 +667,7 @@ extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock) WT_GC
 extern void __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
+extern bool __wt_rwlock_islocked(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern uint32_t __wt_log2_int(uint32_t n);

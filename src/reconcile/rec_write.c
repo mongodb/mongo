@@ -372,7 +372,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 *    In-memory splits: reconciliation of an internal page cannot handle
 	 * a child page splitting during the reconciliation.
 	 */
-	__wt_fair_lock(session, &page->page_lock);
+	__wt_writelock(session, &page->page_lock);
 
 	/*
 	 * Check that transaction time always moves forward for a given page.
@@ -386,7 +386,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	/* Initialize the reconciliation structure for each new run. */
 	if ((ret = __rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile)) != 0) {
-		__wt_fair_unlock(session, &page->page_lock);
+		__wt_writeunlock(session, &page->page_lock);
 		return (ret);
 	}
 	r = session->reconcile;
@@ -427,7 +427,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 
 	/* Release the reconciliation lock. */
-	__wt_fair_unlock(session, &page->page_lock);
+	__wt_writeunlock(session, &page->page_lock);
 
 	/* Update statistics. */
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);

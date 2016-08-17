@@ -682,7 +682,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	    "\t" "disk %p, entries %" PRIu32, (void *)page->dsk, entries));
 	WT_RET(ds->f(ds,
 	    ", %s", __wt_page_is_modified(page) ? "dirty" : "clean"));
-	WT_RET(ds->f(ds, ", %s", __wt_fair_islocked(
+	WT_RET(ds->f(ds, ", %s", __wt_rwlock_islocked(
 	    session, &page->page_lock) ? "locked" : "unlocked"));
 
 	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))

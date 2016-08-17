@@ -1287,12 +1287,12 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 			return (EBUSY);
 
 		if (trylock)
-			WT_RET(__wt_fair_trylock(session, &parent->page_lock));
+			WT_RET(__wt_try_writelock(session, &parent->page_lock));
 		else
-			__wt_fair_lock(session, &parent->page_lock);
+			__wt_writelock(session, &parent->page_lock);
 		if (parent == ref->home)
 			break;
-		__wt_fair_unlock(session, &parent->page_lock);
+		__wt_writeunlock(session, &parent->page_lock);
 	}
 
 	/*
@@ -1315,7 +1315,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	*parentp = parent;
 	return (0);
 
-err:	__wt_fair_unlock(session, &parent->page_lock);
+err:	__wt_writeunlock(session, &parent->page_lock);
 	return (ret);
 }
 
@@ -1331,7 +1331,7 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 	if (hazard)
 		ret = __wt_hazard_clear(session, parent);
 
-	__wt_fair_unlock(session, &parent->page_lock);
+	__wt_writeunlock(session, &parent->page_lock);
 	return (ret);
 }
 
