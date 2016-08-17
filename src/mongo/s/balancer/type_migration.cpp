@@ -43,19 +43,13 @@ const BSONField<BSONObj> MigrationType::min("min");
 const BSONField<BSONObj> MigrationType::max("max");
 const BSONField<std::string> MigrationType::fromShard("fromShard");
 const BSONField<std::string> MigrationType::toShard("toShard");
-const BSONField<std::string> MigrationType::chunkVersionField("chunkVersion");
-const BSONField<std::string> MigrationType::collectionVersionField("collectionVersion");
 
 MigrationType::MigrationType() = default;
 
-MigrationType::MigrationType(MigrateInfo info,
-                             const ChunkVersion& chunkVersion,
-                             const ChunkVersion& collectionVersion)
+MigrationType::MigrationType(MigrateInfo info)
     : _nss(NamespaceString(info.ns)),
       _min(info.minKey),
       _max(info.maxKey),
-      _chunkVersion(chunkVersion),
-      _collectionVersion(collectionVersion),
       _fromShard(info.from),
       _toShard(info.to) {}
 
@@ -78,24 +72,6 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         const auto chunkRange = std::move(chunkRangeStatus.getValue());
         migrationType._min = chunkRange.getMin().getOwned();
         migrationType._max = chunkRange.getMax().getOwned();
-    }
-
-    {
-        auto chunkVersionStatus =
-            ChunkVersion::parseFromBSONWithFieldForCommands(source, chunkVersionField.name());
-        if (!chunkVersionStatus.isOK()) {
-            return chunkVersionStatus.getStatus();
-        }
-        migrationType._chunkVersion = std::move(chunkVersionStatus.getValue());
-    }
-
-    {
-        auto collectionVersionStatus =
-            ChunkVersion::parseFromBSONWithFieldForCommands(source, collectionVersionField.name());
-        if (!collectionVersionStatus.isOK()) {
-            return collectionVersionStatus.getStatus();
-        }
-        migrationType._collectionVersion = std::move(collectionVersionStatus.getValue());
     }
 
     {
@@ -127,16 +103,16 @@ BSONObj MigrationType::toBSON() const {
         builder.append(min.name(), _min.get());
     if (_max)
         builder.append(max.name(), _max.get());
-    if (_chunkVersion)
-        _chunkVersion->appendWithFieldForCommands(&builder, chunkVersionField.name());
-    if (_collectionVersion)
-        _collectionVersion->appendWithFieldForCommands(&builder, collectionVersionField.name());
     if (_fromShard)
         builder.append(fromShard.name(), _fromShard->toString());
     if (_toShard)
         builder.append(toShard.name(), _toShard->toString());
 
     return builder.obj();
+}
+
+MigrateInfo MigrationType::toMigrateInfo() const {
+    return MigrateInfo(_nss->ns(), _toShard.get(), _fromShard.get(), _min.get(), _max.get());
 }
 
 std::string MigrationType::getName() const {

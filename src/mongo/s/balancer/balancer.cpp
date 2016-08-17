@@ -48,6 +48,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_raii.h"
@@ -181,9 +182,7 @@ Status Balancer::startThread(OperationContext* txn) {
             invariant(!_thread.joinable());
             _state = kRunning;
 
-            // Allow new migrations to be scheduled
-            _migrationManager.enableMigrations();
-
+            _migrationManager.startRecovery();
             _thread = stdx::thread([this] { _mainThread(); });
         // Intentional fall through
         case kRunning:
@@ -196,9 +195,6 @@ Status Balancer::startThread(OperationContext* txn) {
 void Balancer::stopThread() {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
     if (_state == kRunning) {
-        // Stop any active migrations and prevent any new migrations from getting scheduled
-        _migrationManager.interruptAndDisableMigrations();
-
         // Request the balancer thread to stop
         _state = kStopping;
         _condVar.notify_all();
@@ -217,9 +213,6 @@ void Balancer::joinThread() {
 
     if (_thread.joinable()) {
         _thread.join();
-
-        // Wait for any scheduled migrations to finish draining
-        _migrationManager.drainActiveMigrations();
 
         stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
         _state = kStopped;
@@ -291,36 +284,47 @@ void Balancer::report(OperationContext* txn, BSONObjBuilder* builder) {
 
 void Balancer::_mainThread() {
     Client::initThread("Balancer");
+    auto txn = cc().makeOperationContext();
+    auto shardingContext = Grid::get(txn.get());
 
     log() << "CSRS balancer is starting";
 
     const Seconds kInitBackoffInterval(10);
 
+    OID clusterIdentity = ClusterIdentityLoader::get(txn.get())->getClusterId();
+
     // Take the balancer distributed lock and hold it permanently
     while (!_stopRequested()) {
-        auto txn = cc().makeOperationContext();
-        auto shardingContext = Grid::get(txn.get());
-
         auto distLockHandleStatus =
             shardingContext->catalogClient(txn.get())->getDistLockManager()->lockWithSessionID(
-                txn.get(), "balancer", "CSRS Balancer", OID::gen());
-        if (distLockHandleStatus.isOK()) {
-            break;
+                txn.get(), "balancer", "CSRS Balancer", clusterIdentity);
+        if (!distLockHandleStatus.isOK()) {
+            warning() << "Balancer distributed lock could not be acquired and will be retried in "
+                      << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
+                      << causedBy(distLockHandleStatus.getStatus());
+
+            _sleepFor(txn.get(), kInitBackoffInterval);
+            continue;
         }
 
-        warning() << "Balancer distributed lock could not be acquired and will be retried in "
-                  << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
-                  << causedBy(distLockHandleStatus.getStatus());
-
-        _sleepFor(txn.get(), kInitBackoffInterval);
+        break;
     }
 
-    log() << "CSRS balancer thread is now running";
+    if (!_stopRequested()) {
+        log() << "CSRS balancer thread for cluster " << clusterIdentity << " is recovering";
+
+        auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
+        _migrationManager.finishRecovery(txn.get(),
+                                         clusterIdentity,
+                                         balancerConfig->getMaxChunkSizeBytes(),
+                                         balancerConfig->getSecondaryThrottle(),
+                                         balancerConfig->waitForDelete());
+
+        log() << "CSRS balancer thread for cluster " << clusterIdentity << " is recovered";
+    }
 
     // Main balancer loop
     while (!_stopRequested()) {
-        auto txn = cc().makeOperationContext();
-        auto shardingContext = Grid::get(txn.get());
         auto balancerConfig = shardingContext->getBalancerConfiguration();
 
         BalanceRoundDetails roundDetails;
@@ -399,6 +403,10 @@ void Balancer::_mainThread() {
             _endRound(txn.get(), kBalanceRoundDefaultInterval);
         }
     }
+
+    // Stop any active migrations and prevent any new migrations from getting scheduled
+    _migrationManager.interruptAndDisableMigrations();
+    _migrationManager.drainActiveMigrations();
 
     log() << "CSRS balancer is now stopped";
 }

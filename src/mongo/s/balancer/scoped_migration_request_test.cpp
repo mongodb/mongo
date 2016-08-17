@@ -45,6 +45,7 @@ const BSONObj kMin = BSON("a" << 10);
 const BSONObj kMax = BSON("a" << 20);
 const ShardId kFromShard("shard0000");
 const ShardId kToShard("shard0001");
+const ShardId kDifferentToShard("shard0002");
 const std::string kName = "TestDB.TestColl-a_10";
 
 class ScopedMigrationRequestTest : public ConfigServerTestFixture {
@@ -82,10 +83,7 @@ void ScopedMigrationRequestTest::checkMigrationsCollectionForDocument(
 ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
     const MigrateInfo& migrateInfo) {
     ScopedMigrationRequest scopedMigrationRequest =
-        assertGet(ScopedMigrationRequest::writeMigration(operationContext(),
-                                                         migrateInfo,
-                                                         ChunkVersion(1, 2, OID::gen()),
-                                                         ChunkVersion(1, 2, OID::gen())));
+        assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
 
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
@@ -114,10 +112,7 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequest) {
 
     {
         ScopedMigrationRequest scopedMigrationRequest =
-            assertGet(ScopedMigrationRequest::writeMigration(operationContext(),
-                                                             migrateInfo,
-                                                             ChunkVersion(1, 2, OID::gen()),
-                                                             ChunkVersion(1, 2, OID::gen())));
+            assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
 
         checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
     }
@@ -138,10 +133,7 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequestOnRecovery) {
     // Insert the document for the MigrationRequest and then prevent its removal in the destructor.
     {
         ScopedMigrationRequest scopedMigrationRequest =
-            assertGet(ScopedMigrationRequest::writeMigration(operationContext(),
-                                                             migrateInfo,
-                                                             ChunkVersion(1, 2, OID::gen()),
-                                                             ChunkVersion(1, 2, OID::gen())));
+            assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
 
         checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
@@ -150,13 +142,14 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequestOnRecovery) {
 
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
-    // Trying to write a migration that already exists should fail.
+    // Fail to write a migration document if a migration document already exists for that chunk but
+    // with a different destination shard. (the migration request must have identical parameters).
     {
+        MigrateInfo differentToShardMigrateInfo = migrateInfo;
+        differentToShardMigrateInfo.to = kDifferentToShard;
+
         StatusWith<ScopedMigrationRequest> statusWithScopedMigrationRequest =
-            ScopedMigrationRequest::writeMigration(operationContext(),
-                                                   migrateInfo,
-                                                   ChunkVersion(1, 2, OID::gen()),
-                                                   ChunkVersion(1, 2, OID::gen()));
+            ScopedMigrationRequest::writeMigration(operationContext(), differentToShardMigrateInfo);
 
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, statusWithScopedMigrationRequest.getStatus());
 
@@ -170,6 +163,32 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequestOnRecovery) {
             operationContext(), NamespaceString(migrateInfo.ns), migrateInfo.minKey);
 
         checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
+    }
+
+    checkMigrationsCollectionForDocument(migrateInfo.getName(), 0);
+}
+
+TEST_F(ScopedMigrationRequestTest, CreateMultipleScopedMigrationRequestsForIdenticalMigration) {
+    MigrateInfo migrateInfo = makeMigrateInfo();
+
+    {
+        // Create a ScopedMigrationRequest, which will do the config.migrations write.
+        ScopedMigrationRequest scopedMigrationRequest =
+            assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+
+        checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
+
+        {
+            // Should be able to create another Scoped object if the request is identical.
+            ScopedMigrationRequest identicalScopedMigrationRequest =
+                assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+
+            checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
+        }
+
+        // If any scoped object goes out of scope, the migration should be over and the document
+        // removed.
+        checkMigrationsCollectionForDocument(migrateInfo.getName(), 0);
     }
 
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 0);

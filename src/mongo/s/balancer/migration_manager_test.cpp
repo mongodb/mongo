@@ -33,10 +33,12 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer/migration_manager.h"
+#include "mongo/s/balancer/type_migration.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/move_chunk_request.h"
@@ -48,6 +50,7 @@ namespace {
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using std::vector;
+using unittest::assertGet;
 
 const auto kShardId0 = ShardId("shard0");
 const auto kShardId1 = ShardId("shard1");
@@ -108,6 +111,21 @@ protected:
                          const ChunkVersion& version);
 
     /**
+     * Inserts a document into the config.migrations collection as an active migration.
+     */
+    void setUpMigration(const std::string& collName,
+                        const BSONObj& minKey,
+                        const BSONObj& maxKey,
+                        const ShardId& toShard,
+                        const ShardId& fromShard);
+
+    /**
+     * Asserts that config.migrations is empty and config.locks contains no locked documents, both
+     * of which should be true if the MigrationManager is inactive and behaving properly.
+     */
+    void checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
+
+    /**
      * Sets up mock network to expect a moveChunk command and return a fixed BSON response or a
      * "returnStatus".
      */
@@ -137,6 +155,9 @@ protected:
 
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
 
+    // Cluster identity to pass to the migration manager
+    const OID _clusterIdentity{OID::gen()};
+
     std::unique_ptr<MigrationManager> _migrationManager;
 
 private:
@@ -147,10 +168,13 @@ private:
 void MigrationManagerTest::setUp() {
     ConfigServerTestFixture::setUp();
     _migrationManager = stdx::make_unique<MigrationManager>(getServiceContext());
-    _migrationManager->enableMigrations();
+    _migrationManager->startRecovery();
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
 }
 
 void MigrationManagerTest::tearDown() {
+    checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
     _migrationManager.reset();
@@ -197,6 +221,50 @@ ChunkType MigrationManagerTest::setUpChunk(const std::string& collName,
     ASSERT_OK(catalogClient()->insertConfigDocument(
         operationContext(), ChunkType::ConfigNS, chunk.toBSON(), kMajorityWriteConcern));
     return chunk;
+}
+
+void MigrationManagerTest::setUpMigration(const std::string& collName,
+                                          const BSONObj& minKey,
+                                          const BSONObj& maxKey,
+                                          const ShardId& toShard,
+                                          const ShardId& fromShard) {
+    BSONObjBuilder builder;
+    builder.append(MigrationType::ns(), collName);
+    builder.append(MigrationType::min(), minKey);
+    builder.append(MigrationType::max(), maxKey);
+    builder.append(MigrationType::toShard(), toShard.toString());
+    builder.append(MigrationType::fromShard(), fromShard.toString());
+    MigrationType migrationType = assertGet(MigrationType::fromBSON(builder.obj()));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    MigrationType::ConfigNS,
+                                                    migrationType.toBSON(),
+                                                    kMajorityWriteConcern));
+}
+
+void MigrationManagerTest::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked() {
+    auto statusWithMigrationsQueryResponse =
+        shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            NamespaceString(MigrationType::ConfigNS),
+            BSONObj(),
+            BSONObj(),
+            boost::none);
+    Shard::QueryResponse migrationsQueryResponse =
+        uassertStatusOK(statusWithMigrationsQueryResponse);
+    ASSERT_EQUALS(0U, migrationsQueryResponse.docs.size());
+
+    auto statusWithLocksQueryResponse = shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        operationContext(),
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        NamespaceString(LocksType::ConfigNS),
+        BSON(LocksType::state(LocksType::LOCKED)),
+        BSONObj(),
+        boost::none);
+    Shard::QueryResponse locksQueryResponse = uassertStatusOK(statusWithLocksQueryResponse);
+    ASSERT_EQUALS(0U, locksQueryResponse.docs.size());
 }
 
 void MigrationManagerTest::expectMoveChunkCommand(const ChunkType& chunk,
@@ -559,7 +627,7 @@ TEST_F(MigrationManagerTest, FailToAcquireDistributedLock) {
     // Take the distributed lock for the collection before scheduling via the MigrationManager.
     const std::string whyMessage("FailToAcquireDistributedLock unit-test taking distributed lock");
     DistLockManager::ScopedDistLock distLockStatus =
-        unittest::assertGet(catalogClient()->getDistLockManager()->lock(
+        assertGet(catalogClient()->getDistLockManager()->lock(
             operationContext(), chunk1.getNS(), whyMessage));
 
     MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
@@ -679,7 +747,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
     setUpCollection(collName, version);
 
     // Set up a single chunk in the metadata.
-    ChunkType chunk1 =
+    ChunkType chunk =
         setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto future = launchAsync([&] {
@@ -691,7 +759,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
         ASSERT_NOT_OK(_migrationManager->executeManualMigration(
-            txn.get(), {chunk1.getNS(), kShardId1, chunk1}, 0, kDefaultSecondaryThrottle, false));
+            txn.get(), {chunk.getNS(), kShardId1, chunk}, 0, kDefaultSecondaryThrottle, false));
     });
 
     // Wait till the move chunk request gets sent and pretend that it is stuck by never responding
@@ -714,13 +782,34 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
 
     // Ensure that no new migrations can be scheduled
     ASSERT_NOT_OK(_migrationManager->executeManualMigration(operationContext(),
-                                                            {chunk1.getNS(), kShardId1, chunk1},
+                                                            {chunk.getNS(), kShardId1, chunk},
                                                             0,
                                                             kDefaultSecondaryThrottle,
                                                             false));
 
-    // Ensure there are no active migrations left
+    // Ensure that the migration manager is no longer handling any migrations.
     _migrationManager->drainActiveMigrations();
+
+    // Check that the migration that was active when the migration manager was interrupted can be
+    // found in config.migrations (and thus would be recovered if a migration manager were to start
+    // up again).
+    auto statusWithMigrationsQueryResponse =
+        shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            NamespaceString(MigrationType::ConfigNS),
+            BSON(MigrationType::name(chunk.getName())),
+            BSONObj(),
+            boost::none);
+    Shard::QueryResponse migrationsQueryResponse =
+        uassertStatusOK(statusWithMigrationsQueryResponse);
+    ASSERT_EQUALS(1U, migrationsQueryResponse.docs.size());
+
+    ASSERT_OK(catalogClient()->removeConfigDocuments(operationContext(),
+                                                     MigrationType::ConfigNS,
+                                                     BSON(MigrationType::name(chunk.getName())),
+                                                     kMajorityWriteConcern));
 }
 
 TEST_F(MigrationManagerTest, RestartMigrationManager) {
@@ -743,7 +832,9 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     // Go through the lifecycle of the migration manager
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
-    _migrationManager->enableMigrations();
+    _migrationManager->startRecovery();
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
 
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready("Test");
@@ -762,6 +853,127 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
 
     // Run the MigrationManager code.
     future.timed_get(kFutureTimeout);
+}
+
+TEST_F(MigrationManagerTest, MigrationRecovery) {
+    // Set up two shards in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
+
+    // Set up the database and collection as sharded in the metadata.
+    std::string dbName = "foo";
+    std::string collName = "foo.bar";
+    ChunkVersion version(2, 0, OID::gen());
+
+    setUpDatabase(dbName, kShardId0);
+    setUpCollection(collName, version);
+
+    // Set up two chunks in the metadata.
+    ChunkType chunk1 =
+        setUpChunk(collName, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    version.incMinor();
+    ChunkType chunk2 =
+        setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+
+    _migrationManager->interruptAndDisableMigrations();
+    _migrationManager->drainActiveMigrations();
+    _migrationManager->startRecovery();
+
+    // Set up two fake active migrations by writing documents to the config.migrations collection.
+    setUpMigration(collName,
+                   chunk1.getMin(),
+                   chunk1.getMax(),
+                   kShardId1.toString(),
+                   chunk1.getShard().toString());
+    setUpMigration(collName,
+                   chunk2.getMin(),
+                   chunk2.getMax(),
+                   kShardId3.toString(),
+                   chunk2.getShard().toString());
+
+    auto future = launchAsync([this] {
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
+        // Scheduling the moveChunk commands requires finding hosts to which to send the commands.
+        // Set up dummy hosts for the source shards.
+        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+
+        _migrationManager->finishRecovery(
+            txn.get(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
+    });
+
+    // Expect two moveChunk commands.
+    expectMoveChunkCommand(chunk1, kShardId1, false, Status::OK());
+    expectMoveChunkCommand(chunk2, kShardId3, false, Status::OK());
+
+    // Run the MigrationManager code.
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(MigrationManagerTest, FailMigrationRecovery) {
+    // Set up two shards in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
+
+    // Set up the database and collection as sharded in the metadata.
+    std::string dbName = "foo";
+    std::string collName = "foo.bar";
+    ChunkVersion version(2, 0, OID::gen());
+
+    setUpDatabase(dbName, kShardId0);
+    setUpCollection(collName, version);
+
+    // Set up two chunks in the metadata.
+    ChunkType chunk1 =
+        setUpChunk(collName, kKeyPattern.globalMin(), BSON(kPattern << 49), kShardId0, version);
+    version.incMinor();
+    ChunkType chunk2 =
+        setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
+
+    // Set up a parsable fake active migration document in the config.migrations collection.
+    setUpMigration(collName,
+                   chunk1.getMin(),
+                   chunk1.getMax(),
+                   kShardId1.toString(),
+                   chunk1.getShard().toString());
+
+    _migrationManager->interruptAndDisableMigrations();
+    _migrationManager->drainActiveMigrations();
+    _migrationManager->startRecovery();
+
+    // Set up a fake active migration document that will fail MigrationType parsing -- missing
+    // field.
+    BSONObjBuilder builder;
+    builder.append("_id", "testing");
+    // No MigrationType::ns() field!
+    builder.append(MigrationType::min(), chunk2.getMin());
+    builder.append(MigrationType::max(), chunk2.getMax());
+    builder.append(MigrationType::toShard(), kShardId3.toString());
+    builder.append(MigrationType::fromShard(), chunk2.getShard().toString());
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), MigrationType::ConfigNS, builder.obj(), kMajorityWriteConcern));
+
+    // Take the distributed lock for the collection, which should be released during recovery when
+    // it fails. Any dist lock held by the config server will be released via proccessId, so the
+    // session ID used here doesn't matter.
+    ASSERT_OK(catalogClient()->getDistLockManager()->lockWithSessionID(
+        operationContext(),
+        collName,
+        "MigrationManagerTest",
+        OID::gen(),
+        DistLockManager::kSingleLockAttemptTimeout));
+
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
+
+    // MigrationManagerTest::tearDown checks that the config.migrations collection is empty and all
+    // distributed locks are unlocked.
 }
 
 }  // namespace

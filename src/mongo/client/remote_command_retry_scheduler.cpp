@@ -96,7 +96,8 @@ const std::initializer_list<ErrorCodes::Error> RemoteCommandRetryScheduler::kAll
     ErrorCodes::HostNotFound,
     ErrorCodes::NetworkTimeout,
     ErrorCodes::PrimarySteppedDown,
-    ErrorCodes::InterruptedDueToReplStateChange};
+    ErrorCodes::InterruptedDueToReplStateChange,
+    ErrorCodes::BalancerInterrupted};
 
 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy>
 RemoteCommandRetryScheduler::makeNoRetryPolicy() {

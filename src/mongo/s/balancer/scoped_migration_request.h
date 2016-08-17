@@ -30,7 +30,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/balancer/balancer_policy.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 
 namespace mongo {
@@ -68,9 +67,7 @@ public:
      * The destructor will handle removing the document when it is no longer needed.
      */
     static StatusWith<ScopedMigrationRequest> writeMigration(OperationContext* txn,
-                                                             const MigrateInfo& migrate,
-                                                             const ChunkVersion& chunkVersion,
-                                                             const ChunkVersion& collectionVersion);
+                                                             const MigrateInfo& migrate);
 
     /**
      * Creates a ScopedMigrationRequest object without inserting a document into config.migrations.

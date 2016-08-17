@@ -59,9 +59,7 @@ public:
      * The Balancer encapsulates migration information in MigrateInfo objects, so this facilitates
      * conversion to a config.migrations entry format.
      */
-    MigrationType(MigrateInfo info,
-                  const ChunkVersion& chunkVersion,
-                  const ChunkVersion& collectionVersion);
+    explicit MigrationType(MigrateInfo info);
 
     /**
      * Constructs a new MigrationType object from BSON. Expects all fields to be present, and errors
@@ -75,6 +73,11 @@ public:
     BSONObj toBSON() const;
 
     /**
+     * Helper function for the Balancer that uses MigrateInfo objects to schedule migrations.
+     */
+    MigrateInfo toMigrateInfo() const;
+
+    /**
      * Uniquely identifies a chunk by collection and min key.
      */
     std::string getName() const;
@@ -86,8 +89,6 @@ private:
     boost::optional<NamespaceString> _nss;
     boost::optional<BSONObj> _min;
     boost::optional<BSONObj> _max;
-    boost::optional<ChunkVersion> _chunkVersion;
-    boost::optional<ChunkVersion> _collectionVersion;
     boost::optional<ShardId> _fromShard;
     boost::optional<ShardId> _toShard;
 };

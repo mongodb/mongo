@@ -36,6 +36,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer/type_migration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -90,18 +91,44 @@ ScopedMigrationRequest& ScopedMigrationRequest::operator=(ScopedMigrationRequest
 }
 
 StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
-    OperationContext* txn,
-    const MigrateInfo& migrateInfo,
-    const ChunkVersion& chunkVersion,
-    const ChunkVersion& collectionVersion) {
+    OperationContext* txn, const MigrateInfo& migrateInfo) {
 
     // Try to write a unique migration document to config.migrations.
-    MigrationType migrationType(migrateInfo, chunkVersion, collectionVersion);
+    MigrationType migrationType(migrateInfo);
     Status result = grid.catalogClient(txn)->insertConfigDocument(
         txn, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
 
     if (result == ErrorCodes::DuplicateKey) {
-        return result;
+        // If the exact migration described by "migrateInfo" is active, return a scoped object for
+        // the request because this migration request will join the active one once scheduled.
+        auto statusWithMigrationQueryResult =
+            grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                txn,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kMajorityReadConcern,
+                NamespaceString(MigrationType::ConfigNS),
+                migrationType.toBSON(),
+                BSONObj(),
+                1);
+
+        if (!statusWithMigrationQueryResult.isOK()) {
+            return {statusWithMigrationQueryResult.getStatus().code(),
+                    str::stream() << "Failed to verify whether conflicting migration is in "
+                                  << "progress for migration '"
+                                  << migrateInfo.toString()
+                                  << "' while trying to persist migration to config.migrations."
+                                  << causedBy(redact(statusWithMigrationQueryResult.getStatus()))};
+        }
+
+        if (statusWithMigrationQueryResult.getValue().docs.size() != 1) {
+            invariant(statusWithMigrationQueryResult.getValue().docs.size() == 0);
+            log() << "Failed to write document '" << migrateInfo
+                  << "' to config.migrations because there is already an active migration for "
+                  << "this chunk" << causedBy(redact(result));
+            return result;
+        }
+
+        result = Status::OK();
     }
 
     // As long as there isn't a DuplicateKey error, the document may have been written, and it's

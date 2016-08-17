@@ -61,15 +61,13 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     ASSERT_OK(chunkType.validate());
 
     MigrateInfo migrateInfo(kNs, kToShard, chunkType);
-    MigrationType migrationType(migrateInfo, version, version);
+    MigrationType migrationType(migrateInfo);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::name(), kName);
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
 
@@ -79,15 +77,11 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
 }
 
 TEST(MigrationTypeTest, FromAndToBSON) {
-    const ChunkVersion version(1, 2, OID::gen());
-
     BSONObjBuilder builder;
     builder.append(MigrationType::name(), kName);
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
 
@@ -98,13 +92,9 @@ TEST(MigrationTypeTest, FromAndToBSON) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredNamespaceField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
     BSONObjBuilder builder;
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
 
@@ -116,13 +106,9 @@ TEST(MigrationTypeTest, MissingRequiredNamespaceField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredMinField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
 
@@ -134,13 +120,9 @@ TEST(MigrationTypeTest, MissingRequiredMinField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredMaxField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
 
@@ -151,53 +133,11 @@ TEST(MigrationTypeTest, MissingRequiredMaxField) {
     ASSERT_STRING_CONTAINS(migrationType.getStatus().reason(), MigrationType::max.name());
 }
 
-TEST(MigrationTypeTest, MissingRequiredChunkVersionField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
-    BSONObjBuilder builder;
-    builder.append(MigrationType::ns(), kNs);
-    builder.append(MigrationType::min(), kMin);
-    builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
-    builder.append(MigrationType::fromShard(), kFromShard.toString());
-    builder.append(MigrationType::toShard(), kToShard.toString());
-
-    BSONObj obj = builder.obj();
-
-    StatusWith<MigrationType> migrationType = MigrationType::fromBSON(obj);
-    ASSERT_EQUALS(migrationType.getStatus(), ErrorCodes::NoSuchKey);
-    ASSERT_STRING_CONTAINS(migrationType.getStatus().reason(),
-                           MigrationType::chunkVersionField.name());
-}
-
-TEST(MigrationTypeTest, MissingRequiredCollectionVersionField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
-    BSONObjBuilder builder;
-    builder.append(MigrationType::ns(), kNs);
-    builder.append(MigrationType::min(), kMin);
-    builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    builder.append(MigrationType::fromShard(), kFromShard.toString());
-    builder.append(MigrationType::toShard(), kToShard.toString());
-
-    BSONObj obj = builder.obj();
-
-    StatusWith<MigrationType> migrationType = MigrationType::fromBSON(obj);
-    ASSERT_EQUALS(migrationType.getStatus(), ErrorCodes::NoSuchKey);
-    ASSERT_STRING_CONTAINS(migrationType.getStatus().reason(),
-                           MigrationType::collectionVersionField.name());
-}
-
 TEST(MigrationTypeTest, MissingRequiredFromShardField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::toShard(), kToShard.toString());
 
     BSONObj obj = builder.obj();
@@ -208,14 +148,10 @@ TEST(MigrationTypeTest, MissingRequiredFromShardField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredToShardField) {
-    const ChunkVersion version(1, 2, OID::gen());
-
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
-    version.appendWithFieldForCommands(&builder, MigrationType::chunkVersionField.name());
-    version.appendWithFieldForCommands(&builder, MigrationType::collectionVersionField.name());
     builder.append(MigrationType::fromShard(), kFromShard.toString());
 
     BSONObj obj = builder.obj();

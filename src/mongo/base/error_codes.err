@@ -192,6 +192,7 @@ error_code("MasterSlaveConnectionFailure", 190)
 error_code("BalancerLostDistributedLock", 191)
 error_code("FailPointEnabled", 192)
 error_code("NoShardingEnabled", 193)
+error_code("BalancerInterrupted", 194)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

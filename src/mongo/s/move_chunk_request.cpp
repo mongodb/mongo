@@ -184,14 +184,6 @@ bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
         return false;
     if (_range != other._range)
         return false;
-    if (_maxChunkSizeBytes != other._maxChunkSizeBytes)
-        return false;
-    if (_secondaryThrottle != other._secondaryThrottle)
-        return false;
-    if (_waitForDelete != other._waitForDelete)
-        return false;
-    if (_takeDistLock != other._takeDistLock)
-        return false;
 
     return true;
 }
