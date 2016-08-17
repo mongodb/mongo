@@ -189,8 +189,8 @@ public:
     };
 
     struct Stats {
-        size_t failedInitialSyncAttempts;
-        size_t maxFailedInitialSyncAttempts;
+        size_t failedInitialSyncAttempts{0};
+        size_t maxFailedInitialSyncAttempts{0};
         Date_t initialSyncStart;
         Date_t initialSyncEnd;
         std::vector<DataReplicator::InitialSyncAttemptInfo> initialSyncAttemptInfos;
