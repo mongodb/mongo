@@ -1302,49 +1302,100 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
 bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
     QuerySolutionNode* root = soln->root.get();
 
-    // We're looking for a project on top of an ixscan.
-    if (STAGE_PROJECTION == root->getType() && (STAGE_IXSCAN == root->children[0]->getType())) {
-        IndexScanNode* isn = static_cast<IndexScanNode*>(root->children[0]);
-
-        // An additional filter must be applied to the data in the key, so we can't just skip
-        // all the keys with a given value; we must examine every one to find the one that (may)
-        // pass the filter.
-        if (NULL != isn->filter.get()) {
-            return false;
-        }
-
-        // We only set this when we have special query modifiers (.max() or .min()) or other
-        // special cases.  Don't want to handle the interactions between those and distinct.
-        // Don't think this will ever really be true but if it somehow is, just ignore this
-        // soln.
-        if (isn->bounds.isSimpleRange) {
-            return false;
-        }
-
-        // Make a new DistinctNode.  We swap this for the ixscan in the provided solution.
-        DistinctNode* dn = new DistinctNode(isn->index);
-        dn->direction = isn->direction;
-        dn->bounds = isn->bounds;
-
-        // Figure out which field we're skipping to the next value of.  TODO: We currently only
-        // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
-        // over.  Consider removing this code if we stick with that policy.
-        dn->fieldNo = 0;
-        BSONObjIterator it(isn->index.keyPattern);
-        while (it.more()) {
-            if (field == it.next().fieldName()) {
-                break;
-            }
-            dn->fieldNo++;
-        }
-
-        // Delete the old index scan, set the child of project to the fast distinct scan.
-        delete root->children[0];
-        root->children[0] = dn;
-        return true;
+    // Root stage must be a project.
+    if (STAGE_PROJECTION != root->getType()) {
+        return false;
     }
 
-    return false;
+    // Child should be either an ixscan or fetch.
+    if (STAGE_IXSCAN != root->children[0]->getType() &&
+        STAGE_FETCH != root->children[0]->getType()) {
+        return false;
+    }
+
+    IndexScanNode* indexScanNode = nullptr;
+    FetchNode* fetchNode = nullptr;
+    if (STAGE_IXSCAN == root->children[0]->getType()) {
+        indexScanNode = static_cast<IndexScanNode*>(root->children[0]);
+    } else {
+        fetchNode = static_cast<FetchNode*>(root->children[0]);
+        // If the fetch has a filter, we're out of luck. We can't skip all keys with a given value,
+        // since one of them may key a document that passes the filter.
+        if (fetchNode->filter) {
+            return false;
+        }
+
+        if (STAGE_IXSCAN != fetchNode->children[0]->getType()) {
+            return false;
+        }
+
+        indexScanNode = static_cast<IndexScanNode*>(fetchNode->children[0]);
+    }
+
+    // An additional filter must be applied to the data in the key, so we can't just skip
+    // all the keys with a given value; we must examine every one to find the one that (may)
+    // pass the filter.
+    if (indexScanNode->filter) {
+        return false;
+    }
+
+    // We only set this when we have special query modifiers (.max() or .min()) or other
+    // special cases.  Don't want to handle the interactions between those and distinct.
+    // Don't think this will ever really be true but if it somehow is, just ignore this
+    // soln.
+    if (indexScanNode->bounds.isSimpleRange) {
+        return false;
+    }
+
+    // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
+    auto distinctNode = stdx::make_unique<DistinctNode>(indexScanNode->index);
+    distinctNode->direction = indexScanNode->direction;
+    distinctNode->bounds = indexScanNode->bounds;
+
+    // Figure out which field we're skipping to the next value of.  TODO: We currently only
+    // try to distinct-hack when there is an index prefixed by the field we're distinct-ing
+    // over.  Consider removing this code if we stick with that policy.
+    distinctNode->fieldNo = 0;
+    BSONObjIterator it(indexScanNode->index.keyPattern);
+    while (it.more()) {
+        if (field == it.next().fieldName()) {
+            break;
+        }
+        distinctNode->fieldNo++;
+    }
+
+    if (fetchNode) {
+        // If there is a fetch node, then there is no need for the projection. The fetch node should
+        // become the new root, with the distinct as its child. The PROJECT=>FETCH=>IXSCAN tree
+        // should become FETCH=>DISTINCT_SCAN.
+        invariant(STAGE_PROJECTION == root->getType());
+        invariant(STAGE_FETCH == root->children[0]->getType());
+        invariant(STAGE_IXSCAN == root->children[0]->children[0]->getType());
+
+        // Detach the fetch from its parent projection.
+        root->children.clear();
+
+        // Make the fetch the new root. This destroys the project stage.
+        soln->root.reset(fetchNode);
+
+        // Take ownership of the index scan node, detaching it from the solution tree.
+        std::unique_ptr<IndexScanNode> ownedIsn(indexScanNode);
+
+        // Attach the distinct node in the index scan's place.
+        fetchNode->children[0] = distinctNode.release();
+    } else {
+        // There is no fetch node. The PROJECT=>IXSCAN tree should become PROJECT=>DISTINCT_SCAN.
+        invariant(STAGE_PROJECTION == root->getType());
+        invariant(STAGE_IXSCAN == root->children[0]->getType());
+
+        // Take ownership of the index scan node, detaching it from the solution tree.
+        std::unique_ptr<IndexScanNode> ownedIsn(indexScanNode);
+
+        // Attach the distinct node in the index scan's place.
+        root->children[0] = distinctNode.release();
+    }
+
+    return true;
 }
 
 StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
