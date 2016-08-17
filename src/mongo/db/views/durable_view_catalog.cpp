@@ -94,7 +94,8 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
 
         if (!valid) {
             return {ErrorCodes::InvalidViewDefinition,
-                    str::stream() << "invalid view definitions reading '"
+                    str::stream() << "found invalid view definition " << viewDef.toString()
+                                  << " while reading '"
                                   << _db->getSystemViewsName()
                                   << "'"};
         }
