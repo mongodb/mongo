@@ -704,9 +704,9 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
     }
 
     // joining the replication executor is blocking so it must be run outside of the mutex
-    _externalState->shutdown(txn);
     _replExecutor.shutdown();
     _replExecutor.join();
+    _externalState->shutdown(txn);
 }
 
 const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {

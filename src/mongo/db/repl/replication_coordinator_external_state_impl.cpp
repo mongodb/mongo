@@ -617,9 +617,7 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
     LockGuard lk(_threadMutex);
-    if (!_bgSync) {
-        return;
-    }
+    invariant(_bgSync);
     _bgSync->cancelFetcher();
 }
 
