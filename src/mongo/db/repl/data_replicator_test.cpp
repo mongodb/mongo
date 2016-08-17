@@ -540,15 +540,7 @@ protected:
         _isbr->run();
     }
 
-    void playResponsesNTimes(int n) {
-        for (int x = 0; x < n; ++x) {
-            log() << "playing responses, pass " << x << " of " << n;
-            playResponses(false);
-        }
-        playResponses(true);
-    }
-
-    void playResponses(bool isLastBatchOfResponses) {
+    void playResponses() {
         NetworkInterfaceMock* net = getNet();
         int processedRequests(0);
         const int expectedResponses(_responses.size());
@@ -642,26 +634,6 @@ protected:
             if (++processedRequests >= expectedResponses) {
                 log() << "done processing expected requests ";
                 break;  // once we have processed all requests, continue;
-            }
-        }
-
-        if (!isLastBatchOfResponses) {
-            return;
-        }
-
-        NetworkGuard guard(net);
-        if (net->hasReadyRequests()) {
-            // Blackhole all oplog getmores for cursor 1.
-            while (net->hasReadyRequests()) {
-                auto noi = net->getNextReadyRequest();
-                if (isOplogGetMore(noi)) {
-                    net->scheduleErrorResponse(
-                        noi, {ErrorCodes::CallbackCanceled, "canceled by playResponses"});
-                    continue;
-                }
-
-                // Error.
-                ASSERT_FALSE(net->hasReadyRequests());
             }
         }
     }
@@ -770,14 +742,14 @@ TEST_F(InitialSyncTest, Complete) {
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
     numGetMoreOplogEntriesMax = 6;
-    playResponses(false);
+    playResponses();
 
     // Initial sync flag should be set.
     ASSERT_TRUE(getStorage().getInitialSyncFlag(txn.get()));
 
     // Play rest of the responses after checking initial sync flag.
     setResponses({responses.begin() + 1, responses.end()});
-    playResponses(true);
+    playResponses();
     log() << "done playing last responses";
 
     log() << "waiting for initial sync to verify it completed OK";
@@ -858,14 +830,14 @@ TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCl
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
-    playResponses(false);
+    playResponses();
 
     // Initial sync flag should be set.
     ASSERT_TRUE(getStorage().getInitialSyncFlag(txn.get()));
 
     // Play rest of the responses after checking initial sync flag.
     setResponses({responses.begin() + 1, responses.end()});
-    playResponses(true);
+    playResponses();
     log() << "done playing last responses";
 
     log() << "waiting for initial sync to verify it completed OK";
@@ -931,7 +903,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
     };
     startSync(0);
     setResponses(responses);
-    playResponses(true);
+    playResponses();
     verifySync(getNet(), ErrorCodes::FailedToParse);
 }
 
@@ -990,7 +962,7 @@ TEST_F(InitialSyncTest, FailOnRollback) {
     startSync(0);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
-    playResponses(true);
+    playResponses();
     verifySync(getNet(), ErrorCodes::UnrecoverableRollbackError);
 }
 
@@ -1048,7 +1020,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
     startSync(0);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
-    playResponses(true);
+    playResponses();
     getExecutor().shutdown();
     verifySync(getNet(), ErrorCodes::CallbackCanceled);
 }
@@ -1080,7 +1052,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
     numGetMoreOplogEntriesMax = 6;
 
     setResponses(responses);
-    playResponses(false);
+    playResponses();
     log() << "done playing responses - both oplog fetcher and databases cloner are active";
 
     {
@@ -1160,14 +1132,14 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
 
     numGetMoreOplogEntriesMax = 6;
     setResponses({responses.begin(), responses.end() - 1});
-    playResponses(false);
+    playResponses();
     log() << "done playing first responses";
 
     // This variable is used for the reponse timestamps. Setting it to 0 will make the oplog
     // entries come out of order.
     numGetMoreOplogEntries = 0;
     setResponses({responses.end() - 1, responses.end()});
-    playResponses(true);
+    playResponses();
     log() << "done playing second responses";
     verifySync(getNet(), ErrorCodes::OplogOutOfOrder);
 }
@@ -1226,12 +1198,12 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
 
     numGetMoreOplogEntriesMax = 6;
     setResponses(responses);
-    playResponses(false);
+    playResponses();
     log() << "done playing first responses";
 
     // Play first response again to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
-    playResponses(false);
+    playResponses();
     log() << "done playing first response of second round of responses";
 
     auto dr = &getDR();
@@ -1240,7 +1212,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     ASSERT_EQUALS(dr->getLastApplied(), OpTimeWithHash());
 
     setResponses({responses.begin() + 1, responses.end()});
-    playResponses(true);
+    playResponses();
     log() << "done playing second round of responses";
     verifySync(getNet(), ErrorCodes::UnrecoverableRollbackError);
 }
@@ -1329,7 +1301,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({failedResponses.begin(), failedResponses.begin() + 1});
     numGetMoreOplogEntriesMax = 7;
-    playResponses(false);
+    playResponses();
     log() << "Done playing first failed response";
 
     progress = getInitialSyncProgress();
@@ -1344,12 +1316,12 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
 
     // Play rest of the failed round of responses.
     setResponses({failedResponses.begin() + 1, failedResponses.end()});
-    playResponses(false);
+    playResponses();
     log() << "Done playing failed responses";
 
     // Play the first response of the successful round of responses.
     setResponses({successfulResponses.begin(), successfulResponses.begin() + 1});
-    playResponses(false);
+    playResponses();
     log() << "Done playing first successful response";
 
     progress = getInitialSyncProgress();
@@ -1372,7 +1344,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
 
     // Play all but last of the successful round of responses.
     setResponses({successfulResponses.begin() + 1, successfulResponses.end() - 1});
-    playResponses(false);
+    playResponses();
     log() << "Done playing all but last successful response";
 
     progress = getInitialSyncProgress();
@@ -1401,7 +1373,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
 
     // Play last successful response.
     setResponses({successfulResponses.end() - 1, successfulResponses.end()});
-    playResponses(true);
+    playResponses();
 
     log() << "waiting for initial sync to verify it completed OK";
     verifySync(getNet());
