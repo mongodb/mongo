@@ -107,7 +107,7 @@ found:	if (fstat(fd, &sb) == -1)
 	if ((fp = fopen(buf, "w")) == NULL)
 		testutil_die(errno, "salvage-corrupt: open: %s", buf);
 	(void)fprintf(fp,
-	    "salvage-corrupt: offset %" PRIuMAX ", length " SIZET_FMT "\n",
+	    "salvage-corrupt: offset %" PRIuMAX ", length %" WT_SIZET_FMT "\n",
 	    (uintmax_t)offset, len);
 	fclose_and_clear(&fp);
 

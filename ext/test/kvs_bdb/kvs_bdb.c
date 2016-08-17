@@ -33,6 +33,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * Berkeley DB has an #ifdef we need to provide a value for, we'll see an
+ * undefined error if it's unset during a strict compile.
+ */
+#ifndef	DB_DBM_HSEARCH
+#define	DB_DBM_HSEARCH	0
+#endif
 #include <db.h>
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
