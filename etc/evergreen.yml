@@ -5884,7 +5884,7 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: views_WT
-  - name: views_WT_rs
+  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -6442,7 +6442,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: views_rs
-  - name: views_WT_rs
+  - name: views_rs_WT
   - name: push
 
 
@@ -6704,7 +6704,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: views_rs
-  - name: views_WT_rs
+  - name: views_rs_WT
   - name: push
 
 
@@ -6791,7 +6791,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: views_rs
-  - name: views_WT_rs
+  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -7027,7 +7027,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: views_rs
-  - name: views_WT_rs
+  - name: views_rs_WT
   - name: push
 
 
@@ -7148,7 +7148,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: views_rs
-  - name: views_WT_rs
+  - name: views_rs_WT
   - name: push
 
 
@@ -7241,7 +7241,7 @@ buildvariants:
   - name: tool
   - name: unittests
   - name: views_WT
-  - name: views_WT_rs
+  - name: views_rs_WT
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
@@ -7320,7 +7320,7 @@ buildvariants:
   - name: tool
   - name: unittests
   - name: views_WT
-  - name: views_WT_rs
+  - name: views_rs_WT
 
 - name: enterprise-rhel-71-ppc64le-inmem
   display_name: Enterprise RHEL 7.1 PPC64LE (inMemory) DEBUG
@@ -7694,7 +7694,7 @@ buildvariants:
   - name: unittests
   - name: views
   - name: views_WT
-  - name: views_WT_rs
+  - name: views_rs_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -7862,7 +7862,7 @@ buildvariants:
   - name: unittests
   - name: views
   - name: views_WT
-  - name: views_WT_rs
+  - name: views_rs_WT
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
@@ -8011,7 +8011,7 @@ buildvariants:
   - name: views
   - name: views_WT
   - name: views_rs
-  - name: views_WT_rs
+  - name: views_rs_WT
 
 - name: ubuntu1404-jepsen
   display_name: ~ Jepsen Ubuntu 14.04
