@@ -149,18 +149,12 @@ private:
     void _signalNoNewDataForApplier(OperationContext* txn);
 
     /**
-     * Record metrics.
-     */
-    void _recordStats(const OplogFetcher::DocumentsInfo& info, Milliseconds getMoreElapsedTime);
-
-    /**
      * Checks current background sync state before pushing operations into blocking queue and
      * updating metrics. If the queue is full, might block.
      */
     void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
                            Fetcher::Documents::const_iterator end,
-                           const OplogFetcher::DocumentsInfo& info,
-                           Milliseconds elapsed);
+                           const OplogFetcher::DocumentsInfo& info);
 
     /**
      * Executes a rollback.

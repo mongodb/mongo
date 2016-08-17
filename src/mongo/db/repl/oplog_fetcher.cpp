@@ -32,8 +32,11 @@
 
 #include "mongo/db/repl/oplog_fetcher.h"
 
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -159,6 +162,20 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents, OpTimeWithHash
     return Status::OK();
 }
 
+Counter64 readersCreatedStats;
+ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
+                                                         &readersCreatedStats);
+// The number and time spent reading batches off the network
+TimerStats getmoreReplStats;
+ServerStatusMetricField<TimerStats> displayBatchesRecieved("repl.network.getmores",
+                                                           &getmoreReplStats);
+// The oplog entries read via the oplog reader
+Counter64 opsReadStats;
+ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadStats);
+// The bytes read via the oplog reader
+Counter64 networkByteStats;
+ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
+
 }  // namespace
 
 StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
@@ -249,6 +266,8 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* exec,
             config.isInitialized());
     uassert(ErrorCodes::BadValue, "null enqueueDocuments function", enqueueDocumentsFn);
     uassert(ErrorCodes::BadValue, "null onShutdownCallback function", onShutdownCallbackFn);
+
+    readersCreatedStats.increment();
 }
 
 std::string OplogFetcher::toString() const {
@@ -363,8 +382,15 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     }
     auto info = validateResult.getValue();
 
+    // Increment stats. We read all of the docs in the query.
+    opsReadStats.increment(info.networkDocumentCount);
+    networkByteStats.increment(info.networkDocumentBytes);
+
+    // Record time for each batch.
+    getmoreReplStats.recordMillis(durationCount<Milliseconds>(queryResponse.elapsedMillis));
+
     // TODO: back pressure handling will be added in SERVER-23499.
-    _enqueueDocumentsFn(firstDocToApply, documents.cend(), info, queryResponse.elapsedMillis);
+    _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
 
     // Update last fetched info.
     if (firstDocToApply != documents.cend()) {

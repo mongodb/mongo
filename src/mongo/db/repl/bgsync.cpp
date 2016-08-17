@@ -51,7 +51,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -110,17 +109,6 @@ size_t getSize(const BSONObj& o) {
 }  // namespace
 
 MONGO_FP_DECLARE(pauseRsBgSyncProducer);
-
-// The number and time spent reading batches off the network
-static TimerStats getmoreReplStats;
-static ServerStatusMetricField<TimerStats> displayBatchesRecieved("repl.network.getmores",
-                                                                  &getmoreReplStats);
-// The oplog entries read via the oplog reader
-static Counter64 opsReadStats;
-static ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadStats);
-// The bytes read via the oplog reader
-static Counter64 networkByteStats;
-static ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
 
 // The count of items in the buffer
 static Counter64 bufferCountGauge;
@@ -379,8 +367,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
                                                        this,
                                                        stdx::placeholders::_1,
                                                        stdx::placeholders::_2,
-                                                       stdx::placeholders::_3,
-                                                       stdx::placeholders::_4),
+                                                       stdx::placeholders::_3),
                                             onOplogFetcherShutdownCallbackFn);
         oplogFetcher = _oplogFetcher.get();
     } catch (const mongo::DBException& ex) {
@@ -478,45 +465,17 @@ void BackgroundSync::_produce(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::_recordStats(const OplogFetcher::DocumentsInfo& info,
-                                  Milliseconds getMoreElapsedTime) {
-    // Inc stats.
-    // We read all of the docs in the query.
-    opsReadStats.increment(info.networkDocumentCount);
-    networkByteStats.increment(info.networkDocumentBytes);
-    bufferCountGauge.increment(info.toApplyDocumentCount);
-    bufferSizeGauge.increment(info.toApplyDocumentBytes);
-
-    // record time for each batch
-    getmoreReplStats.recordMillis(durationCount<Milliseconds>(getMoreElapsedTime));
-
-    // Check some things periodically
-    // (whenever we run out of items in the
-    // current cursor batch)
-    if (info.networkDocumentBytes > 0 && info.networkDocumentBytes < kSmallBatchLimitBytes) {
-        // on a very low latency network, if we don't wait a little, we'll be
-        // getting ops to write almost one at a time.  this will both be expensive
-        // for the upstream server as well as potentially defeating our parallel
-        // application of batches on the secondary.
-        //
-        // the inference here is basically if the batch is really small, we are
-        // "caught up".
-        //
-        sleepmillis(kSleepToAllowBatchingMillis);
-    }
-}
-
 void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
                                        Fetcher::Documents::const_iterator end,
-                                       const OplogFetcher::DocumentsInfo& info,
-                                       Milliseconds getMoreElapsed) {
+                                       const OplogFetcher::DocumentsInfo& info) {
     auto txn = cc().makeOperationContext();
 
     // If this is the first batch of operations returned from the query, "toApplyDocumentCount" will
     // be one fewer than "networkDocumentCount" because the first document (which was applied
     // previously) is skipped.
     if (info.toApplyDocumentCount == 0) {
-        _recordStats(info, getMoreElapsed);
+        bufferCountGauge.increment(info.toApplyDocumentCount);
+        bufferSizeGauge.increment(info.toApplyDocumentBytes);
         return;
     }
 
@@ -538,7 +497,19 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
         LOG(3) << "batch resetting _lastOpTimeFetched: " << _lastOpTimeFetched;
     }
 
-    _recordStats(info, getMoreElapsed);
+    bufferCountGauge.increment(info.toApplyDocumentCount);
+    bufferSizeGauge.increment(info.toApplyDocumentBytes);
+
+    // Check some things periodically (whenever we run out of items in the current cursor batch).
+    if (info.networkDocumentBytes > 0 && info.networkDocumentBytes < kSmallBatchLimitBytes) {
+        // On a very low latency network, if we don't wait a little, we'll be
+        // getting ops to write almost one at a time.  This will both be expensive
+        // for the upstream server as well as potentially defeating our parallel
+        // application of batches on the secondary.
+        //
+        // The inference here is basically if the batch is really small, we are "caught up".
+        sleepmillis(kSleepToAllowBatchingMillis);
+    }
 }
 
 bool BackgroundSync::peek(OperationContext* txn, BSONObj* op) {

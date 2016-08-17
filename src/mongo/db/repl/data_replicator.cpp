@@ -589,8 +589,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
                                                                this,
                                                                stdx::placeholders::_1,
                                                                stdx::placeholders::_2,
-                                                               stdx::placeholders::_3,
-                                                               stdx::placeholders::_4),
+                                                               stdx::placeholders::_3),
                                                     stdx::bind(&DataReplicator::_onOplogFetchFinish,
                                                                this,
                                                                stdx::placeholders::_1,
@@ -1308,8 +1307,7 @@ Status DataReplicator::_scheduleFetch_inlock() {
                        this,
                        stdx::placeholders::_1,
                        stdx::placeholders::_2,
-                       stdx::placeholders::_3,
-                       stdx::placeholders::_4),
+                       stdx::placeholders::_3),
             stdx::bind(&DataReplicator::_onOplogFetchFinish,
                        this,
                        stdx::placeholders::_1,
@@ -1386,8 +1384,7 @@ Status DataReplicator::_shutdown(OperationContext* txn) {
 
 void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
                                        Fetcher::Documents::const_iterator end,
-                                       const OplogFetcher::DocumentsInfo& info,
-                                       Milliseconds getMoreElapsed) {
+                                       const OplogFetcher::DocumentsInfo& info) {
     if (info.toApplyDocumentCount == 0) {
         return;
     }
@@ -1407,7 +1404,7 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
 
     _lastFetched = info.lastDocument;
 
-    // TODO: updates metrics with "info" and "getMoreElapsed".
+    // TODO: updates metrics with "info".
 
     _doNextActions();
 }

@@ -106,7 +106,6 @@ protected:
 
     Fetcher::Documents lastEnqueuedDocuments;
     OplogFetcher::DocumentsInfo lastEnqueuedDocumentsInfo;
-    Milliseconds lastEnqueuedElapsed;
     OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn;
 };
 
@@ -137,11 +136,9 @@ void OplogFetcherTest::setUp() {
 
     enqueueDocumentsFn = [this](Fetcher::Documents::const_iterator begin,
                                 Fetcher::Documents::const_iterator end,
-                                const OplogFetcher::DocumentsInfo& info,
-                                Milliseconds elapsed) {
+                                const OplogFetcher::DocumentsInfo& info) {
         lastEnqueuedDocuments = {begin, end};
         lastEnqueuedDocumentsInfo = info;
-        lastEnqueuedElapsed = elapsed;
     };
 }
 
@@ -555,9 +552,8 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldExcludeFirstDocumentInFirstBatchWhenE
     auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.opTime.getTerm()}, 300);
     Fetcher::Documents documents{firstEntry, secondEntry, thirdEntry};
 
-    Milliseconds elapsed(600);
-    auto shutdownState =
-        processSingleBatch({makeCursorResponse(0, documents), rpc::makeEmptyMetadata(), elapsed});
+    auto shutdownState = processSingleBatch(
+        {makeCursorResponse(0, documents), rpc::makeEmptyMetadata(), Milliseconds(0)});
 
     ASSERT_EQUALS(2U, lastEnqueuedDocuments.size());
     ASSERT_EQUALS(secondEntry, lastEnqueuedDocuments[0]);
@@ -574,8 +570,6 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldExcludeFirstDocumentInFirstBatchWhenE
     ASSERT_EQUALS(thirdEntry["h"].numberLong(), lastEnqueuedDocumentsInfo.lastDocument.value);
     ASSERT_EQUALS(unittest::assertGet(OpTime::parseFromOplogEntry(thirdEntry)),
                   lastEnqueuedDocumentsInfo.lastDocument.opTime);
-
-    ASSERT_EQUALS(elapsed, lastEnqueuedElapsed);
 
     // The last fetched optime and hash should be updated after pushing the operations into the
     // buffer and reflected in the shutdown callback arguments.

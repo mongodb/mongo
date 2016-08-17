@@ -302,8 +302,7 @@ private:
      */
     void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
                            Fetcher::Documents::const_iterator end,
-                           const OplogFetcher::DocumentsInfo& info,
-                           Milliseconds elapsed);
+                           const OplogFetcher::DocumentsInfo& info);
     void _onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched);
     void _rollbackOperations(const CallbackArgs& cbData);
     void _doNextActions();

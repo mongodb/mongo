@@ -100,12 +100,11 @@ public:
      * a buffer to be consumed by the next stage of the replication process.
      *
      * Additional information on the operations is provided in a DocumentsInfo
-     * struct and duration for how long the last remote command took to complete.
+     * struct.
      */
     using EnqueueDocumentsFn = stdx::function<void(Fetcher::Documents::const_iterator begin,
                                                    Fetcher::Documents::const_iterator end,
-                                                   const DocumentsInfo& info,
-                                                   Milliseconds remoteCommandProcessingTime)>;
+                                                   const DocumentsInfo& info)>;
 
     /**
      * Validates documents in current batch of results returned from tailing the remote oplog.
