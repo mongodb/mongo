@@ -3,6 +3,7 @@ load('jstests/replsets/rslib.js');
     "use strict";
 
     var st = new ShardingTest({
+        name: "zzz",
         shards: {
             rs0: {
                 nodes: {n0: {}, n1: {rsConfig: {priority: 0}}},
