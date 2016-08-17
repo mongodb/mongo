@@ -64,7 +64,7 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 class DatabasesCloner {
 public:
     struct Stats {
-        size_t databasesCloned{0};
+        size_t databasesCloned = 0U;
         std::vector<DatabaseCloner::Stats> databaseStats;
 
         std::string toString() const;
