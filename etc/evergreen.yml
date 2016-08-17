@@ -6037,7 +6037,6 @@ buildvariants:
   - mongo-tools
   run_on:
   - ubuntu1404-test
-  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
