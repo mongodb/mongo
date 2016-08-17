@@ -745,6 +745,10 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         _handleElectionTimeoutWhen = Date_t();
     }
 
+    if (_inShutdown) {
+        return;
+    }
+
     if (!isV1ElectionProtocol()) {
         return;
     }
@@ -786,6 +790,10 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cancelPriorityTakeover_inlock();
         _cancelAndRescheduleElectionTimeout_inlock();
+        if (_inShutdown) {
+            log() << "Not starting an election, since we are shutting down";
+            return;
+        }
     }
 
     const auto status =
