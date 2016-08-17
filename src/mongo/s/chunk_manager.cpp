@@ -464,15 +464,17 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
     return Status::OK();
 }
 
-shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
-                                                      const BSONObj& shardKey,
-                                                      const CollatorInterface* collator) const {
+StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationContext* txn,
+                                                                  const BSONObj& shardKey,
+                                                                  const BSONObj& collation) const {
     {
-        if (collator) {
+        const bool hasSimpleCollation = (collation.isEmpty() && !_defaultCollator) ||
+            SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
+        if (!hasSimpleCollation) {
             for (BSONElement elt : shardKey) {
                 if (CollationIndexKey::isCollatableType(elt.type())) {
-                    msgasserted(ErrorCodes::ShardKeyNotFound,
-                                "cannot target single shard due to collation");
+                    return Status(ErrorCodes::ShardKeyNotFound,
+                                  "cannot target single shard due to collation");
                 }
             }
         }
@@ -512,8 +514,12 @@ shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
 
 shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(
     OperationContext* txn, const BSONObj& shardKey) const {
-    const CollatorInterface* collator = nullptr;
-    return findIntersectingChunk(txn, shardKey, collator);
+    auto chunk = findIntersectingChunk(txn, shardKey, CollationSpec::kSimpleSpec);
+
+    // findIntersectingChunk() should succeed in targeting a single shard, since we have the simple
+    // collation.
+    massertStatusOK(chunk.getStatus());
+    return chunk.getValue();
 }
 
 void ChunkManager::getShardIdsForQuery(OperationContext* txn,
@@ -541,18 +547,11 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
 
     // Fast path for targeting equalities on the shard key.
     auto shardKeyToFind = _keyPattern.extractShardKeyFromQuery(*cq);
-    if (shardKeyToFind.isOK() && !shardKeyToFind.getValue().isEmpty()) {
-        try {
-            auto chunk = findIntersectingChunk(txn, shardKeyToFind.getValue(), cq->getCollator());
-            shardIds->insert(chunk->getShardId());
+    if (!shardKeyToFind.isEmpty()) {
+        auto chunk = findIntersectingChunk(txn, shardKeyToFind, collation);
+        if (chunk.isOK()) {
+            shardIds->insert(chunk.getValue()->getShardId());
             return;
-        } catch (const MsgAssertionException& msg) {
-
-            // If we failed to find the intersecting chunk for a reason other than the inability to
-            // target a single shard, throw.
-            if (msg.getCode() != ErrorCodes::ShardKeyNotFound) {
-                throw msg;
-            }
         }
     }
 

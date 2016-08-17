@@ -128,10 +128,15 @@ public:
      * For instance, to locate the chunk for document {a : "foo" , b : "bar"}
      * when the shard key is {a : "hashed"}, you can call
      *  findIntersectingChunk() on {a : hash("foo") }
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
+     *
+     * Returns the error status ShardKeyNotFound if unable to target a single shard due to the
+     * collation.
      */
-    std::shared_ptr<Chunk> findIntersectingChunk(OperationContext* txn,
-                                                 const BSONObj& shardKey,
-                                                 const CollatorInterface* collator) const;
+    StatusWith<std::shared_ptr<Chunk>> findIntersectingChunk(OperationContext* txn,
+                                                             const BSONObj& shardKey,
+                                                             const BSONObj& collation) const;
 
     /*
      * Finds the intersecting chunk, assuming the simple collation.

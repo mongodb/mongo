@@ -113,6 +113,9 @@ struct CollationSpec {
     static const char* kMaxVariablePunct;
     static const char* kMaxVariableSpace;
 
+    // Collation spec which the user can supply to represent the "simple" locale.
+    static const BSONObj kSimpleSpec;
+
     /**
      * Constructs a CollationSpec with no locale, where all other fields have their default values.
      */

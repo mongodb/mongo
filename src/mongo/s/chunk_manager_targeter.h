@@ -128,6 +128,8 @@ private:
      * Returns a vector of ShardEndpoints where a document might need to be placed.
      *
      * Returns !OK with message if replacement could not be targeted
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
      */
     Status targetDoc(OperationContext* txn,
                      const BSONObj& doc,
@@ -138,6 +140,8 @@ private:
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
      * Returns !OK with message if query could not be targeted.
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
      */
     Status targetQuery(OperationContext* txn,
                        const BSONObj& query,
@@ -149,10 +153,12 @@ private:
      *
      * Also has the side effect of updating the chunks stats with an estimate of the amount of
      * data targeted at this shard key.
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
      */
     Status targetShardKey(OperationContext* txn,
                           const BSONObj& doc,
-                          const CollatorInterface* collator,
+                          const BSONObj& collation,
                           long long estDataSize,
                           ShardEndpoint** endpoint) const;
 

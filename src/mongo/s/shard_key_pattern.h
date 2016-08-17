@@ -166,7 +166,7 @@ public:
      */
     StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* txn,
                                                  const BSONObj& basicQuery) const;
-    StatusWith<BSONObj> extractShardKeyFromQuery(const CanonicalQuery& query) const;
+    BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
 
     /**
      * Returns true if the shard key pattern can ensure that the unique index pattern is

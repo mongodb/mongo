@@ -461,9 +461,8 @@ public:
 
         vector<Strategy::CommandResult> results;
         const BSONObj query;
-        const BSONObj collation =
-            BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
-        Strategy::commandOp(txn, dbName, cmdObj, options, cm->getns(), query, collation, &results);
+        Strategy::commandOp(
+            txn, dbName, cmdObj, options, cm->getns(), query, CollationSpec::kSimpleSpec, &results);
 
         BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
         bool isValid = true;
@@ -1383,9 +1382,8 @@ public:
             BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
             vector<Strategy::CommandResult> results;
-            const BSONObj collation =
-                BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
-            Strategy::commandOp(txn, dbName, cmdObj, 0, fullns, finder, collation, &results);
+            Strategy::commandOp(
+                txn, dbName, cmdObj, 0, fullns, finder, CollationSpec::kSimpleSpec, &results);
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
@@ -1417,11 +1415,15 @@ public:
                 BSONObj finder = BSON("files_id" << cmdObj.firstElement() << "n" << n);
 
                 vector<Strategy::CommandResult> results;
-                const BSONObj collation =
-                    BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
                 try {
-                    Strategy::commandOp(
-                        txn, dbName, shardCmd, 0, fullns, finder, collation, &results);
+                    Strategy::commandOp(txn,
+                                        dbName,
+                                        shardCmd,
+                                        0,
+                                        fullns,
+                                        finder,
+                                        CollationSpec::kSimpleSpec,
+                                        &results);
                 } catch (DBException& e) {
                     // This is handled below and logged
                     Strategy::CommandResult errResult;

@@ -53,6 +53,8 @@ const char* CollationSpec::kAlternateNonIgnorable = "non-ignorable";
 const char* CollationSpec::kAlternateShifted = "shifted";
 const char* CollationSpec::kMaxVariablePunct = "punct";
 const char* CollationSpec::kMaxVariableSpace = "space";
+const BSONObj CollationSpec::kSimpleSpec =
+    BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
 
 BSONObj CollationSpec::toBSON() const {
     BSONObjBuilder builder;

@@ -147,10 +147,7 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
     if (pExpCtx->getCollator()) {
         geoNear.append("collation", pExpCtx->getCollator()->getSpec().toBSON());
     } else {
-        BSONObjBuilder collationBuilder(geoNear.subobjStart("collation"));
-        collationBuilder.append(CollationSpec::kLocaleField,
-                                CollationSpec::kSimpleBinaryComparison);
-        collationBuilder.doneFast();
+        geoNear.append("collation", CollationSpec::kSimpleSpec);
     }
 
     geoNear.append("spherical", spherical);

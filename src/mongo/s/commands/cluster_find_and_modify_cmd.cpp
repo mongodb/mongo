@@ -120,24 +120,15 @@ public:
             }
 
             BSONObj shardKey = status.getValue();
+            auto chunk = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
 
-            // Construct collator for targeting.
-            std::unique_ptr<CollatorInterface> collator;
-            if (!collation.isEmpty()) {
-                auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
-                                              ->makeFromBSON(collation);
-                if (!statusWithCollator.isOK()) {
-                    return statusWithCollator.getStatus();
-                }
-                collator = std::move(statusWithCollator.getValue());
+            if (!chunk.isOK()) {
+                uasserted(ErrorCodes::ShardKeyNotFound,
+                          "findAndModify must target a single shard, but was not able to due "
+                          "to non-simple collation");
             }
 
-            auto chunk = chunkMgr->findIntersectingChunk(
-                txn,
-                shardKey,
-                !collation.isEmpty() ? collator.get() : chunkMgr->getDefaultCollator());
-
-            shard = Grid::get(txn)->shardRegistry()->getShard(txn, chunk->getShardId());
+            shard = Grid::get(txn)->shardRegistry()->getShard(txn, chunk.getValue()->getShardId());
         }
 
         BSONObjBuilder explainCmd;
@@ -208,25 +199,19 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
+        auto chunk = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
 
-        // Construct collator for targeting.
-        std::unique_ptr<CollatorInterface> collator;
-        if (!collation.isEmpty()) {
-            auto statusWithCollator =
-                CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collation);
-            if (!statusWithCollator.isOK()) {
-                return appendCommandStatus(result, statusWithCollator.getStatus());
-            }
-            collator = std::move(statusWithCollator.getValue());
+        if (!chunk.isOK()) {
+            uasserted(ErrorCodes::ShardKeyNotFound,
+                      "findAndModify must target a single shard, but was not able to due to "
+                      "non-simple collation");
         }
 
-        auto chunk = chunkMgr->findIntersectingChunk(
-            txn, shardKey, !collation.isEmpty() ? collator.get() : chunkMgr->getDefaultCollator());
-
-        bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
+        bool ok =
+            _runCommand(txn, conf, chunkMgr, chunk.getValue()->getShardId(), nss, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
-            chunk->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
+            chunk.getValue()->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
         }
 
         return ok;

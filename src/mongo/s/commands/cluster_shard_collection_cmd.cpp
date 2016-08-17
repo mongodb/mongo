@@ -403,11 +403,7 @@ public:
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
             //    receiving shard whenever a migrate occurs.
             Status status = clusterCreateIndex(
-                txn,
-                nss.ns(),
-                proposedKey,
-                BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison),
-                careAboutUnique);
+                txn, nss.ns(), proposedKey, CollationSpec::kSimpleSpec, careAboutUnique);
             if (!status.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
                                        << "primary shard: " << status.reason();

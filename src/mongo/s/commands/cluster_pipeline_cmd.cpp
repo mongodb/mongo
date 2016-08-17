@@ -175,16 +175,10 @@ public:
             chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, firstMatchQuery));
         bool singleShard = false;
         if (!shardKeyMatches.isEmpty()) {
-            try {
-                auto chunk =
-                    chunkMgr->findIntersectingChunk(txn, shardKeyMatches, mergeCtx->getCollator());
+            auto chunk = chunkMgr->findIntersectingChunk(
+                txn, shardKeyMatches, request.getValue().getCollation());
+            if (chunk.isOK()) {
                 singleShard = true;
-            } catch (const MsgAssertionException& msg) {
-                if (msg.getCode() == ErrorCodes::ShardKeyNotFound) {
-                    singleShard = false;
-                } else {
-                    throw msg;
-                }
             }
         }
 
@@ -293,8 +287,7 @@ public:
             mergeCmd.setField("collation",
                               mergeCtx->getCollator()
                                   ? Value(mergeCtx->getCollator()->getSpec().toBSON())
-                                  : Value(Document{{CollationSpec::kLocaleField,
-                                                    CollationSpec::kSimpleBinaryComparison}}));
+                                  : Value(Document{CollationSpec::kSimpleSpec}));
         }
 
         string outputNsOrEmpty;

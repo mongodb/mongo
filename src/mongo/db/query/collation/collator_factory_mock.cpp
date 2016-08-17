@@ -41,8 +41,7 @@ namespace mongo {
 
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON(
     const BSONObj& spec) {
-    if (SimpleBSONObjComparator::kInstance.evaluate(
-            spec == BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison))) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(spec == CollationSpec::kSimpleSpec)) {
         return {nullptr};
     }
     auto collator =

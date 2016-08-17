@@ -525,15 +525,13 @@ public:
 
                 try {
                     const BSONObj query;
-                    const BSONObj simpleCollation =
-                        BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
                     Strategy::commandOp(txn,
                                         outDB,
                                         finalCmdObj,
                                         0,
                                         outputCollNss.ns(),
                                         query,
-                                        simpleCollation,
+                                        CollationSpec::kSimpleSpec,
                                         &mrCommandResults);
                     ok = true;
                 } catch (DBException& e) {
