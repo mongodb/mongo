@@ -138,6 +138,10 @@ public:
         return storage().view(sizeof(Layout));
     }
 
+    int32_t dataLen() const {
+        return msgdata().getLen() - sizeof(Layout);
+    }
+
 protected:
     const ConstDataView& storage() const {
         return _storage;

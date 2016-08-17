@@ -41,8 +41,6 @@ namespace rpc {
 
 /**
  * Immutable view of an OP_REPLY legacy-style command reply.
- *
- * TODO: BSON validation (SERVER-18167)
  */
 class LegacyReply : public ReplyInterface {
 public:

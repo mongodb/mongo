@@ -33,6 +33,7 @@
 #include <tuple>
 #include <utility>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
@@ -66,6 +67,15 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
                           << " expected a value of 0 but got "
                           << qr.getStartingFrom(),
             qr.getStartingFrom() == 0);
+
+    if (serverGlobalParams.objcheck) {
+        uassert(ErrorCodes::InvalidBSON,
+                "Got legacy command reply with invalid BSON in the metadata field.",
+                validateBSON(qr.data(),
+                             qr.dataLen(),
+                             enableBSON1_1 ? BSONVersion::kV1_1 : BSONVersion::kV1_0)
+                    .isOK());
+    }
 
     std::tie(_commandReply, _metadata) =
         uassertStatusOK(rpc::upconvertReplyMetadata(BSONObj(qr.data())));

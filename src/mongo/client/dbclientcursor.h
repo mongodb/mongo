@@ -212,6 +212,7 @@ public:
         int nReturned{0};
         int pos{0};
         const char* data{nullptr};
+        int remainingBytes{0};
 
     public:
         Batch() = default;
