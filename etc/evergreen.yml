@@ -793,6 +793,7 @@ post:
       target: "mongo-coredumps.tgz"
       source_dir: "./"
       include:
+        - "./**.core"
         - "./**.mdmp"
   - command: s3.put
     params:
