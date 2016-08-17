@@ -81,13 +81,28 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(txn);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
-        if (!readConcernArgs.getOpTime().isNull())
+        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+            // For master/slave and standalone nodes, Linearizable Read is not supported.
+            return {ErrorCodes::NotAReplicaSet,
+                    "node needs to be a replica set member to use read concern"};
+        }
+
+        if (!replCoord->getSettings().isMajorityReadConcernEnabled()) {
+            // This is an opt-in feature. Fail if the user didn't opt-in.
+            return {ErrorCodes::ReadConcernMajorityNotEnabled,
+                    "Linearizable read concern requested, but server was not started with "
+                    "--enableMajorityReadConcern."};
+        }
+
+        if (!readConcernArgs.getOpTime().isNull()) {
             return {ErrorCodes::FailedToParse,
                     "afterOpTime not compatible with linearizable read concern"};
+        }
 
-        if (!replCoord->getMemberState().primary())
+        if (!replCoord->getMemberState().primary()) {
             return {ErrorCodes::NotMaster,
                     "cannot satisfy linearizable read concern on non-primary node"};
+        }
     }
 
     // Skip waiting for the OpTime when testing snapshot behavior
