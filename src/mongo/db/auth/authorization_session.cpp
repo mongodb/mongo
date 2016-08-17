@@ -389,6 +389,9 @@ bool AuthorizationSession::isAuthorizedToCreateRole(
                 return true;
             }
         }
+        log() << "Not authorized to create the first role in the system '" << args.roleName
+              << "' using the localhost exception. The user needs to acquire the role through "
+                 "external authentication first.";
     }
 
     return false;
