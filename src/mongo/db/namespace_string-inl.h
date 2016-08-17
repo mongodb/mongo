@@ -57,7 +57,7 @@ inline bool NamespaceString::virtualized(StringData ns) {
 }
 
 inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior behavior) {
-    if (db.size() == 0 || db.size() > 64)
+    if (db.size() == 0 || db.size() >= 64)
         return false;
 
     for (StringData::const_iterator iter = db.begin(), end = db.end(); iter != end; ++iter) {

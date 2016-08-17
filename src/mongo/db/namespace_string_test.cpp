@@ -128,6 +128,11 @@ TEST(NamespaceStringTest, DatabaseValidNames) {
     ASSERT(!NamespaceString::validDBName("foo?bar"));
 #endif
 
+    ASSERT(NamespaceString::validDBName(
+        "ThisIsADatabaseNameThatBrokeAllRecordsForValidLengthForDBName63"));
+    ASSERT(!NamespaceString::validDBName(
+        "WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"));
+
     ASSERT(NamespaceString::normal("asdads"));
     ASSERT(!NamespaceString::normal("asda$ds"));
     ASSERT(NamespaceString::normal("local.oplog.$main"));
