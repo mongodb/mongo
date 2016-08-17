@@ -190,6 +190,38 @@ DBCollection.prototype._validateForStorage = function( o ){
         }
     }
 };
+//we define a new cmd in here.We can register the collection into the meta_geom collection 
+//which is stored in the config database
+DBCollection.prototype.registerGeometry = function(opt) {
+    var options = opt || {};
+    var cmd = { registerGeometry: 1};
+    cmd.collectionName = this.getName();
+
+    if (options.field != undefined)
+        cmd.field = options.field;
+   
+    if (options.gtype != undefined)
+        cmd.gtype = options.gtype;
+    else
+        cmd.gtype = 1;
+    if (options.torrance != undefined)
+        cmd.torrance = options.torrance;
+    else
+        cmd.torrance = 0.00001;
+    if (options.srid != undefined)
+        cmd.srid = options.srid;
+    else
+        cmd.srid = 4326;
+    if (options.crstype != undefined)
+        cmd.crstype = options.crstype;
+    else
+        cmd.crstype = 0;
+
+    var res = this._db.runCommand(cmd);
+
+    assert(res, "no result from registerGeometry result");
+    return res;
+}
 
 DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
     var cursor = new DBQuery( this._mongo , this._db , this ,
@@ -200,7 +232,7 @@ DBCollection.prototype.find = function( query , fields , limit , skip, batchSize
     if (readPrefMode != null) {
         cursor.readPref(readPrefMode, connObj.getReadPrefTagSet());
     }
-
+   
     return cursor;
 }
 
