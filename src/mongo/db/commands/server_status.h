@@ -73,11 +73,35 @@ public:
 
     /**
      * actually generate the result
+     *
+     * You should either implement this function or appendSection below, but not both. In
+     * most cases you should just implement this function.
+     *
      * @param configElement the element from the actual command related to this section
      *                      so if the section is 'foo', this is cmdObj['foo']
      */
-    virtual BSONObj generateSection(OperationContext* txn,
-                                    const BSONElement& configElement) const = 0;
+    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+        return BSONObj{};
+    };
+
+    /**
+     * This is what gets called by the serverStatus command to append the section to the
+     * command result.
+     *
+     * If you are just implementing a normal ServerStatusSection, then you don't need to
+     * implement this.
+     *
+     * If you are doing something a bit more complicated, you can implement this and have
+     * full control over what gets included in the command result.
+     */
+    virtual void appendSection(OperationContext* txn,
+                               const BSONElement& configElement,
+                               BSONObjBuilder* result) const {
+        const auto ret = generateSection(txn, configElement);
+        if (ret.isEmpty())
+            return;
+        result->append(getSectionName(), ret);
+    }
 
 private:
     const std::string _sectionName;

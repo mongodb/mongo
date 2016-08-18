@@ -84,18 +84,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="hostname_canonicalization_worker",
-    source=[
-        "hostname_canonicalization_worker.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-        'network',
-    ],
-)
-
-env.Library(
     target='miniwebserver',
     source=[
         'miniwebserver.cpp',

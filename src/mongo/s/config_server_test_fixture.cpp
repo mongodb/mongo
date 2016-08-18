@@ -74,7 +74,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -222,11 +221,6 @@ void ConfigServerTestFixture::setUp() {
 
     _catalogClient->startup();
     _catalogManager->startup();
-
-    // Needed if serverStatus gets called.
-    if (!HostnameCanonicalizationWorker::get(getGlobalServiceContext())) {
-        HostnameCanonicalizationWorker::start(getGlobalServiceContext());
-    }
 }
 
 void ConfigServerTestFixture::tearDown() {

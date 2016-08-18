@@ -50,7 +50,7 @@
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/hostname_canonicalization_worker.h"
+#include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
@@ -99,13 +99,10 @@ public:
         BSONObjBuilder timeBuilder(256);
 
         const auto authSession = AuthorizationSession::get(Client::getCurrent());
-        auto canonicalizer = HostnameCanonicalizationWorker::get(service);
 
         // --- basic fields that are global
 
         result.append("host", prettyHostName());
-        result.append("advisoryHostFQDNs", canonicalizer->getCanonicalizedFQDNs());
-
         result.append("version", VersionInfoInterface::instance().version());
         result.append("process", serverGlobalParams.binaryName);
         result.append("pid", ProcessId::getCurrent().asLongLong());
@@ -129,20 +126,16 @@ public:
                 continue;
 
             bool include = section->includeByDefault();
-
-            BSONElement e = cmdObj[section->getSectionName()];
-            if (e.type()) {
-                include = e.trueValue();
+            const auto& elem = cmdObj[section->getSectionName()];
+            if (elem.type()) {
+                include = elem.trueValue();
             }
 
-            if (!include)
+            if (!include) {
                 continue;
+            }
 
-            BSONObj data = section->generateSection(txn, e);
-            if (data.isEmpty())
-                continue;
-
-            result.append(section->getSectionName(), data);
+            section->appendSection(txn, elem, &result);
             timeBuilder.appendNumber(
                 static_cast<string>(str::stream() << "after " << section->getSectionName()),
                 durationCount<Milliseconds>(clock->now() - runStart));
@@ -332,6 +325,23 @@ public:
         }
     }
 } memBase;
-}
+
+class AdvisoryHostFQDNs final : public ServerStatusSection {
+public:
+    AdvisoryHostFQDNs() : ServerStatusSection("advisoryHostFQDNs") {}
+
+    bool includeByDefault() const override {
+        return false;
+    }
+
+    void appendSection(OperationContext* txn,
+                       const BSONElement& configElement,
+                       BSONObjBuilder* out) const override {
+        out->append(
+            "advisoryHostFQDNs",
+            getHostFQDNs(getHostNameCached(), HostnameCanonicalizationMode::kForwardAndReverse));
+    }
+} advisoryHostFQDNs;
+}  // namespace
 
 }  // namespace mongo
