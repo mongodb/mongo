@@ -1,9 +1,11 @@
 /**
- * This test creates a replica set and  writes during the resync call in order to verify
- * that all phases of the resync/initial-sync process work correctly.
+ * This test creates replica set and then puts load on the primary with writes during
+ * the initial sync in order to verify that all phases of the initial sync work correctly.
  *
+ * We cannot test each phase of the initial sync directly but by providing constant writes we can
+ * assume that each individual phase will have data to work with, and therefore be tested.
  */
-var testName = "resync_with_write_load";
+var testName = "initialsync_with_write_load";
 var replTest = new ReplSetTest({name: testName, nodes: 3, oplogSize: 100});
 var nodes = replTest.nodeList();
 
@@ -34,6 +36,7 @@ assert(a_conn.host == master.host);
 
 // create an oplog entry with an insert
 assert.writeOK(A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 60000}}));
+replTest.stop(BID);
 
 print("******************** starting load for 30 secs *********************");
 var work = function() {
@@ -70,8 +73,18 @@ assert.soon(function() {
     }
 }, "waited too long for start trigger", 90 * 1000 /* 90 secs */);
 
-print("*************** issuing resync command ***************");
-assert.commandWorked(B.adminCommand("resync"));
+print("*************** STARTING node without data ***************");
+replTest.start(BID);
+// check that it is up
+assert.soon(function() {
+    try {
+        var result = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
+        return true;
+    } catch (e) {
+        print(e);
+        return false;
+    }
+}, "node didn't come up");
 
 print("waiting for load generation to finish");
 loadGen();
