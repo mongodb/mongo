@@ -407,6 +407,7 @@ functions:
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
+            hostn_log=/var/log/lxc/$hostn.log
             $sudo lxc-wait -n $hostn -s 'RUNNING' -t 0
             lxc_code=$?
             lxc_restarts=0
@@ -414,9 +415,10 @@ functions:
             while [ $lxc_code -ne 0 ]
             do
               lxc_restarts=$((lxc_restarts+1))
-              echo "Restarting host $hostn"
-              $sudo lxc-start -n $hostn -d
-              $sudo lxc-wait -n $hostn -s 'RUNNING' -t 5
+              echo "Restarting host $hostn, attempt $lxc_restarts"
+              # When restarting, increase the logging level to INFO for the LXC log.
+              $sudo lxc-start -n $hostn --logpriority=INFO --logfile=$hostn_log -d
+              $sudo lxc-wait -n $hostn -s 'RUNNING' -t 60
               lxc_code=$?
               if [ $lxc_restarts -eq 5 ]; then
                 break
@@ -427,7 +429,7 @@ functions:
             # If the copy fails, then tail the LXC host log.
             if [ $exit_code -ne 0 ]; then
               echo "Copy to host $hostn failed!"
-              $sudo tail -n 100 /var/log/lxc/$hostn.log
+              $sudo tail -n 100 $hostn_log
               exit_failure_code=$exit_code
             fi
           done
