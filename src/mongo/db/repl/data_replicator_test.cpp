@@ -1116,10 +1116,25 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
                          "{v:"
                       << OplogEntry::kOplogVersion
                       << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
-            // find:a
+            // find:a - first batch
             {"find",
-             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', firstBatch:["
                       "{_id:1, a:1} "
+                      "]}}")},
+            // getMore:a - second batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', nextBatch:["
+                      "{_id:2, a:2} "
+                      "]}}")},
+            // getMore:a - third batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', nextBatch:["
+                      "{_id:3, a:3} "
+                      "]}}")},
+            // getMore:a - last batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', nextBatch:["
+                      "{_id:4, a:4} "
                       "]}}")},
             // Clone Done
             // get latest oplog ts
@@ -1135,15 +1150,15 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
 
     startSync(0);
 
-    numGetMoreOplogEntriesMax = 6;
-    setResponses({responses.begin(), responses.end() - 1});
+    numGetMoreOplogEntriesMax = 10;
+    setResponses({responses.begin(), responses.end() - 4});
     playResponses();
     log() << "done playing first responses";
 
     // This variable is used for the reponse timestamps. Setting it to 0 will make the oplog
     // entries come out of order.
     numGetMoreOplogEntries = 0;
-    setResponses({responses.end() - 1, responses.end()});
+    setResponses({responses.end() - 4, responses.end()});
     playResponses();
     log() << "done playing second responses";
     verifySync(getNet(), ErrorCodes::OplogOutOfOrder);
@@ -1277,13 +1292,35 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
                          "{v:"
                       << OplogEntry::kOplogVersion
                       << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
-            // find:a
+            // find:a - first batch
             {"find",
-             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', firstBatch:["
                       "{_id:1, a:1} "
+                      "]}}")},
+            // getMore:a - second batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', nextBatch:["
+                      "{_id:2, a:2} "
+                      "]}}")},
+            // getMore:a - third batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', nextBatch:["
+                      "{_id:3, a:3} "
+                      "]}}")},
+            // getMore:a - fourth batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(2), ns:'a.a', nextBatch:["
+                      "{_id:3, a:3} "
+                      "]}}")},
+            // getMore:a - last batch
+            {"getMore",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', nextBatch:["
+                      "{_id:4, a:4} "
                       "]}}")},
             // Clone Done
             // get latest oplog ts
+            // This is a testing-only side effect of using playResponses. We may end up generating
+            // getMore responses past this timestamp 7.
             {"find",
              fromjson(str::stream()
                       << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
@@ -1296,9 +1333,9 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     startSync(1);
 
-    // Play first response to ensure data replicator has entered initial sync state.
+    // Play first 2 responses to ensure data replicator has started the oplog fetcher.
     setResponses({failedResponses.begin(), failedResponses.begin() + 2});
-    numGetMoreOplogEntriesMax = 7;
+    numGetMoreOplogEntriesMax = 10;
     playResponses();
     log() << "Done playing first failed response";
 
@@ -1318,8 +1355,10 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     playResponses();
     log() << "Done playing failed responses";
 
-    // Play the first response of the successful round of responses.
+    // Play the first 2 responses of the successful round of responses to ensure that the
+    // data replicator starts the oplog fetcher.
     setResponses({successfulResponses.begin(), successfulResponses.begin() + 2});
+    numGetMoreOplogEntries = 0;
     playResponses();
     log() << "Done playing first successful response";
 
@@ -1354,15 +1393,17 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2);
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
-    ASSERT_EQUALS(progress.getIntField("appliedOps"), 4);
-    ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
-                      fromjson(str::stream()
-                               << "{databasesCloned: 1, a: {collections: 1, "
-                                  "clonedCollections: 1, start: new Date(1406851200000), "
-                                  "end: new Date(1406851200000), elapsedMillis: 0, "
-                                  "'a.a': {documents: 1, indexes: 1, fetchedBatches: 1, "
-                                  "start: new Date(1406851200000), end: new "
-                                  "Date(1406851200000), elapsedMillis: 0}}}"));
+    // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
+    ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6);
+    auto databasesProgress = progress.getObjectField("databases");
+    ASSERT_EQUALS(1, databasesProgress.getIntField("databasesCloned"));
+    auto dbProgress = databasesProgress.getObjectField("a");
+    ASSERT_EQUALS(1, dbProgress.getIntField("collections"));
+    ASSERT_EQUALS(1, dbProgress.getIntField("clonedCollections"));
+    auto collectionProgress = dbProgress.getObjectField("a.a");
+    ASSERT_EQUALS(5, collectionProgress.getIntField("documents"));
+    ASSERT_EQUALS(1, collectionProgress.getIntField("indexes"));
+    ASSERT_EQUALS(5, collectionProgress.getIntField("fetchedBatches"));
 
     attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1);
