@@ -14,7 +14,8 @@ load('./jstests/multiVersion/libs/verify_collection_data.js');
 //     'dumpDir' : dumpDir,
 //     'testDbpath' : testDbpath,
 //     'dumpType' : "mongos",
-//     'restoreType' : "mongod" // "mongos" also supported
+//     'restoreType' : "mongod", // "mongos" also supported
+//     'storageEngine': [ "mmapv1" ]
 // }
 //
 // The first four fields are which versions of the various binaries to use in the test.
@@ -37,7 +38,8 @@ function multiVersionDumpRestoreTest(configObj) {
         'dumpDir',
         'testDbpath',
         'dumpType',
-        'restoreType'
+        'restoreType',
+        'storageEngine'
     ];
 
     var i;
@@ -53,7 +55,10 @@ function multiVersionDumpRestoreTest(configObj) {
         var shardingTestConfig = {
             name: testBaseName + "_sharded_source",
             mongos: [{binVersion: configObj.serverSourceVersion}],
-            shards: [{binVersion: configObj.serverSourceVersion}],
+            shards: [{
+                binVersion: configObj.serverSourceVersion,
+                storageEngine: configObj.storageEngine
+            }],
             config: [{binVersion: configObj.serverSourceVersion}],
             // TODO: SERVER-24163 remove after v3.4
             waitForCSRSSecondaries: false
@@ -61,8 +66,11 @@ function multiVersionDumpRestoreTest(configObj) {
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
     } else {
-        var serverSource = MongoRunner.runMongod(
-            {binVersion: configObj.serverSourceVersion, dbpath: configObj.testDbpath});
+        var serverSource = MongoRunner.runMongod({
+            binVersion: configObj.serverSourceVersion,
+            dbpath: configObj.testDbpath,
+            storageEngine: configObj.storageEngine
+        });
     }
     var sourceDB = serverSource.getDB(testBaseName);
 
@@ -102,7 +110,8 @@ function multiVersionDumpRestoreTest(configObj) {
 
     // Restore using the specified version of mongorestore
     if (configObj.restoreType === "mongod") {
-        var serverDest = MongoRunner.runMongod({binVersion: configObj.serverDestVersion});
+        var serverDest = MongoRunner.runMongod(
+            {binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine});
 
         MongoRunner.runMongoTool("mongorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
@@ -114,7 +123,8 @@ function multiVersionDumpRestoreTest(configObj) {
         var shardingTestConfig = {
             name: testBaseName + "_sharded_dest",
             mongos: [{binVersion: configObj.serverDestVersion}],
-            shards: [{binVersion: configObj.serverDestVersion}],
+            shards:
+                [{binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine}],
             config: [{binVersion: configObj.serverDestVersion}],
             // TODO: SERVER-24163 remove after v3.4
             waitForCSRSSecondaries: false
@@ -234,7 +244,8 @@ function getPermutationIterator(permsObj) {
 //     'dumpDir' : [ dumpDir ],
 //     'testDbpath' : [ testDbpath ],
 //     'dumpType' : [ "mongod", "mongos" ],
-//     'restoreType' : [ "mongod", "mongos" ]
+//     'restoreType' : [ "mongod", "mongos" ],
+//     'storageEngine': [ "mmapv1" ]
 // }
 //
 // This function will run a test for each possible combination of the parameters.  See comments on

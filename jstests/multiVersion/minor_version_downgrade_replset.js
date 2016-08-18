@@ -1,5 +1,6 @@
 // Test the downgrade of a replica set from latest version
 // to last-stable version succeeds, while reads and writes continue.
+// @tags: [requires_mmapv1]
 
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
@@ -15,7 +16,9 @@ var nodes = {
     n3: {binVersion: newVersion}
 };
 
-var rst = new ReplSetTest({name: name, nodes: nodes, nodeOptions: {storageEngine: 'mmapv1'}});
+// SERVER-25132 - Only runs in mmapv1
+var storageEngine = "mmapv1";
+var rst = new ReplSetTest({name: name, nodes: nodes, nodeOptions: {storageEngine: storageEngine}});
 rst.startSet();
 var replSetConfig = rst.getReplSetConfig();
 replSetConfig.protocolVersion = 0;
@@ -42,7 +45,7 @@ jsTest.log("Starting parallel operations during downgrade..");
 var joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
 
 jsTest.log("Downgrading replica set..");
-rst.upgradeSet({binVersion: oldVersion});
+rst.upgradeSet({binVersion: oldVersion, storageEngine: storageEngine});
 jsTest.log("Downgrade complete.");
 
 primary = rst.getPrimary();

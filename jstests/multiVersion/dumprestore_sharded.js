@@ -16,7 +16,8 @@ var shardedDumpTests = {
     'dumpDir': [dumpDir],
     'testDbpath': [testDbpath],
     'dumpType': ["mongos"],
-    'restoreType': ["mongod"]
+    'restoreType': ["mongod"],
+    'storageEngine': [jsTest.options().storageEngine || "wiredTiger"]
 };
 runAllDumpRestoreTests(shardedDumpTests);
 
@@ -29,6 +30,7 @@ var shardedRestoreTests = {
     'dumpDir': [dumpDir],
     'testDbpath': [testDbpath],
     'dumpType': ["mongod"],
-    'restoreType': ["mongos"]
+    'restoreType': ["mongos"],
+    'storageEngine': [jsTest.options().storageEngine || "wiredTiger"]
 };
 runAllDumpRestoreTests(shardedRestoreTests);
