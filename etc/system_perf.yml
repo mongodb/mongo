@@ -64,7 +64,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/dsi-v3.2/${version_id}/${revision}/mongod-${version_id}.tar.gz --production
+          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --production
           ls
           pwd
     - command: shell.exec
@@ -142,7 +142,7 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          $DSI_PATH/bin/mongodb_setup.py --config && echo "${cluster} MongoDB Cluster STARTED."
+          $DSI_PATH/bin/mongodb_setup.py --mongodb-binary-archive https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --config && echo "${cluster} MongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
@@ -230,7 +230,7 @@ functions:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
             local_file: reports.tgz
-            remote_file: dsi-v3.2/${build_variant}/${revision}/${task_id}/${version_id}/logs/${test}-${build_id}.${ext|tgz}
+            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${test}-${build_id}.${ext|tgz}
             bucket: mciuploads
             permissions: public-read
             content_type: ${content_type|application/x-gzip}
@@ -240,7 +240,7 @@ functions:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
             local_file: work/reports/graphs/timeseries-p1.html
-            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
+            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
             bucket: mciuploads
             permissions: public-read
             content_type: text/html
@@ -267,7 +267,10 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.1.8-Baseline 3.2.0-Baseline --overrideFile ../src/dsi/dsi/analysis/v3.2/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+          TAGS="3.1.8-Baseline 3.2.0-Baseline"
+          PROJECT="sys-perf-3.2"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/v3.2/system_perf_override.json"
+          python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $TAGS --overrideFile $OVERRIDEFILE --project_id sys-perf --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"
@@ -280,7 +283,9 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../src/dsi/dsi/analysis/v3.2/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+          TAG="3.0.6-Baseline"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/v3.2/system_perf_override.json"
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
 
   "compare":
     - command: shell.exec
@@ -352,7 +357,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb.tar.gz
-        remote_file: dsi-v3.2/${version_id}/${revision}/mongod-${version_id}.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -608,6 +613,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: single-replica
     cluster: single
+    project: &project dsi-v3.2
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -624,6 +630,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: standalone
     cluster: single
+    project: *project
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -643,6 +650,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
     cluster: shard
+    project: *project
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -659,6 +667,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: replica
     cluster: replica
+    project: *project
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -676,6 +685,7 @@ buildvariants:
     setup: replica
     cluster: replica
     platform: linux
+    project: *project
   run_on:
       - "rhel70-perf-standalone"
   tasks:
@@ -686,6 +696,8 @@ buildvariants:
   display_name: Linux Oplog Compare
   batchtime: 1440 # 24 hours
   modules: *modules
+  expansions:
+    project: *project
   run_on:
       - "rhel70-perf-standalone"
   tasks:
