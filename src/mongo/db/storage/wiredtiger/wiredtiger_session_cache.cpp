@@ -287,10 +287,13 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
 
     if (shuttingDown & kShuttingDownMask) {
-        // Leak the session in order to avoid race condition with clean shutdown, where the
-        // storage engine is ripped from underneath transactions, which are not "active"
-        // (i.e., do not have any locks), but are just about to delete the recovery unit.
-        // See SERVER-16031 for more information.
+        // There is a race condition with clean shutdown, where the storage engine is ripped from
+        // underneath OperationContexts, which are not "active" (i.e., do not have any locks), but
+        // are just about to delete the recovery unit. See SERVER-16031 for more information. Since
+        // shutting down the WT_CONNECTION will close all WT_SESSIONS, we shouldn't also try to
+        // directly close this session.
+        session->_session = nullptr;  // Prevents calling _session->close() in destructor.
+        delete session;
         return;
     }
 
