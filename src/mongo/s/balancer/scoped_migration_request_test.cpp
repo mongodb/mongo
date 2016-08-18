@@ -89,7 +89,7 @@ ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
 
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
-    return scopedMigrationRequest;
+    return std::move(scopedMigrationRequest);
 }
 
 MigrateInfo makeMigrateInfo() {
