@@ -26,6 +26,7 @@
               resource: {db: viewsDBName, collection: "view"},
               actions: ["find", "createCollection", "collMod"]
             },
+            {resource: {db: viewsDBName, collection: "view2"}, actions: ["find"]},
             {resource: {db: viewsDBName, collection: "permitted"}, actions: ["find"]}
         ],
         roles: []
@@ -83,4 +84,18 @@
         viewsDB.runCommand(
             {collMod: "view", viewOn: "permitted", pipeline: [{$facet: {b: [graphLookupStage]}}]}),
         ErrorCodes.Unauthorized);
+
+    // Performing a find on a readable view returns a cursor that allows us to perform a getMore
+    // even if the underlying collection is unreadable.
+    assert.eq(1, adminDB.auth("admin", "admin"));
+    assert.commandWorked(viewsDB.createView("view2", "forbidden", []));
+    for (let i = 0; i < 10; i++) {
+        assert.writeOK(viewsDB.forbidden.insert({x: 1}));
+    }
+    adminDB.logout();
+    assert.commandFailedWithCode(viewsDB.runCommand({find: "forbidden"}), ErrorCodes.Unauthorized);
+    let res = viewsDB.runCommand({find: "view2", batchSize: 1});
+    assert.commandWorked(res);
+    assert.eq(res.cursor.ns, "views_authz.view2");
+    assert.commandWorked(viewsDB.runCommand({getMore: res.cursor.id, collection: "view2"}));
 }());

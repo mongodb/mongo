@@ -14,7 +14,9 @@
         assert.commandWorked(res);
 
         let cursor = new DBCommandCursor(db.getMongo(), res, 5);
-        assert(arrayEq(cursor.toArray(), expected));
+        let actual = cursor.toArray();
+        assert(arrayEq(actual, expected),
+               "actual: " + tojson(cursor.toArray()) + ", expected:" + tojson(expected));
     };
 
     // Insert some control documents.

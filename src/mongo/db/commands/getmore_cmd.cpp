@@ -145,26 +145,12 @@ public:
             request.nss, request.cursorid, request.term.is_initialized());
     }
 
-    bool run(OperationContext* txn,
-             const std::string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
-        // Counted as a getMore, not as a command.
-        globalOpCounters.gotGetMore();
-
-        if (txn->getClient()->isInDirectClient()) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation, "Cannot run getMore command from eval()"));
-        }
-
-        StatusWith<GetMoreRequest> parseStatus = GetMoreRequest::parseFromBSON(dbname, cmdObj);
-        if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus.getStatus());
-        }
-        const GetMoreRequest& request = parseStatus.getValue();
+    bool runParsed(OperationContext* txn,
+                   const NamespaceString& origNss,
+                   const GetMoreRequest& request,
+                   BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) {
 
         auto curOp = CurOp::get(txn);
         curOp->debug().cursorid = request.cursorid;
@@ -208,9 +194,41 @@ public:
         if (request.nss.isListIndexesCursorNS() || request.nss.isListCollectionsCursorNS()) {
             cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, request.nss);
+            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(txn, request.nss);
+            auto viewCtx = static_cast<AutoGetCollectionOrViewForRead*>(ctx.get());
             Collection* collection = ctx->getCollection();
             if (!collection) {
+                // Rewrite a getMore on a view to a getMore on the original underlying collection.
+                // If the view no longer exists, or has been rewritten, the cursor id will be
+                // unknown, resulting in an appropriate error.
+                if (viewCtx->getView()) {
+                    auto resolved =
+                        viewCtx->getDb()->getViewCatalog()->resolveView(txn, request.nss);
+                    if (!resolved.isOK()) {
+                        return appendCommandStatus(result, resolved.getStatus());
+                    }
+                    viewCtx->releaseLocksForView();
+
+                    // Only one shardversion can be set at a time for an operation, so unset it
+                    // here to allow setting it on the underlying namespace.
+                    OperationShardingState::get(txn).unsetShardVersion(request.nss);
+
+                    GetMoreRequest newRequest(resolved.getValue().getNamespace(),
+                                              request.cursorid,
+                                              request.batchSize,
+                                              request.awaitDataTimeout,
+                                              request.term,
+                                              request.lastKnownCommittedOpTime);
+
+                    bool retVal = runParsed(txn, origNss, newRequest, cmdObj, errmsg, result);
+                    {
+                        // Set the namespace of the curop back to the view namespace so ctx records
+                        // stats on this view namespace on destruction.
+                        stdx::lock_guard<Client>(*txn->getClient());
+                        curOp->setNS_inlock(origNss.ns());
+                    }
+                    return retVal;
+                }
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::OperationFailed,
                                                   "collection dropped between getMore calls"));
@@ -429,7 +447,9 @@ public:
             curOp->debug().cursorExhausted = true;
         }
 
-        nextBatch.done(respondWithId, request.nss.ns());
+        // Respond with the originally requested namespace, even if this is a getMore over a view
+        // that was resolved to a different backing namespace.
+        nextBatch.done(respondWithId, origNss.ns());
 
         // Ensure log and profiler include the number of results returned in this getMore's response
         // batch.
@@ -449,6 +469,29 @@ public:
         }
 
         return true;
+    }
+
+    bool run(OperationContext* txn,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
+        // Counted as a getMore, not as a command.
+        globalOpCounters.gotGetMore();
+
+        if (txn->getClient()->isInDirectClient()) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::IllegalOperation, "Cannot run getMore command from eval()"));
+        }
+
+        StatusWith<GetMoreRequest> parsedRequest = GetMoreRequest::parseFromBSON(dbname, cmdObj);
+        if (!parsedRequest.isOK()) {
+            return appendCommandStatus(result, parsedRequest.getStatus());
+        }
+        auto request = parsedRequest.getValue();
+        return runParsed(txn, request.nss, request, cmdObj, errmsg, result);
     }
 
     /**

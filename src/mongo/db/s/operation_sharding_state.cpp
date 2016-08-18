@@ -90,6 +90,11 @@ void OperationShardingState::setShardVersion(NamespaceString nss, ChunkVersion n
     _hasVersion = true;
 }
 
+void OperationShardingState::unsetShardVersion(NamespaceString nss) {
+    invariant(!_hasVersion || _ns == nss);
+    _clear();
+}
+
 bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationContext* txn) {
     // Must not block while holding a lock
     invariant(!txn->lockState()->isLocked());
