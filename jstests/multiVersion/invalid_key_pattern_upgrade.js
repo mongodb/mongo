@@ -25,7 +25,6 @@
         var defaultOptions = {
             dbpath: dbpath,
             noCleanData: true,
-            storageEngine: jsTest.options().storageEngine
         };
 
         // Start the old version.

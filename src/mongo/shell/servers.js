@@ -907,8 +907,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      */
     function appendSetParameterArgs(argArray) {
         var programName = argArray[0];
-        var [baseProgramName, programVersion] = programName.split("-");
-        if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
+        if (programName.endsWith('mongod') || programName.endsWith('mongos') ||
+            programName.startsWith('mongod-') || programName.startsWith('mongos-')) {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
             }
@@ -931,8 +931,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 argArray.push(...['--setParameter', "enableLocalhostAuthBypass=false"]);
             }
 
-            // mongos only options.
-            if (baseProgramName === 'mongos') {
+            // mongos only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
+            if (programName.endsWith('mongos')) {
                 // apply setParameters for mongos
                 if (jsTest.options().setParametersMongos) {
                     var params = jsTest.options().setParametersMongos.split(",");
@@ -944,27 +944,20 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
             }
-            // mongod only options.
-            else if (baseProgramName === 'mongod') {
-                var storageEngine;
+            // mongod only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
+            else if (programName.endsWith('mongod')) {
                 // set storageEngine for mongod
                 if (jsTest.options().storageEngine) {
-                    storageEngine = jsTest.options().storageEngine;
                     if (argArray.indexOf("--storageEngine") < 0) {
-                        argArray.push(...['--storageEngine', storageEngine]);
-                    }
-                } else if (programVersion) {
-                    // There was no wiredTiger storageEngine before 3.0.
-                    if (parseInt(programVersion.split(".")[0]) < 3) {
-                        storageEngine = "mmapv1";
+                        argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
                     }
                 }
-                // Convert storageEngineCacheSizeGB to specific storageEngine parameter
                 if (jsTest.options().storageEngineCacheSizeGB) {
-                    if (storageEngine === "rocksdb") {
+                    if (jsTest.options().storageEngine === "rocksdb") {
                         argArray.push(
                             ...['--rocksdbCacheSizeGB', jsTest.options().storageEngineCacheSizeGB]);
-                    } else if (storageEngine === "wiredTiger" || !storageEngine) {
+                    } else if (jsTest.options().storageEngine === "wiredTiger" ||
+                               !jsTest.options().storageEngine) {
                         argArray.push(...['--wiredTigerCacheSizeGB',
                                           jsTest.options().storageEngineCacheSizeGB]);
                     }

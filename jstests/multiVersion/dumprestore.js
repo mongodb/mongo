@@ -18,7 +18,6 @@ var singleNodeTests = {
     'dumpDir': [dumpDir],
     'testDbpath': [testDbpath],
     'dumpType': ["mongod"],
-    'restoreType': ["mongod"],
-    'storageEngine': [jsTest.options().storageEngine || "wiredTiger"]
+    'restoreType': ["mongod"]
 };
 runAllDumpRestoreTests(singleNodeTests);
