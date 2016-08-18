@@ -585,6 +585,11 @@ protected:
                     net->now(),
                     ResponseStatus(RemoteCommandResponse(respBSON, BSONObj(), Milliseconds(10))));
 
+                log() << "Sending response for getMore network request:";
+                log() << "     req: " << noi->getRequest().dbname << "."
+                      << noi->getRequest().cmdObj;
+                log() << "     resp:" << respBSON;
+
                 if ((Date_t::now() - lastLog) > Seconds(1)) {
                     lastLog = Date_t::now();
                     log() << "processing oplog getmore, net:" << net->getDiagnosticString();
