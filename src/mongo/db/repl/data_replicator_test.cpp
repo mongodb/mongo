@@ -1054,11 +1054,15 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
 
     startSync(0);
 
-    numGetMoreOplogEntriesMax = 6;
+    // Set to a high enough number to ensure we have a pending getMore request in the queue after
+    // responding to the listDatabases request.
+    numGetMoreOplogEntriesMax = 20;
 
     setResponses(responses);
     playResponses();
     log() << "done playing responses - both oplog fetcher and databases cloner are active";
+
+    ASSERT_LESS_THAN(numGetMoreOplogEntries, numGetMoreOplogEntriesMax);
 
     {
         auto net = getNet();
