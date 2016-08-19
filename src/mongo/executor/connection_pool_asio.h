@@ -70,6 +70,7 @@ private:
 class ASIOConnection final : public ConnectionPool::ConnectionInterface {
 public:
     ASIOConnection(const HostAndPort& hostAndPort, size_t generation, ASIOImpl* global);
+    ~ASIOConnection();
 
     void indicateSuccess() override;
     void indicateUsed() override;

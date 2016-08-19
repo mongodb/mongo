@@ -256,6 +256,71 @@ TEST(ConnectionPoolASIO, ConnRefreshSurvivesFailure) {
     ASSERT_EQ(cps.totalCreated, 1u);
 }
 
+/**
+ * Tests that thrashing the timer while calls to setup are occurring doesn't crash.  This could
+ * occur if a setup connection goes through, but the timer thread is too over-worked to cancel the
+ * timers before they're invoked
+ */
+TEST(ConnectionPoolASIO, ConnSetupSurvivesFailure) {
+    auto fixture = unittest::getFixtureConnectionString();
+
+    NetworkInterfaceASIO::Options options;
+    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    options.connectionPoolOptions.refreshTimeout = Seconds(1);
+    NetworkInterfaceASIO net{std::move(options)};
+
+    net.startup();
+    auto guard = MakeGuard([&] { net.shutdown(); });
+
+    const int kNumThreads = 8;
+    const int kNumOps = 1000;
+
+    AtomicWord<size_t> unfinished(kNumThreads * kNumOps);
+    AtomicWord<size_t> unstarted(kNumThreads * kNumOps);
+
+    std::array<stdx::thread, kNumThreads> threads;
+    stdx::mutex mutex;
+    stdx::condition_variable condvar;
+
+    for (auto& thread : threads) {
+        thread = stdx::thread([&] {
+            for (int i = 0; i < kNumOps; i++) {
+                RemoteCommandRequest request{fixture.getServers()[0],
+                                             "admin",
+                                             BSON("sleep" << 1 << "lock"
+                                                          << "none"
+                                                          << "secs" << 3),
+                                             BSONObj()};
+                net.startCommand(makeCallbackHandle(),
+                                 request,
+                                 [&](StatusWith<RemoteCommandResponse> resp) {
+                                     if (!unfinished.subtractAndFetch(1)) {
+                                         condvar.notify_one();
+                                     }
+                                 });
+                unstarted.subtractAndFetch(1);
+            }
+        });
+    }
+
+    stdx::thread timerThrasher([&] {
+        while (unstarted.load()) {
+            net.setAlarm(Date_t::now() + Seconds(1), [] {});
+        }
+    });
+
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(mutex);
+    condvar.wait(lk, [&] { return !unfinished.load(); });
+
+    timerThrasher.join();
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo
