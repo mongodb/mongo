@@ -115,6 +115,13 @@ ASIOConnection::ASIOConnection(const HostAndPort& hostAndPort, size_t generation
       _impl(makeAsyncOp(this)),
       _timer(&_impl->strand()) {}
 
+ASIOConnection::~ASIOConnection() {
+    if (_impl) {
+        stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
+        _impl->_access->id++;
+    }
+}
+
 void ASIOConnection::indicateSuccess() {
     _status = Status::OK();
 }
@@ -192,16 +199,21 @@ void ASIOConnection::setup(Milliseconds timeout, SetupCallback cb) {
             cb(ptr, status);
         };
 
+        // Capturing the shared access pad and generation before calling setTimeout gives us enough
+        // information to avoid calling the timer if we shouldn't without needing any other
+        // resources that might have been cleaned up.
+        decltype(_impl->_access) access;
         std::size_t generation;
         {
             stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
-            generation = _impl->_access->id;
+            access = _impl->_access;
+            generation = access->id;
         }
 
         // Actually timeout setup
-        setTimeout(timeout, [this, generation] {
-            stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
-            if (generation != _impl->_access->id) {
+        setTimeout(timeout, [this, access, generation] {
+            stdx::lock_guard<stdx::mutex> lk(access->mutex);
+            if (generation != access->id) {
                 // The operation has been cleaned up, do not access.
                 return;
             }
@@ -267,6 +279,10 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
 }
 
 std::unique_ptr<NetworkInterfaceASIO::AsyncOp> ASIOConnection::releaseAsyncOp() {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
+        _impl->_access->id++;
+    }
     return std::move(_impl);
 }
 
