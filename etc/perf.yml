@@ -711,7 +711,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel70
+    - rhel62-large
   - name: aggregation
   - name: query
   - name: where
