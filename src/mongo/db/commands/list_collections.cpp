@@ -256,15 +256,13 @@ public:
                     }
                 }
             }
-            auto viewCatalog = db->getViewCatalog();
-            if (viewCatalog) {
-                for (auto& view : *viewCatalog) {
-                    BSONObj viewBson = buildViewBson(*(view.second.get()));
-                    if (!viewBson.isEmpty()) {
-                        _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
-                    }
+
+            db->getViewCatalog()->iterate(txn, [&](const ViewDefinition& view) {
+                BSONObj viewBson = buildViewBson(view);
+                if (!viewBson.isEmpty()) {
+                    _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
                 }
-            }
+            });
         }
 
         const std::string cursorNamespace = str::stream() << dbname << ".$cmd." << getName();

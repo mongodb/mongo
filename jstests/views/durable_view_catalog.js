@@ -79,8 +79,8 @@
                                  ErrorCodes.InvalidViewDefinition);
     assert.commandFailedWithCode(viewsDB.runCommand({drop: "view4"}),
                                  ErrorCodes.InvalidViewDefinition);
-    // TODO(SERVER-25569): We expect this to fail in the presence of bad view definitions.
-    assert.commandWorked(viewsDB.runCommand({listCollections: 1}));
+    assert.commandFailedWithCode(viewsDB.runCommand({listCollections: 1}),
+                                 ErrorCodes.InvalidViewDefinition);
 
     // Manually remove the invalid view definition from system.views, and then verify that view
     // operations work successfully without requiring a server restart.

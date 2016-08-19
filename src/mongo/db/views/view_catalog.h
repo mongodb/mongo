@@ -42,6 +42,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -49,24 +50,27 @@ namespace mongo {
 class OperationContext;
 
 /**
- * In-memory data structure for view definitions. This datastructure is thread-safe. This is needed
- * as concurrent updates may happen through direct writes to the views catalog collection.
+ * In-memory data structure for view definitions. This data structure is thread-safe -- this is
+ * needed as concurrent updates may happen through direct writes to the views catalog collection.
+ *
+ * All public methods of the view catalog obtain the mutex and refresh the in-memory map with the
+ * views catalog collection if necessary, throwing if the refresh fails.
  */
 class ViewCatalog {
     MONGO_DISALLOW_COPYING(ViewCatalog);
 
 public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
+    using ViewIteratorCallback = stdx::function<void(const ViewDefinition& view)>;
 
     explicit ViewCatalog(DurableViewCatalog* durable) : _durable(durable) {}
 
-    ViewMap::const_iterator begin() const {
-        return _viewMap.begin();
-    }
-
-    ViewMap::const_iterator end() const {
-        return _viewMap.end();
-    }
+    /**
+     * Iterates through the catalog, applying 'callback' to each view. This callback function
+     * executes under the catalog's mutex, so it must not access other methods of the catalog,
+     * acquire locks or run for a long time.
+     */
+    void iterate(OperationContext* txn, ViewIteratorCallback callback);
 
     /**
      * Create a new view 'viewName' with contents defined by running the specified aggregation

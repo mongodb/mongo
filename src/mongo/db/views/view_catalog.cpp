@@ -80,6 +80,14 @@ Status ViewCatalog::_reloadIfNeeded_inlock(OperationContext* txn) {
     return status;
 }
 
+void ViewCatalog::iterate(OperationContext* txn, ViewIteratorCallback callback) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    uassertStatusOK(_reloadIfNeeded_inlock(txn));
+    for (auto&& view : _viewMap) {
+        callback(*view.second);
+    }
+}
+
 Status ViewCatalog::_createOrUpdateView_inlock(OperationContext* txn,
                                                const NamespaceString& viewName,
                                                const NamespaceString& viewOn,
