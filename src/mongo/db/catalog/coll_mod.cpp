@@ -56,7 +56,7 @@ Status collMod(OperationContext* txn,
     Collection* coll = db ? db->getCollection(nss) : nullptr;
 
     // May also modify a view instead of a collection.
-    const ViewDefinition* view = db ? db->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
+    auto view = db ? db->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
     boost::optional<ViewDefinition> newView;
     if (view)
         newView = {*view};

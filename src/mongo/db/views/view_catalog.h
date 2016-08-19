@@ -56,7 +56,6 @@ class ViewCatalog {
     MONGO_DISALLOW_COPYING(ViewCatalog);
 
 public:
-    // TODO(SERVER-23700): Make this a unique_ptr once StringMap supports move-only types.
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
 
     explicit ViewCatalog(DurableViewCatalog* durable) : _durable(durable) {}
@@ -102,13 +101,10 @@ public:
 
 
     /**
-     * Look up the namespace in the view catalog, returning a pointer to a View definition, or
-     * nullptr if it doesn't exist. Note that the caller does not own the pointer.
-     *
-     * @param ns The full namespace string of the view.
-     * @return A bare pointer to a view definition if ns is a valid view with a backing namespace.
+     * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition, or
+     * nullptr if it doesn't exist.
      */
-    ViewDefinition* lookup(OperationContext* txn, StringData ns);
+    std::shared_ptr<ViewDefinition> lookup(OperationContext* txn, StringData nss);
 
     /**
      * Resolve the views on 'ns', transforming the pipeline appropriately. This function returns a
@@ -147,7 +143,7 @@ private:
      */
     Status _upsertIntoGraph(OperationContext* txn, const ViewDefinition& viewDef);
 
-    ViewDefinition* _lookup_inlock(OperationContext* txn, StringData ns);
+    std::shared_ptr<ViewDefinition> _lookup_inlock(OperationContext* txn, StringData ns);
     Status _reloadIfNeeded_inlock(OperationContext* txn);
 
     stdx::mutex _mutex;  // Protects all members, except for _valid.

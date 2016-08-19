@@ -217,7 +217,7 @@ public:
     AutoGetCollectionOrViewForRead(OperationContext* txn, const NamespaceString& nss);
 
     ViewDefinition* getView() const {
-        return _view;
+        return _view.get();
     }
 
     /**
@@ -230,7 +230,7 @@ public:
     void releaseLocksForView() noexcept;
 
 private:
-    ViewDefinition* _view;
+    std::shared_ptr<ViewDefinition> _view;
 };
 
 /**

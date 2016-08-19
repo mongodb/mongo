@@ -52,6 +52,7 @@ bool enableViews = true;
 }  // namespace
 
 namespace mongo {
+
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableViewsParameter(
     ServerParameterSet::getGlobal(), "enableViews", &enableViews);
 
@@ -190,7 +191,7 @@ Status ViewCatalog::modifyView(OperationContext* txn,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    ViewDefinition* viewPtr = _lookup_inlock(txn, viewName.ns());
+    auto viewPtr = _lookup_inlock(txn, viewName.ns());
     if (!viewPtr)
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot modify missing view " << viewName.ns());
@@ -210,7 +211,7 @@ Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewN
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // Save a copy of the view definition in case we need to roll back.
-    ViewDefinition* viewPtr = _lookup_inlock(txn, viewName.ns());
+    auto viewPtr = _lookup_inlock(txn, viewName.ns());
     if (!viewPtr) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "cannot drop missing view: " << viewName.ns()};
@@ -232,16 +233,16 @@ Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewN
     return Status::OK();
 }
 
-ViewDefinition* ViewCatalog::_lookup_inlock(OperationContext* txn, StringData ns) {
+std::shared_ptr<ViewDefinition> ViewCatalog::_lookup_inlock(OperationContext* txn, StringData ns) {
     uassertStatusOK(_reloadIfNeeded_inlock(txn));
     ViewMap::const_iterator it = _viewMap.find(ns);
     if (it != _viewMap.end()) {
-        return it->second.get();
+        return it->second;
     }
     return nullptr;
 }
 
-ViewDefinition* ViewCatalog::lookup(OperationContext* txn, StringData ns) {
+std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* txn, StringData ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lookup_inlock(txn, ns);
 }
@@ -253,7 +254,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* txn,
     std::vector<BSONObj> resolvedPipeline;
 
     for (int i = 0; i < ViewGraph::kMaxViewDepth; i++) {
-        ViewDefinition* view = _lookup_inlock(txn, resolvedNss->ns());
+        auto view = _lookup_inlock(txn, resolvedNss->ns());
         if (!view)
             return StatusWith<ResolvedView>({*resolvedNss, resolvedPipeline});
 
