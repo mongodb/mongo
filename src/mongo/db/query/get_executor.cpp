@@ -1137,6 +1137,10 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
         if (indices[i].multikey && isDottedField) {
             continue;
         }
+        // Skip indices where the first key is not field
+        if (indices[i].keyPattern.firstElementFieldName() != field) {
+            continue;
+        }
         int nFields = indices[i].keyPattern.nFields();
         // Pick the index with the lowest number of fields.
         if (nFields < minFields) {
