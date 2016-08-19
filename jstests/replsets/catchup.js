@@ -162,6 +162,7 @@ load("jstests/replsets/rslib.js");
     // Disable fail point on one of the other secondaries.
     // Wait until it catches up with the old primary.
     disableFailPoint(oldSecondaries[1]);
+    assert.commandWorked(oldSecondaries[1].adminCommand({replSetSyncFrom: oldPrimary.host}));
     awaitOpTime(oldSecondaries[1], latestOp.ts);
     // Disconnect the new primary and the old one.
     oldPrimary.disconnect(newPrimary);
