@@ -3779,7 +3779,7 @@ buildvariants:
   - name: tool_WT
   - name: unittests
   - name: ssl
-  - name: sslspecial
+  - name: sslSpecial
   - name: push
     distros:
     - rhel70
