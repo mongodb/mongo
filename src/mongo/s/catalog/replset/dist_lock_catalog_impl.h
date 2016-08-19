@@ -40,6 +40,7 @@
 
 namespace mongo {
 
+class FindAndModifyRequest;
 class NamespaceString;
 class ShardRegistry;
 struct HostAndPort;
@@ -74,6 +75,10 @@ public:
 
     virtual Status unlock(OperationContext* txn, const OID& lockSessionID) override;
 
+    virtual Status unlock(OperationContext* txn,
+                          const OID& lockSessionID,
+                          StringData name) override;
+
     virtual Status unlockAll(OperationContext* txn, const std::string& processID) override;
 
     virtual StatusWith<ServerInfo> getServerInfo(OperationContext* txn) override;
@@ -86,6 +91,8 @@ public:
     virtual Status stopPing(OperationContext* txn, StringData processId) override;
 
 private:
+    Status _unlock(OperationContext* txn, const FindAndModifyRequest& request);
+
     StatusWith<std::vector<BSONObj>> _findOnConfig(OperationContext* txn,
                                                    const ReadPreferenceSetting& readPref,
                                                    const NamespaceString& nss,

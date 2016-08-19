@@ -66,6 +66,10 @@ public:
 protected:
     virtual void unlock(OperationContext* txn, const DistLockHandle& lockHandle) override;
 
+    virtual void unlock(OperationContext* txn,
+                        const DistLockHandle& lockHandle,
+                        StringData name) override;
+
     virtual Status checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) override;
 
 private:

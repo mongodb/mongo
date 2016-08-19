@@ -160,6 +160,14 @@ public:
     virtual void unlock(OperationContext* txn, const DistLockHandle& lockHandle) = 0;
 
     /**
+     * Unlocks the lock specified by "lockHandle" and "name". Will attempt to retry again later if
+     * the config server is not reachable.
+     */
+    virtual void unlock(OperationContext* txn,
+                        const DistLockHandle& lockHandle,
+                        StringData name) = 0;
+
+    /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
      */
     virtual void unlockAll(OperationContext* txn, const std::string& processID) = 0;

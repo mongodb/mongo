@@ -77,6 +77,10 @@ public:
 
     virtual void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 
+    virtual void unlock(OperationContext* txn,
+                        const DistLockHandle& lockSessionID,
+                        StringData name) override;
+
     virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
 
 protected:
@@ -86,7 +90,7 @@ private:
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */
-    void queueUnlock(const DistLockHandle& lockSessionID);
+    void queueUnlock(const DistLockHandle& lockSessionID, const boost::optional<StringData>& name);
 
     /**
      * Periodically pings and checks if there are locks queued that needs unlocking.
@@ -132,7 +136,7 @@ private:
     // 2. Attempting to grab or overtake a lock resulted in an error where we are uncertain
     //    whether the modification was actually applied or not, and call unlock to make
     //    sure that it was cleaned up.
-    std::deque<DistLockHandle> _unlockList;  // (M)
+    std::deque<std::pair<DistLockHandle, boost::optional<StringData>>> _unlockList;  // (M)
 
     bool _isShutDown = false;              // (M)
     stdx::condition_variable _shutDownCV;  // (M)

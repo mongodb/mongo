@@ -115,6 +115,19 @@ void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lo
     _locks.erase(it);
 }
 
+void DistLockManagerMock::unlock(OperationContext* txn,
+                                 const DistLockHandle& lockHandle,
+                                 StringData name) {
+    std::vector<LockInfo>::iterator it =
+        std::find_if(_locks.begin(), _locks.end(), [&lockHandle, &name](LockInfo info) -> bool {
+            return ((info.lockID == lockHandle) && (info.name == name));
+        });
+    if (it == _locks.end()) {
+        return;
+    }
+    _locks.erase(it);
+}
+
 Status DistLockManagerMock::checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) {
     return Status::OK();
 }

@@ -139,22 +139,32 @@ void ReplSetDistLockManager::doTask() {
             }
             elapsedSincelastPing.reset();
 
-            std::deque<DistLockHandle> toUnlockBatch;
+            std::deque<std::pair<DistLockHandle, boost::optional<StringData>>> toUnlockBatch;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
                 toUnlockBatch.swap(_unlockList);
             }
 
             for (const auto& toUnlock : toUnlockBatch) {
-                auto unlockStatus = _catalog->unlock(txn.get(), toUnlock);
+                std::string nameMessage = "";
+                Status unlockStatus(ErrorCodes::NotYetInitialized,
+                                    "status unlock not initialized!");
+                if (toUnlock.second) {
+                    // A non-empty _id (name) field was provided, unlock by ts (sessionId) and _id.
+                    unlockStatus =
+                        _catalog->unlock(txn.get(), toUnlock.first, toUnlock.second.get());
+                    nameMessage = " and " + LocksType::name() + ": " + toUnlock.second->toString();
+                } else {
+                    unlockStatus = _catalog->unlock(txn.get(), toUnlock.first);
+                }
 
                 if (!unlockStatus.isOK()) {
                     warning() << "Failed to unlock lock with " << LocksType::lockID() << ": "
-                              << toUnlock << causedBy(unlockStatus);
-                    queueUnlock(toUnlock);
+                              << toUnlock.first << nameMessage << causedBy(unlockStatus);
+                    queueUnlock(toUnlock.first, toUnlock.second);
                 } else {
-                    LOG(0) << "distributed lock with " << LocksType::lockID() << ": " << toUnlock
-                           << "' unlocked.";
+                    LOG(0) << "distributed lock with " << LocksType::lockID() << ": "
+                           << toUnlock.first << nameMessage << " unlocked.";
                 }
 
                 if (isShutDown()) {
@@ -324,7 +334,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
 
             networkErrorRetries++;
 
-            status = _catalog->unlock(txn, lockSessionID);
+            status = _catalog->unlock(txn, lockSessionID, name);
             if (status.isOK()) {
                 // We certainly do not own the lock, so we can retry
                 continue;
@@ -341,7 +351,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         if (status != ErrorCodes::LockStateChangeFailed) {
             // An error occurred but the write might have actually been applied on the
             // other side. Schedule an unlock to clean it up just in case.
-            queueUnlock(lockSessionID);
+            queueUnlock(lockSessionID, name);
             return status;
         }
 
@@ -387,7 +397,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
                 if (overtakeStatus != ErrorCodes::LockStateChangeFailed) {
                     // An error occurred but the write might have actually been applied on the
                     // other side. Schedule an unlock to clean it up just in case.
-                    queueUnlock(lockSessionID);
+                    queueUnlock(lockSessionID, boost::none);
                     return overtakeStatus;
                 }
             }
@@ -423,10 +433,23 @@ void ReplSetDistLockManager::unlock(OperationContext* txn, const DistLockHandle&
     auto unlockStatus = _catalog->unlock(txn, lockSessionID);
 
     if (!unlockStatus.isOK()) {
-        queueUnlock(lockSessionID);
+        queueUnlock(lockSessionID, boost::none);
     } else {
         LOG(0) << "distributed lock with " << LocksType::lockID() << ": " << lockSessionID
                << "' unlocked.";
+    }
+}
+
+void ReplSetDistLockManager::unlock(OperationContext* txn,
+                                    const DistLockHandle& lockSessionID,
+                                    StringData name) {
+    auto unlockStatus = _catalog->unlock(txn, lockSessionID, name);
+
+    if (!unlockStatus.isOK()) {
+        queueUnlock(lockSessionID, name);
+    } else {
+        LOG(0) << "distributed lock with " << LocksType::lockID() << ": '" << lockSessionID
+               << "' and " << LocksType::name() << ": '" << name.toString() << "' unlocked.";
     }
 }
 
@@ -443,9 +466,10 @@ Status ReplSetDistLockManager::checkStatus(OperationContext* txn,
     return _catalog->getLockByTS(txn, lockHandle).getStatus();
 }
 
-void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID) {
+void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
+                                         const boost::optional<StringData>& name) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _unlockList.push_back(lockSessionID);
+    _unlockList.push_back(std::make_pair(lockSessionID, name));
 }
 
 }  // namespace mongo

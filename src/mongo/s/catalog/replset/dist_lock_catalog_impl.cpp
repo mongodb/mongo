@@ -296,12 +296,26 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
 }
 
 Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSessionID) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    FindAndModifyRequest request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::lockID(lockSessionID)),
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
     request.setWriteConcern(kMajorityWriteConcern);
+    return _unlock(txn, request);
+}
 
+Status DistLockCatalogImpl::unlock(OperationContext* txn,
+                                   const OID& lockSessionID,
+                                   StringData name) {
+    FindAndModifyRequest request = FindAndModifyRequest::makeUpdate(
+        _locksNS,
+        BSON(LocksType::lockID(lockSessionID) << LocksType::name(name.toString())),
+        BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+    request.setWriteConcern(kMajorityWriteConcern);
+    return _unlock(txn, request);
+}
+
+Status DistLockCatalogImpl::_unlock(OperationContext* txn, const FindAndModifyRequest& request) {
     auto resultStatus =
         _client->getConfigShard()->runCommand(txn,
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},

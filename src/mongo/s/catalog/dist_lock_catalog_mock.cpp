@@ -228,6 +228,23 @@ Status DistLockCatalogMock::unlock(OperationContext* txn, const OID& lockSession
     return ret;
 }
 
+Status DistLockCatalogMock::unlock(OperationContext* txn,
+                                   const OID& lockSessionID,
+                                   StringData name) {
+    auto ret = kBadRetValue;
+    UnlockFunc checkerFunc = noUnLockFuncSet;
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        ret = _unlockReturnValue;
+        checkerFunc = _unlockChecker;
+    }
+
+    checkerFunc(lockSessionID);
+
+    return ret;
+}
+
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogMock::getServerInfo(OperationContext* txn) {
     auto ret = kServerInfoBadRetValue;
     GetServerInfoFunc checkerFunc = noGetServerInfoSet;

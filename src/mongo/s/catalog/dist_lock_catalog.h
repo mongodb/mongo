@@ -132,6 +132,13 @@ public:
     virtual Status unlock(OperationContext* txn, const OID& lockSessionID) = 0;
 
     /**
+     * Same as unlock() above except that it unlocks the lock document that matches "lockSessionID"
+     * AND "name", rather than just "lockSessionID". This is necessary if multiple documents have
+     * been locked with the same lockSessionID.
+     */
+    virtual Status unlock(OperationContext* txn, const OID& lockSessionID, StringData name) = 0;
+
+    /**
      * Unlocks all distributed locks with the given owning process ID.  Does not provide any
      * indication as to how many locks were actually unlocked.  So long as the update command runs
      * successfully, returns OK, otherwise returns an error status.
