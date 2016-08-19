@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#pragma once
+
+#include "mongo/base/disallow_copying.h"
+
 namespace mongo {
 
 /**
@@ -63,6 +67,14 @@ enum WireVersion {
     COMMANDS_ACCEPT_WRITE_CONCERN = 5,
 };
 
+/**
+ * Struct to pass around information about wire version.
+ */
+struct WireVersionInfo {
+    int minWireVersion;
+    int maxWireVersion;
+};
+
 struct WireSpec {
     MONGO_DISALLOW_COPYING(WireSpec);
 
@@ -71,18 +83,20 @@ struct WireSpec {
         return instance;
     }
 
-    // Minimum version that the server accepts on incoming requests. We should bump this whenever
-    // we don't want to allow incoming connections from clients that are too old.
-    int minWireVersionIncoming;
-    // Latest version that the server accepts on incoming requests. This should always be at the
-    // latest entry in WireVersion.
-    int maxWireVersionIncoming;
+    // incoming.minWireVersion - Minimum version that the server accepts on incoming requests. We
+    // should bump this whenever we don't want to allow incoming connections from clients that are
+    // too old.
 
-    // Minimum version allowed on remote nodes when the server sends requests. We should bump this
-    // whenever we don't want to connect to clients that are too old.
-    int minWireVersionOutgoing;
-    // Latest version allowed on remote nodes when the server sends requests.
-    int maxWireVersionOutgoing;
+    // incoming.maxWireVersion - Latest version that the server accepts on incoming requests. This
+    // should always be at the latest entry in WireVersion.
+    WireVersionInfo incoming;
+
+    // outgoing.minWireVersion - Minimum version allowed on remote nodes when the server sends
+    // requests. We should bump this whenever we don't want to connect to clients that are too old.
+
+    // outgoing.maxWireVersion - Latest version allowed on remote nodes when the server sends
+    // requests.
+    WireVersionInfo outgoing;
 
 private:
     WireSpec() = default;

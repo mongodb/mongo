@@ -19,6 +19,27 @@
             arguments[0].other = {};
         }
 
+        // Do not start the mongos server for controlling the balancer if the config server is 3.2.
+        var skipControlMongoS = false;
+
+        var configOptions = arguments[0].other.configOptions;
+        if (configOptions && configOptions.binVersion == "last-stable") {
+            skipControlMongoS = true;
+        }
+
+        // Check if config server options were specified as an array instead.
+        if (arguments[0].config && Array.isArray(arguments[0].config) &&
+            arguments[0].config[0].binVersion == "last-stable") {
+            skipControlMongoS = true;
+        }
+
+        if (skipControlMongoS) {
+            // Construct the original object and skip creating the separate mongos for controlling
+            // the balancer.
+            originalShardingTest.apply(this, arguments);
+            return;
+        }
+
         var originalEnableBalancer = arguments[0].other.enableBalancer;
         if (!originalEnableBalancer) {
             arguments[0].other.enableBalancer = true;

@@ -108,7 +108,8 @@ StatusWith<ProtocolSet> parseProtocolSet(StringData repr) {
                                 << "and 'all' (0x3) are supported.");
 }
 
-StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMasterReply) {
+StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
+    const BSONObj& isMasterReply) {
     long long maxWireVersion;
     auto maxWireExtractStatus =
         bsonExtractIntegerField(isMasterReply, "maxWireVersion", &maxWireVersion);
@@ -120,7 +121,7 @@ StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMaste
     // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster' replies
     if ((maxWireExtractStatus == minWireExtractStatus) &&
         (maxWireExtractStatus == ErrorCodes::NoSuchKey)) {
-        return supports::kOpQueryOnly;
+        return {{supports::kOpQueryOnly, {0, 0}}};
     } else if (!maxWireExtractStatus.isOK()) {
         return maxWireExtractStatus;
     } else if (!minWireExtractStatus.isOK()) {
@@ -140,28 +141,76 @@ StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMaste
         isMongos = (msgField == "isdbgrid");
     }
 
-    return (!isMongos && supportsWireVersionForOpCommandInMongod(minWireVersion, maxWireVersion))
-        ? supports::kAll
-        : supports::kOpQueryOnly;
+    if (minWireVersion < 0 || maxWireVersion < 0 ||
+        minWireVersion >= std::numeric_limits<int>::max() ||
+        maxWireVersion >= std::numeric_limits<int>::max()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Server min and max wire version have invalid values ("
+                                    << minWireVersion
+                                    << ","
+                                    << maxWireVersion
+                                    << ")");
+    }
+
+    WireVersionInfo version{static_cast<int>(minWireVersion), static_cast<int>(maxWireVersion)};
+
+    return {{(!isMongos && supportsWireVersionForOpCommandInMongod(version))
+                 ? supports::kAll
+                 : supports::kOpQueryOnly,
+             version}};
 }
 
-bool supportsWireVersionForOpCommandInMongod(int minWireVersion, int maxWireVersion) {
+bool supportsWireVersionForOpCommandInMongod(const WireVersionInfo version) {
     // FIND_COMMAND versions support OP_COMMAND (in mongod but not mongos).
-    return (minWireVersion <= WireVersion::FIND_COMMAND) &&
-        (maxWireVersion >= WireVersion::FIND_COMMAND);
+    return (version.minWireVersion <= WireVersion::FIND_COMMAND) &&
+        (version.maxWireVersion >= WireVersion::FIND_COMMAND);
 }
 
-ProtocolSet computeProtocolSet(int minWireVersion, int maxWireVersion) {
+ProtocolSet computeProtocolSet(const WireVersionInfo version) {
     ProtocolSet result = supports::kNone;
-    if (minWireVersion <= maxWireVersion) {
-        if (maxWireVersion >= WireVersion::FIND_COMMAND) {
+    if (version.minWireVersion <= version.maxWireVersion) {
+        if (version.maxWireVersion >= WireVersion::FIND_COMMAND) {
             result |= supports::kOpCommandOnly;
         }
-        if (minWireVersion <= WireVersion::RELEASE_2_4_AND_BEFORE) {
+        if (version.minWireVersion <= WireVersion::RELEASE_2_4_AND_BEFORE) {
             result |= supports::kOpQueryOnly;
         }
     }
     return result;
+}
+
+Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo server) {
+    // Since this is defined in the code, it should always hold true since this is the versions that
+    // mongos/d wants to connect to.
+    invariant(client.minWireVersion <= client.maxWireVersion);
+
+    // Server may return bad data.
+    if (server.minWireVersion > server.maxWireVersion) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Server min and max wire version are incorrect ("
+                                    << server.minWireVersion
+                                    << ","
+                                    << server.maxWireVersion
+                                    << ")");
+    }
+
+    // Determine if the [min, max] tuples overlap.
+    // We assert the invariant that min < max above.
+    if (!(client.minWireVersion <= server.maxWireVersion &&
+          client.maxWireVersion >= server.minWireVersion)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Server min and max wire version are incompatible ("
+                                    << server.minWireVersion
+                                    << ","
+                                    << server.maxWireVersion
+                                    << ") with client min wire version ("
+                                    << client.minWireVersion
+                                    << ","
+                                    << client.maxWireVersion
+                                    << ")");
+    }
+
+    return Status::OK();
 }
 
 }  // namespace rpc

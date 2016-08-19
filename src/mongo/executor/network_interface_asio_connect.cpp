@@ -52,8 +52,7 @@ NetworkInterfaceASIO::AsyncConnection::AsyncConnection(std::unique_ptr<AsyncStre
                                                        rpc::ProtocolSet protocols)
     : _stream(std::move(stream)),
       _serverProtocols(protocols),
-      _clientProtocols(rpc::computeProtocolSet(WireSpec::instance().minWireVersionOutgoing,
-                                               WireSpec::instance().maxWireVersionOutgoing)) {}
+      _clientProtocols(rpc::computeProtocolSet(WireSpec::instance().outgoing)) {}
 
 AsyncStreamInterface& NetworkInterfaceASIO::AsyncConnection::stream() {
     return *_stream;

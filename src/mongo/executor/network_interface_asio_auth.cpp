@@ -39,6 +39,7 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_request_builder.h"
@@ -109,7 +110,15 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         if (!protocolSet.isOK())
             return _completeOperation(op, protocolSet.getStatus());
 
-        op->connection().setServerProtocols(protocolSet.getValue());
+        auto validateStatus =
+            rpc::validateWireVersion(WireSpec::instance().outgoing, protocolSet.getValue().version);
+        if (!validateStatus.isOK()) {
+            warning() << "remote host has incompatible wire version: " << validateStatus;
+
+            return _completeOperation(op, validateStatus);
+        }
+
+        op->connection().setServerProtocols(protocolSet.getValue().protocolSet);
 
         invariant(op->connection().clientProtocols() != rpc::supports::kNone);
         // Set the operation protocol

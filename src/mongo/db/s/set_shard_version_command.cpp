@@ -148,8 +148,8 @@ public:
 
             // TODO: SERVER-21397 remove post v3.3.
             // Send back wire version to let mongos know what protocol we can speak
-            result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
-            result.append("maxWireVersion", WireSpec::instance().maxWireVersionIncoming);
+            result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+            result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
 
             return true;
         }
