@@ -632,6 +632,10 @@ void Database::dropDatabase(OperationContext* txn, Database* db) {
 
     audit::logDropDatabase(txn->getClient(), name);
 
+    for (auto&& coll : *db) {
+        Top::get(txn->getClient()->getServiceContext()).collectionDropped(coll->ns().ns(), true);
+    }
+
     dbHolder().close(txn, name);
     db = NULL;  // d is now deleted
 

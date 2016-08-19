@@ -99,7 +99,7 @@ public:
 
     void cloneMap(UsageMap& out) const;
 
-    void collectionDropped(StringData ns);
+    void collectionDropped(StringData ns, bool databaseDropped = false);
 
     /**
      * Appends the collection-level latency statistics

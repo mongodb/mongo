@@ -84,8 +84,6 @@ void Top::record(OperationContext* txn,
         return;
 
     auto hashedNs = UsageMap::HashedKey(ns);
-
-    // cout << "record: " << ns << "\t" << op << "\t" << command << endl;
     stdx::lock_guard<SimpleMutex> lk(_lock);
 
     if ((command || logicalOp == LogicalOp::opQuery) && ns == _lastDropped) {
@@ -142,10 +140,14 @@ void Top::_record(OperationContext* txn,
     }
 }
 
-void Top::collectionDropped(StringData ns) {
+void Top::collectionDropped(StringData ns, bool databaseDropped) {
     stdx::lock_guard<SimpleMutex> lk(_lock);
     _usage.erase(ns);
-    _lastDropped = ns.toString();
+    if (!databaseDropped) {
+        // If a collection drop occurred, there will be a subsequent call to record for this
+        // collection namespace which must be ignored. This does not apply to a database drop.
+        _lastDropped = ns.toString();
+    }
 }
 
 void Top::cloneMap(Top::UsageMap& out) const {
