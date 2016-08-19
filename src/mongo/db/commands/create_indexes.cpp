@@ -187,13 +187,6 @@ public:
         }
 
         Database* db = dbHolder().get(txn, ns.db());
-
-        if (db && db->getViewCatalog()->lookup(txn, ns.ns())) {
-            errmsg = "cannot create indexes on a view";
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::CommandNotSupportedOnView, errmsg));
-        }
-
         if (!db) {
             db = dbHolder().openDb(txn, ns.db());
         }
@@ -202,6 +195,11 @@ public:
         if (collection) {
             result.appendBool("createdCollectionAutomatically", false);
         } else {
+            if (db->getViewCatalog()->lookup(txn, ns.ns())) {
+                errmsg = "Cannot create indexes on a view";
+                return appendCommandStatus(result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
+            }
+
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
                 collection = db->createCollection(txn, ns.ns(), CollectionOptions());

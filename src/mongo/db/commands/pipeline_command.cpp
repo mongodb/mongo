@@ -175,7 +175,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
     // This is necessary to prevent a cycle from being formed among the view definitions cached in
     // 'resolvedNamespaces' because we won't re-resolve a view namespace we've already encountered.
     AutoGetDb autoDb(txn, expCtx->ns.db(), MODE_IS);
-    ViewCatalog* viewCatalog = autoDb.getDb() ? autoDb.getDb()->getViewCatalog() : nullptr;
+    Database* const db = autoDb.getDb();
+    ViewCatalog* viewCatalog = db ? db->getViewCatalog() : nullptr;
 
     const auto& pipelineInvolvedNamespaces = pipeline->getInvolvedCollections();
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
@@ -190,9 +191,15 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             continue;
         }
 
-        if (viewCatalog && viewCatalog->lookup(txn, involvedNs.ns())) {
-            // If the database exists and 'involvedNs' refers to a view namespace, then we resolve
-            // its definition.
+        if (!db || db->getCollection(involvedNs.ns())) {
+            // If the database exists and 'involvedNs' refers to a collection namespace, then we
+            // resolve it as an empty pipeline in order to read directly from the underlying
+            // collection. If the database doesn't exist, then we still resolve it as an empty
+            // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
+            // snapshot of the view catalog.
+            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+        } else if (viewCatalog->lookup(txn, involvedNs.ns())) {
+            // If 'involvedNs' refers to a view namespace, then we resolve its definition.
             auto resolvedView = viewCatalog->resolveView(txn, involvedNs);
             if (!resolvedView.isOK()) {
                 return {ErrorCodes::FailedToParse,
@@ -220,11 +227,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                                            resolvedViewInvolvedNamespaces.begin(),
                                            resolvedViewInvolvedNamespaces.end());
         } else {
-            // If the database exists and 'involvedNs' refers to a collection namespace, then we
-            // resolve it as an empty pipeline in order to read directly from the underlying
-            // collection. If the database doesn't exist, then we still resolve it as an empty
-            // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
-            // snapshot of the view catalog.
+            // 'involvedNs' is neither a view nor a collection, so resolve it as an empty pipeline
+            // to treat it as reading from a non-existent collection.
             resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
         }
     }

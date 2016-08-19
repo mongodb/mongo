@@ -149,7 +149,8 @@ public:
         Database* const collDB = autoDb.getDb();
 
         Collection* collection = collDB ? collDB->getCollection(nss) : nullptr;
-        auto view = collDB ? collDB->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
+        auto view =
+            collDB && !collection ? collDB->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
 
         // If db/collection does not exist, short circuit and return.
         if (!collDB || !collection) {

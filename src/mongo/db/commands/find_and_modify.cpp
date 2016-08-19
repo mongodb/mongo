@@ -395,11 +395,6 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                if (autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::CommandNotSupportedOnView,
-                                                "findAndModify not supported on views"});
-                }
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
@@ -418,6 +413,11 @@ public:
                 }
 
                 Collection* const collection = autoDb.getDb()->getCollection(nsString.ns());
+                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::CommandNotSupportedOnView,
+                                                "findAndModify not supported on a view"});
+                }
                 auto statusWithPlanExecutor =
                     getExecutorDelete(txn, opDebug, collection, &parsedDelete);
                 if (!statusWithPlanExecutor.isOK()) {
@@ -472,12 +472,6 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                if (autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::CommandNotSupportedOnView,
-                                                "findAndModify not supported on views"});
-                }
-
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
@@ -496,6 +490,11 @@ public:
                 }
 
                 Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
+                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::CommandNotSupportedOnView,
+                                                "findAndModify not supported on a view"});
+                }
 
                 // Create the collection if it does not exist when performing an upsert
                 // because the update stage does not create its own collection.

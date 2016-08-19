@@ -972,7 +972,7 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     }
     {
         Database* db = dbHolder().get(txn, nss.ns());
-        if (db && db->getViewCatalog()->lookup(txn, nss.ns())) {
+        if (db && !db->getCollection(nss.ns()) && db->getViewCatalog()->lookup(txn, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }

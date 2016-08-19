@@ -56,10 +56,13 @@ Status collMod(OperationContext* txn,
     Collection* coll = db ? db->getCollection(nss) : nullptr;
 
     // May also modify a view instead of a collection.
-    auto view = db ? db->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
-    boost::optional<ViewDefinition> newView;
-    if (view)
-        newView = {*view};
+    boost::optional<ViewDefinition> view;
+    if (db && !coll) {
+        auto sharedView = db->getViewCatalog()->lookup(txn, nss.ns());
+        if (sharedView) {
+            view = {*sharedView};
+        }
+    }
 
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
@@ -245,7 +248,7 @@ Status collMod(OperationContext* txn,
                     Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
                 continue;
             }
-            newView->setPipeline(e);
+            view->setPipeline(e);
         } else if (str::equals("viewOn", e.fieldName())) {
             if (!view) {
                 errorStatus =
@@ -257,7 +260,7 @@ Status collMod(OperationContext* txn,
                     Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
                 continue;
             }
-            newView->setViewOn(NamespaceString(dbName, e.str()));
+            view->setViewOn(NamespaceString(dbName, e.str()));
         } else {
             // As of SERVER-17312 we only support these two options. When SERVER-17320 is
             // resolved this will need to be enhanced to handle other options.
@@ -310,10 +313,10 @@ Status collMod(OperationContext* txn,
         ViewCatalog* catalog = db->getViewCatalog();
 
         BSONArrayBuilder pipeline;
-        for (auto& item : newView->pipeline()) {
+        for (auto& item : view->pipeline()) {
             pipeline.append(item);
         }
-        errorStatus = catalog->modifyView(txn, nss, newView->viewOn(), BSONArray(pipeline.obj()));
+        errorStatus = catalog->modifyView(txn, nss, view->viewOn(), BSONArray(pipeline.obj()));
         if (!errorStatus.isOK()) {
             return errorStatus;
         }

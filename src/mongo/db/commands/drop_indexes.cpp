@@ -133,10 +133,8 @@ public:
         OldClientContext ctx(txn, toReIndexNs.ns());
 
         Collection* collection = ctx.db()->getCollection(toReIndexNs.ns());
-        auto view = ctx.db()->getViewCatalog()->lookup(txn, toReIndexNs.ns());
-
         if (!collection) {
-            if (view)
+            if (ctx.db()->getViewCatalog()->lookup(txn, toReIndexNs.ns()))
                 return appendCommandStatus(
                     result, {ErrorCodes::CommandNotSupportedOnView, "can't re-index a view"});
             else
