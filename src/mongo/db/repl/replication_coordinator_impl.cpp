@@ -2410,8 +2410,15 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
-    _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
-    _performPostMemberStateUpdateAction(action);
+    auto evh = _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
+    if (evh) {
+        _replExecutor.onEvent(evh,
+                              [this, action](const ReplicationExecutor::CallbackArgs& cbArgs) {
+                                  _performPostMemberStateUpdateAction(action);
+                              });
+    } else {
+        _performPostMemberStateUpdateAction(action);
+    }
 }
 
 Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
@@ -2532,11 +2539,8 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
-    const ReplicaSetConfig oldConfig = _rsConfig;
-    const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+    auto action = _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
-    _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -3665,18 +3669,25 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     }
 }
 
-void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
+EventHandle ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
     const ReplicaSetConfig& oldConfig, const ReplicaSetConfig& newConfig) {
     // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
     // nodes.
     if (!oldConfig.isInitialized() ||
         oldConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
-        return;
+        return {};
     }
     invariant(newConfig.getProtocolVersion() == 1);
 
     // Write last vote
-    auto cbStatus = _replExecutor.scheduleDBWork([this](const CallbackArgs& cbData) {
+    auto evhStatus = _replExecutor.makeEvent();
+    if (evhStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return {};
+    }
+    invariant(evhStatus.isOK());
+    auto evh = evhStatus.getValue();
+
+    auto cbStatus = _replExecutor.scheduleDBWork([this, evh](const CallbackArgs& cbData) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
         }
@@ -3685,13 +3696,13 @@ void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
         LastVote lastVote{OpTime::kInitialTerm, -1};
         auto status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
         invariant(status.isOK());
+        _replExecutor.signalEvent(evh);
     });
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return;
+        return {};
     }
-
     invariant(cbStatus.isOK());
-    _replExecutor.wait(cbStatus.getValue());
+    return evh;
 }
 
 CallbackHandle ReplicationCoordinatorImpl::_scheduleWork(const CallbackFn& work) {
