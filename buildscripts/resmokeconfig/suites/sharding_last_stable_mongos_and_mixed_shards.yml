@@ -44,8 +44,6 @@ selector:
     # Bug in v3.2 shards, fixed in v3.4.
     - jstests/sharding/auth_sharding_cmd_metadata.js
     - jstests/sharding/split_against_shard_with_invalid_split_points.js
-    # TODO Requires mongos to have fix for SERVER-25258. Enable when v3.2.9+ is 'last-stable'.
-    - jstests/sharding/kill_op_overflow.js
     # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
     # 'last-stable'.
     - jstests/sharding/collation_targeting.js
