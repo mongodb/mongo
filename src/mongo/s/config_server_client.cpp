@@ -73,7 +73,7 @@ Status rebalanceChunk(OperationContext* txn, const ChunkType& chunk) {
                           kPrimaryOnlyReadPreference,
                           "admin",
                           BalanceChunkRequest::serializeToRebalanceCommandForConfig(chunk),
-                          Shard::RetryPolicy::kIdempotent);
+                          Shard::RetryPolicy::kNotIdempotent);
     if (!cmdResponseStatus.isOK()) {
         return cmdResponseStatus.getStatus();
     }

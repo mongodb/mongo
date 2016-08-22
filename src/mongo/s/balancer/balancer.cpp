@@ -252,24 +252,11 @@ Status Balancer::rebalanceSingleChunk(OperationContext* txn, const ChunkType& ch
         return refreshStatus;
     }
 
-    // Wait for the migration to complete
-    Status migrationStatus =
-        _migrationManager.executeManualMigration(txn,
-                                                 *migrateInfo,
-                                                 balancerConfig->getMaxChunkSizeBytes(),
-                                                 balancerConfig->getSecondaryThrottle(),
-                                                 balancerConfig->waitForDelete());
-
-    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
-    }
-
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
-    cm->reload(txn);
-
-    return migrationStatus;
+    return _migrationManager.executeManualMigration(txn,
+                                                    *migrateInfo,
+                                                    balancerConfig->getMaxChunkSizeBytes(),
+                                                    balancerConfig->getSecondaryThrottle(),
+                                                    balancerConfig->waitForDelete());
 }
 
 Status Balancer::moveSingleChunk(OperationContext* txn,
@@ -283,24 +270,11 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
         return moveAllowedStatus;
     }
 
-    // Wait for the migration to complete
-    Status migrationStatus =
-        _migrationManager.executeManualMigration(txn,
-                                                 MigrateInfo(chunk.getNS(), newShardId, chunk),
-                                                 maxChunkSizeBytes,
-                                                 secondaryThrottle,
-                                                 waitForDelete);
-
-    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(chunk.getNS()));
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
-    }
-
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
-    cm->reload(txn);
-
-    return migrationStatus;
+    return _migrationManager.executeManualMigration(txn,
+                                                    MigrateInfo(chunk.getNS(), newShardId, chunk),
+                                                    maxChunkSizeBytes,
+                                                    secondaryThrottle,
+                                                    waitForDelete);
 }
 
 void Balancer::report(OperationContext* txn, BSONObjBuilder* builder) {

@@ -79,10 +79,13 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     : _args(std::move(request)), _startTime() {
     invariant(!txn->lockState()->isLocked());
 
+    // Disallow moving a chunk to ourselves
+    uassert(ErrorCodes::InvalidOptions,
+            "Destination shard cannot be the same as source",
+            _args.getFromShardId() != _args.getToShardId());
+
     const auto& oss = OperationShardingState::get(txn);
-    if (!oss.hasShardVersion()) {
-        uasserted(ErrorCodes::InvalidOptions, "collection version is missing");
-    }
+    uassert(ErrorCodes::InvalidOptions, "collection version is missing", oss.hasShardVersion());
 
     // Even though the moveChunk command transmits a value in the operation's shardVersion field,
     // this value does not actually contain the shard version, but the global collection version.
