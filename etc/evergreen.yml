@@ -96,31 +96,6 @@ variables:
   - osx-107
 
 
-- &packaging_variants
-  - enterprise-linux-64-amazon-ami
-  - enterprise-rhel-57-64-bit
-  - enterprise-rhel-62-64-bit
-  - enterprise-rhel-70-64-bit
-  - enterprise-rhel-71-ppc64le
-  - enterprise-suse11-64
-  - enterprise-suse12-64
-  - enterprise-ubuntu1204-64
-  - enterprise-ubuntu1404-64
-  - enterprise-ubuntu1604-64
-  - enterprise-debian71-64
-  - enterprise-debian81-64
-  - rhel55
-  - rhel62
-  - rhel70
-  - suse11
-  - suse12
-  - ubuntu1204
-  - ubuntu1404
-  - ubuntu1604
-  - amazon
-  - debian71
-  - debian81
-
 #######################################
 #            Functions                #
 #######################################
@@ -399,6 +374,15 @@ functions:
         rm -rf /data/install /data/multiversion
         ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_platform_arch|"Linux/x86_64"} "3.3.10"
 
+  "cleanup environment" :
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+
+        rm -rf src /data/db/* mongo-coredumps.tgz ~/.aws
+
 pre:
   - command: shell.track
   - command: shell.exec
@@ -412,7 +396,7 @@ pre:
         set -o errexit
         set -o verbose
 
-        rm -rf src /data/db/* mongo-coredumps.tgz
+  - func: "cleanup environment"
   - command: expansions.update
     params:
        updates:
@@ -510,11 +494,7 @@ post:
         else
           echo "No OOM (Out of memory) killed processes detected"
         fi
-  - command: shell.exec
-    params:
-      script: |
-        rm -rf ~/.aws
-  - command: shell.cleanup
+  - func: "cleanup environment"
 
 timeout:
   - command: shell.exec
