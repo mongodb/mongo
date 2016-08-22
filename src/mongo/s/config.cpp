@@ -54,6 +54,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
+
 namespace mongo {
 
 using std::set;
@@ -435,6 +436,147 @@ bool DBConfig::load(OperationContext* txn) {
     return _load(txn);
 }
 
+void DBConfig::registerGeometry(OperationContext* txn,BSONObj bdr)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    
+    conn->insert(DatabaseType::GeoMetaDataNS, bdr);
+    conn.done();
+    this->_currGeoMeta.datanamespace = bdr["NAMESPACE"].str();
+    this->_currGeoMeta.column_name = bdr["COLUMN_NAME"].str();
+    this->_currGeoMeta.gtype = bdr["SDO_GTYPE"].Int();
+    this->_currGeoMeta.index_type = bdr["INDEX_TYPE"].Int();
+    this->_currGeoMeta.srid = bdr["SRID"].Int();
+    this->_currGeoMeta.crs_type = bdr["CRS_TYPE"].Int();
+    this->_currGeoMeta.tolerrance = bdr["TOLERANCE"].Double();
+    this->_currGeoMeta.index_info = bdr["INDEX_INFO"].OID();
+    
+}
+
+BSONObj DBConfig::getGeometry(OperationContext* txn,BSONObj query)
+{
+   
+    if (query.hasField("NAMESPACE") && _currGeoMeta.datanamespace == query["NAMESPACE"].str())
+    {
+        return this->_currGeoMeta.toBson();
+    }
+    else
+    {
+        ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+        BSONObj Geo= conn->findOne(DatabaseType::GeoMetaDataNS, query);
+        conn.done();
+        //log() << "geo:" << Geo;
+        if (!Geo.isEmpty())
+        {
+            this->_currGeoMeta.datanamespace = Geo["NAMESPACE"].str();
+            log() << "datanamespace" << this->_currGeoMeta.datanamespace;
+            this->_currGeoMeta.column_name = Geo["COLUMN_NAME"].str();
+            this->_currGeoMeta.gtype = Geo["SDO_GTYPE"].Int();
+            this->_currGeoMeta.index_type = Geo["INDEX_TYPE"].Int();
+            this->_currGeoMeta.srid = Geo["SRID"].Int();
+            this->_currGeoMeta.crs_type = Geo["CRS_TYPE"].Int();
+            this->_currGeoMeta.tolerrance = Geo["TOLERANCE"].Double();
+            this->_currGeoMeta.index_info = Geo["INDEX_INFO"].OID();
+        }
+        return Geo;
+    }
+}
+
+void  DBConfig::updateGeometry(OperationContext* txn,BSONObj query, BSONObj obj)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    conn->update(DatabaseType::GeoMetaDataNS, query,obj);
+    BSONObj Geo = conn->findOne(DatabaseType::GeoMetaDataNS, query);
+    conn.done();
+    if (!Geo.isEmpty())
+    {
+        this->_currGeoMeta.datanamespace = Geo["NAMESPACE"].str();
+        this->_currGeoMeta.column_name = Geo["COLUMN_NAME"].str();
+        this->_currGeoMeta.gtype = Geo["SDO_GTYPE"].Int();
+        this->_currGeoMeta.index_type = Geo["INDEX_TYPE"].Int();
+        this->_currGeoMeta.srid = Geo["SRID"].Int();
+        this->_currGeoMeta.crs_type = Geo["CRS_TYPE"].Int();
+        this->_currGeoMeta.tolerrance = Geo["TOLERANCE"].Double();
+        this->_currGeoMeta.index_info = Geo["INDEX_INFO"].OID();
+        log() << "oid:" << this->_currGeoMeta.index_info;
+    }
+}
+
+void DBConfig::deleteGeometry(OperationContext* txn,BSONObj query)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    conn->remove(DatabaseType::GeoMetaDataNS, query);
+    conn.done();
+    if (query.hasField("NAMESPACE") && _currGeoMeta.datanamespace == query["NAMESPACE"].str())
+    {
+        this->_currGeoMeta.datanamespace ="";
+        this->_currGeoMeta.column_name ="";
+        this->_currGeoMeta.gtype = 0;
+        this->_currGeoMeta.index_type = 0;
+        this->_currGeoMeta.srid = 0;
+        this->_currGeoMeta.crs_type = 0;
+        this->_currGeoMeta.tolerrance = 0;
+        this->_currGeoMeta.index_info = OID("000000000000000000000000");
+    }
+}
+
+bool DBConfig::checkGeoExist(OperationContext* txn,BSONObj bdr)
+{
+    if (bdr.hasField("NAMESPACE") && _currGeoMeta.datanamespace == bdr["NAMESPACE"].str())
+    {
+        return true;
+    }
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    BSONObj Geo = conn->findOne(DatabaseType::GeoMetaDataNS, bdr);
+    conn.done();
+    if (Geo.isEmpty())
+        return false;
+    return true;
+}
+
+bool DBConfig::checkRtreeExist(OperationContext* txn,BSONObj bdr)
+{
+    if (bdr.hasField("NAMESPACE") && _currGeoMeta.datanamespace == bdr["NAMESPACE"].str())
+    {
+        return _currGeoMeta.index_type != 0 ? true : false;
+    }
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    BSONObj Geo = conn->findOne(DatabaseType::GeoMetaDataNS, bdr);
+    conn.done();
+    if (Geo.isEmpty())
+        return false;
+    else
+        return Geo["INDEX_TYPE"].Int() != 0 ? true : false;
+}
+
+void DBConfig::insertIndexMetadata(OperationContext* txn,BSONObj bdr)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    conn->insert(DatabaseType::IndexMetaDataNS, bdr);
+    conn.done();
+}
+
+BSONObj DBConfig::getIndexMetadata(OperationContext* txn,BSONObj query)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    BSONObj index = conn->findOne(DatabaseType::IndexMetaDataNS, query);
+    conn.done();
+    return index;
+}
+
+void DBConfig::updateIndexMetadata(OperationContext* txn,BSONObj query, BSONObj obj)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    conn->update(DatabaseType::IndexMetaDataNS, query,obj);
+    conn.done();
+}
+
+void DBConfig::deleteIndexMetadata(OperationContext* txn,BSONObj query)
+{
+    ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString());
+    conn->remove(DatabaseType::IndexMetaDataNS, query);
+    conn.done();
+}
 bool DBConfig::_load(OperationContext* txn) {
     auto status = grid.catalogManager(txn)->getDatabase(txn, _name);
     if (status == ErrorCodes::NamespaceNotFound) {

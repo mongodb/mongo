@@ -41,6 +41,8 @@ namespace mongo {
 using std::string;
 
 const std::string DatabaseType::ConfigNS = "config.databases";
+const std::string DatabaseType::GeoMetaDataNS = "config.meta_geom";
+const std::string DatabaseType::IndexMetaDataNS = "config.meta_rtree";
 
 const BSONField<std::string> DatabaseType::name("_id");
 const BSONField<std::string> DatabaseType::primary("primary");

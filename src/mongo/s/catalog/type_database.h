@@ -50,7 +50,13 @@ class DatabaseType {
 public:
     // Name of the databases collection in the config server.
     static const std::string ConfigNS;
-
+   /**
+	*Names of meta_geom and meta_rtree in the config server 
+	*The two collections are new collection 
+	*/
+	static const std::string GeoMetaDataNS;
+	static const std::string IndexMetaDataNS;
+	
     static const BSONField<std::string> name;
     static const BSONField<std::string> primary;
     static const BSONField<bool> sharded;

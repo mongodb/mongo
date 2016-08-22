@@ -96,7 +96,41 @@ private:
     bool _dropped;
     repl::OpTime _configOpTime;
 };
+/**
+*The two new structs can store the datas of the BSONObj we get from
+*The GeoMetaDataNS and IndexMetaDataNS.
+*Store the information so we don't have to connect the database everytime
+*/
+struct GeoMetaData{
+    std::string datanamespace;
+    std::string column_name;
+    int index_type;
+    OID index_info;
+    int gtype;
+    int srid;
+    int crs_type;
+    double tolerrance;
 
+    BSONObj toBson()
+    {
+        BSONObjBuilder bdr;
+        bdr.append("NAMESPACE", datanamespace);
+        bdr.append("COLUMN_NAME", column_name);
+        bdr.append("INDEX_TYPE", index_type);
+        bdr.append("INDEX_INFO", index_info);
+        bdr.append("SDO_GTYPE", gtype);
+        bdr.append("SRID", srid);
+        bdr.append("CRS_TYPE", srid);
+        bdr.append("TOLERANCE", tolerrance);
+        return bdr.obj();
+    }
+};
+
+struct RtreeMetaData{
+    int maxnode;
+    int maxleaf;
+    OID root_key;
+};
 /**
  * top level configuration for a database
  */
@@ -171,6 +205,30 @@ public:
     bool load(OperationContext* txn);
     bool reload(OperationContext* txn);
 
+	/**
+	*metadata oprations.
+	*/
+	//insert geometry metadata
+	void registerGeometry(OperationContext* txn,BSONObj bdr);
+	//get geometry metadata
+	BSONObj getGeometry(OperationContext* txn,BSONObj query);
+	//update geometry metadata
+	void  updateGeometry(OperationContext* txn,BSONObj query, BSONObj obj);
+	//delete geometry metadata
+	void deleteGeometry(OperationContext* txn,BSONObj query);
+	//check whether geometry metadata related to given field exist
+	bool checkGeoExist(OperationContext* txn,BSONObj bdr);
+	//check whether R-tree related to given field exist
+	bool checkRtreeExist(OperationContext* txn,BSONObj bdr);
+	//insert index metadata
+	void insertIndexMetadata(OperationContext* txn,BSONObj bdr);
+	//get index metadata
+	BSONObj getIndexMetadata(OperationContext* txn,BSONObj query);
+	//update index metadata
+	void updateIndexMetadata(OperationContext* txn, BSONObj query,BSONObj obj);
+	//delete index metadata
+	void deleteIndexMetadata(OperationContext* txn,BSONObj query);
+	
     bool dropDatabase(OperationContext*, std::string& errmsg);
 
     void getAllShardIds(std::set<ShardId>* shardIds);
@@ -204,6 +262,9 @@ protected:
     // Set of collections and lock to protect access
     stdx::mutex _lock;
     CollectionInfoMap _collections;
+
+    GeoMetaData _currGeoMeta;
+	RtreeMetaData _currIndexMeta;
 
     // OpTime of config server when the database definition was loaded.
     repl::OpTime _configOpTime;
