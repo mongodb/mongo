@@ -529,6 +529,15 @@ functions:
         # 3.2.1 is also needed to check for a correct implementation of SERVER-23299.
         ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_platform_arch|"Linux/x86_64"} "2.6" "3.0" "3.2" "3.2.1"
 
+  "cleanup environment" :
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          rm -rf src /data/db/* mongo-coredumps.tgz ~/.aws
+
   "kill processes" :
     command: shell.exec
     params:
@@ -592,6 +601,7 @@ functions:
 pre:
   - command: shell.track
   - func: "kill processes"
+  - func: "cleanup environment"
   - command: expansions.update
     params:
        updates:
@@ -611,13 +621,6 @@ pre:
           if [ $errexit_on -eq 0 ]; then
             set -o errexit
           fi
-  - command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-
-        rm -rf src /data/db/* mongo-coredumps.tgz
   - command: shell.exec
     params:
       script: |
@@ -654,6 +657,8 @@ pre:
         else
           echo "Could not clear the dmesg ring buffer"
         fi
+
+
 
 post:
   - command: attach.results
@@ -858,11 +863,7 @@ post:
             rm -rf mongod.exe-\(PID-*
           fi
         fi
-  - command: shell.exec
-    params:
-      script: |
-        rm -rf ~/.aws
-  - command: shell.cleanup
+  - func: "cleanup environment"
 
 timeout:
   - command: shell.exec
