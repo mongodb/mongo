@@ -209,7 +209,7 @@ pre:
         set -o errexit
         set -o verbose
 
-        rm -rf src /data/db/*
+        rm -rf src /data/db/* ~/.aws
 
 post:
   - command: attach.results
@@ -224,7 +224,7 @@ post:
   - command: shell.exec
     params:
       script: |
-        rm -rf ~/.aws
+        rm -rf src /data/db/* ~/.aws
 
 timeout:
   - command: shell.exec
