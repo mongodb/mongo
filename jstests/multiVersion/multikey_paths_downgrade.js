@@ -87,11 +87,7 @@
     //
     MongoRunner.stopMongod(conn);
 
-    // We use the "enableBSON1_1" server parameter to force indexes created on the "latest" version
-    // with the wiredTiger storage engine to use KeyString v0. Otherwise, we wouldn't be able to
-    // downgrade to 3.2 without first dropping the newly created index.
-    options =
-        Object.extend({binVersion: "latest", setParameter: "enableBSON1_1=false"}, defaultOptions);
+    options = Object.extend({binVersion: "latest"}, defaultOptions);
     conn = MongoRunner.runMongod(options);
     assert.neq(null,
                conn,
@@ -157,8 +153,7 @@
     // Upgrade from the "last-stable" version to the "latest" version.
     //
     MongoRunner.stopMongod(conn);
-    options =
-        Object.extend({binVersion: "latest", setParameter: "enableBSON1_1=false"}, defaultOptions);
+    options = Object.extend({binVersion: "latest"}, defaultOptions);
     conn = MongoRunner.runMongod(options);
     assert.neq(
         null,

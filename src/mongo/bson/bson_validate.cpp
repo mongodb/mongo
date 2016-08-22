@@ -237,9 +237,10 @@ Status validateElementInfo(Buffer* buffer,
                     return makeError("Invalid bson", idElem);
                 return Status::OK();
             } else {
-                return Status(
-                    ErrorCodes::InvalidBSON,
-                    "Attempt to use a decimal BSON type when support is not currently enabled.");
+                return Status(ErrorCodes::InvalidBSON,
+                              "Cannot use decimal BSON type when the featureCompatibilityVersion "
+                              "is 3.2. See "
+                              "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
             }
 
         case DBRef:

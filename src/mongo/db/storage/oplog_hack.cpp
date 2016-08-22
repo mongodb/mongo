@@ -65,7 +65,9 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime) {
  * data and len must be the arguments from RecordStore::insert() on an oplog collection.
  */
 StatusWith<RecordId> extractKey(const char* data, int len) {
-    DEV invariant(validateBSON(data, len).isOK());
+    // Use the latest BSON validation version. Oplog entries are allowed to contain decimal data
+    // even if decimal is disabled.
+    DEV invariant(validateBSON(data, len, BSONVersion::kLatest).isOK());
 
     const BSONObj obj(data);
     const BSONElement elem = obj["ts"];

@@ -218,7 +218,9 @@ struct Cloner::Fun {
             }
 
             /* assure object is valid.  note this will slow us down a little. */
-            const Status status = validateBSON(tmp.objdata(), tmp.objsize());
+            // Use the latest BSON validation version. We allow cloning of collections containing
+            // decimal data even if decimal is disabled.
+            const Status status = validateBSON(tmp.objdata(), tmp.objsize(), BSONVersion::kLatest);
             if (!status.isOK()) {
                 str::stream ss;
                 ss << "Cloner: found corrupt document in " << from_collection.toString() << ": "

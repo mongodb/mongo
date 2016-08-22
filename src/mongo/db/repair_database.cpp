@@ -138,7 +138,9 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
         RecordId id = record->id;
         RecordData& data = record->data;
 
-        Status status = validateBSON(data.data(), data.size());
+        // Use the latest BSON validation version. We retain decimal data when repairing the
+        // database even if decimal is disabled.
+        Status status = validateBSON(data.data(), data.size(), BSONVersion::kLatest);
         if (!status.isOK()) {
             log() << "Invalid BSON detected at " << id << ": " << redact(status) << ". Deleting.";
             cursor->save();  // 'data' is no longer valid.

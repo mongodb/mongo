@@ -99,8 +99,8 @@ string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) co
     return s.str();
 }
 
-bool BSONObj::valid() const {
-    return validateBSON(objdata(), objsize()).isOK();
+bool BSONObj::valid(BSONVersion version) const {
+    return validateBSON(objdata(), objsize(), version).isOK();
 }
 
 int BSONObj::woCompare(const BSONObj& r,

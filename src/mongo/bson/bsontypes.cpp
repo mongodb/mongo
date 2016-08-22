@@ -34,8 +34,6 @@
 
 namespace mongo {
 
-bool enableBSON1_1 = true;
-
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
 

@@ -1024,7 +1024,11 @@ public:
 
     virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
         BSONObj recordBson = record.toBson();
-        const Status status = validateBSON(recordBson.objdata(), recordBson.objsize());
+
+        // Use the latest BSON validation version. We do not say the collection is invalid for
+        // containing decimal data, even if decimal is disabled.
+        const Status status =
+            validateBSON(recordBson.objdata(), recordBson.objsize(), BSONVersion::kLatest);
         if (status.isOK()) {
             *dataSize = recordBson.objsize();
         } else {

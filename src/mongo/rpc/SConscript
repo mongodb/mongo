@@ -51,7 +51,6 @@ env.Library(
     ],
     source=[
         'factory.cpp',
-        'object_check.cpp',
     ],
     LIBDEPS=[
         'command_reply',
@@ -59,9 +58,22 @@ env.Library(
         'legacy_reply',
         'legacy_request',
         'metadata',
+        'object_check',
         'protocol',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/dbmessage',
+    ],
+)
+
+env.Library(
+    target=[
+        'object_check',
+    ],
+    source=[
+        'object_check.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters',
     ],
 )
 
@@ -122,6 +134,7 @@ env.Library(
         'command_reply',
         'document_range',
         'metadata',
+        'object_check',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )

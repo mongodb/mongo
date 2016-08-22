@@ -625,7 +625,7 @@ class Base {
 public:
     virtual ~Base() {}
     void run() {
-        ASSERT(fromjson(json()).valid());
+        ASSERT(fromjson(json()).valid(BSONVersion::kLatest));
         assertEquals(bson(), fromjson(json()), "mode: json-to-bson");
         assertEquals(bson(), fromjson(tojson(bson())), "mode: <default>");
         assertEquals(bson(), fromjson(tojson(bson(), Strict)), "mode: strict");

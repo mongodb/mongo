@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
@@ -87,6 +88,15 @@ static volatile bool atPrompt = false;  // can eval before getting to prompt
 
 namespace {
 const auto kDefaultMongoURL = "mongodb://127.0.0.1:27017"_sd;
+
+// We set the featureCompatibilityVersion to 3.4 in the mongo shell so that BSON validation always
+// uses BSONVersion::kLatest.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion34, ("EndStartupOptionSetup"))
+(InitializerContext* context) {
+    mongo::serverGlobalParams.featureCompatibilityVersion.store(
+        ServerGlobalParams::FeatureCompatibilityVersion_34);
+    return Status::OK();
+}
 }
 
 namespace mongo {

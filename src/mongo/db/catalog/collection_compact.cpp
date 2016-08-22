@@ -79,7 +79,9 @@ public:
         : _collection(collection), _multiIndexBlock(indexBlock) {}
 
     virtual bool isDataValid(const RecordData& recData) {
-        return recData.toBson().valid();
+        // Use the latest BSON validation version. We allow compaction of collections containing
+        // decimal data even if decimal is disabled.
+        return recData.toBson().valid(BSONVersion::kLatest);
     }
 
     virtual size_t dataSize(const RecordData& recData) {

@@ -267,6 +267,7 @@ private:
     std::string _scopedHost;
     std::string _lazyHost;
     bool wasError;
+    BSONVersion _enabledBSONVersion;
 
     void dataReceived() {
         bool retry;

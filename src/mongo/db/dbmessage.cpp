@@ -125,7 +125,10 @@ BSONObj DbMessage::nextJsObj() {
             _nextjsobj != NULL && _theEnd - _nextjsobj >= 5);
 
     if (serverGlobalParams.objcheck) {
-        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
+        // TODO SERVER-23972: Change BSONVersion::kLatest to
+        // Validator<BSONObj>::enabledBSONVersion() so that we disallow decimal inserts in legacy
+        // write mode if decimal is disabled.
+        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj, BSONVersion::kLatest);
         massert(10307,
                 str::stream() << "Client Error: bad object in message: " << status.reason(),
                 status.isOK());

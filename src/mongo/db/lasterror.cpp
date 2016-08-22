@@ -58,7 +58,10 @@ void LastError::recordUpdate(bool updateObjects, long long nObjects, BSONObj ups
     reset(true);
     _nObjects = nObjects;
     _updatedExisting = updateObjects ? True : False;
-    if (upsertedId.valid() && upsertedId.hasField(kUpsertedFieldName))
+
+    // Use the latest BSON validation version. We record updates containing decimal data even if
+    // decimal is disabled.
+    if (upsertedId.valid(BSONVersion::kLatest) && upsertedId.hasField(kUpsertedFieldName))
         _upsertedId = upsertedId;
 }
 

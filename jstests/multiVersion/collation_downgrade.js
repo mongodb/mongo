@@ -21,12 +21,7 @@
         storageEngine: jsTest.options().storageEngine || "wiredTiger",
     };
 
-    // Whenever we start "latest", we use the "enableBSON1_1" server parameter to force indices
-    // created with the wiredTiger storage engine to use KeyString V0. Otherwise, downgrade will
-    // fail due to creating KeyString V1 indices rather than exercising the code which prevents
-    // downgrading in the presence of non-simple collations.
-    var latestOptions =
-        Object.extend({binVersion: "latest", setParameter: "enableBSON1_1=false"}, defaultOptions);
+    var latestOptions = Object.extend({binVersion: "latest"}, defaultOptions);
 
     var downgradeVersion = "3.2";
     var downgradeOptions = Object.extend({binVersion: downgradeVersion}, defaultOptions);
@@ -39,6 +34,12 @@
     // Create a collection with a simple collation on the latest version.
     var conn = MongoRunner.runMongod(latestOptions);
     assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(latestOptions));
+
+    // Set featureCompatibilityVersion to 3.2 to force indices created with the wiredTiger storage
+    // engine to use KeyString V0. Otherwise, downgrade will fail due to creating KeyString V1
+    // indices rather than exercising the code which prevents downgrading in the presence of
+    // non-simple collations.
+    assert.commandWorked(conn.getDB("admin").runCommand({setFeatureCompatibilityVersion: "3.2"}));
 
     var testDB = conn.getDB("test");
     testDB.dropDatabase();

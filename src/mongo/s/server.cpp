@@ -326,6 +326,15 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
     return Status::OK();
 }
 
+// We set the featureCompatibilityVersion to 3.4 in the mongos so that BSON validation always uses
+// BSONVersion::kLatest.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion34, ("EndStartupOptionStorage"))
+(InitializerContext* context) {
+    mongo::serverGlobalParams.featureCompatibilityVersion.store(
+        ServerGlobalParams::FeatureCompatibilityVersion_34);
+    return Status::OK();
+}
+
 /*
  * This function should contain the startup "actions" that we take based on the startup config.  It
  * is intended to separate the actions from "storage" and "validation" of our startup configuration.

@@ -532,8 +532,11 @@ public:
         passed object. */
     BSONObj replaceFieldNames(const BSONObj& obj) const;
 
-    /** true unless corrupt */
-    bool valid() const;
+    /**
+     * Returns true if this object is valid according to the specified BSON version, and returns
+     * false otherwise.
+     */
+    bool valid(BSONVersion version) const;
 
     enum MatchType {
         Equality = 0,

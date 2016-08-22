@@ -282,7 +282,7 @@ public:
     AuditingDbMessage(const Message& m) : DbMessage(m) {}
     BSONObj nextJsObj(const char* context) {
         BSONObj ret = DbMessage::nextJsObj();
-        if (objcheck && !ret.valid()) {
+        if (objcheck && !ret.valid(mongo::BSONVersion::kLatest)) {
             // TODO provide more debugging info
             cout << "invalid object in " << context << ": " << ret.hexDump() << endl;
         }
