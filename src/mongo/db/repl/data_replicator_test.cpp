@@ -1047,22 +1047,13 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
                               "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
                            << OplogEntry::kOplogVersion
                            << ", op:'i', o:{_id:1, a:1}}]}}")},
-        // Clone Start
-        // listDatabases
-        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
     };
 
     startSync(0);
 
-    // Set to a high enough number to ensure we have a pending getMore request in the queue after
-    // responding to the listDatabases request.
-    numGetMoreOplogEntriesMax = 20;
-
     setResponses(responses);
     playResponses();
-    log() << "done playing responses - both oplog fetcher and databases cloner are active";
-
-    ASSERT_LESS_THAN(numGetMoreOplogEntries, numGetMoreOplogEntriesMax);
+    log() << "done playing responses - oplog fetcher is active";
 
     {
         auto net = getNet();
@@ -1080,9 +1071,6 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
         net->scheduleErrorResponse(noi, {ErrorCodes::OperationFailed, "dead cursor"});
         net->runReadyNetworkOperations();
     }
-
-    // Shut executor down and wait for initial sync thread to return with final status.
-    getExecutor().shutdown();
 
     verifySync(getNet(), ErrorCodes::OperationFailed);
 }
