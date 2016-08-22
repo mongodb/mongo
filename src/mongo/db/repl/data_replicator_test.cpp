@@ -1387,6 +1387,8 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     // Play all but last of the successful round of responses.
     setResponses({successfulResponses.begin() + 2, successfulResponses.end() - 1});
+    // Reset getMore counter because the data replicator starts a new oplog tailing query.
+    numGetMoreOplogEntries = 0;
     playResponses();
     log() << "Done playing all but last successful response";
 
