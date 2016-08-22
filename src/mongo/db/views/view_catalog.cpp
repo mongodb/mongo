@@ -77,12 +77,18 @@ Status ViewCatalog::_reloadIfNeeded_inlock(OperationContext* txn) {
         _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(def);
     });
     _valid.store(status.isOK());
+
+    if (!status.isOK()) {
+        LOG(0) << "could not load view catalog for database " << _durable->getName() << ": "
+               << status;
+    }
+
     return status;
 }
 
 void ViewCatalog::iterate(OperationContext* txn, ViewIteratorCallback callback) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    uassertStatusOK(_reloadIfNeeded_inlock(txn));
+    _requireValidCatalog_inlock(txn);
     for (auto&& view : _viewMap) {
         callback(*view.second);
     }
@@ -92,7 +98,7 @@ Status ViewCatalog::_createOrUpdateView_inlock(OperationContext* txn,
                                                const NamespaceString& viewName,
                                                const NamespaceString& viewOn,
                                                const BSONArray& pipeline) {
-    invariant(_valid.load());
+    _requireValidCatalog_inlock(txn);
     BSONObj viewDef =
         BSON("_id" << viewName.ns() << "viewOn" << viewOn.coll() << "pipeline" << pipeline);
 
@@ -217,6 +223,7 @@ Status ViewCatalog::modifyView(OperationContext* txn,
 
 Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewName) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _requireValidCatalog_inlock(txn);
 
     // Save a copy of the view definition in case we need to roll back.
     auto viewPtr = _lookup_inlock(txn, viewName.ns());
@@ -242,7 +249,21 @@ Status ViewCatalog::dropView(OperationContext* txn, const NamespaceString& viewN
 }
 
 std::shared_ptr<ViewDefinition> ViewCatalog::_lookup_inlock(OperationContext* txn, StringData ns) {
-    uassertStatusOK(_reloadIfNeeded_inlock(txn));
+    // We expect the catalog to be valid, so short-circuit other checks for best performance.
+    if (MONGO_unlikely(!_valid.load())) {
+        // If the catalog is invalid, we want to avoid references to virtualized or other invalid
+        // collection names to trigger a reload. This makes the system more robust in presence of
+        // invalid view definitions.
+        if (!NamespaceString::validCollectionName(ns))
+            return nullptr;
+        Status status = _reloadIfNeeded_inlock(txn);
+        // In case of errors we've already logged a message. Only uassert if there actually is
+        // a user connection, as otherwise we'd crash the server. The catalog will remain invalid,
+        // and any views after the first invalid one are ignored.
+        if (txn->getClient()->isFromUserConnection())
+            uassertStatusOK(status);
+    }
+
     ViewMap::const_iterator it = _viewMap.find(ns);
     if (it != _viewMap.end()) {
         return it->second;

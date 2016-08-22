@@ -122,7 +122,8 @@ public:
     /**
      * Reload the views catalog if marked invalid. No-op if already valid. Does only minimal
      * validation, namely that the view definitions are valid BSON and have no unknown fields.
-     * No cycle detection etc. This is implicitly called by other methods when the ViewCatalog is
+     * Reading stops on the first invalid entry. Errors are logged and returned. Performs no
+     * cycle detection etc. This is implicitly called by other methods when the ViewCatalog is
      * marked invalid, and on first opening a database.
      */
     Status reloadIfNeeded(OperationContext* txn);
@@ -149,6 +150,11 @@ private:
 
     std::shared_ptr<ViewDefinition> _lookup_inlock(OperationContext* txn, StringData ns);
     Status _reloadIfNeeded_inlock(OperationContext* txn);
+
+    void _requireValidCatalog_inlock(OperationContext* txn) {
+        uassertStatusOK(_reloadIfNeeded_inlock(txn));
+        invariant(_valid.load());
+    }
 
     stdx::mutex _mutex;  // Protects all members, except for _valid.
     ViewMap _viewMap;

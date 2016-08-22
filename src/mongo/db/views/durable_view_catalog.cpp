@@ -82,7 +82,7 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
         BSONObj viewDef = data.toBson();
 
         // Check read definitions for correct structure, and refuse reading past invalid
-        // definitions. Complain loudly, but otherwise ignore any further view definitions.
+        // definitions. Ignore any further view definitions.
         bool valid = true;
         for (const BSONElement& e : viewDef) {
             std::string name(e.fieldName());
@@ -94,7 +94,7 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
 
         if (!valid) {
             return {ErrorCodes::InvalidViewDefinition,
-                    str::stream() << "found invalid view definition " << viewDef.toString()
+                    str::stream() << "found invalid view definition " << viewDef["_id"]
                                   << " while reading '"
                                   << _db->getSystemViewsName()
                                   << "'"};
