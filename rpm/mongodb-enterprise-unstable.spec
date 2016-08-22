@@ -243,6 +243,7 @@ fi
 
 %{_bindir}/bsondump
 %{_bindir}/mongodecrypt
+%{_bindir}/mongoldap
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles
