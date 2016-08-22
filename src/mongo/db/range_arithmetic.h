@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -108,7 +109,7 @@ int compareRanges(const BSONObj& rangeMin1,
  * NOTE: For overlap testing to work correctly, there may be no overlaps present in the map
  * itself.
  */
-typedef std::map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+typedef BSONObjIndexedMap<BSONObj> RangeMap;
 
 /**
  * A RangeVector is a list of [lower,upper) ranges.

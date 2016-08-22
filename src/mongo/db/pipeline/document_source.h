@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/collection_index_usage_tracker.h"
@@ -156,7 +157,7 @@ public:
      * Gets a BSONObjSet representing the sort order(s) of the output of the stage.
      */
     virtual BSONObjSet getOutputSorts() {
-        return BSONObjSet();
+        return SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
 
     /**
@@ -765,7 +766,8 @@ public:
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     BSONObjSet getOutputSorts() final {
-        return pSource ? pSource->getOutputSorts() : BSONObjSet();
+        return pSource ? pSource->getOutputSorts()
+                       : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
@@ -1250,8 +1252,10 @@ public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final {
-        return pSource ? pSource->getOutputSorts() : BSONObjSet();
+        return pSource ? pSource->getOutputSorts()
+                       : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
+
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */
@@ -1479,7 +1483,8 @@ public:
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     BSONObjSet getOutputSorts() final {
-        return pSource ? pSource->getOutputSorts() : BSONObjSet();
+        return pSource ? pSource->getOutputSorts()
+                       : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
@@ -1612,7 +1617,8 @@ public:
     }
     Value serialize(bool explain = false) const final;
     BSONObjSet getOutputSorts() final {
-        return {BSON(distanceField->fullPath() << -1)};
+        return SimpleBSONObjComparator::kInstance.makeBSONObjSet(
+            {BSON(distanceField->fullPath() << -1)});
     }
 
     // Virtuals for SplittableDocumentSource

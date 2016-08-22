@@ -91,30 +91,38 @@ namespace DocumentSourceClass {
 using mongo::DocumentSource;
 
 TEST(TruncateSort, SortTruncatesNormalField) {
+    SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "c" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKey}, {"b"});
+    auto truncated =
+        DocumentSource::truncateSortSet(bsonComparator.makeBSONObjSet({sortKey}), {"b"});
     ASSERT_EQUALS(truncated.size(), 1U);
     ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
 }
 
 TEST(TruncateSort, SortTruncatesOnSubfield) {
+    SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKey = BSON("a" << 1 << "b.c" << 1 << "d" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKey}, {"b"});
+    auto truncated =
+        DocumentSource::truncateSortSet(bsonComparator.makeBSONObjSet({sortKey}), {"b"});
     ASSERT_EQUALS(truncated.size(), 1U);
     ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
 }
 
 TEST(TruncateSort, SortDoesNotTruncateOnParent) {
+    SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "d" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKey}, {"b.c"});
+    auto truncated =
+        DocumentSource::truncateSortSet(bsonComparator.makeBSONObjSet({sortKey}), {"b.c"});
     ASSERT_EQUALS(truncated.size(), 1U);
     ASSERT_EQUALS(truncated.count(BSON("a" << 1 << "b" << 1 << "d" << 1)), 1U);
 }
 
 TEST(TruncateSort, TruncateSortDedupsSortCorrectly) {
+    SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKeyOne = BSON("a" << 1 << "b" << 1);
     BSONObj sortKeyTwo = BSON("a" << 1);
-    auto truncated = DocumentSource::truncateSortSet({sortKeyOne, sortKeyTwo}, {"b"});
+    auto truncated = DocumentSource::truncateSortSet(
+        bsonComparator.makeBSONObjSet({sortKeyOne, sortKeyTwo}), {"b"});
     ASSERT_EQUALS(truncated.size(), 1U);
     ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
 }

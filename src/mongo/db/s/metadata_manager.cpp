@@ -46,7 +46,10 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 MetadataManager::MetadataManager(ServiceContext* sc, NamespaceString nss)
     : _nss(std::move(nss)),
       _serviceContext(sc),
-      _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)) {}
+      _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)),
+      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()),
+      _rangesToClean(
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<RangeToCleanDescriptor>()) {}
 
 MetadataManager::~MetadataManager() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
@@ -320,7 +323,7 @@ RangeMap MetadataManager::getCopyOfRangesToClean() {
 }
 
 RangeMap MetadataManager::_getCopyOfRangesToClean_inlock() {
-    RangeMap ranges;
+    RangeMap ranges = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>();
     for (auto it = _rangesToClean.begin(); it != _rangesToClean.end(); ++it) {
         ranges.insert(std::make_pair(it->first, it->second.getMax()));
     }

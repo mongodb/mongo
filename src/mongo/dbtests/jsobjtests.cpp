@@ -36,6 +36,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
@@ -58,6 +59,18 @@ using std::stringstream;
 using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
+
+namespace {
+
+enum FieldCompareResult {
+    LEFT_SUBFIELD = -2,
+    LEFT_BEFORE = -1,
+    SAME = 0,
+    RIGHT_BEFORE = 1,
+    RIGHT_SUBFIELD = 2
+};
+
+}  // namespace
 
 typedef std::map<std::string, BSONElement> BSONMap;
 BSONMap bson2map(const BSONObj& obj) {
@@ -1755,8 +1768,10 @@ public:
     }
 
     void test(BSONObj order, BSONObj l, BSONObj r, bool wanted) {
-        BSONObjCmp c(order);
-        bool got = c(l, r);
+        const StringData::ComparatorInterface* stringComparator = nullptr;
+        BSONObjComparator bsonCmp(
+            order, BSONObjComparator::FieldNamesMode::kConsider, stringComparator);
+        bool got = bsonCmp.makeLessThan()(l, r);
         if (got == wanted)
             return;
         cout << " order: " << order << " l: " << l << "r: " << r << " wanted: " << wanted

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
@@ -1213,9 +1214,11 @@ public:
         set<ShardId> shardIds;
         cm->getShardIdsForQuery(txn, query, queryCollation.getValue(), &shardIds);
 
-        BSONObjSet all(BSONObjCmp(BSONObj(),
+        BSONObjComparator bsonCmp(BSONObj(),
+                                  BSONObjComparator::FieldNamesMode::kConsider,
                                   !queryCollation.getValue().isEmpty() ? collator.get()
-                                                                       : cm->getDefaultCollator()));
+                                                                       : cm->getDefaultCollator());
+        BSONObjSet all = bsonCmp.makeBSONObjSet();
 
         for (const ShardId& shardId : shardIds) {
             const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
@@ -1244,8 +1247,8 @@ public:
 
         BSONObjBuilder b(32);
         int n = 0;
-        for (set<BSONObj, BSONObjCmp>::iterator i = all.begin(); i != all.end(); i++) {
-            b.appendAs(i->firstElement(), b.numStr(n++));
+        for (auto&& obj : all) {
+            b.appendAs(obj.firstElement(), b.numStr(n++));
         }
 
         result.appendArray("values", b.obj());

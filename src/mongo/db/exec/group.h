@@ -28,7 +28,7 @@
 
 #pragma once
 
-
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/scripting/engine.h"
 
@@ -155,7 +155,7 @@ private:
 
     // Map from group key => group index.  The group index is used to index into "$arr", a
     // variable owned by _scope which contains the group data for this key.
-    std::map<BSONObj, int, BSONObjCmp> _groupMap;
+    BSONObjIndexedMap<int> _groupMap;
 };
 
 }  // namespace mongo

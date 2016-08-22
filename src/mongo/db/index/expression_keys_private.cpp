@@ -32,6 +32,7 @@
 
 #include <utility>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_index_format.h"
@@ -460,7 +461,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                                       const S2IndexingParams& params,
                                       BSONObjSet* keys,
                                       MultikeyPaths* multikeyPaths) {
-    BSONObjSet keysToAdd;
+    BSONObjSet keysToAdd = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     // Does one of our documents have a geo field?
     bool haveGeoField = false;
@@ -490,7 +491,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
         //   (b) the last component of the indexed path ever refers to GeoJSON data that requires
         //       multiple cells for its covering.
         bool lastPathComponentCausesIndexToBeMultikey;
-        BSONObjSet keysForThisField;
+        BSONObjSet keysForThisField = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
             if (params.indexVersion >= S2_INDEX_VERSION_2) {
                 // For >= V2,
@@ -546,7 +547,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
             continue;
         }
 
-        BSONObjSet updatedKeysToAdd;
+        BSONObjSet updatedKeysToAdd = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         for (BSONObjSet::const_iterator it = keysToAdd.begin(); it != keysToAdd.end(); ++it) {
             for (BSONObjSet::const_iterator newIt = keysForThisField.begin();
                  newIt != keysForThisField.end();

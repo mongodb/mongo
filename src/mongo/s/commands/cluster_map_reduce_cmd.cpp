@@ -326,7 +326,7 @@ public:
         BSONObjBuilder shardResultsB;
         BSONObjBuilder shardCountsB;
         map<string, int64_t> countsMap;
-        auto splitPts = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
+        auto splitPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
         {
             bool ok = true;
@@ -510,7 +510,7 @@ public:
                 confOut->getChunkManager(txn, outputCollNss.ns(), true /* force */);
             }
 
-            auto chunkSizes = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjMap<int>();
+            auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = grid.catalogClient(txn)->distLock(

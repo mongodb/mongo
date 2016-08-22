@@ -36,11 +36,15 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs)
-    : DocumentSource(NULL), queue(std::move(docs)) {}
+    : DocumentSource(NULL),
+      queue(std::move(docs)),
+      sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
 DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx), queue(std::move(docs)) {}
+    : DocumentSource(expCtx),
+      queue(std::move(docs)),
+      sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
 const char* DocumentSourceMock::getSourceName() const {
     return "mock";

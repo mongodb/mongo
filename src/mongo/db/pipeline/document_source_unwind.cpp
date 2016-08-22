@@ -203,7 +203,7 @@ boost::optional<Document> DocumentSourceUnwind::getNext() {
 }
 
 BSONObjSet DocumentSourceUnwind::getOutputSorts() {
-    BSONObjSet out;
+    BSONObjSet out = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     std::string unwoundPath = getUnwindPath();
     BSONObjSet inputSort = pSource->getOutputSorts();
 

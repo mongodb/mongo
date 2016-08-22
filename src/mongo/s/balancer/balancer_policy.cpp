@@ -56,7 +56,9 @@ const size_t kAggressiveImbalanceThreshold = 1;
 }  // namespace
 
 DistributionStatus::DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap)
-    : _nss(std::move(nss)), _shardChunks(std::move(shardToChunksMap)) {}
+    : _nss(std::move(nss)),
+      _shardChunks(std::move(shardToChunksMap)),
+      _zoneRanges(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ZoneRange>()) {}
 
 size_t DistributionStatus::totalChunks() const {
     size_t total = 0;

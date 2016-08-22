@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/service_context.h"
@@ -220,7 +221,7 @@ private:
     RangeMap _receivingChunks;
 
     // Set of ranges to be deleted. Indexed by the min key of the range.
-    typedef std::map<BSONObj, RangeToCleanDescriptor, BSONObjCmp> RangeToCleanMap;
+    typedef BSONObjIndexedMap<RangeToCleanDescriptor> RangeToCleanMap;
     RangeToCleanMap _rangesToClean;
 };
 

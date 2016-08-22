@@ -32,8 +32,8 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"

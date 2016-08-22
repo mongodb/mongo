@@ -35,6 +35,7 @@
 
 #include <string>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
@@ -100,7 +101,7 @@ public:
         BSONObj nullObj = BSON("a" << BSONNULL);
 
         // Call getKeys on the nullObj.
-        BSONObjSet nullFieldKeySet;
+        BSONObjSet nullFieldKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         const CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(nullObj, "a", 0, 0, false, collator, &nullFieldKeySet);
         BSONElement nullFieldFromKey = nullFieldKeySet.begin()->firstElement();
@@ -129,7 +130,7 @@ public:
                                 << 0x5eed));
         BSONObj nullObj = BSON("a" << BSONNULL);
 
-        BSONObjSet nullFieldKeySet;
+        BSONObjSet nullFieldKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         const CollatorInterface* collator = nullptr;
         ExpressionKeysPrivate::getHashKeys(
             nullObj, "a", 0x5eed, 0, false, collator, &nullFieldKeySet);

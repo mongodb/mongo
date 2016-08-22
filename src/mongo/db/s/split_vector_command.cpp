@@ -272,7 +272,7 @@ public:
             // Use every 'keyCount'-th key as a split point. We add the initial key as a sentinel,
             // to be removed at the end. If a key appears more times than entries allowed on a
             // chunk, we issue a warning and split on the following key.
-            auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
+            auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             splitKeys.push_back(dps::extractElementsBasedOnTemplate(
                 prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
 

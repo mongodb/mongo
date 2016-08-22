@@ -102,7 +102,7 @@ void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const 
 }
 
 BSONObjSet DocumentSource::allPrefixes(BSONObj obj) {
-    BSONObjSet out;
+    BSONObjSet out = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     BSONObj last = {};
     for (auto&& field : obj) {
@@ -118,7 +118,7 @@ BSONObjSet DocumentSource::allPrefixes(BSONObj obj) {
 
 BSONObjSet DocumentSource::truncateSortSet(const BSONObjSet& sorts,
                                            const std::set<std::string>& fields) {
-    BSONObjSet out;
+    BSONObjSet out = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     for (auto&& sort : sorts) {
         BSONObjBuilder outputSort;

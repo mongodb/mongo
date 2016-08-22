@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-using ChunkMinimumsSet = BSONObj::ComparatorInterface::BSONObjSet;
+using ChunkMinimumsSet = BSONObjSet;
 using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
 using SplitInfoVector = BalancerChunkSelectionPolicy::SplitInfoVector;
 using std::shared_ptr;
@@ -66,7 +66,7 @@ namespace {
 StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDistributionInfo(
     OperationContext* txn, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
     ShardToChunksMap shardToChunksMap;
-    ChunkMinimumsSet chunkMinimums = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
+    ChunkMinimumsSet chunkMinimums = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
     // be accounted for

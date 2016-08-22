@@ -33,6 +33,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/platform/random.h"
@@ -104,7 +105,7 @@ void convertBSONArrayToChunkTypes(const vector<BSONObj>& chunksArray,
 
 class ChunkDiffUnitTest : public mongo::unittest::Test {
 protected:
-    typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+    typedef BSONObjIndexedMap<BSONObj> RangeMap;
     typedef map<ShardId, ChunkVersion> VersionMap;
 
     ChunkDiffUnitTest() = default;
@@ -163,7 +164,7 @@ protected:
         vector<BSONObj> chunks(std::move(chunksB));
 
         // Setup the empty ranges and versions first
-        RangeMap ranges;
+        RangeMap ranges = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>();
         ChunkVersion maxVersion = ChunkVersion(0, 0, OID());
         VersionMap maxShardVersions;
 

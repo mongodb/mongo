@@ -30,8 +30,8 @@
 
 #include <string>
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -71,8 +71,8 @@ public:
 template <class ValType>
 class ConfigDiffTracker : public ConfigDiffTrackerBase {
 public:
-    // Stores ranges indexed by max or  min key
-    typedef typename std::map<BSONObj, ValType, BSONObjCmp> RangeMap;
+    // Stores ranges indexed by max or min key.
+    typedef BSONObjIndexedMap<ValType> RangeMap;
 
     // Pair of iterators defining a subset of ranges
     typedef typename std::pair<typename RangeMap::iterator, typename RangeMap::iterator>

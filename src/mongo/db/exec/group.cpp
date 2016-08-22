@@ -86,7 +86,8 @@ GroupStage::GroupStage(OperationContext* txn,
       _specificStats(),
       _groupState(GroupState_Initializing),
       _reduceFunction(0),
-      _keyFunction(0) {
+      _keyFunction(0),
+      _groupMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()) {
     _children.emplace_back(child);
 }
 

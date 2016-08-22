@@ -658,7 +658,7 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
     }
 
     if (!(_streaming || _spilled)) {
-        return BSONObjSet();
+        return SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
 
     BSONObjBuilder sortOrder;

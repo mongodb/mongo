@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/working_set_common.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
@@ -113,7 +114,7 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
         // unneeded due to the structure of the plan.
         invariant(!member->keyData.empty());
         for (size_t i = 0; i < member->keyData.size(); i++) {
-            BSONObjSet keys;
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             // There's no need to compute the prefixes of the indexed fields that cause the index to
             // be multikey when ensuring the keyData is still valid.
             MultikeyPaths* multikeyPaths = nullptr;

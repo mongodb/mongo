@@ -39,6 +39,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -1053,7 +1054,7 @@ public:
                 }
             }
 
-            BSONObjSet documentKeySet;
+            BSONObjSet documentKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when validating the index keys.
             MultikeyPaths* multikeyPaths = nullptr;

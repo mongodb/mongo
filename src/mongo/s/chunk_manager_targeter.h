@@ -46,11 +46,11 @@ struct ChunkVersion;
 
 struct TargeterStats {
     TargeterStats()
-        : chunkSizeDelta(SimpleBSONObjComparator::kInstance.makeOrderedBSONObjMap<int>()) {}
+        : chunkSizeDelta(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()) {}
 
     // Map of chunk shard minKey -> approximate delta. This is used for deciding
     // whether a chunk might need splitting or not.
-    BSONObj::ComparatorInterface::BSONObjMap<int> chunkSizeDelta;
+    BSONObjIndexedMap<int> chunkSizeDelta;
 };
 
 /**

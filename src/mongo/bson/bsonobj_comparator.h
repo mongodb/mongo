@@ -28,47 +28,48 @@
 
 #pragma once
 
-#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 
 namespace mongo {
 
 /**
- * An implementation of the CollatorInterface used for testing that does not depend on the ICU
- * library.
+ * A BSONObj comparator that supports:
+ * - Comparing with respect to an ordering spec such as {a: 1, b: -1}.
+ * - Ignoring field names during comparison.
+ * - Passing a custom string comparator.
  */
-class CollatorInterfaceMock final : public CollatorInterface {
+class BSONObjComparator final : public BSONObj::ComparatorInterface {
 public:
-    /**
-     * The mock can compute a number of artificial collations. A test can request a particular
-     * kind of mock collator and then assert that it obtains the mock behavior.
-     */
-    enum class MockType {
-        // Compares strings after reversing them. For example, the comparison key for "abc" is
-        // "cba".
-        kReverseString,
-
-        // Considers all strings equal.
-        kAlwaysEqual,
-
-        // Compares strings after converting them to lower case.  For example, the comparison key
-        // for "FOO" is "foo".
-        kToLowerString,
+    enum class FieldNamesMode {
+        kConsider,
+        kIgnore,
     };
 
     /**
-     * Constructs a mock collator which computes the collation described by 'mockType'. The
-     * collator's spec will have a fake locale string such as "mock_reverse".
+     * Constructs a BSONObj comparator which will use the 'ordering' pattern for comparisons.
+     *
+     * Will not consider BSON field names in comparisons if 'fieldNamesMode' is kIgnore.
+     *
+     * If 'stringComparator' is null, uses default binary string comparison. Otherwise,
+     * 'stringComparator' is used for all string comparisons.
      */
-    CollatorInterfaceMock(MockType mockType);
+    BSONObjComparator(BSONObj ordering,
+                      FieldNamesMode fieldNamesMode,
+                      const StringData::ComparatorInterface* stringComparator)
+        : _ordering(std::move(ordering)),
+          _fieldNamesMode(fieldNamesMode),
+          _stringComparator(stringComparator) {}
 
-    std::unique_ptr<CollatorInterface> clone() const final;
-
-    int compare(StringData left, StringData right) const final;
-
-    ComparisonKey getComparisonKey(StringData stringData) const final;
+    int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
+        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
+        return lhs.woCompare(rhs, _ordering, considerFieldName, _stringComparator);
+    }
 
 private:
-    const MockType _mockType;
+    BSONObj _ordering;
+    FieldNamesMode _fieldNamesMode;
+    const StringData::ComparatorInterface* _stringComparator;
 };
 
 }  // namespace mongo

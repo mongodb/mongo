@@ -173,13 +173,19 @@ ChunkManager::ChunkManager(const string& ns,
       _keyPattern(pattern.getKeyPattern()),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
-      _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {}
+      _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
+      _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
+      _chunkRangeMap(
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {}
 
 ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
     : _ns(coll.getNs().ns()),
       _keyPattern(coll.getKeyPattern()),
       _unique(coll.getUnique()),
-      _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {
+      _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
+      _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
+      _chunkRangeMap(
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {
     // coll does not have correct version. Use same initial version as _load and createFirstChunks.
     _version = ChunkVersion(0, 0, coll.getEpoch());
 
@@ -198,7 +204,8 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
     int tries = 3;
 
     while (tries--) {
-        ChunkMap chunkMap;
+        ChunkMap chunkMap =
+            SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>();
         set<ShardId> shardIds;
         ShardVersionMap shardVersions;
 
@@ -404,7 +411,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         shardIds->push_back(primaryShardId);
     } else {
         // make sure points are unique and ordered
-        auto orderedPts = SimpleBSONObjComparator::kInstance.makeOrderedBSONObjSet();
+        auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         for (unsigned i = 0; i < initPoints->size(); ++i) {
             BSONObj pt = (*initPoints)[i];
             orderedPts.insert(pt);
@@ -766,7 +773,8 @@ string ChunkManager::toString() const {
 }
 
 ChunkManager::ChunkRangeMap ChunkManager::_constructRanges(const ChunkMap& chunkMap) {
-    ChunkRangeMap chunkRangeMap;
+    ChunkRangeMap chunkRangeMap =
+        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>();
 
     if (chunkMap.empty()) {
         return chunkRangeMap;

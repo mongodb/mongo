@@ -31,6 +31,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 

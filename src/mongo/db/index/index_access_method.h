@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -295,7 +296,10 @@ private:
  * validateUpdate fills out the UpdateStatus and update actually applies it.
  */
 class UpdateTicket {
-    // No public interface
+public:
+    UpdateTicket()
+        : oldKeys(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), newKeys(oldKeys) {}
+
 private:
     friend class IndexAccessMethod;
 

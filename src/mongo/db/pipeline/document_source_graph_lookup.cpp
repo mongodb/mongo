@@ -148,7 +148,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
         shouldPerformAnotherQuery = false;
 
         // Check whether each key in the frontier exists in the cache or needs to be queried.
-        BSONObjSet cached;
+        BSONObjSet cached = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         auto matchStage = makeMatchStageFromFrontier(&cached);
 
         ValueUnorderedSet queried = pExpCtx->getValueComparator().makeUnorderedValueSet();

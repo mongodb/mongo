@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
@@ -127,7 +128,7 @@ public:
     /**
      * Returns all tag ranges defined for the collection.
      */
-    const std::map<BSONObj, ZoneRange, BSONObjCmp>& tagRanges() const {
+    const BSONObjIndexedMap<ZoneRange>& tagRanges() const {
         return _zoneRanges;
     }
 
@@ -158,7 +159,7 @@ private:
     ShardToChunksMap _shardChunks;
 
     // Map of zone max key to the zone description
-    std::map<BSONObj, ZoneRange, BSONObjCmp> _zoneRanges;
+    BSONObjIndexedMap<ZoneRange> _zoneRanges;
 
     // Set of all zones defined for this collection
     std::set<std::string> _allTags;

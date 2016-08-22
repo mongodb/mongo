@@ -40,6 +40,9 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/config.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
@@ -717,7 +720,10 @@ void testPermutation(KeyString::Version version,
             log() << "ordering: " << orderObj;
 
         std::vector<BSONObj> elements = elementsOrig;
-        std::stable_sort(elements.begin(), elements.end(), BSONObjCmp(orderObj));
+        BSONObjComparator bsonCmp(orderObj,
+                                  BSONObjComparator::FieldNamesMode::kConsider,
+                                  &SimpleStringDataComparator::kInstance);
+        std::stable_sort(elements.begin(), elements.end(), bsonCmp.makeLessThan());
 
         for (size_t i = 0; i < elements.size(); i++) {
             const BSONObj& o1 = elements[i];

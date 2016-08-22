@@ -36,7 +36,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_settings.h"
@@ -101,7 +101,6 @@ void testAllowedIndices(std::vector<IndexEntry> indexes,
     ASSERT_FALSE(querySettings.getAllowedIndicesFilter(key));
 
     querySettings.setAllowedIndices(*cq, key, keyPatterns, indexNames);
-
     // Index entry vector should contain 1 entry after filtering.
     boost::optional<AllowedIndicesFilter> hasFilter = querySettings.getAllowedIndicesFilter(key);
     ASSERT_TRUE(hasFilter);
@@ -120,24 +119,26 @@ void testAllowedIndices(std::vector<IndexEntry> indexes,
 
 // Use of index filters to select compound index over single key index.
 TEST(GetExecutorTest, GetAllowedIndices) {
-    testAllowedIndices({IndexEntry(fromjson("{a: 1}"), "a_1"),
-                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
-                       {fromjson("{a: 1, b: 1}")},
-                       {},
-                       {"a_1_b_1"});
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"),
+         IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+         IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1, b: 1}")}),
+        {},
+        {"a_1_b_1"});
 }
 
 // Setting index filter referring to non-existent indexes
 // will effectively disregard the index catalog and
 // result in the planner generating a collection scan.
 TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
-    testAllowedIndices({IndexEntry(fromjson("{a: 1}"), "a_1"),
-                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
-                       {fromjson("{nosuchfield: 1}")},
-                       {},
-                       {});
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"),
+         IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+         IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{nosuchfield: 1}")}),
+        {},
+        {});
 }
 
 // This test case shows how to force query execution to use
@@ -145,7 +146,7 @@ TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
 TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
     testAllowedIndices(
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: -1}"), "a_-1")},
-        {fromjson("{a: -1}")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
         {},
         {"a_-1"});
 }
@@ -155,7 +156,7 @@ TEST(GetExecutorTest, GetAllowedIndicesMatchesByName) {
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
         // BSONObjSet default constructor is explicit, so we cannot copy-list-initialize until
         // C++14.
-        BSONObjSet(),
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
         {"a_1"},
         {"a_1"});
 }
@@ -163,7 +164,7 @@ TEST(GetExecutorTest, GetAllowedIndicesMatchesByName) {
 TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
     testAllowedIndices(
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
-        {fromjson("{a: 1}")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
         {},
         {"a_1", "a_1:en"});
 }

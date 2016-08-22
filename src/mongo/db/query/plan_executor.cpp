@@ -26,9 +26,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/plan_executor.h"
 
-
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -268,7 +270,7 @@ BSONObjSet PlanExecutor::getOutputSorts() const {
         }
     }
 
-    return BSONObjSet();
+    return SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 }
 
 OperationContext* PlanExecutor::getOpCtx() const {

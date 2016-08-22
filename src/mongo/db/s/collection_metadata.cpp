@@ -47,12 +47,18 @@ using std::string;
 using std::vector;
 using str::stream;
 
-CollectionMetadata::CollectionMetadata() = default;
+CollectionMetadata::CollectionMetadata()
+    : _pendingMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()),
+      _chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()),
+      _rangesMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 
 CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern, ChunkVersion collectionVersion)
     : _collVersion(collectionVersion),
       _shardVersion(ChunkVersion(0, 0, collectionVersion.epoch())),
-      _keyPattern(keyPattern.getOwned()) {}
+      _keyPattern(keyPattern.getOwned()),
+      _pendingMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()),
+      _chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()),
+      _rangesMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 
 CollectionMetadata::~CollectionMetadata() = default;
 

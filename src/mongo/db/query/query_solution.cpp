@@ -217,7 +217,11 @@ QuerySolutionNode* TextNode::clone() const {
 // CollectionScanNode
 //
 
-CollectionScanNode::CollectionScanNode() : tailable(false), direction(1), maxScan(0) {}
+CollectionScanNode::CollectionScanNode()
+    : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
+      tailable(false),
+      direction(1),
+      maxScan(0) {}
 
 void CollectionScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -248,7 +252,7 @@ QuerySolutionNode* CollectionScanNode::clone() const {
 // AndHashNode
 //
 
-AndHashNode::AndHashNode() {}
+AndHashNode::AndHashNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
 AndHashNode::~AndHashNode() {}
 
@@ -302,7 +306,7 @@ QuerySolutionNode* AndHashNode::clone() const {
 // AndSortedNode
 //
 
-AndSortedNode::AndSortedNode() {}
+AndSortedNode::AndSortedNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
 AndSortedNode::~AndSortedNode() {}
 
@@ -352,7 +356,7 @@ QuerySolutionNode* AndSortedNode::clone() const {
 // OrNode
 //
 
-OrNode::OrNode() : dedup(true) {}
+OrNode::OrNode() : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), dedup(true) {}
 
 OrNode::~OrNode() {}
 
@@ -412,7 +416,8 @@ QuerySolutionNode* OrNode::clone() const {
 // MergeSortNode
 //
 
-MergeSortNode::MergeSortNode() : dedup(true) {}
+MergeSortNode::MergeSortNode()
+    : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), dedup(true) {}
 
 MergeSortNode::~MergeSortNode() {}
 
@@ -473,7 +478,7 @@ QuerySolutionNode* MergeSortNode::clone() const {
 // FetchNode
 //
 
-FetchNode::FetchNode() {}
+FetchNode::FetchNode() : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
 void FetchNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -505,7 +510,8 @@ QuerySolutionNode* FetchNode::clone() const {
 //
 
 IndexScanNode::IndexScanNode(IndexEntry index)
-    : index(std::move(index)),
+    : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
+      index(std::move(index)),
       direction(1),
       maxScan(0),
       addKeyMetadata(false),

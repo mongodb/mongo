@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -1093,13 +1094,14 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& quer
             if (!sharedSortOrders.empty()) {
                 for (size_t i = 1; i < ixscanNodes.size(); ++i) {
                     ixscanNodes[i]->computeProperties();
-                    BSONObjSet isect;
+                    const auto& bsonCmp = SimpleBSONObjComparator::kInstance;
+                    BSONObjSet isect = bsonCmp.makeBSONObjSet();
                     set_intersection(sharedSortOrders.begin(),
                                      sharedSortOrders.end(),
                                      ixscanNodes[i]->getSort().begin(),
                                      ixscanNodes[i]->getSort().end(),
                                      std::inserter(isect, isect.end()),
-                                     BSONObjCmp());
+                                     bsonCmp.makeLessThan());
                     sharedSortOrders = isect;
                     if (sharedSortOrders.empty()) {
                         break;

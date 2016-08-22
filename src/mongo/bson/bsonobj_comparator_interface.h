@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <initializer_list>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -97,11 +98,11 @@ public:
         std::unordered_set<BSONObj, BSONObj::Hasher, BSONObj::ComparatorInterface::EqualTo>;
 
     template <typename T>
-    using BSONObjMap = std::map<BSONObj, T, BSONObj::ComparatorInterface::LessThan>;
+    using BSONObjIndexedMap = std::map<BSONObj, T, BSONObj::ComparatorInterface::LessThan>;
 
     // TODO SERVER-23990: Make the BSONObj hash collation-aware.
     template <typename T>
-    using BSONObjIndexedMap =
+    using BSONObjIndexedUnorderedMap =
         std::unordered_map<BSONObj, T, BSONObj::Hasher, BSONObj::ComparatorInterface::EqualTo>;
 
     virtual ~ComparatorInterface() = default;
@@ -153,43 +154,55 @@ public:
     }
 
     /**
-     * Construct an empty BSONObjSet whose ordering is given by this comparator. This comparator
-     * must outlive the returned set.
+     * Constructs a BSONObjSet whose ordering is given by this comparator. This comparator must
+     * outlive the returned set.
      */
-    BSONObjSet makeOrderedBSONObjSet() const {
-        return BSONObjSet(LessThan(this));
+    BSONObjSet makeBSONObjSet(std::initializer_list<BSONObj> init = {}) const {
+        return BSONObjSet(init, LessThan(this));
     }
 
     /**
-     * Construct an empty BSONObjUnorderedSet whose equivalence classes are given by this
+     * Constructs a BSONObjUnorderedSet whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
-    BSONObjUnorderedSet makeUnorderedBSONObjSet() const {
+    BSONObjUnorderedSet makeBSONObjUnorderedSet(std::initializer_list<BSONObj> init = {}) const {
         // TODO SERVER-23990: Make the BSONObj hash collation-aware.
-        return BSONObjUnorderedSet(0, BSONObj::Hasher(), EqualTo(this));
+        return BSONObjUnorderedSet(init, 0, BSONObj::Hasher(), EqualTo(this));
     }
 
     /**
-     * Construct an empty ordered map from BSONObj to type T whose ordering is given by this
-     * comparator. This comparator must outlive the returned map.
+     * Constructs an ordered map from BSONObj to type T whose ordering is given by this comparator.
+     * This comparator must outlive the returned map.
      */
     template <typename T>
-    BSONObjMap<T> makeOrderedBSONObjMap() const {
-        return BSONObjMap<T>(LessThan(this));
+    BSONObjIndexedMap<T> makeBSONObjIndexedMap(
+        std::initializer_list<std::pair<const BSONObj, T>> init = {}) const {
+        return BSONObjIndexedMap<T>(init, LessThan(this));
     }
 
     /**
-     * Construct an empty unordered map from BSONObj to type T whose ordering is given by this
+     * Constructs an unordered map from BSONObj to type T whose ordering is given by this
      * comparator. This comparator must outlive the returned map.
      */
     template <typename T>
-    BSONObjIndexedMap<T> makeBSONObjIndexedMap() const {
+    BSONObjIndexedUnorderedMap<T> makeBSONObjIndexedUnorderedMap(
+        std::initializer_list<std::pair<const BSONObj, T>> init = {}) const {
         // TODO SERVER-23990: Make the BSONObj hash collation-aware.
-        return BSONObjIndexedMap<T>(0, BSONObj::Hasher(), EqualTo(this));
+        return BSONObjIndexedUnorderedMap<T>(init, 0, BSONObj::Hasher(), EqualTo(this));
     }
 
 protected:
     constexpr ComparatorInterface() = default;
 };
+
+using BSONObjSet = BSONObj::ComparatorInterface::BSONObjSet;
+
+using BSONObjUnorderedSet = BSONObj::ComparatorInterface::BSONObjUnorderedSet;
+
+template <typename T>
+using BSONObjIndexedMap = BSONObj::ComparatorInterface::BSONObjIndexedMap<T>;
+
+template <typename T>
+using BSONObjIndexedUnorderedMap = BSONObj::ComparatorInterface::BSONObjIndexedUnorderedMap<T>;
 
 }  // namespace mongo

@@ -123,7 +123,7 @@ Status IndexAccessMethod::insert(OperationContext* txn,
                                  int64_t* numInserted) {
     invariant(numInserted);
     *numInserted = 0;
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
     // Delegate to the subclass.
     getKeys(obj, &keys, &multikeyPaths);
@@ -201,7 +201,7 @@ Status IndexAccessMethod::remove(OperationContext* txn,
                                  int64_t* numDeleted) {
     invariant(numDeleted);
     *numDeleted = 0;
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
@@ -221,7 +221,7 @@ Status IndexAccessMethod::initializeAsEmpty(OperationContext* txn) {
 }
 
 Status IndexAccessMethod::touch(OperationContext* txn, const BSONObj& obj) {
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when paging a document's index entries into memory.
     MultikeyPaths* multikeyPaths = nullptr;
@@ -242,7 +242,7 @@ Status IndexAccessMethod::touch(OperationContext* txn) const {
 
 RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
     // Generate the key for this index.
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths* multikeyPaths = nullptr;
     getKeys(key, &keys, multikeyPaths);
     invariant(keys.size() == 1);
@@ -410,7 +410,7 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* txn,
                                               const RecordId& loc,
                                               const InsertDeleteOptions& options,
                                               int64_t* numInserted) {
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
     _real->getKeys(obj, &keys, &multikeyPaths);
 

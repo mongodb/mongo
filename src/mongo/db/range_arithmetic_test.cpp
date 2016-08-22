@@ -31,12 +31,14 @@
 
 namespace {
 
-using mongo::MINKEY;
+using mongo::BSONObj;
 using mongo::MAXKEY;
-using mongo::rangeOverlaps;
-using mongo::rangeMapOverlaps;
+using mongo::MINKEY;
 using mongo::RangeMap;
 using mongo::RangeVector;
+using mongo::SimpleBSONObjComparator;
+using mongo::rangeMapOverlaps;
+using mongo::rangeOverlaps;
 using std::make_pair;
 
 TEST(BSONRange, SmallerLowerRangeNonSubset) {
@@ -76,7 +78,8 @@ TEST(BSONRange, EqualRange) {
 }
 
 TEST(RangeMap, RangeMapOverlap) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
     rangeMap.insert(make_pair(BSON("x" << 200), BSON("x" << 300)));
     rangeMap.insert(make_pair(BSON("x" << 300), BSON("x" << 400)));
@@ -89,7 +92,8 @@ TEST(RangeMap, RangeMapOverlap) {
 }
 
 TEST(RangeMap, RangeMapOverlapPartial) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
     rangeMap.insert(make_pair(BSON("x" << 200), BSON("x" << 300)));
 
@@ -101,7 +105,8 @@ TEST(RangeMap, RangeMapOverlapPartial) {
 }
 
 TEST(RangeMap, RangeMapOverlapInner) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
 
     RangeVector overlap;
@@ -112,7 +117,8 @@ TEST(RangeMap, RangeMapOverlapInner) {
 }
 
 TEST(RangeMap, RangeMapNoOverlap) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
     rangeMap.insert(make_pair(BSON("x" << 300), BSON("x" << 400)));
 
@@ -123,7 +129,8 @@ TEST(RangeMap, RangeMapNoOverlap) {
 }
 
 TEST(RangeMap, RangeMapOverlaps) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
 
     ASSERT(rangeMapOverlaps(rangeMap, BSON("x" << 100), BSON("x" << 200)));
@@ -135,7 +142,8 @@ TEST(RangeMap, RangeMapOverlaps) {
 }
 
 TEST(RangeMap, RangeMapContains) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
 
     ASSERT(rangeMapContains(rangeMap, BSON("x" << 100), BSON("x" << 200)));
@@ -144,7 +152,8 @@ TEST(RangeMap, RangeMapContains) {
 }
 
 TEST(RangeMap, RangeMapContainsMinMax) {
-    RangeMap rangeMap;
+    SimpleBSONObjComparator bsonCmp;
+    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
     rangeMap.insert(make_pair(BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     ASSERT(rangeMapContains(rangeMap, BSON("x" << MINKEY), BSON("x" << MAXKEY)));

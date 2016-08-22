@@ -34,6 +34,7 @@
 
 #include <vector>
 
+#include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
@@ -178,8 +179,10 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromObject(const WorkingSetMembe
     // We will sort '_data' in the same order an index over '_pattern' would have.  This is
     // tricky.  Consider the sort pattern {a:1} and the document {a:[1, 10]}. We have
     // potentially two keys we could use to sort on. Here we extract these keys.
-    BSONObjCmp patternCmp(_btreeObj);
-    BSONObjSet keys(patternCmp);
+    const StringData::ComparatorInterface* stringComparator = nullptr;
+    BSONObjComparator patternCmp(
+        _btreeObj, BSONObjComparator::FieldNamesMode::kConsider, stringComparator);
+    BSONObjSet keys = patternCmp.makeBSONObjSet();
 
     try {
         // There's no need to compute the prefixes of the indexed fields that cause the index to be
