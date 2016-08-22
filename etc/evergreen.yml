@@ -796,7 +796,8 @@ post:
       source_dir: "./"
       include:
         - "./**.core"
-        - "./**.mdmp"
+        - "./**.dmp"  # Windows: SilentProcessExit minidumps
+        - "./**.mdmp" # Windows: minidumps
   - command: s3.put
     params:
       aws_key: ${aws_key}
