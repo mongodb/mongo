@@ -2236,6 +2236,10 @@ def doConfigure(myenv):
         if not myenv.ToolchainIs('clang', 'gcc'):
             env.FatalError('sanitize is only supported with clang or gcc')
 
+        if myenv.ToolchainIs('gcc'):
+            # GCC's implementation of ASAN depends on libdl.
+            env.Append(LIBS=['dl'])
+
         if env['MONGO_ALLOCATOR'] == 'tcmalloc':
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
