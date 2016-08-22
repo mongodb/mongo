@@ -586,7 +586,7 @@ public:
     virtual void help(stringstream& help) const {
         help << "{ replSetSyncFrom : \"host:port\" }\n";
         help << "Change who this member is syncing from. Note: This will interrupt and restart an "
-                "existing initial sync with the specified member.";
+                "in-progress initial sync.";
     }
     CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") {}
     virtual bool run(OperationContext* txn,
