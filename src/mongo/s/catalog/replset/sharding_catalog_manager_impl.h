@@ -114,6 +114,9 @@ public:
 
     void cancelAddShardTaskIfNeeded(const ShardId& shardId) override;
 
+    Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+                                                  const std::string& version) override;
+
 private:
     /**
      * Generates a unique name to be given to a newly added shard.

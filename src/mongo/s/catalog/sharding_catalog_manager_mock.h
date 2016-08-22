@@ -94,6 +94,9 @@ public:
                                                  const std::string& shardName) override;
 
     void cancelAddShardTaskIfNeeded(const ShardId& shardId) override;
+
+    Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+                                                  const std::string& version) override;
 };
 
 }  // namespace mongo

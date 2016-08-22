@@ -1916,4 +1916,38 @@ void ShardingCatalogManagerImpl::_untrackAddShardHandle_inlock(const ShardId& sh
     _addShardHandles.erase(shardId);
 }
 
+Status ShardingCatalogManagerImpl::setFeatureCompatibilityVersionOnShards(
+    OperationContext* txn, const std::string& version) {
+
+    // No shards should be added until we have forwarded featureCompatibilityVersion to all shards.
+    Lock::SharedLock lk(txn->lockState(), _kShardMembershipLock);
+
+    std::vector<ShardId> shardIds;
+    grid.shardRegistry()->getAllShardIds(&shardIds);
+    for (const ShardId& shardId : shardIds) {
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
+        if (!shard) {
+            continue;
+        }
+
+        auto response =
+            shard->runCommand(txn,
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              "admin",
+                              BSON(FeatureCompatibilityVersion::kCommandName << version),
+                              Shard::RetryPolicy::kIdempotent);
+        if (!response.isOK()) {
+            return response.getStatus();
+        }
+        if (!response.getValue().commandStatus.isOK()) {
+            return response.getValue().commandStatus;
+        }
+        if (!response.getValue().writeConcernStatus.isOK()) {
+            return response.getValue().writeConcernStatus;
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo

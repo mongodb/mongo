@@ -32,8 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -122,23 +121,8 @@ public:
         FeatureCompatibilityVersion::set(txn, version);
 
         // Forward to all shards.
-        std::vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIds(&shardIds);
-        for (const ShardId& shardId : shardIds) {
-            const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-            if (!shard) {
-                continue;
-            }
-
-            auto response =
-                shard->runCommand(txn,
-                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                  "admin",
-                                  BSON(FeatureCompatibilityVersion::kCommandName << version),
-                                  Shard::RetryPolicy::kIdempotent);
-            uassertStatusOK(response);
-            uassertStatusOK(response.getValue().commandStatus);
-        }
+        uassertStatusOK(
+            Grid::get(txn)->catalogManager()->setFeatureCompatibilityVersionOnShards(txn, version));
 
         return true;
     }

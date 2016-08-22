@@ -199,6 +199,12 @@ public:
      */
     virtual void cancelAddShardTaskIfNeeded(const ShardId& shardId) = 0;
 
+    /**
+     * Runs the setFeatureCompatibilityVersion command on all shards.
+     */
+    virtual Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+                                                          const std::string& version) = 0;
+
 protected:
     ShardingCatalogManager() = default;
 };

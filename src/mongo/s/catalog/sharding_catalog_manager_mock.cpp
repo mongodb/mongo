@@ -123,4 +123,9 @@ void ShardingCatalogManagerMock::cancelAddShardTaskIfNeeded(const ShardId& shard
     MONGO_UNREACHABLE;
 }
 
+Status ShardingCatalogManagerMock::setFeatureCompatibilityVersionOnShards(
+    OperationContext* txn, const std::string& version) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo
