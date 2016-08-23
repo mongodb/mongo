@@ -92,7 +92,8 @@ void ServiceEntryPointMongos::_sessionLoop(Session* session) {
         {
             auto status = session->sourceMessage(&message).wait();
 
-            if (ErrorCodes::isInterruption(status.code())) {
+            if (ErrorCodes::isInterruption(status.code()) ||
+                ErrorCodes::isNetworkError(status.code())) {
                 break;
             }
 

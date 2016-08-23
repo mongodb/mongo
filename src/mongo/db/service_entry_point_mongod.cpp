@@ -112,7 +112,8 @@ void ServiceEntryPointMongod::_sessionLoop(Session* session) {
             inMessage.reset();
             auto status = session->sourceMessage(&inMessage).wait();
 
-            if (ErrorCodes::isInterruption(status.code())) {
+            if (ErrorCodes::isInterruption(status.code()) ||
+                ErrorCodes::isNetworkError(status.code())) {
                 break;
             }
 
@@ -137,7 +138,6 @@ void ServiceEntryPointMongod::_sessionLoop(Session* session) {
 
             // If this is an exhaust cursor, don't source more Messages
             if (dbresponse.exhaustNS.size() > 0 && setExhaustMessage(&inMessage, dbresponse)) {
-                log() << "we are in exhaust";
                 inExhaust = true;
             } else {
                 inExhaust = false;
