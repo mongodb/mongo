@@ -26,7 +26,7 @@
 
     secondaries.forEach(function(secondary) {
         assert.commandWorked(secondary.getDB('admin').runCommand(
-            {configureFailPoint: 'pauseRsBgSyncProducer', mode: 'alwaysOn'}));
+            {configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));
     });
 
     jsTest.log("inserting shardIdentity document to primary that shouldn't replicate");
@@ -61,7 +61,7 @@
     // primary.
     secondaries.forEach(function(secondary) {
         assert.commandWorked(secondary.getDB('admin').runCommand(
-            {configureFailPoint: 'pauseRsBgSyncProducer', mode: 'off'}));
+            {configureFailPoint: 'stopOplogFetcher', mode: 'off'}));
     });
 
     // Wait for a new healthy primary
