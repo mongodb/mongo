@@ -142,7 +142,8 @@ public:
                                              BSONObj(),
                                              boost::none,  // return all
                                              &chunks,
-                                             nullptr);
+                                             nullptr,
+                                             repl::ReadConcernLevel::kMajorityReadConcern);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

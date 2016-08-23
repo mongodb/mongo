@@ -298,7 +298,8 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
         grid.catalogClient(txn)->logChange(txn,
                                            "Sharding minOpTime recovery",
                                            NamespaceString::kConfigCollectionNamespace.ns(),
-                                           recoveryDocBSON);
+                                           recoveryDocBSON,
+                                           ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK())
         return status;
 

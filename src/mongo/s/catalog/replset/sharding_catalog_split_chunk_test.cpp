@@ -142,11 +142,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     auto lastChunkDoc = lastChunkDocStatus.getValue();
     ASSERT_BSONOBJ_EQ(chunkMax, lastChunkDoc.getMax());
 
-    {
-        // Check for increment on third chunkDoc's minor version
-        ASSERT_EQ(origVersion.majorVersion(), lastChunkDoc.getVersion().majorVersion());
-        ASSERT_EQ(origVersion.minorVersion() + 3, lastChunkDoc.getVersion().minorVersion());
-    }
+    // Check for increment on third chunkDoc's minor version
+    ASSERT_EQ(origVersion.majorVersion(), lastChunkDoc.getVersion().majorVersion());
+    ASSERT_EQ(origVersion.minorVersion() + 3, lastChunkDoc.getVersion().minorVersion());
 }
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
@@ -165,8 +163,9 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
 
+    std::vector<BSONObj> splitPoints;
     auto chunkSplitPoint = BSON("a" << 5);
-    std::vector<BSONObj> splitPoints{chunkSplitPoint};
+    splitPoints.push_back(chunkSplitPoint);
 
     // set up second chunk (chunk2)
     auto competingVersion = ChunkVersion(2, 1, collEpoch);
@@ -206,6 +205,35 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ASSERT_EQ(competingVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
     ASSERT_EQ(competingVersion.minorVersion() + 2, otherChunkDoc.getVersion().minorVersion());
 }
+
+TEST_F(SplitChunkTest, PreConditionFailErrors) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    std::vector<BSONObj> splitPoints;
+    auto chunkSplitPoint = BSON("a" << 5);
+    splitPoints.push_back(chunkSplitPoint);
+
+    setupChunks({chunk});
+
+    auto splitStatus = catalogManager()->commitChunkSplit(operationContext(),
+                                                          NamespaceString("TestDB.TestColl"),
+                                                          origVersion.epoch(),
+                                                          ChunkRange(chunkMin, BSON("a" << 7)),
+                                                          splitPoints,
+                                                          "shard0000");
+    ASSERT_EQ(ErrorCodes::BadValue, splitStatus);
+}
+
 TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
     ChunkType chunk;
     chunk.setNS("TestDB.TestColl");

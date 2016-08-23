@@ -311,7 +311,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
                                                BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                                1,
                                                &newestChunk,
-                                               nullptr));
+                                               nullptr,
+                                               repl::ReadConcernLevel::kMajorityReadConcern));
 
         if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
@@ -540,7 +541,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
      */
 
     log() << "DBConfig::dropDatabase: " << _name;
-    grid.catalogClient(txn)->logChange(txn, "dropDatabase.start", _name, BSONObj());
+    grid.catalogClient(txn)->logChange(
+        txn, "dropDatabase.start", _name, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // 1
     grid.catalogCache()->invalidate(_name);
@@ -618,7 +620,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     LOG(1) << "\t dropped primary db for: " << _name;
 
-    grid.catalogClient(txn)->logChange(txn, "dropDatabase", _name, BSONObj());
+    grid.catalogClient(txn)->logChange(
+        txn, "dropDatabase", _name, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     return true;
 }

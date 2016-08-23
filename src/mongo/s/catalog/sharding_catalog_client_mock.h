@@ -88,7 +88,8 @@ public:
                      const BSONObj& sort,
                      boost::optional<int> limit,
                      std::vector<ChunkType>* chunks,
-                     repl::OpTime* opTime) override;
+                     repl::OpTime* opTime,
+                     repl::ReadConcernLevel readConcern) override;
 
     Status getTagsForCollection(OperationContext* txn,
                                 const std::string& collectionNs,
@@ -116,7 +117,9 @@ public:
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition,
                                    const std::string& nss,
-                                   const ChunkVersion& lastChunkVersion) override;
+                                   const ChunkVersion& lastChunkVersion,
+                                   const WriteConcernOptions& writeConcern,
+                                   repl::ReadConcernLevel readConcern) override;
 
     Status logAction(OperationContext* txn,
                      const std::string& what,
@@ -126,7 +129,8 @@ public:
     Status logChange(OperationContext* txn,
                      const std::string& what,
                      const std::string& ns,
-                     const BSONObj& detail) override;
+                     const BSONObj& detail,
+                     const WriteConcernOptions& writeConcern) override;
 
     StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) override;
 

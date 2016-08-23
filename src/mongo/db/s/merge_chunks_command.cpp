@@ -146,7 +146,13 @@ Status runApplyOpsCmd(OperationContext* txn,
     BSONArray preCond = buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), currShardVersion);
 
     return grid.catalogClient(txn)->applyChunkOpsDeprecated(
-        txn, updatesB.arr(), preCond, firstChunk.getNS(), newMergedVersion);
+        txn,
+        updatesB.arr(),
+        preCond,
+        firstChunk.getNS(),
+        newMergedVersion,
+        ShardingCatalogClient::kMajorityWriteConcern,
+        repl::ReadConcernLevel::kMajorityReadConcern);
 }
 
 bool mergeChunks(OperationContext* txn,
@@ -351,7 +357,8 @@ bool mergeChunks(OperationContext* txn,
 
     BSONObj mergeLogEntry = buildMergeLogEntry(chunksToMerge, shardVersion, mergeVersion);
 
-    grid.catalogClient(txn)->logChange(txn, "merge", nss.ns(), mergeLogEntry);
+    grid.catalogClient(txn)->logChange(
+        txn, "merge", nss.ns(), mergeLogEntry, ShardingCatalogClient::kMajorityWriteConcern);
 
     return true;
 }

@@ -282,8 +282,14 @@ bool ChunkManager::_load(OperationContext* txn,
 
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
-    uassertStatusOK(grid.catalogClient(txn)->getChunks(
-        txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, &opTime));
+    uassertStatusOK(
+        grid.catalogClient(txn)->getChunks(txn,
+                                           diffQuery.query,
+                                           diffQuery.sort,
+                                           boost::none,
+                                           &chunks,
+                                           &opTime,
+                                           repl::ReadConcernLevel::kMajorityReadConcern));
 
     invariant(opTime >= _configOpTime);
     _configOpTime = opTime;

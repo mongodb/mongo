@@ -71,6 +71,7 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -812,7 +813,8 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    _catalogClient->logChange(txn, "addShard", "", shardDetails.obj());
+    _catalogClient->logChange(
+        txn, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // Ensure the added shard is visible to this process.
     auto shardRegistry = Grid::get(txn)->shardRegistry();
@@ -1061,7 +1063,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
 
     // Acquire GlobalLock in MODE_X twice to prevent yielding.
-    // GLobalLock and the following lock on config.chunks are only needed to support
+    // GlobalLock and the following lock on config.chunks are only needed to support
     // mixed-mode operation with mongoses from 3.2
     // TODO(SERVER-25337): Remove GlobalLock and config.chunks lock after 3.4
     Lock::GlobalLock firstGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
@@ -1110,12 +1112,30 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     BSONArrayBuilder updates;
 
     for (const auto& endKey : newChunkBounds) {
+        // verify that splitPoints are non-equivalent
+        if (endKey.woCompare(startKey) == 0) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "split on lower bound "
+                                     " of chunk "
+                                  << "["
+                                  << startKey
+                                  << ","
+                                  << endKey
+                                  << ")"
+                                  << "is not allowed"};
+        }
+
+        // verify that splits don't create too-big shard keys
+        Status shardKeyStatus = ShardKeyPattern::checkShardKeySize(endKey);
+        if (!shardKeyStatus.isOK()) {
+            return shardKeyStatus;
+        }
+
         // splits only update the 'minor' portion of version
         currentMaxVersion.incMinor();
 
         // build an update operation against the chunks collection of the config database
-        // with
-        // upsert true
+        // with upsert true
         BSONObjBuilder op;
         op.append("op", "u");
         op.appendBool("b", true);
@@ -1156,18 +1176,28 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
         BSONObjBuilder b;
         b.append("ns", ChunkType::ConfigNS);
         b.append("q",
-                 BSON("query" << BSON(ChunkType::ns(ns.ns())) << "orderby"
+                 BSON("query" << BSON(ChunkType::ns(ns.ns()) << ChunkType::min() << range.getMin()
+                                                             << ChunkType::max()
+                                                             << range.getMax())
+                              << "orderby"
                               << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
         {
             BSONObjBuilder bb(b.subobjStart("res"));
-            collVersion.addToBSON(bb, ChunkType::DEPRECATED_lastmod());
+            bb.append(ChunkType::DEPRECATED_epoch(), requestEpoch);
+            bb.append(ChunkType::shard(), shardName);
         }
         preCond.append(b.obj());
     }
 
     // apply the batch of updates to remote and local metadata
-    Status applyOpsStatus = grid.catalogClient(txn)->applyChunkOpsDeprecated(
-        txn, updates.arr(), preCond.arr(), ns.ns(), currentMaxVersion);
+    Status applyOpsStatus =
+        grid.catalogClient(txn)->applyChunkOpsDeprecated(txn,
+                                                         updates.arr(),
+                                                         preCond.arr(),
+                                                         ns.ns(),
+                                                         currentMaxVersion,
+                                                         WriteConcernOptions(),
+                                                         repl::ReadConcernLevel::kLocalReadConcern);
     if (!applyOpsStatus.isOK()) {
         return applyOpsStatus;
     }
@@ -1182,10 +1212,11 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     }
 
     if (newChunks.size() == 2) {
-        appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
-        appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
+        _appendShortVersion(logDetail.subobjStart("left"), newChunks[0]);
+        _appendShortVersion(logDetail.subobjStart("right"), newChunks[1]);
 
-        grid.catalogClient(txn)->logChange(txn, "split", ns.ns(), logDetail.obj());
+        grid.catalogClient(txn)->logChange(
+            txn, "split", ns.ns(), logDetail.obj(), WriteConcernOptions());
     } else {
         BSONObj beforeDetailObj = logDetail.obj();
         BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -1196,9 +1227,10 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
             chunkDetail.appendElements(beforeDetailObj);
             chunkDetail.append("number", i + 1);
             chunkDetail.append("of", newChunksSize);
-            appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
+            _appendShortVersion(chunkDetail.subobjStart("chunk"), newChunks[i]);
 
-            grid.catalogClient(txn)->logChange(txn, "multi-split", ns.ns(), chunkDetail.obj());
+            grid.catalogClient(txn)->logChange(
+                txn, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions());
         }
     }
 
@@ -1325,8 +1357,14 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     }
 
     // apply the batch of updates to remote and local metadata
-    Status applyOpsStatus = grid.catalogClient(txn)->applyChunkOpsDeprecated(
-        txn, updates.arr(), preCond.arr(), ns.ns(), mergeVersion);
+    Status applyOpsStatus =
+        grid.catalogClient(txn)->applyChunkOpsDeprecated(txn,
+                                                         updates.arr(),
+                                                         preCond.arr(),
+                                                         ns.ns(),
+                                                         mergeVersion,
+                                                         WriteConcernOptions(),
+                                                         repl::ReadConcernLevel::kLocalReadConcern);
     if (!applyOpsStatus.isOK()) {
         return applyOpsStatus;
     }
@@ -1342,9 +1380,19 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     collVersion.addToBSON(logDetail, "prevShardVersion");
     mergeVersion.addToBSON(logDetail, "mergedVersion");
 
-    grid.catalogClient(txn)->logChange(txn, "merge", ns.ns(), logDetail.obj());
+    grid.catalogClient(txn)->logChange(
+        txn, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions());
 
     return applyOpsStatus;
+}
+
+void ShardingCatalogManagerImpl::_appendShortVersion(BufBuilder& b, const ChunkType& chunk) {
+    BSONObjBuilder bb(b);
+    bb.append(ChunkType::min(), chunk.getMin());
+    bb.append(ChunkType::max(), chunk.getMax());
+    if (chunk.isVersionSet())
+        chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
+    bb.done();
 }
 
 void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) {

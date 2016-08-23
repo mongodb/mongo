@@ -411,9 +411,8 @@ Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks
     const NamespaceString chunkNS(ChunkType::ConfigNS);
     for (const auto& chunk : chunks) {
         auto insertStatus = insertToConfigCollection(operationContext(), chunkNS, chunk.toBSON());
-        if (!insertStatus.isOK()) {
+        if (!insertStatus.isOK())
             return insertStatus;
-        }
     }
 
     return Status::OK();

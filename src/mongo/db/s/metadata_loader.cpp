@@ -178,8 +178,13 @@ Status MetadataLoader::initChunks(OperationContext* txn,
     try {
         std::vector<ChunkType> chunks;
         const auto diffQuery = differ.configDiffQuery();
-        Status status = catalogClient->getChunks(
-            txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, nullptr);
+        Status status = catalogClient->getChunks(txn,
+                                                 diffQuery.query,
+                                                 diffQuery.sort,
+                                                 boost::none,
+                                                 &chunks,
+                                                 nullptr,
+                                                 repl::ReadConcernLevel::kMajorityReadConcern);
         if (!status.isOK()) {
             if (status == ErrorCodes::HostUnreachable) {
                 // Make our metadata invalid

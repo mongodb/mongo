@@ -166,7 +166,11 @@ public:
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
         auto catalogClient = grid.catalogClient(txn);
-        catalogClient->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
+        catalogClient->logChange(txn,
+                                 "movePrimary.start",
+                                 dbname,
+                                 moveStartDetails,
+                                 ShardingCatalogClient::kMajorityWriteConcern);
 
         BSONArrayBuilder barr;
         barr.append(shardedColls);
@@ -287,7 +291,11 @@ public:
         BSONObj moveFinishDetails =
             _buildMoveEntry(dbname, oldPrimary, toShard->toString(), shardedColls);
 
-        catalogClient->logChange(txn, "movePrimary", dbname, moveFinishDetails);
+        catalogClient->logChange(txn,
+                                 "movePrimary",
+                                 dbname,
+                                 moveFinishDetails,
+                                 ShardingCatalogClient::kMajorityWriteConcern);
         return true;
     }
 

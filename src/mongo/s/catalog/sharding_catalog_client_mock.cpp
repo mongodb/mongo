@@ -118,7 +118,8 @@ Status ShardingCatalogClientMock::getChunks(OperationContext* txn,
                                             const BSONObj& sort,
                                             boost::optional<int> limit,
                                             std::vector<ChunkType>* chunks,
-                                            repl::OpTime* opTime) {
+                                            repl::OpTime* opTime,
+                                            repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -163,7 +164,9 @@ Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* txn,
                                                           const BSONArray& updateOps,
                                                           const BSONArray& preCondition,
                                                           const std::string& nss,
-                                                          const ChunkVersion& lastChunkVersion) {
+                                                          const ChunkVersion& lastChunkVersion,
+                                                          const WriteConcernOptions& writeConcern,
+                                                          repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -177,7 +180,8 @@ Status ShardingCatalogClientMock::logAction(OperationContext* txn,
 Status ShardingCatalogClientMock::logChange(OperationContext* txn,
                                             const string& what,
                                             const string& ns,
-                                            const BSONObj& detail) {
+                                            const BSONObj& detail,
+                                            const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

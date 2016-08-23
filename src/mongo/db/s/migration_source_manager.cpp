@@ -191,7 +191,8 @@ Status MigrationSourceManager::startClone(OperationContext* txn) {
                                                   << "from"
                                                   << _args.getFromShardId()
                                                   << "to"
-                                                  << _args.getToShardId()));
+                                                  << _args.getToShardId()),
+                                       ShardingCatalogClient::kMajorityWriteConcern);
 
     _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
         _args, _committedMetadata->getKeyPattern());
@@ -377,7 +378,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
             BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
                        << _args.getFromShardId()
                        << "to"
-                       << _args.getToShardId()));
+                       << _args.getToShardId()),
+            ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             fassertStatusOK(40137,
                             {status.code(),
@@ -473,7 +475,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                                   << "from"
                                                   << _args.getFromShardId()
                                                   << "to"
-                                                  << _args.getToShardId()));
+                                                  << _args.getToShardId()),
+                                       ShardingCatalogClient::kMajorityWriteConcern);
 
     return Status::OK();
 }
@@ -490,7 +493,8 @@ void MigrationSourceManager::cleanupOnError(OperationContext* txn) {
                                                   << "from"
                                                   << _args.getFromShardId()
                                                   << "to"
-                                                  << _args.getToShardId()));
+                                                  << _args.getToShardId()),
+                                       ShardingCatalogClient::kMajorityWriteConcern);
 
     _cleanup(txn);
 }

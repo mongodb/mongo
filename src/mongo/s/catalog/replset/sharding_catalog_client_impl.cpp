@@ -236,8 +236,10 @@ Status ShardingCatalogClientImpl::logAction(OperationContext* txn,
                                             const std::string& ns,
                                             const BSONObj& detail) {
     if (_actionLogCollectionCreated.load() == 0) {
-        Status result = _createCappedConfigCollection(
-            txn, kActionLogCollectionName, kActionLogCollectionSizeMB);
+        Status result = _createCappedConfigCollection(txn,
+                                                      kActionLogCollectionName,
+                                                      kActionLogCollectionSizeMB,
+                                                      ShardingCatalogClient::kMajorityWriteConcern);
         if (result.isOK()) {
             _actionLogCollectionCreated.store(1);
         } else {
@@ -246,16 +248,24 @@ Status ShardingCatalogClientImpl::logAction(OperationContext* txn,
         }
     }
 
-    return _log(txn, kActionLogCollectionName, what, ns, detail);
+    return _log(txn,
+                kActionLogCollectionName,
+                what,
+                ns,
+                detail,
+                ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 Status ShardingCatalogClientImpl::logChange(OperationContext* txn,
                                             const std::string& what,
                                             const std::string& ns,
-                                            const BSONObj& detail) {
+                                            const BSONObj& detail,
+                                            const WriteConcernOptions& writeConcern) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+              writeConcern.wMode == WriteConcernOptions::kMajority);
     if (_changeLogCollectionCreated.load() == 0) {
         Status result = _createCappedConfigCollection(
-            txn, kChangeLogCollectionName, kChangeLogCollectionSizeMB);
+            txn, kChangeLogCollectionName, kChangeLogCollectionSizeMB, writeConcern);
         if (result.isOK()) {
             _changeLogCollectionCreated.store(1);
         } else {
@@ -264,7 +274,7 @@ Status ShardingCatalogClientImpl::logChange(OperationContext* txn,
         }
     }
 
-    return _log(txn, kChangeLogCollectionName, what, ns, detail);
+    return _log(txn, kChangeLogCollectionName, what, ns, detail, writeConcern);
 }
 
 // static
@@ -355,7 +365,8 @@ Status ShardingCatalogClientImpl::_log(OperationContext* txn,
                                        const StringData& logCollName,
                                        const std::string& what,
                                        const std::string& operationNS,
-                                       const BSONObj& detail) {
+                                       const BSONObj& detail,
+                                       const WriteConcernOptions& writeConcern) {
     Date_t now = Grid::get(txn)->getNetwork()->now();
     const std::string hostName = Grid::get(txn)->getNetwork()->getHostName();
     const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
@@ -373,8 +384,8 @@ Status ShardingCatalogClientImpl::_log(OperationContext* txn,
     log() << "about to log metadata event into " << logCollName << ": " << redact(changeLogBSON);
 
     const NamespaceString nss("config", logCollName);
-    Status result = insertConfigDocument(
-        txn, nss.ns(), changeLogBSON, ShardingCatalogClient::kMajorityWriteConcern);
+    Status result = insertConfigDocument(txn, nss.ns(), changeLogBSON, writeConcern);
+
     if (!result.isOK()) {
         warning() << "Error encountered while logging config change with ID [" << changeId
                   << "] into collection " << logCollName << ": " << redact(result);
@@ -446,7 +457,11 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
 
         collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
 
-        logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
+        logChange(txn,
+                  "shardCollection.start",
+                  ns,
+                  collectionDetail.obj(),
+                  ShardingCatalogClientImpl::kMajorityWriteConcern);
     }
 
     // Construct the collection default collator.
@@ -502,7 +517,11 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
                   << dbPrimaryShardId << causedBy(status);
     }
 
-    logChange(txn, "shardCollection.end", ns, BSON("version" << manager->getVersion().toString()));
+    logChange(txn,
+              "shardCollection.end",
+              ns,
+              BSON("version" << manager->getVersion().toString()),
+              ShardingCatalogClientImpl::kMajorityWriteConcern);
 
     return Status::OK();
 }
@@ -558,7 +577,11 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
         grid.shardRegistry()->reload(txn);
 
         // Record start in changelog
-        logChange(txn, "removeShard.start", "", BSON("shard" << name));
+        logChange(txn,
+                  "removeShard.start",
+                  "",
+                  BSON("shard" << name),
+                  ShardingCatalogClientImpl::kMajorityWriteConcern);
         return ShardDrainingStatus::STARTED;
     }
 
@@ -603,7 +626,11 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
     grid.shardRegistry()->reload(txn);
 
     // Record finish in changelog
-    logChange(txn, "removeShard", "", BSON("shard" << name));
+    logChange(txn,
+              "removeShard",
+              "",
+              BSON("shard" << name),
+              ShardingCatalogClientImpl::kMajorityWriteConcern);
 
     return ShardDrainingStatus::COMPLETED;
 }
@@ -749,7 +776,11 @@ Status ShardingCatalogClientImpl::getCollections(OperationContext* txn,
 }
 
 Status ShardingCatalogClientImpl::dropCollection(OperationContext* txn, const NamespaceString& ns) {
-    logChange(txn, "dropCollection.start", ns.ns(), BSONObj());
+    logChange(txn,
+              "dropCollection.start",
+              ns.ns(),
+              BSONObj(),
+              ShardingCatalogClientImpl::kMajorityWriteConcern);
 
     auto shardsStatus = getAllShards(txn, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!shardsStatus.isOK()) {
@@ -904,7 +935,11 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* txn, const Na
 
     LOG(1) << "dropCollection " << ns << " completed";
 
-    logChange(txn, "dropCollection", ns.ns(), BSONObj());
+    logChange(txn,
+              "dropCollection",
+              ns.ns(),
+              BSONObj(),
+              ShardingCatalogClientImpl::kMajorityWriteConcern);
 
     return Status::OK();
 }
@@ -1012,14 +1047,17 @@ Status ShardingCatalogClientImpl::getChunks(OperationContext* txn,
                                             const BSONObj& sort,
                                             boost::optional<int> limit,
                                             vector<ChunkType>* chunks,
-                                            OpTime* opTime) {
+                                            OpTime* opTime,
+                                            repl::ReadConcernLevel readConcern) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+              readConcern == repl::ReadConcernLevel::kMajorityReadConcern);
     chunks->clear();
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
     auto findStatus = _exhaustiveFindOnConfig(txn,
                                               kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcern,
                                               NamespaceString(ChunkType::ConfigNS),
                                               query,
                                               sort,
@@ -1264,10 +1302,15 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
                                                           const BSONArray& updateOps,
                                                           const BSONArray& preCondition,
                                                           const std::string& nss,
-                                                          const ChunkVersion& lastChunkVersion) {
+                                                          const ChunkVersion& lastChunkVersion,
+                                                          const WriteConcernOptions& writeConcern,
+                                                          repl::ReadConcernLevel readConcern) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+              (readConcern == repl::ReadConcernLevel::kMajorityReadConcern &&
+               writeConcern.wMode == WriteConcernOptions::kMajority));
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
                                   << WriteConcernOptions::kWriteConcernField
-                                  << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+                                  << writeConcern.toBSON());
 
     auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,
@@ -1309,7 +1352,8 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
         BSONObjBuilder query;
         lastChunkVersion.addToBSON(query, ChunkType::DEPRECATED_lastmod());
         query.append(ChunkType::ns(), nss);
-        Status chunkStatus = getChunks(txn, query.obj(), BSONObj(), 1, &newestChunk, nullptr);
+        Status chunkStatus =
+            getChunks(txn, query.obj(), BSONObj(), 1, &newestChunk, nullptr, readConcern);
 
         if (!chunkStatus.isOK()) {
             warning() << "getChunks function failed, unable to validate chunk operation metadata"
@@ -1546,12 +1590,14 @@ Status ShardingCatalogClientImpl::_checkDbDoesNotExist(OperationContext* txn,
                                 << dbName);
 }
 
-Status ShardingCatalogClientImpl::_createCappedConfigCollection(OperationContext* txn,
-                                                                StringData collName,
-                                                                int cappedSize) {
+Status ShardingCatalogClientImpl::_createCappedConfigCollection(
+    OperationContext* txn,
+    StringData collName,
+    int cappedSize,
+    const WriteConcernOptions& writeConcern) {
     BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize
                                       << WriteConcernOptions::kWriteConcernField
-                                      << ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+                                      << writeConcern.toBSON());
 
     auto result = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
         txn,

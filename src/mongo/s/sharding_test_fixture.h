@@ -84,8 +84,6 @@ protected:
 
     ShardingCatalogClient* catalogClient() const;
 
-    ShardingCatalogManager* catalogManager() const;
-
     /**
      * Prefer catalogClient() method over this as much as possible.
      */
@@ -113,8 +111,6 @@ protected:
      * single request + response or find tests.
      */
     void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
-    // Same as onCommand but run against _addShardNetworkTestEnv
-    void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
     void onCommandWithMetadata(executor::NetworkTestEnv::OnCommandWithMetadataFunction func);
     void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
     void onFindWithMetadataCommand(
@@ -221,12 +217,9 @@ private:
 
     executor::NetworkInterfaceMock* _mockNetwork;
     executor::TaskExecutor* _executor;
-    executor::TaskExecutor* _executorForAddShard;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
-    std::unique_ptr<executor::NetworkTestEnv> _addShardNetworkTestEnv;
     DistLockManagerMock* _distLockManager = nullptr;
     ShardingCatalogClientImpl* _catalogClient = nullptr;
-    ShardingCatalogManagerImpl* _catalogManager = nullptr;
 };
 
 }  // namespace mongo

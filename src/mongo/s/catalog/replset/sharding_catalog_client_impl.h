@@ -80,7 +80,8 @@ public:
     Status logChange(OperationContext* txn,
                      const std::string& what,
                      const std::string& ns,
-                     const BSONObj& detail) override;
+                     const BSONObj& detail,
+                     const WriteConcernOptions& writeConcern) override;
 
     StatusWith<DistLockManager::ScopedDistLock> distLock(OperationContext* txn,
                                                          StringData name,
@@ -120,7 +121,8 @@ public:
                      const BSONObj& sort,
                      boost::optional<int> limit,
                      std::vector<ChunkType>* chunks,
-                     repl::OpTime* opTime) override;
+                     repl::OpTime* opTime,
+                     repl::ReadConcernLevel readConcern) override;
 
     Status getTagsForCollection(OperationContext* txn,
                                 const std::string& collectionNs,
@@ -148,7 +150,9 @@ public:
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition,
                                    const std::string& nss,
-                                   const ChunkVersion& lastChunkVersion) override;
+                                   const ChunkVersion& lastChunkVersion,
+                                   const WriteConcernOptions& writeConcern,
+                                   repl::ReadConcernLevel readConcern) override;
 
     StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) override;
 
@@ -214,7 +218,8 @@ private:
      */
     Status _createCappedConfigCollection(OperationContext* txn,
                                          StringData collName,
-                                         int cappedSize);
+                                         int cappedSize,
+                                         const WriteConcernOptions& writeConcern);
 
     /**
      * Helper method for running a count command against the config server with appropriate
@@ -255,12 +260,14 @@ private:
      * @param what E.g. "split", "migrate" (not interpreted)
      * @param operationNS To which collection the metadata change is being applied (not interpreted)
      * @param detail Additional info about the metadata change (not interpreted)
+     * @param writeConcern Write concern options to use for logging
      */
     Status _log(OperationContext* txn,
                 const StringData& logCollName,
                 const std::string& what,
                 const std::string& operationNS,
-                const BSONObj& detail);
+                const BSONObj& detail,
+                const WriteConcernOptions& writeConcern);
 
     //
     // All member variables are labeled with one of the following codes indicating the

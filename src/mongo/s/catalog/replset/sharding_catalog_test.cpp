@@ -483,7 +483,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
                                              BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                              1,
                                              &chunks,
-                                             &opTime));
+                                             &opTime,
+                                             repl::ReadConcernLevel::kMajorityReadConcern));
         ASSERT_EQ(2U, chunks.size());
         ASSERT_EQ(newOpTime, opTime);
 
@@ -531,8 +532,13 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
     auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
 
-        ASSERT_OK(catalogClient()->getChunks(
-            operationContext(), chunksQuery, BSONObj(), boost::none, &chunks, nullptr));
+        ASSERT_OK(catalogClient()->getChunks(operationContext(),
+                                             chunksQuery,
+                                             BSONObj(),
+                                             boost::none,
+                                             &chunks,
+                                             nullptr,
+                                             repl::ReadConcernLevel::kMajorityReadConcern));
         ASSERT_EQ(0U, chunks.size());
 
         return chunks;
@@ -571,8 +577,13 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
 
     auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
-        Status status = catalogClient()->getChunks(
-            operationContext(), chunksQuery, BSONObj(), boost::none, &chunks, nullptr);
+        Status status = catalogClient()->getChunks(operationContext(),
+                                                   chunksQuery,
+                                                   BSONObj(),
+                                                   boost::none,
+                                                   &chunks,
+                                                   nullptr,
+                                                   repl::ReadConcernLevel::kMajorityReadConcern);
 
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, chunks.size());
@@ -1396,8 +1407,14 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
     ChunkVersion lastChunkVersion(0, 0, OID());
 
     auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
-        auto status = catalogClient()->applyChunkOpsDeprecated(
-            operationContext(), updateOps, preCondition, nss, lastChunkVersion);
+        auto status =
+            catalogClient()->applyChunkOpsDeprecated(operationContext(),
+                                                     updateOps,
+                                                     preCondition,
+                                                     nss,
+                                                     lastChunkVersion,
+                                                     ShardingCatalogClient::kMajorityWriteConcern,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(status);
     });
 
@@ -1434,8 +1451,14 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     ChunkVersion lastChunkVersion(0, 0, OID());
 
     auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
-        auto status = catalogClient()->applyChunkOpsDeprecated(
-            operationContext(), updateOps, preCondition, nss, lastChunkVersion);
+        auto status =
+            catalogClient()->applyChunkOpsDeprecated(operationContext(),
+                                                     updateOps,
+                                                     preCondition,
+                                                     nss,
+                                                     lastChunkVersion,
+                                                     ShardingCatalogClient::kMajorityWriteConcern,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_OK(status);
     });
 
@@ -1476,8 +1499,14 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
     ChunkVersion lastChunkVersion(0, 0, OID());
 
     auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
-        auto status = catalogClient()->applyChunkOpsDeprecated(
-            operationContext(), updateOps, preCondition, nss, lastChunkVersion);
+        auto status =
+            catalogClient()->applyChunkOpsDeprecated(operationContext(),
+                                                     updateOps,
+                                                     preCondition,
+                                                     nss,
+                                                     lastChunkVersion,
+                                                     ShardingCatalogClient::kMajorityWriteConcern,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, status);
     });
 
