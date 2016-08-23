@@ -419,6 +419,19 @@ public:
                                                     const BSONObj& metadata,
                                                     const BSONObj& commandArgs);
 
+    /*
+     * This wraps up the runCommandWithMetadata function above, but returns the DBClient that
+     * actually ran the command. When called against a replica set, this will return the specific
+     * replica set member the command ran against.
+     *
+     * This is used in the shell so that cursors can send getMore through the correct connection.
+     */
+    virtual std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
+        StringData database,
+        StringData command,
+        const BSONObj& metadata,
+        const BSONObj& commandArgs);
+
     /** Run a database command.  Database commands are represented as BSON objects.  Common database
         commands have prebuilt helper functions -- see below.  If a helper is not available you can
         directly call runCommand.
@@ -436,6 +449,18 @@ public:
                             const BSONObj& cmd,
                             BSONObj& info,
                             int options = 0);
+
+    /*
+     * This wraps up the runCommand function avove, but returns the DBClient that actually ran
+     * the command. When called against a replica set, this will return the specific
+     * replica set member the command ran against.
+     *
+     * This is used in the shell so that cursors can send getMore through the correct connection.
+     */
+    virtual std::tuple<bool, DBClientWithCommands*> runCommandWithTarget(const std::string& dbname,
+                                                                         const BSONObj& cmd,
+                                                                         BSONObj& info,
+                                                                         int options = 0);
 
     /**
     * Authenticates to another cluster member using appropriate authentication data.

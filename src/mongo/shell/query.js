@@ -114,7 +114,7 @@ DBQuery.prototype._exec = function() {
             var canAttachReadPref = true;
             var findCmd = this._convertToCommand(canAttachReadPref);
             var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
-            this._cursor = new DBCommandCursor(this._mongo, cmdRes, this._batchSize);
+            this._cursor = new DBCommandCursor(cmdRes._mongo, cmdRes, this._batchSize);
         } else {
             if (this._special && this._query.readConcern) {
                 throw new Error("readConcern requires use of read commands");

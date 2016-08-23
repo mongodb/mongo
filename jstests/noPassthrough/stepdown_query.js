@@ -5,7 +5,7 @@
     var dbName = "test";
     var collName = jsTest.name();
 
-    function runTest(host, rst) {
+    function runTest(host, rst, waitForPrimary) {
         // We create a new connection to 'host' here instead of passing in the original connection.
         // This to work around the fact that connections created by ReplSetTest already have slaveOk
         // set on them, but we need a connection with slaveOk not set for this test.
@@ -19,10 +19,14 @@
         cursor.next();
         assert.eq(0, cursor.objsLeftInBatch());
         var primary = rst.getPrimary();
+        var secondary = rst.getSecondary();
         assert.throws(function() {
             primary.getDB("admin").runCommand({replSetStepDown: 60, force: true});
         });
         rst.waitForState(primary, ReplSetTest.State.SECONDARY, 60 * 1000);
+        if (waitForPrimary) {
+            rst.waitForState(secondary, ReplSetTest.State.PRIMARY, 60 * 1000);
+        }
         // When the primary steps down, it closes all client connections. Since 'conn' may be a
         // direct connection to the primary and the shell doesn't automatically retry operations on
         // network errors, we run a dummy operation here to force the shell to reconnect.
@@ -43,7 +47,13 @@
     var rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
-    runTest(rst.getPrimary().host, rst);
+    runTest(rst.getPrimary().host, rst, false);
+    rst.stopSet();
+
+    rst = new ReplSetTest({nodes: 2});
+    rst.startSet();
+    rst.initiate();
+    runTest(rst.getURL(), rst, true);
     rst.stopSet();
 
     // Test querying a replica set primary through mongos.

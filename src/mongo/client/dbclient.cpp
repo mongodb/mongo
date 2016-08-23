@@ -236,10 +236,16 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     return rpc::UniqueReply(std::move(replyMsg), std::move(commandReply));
 }
 
-bool DBClientWithCommands::runCommand(const string& dbname,
-                                      const BSONObj& cmd,
-                                      BSONObj& info,
-                                      int options) {
+std::tuple<rpc::UniqueReply, DBClientWithCommands*>
+DBClientWithCommands::runCommandWithMetadataAndTarget(StringData database,
+                                                      StringData command,
+                                                      const BSONObj& metadata,
+                                                      const BSONObj& commandArgs) {
+    return std::make_tuple(runCommandWithMetadata(database, command, metadata, commandArgs), this);
+}
+
+std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
+    const string& dbname, const BSONObj& cmd, BSONObj& info, int options) {
     BSONObj upconvertedCmd;
     BSONObj upconvertedMetadata;
 
@@ -251,12 +257,23 @@ bool DBClientWithCommands::runCommand(const string& dbname,
 
     auto commandName = upconvertedCmd.firstElementFieldName();
 
-    auto result = runCommandWithMetadata(dbname, commandName, upconvertedMetadata, upconvertedCmd);
+    auto resultTuple =
+        runCommandWithMetadataAndTarget(dbname, commandName, upconvertedMetadata, upconvertedCmd);
+    auto result = std::move(std::get<0>(resultTuple));
 
     info = result->getCommandReply().getOwned();
 
-    return isOk(info);
+    return std::make_tuple(isOk(info), std::get<1>(resultTuple));
 }
+
+bool DBClientWithCommands::runCommand(const string& dbname,
+                                      const BSONObj& cmd,
+                                      BSONObj& info,
+                                      int options) {
+    auto res = runCommandWithTarget(dbname, cmd, info, options);
+    return std::get<0>(res);
+}
+
 
 /* note - we build a bson obj here -- for something that is super common like getlasterror you
           should have that object prebuilt as that would be faster.

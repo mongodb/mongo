@@ -804,7 +804,7 @@ var DB;
             throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
         }
 
-        return new DBCommandCursor(this._mongo, res).toArray().sort(compareOn("name"));
+        return new DBCommandCursor(res._mongo, res).toArray().sort(compareOn("name"));
     };
 
     /**

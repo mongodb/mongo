@@ -189,6 +189,12 @@ public:
                                             const BSONObj& metadata,
                                             const BSONObj& commandArgs) final;
 
+    std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
+        StringData database,
+        StringData command,
+        const BSONObj& metadata,
+        const BSONObj& commandArgs) final;
+
     void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
 
     void setReplyMetadataReader(rpc::ReplyMetadataReader reader) final;

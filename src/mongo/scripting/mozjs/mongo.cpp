@@ -112,6 +112,50 @@ void setCursorHandle(JS::HandleObject target, long long cursorId, JS::CallArgs& 
     // Copy the client shared pointer to up the refcount.
     JS_SetPrivate(target, new CursorHandleInfo::CursorTracker(cursorId, *client));
 }
+
+void setHiddenMongo(JSContext* cx,
+                    DBClientWithCommands* resPtr,
+                    DBClientWithCommands* origConn,
+                    JS::CallArgs& args) {
+    ObjectWrapper o(cx, args.rval());
+    // If the connection that ran the command is the same as conn, then we set a hidden "_mongo"
+    // property on the returned object that is just "this" Mongo object.
+    if (resPtr == origConn) {
+        o.defineProperty(InternedString::_mongo, args.thisv(), JSPROP_READONLY | JSPROP_PERMANENT);
+    } else {
+        // Otherwise, we construct a new Mongo object that is a copy of "this", but has a different
+        // private value which is the specific DBClientBase that should be used for getMore calls.
+        auto& connSharedPtr = *(static_cast<std::shared_ptr<DBClientBase>*>(
+            JS_GetPrivate(args.thisv().toObjectOrNull())));
+
+        JS::RootedObject newMongo(cx);
+
+        auto scope = getScope(cx);
+        auto isLocalInfo = scope->getProto<MongoLocalInfo>().instanceOf(args.thisv());
+        if (isLocalInfo) {
+            scope->getProto<MongoLocalInfo>().newObject(&newMongo);
+        } else {
+            scope->getProto<MongoExternalInfo>().newObject(&newMongo);
+        }
+        JS_SetPrivate(
+            newMongo,
+            new std::shared_ptr<DBClientBase>(connSharedPtr, static_cast<DBClientBase*>(resPtr)));
+
+        ObjectWrapper from(cx, args.thisv());
+        ObjectWrapper to(cx, newMongo);
+        for (const auto& k :
+             {InternedString::slaveOk, InternedString::defaultDB, InternedString::host}) {
+            JS::RootedValue tmpValue(cx);
+            from.getValue(k, &tmpValue);
+            to.setValue(k, tmpValue);
+        }
+
+        JS::RootedValue value(cx);
+        value.setObjectOrNull(newMongo);
+
+        o.defineProperty(InternedString::_mongo, value, JSPROP_READONLY | JSPROP_PERMANENT);
+    }
+}
 }  // namespace
 
 void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
@@ -143,12 +187,13 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
 
     int queryOptions = ValueWriter(cx, args.get(2)).toInt32();
     BSONObj cmdRes;
-    conn->runCommand(database, cmdObj, cmdRes, queryOptions);
+    auto resTuple = conn->runCommandWithTarget(database, cmdObj, cmdRes, queryOptions);
 
     // the returned object is not read only as some of our tests depend on modifying it.
     //
     // Also, we make a copy here because we want a copy after we dump cmdRes
     ValueReader(cx, args.rval()).fromBSON(cmdRes.getOwned(), nullptr, false /* read only */);
+    setHiddenMongo(cx, std::get<1>(resTuple), conn, args);
 }
 
 void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
@@ -177,14 +222,16 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
     BSONObj commandArgs = ValueWriter(cx, args.get(3)).toBSON();
 
     auto conn = getConnection(args);
-    auto res = conn->runCommandWithMetadata(database, commandName, metadata, commandArgs);
+    auto resTuple =
+        conn->runCommandWithMetadataAndTarget(database, commandName, metadata, commandArgs);
+    auto res = std::move(std::get<0>(resTuple));
 
     BSONObjBuilder mergedResultBob;
     mergedResultBob.append("commandReply", res->getCommandReply());
     mergedResultBob.append("metadata", res->getMetadata());
 
-    auto mergedResult = mergedResultBob.obj();
-    ValueReader(cx, args.rval()).fromBSON(mergedResult, nullptr, false);
+    ValueReader(cx, args.rval()).fromBSON(mergedResultBob.obj(), nullptr, false);
+    setHiddenMongo(cx, std::get<1>(resTuple), conn, args);
 }
 
 void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
