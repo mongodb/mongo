@@ -216,8 +216,6 @@ sh.getShouldAutoSplit = function(configDB) {
         configDB = sh._getConfigDB();
     var autosplit = configDB.settings.findOne({_id: 'autosplit'});
     if (autosplit == null) {
-        print(
-            "No autosplit document found in config.settings collection. Be sure you are connected to a mongos");
         return true;
     }
     return autosplit.enabled;
