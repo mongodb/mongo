@@ -1184,7 +1184,7 @@ list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options)
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
-            const std::string ns = cursorObj["ns"].String();
+            invariant(ns == cursorObj["ns"].String());
             unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
