@@ -721,13 +721,6 @@ static ExitCode _initAndListen(int listenPort) {
 
     HostnameCanonicalizationWorker::start(getGlobalServiceContext());
 
-    if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
-        storageGlobalParams.engine != "devnull") {
-        ScopedTransaction transaction(startupOpCtx.get(), MODE_X);
-        Lock::GlobalWrite lk(startupOpCtx.get()->lockState());
-        FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get());
-    }
-
     uassertStatusOK(ShardingState::get(startupOpCtx.get())
                         ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
 
@@ -771,8 +764,14 @@ static ExitCode _initAndListen(int listenPort) {
         } else {
             startTTLBackgroundJob();
         }
-    }
 
+        if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
+            storageGlobalParams.engine != "devnull") {
+            ScopedTransaction transaction(startupOpCtx.get(), MODE_X);
+            Lock::GlobalWrite lk(startupOpCtx.get()->lockState());
+            FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get());
+        }
+    }
 
     startClientCursorMonitor();
 
