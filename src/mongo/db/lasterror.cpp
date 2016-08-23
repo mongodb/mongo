@@ -83,8 +83,10 @@ bool LastError::appendSelf(BSONObjBuilder& b, bool blankErr) const {
         b.append("err", _msg);
     }
 
-    if (_code)
+    if (_code) {
         b.append("code", _code);
+        b.append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(_code)));
+    }
     if (_updatedExisting != NotUpdate)
         b.appendBool("updatedExisting", _updatedExisting == True);
     if (!_upsertedId.isEmpty()) {

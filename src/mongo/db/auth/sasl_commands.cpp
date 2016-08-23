@@ -164,14 +164,6 @@ Status extractMechanism(const BSONObj& cmdObj, std::string* mechanism) {
     return bsonExtractStringField(cmdObj, saslCommandMechanismFieldName, mechanism);
 }
 
-void addStatus(const Status& status, BSONObjBuilder* builder) {
-    builder->append("ok", status.isOK() ? 1.0 : 0.0);
-    if (!status.isOK())
-        builder->append(saslCommandCodeFieldName, status.code());
-    if (!status.reason().empty())
-        builder->append(saslCommandErrmsgFieldName, status.reason());
-}
-
 Status doSaslStep(const Client* client,
                   SaslAuthenticationSession* session,
                   const BSONObj& cmdObj,
@@ -301,7 +293,7 @@ bool CmdSaslStart::run(OperationContext* txn,
     session->setOpCtxt(txn);
 
     Status status = doSaslStart(client, session, db, cmdObj, &result);
-    addStatus(status, &result);
+    appendCommandStatus(result, status);
 
     if (session->isDone()) {
         audit::logAuthentication(client,
@@ -332,8 +324,8 @@ bool CmdSaslContinue::run(OperationContext* txn,
     AuthenticationSession::swap(client, sessionGuard);
 
     if (!sessionGuard || sessionGuard->getType() != AuthenticationSession::SESSION_TYPE_SASL) {
-        addStatus(Status(ErrorCodes::ProtocolError, "No SASL session state found"), &result);
-        return false;
+        return appendCommandStatus(
+            result, Status(ErrorCodes::ProtocolError, "No SASL session state found"));
     }
 
     SaslAuthenticationSession* session =
@@ -342,16 +334,16 @@ bool CmdSaslContinue::run(OperationContext* txn,
     // Authenticating the __system@local user to the admin database on mongos is required
     // by the auth passthrough test suite.
     if (session->getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
-        addStatus(Status(ErrorCodes::ProtocolError,
-                         "Attempt to switch database target during SASL authentication."),
-                  &result);
-        return false;
+        return appendCommandStatus(
+            result,
+            Status(ErrorCodes::ProtocolError,
+                   "Attempt to switch database target during SASL authentication."));
     }
 
     session->setOpCtxt(txn);
 
     Status status = doSaslContinue(client, session, cmdObj, &result);
-    addStatus(status, &result);
+    appendCommandStatus(result, status);
 
     if (session->isDone()) {
         audit::logAuthentication(client,

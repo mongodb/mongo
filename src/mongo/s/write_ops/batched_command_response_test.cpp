@@ -50,8 +50,11 @@ TEST(BatchedCommandResponse, Basic) {
                                            << WriteErrorDetail::errInfo(BSON("more info" << 1))
                                            << WriteErrorDetail::errMessage("index 1 failed too")));
 
-    BSONObj writeConcernError(BSON("code" << 8 << "errInfo" << BSON("a" << 1) << "errmsg"
-                                          << "norepl"));
+    BSONObj writeConcernError(BSON(
+        "code" << 8 << "codeName" << ErrorCodes::errorString(ErrorCodes::fromInt(8)) << "errInfo"
+               << BSON("a" << 1)
+               << "errmsg"
+               << "norepl"));
 
     BSONObj origResponseObj = BSON(BatchedCommandResponse::ok(false)
                                    << BatchedCommandResponse::errCode(-1)

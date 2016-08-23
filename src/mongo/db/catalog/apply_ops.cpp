@@ -170,6 +170,8 @@ Status _applyOps(OperationContext* txn,
                 ab.append(false);
                 result->append("applied", ++(*numApplied));
                 result->append("code", ex.getCode());
+                result->append("codeName",
+                               ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
                 result->append("errmsg", ex.what());
                 result->append("results", ab.arr());
                 return Status(ErrorCodes::UnknownError, "");
@@ -334,6 +336,7 @@ Status applyOps(OperationContext* txn,
             ab.append(false);
         result->append("applied", numApplied);
         result->append("code", ex.getCode());
+        result->append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
         result->append("errmsg", ex.what());
         result->append("results", ab.arr());
         return Status(ErrorCodes::UnknownError, "");

@@ -53,19 +53,6 @@ using std::string;
 using std::unique_ptr;
 using namespace mongo;
 
-/**
- * Utility function to extract error code and message from status
- * and append to BSON results.
- */
-void addStatus(const Status& status, BSONObjBuilder& builder) {
-    builder.append("ok", status.isOK() ? 1.0 : 0.0);
-    if (!status.isOK()) {
-        builder.append("code", status.code());
-    }
-    if (!status.reason().empty()) {
-        builder.append("errmsg", status.reason());
-    }
-}
 
 /**
  * Retrieves a collection's plan cache from the database.
@@ -129,15 +116,8 @@ bool PlanCacheCommand::run(OperationContext* txn,
                            string& errmsg,
                            BSONObjBuilder& result) {
     string ns = parseNs(dbname, cmdObj);
-
     Status status = runPlanCacheCommand(txn, ns, cmdObj, &result);
-
-    if (!status.isOK()) {
-        addStatus(status, result);
-        return false;
-    }
-
-    return true;
+    return appendCommandStatus(result, status);
 }
 
 

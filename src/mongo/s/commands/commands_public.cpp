@@ -327,6 +327,7 @@ public:
             BSONObjBuilder b;
             b.append("errmsg", e.toString());
             b.append("code", e.getCode());
+            b.append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(e.getCode())));
             return b.obj();
         }
     }
@@ -494,6 +495,7 @@ public:
         int code = getUniqueCodeFromCommandResults(results);
         if (code != 0) {
             output.append("code", code);
+            output.append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(code)));
         }
 
         if (errored) {

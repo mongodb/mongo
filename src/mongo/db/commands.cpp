@@ -173,6 +173,7 @@ bool Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) 
     BSONObj tmp = result.asTempObj();
     if (!status.isOK() && !tmp.hasField("code")) {
         result.append("code", status.code());
+        result.append("codeName", ErrorCodes::errorString(status.code()));
     }
     return status.isOK();
 }
@@ -180,12 +181,12 @@ bool Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) 
 void Command::appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg) {
     BSONObj tmp = result.asTempObj();
     bool have_ok = tmp.hasField("ok");
-    bool have_errmsg = tmp.hasField("errmsg");
+    bool need_errmsg = !ok && !tmp.hasField("errmsg");
 
     if (!have_ok)
         result.append("ok", ok ? 1.0 : 0.0);
 
-    if (!ok && !have_errmsg) {
+    if (need_errmsg) {
         result.append("errmsg", errmsg);
     }
 }

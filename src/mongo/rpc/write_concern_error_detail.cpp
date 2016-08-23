@@ -40,6 +40,7 @@ using std::string;
 namespace {
 
 const BSONField<int> errCode("code");
+const BSONField<string> errCodeName("codeName");
 const BSONField<BSONObj> errInfo("errInfo");
 const BSONField<string> errMessage("errmsg");
 
@@ -67,8 +68,10 @@ bool WriteConcernErrorDetail::isValid(string* errMsg) const {
 BSONObj WriteConcernErrorDetail::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_isErrCodeSet)
+    if (_isErrCodeSet) {
         builder.append(errCode(), _errCode);
+        builder.append(errCodeName(), ErrorCodes::errorString(ErrorCodes::fromInt(_errCode)));
+    }
 
     if (_isErrInfoSet)
         builder.append(errInfo(), _errInfo);

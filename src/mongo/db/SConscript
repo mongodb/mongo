@@ -554,6 +554,20 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="commands_test",
+    source=[
+        "commands_test.cpp",
+    ],
+    LIBDEPS=[
+        "commands",
+        "commands_test_crutch",
+        "service_context_noop_init",
+        "auth/authorization_manager_mock_init",
+        "repl/replmocks",
+    ],
+)
+
 # TODO: This library should probably be folded into catalog/catalog,
 # with which it is currently circular.
 env.Library(

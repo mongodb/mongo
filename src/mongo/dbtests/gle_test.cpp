@@ -103,8 +103,12 @@ public:
         // insert dup
         client.insert(_ns, BSON("_id" << 1));
         // Make sure there was an error
-        gleString = client.getLastError();
-        ASSERT_NOT_EQUALS(gleString, "");
+
+        BSONObj info = client.getLastErrorDetailed();
+        ASSERT_NOT_EQUALS(info["err"].String(), "");
+        ASSERT_EQUALS(info["ok"].Double(), 1.0);
+        ASSERT_EQUALS(info["code"].Int(), 11000);
+        ASSERT_EQUALS(info["codeName"].String(), "DuplicateKey");
     }
 };
 

@@ -58,20 +58,6 @@ using std::vector;
 using namespace mongo;
 
 /**
- * Utility function to extract error code and message from status
- * and append to BSON results.
- */
-void addStatus(const Status& status, BSONObjBuilder& builder) {
-    builder.append("ok", status.isOK() ? 1.0 : 0.0);
-    if (!status.isOK()) {
-        builder.append("code", status.code());
-    }
-    if (!status.reason().empty()) {
-        builder.append("errmsg", status.reason());
-    }
-}
-
-/**
  * Retrieves a collection's query settings and plan cache from the database.
  */
 static Status getQuerySettingsAndPlanCache(OperationContext* txn,
@@ -135,15 +121,8 @@ bool IndexFilterCommand::run(OperationContext* txn,
                              string& errmsg,
                              BSONObjBuilder& result) {
     string ns = parseNs(dbname, cmdObj);
-
     Status status = runIndexFilterCommand(txn, ns, cmdObj, &result);
-
-    if (!status.isOK()) {
-        addStatus(status, result);
-        return false;
-    }
-
-    return true;
+    return appendCommandStatus(result, status);
 }
 
 
