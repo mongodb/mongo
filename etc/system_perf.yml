@@ -263,7 +263,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          TAGS="3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline"
+          TAGS="3.3.10-Baseline 3.2.9-Baseline 3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline"
           PROJECT="sys-perf"
           OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $TAGS --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
@@ -279,7 +279,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          TAG="3.2.1-Baseline"
+          TAG="3.2.9-Baseline"
           OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
 
