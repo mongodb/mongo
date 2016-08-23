@@ -933,7 +933,7 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} ${additional_targets|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -995,6 +995,7 @@ tasks:
           - "./build/integration_tests.txt"
           - "repo/**"
           - "src/mongo/util/options_parser/test_config_files/**"
+          - "library_dependency_graph.json"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -1018,6 +1019,17 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: Artifacts
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/library_dependency_graph.json
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/library_dependency_graph.${build_id}.json
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/json
+        display_name: Library Dependency Graph (library_dependency_graph.json)
+        build_variants: [linux-64, osx-107, enterprise-osx-107, enterprise-rhel-62-64-bit, enterprise-rhel-70-64-bit, enterprise-ubuntu1404-64, enterprise-debian71-64]
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -2935,6 +2947,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    additional_targets: dagger
   tasks:
   - name: compile
     distros:
@@ -4800,6 +4813,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_jobs_available: 1
+    additional_targets: dagger
   tasks:
   - name: compile
   - name: aggregation
@@ -5047,6 +5061,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_jobs_available: 1
+    additional_targets: dagger
   tasks:
   - name: compile
   - name: audit
@@ -5110,6 +5125,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     use_scons_cache: true
+    additional_targets: dagger
   tasks:
   - name: compile
     requires:
@@ -5313,6 +5329,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     use_scons_cache: true
+    additional_targets: dagger
   tasks:
   - name: compile
     distros:
@@ -5955,6 +5972,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: enterprise
     use_scons_cache: true
+    additional_targets: dagger
   tasks:
   - name: compile
     distros:
@@ -6752,6 +6770,7 @@ buildvariants:
     packager_distro: debian71
     repo_edition: enterprise
     use_scons_cache: true
+    additional_targets: dagger
   tasks:
   - name: compile
     distros:
