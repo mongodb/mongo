@@ -75,4 +75,18 @@
     assert.commandWorked(result);
     assert(result.hasOwnProperty("shards"), tojson(result));
 
+    //
+    // Confirm cleanupOrphaned command fails.
+    //
+    result = st.getPrimaryShard(db.getName()).getDB("admin").runCommand({
+        cleanupOrphaned: view.getFullName()
+    });
+    assert.commandFailedWithCode(result, ErrorCodes.CommandNotSupportedOnView);
+
+    //
+    //  Confirm getShardVersion command fails.
+    //
+    assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
+                                 ErrorCodes.NamespaceNotSharded);
+
 })();

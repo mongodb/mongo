@@ -223,52 +223,74 @@ public:
             }
         }
 
-        BSONObj collectionOptions;
-        if (res["options"].type() == BSONType::Object) {
-            collectionOptions = res["options"].Obj();
-        }
-
-        // Check that collection is not capped.
-        if (collectionOptions["capped"].trueValue()) {
-            errmsg = "can't shard capped collection";
-            conn.done();
-            return false;
-        }
-
-        // Get collection default collation.
         BSONObj defaultCollation;
-        {
-            BSONElement collationElement;
-            auto status = bsonExtractTypedField(
-                collectionOptions, "collation", BSONType::Object, &collationElement);
-            if (status.isOK()) {
-                defaultCollation = collationElement.Obj().getOwned();
-                if (defaultCollation.isEmpty()) {
+
+        if (!res.isEmpty()) {
+            // Check that namespace is not a view.
+            {
+                std::string namespaceType;
+                auto status = bsonExtractStringField(res, "type", &namespaceType);
+                if (!status.isOK()) {
+                    conn.done();
+                    return appendCommandStatus(result, status);
+                }
+
+                if (namespaceType == "view") {
                     conn.done();
                     return appendCommandStatus(
                         result,
-                        {ErrorCodes::BadValue,
-                         "Default collation in collection metadata cannot be empty."});
+                        {ErrorCodes::CommandNotSupportedOnView, "Views cannot be sharded."});
                 }
-            } else if (status != ErrorCodes::NoSuchKey) {
-                conn.done();
-                return appendCommandStatus(
-                    result,
-                    {status.code(),
-                     str::stream() << "Could not parse default collation in collection metadata "
-                                   << causedBy(status)});
             }
-        }
 
-        // If the collection has a non-simple default collation but the user did not specify the
-        // simple collation explicitly, return an error.
-        if (!defaultCollation.isEmpty() && !simpleCollationSpecified) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::BadValue,
-                                        str::stream()
-                                            << "Collection has default collation: "
-                                            << collectionOptions["collation"]
-                                            << ". Must specify collation {locale: 'simple'}"});
+            BSONObj collectionOptions;
+            if (res["options"].type() == BSONType::Object) {
+                collectionOptions = res["options"].Obj();
+            }
+
+            // Check that collection is not capped.
+            if (collectionOptions["capped"].trueValue()) {
+                errmsg = "can't shard capped collection";
+                conn.done();
+                return false;
+            }
+
+            // Get collection default collation.
+            {
+                BSONElement collationElement;
+                auto status = bsonExtractTypedField(
+                    collectionOptions, "collation", BSONType::Object, &collationElement);
+                if (status.isOK()) {
+                    defaultCollation = collationElement.Obj().getOwned();
+                    if (defaultCollation.isEmpty()) {
+                        conn.done();
+                        return appendCommandStatus(
+                            result,
+                            {ErrorCodes::BadValue,
+                             "Default collation in collection metadata cannot be empty."});
+                    }
+                } else if (status != ErrorCodes::NoSuchKey) {
+                    conn.done();
+                    return appendCommandStatus(
+                        result,
+                        {status.code(),
+                         str::stream()
+                             << "Could not parse default collation in collection metadata "
+                             << causedBy(status)});
+                }
+            }
+
+            // If the collection has a non-simple default collation but the user did not specify the
+            // simple collation explicitly, return an error.
+            if (!defaultCollation.isEmpty() && !simpleCollationSpecified) {
+                conn.done();
+                return appendCommandStatus(result,
+                                           {ErrorCodes::BadValue,
+                                            str::stream()
+                                                << "Collection has default collation: "
+                                                << collectionOptions["collation"]
+                                                << ". Must specify collation {locale: 'simple'}"});
+            }
         }
 
         // The proposed shard key must be validated against the set of existing indexes.

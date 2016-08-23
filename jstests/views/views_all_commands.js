@@ -28,8 +28,12 @@
  *      selection of commonly-used reasons below.)
  *
  *  expectFailure
- *      If true, assert that the command fails with a views-specific error code. Otherwise, all
- *      commands are expected to succeed.
+ *      If true, assert that the command fails. Otherwise, all commands are expected to succeed.
+ *
+ *  expectedErrorCode
+ *      When 'expectFailure' is true, specifies the error code expected. Defaults to
+ *      'CommandNotSupportedOnView' when not specified. Set to 'null' when expecting an error
+ *      without an error code field.
  *
  *  setup
  *      A function that will be run before the command is executed. It takes a handle to the 'test'
@@ -97,7 +101,9 @@
             expectFailure: true,
         },
         checkShardingIndex: {skip: isUnrelated},
-        cleanupOrphaned: {command: {cleanupOrphaned: 1}, skip: "TODO(SERVER-24764)"},
+        cleanupOrphaned: {
+            skip: "Tested in views/views_sharded.js",
+        },
         clone: {skip: "TODO(SERVER-24506)"},
         cloneCollection: {skip: "TODO(SERVER-24506)"},
         cloneCollectionAsCapped: {
@@ -228,7 +234,7 @@
             command: {getShardVersion: "test.view"},
             isAdminCommand: true,
             expectFailure: true,
-            skip: "TODO(SERVER-24764)"
+            skipSharded: true,  // mongos is tested in views/views_sharded.js
         },
         getnonce: {skip: isUnrelated},
         godinsert: {skip: isAnInternalCommand},
@@ -296,15 +302,25 @@
         "mapreduce.shardedfinish": {skip: isAnInternalCommand},
         mergeChunks: {
             command: {mergeChunks: "test.view", bounds: [{x: 0}, {x: 10}]},
+            setup: function(conn) {
+                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+            },
+            skipStandalone: true,
             isAdminCommand: true,
-            skip: "TODO(SERVER-24764) Confirm/add correct mongoS error handling.",
+            expectFailure: true,
+            expectedErrorCode: ErrorCodes.NamespaceNotSharded,
         },
         moveChunk: {
             command: {moveChunk: "test.view"},
+            setup: function(conn) {
+                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+            },
+            skipStandalone: true,
             isAdminCommand: true,
-            skip: "TODO(SERVER-24764) Confirm/add correct mongoS error handling.",
+            expectFailure: true,
+            expectedErrorCode: ErrorCodes.NamespaceNotSharded,
         },
-        movePrimary: {skip: "TODO(SERVER-24764) Add test for views"},
+        movePrimary: {skip: "Tested in sharding/movePrimary1.js"},
         netstat: {skip: isAnInternalCommand},
         parallelCollectionScan: {command: {parallelCollectionScan: "view"}, expectFailure: true},
         ping: {command: {ping: 1}},
@@ -328,7 +344,8 @@
             {
               isAdminCommand: true,
               command: {renameCollection: "test.collection", to: "test.view"},
-              expectFailure: ErrorCodes.NamespaceExists,
+              expectFailure: true,
+              expectedErrorCode: ErrorCodes.NamespaceExists,
             }
         ],
         repairCursor: {command: {repairCursor: "view"}, expectFailure: true},
@@ -382,15 +399,44 @@
             skipStandalone: true,
             expectFailure: true,
             isAdminCommand: true,
-            skip: "TODO(SERVER-24764) Add view check to mongoS"
         },
         shardConnPoolStats: {skip: isUnrelated},
         shardingState: {skip: isUnrelated},
         shutdown: {skip: isUnrelated},
         sleep: {skip: isUnrelated},
-        split: {skip: "TODO(SERVER-24764) Test that split on view fails"},
-        splitChunk: {skip: "TODO(SERVER-24764) Test that split on view fails"},
-        splitVector: {skip: "TODO(SERVER-24764) Test that split on view fails"},
+        split: {
+            command: {split: "test.view", find: {_id: 1}},
+            setup: function(conn) {
+                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+            },
+            skipStandalone: true,
+            expectFailure: true,
+            expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+            isAdminCommand: true,
+        },
+        splitChunk: {
+            command: {
+                splitChunk: "test.view",
+                from: "shard0000",
+                min: {x: MinKey},
+                max: {x: 0},
+                keyPattern: {x: 1},
+                splitKeys: [{x: -2}, {x: -1}],
+                shardVersion: [1, 2]
+            },
+            skipSharded: true,
+            expectFailure: true,
+            expectedErrorCode: null,
+            isAdminCommand: true,
+        },
+        splitVector: {
+            command: {
+                splitVector: "test.view",
+                keyPattern: {x: 1},
+                maxChunkSize: 1,
+            },
+            expectFailure: true,
+        },
         stageDebug: {skip: isAnInternalCommand},
         top: {command: {top: "view"}, isAdminCommand: true, skip: "TODO(SERVER-24568)"},
         touch: {
@@ -421,18 +467,16 @@
 
     /**
      * Helper function for failing commands or writes that checks the result 'res' of either.
-     * If 'code' is undefined or true, the expected error defaults to CommandNotSupportedOnView.
-     * Otherwise it is the numerical value of code. On no error, or wrong error code, the resulting
-     * assert includes the message 'msg'.
+     * If 'code' is null we only check for failure, otherwise we confirm error code matches as
+     * well. On assert 'msg' is printed.
      */
     let assertCommandOrWriteFailed = function(res, code, msg) {
-        if (code == undefined || code === true)
-            code = ErrorCodes.CommandNotSupportedOnView;
-
         if (res.writeErrors !== undefined)
             assert.neq(0, res.writeErrors.length, msg);
-        else
+        else if (res.code !== null)
             assert.commandFailedWithCode(res, code, msg);
+        else
+            assert.commandFailed(res, msg);
     };
 
     function runTests(db) {
@@ -493,11 +537,15 @@
                 if (subtest.isAdminCommand)
                     commandHandle = db.getSiblingDB("admin");
 
-                if (subtest.expectFailure)
+                if (subtest.expectFailure) {
+                    let expectedErrorCode = subtest.expectedErrorCode;
+                    if (expectedErrorCode === undefined)
+                        expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
+
                     assertCommandOrWriteFailed(commandHandle.runCommand(subtest.command),
-                                               subtest.expectFailure,
+                                               expectedErrorCode,
                                                tojson(subtest.command));
-                else if (subtest.command instanceof Function)
+                } else if (subtest.command instanceof Function)
                     subtest.command(commandHandle);
                 else
                     assert.commandWorked(commandHandle.runCommand(subtest.command),
