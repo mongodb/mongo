@@ -318,6 +318,20 @@ SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
     _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
     return _sslManager->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), "");
 }
+
+std::string Socket::getSNIServerName() const {
+    if (!_sslConnection)
+        return "";
+
+    if (!_sslConnection->ssl)
+        return "";
+
+    const char* name = SSL_get_servername(_sslConnection->ssl, TLSEXT_NAMETYPE_host_name);
+    if (!name)
+        return "";
+
+    return name;
+}
 #endif
 
 class ConnectBG : public BackgroundJob {

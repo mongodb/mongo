@@ -234,6 +234,8 @@ public:
     void handleRecvError(int ret, int len);
     MONGO_COMPILER_NORETURN void handleSendError(int ret, const char* context);
 
+    std::string getSNIServerName() const;
+
 private:
     void _init();
 

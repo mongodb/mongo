@@ -129,6 +129,8 @@ bool MessagingPort::recv(Message& m) {
                         sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
                 setX509PeerInfo(
                     _psock->doSSLHandshake(reinterpret_cast<const char*>(&header), sizeof(header)));
+                LOG(1) << "new ssl connection, SNI server name [" << _psock->getSNIServerName()
+                       << "]";
                 _psock->setHandshakeReceived();
 
                 goto again;

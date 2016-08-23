@@ -68,7 +68,7 @@ SockAddr::SockAddr(int sourcePort) {
     _isValid = true;
 }
 
-SockAddr::SockAddr(const char* _iporhost, int port) {
+SockAddr::SockAddr(const char* _iporhost, int port) : _hostOrIp(_iporhost) {
     std::string target = _iporhost;
     if (target == "localhost") {
         target = "127.0.0.1";
