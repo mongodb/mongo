@@ -213,7 +213,7 @@ functions:
             typeperf -qx PhysicalDisk | grep Disk | grep -v _Total > disk_counters.txt
             typeperf -cf disk_counters.txt -si 5 -o mongo-diskstats
         # See if iostat is available.
-        elif which iostat 2>&1 /dev/null; then
+        elif which iostat 2>&1 > /dev/null; then
             iostat -d 5 > mongo-diskstats
         # Fall back to vmstat if iostat is not available.
         else
