@@ -146,7 +146,8 @@ __wt_posix_file_extend(
 	 * Use the POSIX ftruncate call if there's nothing else, it can extend
 	 * files. Note ftruncate requires locking.
 	 */
-	if (file_handle->fh_truncate(file_handle, wt_session, offset) == 0) {
+	if (file_handle->fh_truncate != NULL &&
+	    file_handle->fh_truncate(file_handle, wt_session, offset) == 0) {
 		file_handle->fh_extend = file_handle->fh_truncate;
 		WT_WRITE_BARRIER();
 		return (0);
