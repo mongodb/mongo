@@ -645,7 +645,6 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                 mdata.finished = true;
             }
 
-
             LOG(pc) << "initialized " << (isCommand() ? "command " : "query ")
                     << (lazyInit ? "(lazily) " : "(full) ") << "on shard " << shardId
                     << ", current connection state is " << mdata.toBSON();
@@ -665,7 +664,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             int logLevel = fullReload ? 0 : 1;
             LOG(pc + logLevel) << "stale config of ns " << staleNS
                                << " during initialization, will retry with forced : " << forceReload
-                               << ", full : " << fullReload << causedBy(e);
+                               << ", full : " << fullReload << causedBy(redact(e));
 
             // This is somewhat strange
             if (staleNS != nss)
@@ -679,7 +678,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             return;
         } catch (SocketException& e) {
             warning() << "socket exception when initializing on " << shardId
-                      << ", current connection state is " << mdata.toBSON() << causedBy(e);
+                      << ", current connection state is " << mdata.toBSON() << causedBy(redact(e));
             e._shard = shardId.toString();
             mdata.errored = true;
             if (returnPartial) {
@@ -689,7 +688,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             throw;
         } catch (DBException& e) {
             warning() << "db exception when initializing on " << shardId
-                      << ", current connection state is " << mdata.toBSON() << causedBy(e);
+                      << ", current connection state is " << mdata.toBSON() << causedBy(redact(e));
             e._shard = shardId.toString();
             mdata.errored = true;
             if (returnPartial && e.getCode() == 15925 /* From above! */) {
@@ -828,7 +827,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
             continue;
         } catch (SocketException& e) {
             warning() << "socket exception when finishing on " << shardId
-                      << ", current connection state is " << mdata.toBSON() << causedBy(e);
+                      << ", current connection state is " << mdata.toBSON() << causedBy(redact(e));
             mdata.errored = true;
             if (returnPartial) {
                 mdata.cleanup(true);
@@ -840,7 +839,8 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
             // ABOVE
             if (e.getCode() == 15988) {
                 warning() << "exception when receiving data from " << shardId
-                          << ", current connection state is " << mdata.toBSON() << causedBy(e);
+                          << ", current connection state is " << mdata.toBSON()
+                          << causedBy(redact(e));
 
                 mdata.errored = true;
                 if (returnPartial) {
@@ -853,10 +853,11 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
                 // don't print/call "mdata.toBSON()" to avoid unexpected errors e.g. a segfault
                 if (e.getCode() == 22)
                     warning() << "bson is malformed :: db exception when finishing on " << shardId
-                              << causedBy(e);
+                              << causedBy(redact(e));
                 else
                     warning() << "db exception when finishing on " << shardId
-                              << ", current connection state is " << mdata.toBSON() << causedBy(e);
+                              << ", current connection state is " << mdata.toBSON()
+                              << causedBy(redact(e));
                 mdata.errored = true;
                 throw;
             }
@@ -891,7 +892,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
                 LOG(pc + logLevel)
                     << "stale config of ns " << staleNS
                     << " on finishing query, will retry with forced : " << forceReload
-                    << ", full : " << fullReload << causedBy(exception);
+                    << ", full : " << fullReload << causedBy(redact(exception));
 
                 // This is somewhat strange
                 if (staleNS != ns)
@@ -1062,7 +1063,8 @@ void ParallelSortClusteredCursor::_oldInit() {
             }
 
             LOG(5) << "ParallelSortClusteredCursor::init server:" << serverHost << " ns:" << _ns
-                   << " query:" << _query << " fields:" << _fields << " options: " << _options;
+                   << " query:" << redact(_query) << " fields:" << redact(_fields)
+                   << " options: " << _options;
 
             if (!_cursors[i].get())
                 _cursors[i].reset(
@@ -1214,7 +1216,7 @@ void ParallelSortClusteredCursor::_oldInit() {
         } else if (throwException) {
             throw DBException(errMsg.str(), 14827);
         } else {
-            warning() << errMsg.str();
+            warning() << redact(errMsg.str());
         }
     }
 

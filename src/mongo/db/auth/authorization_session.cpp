@@ -711,7 +711,8 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
                     // Unrecognized error; assume that it's transient, and continue working with the
                     // out-of-date privilege data.
                     warning() << "Could not fetch updated user privilege information for " << name
-                              << "; continuing to use old information.  Reason is " << status;
+                              << "; continuing to use old information.  Reason is "
+                              << redact(status);
                     break;
             }
         }

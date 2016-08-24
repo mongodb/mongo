@@ -163,12 +163,11 @@ void UserCacheInvalidator::run() {
             if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
                 warning() << "_getUserCacheGeneration command not found on config server(s), "
                              "this most likely means you are running an outdated version of mongod "
-                             "on the config servers"
-                          << std::endl;
+                             "on the config servers";
             } else {
                 warning() << "An error occurred while fetching current user cache generation "
                              "to check if user cache needs invalidation: "
-                          << currentGeneration.getStatus() << std::endl;
+                          << currentGeneration.getStatus();
             }
             // When in doubt, invalidate the cache
             _authzManager->invalidateUserCache();
@@ -177,7 +176,7 @@ void UserCacheInvalidator::run() {
 
         if (currentGeneration.getValue() != _previousCacheGeneration) {
             log() << "User cache generation changed from " << _previousCacheGeneration << " to "
-                  << currentGeneration.getValue() << "; invalidating user cache" << std::endl;
+                  << currentGeneration.getValue() << "; invalidating user cache";
             _authzManager->invalidateUserCache();
             _previousCacheGeneration = currentGeneration.getValue();
         }

@@ -125,7 +125,7 @@ MultiIndexBlock::~MultiIndexBlock() {
         } catch (const DBException& e) {
             if (e.toStatus() == ErrorCodes::ExceededMemoryLimit)
                 continue;
-            error() << "Caught exception while cleaning up partially built indexes: " << e.what();
+            error() << "Caught exception while cleaning up partially built indexes: " << redact(e);
         } catch (const std::exception& e) {
             error() << "Caught exception while cleaning up partially built indexes: " << e.what();
         } catch (...) {
@@ -337,8 +337,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
     if (!ret.isOK())
         return ret;
 
-    log() << "build index done.  scanned " << n << " total records. " << t.seconds() << " secs"
-          << endl;
+    log() << "build index done.  scanned " << n << " total records. " << t.seconds() << " secs";
 
     return Status::OK();
 }

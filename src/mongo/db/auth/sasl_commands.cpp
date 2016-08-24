@@ -181,8 +181,7 @@ Status doSaslStep(const Client* client,
     if (!status.isOK()) {
         log() << session->getMechanism() << " authentication failed for "
               << session->getPrincipalId() << " on " << session->getAuthenticationDatabase()
-              << " from client " << client->getRemote().toString() << " ; " << status.toString()
-              << std::endl;
+              << " from client " << client->getRemote().toString() << " ; " << redact(status);
 
         sleepmillis(saslGlobalParams.authFailedDelay);
         // All the client needs to know is that authentication has failed.

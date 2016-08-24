@@ -145,7 +145,7 @@ void Database::close(OperationContext* txn) {
     repl::oplogCheckCloseDatabase(txn, this);
 
     if (BackgroundOperation::inProgForDb(_name)) {
-        log() << "warning: bg op in prog during close db? " << _name << endl;
+        log() << "warning: bg op in prog during close db? " << _name;
     }
 }
 
@@ -208,7 +208,7 @@ Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry*
       _views(&_durableViews) {
     Status status = validateDBName(_name);
     if (!status.isOK()) {
-        warning() << "tried to open invalid db: " << _name << endl;
+        warning() << "tried to open invalid db: " << _name;
         uasserted(10028, status.toString());
     }
 
@@ -227,7 +227,7 @@ Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry*
     _views.invalidate();
     Status reloadStatus = _views.reloadIfNeeded(txn);
     if (!reloadStatus.isOK()) {
-        warning() << "Unable to parse views: " << reloadStatus
+        warning() << "Unable to parse views: " << redact(reloadStatus)
                   << "; remove any invalid views from the " << _viewsName
                   << " collection to restore server functionality." << startupWarningsLog;
     }
@@ -280,7 +280,7 @@ void Database::clearTmpCollections(OperationContext* txn) {
             WriteUnitOfWork wunit(txn);
             Status status = dropCollection(txn, ns);
             if (!status.isOK()) {
-                warning() << "could not drop temp collection '" << ns << "': " << status;
+                warning() << "could not drop temp collection '" << ns << "': " << redact(status);
                 continue;
             }
 
@@ -369,7 +369,7 @@ Status Database::dropView(OperationContext* txn, StringData fullns) {
 Status Database::dropCollection(OperationContext* txn, StringData fullns) {
     invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    LOG(1) << "dropCollection: " << fullns << endl;
+    LOG(1) << "dropCollection: " << fullns;
     massertNamespaceNotIndex(fullns, "dropCollection");
 
     Collection* collection = getCollection(fullns);
@@ -408,12 +408,12 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
     Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
     if (!s.isOK()) {
         warning() << "could not drop collection, trying to drop indexes" << fullns << " because of "
-                  << s.toString();
+                  << redact(s.toString());
         return s;
     }
 
     verify(collection->_details->getTotalIndexCount(txn) == 0);
-    LOG(1) << "\t dropIndexes done" << endl;
+    LOG(1) << "\t dropIndexes done";
 
     Top::get(txn->getClient()->getServiceContext()).collectionDropped(fullns);
 
@@ -607,7 +607,7 @@ void dropAllDatabasesExceptLocal(OperationContext* txn) {
 
     if (n.size() == 0)
         return;
-    log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
+    log() << "dropAllDatabasesExceptLocal " << n.size();
 
     repl::getGlobalReplicationCoordinator()->dropAllSnapshots();
     for (vector<string>::iterator i = n.begin(); i != n.end(); i++) {

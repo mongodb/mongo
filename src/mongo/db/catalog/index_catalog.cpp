@@ -138,7 +138,7 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
     Status status = _isSpecOk(txn, descriptor->infoObj());
     if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
-                 << _collection->ns().ns() << " collection: " << status.reason();
+                 << _collection->ns().ns() << " collection: " << redact(status);
         fassertFailedNoTrace(28782);
     }
 
@@ -209,14 +209,14 @@ bool IndexCatalog::_shouldOverridePlugin(OperationContext* txn, const BSONObj& k
 
     // RulesFor22
     if (!known) {
-        log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+        log() << "warning: can't find plugin [" << pluginName << "]";
         return true;
     }
 
     if (!IndexNames::existedBefore24(pluginName)) {
         warning() << "Treating index " << keyPattern << " as ascending since "
                   << "it was created before 2.4 and '" << pluginName << "' "
-                  << "was not a valid type at that time." << endl;
+                  << "was not a valid type at that time.";
         return true;
     }
 
@@ -712,7 +712,7 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
             findIndexByKeyPatternAndCollationSpec(txn, key, collation, findInProgressIndexes);
         if (desc) {
             LOG(2) << "index already exists with diff name " << name << " pattern: " << key
-                   << " collation: " << collation << endl;
+                   << " collation: " << collation;
 
             IndexDescriptor temp(_collection, _getAccessMethodName(txn, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
@@ -931,7 +931,7 @@ void IndexCatalog::_deleteIndexFromDisk(OperationContext* txn,
         // this is ok, as we may be partially through index creation
     } else if (!status.isOK()) {
         warning() << "couldn't drop index " << indexName << " on collection: " << _collection->ns()
-                  << " because of " << status.toString();
+                  << " because of " << redact(status);
     }
 }
 
@@ -1266,8 +1266,8 @@ Status IndexCatalog::_unindexRecord(OperationContext* txn,
     Status status = index->accessMethod()->remove(txn, obj, loc, options, &removed);
 
     if (!status.isOK()) {
-        log() << "Couldn't unindex record " << obj.toString() << " from collection "
-              << _collection->ns() << ". Status: " << status.toString();
+        log() << "Couldn't unindex record " << redact(obj) << " from collection "
+              << _collection->ns() << ". Status: " << redact(status);
     }
 
     if (keysDeletedOut) {

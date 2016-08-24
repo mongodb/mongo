@@ -473,7 +473,6 @@ void BSONObj::dump() const {
         builder << i << '\t' << (0xff & ((unsigned)*p));
         if (*p >= 'A' && *p <= 'z')
             builder << '\t' << *p;
-        builder << endl;
         p++;
     }
 }

@@ -299,29 +299,22 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
             const BSONObj& data = customTimeout.getData();
             lockExpiration = Milliseconds(data["timeoutMs"].numberInt());
         }
-        // REDACT: can this whyMessage ever have PII?
         LOG(1) << "trying to acquire new distributed lock for " << name
                << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)
                << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
                << " ms, process : " << _processID << " )"
-               << " with lockSessionID: " << lockSessionID
-               << ", why: " << redact(whyMessage.toString());
+               << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage.toString();
 
-        auto lockResult = _catalog->grabLock(txn,
-                                             name,
-                                             lockSessionID,
-                                             who,
-                                             _processID,
-                                             Date_t::now(),
-                                             redact(whyMessage.toString()));
+        auto lockResult = _catalog->grabLock(
+            txn, name, lockSessionID, who, _processID, Date_t::now(), whyMessage.toString());
 
         auto status = lockResult.getStatus();
 
         if (status.isOK()) {
             // Lock is acquired since findAndModify was able to successfully modify
             // the lock document.
-            log() << "distributed lock '" << name << "' acquired for '"
-                  << redact(whyMessage.toString()) << "', ts : " << lockSessionID;
+            log() << "distributed lock '" << name << "' acquired for '" << whyMessage.toString()
+                  << "', ts : " << lockSessionID;
             return lockSessionID;
         }
 
@@ -412,7 +405,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         // Periodically message for debugging reasons
         if (msgTimer.seconds() > 10) {
             LOG(0) << "waited " << timer.seconds() << "s for distributed lock " << name << " for "
-                   << redact(whyMessage.toString());
+                   << whyMessage.toString();
 
             msgTimer.reset();
         }

@@ -303,7 +303,7 @@ Status Collection::checkValidation(OperationContext* txn, const BSONObj& documen
 
     if (_validationAction == WARN) {
         warning() << "Document would fail validation"
-                  << " collection: " << ns() << " doc: " << document;
+                  << " collection: " << ns() << " doc: " << redact(document);
         return Status::OK();
     }
 
@@ -539,7 +539,7 @@ Status Collection::aboutToDeleteCapped(OperationContext* txn,
 void Collection::deleteDocument(
     OperationContext* txn, const RecordId& loc, OpDebug* opDebug, bool fromMigrate, bool noWarn) {
     if (isCapped()) {
-        log() << "failing remove on a capped ns " << _ns << endl;
+        log() << "failing remove on a capped ns " << _ns;
         uasserted(10089, "cannot remove from a capped collection");
         return;
     }

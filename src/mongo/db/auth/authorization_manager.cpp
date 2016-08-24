@@ -285,7 +285,7 @@ Status AuthorizationManager::getAuthorizationVersion(OperationContext* txn, int*
         guard.endFetchPhase();
         if (!status.isOK()) {
             warning() << "Problem fetching the stored schema version of authorization data: "
-                      << status;
+                      << redact(status);
             *version = schemaVersionInvalid;
             return status;
         }
@@ -722,7 +722,7 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
         if (!userName.isOK()) {
             warning() << "Invalidating user cache based on user being updated failed, will "
                          "invalidate the entire cache instead: "
-                      << userName.getStatus() << endl;
+                      << userName.getStatus();
             invalidateUserCache();
             return;
         }

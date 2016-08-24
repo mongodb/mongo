@@ -195,7 +195,7 @@ void ReplicaSetMonitor::init() {
 
     if (!status.isOK()) {
         severe() << "Can't start refresh for replica set " << getName()
-                 << causedBy(status.getStatus());
+                 << causedBy(redact(status.getStatus()));
         fassertFailed(40139);
     }
 
@@ -246,7 +246,7 @@ void ReplicaSetMonitor::_refresh(const CallbackArgs& cbArgs) {
 
         if (!status.isOK()) {
             severe() << "Can't continue refresh for replica set " << getName() << " due to "
-                     << status.getStatus().toString();
+                     << redact(status.getStatus());
             fassertFailed(40140);
         }
 
@@ -677,7 +677,7 @@ bool Refresher::receivedIsMasterFromMaster(const IsMasterReply& reply) {
         !std::equal(
             _set->nodes.begin(), _set->nodes.end(), reply.normalHosts.begin(), hostsEqual)) {
         LOG(2) << "Adjusting nodes in our view of replica set " << _set->name
-               << " based on master reply: " << reply.raw;
+               << " based on master reply: " << redact(reply.raw);
 
         // remove non-members from _set->nodes
         _set->nodes.erase(

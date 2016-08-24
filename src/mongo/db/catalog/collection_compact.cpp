@@ -168,7 +168,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
         // note that the drop indexes call also invalidates all clientcursors for the namespace,
         // which is important and wanted here
         WriteUnitOfWork wunit(txn);
-        log() << "compact dropping indexes" << endl;
+        log() << "compact dropping indexes";
         Status status = _indexCatalog.dropAllIndexes(txn, true);
         if (!status.isOK()) {
             return StatusWith<CompactStats>(status);

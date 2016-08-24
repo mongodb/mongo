@@ -163,7 +163,7 @@ struct Cloner::Fun {
                 if (now - lastLog >= 60) {
                     // report progress
                     if (lastLog)
-                        log() << "clone " << to_collection << ' ' << numSeen << endl;
+                        log() << "clone " << to_collection << ' ' << numSeen;
                     lastLog = now;
                 }
                 txn->checkForInterrupt();
@@ -224,7 +224,7 @@ struct Cloner::Fun {
             if (!status.isOK()) {
                 str::stream ss;
                 ss << "Cloner: found corrupt document in " << from_collection.toString() << ": "
-                   << status.reason();
+                   << redact(status);
                 if (skipCorruptDocumentsWhenCloning) {
                     warning() << ss.ss.str() << "; skipping";
                     continue;
@@ -244,7 +244,7 @@ struct Cloner::Fun {
                 Status status = collection->insertDocument(txn, doc, nullOpDebug, true);
                 if (!status.isOK()) {
                     error() << "error: exception cloning object in " << from_collection << ' '
-                            << status << " obj:" << doc;
+                            << redact(status) << " obj:" << redact(doc);
                 }
                 uassertStatusOK(status);
                 wunit.commit();
@@ -280,7 +280,7 @@ void Cloner::copy(OperationContext* txn,
                   const CloneOptions& opts,
                   Query query) {
     LOG(2) << "\t\tcloning collection " << from_collection << " to " << to_collection << " on "
-           << _conn->getServerAddress() << " with filter " << query.toString() << endl;
+           << _conn->getServerAddress() << " with filter " << redact(query.toString());
 
     Fun f(txn, toDBName);
     f.numSeen = 0;
@@ -461,7 +461,7 @@ bool Cloner::copyCollection(OperationContext* txn,
 
     /* TODO : copyIndexes bool does not seem to be implemented! */
     if (!shouldCopyIndexes) {
-        log() << "ERROR copy collection shouldCopyIndexes not implemented? " << ns << endl;
+        log() << "ERROR copy collection shouldCopyIndexes not implemented? " << ns;
     }
 
     // indexes
@@ -494,7 +494,7 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
 
         if (ns.isSystem()) {
             if (legalClientSystemNS(ns.ns()) == 0) {
-                LOG(2) << "\t\t not cloning because system collection" << endl;
+                LOG(2) << "\t\t not cloning because system collection";
                 continue;
             }
         }
@@ -631,7 +631,7 @@ Status Cloner::copyDb(OperationContext* txn,
             }
         }
         for (auto&& collection : toClone) {
-            LOG(2) << "  really will clone: " << collection << endl;
+            LOG(2) << "  really will clone: " << collection;
 
             const char* collectionName = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
@@ -643,7 +643,7 @@ Status Cloner::copyDb(OperationContext* txn,
                 clonedColls->insert(from_name.ns());
             }
 
-            LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
+            LOG(1) << "\t\t cloning " << from_name << " -> " << to_name;
             Query q;
             if (opts.snapshot)
                 q.snapshot();
