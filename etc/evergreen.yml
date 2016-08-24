@@ -389,7 +389,7 @@ functions:
           set -o errexit
           git clone git@github.com:10gen/jepsen.git
           cd jepsen/jepsen
-          git checkout mongodb-linearizable
+          git checkout mongodb-master
           branch=$(git symbolic-ref --short HEAD)
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
@@ -1093,18 +1093,6 @@ tasks:
       <<: *jepsen_config_vars
       hang_analyzer_processes: "java"
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
-      jepsen_storage_engine: --storage-engine wiredTiger
-
-- <<: *run_jepsen_template
-  name: jepsen_linearizableRead_WT
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-      hang_analyzer_processes: "java"
-      jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine wiredTiger
 
 ## jstestfuzz mmapv1 ##
@@ -3471,9 +3459,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jepsen_findAndModify_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_linearizableRead_WT
     distros:
     - ubuntu1404-jepsen
   - name: jsCore
@@ -5948,9 +5933,6 @@ buildvariants:
   - name: jepsen_findAndModify_WT
     distros:
     - ubuntu1404-jepsen
-  - name: jepsen_linearizableRead_WT
-    distros:
-    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
@@ -7983,7 +7965,6 @@ buildvariants:
     distros:
     - ubuntu1404-build
   - name: jepsen_findAndModify_WT
-  - name: jepsen_linearizableRead_WT
   - name: unittests
     distros:
     - ubuntu1404-test
