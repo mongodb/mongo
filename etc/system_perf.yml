@@ -613,6 +613,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: single-replica
     cluster: single
+    platform: linux
     project: &project dsi-v3.2
   run_on:
       - "rhel70-perf-standalone"
@@ -630,6 +631,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: standalone
     cluster: single
+    platform: linux
     project: *project
   run_on:
       - "rhel70-perf-standalone"
@@ -650,6 +652,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
     cluster: shard
+    platform: linux
     project: *project
   run_on:
       - "rhel70-perf-standalone"
@@ -667,6 +670,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: replica
     cluster: replica
+    platform: linux
     project: *project
   run_on:
       - "rhel70-perf-standalone"
