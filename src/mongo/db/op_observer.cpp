@@ -225,7 +225,12 @@ void OpObserver::onDropCollection(OperationContext* txn, const NamespaceString& 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(txn, collectionName);
     }
+
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
+
+    auto css = CollectionShardingState::get(txn, collectionName);
+    css->onDropCollection(txn, collectionName);
+
     logOpForDbHash(txn, dbName.c_str());
 }
 

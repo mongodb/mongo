@@ -73,6 +73,12 @@ public:
      */
     Status loadClusterId(OperationContext* txn, const repl::ReadConcernLevel& readConcernLevel);
 
+    /**
+     * Called if the config.version document is rolled back.  Notifies the ClusterIdentityLoader
+     * that the cached cluster ID is invalid and needs to be reloaded.
+     */
+    void discardCachedClusterId();
+
 private:
     enum class InitializationState {
         kUninitialized,  // We have never successfully loaded the cluster ID

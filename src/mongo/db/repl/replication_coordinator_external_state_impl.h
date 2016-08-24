@@ -128,7 +128,7 @@ private:
      *
      * Throws on errors.
      */
-    void shardingOnTransitionToPrimaryHook(OperationContext* txn);
+    void _shardingOnTransitionToPrimaryHook(OperationContext* txn);
 
     /**
     * Drops all temporary collections on all databases except "local".
@@ -136,7 +136,7 @@ private:
     * The implementation may assume that the caller has acquired the global exclusive lock
     * for "txn".
     */
-    void dropAllTempCollections(OperationContext* txn);
+    void _dropAllTempCollections(OperationContext* txn);
 
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;

@@ -159,6 +159,8 @@ public:
 
     void onDeleteOp(OperationContext* txn, const DeleteState& deleteState);
 
+    void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
+
 private:
     friend class CollectionRangeDeleter;
 

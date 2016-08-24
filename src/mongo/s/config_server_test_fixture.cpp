@@ -109,6 +109,7 @@ void ConfigServerTestFixture::setUp() {
     repl::ReplSettings replSettings;
     replSettings.setReplSetString("mySet/node1:12345,node2:54321,node3:12543");
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(replSettings);
+    _replCoord = replCoord.get();
 
     repl::ReplicaSetConfig config;
     config.initialize(BSON("_id"
@@ -305,6 +306,12 @@ OperationContext* ConfigServerTestFixture::operationContext() const {
     invariant(_opCtx);
 
     return _opCtx.get();
+}
+
+repl::ReplicationCoordinatorMock* ConfigServerTestFixture::getReplicationCoordinator() const {
+    invariant(_replCoord);
+
+    return _replCoord;
 }
 
 void ConfigServerTestFixture::onCommand(NetworkTestEnv::OnCommandFunction func) {

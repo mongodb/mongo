@@ -63,6 +63,10 @@ class NetworkInterfaceMock;
 class TaskExecutor;
 }  // namespace executor
 
+namespace repl {
+class ReplicationCoordinatorMock;
+}
+
 /**
  * Sets up the mocked out objects for testing the catalog manager and catalog client with the
  * remote interface backed by the NetworkTestEnv and config server as the local storage engine.
@@ -108,6 +112,8 @@ public:
     ReplSetDistLockManager* distLock() const;
 
     OperationContext* operationContext() const;
+
+    repl::ReplicationCoordinatorMock* getReplicationCoordinator() const;
 
     /**
      * Insert a document to this config server to the specified namespace.
@@ -191,6 +197,7 @@ private:
     ReplSetDistLockManager* _distLockManager = nullptr;
     ShardingCatalogClientImpl* _catalogClient = nullptr;
     ShardingCatalogManagerImpl* _catalogManager = nullptr;
+    repl::ReplicationCoordinatorMock* _replCoord = nullptr;
 };
 
 }  // namespace mongo

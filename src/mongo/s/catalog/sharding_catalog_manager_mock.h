@@ -86,6 +86,8 @@ public:
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
 
+    void discardCachedConfigDatabaseInitializationState() override;
+
     Status initializeShardingAwarenessOnUnawareShards(OperationContext* txn) override;
 
     Status upsertShardIdentityOnShard(OperationContext* txn, ShardType shardType) override;

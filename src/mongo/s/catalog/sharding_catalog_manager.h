@@ -170,6 +170,14 @@ public:
     virtual Status initializeConfigDatabaseIfNeeded(OperationContext* txn) = 0;
 
     /**
+     * Called if the config.version document is rolled back.  Indicates to the
+     * ShardingCatalogManager that on the next transition to primary
+     * initializeConfigDatabaseIfNeeded will need to re-run the work to initialize the config
+     * database.
+     */
+    virtual void discardCachedConfigDatabaseInitializationState() = 0;
+
+    /**
      * For upgrade from 3.2 to 3.4, for each shard in config.shards that is not marked as sharding
      * aware, schedules a task to upsert a shardIdentity doc into the shard and mark the shard as
      * sharding aware.

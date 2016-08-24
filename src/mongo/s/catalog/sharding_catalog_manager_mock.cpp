@@ -104,6 +104,8 @@ Status ShardingCatalogManagerMock::initializeConfigDatabaseIfNeeded(OperationCon
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+void ShardingCatalogManagerMock::discardCachedConfigDatabaseInitializationState() {}
+
 Status ShardingCatalogManagerMock::initializeShardingAwarenessOnUnawareShards(
     OperationContext* txn) {
     return {ErrorCodes::InternalError, "Method not implemented"};

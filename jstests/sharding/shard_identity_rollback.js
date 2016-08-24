@@ -71,7 +71,7 @@
 
     // Restart the original primary so it triggers a rollback of the shardIdentity insert.
     jsTest.log("Restarting original primary");
-    priConn = replTest.restart(priConn, {shardsvr: ''});
+    priConn = replTest.restart(priConn);
 
     // Wait until we cannot create a connection to the former primary, which indicates that it must
     // have shut itself down during the rollback.

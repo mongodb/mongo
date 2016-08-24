@@ -33,6 +33,8 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
@@ -44,6 +46,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/config_server_test_fixture.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -188,20 +191,55 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
     ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
 
-    // Now remove the version document and re-run initializeConfigDatabaseIfNeeded().
-    ASSERT_OK(catalogClient()->removeConfigDocuments(operationContext(),
-                                                     VersionType::ConfigNS,
-                                                     BSONObj(),
-                                                     ShardingCatalogClient::kMajorityWriteConcern));
-
     ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
                   catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+}
 
-    // Even though there was no version document, initializeConfigDatabaseIfNeeded() returned
-    // without making one because it has already run once successfully so didn't bother to check.
+TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto versionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
+
+    ASSERT_TRUE(foundVersion.getClusterId().isSet());
+    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, foundVersion.getCurrentVersion());
+    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, foundVersion.getMinCompatibleVersion());
+
+    // Now remove the version document and re-run initializeConfigDatabaseIfNeeded().
+    {
+        // Mirror what happens if the config.version document is rolled back.
+        ON_BLOCK_EXIT([&] {
+            operationContext()->setReplicatedWrites(true);
+            getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+        });
+        operationContext()->setReplicatedWrites(false);
+        getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
+        ASSERT_OK(
+            catalogClient()->removeConfigDocuments(operationContext(),
+                                                   VersionType::ConfigNS,
+                                                   BSONObj(),
+                                                   ShardingCatalogClient::kMajorityWriteConcern));
+    }
+
+    // Verify the document was actually removed.
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
                   findOneOnConfigCollection(
                       operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    // Re-create the config.version document.
+    ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
+
+    auto newVersionDoc = assertGet(findOneOnConfigCollection(
+        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+
+    VersionType newFoundVersion = assertGet(VersionType::fromBSON(newVersionDoc));
+
+    ASSERT_TRUE(newFoundVersion.getClusterId().isSet());
+    ASSERT_NOT_EQUALS(newFoundVersion.getClusterId(), foundVersion.getClusterId());
+    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, newFoundVersion.getCurrentVersion());
+    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, newFoundVersion.getMinCompatibleVersion());
 }
 
 TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {

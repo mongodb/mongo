@@ -364,8 +364,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     }
     const auto opTimeToReturn = fassertStatusOK(28665, loadLastOpTime(txn));
 
-    shardingOnTransitionToPrimaryHook(txn);
-    dropAllTempCollections(txn);
+    _shardingOnTransitionToPrimaryHook(txn);
+    _dropAllTempCollections(txn);
 
     return opTimeToReturn;
 }
@@ -621,7 +621,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     ShardingState::get(getGlobalServiceContext())->clearCollectionMetadata();
 }
 
-void ReplicationCoordinatorExternalStateImpl::shardingOnTransitionToPrimaryHook(
+void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
     OperationContext* txn) {
     auto status = ShardingStateRecovery::recover(txn);
 
@@ -722,7 +722,7 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
     _bgSync->cancelFetcher();
 }
 
-void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
+void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* txn) {
     std::vector<std::string> dbNames;
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
     storageEngine->listDatabases(&dbNames);

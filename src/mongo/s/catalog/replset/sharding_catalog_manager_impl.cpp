@@ -1408,12 +1408,15 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
         }
     }
 
-    Status status = _initConfigVersion(txn);
+    Status status = _initConfigIndexes(txn);
     if (!status.isOK()) {
         return status;
     }
 
-    status = _initConfigIndexes(txn);
+    // Make sure to write config.version last since we detect rollbacks of config.version and
+    // will re-run initializeConfigDatabaseIfNeeded if that happens, but we don't detect rollback
+    // of the index builds.
+    status = _initConfigVersion(txn);
     if (!status.isOK()) {
         return status;
     }
@@ -1422,6 +1425,11 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
     _configInitialized = true;
 
     return Status::OK();
+}
+
+void ShardingCatalogManagerImpl::discardCachedConfigDatabaseInitializationState() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _configInitialized = false;
 }
 
 Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* txn) {
