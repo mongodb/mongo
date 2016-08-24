@@ -3,30 +3,26 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    var t = db.distinct_multikey_index;
+    var coll = db.distinct_multikey_index;
 
-    t.drop();
+    coll.drop();
     for (var i = 0; i < 10; i++) {
-        t.save({a: 1, b: 1});
-        t.save({a: 1, b: 2});
-        t.save({a: 2, b: 1});
-        t.save({a: 2, b: 3});
+        assert.writeOK(coll.save({a: 1, b: 1}));
+        assert.writeOK(coll.save({a: 1, b: 2}));
+        assert.writeOK(coll.save({a: 2, b: 1}));
+        assert.writeOK(coll.save({a: 2, b: 3}));
     }
-    t.createIndex({a: 1, b: 1});
+    coll.createIndex({a: 1, b: 1});
 
-    var explain = t.distinct('b', {a: 1}).explain("executionStats");
-    assert.commandWorked(explain);
-    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
-    assert(planHasState(explain.queryPlanner.winningPlan, "PROJECTION"));
-    assert.eq(2, explain.executionStats.nReturned);
+    var explain_distinct_with_query = coll.explain("executionStats").distinct('b', {a: 1});
+    assert.commandWorked(explain_distinct_with_query);
+    assert(planHasStage(explain_distinct_with_query.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(planHasStage(explain_distinct_with_query.queryPlanner.winningPlan, "PROJECTION"));
+    assert.eq(2, explain_distinct_with_query.executionStats.nReturned);
 
-    var stage = getPlanStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN");
-    assert.eq({a: 1, b: 1}, stage.keyPattern);
-    assert.eq("a_1_b_1", stage.indexName);
-    assert.eq(false, stage.isMultiKey);
-    assert.eq(false, stage.isUnique);
-    assert.eq(false, stage.isSparse);
-    assert.eq(false, stage.isPartial);
-    assert.eq(1, stage.indexVersion);
-    assert("indexBounds" in stage);
+    var explain_distinct_without_query = coll.explain("executionStats").distinct('b');
+    assert.commandWorked(explain_distinct_without_query);
+    assert(planHasStage(explain_distinct_without_query.queryPlanner.winningPlan, "COLLSCAN"));
+    assert(!planHasStage(explain_distinct_without_query.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert.eq(40, explain_distinct_without_query.executionStats.nReturned);
 })();

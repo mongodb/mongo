@@ -263,23 +263,23 @@ public:
 
         std::vector<IndexDescriptor*> indices;
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, BSON("a" << 1 << "b" << 1), false, &indices);
-        verify(indices.size() == 1);
+        ASSERT_EQ(1U, indices.size());
 
         DistinctParams params;
         params.descriptor = indices[0];
-        verify(params.descriptor);
+        ASSERT_TRUE(params.descriptor);
 
         params.direction = 1;
         params.fieldNo = 1;
         params.bounds.isSimpleRange = false;
 
-        OrderedIntervalList a_oil{"a"};
-        a_oil.intervals.push_back(IndexBoundsBuilder::allValues());
-        params.bounds.fields.push_back(a_oil);
+        OrderedIntervalList aOil{"a"};
+        aOil.intervals.push_back(IndexBoundsBuilder::allValues());
+        params.bounds.fields.push_back(aOil);
 
-        OrderedIntervalList b_oil{"b"};
-        b_oil.intervals.push_back(IndexBoundsBuilder::allValues());
-        params.bounds.fields.push_back(b_oil);
+        OrderedIntervalList bOil{"b"};
+        bOil.intervals.push_back(IndexBoundsBuilder::allValues());
+        params.bounds.fields.push_back(bOil);
 
         WorkingSet ws;
         DistinctScan distinct(&_txn, params, &ws);
@@ -290,6 +290,8 @@ public:
         std::vector<int> seen;
 
         while (PlanStage::IS_EOF != (state = distinct.work(&wsid))) {
+            ASSERT_NE(PlanStage::FAILURE, state);
+            ASSERT_NE(PlanStage::DEAD, state);
             if (PlanStage::ADVANCED == state) {
                 seen.push_back(getIntFieldDotted(ws, wsid, "b"));
             }
