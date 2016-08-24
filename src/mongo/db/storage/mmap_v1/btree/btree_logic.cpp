@@ -1872,7 +1872,7 @@ void BtreeLogic<BtreeLayout>::dumpBucket(const BucketType* bucket, int indentLen
         string ks = k.data.toString();
         log() << "  " << hex << k.prevChildBucket.getOfs() << "<-- prevChildBucket for " << i
               << '\n';
-        log() << indent << "    " << i << ' ' << ks.substr(0, 30)
+        log() << indent << "    " << i << ' ' << redact(ks.substr(0, 30))
               << " Loc:" << k.recordLoc.toString() << dec;
         if (getKeyHeader(bucket, i).isUnused()) {
             log() << " UNUSED";
@@ -2109,7 +2109,7 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
                 log() << "ERROR: btree key order corrupt.  Keys:" << endl;
                 if (++nDumped < 5) {
                     for (int j = 0; j < bucket->n; j++) {
-                        log() << "  " << getFullKey(bucket, j).data.toString() << endl;
+                        log() << "  " << redact(getFullKey(bucket, j).data.toString()) << endl;
                     }
                     dumpBucket(bucket);
                 }
@@ -2118,9 +2118,9 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
             } else if (z == 0) {
                 if (!(firstKey.header.recordLoc < secondKey.header.recordLoc)) {
                     log() << "ERROR: btree key order corrupt (recordlocs wrong):" << endl;
-                    log() << " k(" << i << ")" << firstKey.data.toString()
+                    log() << " k(" << i << ")" << redact(firstKey.data.toString())
                           << " RL:" << firstKey.header.recordLoc.toString() << endl;
-                    log() << " k(" << i + 1 << ")" << secondKey.data.toString()
+                    log() << " k(" << i + 1 << ")" << redact(secondKey.data.toString())
                           << " RL:" << secondKey.header.recordLoc.toString() << endl;
                     wassert(firstKey.header.recordLoc < secondKey.header.recordLoc);
                 }

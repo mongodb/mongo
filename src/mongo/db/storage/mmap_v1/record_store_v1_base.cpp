@@ -728,7 +728,7 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
                             results->errors.push_back("invalid object detected (see logs)");
 
                         nInvalid++;
-                        log() << "Invalid object detected in " << _ns << ": " << status.reason();
+                        log() << "Invalid object detected in " << _ns << ": " << redact(status);
                     } else {
                         bsonLen += dataSize;
                     }

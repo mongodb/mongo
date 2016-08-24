@@ -345,7 +345,7 @@ void RecoveryJob::applyEntry(Last& last, const ParsedJournalEntry& entry, bool a
                 ss << setw(2) << entry.e->getFileNo();
             ss << ' ' << setw(6) << entry.e->len << ' '
                << /*hex << setw(8) << (size_t) fqe.srcData << dec <<*/
-                "  " << hexdump(entry.e->srcData(), entry.e->len);
+                "  " << redact(hexdump(entry.e->srcData(), entry.e->len));
             log() << ss.str() << endl;
         }
         if (apply) {
@@ -354,7 +354,7 @@ void RecoveryJob::applyEntry(Last& last, const ParsedJournalEntry& entry, bool a
     } else if (entry.op) {
         // a DurOp subclass operation
         if (dump) {
-            log() << "  OP " << entry.op->toString() << endl;
+            log() << "  OP " << redact(entry.op->toString()) << endl;
         }
         if (apply) {
             if (entry.op->needFilesClosed()) {

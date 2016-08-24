@@ -644,15 +644,16 @@ static void remapPrivateView(double fraction) {
         LOG(4) << "remapPrivateView end";
         return;
     } catch (DBException& e) {
-        severe() << "dbexception in remapPrivateView causing immediate shutdown: " << e.toString();
+        severe() << "dbexception in remapPrivateView causing immediate shutdown: " << redact(e);
     } catch (std::ios_base::failure& e) {
         severe() << "ios_base exception in remapPrivateView causing immediate shutdown: "
-                 << e.what();
+                 << redact(e.what());
     } catch (std::bad_alloc& e) {
         severe() << "bad_alloc exception in remapPrivateView causing immediate shutdown: "
-                 << e.what();
+                 << redact(e.what());
     } catch (std::exception& e) {
-        severe() << "exception in remapPrivateView causing immediate shutdown: " << e.what();
+        severe() << "exception in remapPrivateView causing immediate shutdown: "
+                 << redact(e.what());
     } catch (...) {
         severe() << "unknown exception in remapPrivateView causing immediate shutdown: ";
     }
@@ -846,16 +847,18 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
 
             LOG(4) << "groupCommit end";
         } catch (DBException& e) {
-            severe() << "dbexception in durThread causing immediate shutdown: " << e.toString();
+            severe() << "dbexception in durThread causing immediate shutdown: " << redact(e);
             invariant(false);
         } catch (std::ios_base::failure& e) {
-            severe() << "ios_base exception in durThread causing immediate shutdown: " << e.what();
+            severe() << "ios_base exception in durThread causing immediate shutdown: "
+                     << redact(e.what());
             invariant(false);
         } catch (std::bad_alloc& e) {
-            severe() << "bad_alloc exception in durThread causing immediate shutdown: " << e.what();
+            severe() << "bad_alloc exception in durThread causing immediate shutdown: "
+                     << redact(e.what());
             invariant(false);
         } catch (std::exception& e) {
-            severe() << "exception in durThread causing immediate shutdown: " << e.what();
+            severe() << "exception in durThread causing immediate shutdown: " << redact(e.what());
             invariant(false);
         } catch (...) {
             severe() << "unhandled exception in durThread causing immediate shutdown";
@@ -887,10 +890,10 @@ void startup(ClockSource* cs, int64_t serverStartMs) {
     try {
         replayJournalFilesAtStartup();
     } catch (DBException& e) {
-        severe() << "dbexception during recovery: " << e.toString();
+        severe() << "dbexception during recovery: " << redact(e);
         throw;
     } catch (std::exception& e) {
-        severe() << "std::exception during recovery: " << e.what();
+        severe() << "std::exception during recovery: " << redact(e.what());
         throw;
     } catch (...) {
         severe() << "exception during recovery";

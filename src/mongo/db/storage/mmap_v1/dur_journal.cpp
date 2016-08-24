@@ -125,7 +125,7 @@ void journalingFailure(const char* msg) {
         (2) make an indicator in the journal dir that something bad happened.
         (2b) refuse to do a recovery startup if that is there without manual override.
     */
-    log() << "journaling failure/error: " << msg << endl;
+    log() << "journaling failure/error: " << redact(msg) << endl;
     verify(false);
 }
 

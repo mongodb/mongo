@@ -154,7 +154,7 @@ void WiredTigerSizeStorer::fillCache() {
             std::string uriKey(reinterpret_cast<const char*>(key.data), key.size);
             BSONObj data(reinterpret_cast<const char*>(value.data));
 
-            LOG(2) << "WiredTigerSizeStorer::loadFrom " << uriKey << " -> " << data;
+            LOG(2) << "WiredTigerSizeStorer::loadFrom " << uriKey << " -> " << redact(data);
 
             Entry& e = m[uriKey];
             e.numRecords = data["numRecords"].safeNumberLong();
@@ -214,7 +214,7 @@ void WiredTigerSizeStorer::syncCache(bool syncToDisk) {
             data = b.obj();
         }
 
-        LOG(2) << "WiredTigerSizeStorer::storeInto " << uriKey << " -> " << data;
+        LOG(2) << "WiredTigerSizeStorer::storeInto " << uriKey << " -> " << redact(data);
 
         WiredTigerItem key(uriKey.c_str(), uriKey.size());
         WiredTigerItem value(data.objdata(), data.objsize());

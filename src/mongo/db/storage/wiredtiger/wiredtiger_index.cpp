@@ -879,9 +879,9 @@ protected:
 
             if (nextNotIncreasing) {
                 // Our new key is less than the old key which means the next call moved to !next.
-                log() << "WTIndex::updatePosition -- the new key ( " << toHex(item.data, item.size)
-                      << ") is less than the previous key (" << _key.toString()
-                      << "), which is a bug.";
+                log() << "WTIndex::updatePosition -- the new key ( "
+                      << redact(toHex(item.data, item.size)) << ") is less than the previous key ("
+                      << redact(_key.toString()) << "), which is a bug.";
 
                 // Force a retry of the operation from our last known position by acting as-if
                 // we received a WT_ROLLBACK error.
@@ -960,7 +960,7 @@ public:
 
         if (!br.atEof()) {
             severe() << "Unique index cursor seeing multiple records for key "
-                     << curr(kWantKey)->key;
+                     << redact(curr(kWantKey)->key);
             fassertFailed(28608);
         }
     }
@@ -1125,7 +1125,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
     }
 
     if (!foundId) {
-        warning().stream() << id << " not found in the index for key " << key;
+        warning().stream() << id << " not found in the index for key " << redact(key);
         return;  // nothing to do
     }
 

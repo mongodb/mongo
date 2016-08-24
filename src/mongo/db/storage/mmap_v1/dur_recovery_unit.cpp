@@ -188,7 +188,7 @@ void DurRecoveryUnit::rollbackChanges() {
 
     try {
         for (int i = _changes.size() - 1; i >= 0; i--) {
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*_changes[i]));
+            LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*_changes[i])));
             _changes[i]->rollback();
         }
     } catch (...) {

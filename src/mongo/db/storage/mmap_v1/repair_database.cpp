@@ -257,7 +257,7 @@ public:
 
             MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::remove_all(_path));
         } catch (DBException& e) {
-            error() << "RepairFileDeleter failed to cleanup: " << e;
+            error() << "RepairFileDeleter failed to cleanup: " << redact(e);
             error() << "aborting";
             fassertFailed(17402);
         }

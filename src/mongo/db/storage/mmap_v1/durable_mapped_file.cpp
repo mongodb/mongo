@@ -156,7 +156,7 @@ __declspec(noinline) void PointerToDurableMappedFile::makeChunkWritable(size_t c
                 p.getExtraInfo(bb);
 
                 severe() << "MongoDB has exhausted the system memory capacity.";
-                severe() << "Current Memory Status: " << bb.obj().toString();
+                severe() << "Current Memory Status: " << bb.obj();
             }
 
             severe() << "VirtualProtect for " << mmf->filename() << " chunk " << chunkno
