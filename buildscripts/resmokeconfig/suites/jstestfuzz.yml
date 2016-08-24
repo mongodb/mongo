@@ -10,6 +10,10 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
     fixture:
       class: MongoDFixture
       mongod_options:

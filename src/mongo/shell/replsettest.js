@@ -974,7 +974,18 @@ var ReplSetTest = function(opts) {
                     var primaryDBHash = dbHashes.master;
                     assert.commandWorked(primaryDBHash);
 
-                    var primaryCollInfo = primary.getDB(dbName).getCollectionInfos();
+                    try {
+                        var primaryCollInfo = primary.getDB(dbName).getCollectionInfos();
+                    } catch (e) {
+                        if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
+                            assert.commandFailedWithCode(e, ErrorCodes.InvalidViewDefinition);
+                            print('Skipping dbhash check on ' + dbName +
+                                  ' because of invalid views in system.views');
+                            continue;
+                        } else {
+                            throw e;
+                        }
+                    }
 
                     dbHashes.slaves.forEach(secondaryDBHash => {
                         assert.commandWorked(secondaryDBHash);

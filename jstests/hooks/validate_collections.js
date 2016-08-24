@@ -23,7 +23,13 @@ function validateCollections(db, obj) {
 
     // Don't run validate on view namespaces.
     let listCollectionsRes = db.runCommand({listCollections: 1, filter: {"type": "collection"}});
+    if (jsTest.options().skipValidationOnInvalidViewDefinitions && listCollectionsRes.ok === 0) {
+        assert.commandFailedWithCode(listCollectionsRes, ErrorCodes.InvalidViewDefinition);
+        print('Skipping validate hook because of invalid views in system.views');
+        return true;
+    }
     assert.commandWorked(listCollectionsRes);
+
     let collInfo = new DBCommandCursor(db.getMongo(), listCollectionsRes).toArray();
 
     for (var collDocument of collInfo) {
