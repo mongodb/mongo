@@ -88,13 +88,17 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
 
     std::list<std::shared_ptr<Future::CommandResult>> futures;
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-        if (!shard) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+        if (!shardStatus.isOK()) {
             continue;
         }
 
-        futures.push_back(Future::spawnCommand(
-            shard->getConnString().toString(), dbName, cmdObj, 0, NULL, _useShardConn));
+        futures.push_back(Future::spawnCommand(shardStatus.getValue()->getConnString().toString(),
+                                               dbName,
+                                               cmdObj,
+                                               0,
+                                               NULL,
+                                               _useShardConn));
     }
 
     std::vector<ShardAndReply> results;

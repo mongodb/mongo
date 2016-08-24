@@ -91,11 +91,12 @@ bool cursorCommandPassthrough(OperationContext* txn,
                               const BSONObj& cmdObj,
                               int options,
                               BSONObjBuilder* out) {
-    const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
-    if (!shard) {
-        return Command::appendCommandStatus(
-            *out, {ErrorCodes::ShardNotFound, "failed to find a valid shard"});
+    const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+    if (!shardStatus.isOK()) {
+        invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
+        return Command::appendCommandStatus(*out, shardStatus.getStatus());
     }
+    const auto shard = shardStatus.getValue();
     ScopedDbConnection conn(shard->getConnString());
     auto cursor = conn->query(str::stream() << conf->name() << ".$cmd",
                               cmdObj,
@@ -198,7 +199,10 @@ private:
                       const BSONObj& cmdObj,
                       int options,
                       BSONObjBuilder& result) {
-        const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+        const auto shardStatus =
+            Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+        const auto shard = uassertStatusOK(shardStatus);
+
         ShardConnection conn(shard->getConnString(), "");
 
         BSONObj res;
@@ -673,8 +677,8 @@ public:
             }
 
             {
-                const auto& shard =
-                    Grid::get(txn)->shardRegistry()->getShard(txn, confFrom->getPrimaryId());
+                const auto shard = uassertStatusOK(
+                    Grid::get(txn)->shardRegistry()->getShard(txn, confFrom->getPrimaryId()));
                 b.append("fromhost", shard->getConnString().toString());
             }
             BSONObj fixed = b.obj();
@@ -732,10 +736,12 @@ public:
         set<ShardId> shardIds;
         cm->getAllShardIds(&shardIds);
         for (const ShardId& shardId : shardIds) {
-            const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-            if (!shard) {
+            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            if (!shardStatus.isOK()) {
+                invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
             }
+            const auto shard = shardStatus.getValue();
 
             BSONObj res;
             {
@@ -918,12 +924,13 @@ public:
         set<ShardId> shardIds;
         cm->getShardIdsForRange(shardIds, min, max);
         for (const ShardId& shardId : shardIds) {
-            const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-            if (!shard) {
+            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            if (!shardStatus.isOK()) {
+                invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
             }
 
-            ScopedDbConnection conn(shard->getConnString());
+            ScopedDbConnection conn(shardStatus.getValue()->getConnString());
             BSONObj res;
             bool ok = conn->runCommand(conf->name(), cmdObj, res);
             conn.done();
@@ -1028,12 +1035,15 @@ public:
                                         << ". Cannot run on sharded namespace.");
         }
 
-        const auto primaryShard =
+        const auto primaryShardStatus =
             Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+        if (!primaryShardStatus.isOK()) {
+            return primaryShardStatus.getStatus();
+        }
 
         BSONObj shardResult;
         try {
-            ShardConnection conn(primaryShard->getConnString(), "");
+            ShardConnection conn(primaryShardStatus.getValue()->getConnString(), "");
 
             // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
             if (!conn->runCommand(nss.db().toString(), command, shardResult, options)) {
@@ -1054,7 +1064,7 @@ public:
         Strategy::CommandResult cmdResult;
         cmdResult.shardTargetId = conf->getPrimaryId();
         cmdResult.result = shardResult;
-        cmdResult.target = primaryShard->getConnString();
+        cmdResult.target = primaryShardStatus.getValue()->getConnString();
 
         return ClusterExplain::buildExplainResult(
             txn, {cmdResult}, ClusterExplain::kSingleShard, timer.millis(), out);
@@ -1206,12 +1216,13 @@ public:
         BSONObjSet all = bsonCmp.makeBSONObjSet();
 
         for (const ShardId& shardId : shardIds) {
-            const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-            if (!shard) {
+            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            if (!shardStatus.isOK()) {
+                invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
             }
 
-            ShardConnection conn(shard->getConnString(), fullns);
+            ShardConnection conn(shardStatus.getValue()->getConnString(), fullns);
             BSONObj res;
             bool ok = conn->runCommand(conf->name(), cmdObj, res, options);
             conn.done();
@@ -1524,13 +1535,14 @@ public:
         list<shared_ptr<Future::CommandResult>> futures;
         BSONArrayBuilder shardArray;
         for (const ShardId& shardId : shardIds) {
-            const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-            if (!shard) {
+            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            if (!shardStatus.isOK()) {
+                invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
             }
 
-            futures.push_back(
-                Future::spawnCommand(shard->getConnString().toString(), dbName, cmdObj, options));
+            futures.push_back(Future::spawnCommand(
+                shardStatus.getValue()->getConnString().toString(), dbName, cmdObj, options));
             shardArray.append(shardId.toString());
         }
 

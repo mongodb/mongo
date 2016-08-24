@@ -225,7 +225,10 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
         // No namespace
         if (i == _collections.end()) {
             // If we don't know about this namespace, it's unsharded by default
-            primary = grid.shardRegistry()->getShard(txn, _primaryId);
+            auto primaryStatus = grid.shardRegistry()->getShard(txn, _primaryId);
+            if (primaryStatus.isOK()) {
+                primary = primaryStatus.getValue();
+            }
         } else {
             CollectionInfo& cInfo = i->second;
 
@@ -236,13 +239,16 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
             if (_shardingEnabled && cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
-                primary = grid.shardRegistry()->getShard(txn, _primaryId);
+                auto primaryStatus = grid.shardRegistry()->getShard(txn, _primaryId);
+                if (primaryStatus.isOK()) {
+                    primary = primaryStatus.getValue();
+                }
             }
         }
     }
 
-    verify(manager || primary);
-    verify(!manager || !primary);
+    invariant(manager || primary);
+    invariant(!manager || !primary);
 }
 
 
@@ -578,7 +584,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     // 3
     {
-        const auto shard = grid.shardRegistry()->getShard(txn, _primaryId);
+        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, _primaryId));
+
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
@@ -597,12 +604,12 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     // 4
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-        if (!shard) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+        if (!shardStatus.isOK()) {
             continue;
         }
 
-        ScopedDbConnection conn(shard->getConnString(), 30.0);
+        ScopedDbConnection conn(shardStatus.getValue()->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
             errmsg = res.toString() + " at " + shardId.toString();

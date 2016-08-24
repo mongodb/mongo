@@ -184,12 +184,20 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
     // Resolve the donor and recipient shards and their connection string
 
     {
-        auto donorShard = grid.shardRegistry()->getShard(txn, _args.getFromShardId());
-        _donorCS = donorShard->getConnString();
+        auto donorShardStatus = grid.shardRegistry()->getShard(txn, _args.getFromShardId());
+        if (!donorShardStatus.isOK()) {
+            return donorShardStatus.getStatus();
+        }
+        _donorCS = donorShardStatus.getValue()->getConnString();
     }
 
     {
-        auto recipientShard = grid.shardRegistry()->getShard(txn, _args.getToShardId());
+        auto recipientShardStatus = grid.shardRegistry()->getShard(txn, _args.getToShardId());
+        if (!recipientShardStatus.isOK()) {
+            return recipientShardStatus.getStatus();
+        }
+        auto recipientShard = recipientShardStatus.getValue();
+
         auto shardHostStatus = recipientShard->getTargeter()->findHost(
             ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         if (!shardHostStatus.isOK()) {

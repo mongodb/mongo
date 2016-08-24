@@ -818,7 +818,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 
     // Ensure the added shard is visible to this process.
     auto shardRegistry = Grid::get(txn)->shardRegistry();
-    if (!shardRegistry->getShard(txn, shardType.getName())) {
+    if (!shardRegistry->getShard(txn, shardType.getName()).isOK()) {
         return {ErrorCodes::OperationFailed,
                 "Could not find shard metadata for shard after adding it. This most likely "
                 "indicates that the shard was removed immediately after it was added."};
@@ -1925,10 +1925,11 @@ Status ShardingCatalogManagerImpl::setFeatureCompatibilityVersionOnShards(
     std::vector<ShardId> shardIds;
     grid.shardRegistry()->getAllShardIds(&shardIds);
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-        if (!shard) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+        if (!shardStatus.isOK()) {
             continue;
         }
+        const auto shard = shardStatus.getValue();
 
         auto response =
             shard->runCommand(txn,

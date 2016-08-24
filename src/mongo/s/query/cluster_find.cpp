@@ -168,12 +168,11 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                           &shardIds);
 
         for (auto id : shardIds) {
-            auto shard = shardRegistry->getShard(txn, id);
-            if (!shard) {
-                return {ErrorCodes::ShardNotFound,
-                        str::stream() << "Shard with id:  " << id << " is not found."};
+            auto shardStatus = shardRegistry->getShard(txn, id);
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
             }
-            shards.emplace_back(shard);
+            shards.emplace_back(shardStatus.getValue());
         }
     }
 

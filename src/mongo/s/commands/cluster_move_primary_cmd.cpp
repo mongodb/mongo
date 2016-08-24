@@ -130,17 +130,18 @@ public:
             return false;
         }
 
-        shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, to);
-        if (!toShard) {
+        auto toShardStatus = grid.shardRegistry()->getShard(txn, to);
+        if (!toShardStatus.isOK()) {
             string msg(str::stream() << "Could not move database '" << dbname << "' to shard '"
                                      << to
                                      << "' because the shard does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
+        auto toShard = toShardStatus.getValue();
 
-        shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
-        invariant(fromShard);
+        auto fromShard =
+            uassertStatusOK(grid.shardRegistry()->getShard(txn, config->getPrimaryId()));
 
         if (fromShard->getId() == toShard->getId()) {
             errmsg = "it is already the primary";

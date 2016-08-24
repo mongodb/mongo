@@ -304,7 +304,9 @@ public:
         const auto& mergingShardId = needPrimaryShardMerger
             ? conf->getPrimaryId()
             : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
-        const auto mergingShard = grid.shardRegistry()->getShard(txn, mergingShardId);
+        const auto mergingShard =
+            uassertStatusOK(grid.shardRegistry()->getShard(txn, mergingShardId));
+
         ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
         BSONObj mergedResults =
             aggRunCommand(conn.get(), dbname, mergeCmd.freeze().toBson(), options);
@@ -490,15 +492,19 @@ bool PipelineCommand::aggPassthrough(OperationContext* txn,
                                      int queryOptions,
                                      std::string& errmsg) {
     // Temporary hack. See comment on declaration for details.
-    const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
-    ShardConnection conn(shard->getConnString(), "");
+    auto shardStatus = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
+    if (!shardStatus.isOK()) {
+        return appendCommandStatus(out, shardStatus.getStatus());
+    }
+
+    ShardConnection conn(shardStatus.getValue()->getConnString(), "");
     BSONObj result = aggRunCommand(conn.get(), conf->name(), cmdObj, queryOptions);
     conn.done();
 
     // First append the properly constructed writeConcernError. It will then be skipped
     // in appendElementsUnique.
     if (auto wcErrorElem = result["writeConcernError"]) {
-        appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, out);
+        appendWriteConcernErrorToCmdResponse(shardStatus.getValue()->getId(), wcErrorElem, out);
     }
 
     out.appendElementsUnique(result);

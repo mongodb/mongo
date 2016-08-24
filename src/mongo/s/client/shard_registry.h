@@ -185,12 +185,14 @@ public:
     void updateReplSetHosts(const ConnectionString& newConnString);
 
     /**
-     * Returns a shared pointer to the shard object with the given shard id.
+     * Returns a shared pointer to the shard object with the given shard id, or ShardNotFound error
+     * otherwise.
+     *
      * May refresh the shard registry if there's no cached information about the shard. The shardId
      * parameter can actually be the shard name or the HostAndPort for any
      * server in the shard.
      */
-    std::shared_ptr<Shard> getShard(OperationContext* txn, const ShardId& shardId);
+    StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* txn, const ShardId& shardId);
 
     /**
      * Returns a shared pointer to the shard object with the given shard id. The shardId parameter

@@ -98,7 +98,11 @@ public:
         shared_ptr<Shard> shard;
 
         if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
-            shard = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
+            }
+            shard = shardStatus.getValue();
         } else {
             chunkMgr = _getChunkManager(txn, conf, nss);
 
@@ -128,7 +132,12 @@ public:
                           "to non-simple collation");
             }
 
-            shard = Grid::get(txn)->shardRegistry()->getShard(txn, chunk.getValue()->getShardId());
+            auto shardStatus =
+                Grid::get(txn)->shardRegistry()->getShard(txn, chunk.getValue()->getShardId());
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
+            }
+            shard = shardStatus.getValue();
         }
 
         BSONObjBuilder explainCmd;
@@ -257,7 +266,8 @@ private:
                      BSONObjBuilder& result) const {
         BSONObj res;
 
-        const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+
         ShardConnection conn(shard->getConnString(), nss.ns(), chunkManager);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();

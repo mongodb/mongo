@@ -135,14 +135,15 @@ public:
             return false;
         }
 
-        const auto to = grid.shardRegistry()->getShard(txn, toString);
-        if (!to) {
+        const auto toStatus = grid.shardRegistry()->getShard(txn, toString);
+        if (!toStatus.isOK()) {
             string msg(str::stream() << "Could not move chunk in '" << nss.ns() << "' to shard '"
                                      << toString
                                      << "' because that shard does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
+        const auto to = toStatus.getValue();
 
         // so far, chunk size serves test purposes; it may or may not become a supported parameter
         long long maxChunkSizeBytes = cmdObj["maxChunkSizeBytes"].numberLong();

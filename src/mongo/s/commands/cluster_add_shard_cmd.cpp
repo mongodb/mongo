@@ -104,7 +104,7 @@ public:
 
         // Ensure the added shard is visible to this process.
         auto shardRegistry = Grid::get(txn)->shardRegistry();
-        if (!shardRegistry->getShard(txn, shardAdded)) {
+        if (!shardRegistry->getShard(txn, shardAdded).isOK()) {
             return appendCommandStatus(result,
                                        {ErrorCodes::OperationFailed,
                                         "Could not find shard metadata for shard after adding it. "

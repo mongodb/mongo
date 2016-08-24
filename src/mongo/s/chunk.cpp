@@ -81,7 +81,7 @@ Chunk::Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from
     uassert(13327, "Chunk ns must match server ns", ns == _manager->getns());
     uassert(10172, "Chunk needs a min", !_min.isEmpty());
     uassert(10173, "Chunk needs a max", !_max.isEmpty());
-    uassert(10171, "Chunk needs a server", grid.shardRegistry()->getShard(txn, _shardId));
+    uassert(10171, "Chunk needs a server", grid.shardRegistry()->getShard(txn, _shardId).isOK());
 }
 
 Chunk::Chunk(ChunkManager* info,
@@ -415,7 +415,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
 }
 
 ConnectionString Chunk::_getShardConnectionString(OperationContext* txn) const {
-    const auto shard = grid.shardRegistry()->getShard(txn, getShardId());
+    const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, getShardId()));
     return shard->getConnString();
 }
 

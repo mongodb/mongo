@@ -185,15 +185,15 @@ public:
 
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
         // formatting.
-        const auto shard = grid.shardRegistry()->getShard(txn, firstChunk->getShardId());
-        if (!shard) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, firstChunk->getShardId());
+        if (!shardStatus.isOK()) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::ShardNotFound,
                        str::stream() << "Can't find shard for chunk: " << firstChunk->toString()));
         }
 
-        ShardConnection conn(shard->getConnString(), "");
+        ShardConnection conn(shardStatus.getValue()->getConnString(), "");
         bool ok = conn->runCommand("admin", remoteCmdObjB.obj(), remoteResult);
         conn.done();
 

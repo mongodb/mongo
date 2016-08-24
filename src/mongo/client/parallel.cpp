@@ -397,7 +397,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
 
     // Setup conn
     if (!state->conn) {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
+        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, shardId));
         state->conn.reset(new ShardConnection(shard->getConnString(), ns.ns(), manager));
     }
 
@@ -945,7 +945,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
         _cursors[index].reset(mdata.pcState->cursor.get(), &mdata);
 
         {
-            const auto shard = grid.shardRegistry()->getShard(txn, i->first);
+            const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, i->first));
             _servers.insert(shard->getConnString().toString());
         }
 

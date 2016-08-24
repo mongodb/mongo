@@ -79,11 +79,13 @@ public:
         setupShards({_shard1, _shard2});
 
         auto shard1Targeter = RemoteCommandTargeterMock::get(
-            shardRegistry()->getShard(operationContext(), _shard1.getName())->getTargeter());
+            uassertStatusOK(shardRegistry()->getShard(operationContext(), _shard1.getName()))
+                ->getTargeter());
         shard1Targeter->setFindHostReturnValue(HostAndPort(_shard1.getHost()));
 
         auto shard2Targeter = RemoteCommandTargeterMock::get(
-            shardRegistry()->getShard(operationContext(), _shard2.getName())->getTargeter());
+            uassertStatusOK(shardRegistry()->getShard(operationContext(), _shard2.getName()))
+                ->getTargeter());
         shard2Targeter->setFindHostReturnValue(HostAndPort(_shard2.getHost()));
     }
 
@@ -284,7 +286,8 @@ TEST_F(DropColl2ShardTest, DistLockBusy) {
 
 TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
     auto shard1Targeter = RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), shard1().getName())->getTargeter());
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), shard1().getName()))
+            ->getTargeter());
     shard1Targeter->setFindHostReturnValue({ErrorCodes::HostUnreachable, "bad test network"});
 
     auto future = launchAsync([this] {
@@ -348,7 +351,8 @@ TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
 
 TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
     auto shard2Targeter = RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), shard2().getName())->getTargeter());
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), shard2().getName()))
+            ->getTargeter());
     shard2Targeter->setFindHostReturnValue({ErrorCodes::HostUnreachable, "bad test network"});
 
     auto future = launchAsync([this] {

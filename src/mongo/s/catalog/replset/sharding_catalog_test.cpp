@@ -1564,15 +1564,14 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
 
     // Set up all the target mocks return values.
     RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), s0.getName())->getTargeter())
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s0.getName()))->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s0.getHost()));
     RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), s1.getName())->getTargeter())
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s1.getName()))->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s1.getHost()));
     RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), s2.getName())->getTargeter())
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s2.getName()))->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s2.getHost()));
-
 
     // Now actually start the createDatabase work.
 
@@ -1855,15 +1854,14 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
 
     // Set up all the target mocks return values.
     RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), s0.getName())->getTargeter())
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s0.getName()))->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s0.getHost()));
     RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), s1.getName())->getTargeter())
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s1.getName()))->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s1.getHost()));
     RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), s2.getName())->getTargeter())
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), s2.getName()))->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s2.getHost()));
-
 
     // Now actually start the createDatabase work.
 
@@ -1977,7 +1975,8 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
     setupShards(vector<ShardType>{shard});
 
     auto shardTargeter = RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), ShardId("shard0"))->getTargeter());
+        uassertStatusOK(shardRegistry()->getShard(operationContext(), ShardId("shard0")))
+            ->getTargeter());
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
     distLock()->expectLock(

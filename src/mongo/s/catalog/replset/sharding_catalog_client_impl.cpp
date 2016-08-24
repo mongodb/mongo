@@ -419,7 +419,10 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
     }
 
     ShardId dbPrimaryShardId = getDBStatus.getValue().value.getPrimary();
-    const auto primaryShard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
+    const auto primaryShardStatus = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
+    if (!primaryShardStatus.isOK()) {
+        return primaryShardStatus.getStatus();
+    }
 
     {
         // In 3.0 and prior we include this extra safety check that the collection is not getting
@@ -446,7 +449,7 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
         BSONObjBuilder collectionDetail;
         collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
         collectionDetail.append("collection", ns);
-        collectionDetail.append("primary", primaryShard->toString());
+        collectionDetail.append("primary", primaryShardStatus.getValue()->toString());
 
         {
             BSONArrayBuilder initialShards(collectionDetail.subarrayStart("initShards"));
@@ -494,16 +497,16 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
         grid.shardRegistry()->getConfigServerConnectionString(),
         dbPrimaryShardId,
-        primaryShard->getConnString(),
+        primaryShardStatus.getValue()->getConnString(),
         NamespaceString(ns),
         manager->getVersion(),
         true);
 
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, dbPrimaryShardId);
-    if (!shard) {
-        return {ErrorCodes::ShardNotFound,
-                str::stream() << "shard " << dbPrimaryShardId << " not found"};
+    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, dbPrimaryShardId);
+    if (!shardStatus.isOK()) {
+        return shardStatus.getStatus();
     }
+    auto shard = shardStatus.getValue();
 
     auto ssvResponse = shard->runCommand(txn,
                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -808,18 +811,17 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* txn, const Na
     auto* shardRegistry = grid.shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        auto shard = shardRegistry->getShard(txn, shardEntry.getName());
-        if (!shard) {
-            return {ErrorCodes::ShardNotFound,
-                    str::stream() << "shard " << shardEntry.getName() << " not found"};
+        auto shardStatus = shardRegistry->getShard(txn, shardEntry.getName());
+        if (!shardStatus.isOK()) {
+            return shardStatus.getStatus();
         }
-        auto dropResult =
-            shard->runCommand(txn,
-                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                              ns.db().toString(),
-                              BSON("drop" << ns.coll() << WriteConcernOptions::kWriteConcernField
-                                          << txn->getWriteConcern().toBSON()),
-                              Shard::RetryPolicy::kIdempotent);
+        auto dropResult = shardStatus.getValue()->runCommand(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            ns.db().toString(),
+            BSON("drop" << ns.coll() << WriteConcernOptions::kWriteConcernField
+                        << txn->getWriteConcern().toBSON()),
+            Shard::RetryPolicy::kIdempotent);
 
         if (!dropResult.isOK()) {
             return Status(dropResult.getStatus().code(),
@@ -895,11 +897,11 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* txn, const Na
             ChunkVersion::DROPPED(),
             true);
 
-        auto shard = shardRegistry->getShard(txn, shardEntry.getName());
-        if (!shard) {
-            return {ErrorCodes::ShardNotFound,
-                    str::stream() << "shard " << shardEntry.getName() << " not found"};
+        auto shardStatus = shardRegistry->getShard(txn, shardEntry.getName());
+        if (!shardStatus.isOK()) {
+            return shardStatus.getStatus();
         }
+        auto shard = shardStatus.getValue();
 
         auto ssvResult = shard->runCommand(txn,
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},

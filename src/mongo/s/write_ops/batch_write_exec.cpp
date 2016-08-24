@@ -170,16 +170,14 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     continue;
 
                 // Figure out what host we need to dispatch our targeted batch
-                bool resolvedHost = true;
                 const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-                auto shard = Grid::get(txn)->shardRegistry()->getShard(
+                auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(
                     txn, nextBatch->getEndpoint().shardName);
 
-                if (!shard) {
-                    Status status = Status(ErrorCodes::ShardNotFound,
-                                           str::stream() << "unknown shard name "
-                                                         << nextBatch->getEndpoint().shardName);
-                    resolvedHost = false;
+                bool resolvedHost = false;
+                ConnectionString shardHost;
+                if (!shardStatus.isOK()) {
+                    Status status(std::move(shardStatus.getStatus()));
 
                     // Record a resolve failure
                     // TODO: It may be necessary to refresh the cache if stale, or maybe just
@@ -189,20 +187,25 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     LOG(4) << "unable to send write batch to " << nextBatch->getEndpoint().shardName
                            << causedBy(status);
                     batchOp.noteBatchError(*nextBatch, error);
-                }
+                } else {
+                    auto shard = shardStatus.getValue();
 
-                auto swHostAndPort = shard->getTargeter()->findHost(readPref);
-                if (!swHostAndPort.isOK()) {
-                    resolvedHost = false;
+                    auto swHostAndPort = shard->getTargeter()->findHost(readPref);
+                    if (!swHostAndPort.isOK()) {
 
-                    // Record a resolve failure
-                    // TODO: It may be necessary to refresh the cache if stale, or maybe just
-                    // cancel and retarget the batch
-                    WriteErrorDetail error;
-                    buildErrorFrom(swHostAndPort.getStatus(), &error);
-                    LOG(4) << "unable to send write batch to " << nextBatch->getEndpoint().shardName
-                           << causedBy(swHostAndPort.getStatus());
-                    batchOp.noteBatchError(*nextBatch, error);
+                        // Record a resolve failure
+                        // TODO: It may be necessary to refresh the cache if stale, or maybe just
+                        // cancel and retarget the batch
+                        WriteErrorDetail error;
+                        buildErrorFrom(swHostAndPort.getStatus(), &error);
+                        LOG(4) << "unable to send write batch to "
+                               << nextBatch->getEndpoint().shardName
+                               << causedBy(swHostAndPort.getStatus());
+                        batchOp.noteBatchError(*nextBatch, error);
+                    } else {
+                        shardHost = ConnectionString(std::move(swHostAndPort.getValue()));
+                        resolvedHost = true;
+                    }
                 }
 
                 if (!resolvedHost) {
@@ -215,8 +218,6 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     --numToSend;
                     continue;
                 }
-
-                ConnectionString shardHost(swHostAndPort.getValue());
 
                 // If we already have a batch for this host, wait until the next time
                 OwnedHostBatchMap::MapType::iterator pendingIt = pendingBatches.find(shardHost);

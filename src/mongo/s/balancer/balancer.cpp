@@ -444,10 +444,11 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
             return false;
         }
 
-        const auto s = shardingContext->shardRegistry()->getShard(txn, shardId);
-        if (!s) {
+        auto shardStatus = shardingContext->shardRegistry()->getShard(txn, shardId);
+        if (!shardStatus.isOK()) {
             continue;
         }
+        const auto s = shardStatus.getValue();
 
         auto result =
             uassertStatusOK(s->runCommand(txn,
@@ -474,14 +475,14 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                                   Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(result.commandStatus);
 
-                const auto otherShard = shardingContext->shardRegistry()->getShard(txn, oids[x]);
-                if (otherShard) {
-                    result = uassertStatusOK(
-                        otherShard->runCommand(txn,
-                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               "admin",
-                                               BSON("features" << 1 << "oidReset" << 1),
-                                               Shard::RetryPolicy::kIdempotent));
+                auto otherShardStatus = shardingContext->shardRegistry()->getShard(txn, oids[x]);
+                if (otherShardStatus.isOK()) {
+                    result = uassertStatusOK(otherShardStatus.getValue()->runCommand(
+                        txn,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        "admin",
+                        BSON("features" << 1 << "oidReset" << 1),
+                        Shard::RetryPolicy::kIdempotent));
                     uassertStatusOK(result.commandStatus);
                 }
 

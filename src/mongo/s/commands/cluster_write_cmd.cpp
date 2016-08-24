@@ -267,12 +267,11 @@ private:
             const ShardEndpoint* endpoint = *it;
 
             const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shard = grid.shardRegistry()->getShard(txn, endpoint->shardName);
-            if (!shard) {
-                return Status(ErrorCodes::ShardNotFound,
-                              "Could not find shard with id " + endpoint->shardName.toString());
+            auto shardStatus = grid.shardRegistry()->getShard(txn, endpoint->shardName);
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
             }
-            auto swHostAndPort = shard->getTargeter()->findHost(readPref);
+            auto swHostAndPort = shardStatus.getValue()->getTargeter()->findHost(readPref);
             if (!swHostAndPort.isOK()) {
                 return swHostAndPort.getStatus();
             }
@@ -300,8 +299,11 @@ private:
             Strategy::CommandResult result;
             result.target = host;
             {
-                const auto shard = grid.shardRegistry()->getShard(txn, host.toString());
-                result.shardTargetId = shard->getId();
+                auto shardStatus = grid.shardRegistry()->getShard(txn, host.toString());
+                if (!shardStatus.isOK()) {
+                    return shardStatus.getStatus();
+                }
+                result.shardTargetId = shardStatus.getValue()->getId();
             }
             result.result = response.toBSON();
 

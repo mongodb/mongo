@@ -320,7 +320,12 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
                      << " does not exist."));
     }
 
-    const auto fromShard = Grid::get(txn)->shardRegistry()->getShard(txn, migrateInfo.from);
+    const auto fromShardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, migrateInfo.from);
+    if (!fromShardStatus.isOK()) {
+        return std::make_shared<Notification<Status>>(std::move(fromShardStatus.getStatus()));
+    }
+
+    const auto fromShard = fromShardStatus.getValue();
     auto fromHostStatus =
         fromShard->getTargeter()->findHost(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                            RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));

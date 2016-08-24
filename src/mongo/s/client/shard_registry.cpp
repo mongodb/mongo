@@ -106,7 +106,8 @@ void ShardRegistry::rebuildConfigShard() {
     invariant(_data.getConfigShard());
 }
 
-shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& shardId) {
+StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* txn,
+                                                      const ShardId& shardId) {
     // If we know about the shard, return it.
     auto shard = _data.findByShardId(shardId);
     if (shard) {
@@ -117,16 +118,27 @@ shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& 
     bool didReload = reload(txn);
     shard = _data.findByShardId(shardId);
 
-    // If we found the shard, return it. If we did not find the shard but performed the reload
-    // ourselves, return, because it means the shard does not exist.
-    if (shard || didReload) {
+    // If we found the shard, return it.
+    if (shard) {
         return shard;
+    }
+
+    // If we did not find the shard but performed the reload
+    // ourselves, return, because it means the shard does not exist.
+    if (didReload) {
+        return {ErrorCodes::ShardNotFound, str::stream() << "Shard " << shardId << " not found"};
     }
 
     // If we did not perform the reload ourselves (because there was a concurrent reload), force a
     // reload again to ensure that we have seen data at least as up to date as our first reload.
     reload(txn);
-    return _data.findByShardId(shardId);
+    shard = _data.findByShardId(shardId);
+
+    if (shard) {
+        return shard;
+    }
+
+    return {ErrorCodes::ShardNotFound, str::stream() << "Shard " << shardId << " not found"};
 }
 
 shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) {

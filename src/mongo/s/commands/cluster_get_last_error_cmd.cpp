@@ -111,13 +111,12 @@ public:
             const HostOpTime& hot = it->second;
 
             const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shard = grid.shardRegistry()->getShard(txn, shardEndpoint.toString());
-            if (!shard) {
-                status =
-                    Status(ErrorCodes::ShardNotFound,
-                           str::stream() << "shard " << shardEndpoint.toString() << " not found");
+            auto shardStatus = grid.shardRegistry()->getShard(txn, shardEndpoint.toString());
+            if (!shardStatus.isOK()) {
+                status = shardStatus.getStatus();
                 break;
             }
+            auto shard = shardStatus.getValue();
             auto swHostAndPort = shard->getTargeter()->findHost(readPref);
             if (!swHostAndPort.isOK()) {
                 status = swHostAndPort.getStatus();

@@ -103,13 +103,11 @@ public:
         log() << "want to kill op: " << redact(opToKill);
 
         // Will throw if shard id is not found
-        auto shard = grid.shardRegistry()->getShard(txn, shardIdent);
-        if (!shard) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::ShardNotFound,
-                       str::stream() << "shard " << shardIdent << " does not exist"));
+        auto shardStatus = grid.shardRegistry()->getShard(txn, shardIdent);
+        if (!shardStatus.isOK()) {
+            return appendCommandStatus(result, shardStatus.getStatus());
         }
+        auto shard = shardStatus.getValue();
 
         int opId;
         uassertStatusOK(parseNumberFromStringWithBase(opToKill.substr(opSepPos + 1), 10, &opId));

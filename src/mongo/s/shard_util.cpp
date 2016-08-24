@@ -55,17 +55,17 @@ const char kShouldMigrate[] = "shouldMigrate";
 }  // namespace
 
 StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId) {
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-    if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "shard " << shardId << " not found");
+    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+    if (!shardStatus.isOK()) {
+        return shardStatus.getStatus();
     }
+
     auto listDatabasesStatus =
-        shard->runCommand(txn,
-                          ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                          "admin",
-                          BSON("listDatabases" << 1),
-                          Shard::RetryPolicy::kIdempotent);
+        shardStatus.getValue()->runCommand(txn,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                           "admin",
+                                           BSON("listDatabases" << 1),
+                                           Shard::RetryPolicy::kIdempotent);
     if (!listDatabasesStatus.isOK()) {
         return std::move(listDatabasesStatus.getStatus());
     }
@@ -94,16 +94,17 @@ StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
     cmd.append(kMaxKey, maxKey);
     cmd.appendBool("force", true);
 
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-    if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "shard " << shardId << " not found");
+    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+    if (!shardStatus.isOK()) {
+        return shardStatus.getStatus();
     }
-    auto cmdStatus = shard->runCommand(txn,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                       "admin",
-                                       cmd.obj(),
-                                       Shard::RetryPolicy::kIdempotent);
+
+    auto cmdStatus =
+        shardStatus.getValue()->runCommand(txn,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                           "admin",
+                                           cmd.obj(),
+                                           Shard::RetryPolicy::kIdempotent);
     if (!cmdStatus.isOK()) {
         return std::move(cmdStatus.getStatus());
     }
@@ -139,16 +140,17 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
     cmd.append("maxSplitPoints", maxPoints);
     cmd.append("maxChunkObjects", maxObjs);
 
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-    if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "shard " << shardId << " not found");
+    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+    if (!shardStatus.isOK()) {
+        return shardStatus.getStatus();
     }
-    auto cmdStatus = shard->runCommand(txn,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                       "admin",
-                                       cmd.obj(),
-                                       Shard::RetryPolicy::kIdempotent);
+
+    auto cmdStatus =
+        shardStatus.getValue()->runCommand(txn,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                           "admin",
+                                           cmd.obj(),
+                                           Shard::RetryPolicy::kIdempotent);
     if (!cmdStatus.isOK()) {
         return std::move(cmdStatus.getStatus());
     }
@@ -206,16 +208,16 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     Status status{ErrorCodes::InternalError, "Uninitialized value"};
     BSONObj cmdResponse;
 
-    auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-    if (!shard) {
-        status =
-            Status(ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found");
+    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+    if (!shardStatus.isOK()) {
+        status = shardStatus.getStatus();
     } else {
-        auto cmdStatus = shard->runCommand(txn,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           "admin",
-                                           cmdObj,
-                                           Shard::RetryPolicy::kNotIdempotent);
+        auto cmdStatus =
+            shardStatus.getValue()->runCommand(txn,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               "admin",
+                                               cmdObj,
+                                               Shard::RetryPolicy::kNotIdempotent);
         if (!cmdStatus.isOK()) {
             status = std::move(cmdStatus.getStatus());
         } else {

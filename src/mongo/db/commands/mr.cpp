@@ -1720,11 +1720,9 @@ public:
                 std::string server = e.fieldName();
                 servers.insert(server);
 
-                if (!grid.shardRegistry()->getShard(txn, server)) {
-                    return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::ShardNotFound,
-                               str::stream() << "Shard not found for server: " << server));
+                auto shardStatus = grid.shardRegistry()->getShard(txn, server);
+                if (!shardStatus.isOK()) {
+                    return appendCommandStatus(result, shardStatus.getStatus());
                 }
             }
         }

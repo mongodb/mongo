@@ -281,10 +281,12 @@ public:
         // Now only check top-level shard connections
         for (const ShardId& shardId : all) {
             try {
-                const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-                if (!shard) {
+                auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+                if (!shardStatus.isOK()) {
+                    invariant(shardStatus == ErrorCodes::ShardNotFound);
                     continue;
                 }
+                const auto shard = shardStatus.getValue();
 
                 string sconnString = shard->getConnString().toString();
                 Status* s = _getStatus(sconnString);

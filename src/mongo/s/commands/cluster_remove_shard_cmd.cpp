@@ -87,13 +87,14 @@ public:
                      BSONObjBuilder& result) {
         const string target = cmdObj.firstElement().valuestrsafe();
 
-        const auto s = grid.shardRegistry()->getShard(txn, ShardId(target));
-        if (!s) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, ShardId(target));
+        if (!shardStatus.isOK()) {
             string msg(str::stream() << "Could not drop shard '" << target
                                      << "' because it does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
+        const auto s = shardStatus.getValue();
 
         auto catalogClient = grid.catalogClient(txn);
         StatusWith<ShardDrainingStatus> removeShardResult =

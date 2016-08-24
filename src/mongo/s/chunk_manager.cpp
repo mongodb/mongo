@@ -102,7 +102,7 @@ public:
     }
 
     ShardId shardFor(OperationContext* txn, const ShardId& shardId) const final {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
+        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, shardId));
         return shard->getId();
     }
 
@@ -308,11 +308,12 @@ bool ChunkManager::_load(OperationContext* txn,
 
         // Add all existing shards we find to the shards set
         for (ShardVersionMap::iterator it = shardVersions->begin(); it != shardVersions->end();) {
-            shared_ptr<Shard> shard = grid.shardRegistry()->getShard(txn, it->first);
-            if (shard) {
+            auto shardStatus = grid.shardRegistry()->getShard(txn, it->first);
+            if (shardStatus.isOK()) {
                 shardIds.insert(it->first);
                 ++it;
             } else {
+                invariant(shardStatus == ErrorCodes::ShardNotFound);
                 shardVersions->erase(it++);
             }
         }
@@ -380,7 +381,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
 
     if (!initPoints || initPoints->empty()) {
         // discover split points
-        const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
+        auto primaryShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, primaryShardId));
         const NamespaceString nss{getns()};
 
         auto result = uassertStatusOK(

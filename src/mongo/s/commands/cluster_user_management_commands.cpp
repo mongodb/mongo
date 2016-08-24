@@ -854,16 +854,16 @@ Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, BSONObjBuilder
 
     bool hasWCError = false;
     for (const auto& shardId : shardIds) {
-        auto shard = shardRegistry->getShard(txn, shardId);
-        if (!shard) {
-            return {ErrorCodes::ShardNotFound,
-                    str::stream() << "shard " << shardId << " not found"};
+        auto shardStatus = shardRegistry->getShard(txn, shardId);
+        if (!shardStatus.isOK()) {
+            return shardStatus.getStatus();
         }
-        auto cmdResult = shard->runCommand(txn,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           "admin",
-                                           cmdObj,
-                                           Shard::RetryPolicy::kIdempotent);
+        auto cmdResult =
+            shardStatus.getValue()->runCommand(txn,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               "admin",
+                                               cmdObj,
+                                               Shard::RetryPolicy::kIdempotent);
         auto status = cmdResult.isOK() ? std::move(cmdResult.getValue().commandStatus)
                                        : std::move(cmdResult.getStatus());
         if (!status.isOK()) {

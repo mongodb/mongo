@@ -159,7 +159,8 @@ void MigrationManagerTest::tearDown() {
 
 std::shared_ptr<RemoteCommandTargeterMock> MigrationManagerTest::shardTargeterMock(
     OperationContext* txn, ShardId shardId) {
-    return RemoteCommandTargeterMock::get(shardRegistry()->getShard(txn, shardId)->getTargeter());
+    return RemoteCommandTargeterMock::get(
+        uassertStatusOK(shardRegistry()->getShard(txn, shardId))->getTargeter());
 }
 
 void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardId primaryShard) {

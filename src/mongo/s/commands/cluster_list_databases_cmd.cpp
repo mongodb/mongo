@@ -95,10 +95,11 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto s = grid.shardRegistry()->getShard(txn, shardId);
-            if (!s) {
+            const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+            if (!shardStatus.isOK()) {
                 continue;
             }
+            const auto s = shardStatus.getValue();
 
             auto response = uassertStatusOK(
                 s->runCommand(txn,
