@@ -6050,39 +6050,6 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1604-build
-  - name: aggregation_auth
-  - name: aggregation_WT
-  - name: auth_WT
-  - name: bulk_gle_passthrough_WT
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded_WT
-  - name: jsCore
-  - name: jsCore_small_oplog_rs_WT
-  - name: jsCore_WT
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_concurrent_WT
-  - name: jstestfuzz_concurrent_replication_WT
-  - name: jstestfuzz_concurrent_sharded_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mongosTest
-  - name: multiversion
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod_WT
-  - name: replicasets_auth
-  - name: replicasets_WT
-  - name: replication_auth
-  - name: replication_WT
-  - name: sharding_auth
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_WT
-  - name: slow1_WT
-  - name: ssl
-  - name: sslSpecial
-  - name: tool_WT
 
 - name: windows-64-2k8-debug-asio
   display_name: "z ASIO MessagingPort Windows 2008R2 DEBUG"
@@ -6103,24 +6070,6 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
-  - name: aggregation_WT
-  - name: auth_WT
-  - name: bulk_gle_passthrough_WT
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded_WT
-  - name: dbtest_WT
-  - name: jsCore
-  - name: jsCore_small_oplog_rs_WT
-  - name: jsCore_WT
-  - name: mongosTest
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod_WT
-  - name: replicasets_WT
-  - name: replication_WT
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_WT
-  - name: slow1_WT
-  - name: tool_WT
 
 ###########################################
 #          SUSE buildvariants             #
