@@ -48,6 +48,13 @@ start()
     install -d -m 0755 -o $MONGO_USER -g $MONGO_GROUP $PIDDIR
   fi
 
+  # Make sure the pidfile does not exist
+  if [ -f $PIDFILEPATH ]; then
+      echo "Error starting mongod. $PIDFILEPATH exists."
+      RETVAL=1
+      return
+  fi
+
   # Recommended ulimit values for mongod or mongos
   # See http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
   #
