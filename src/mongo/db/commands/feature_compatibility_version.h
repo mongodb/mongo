@@ -30,6 +30,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 
 namespace mongo {
@@ -64,7 +66,7 @@ public:
      * If there are no non-local databases and we are not running with --shardsvr, set
      * featureCompatibilityVersion to 3.4.
      */
-    static void setIfCleanStartup(OperationContext* txn);
+    static void setIfCleanStartup(OperationContext* txn, repl::StorageInterface* storageInterface);
 
     /**
      * Examines a document inserted or updated in admin.system.version. If it is the

@@ -766,7 +766,8 @@ static ExitCode _initAndListen(int listenPort) {
             storageGlobalParams.engine != "devnull") {
             ScopedTransaction transaction(startupOpCtx.get(), MODE_X);
             Lock::GlobalWrite lk(startupOpCtx.get()->lockState());
-            FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get());
+            FeatureCompatibilityVersion::setIfCleanStartup(
+                startupOpCtx.get(), repl::StorageInterface::get(getGlobalServiceContext()));
         }
     }
 

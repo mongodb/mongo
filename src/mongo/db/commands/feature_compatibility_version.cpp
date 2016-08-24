@@ -31,7 +31,9 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -152,35 +154,30 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
     }
 }
 
-void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn) {
-    std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-    storageEngine->listDatabases(&dbNames);
-
-    for (auto&& dbName : dbNames) {
-        if (dbName != "local") {
-            return;
-        }
-    }
-
+void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
+                                                    repl::StorageInterface* storageInterface) {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        std::vector<std::string> dbNames;
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&dbNames);
+
+        for (auto&& dbName : dbNames) {
+            if (dbName != "local") {
+                return;
+            }
+        }
 
         // Insert featureCompatibilityDocument into admin.system.version.
-        // Do not use writeConcern majority, because we may be holding locks.
+        txn->setReplicatedWrites(false);
         NamespaceString nss(FeatureCompatibilityVersion::kCollection);
-        DBDirectClient client(txn);
-        BSONObj result;
-        client.runCommand(
-            nss.db().toString(),
-            BSON("insert" << nss.coll() << "documents"
-                          << BSON_ARRAY(BSON("_id" << FeatureCompatibilityVersion::kParameterName
-                                                   << FeatureCompatibilityVersion::kVersionField
-                                                   << FeatureCompatibilityVersion::kVersion34))),
-            result);
-        auto status = getStatusFromCommandResult(result);
-        if (!status.isOK() && status != ErrorCodes::InterruptedAtShutdown) {
-            uassertStatusOK(status);
-        }
+        CollectionOptions options;
+        uassertStatusOK(storageInterface->createCollection(txn, nss, options));
+        uassertStatusOK(storageInterface->insertDocument(
+            txn,
+            nss,
+            BSON("_id" << FeatureCompatibilityVersion::kParameterName
+                       << FeatureCompatibilityVersion::kVersionField
+                       << FeatureCompatibilityVersion::kVersion34)));
 
         // Update server parameter.
         serverGlobalParams.featureCompatibilityVersion.store(

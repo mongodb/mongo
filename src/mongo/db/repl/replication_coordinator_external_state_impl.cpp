@@ -332,6 +332,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         // get angry if the minValid document is present but doesn't have a "ts" field.
         // Consider removing this once we no longer need to support downgrading to 3.2.
         _storageInterface->setMinValidToAtLeast(txn, {});
+
+        FeatureCompatibilityVersion::setIfCleanStartup(txn, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -362,7 +364,6 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     }
     const auto opTimeToReturn = fassertStatusOK(28665, loadLastOpTime(txn));
 
-    FeatureCompatibilityVersion::setIfCleanStartup(txn);
     shardingOnTransitionToPrimaryHook(txn);
     dropAllTempCollections(txn);
 
