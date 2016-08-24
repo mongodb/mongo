@@ -127,7 +127,8 @@ bool checkIfStreamIsOpen(ASIOStream* stream, bool connected) {
         // If the read worked or we got EWOULDBLOCK or EAGAIN (since we are in non-blocking mode),
         // we assume the socket is still open.
         return true;
-    } else if (ec == asio::error::eof) {
+    } else if (ec == asio::error::eof || ec == asio::error::connection_reset ||
+               ec == asio::error::network_reset) {
         return false;
     }
     // We got a different error. Log it and return false so we throw the connection away.
