@@ -121,9 +121,8 @@ AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 
 AC_CHECK_FUNCS([\
-	clock_gettime fallocate fcntl fread_unlocked ftruncate gettimeofday\
-	posix_fadvise posix_fallocate posix_madvise\
-	strtouq sync_file_range])
+	clock_gettime fallocate ftruncate gettimeofday posix_fadvise\
+	posix_fallocate posix_madvise strtouq sync_file_range])
 
 # OS X wrongly reports that it has fdatasync
 AS_CASE([$host_os], [darwin*], [], [AC_CHECK_FUNCS([fdatasync])])
