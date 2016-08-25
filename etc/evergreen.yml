@@ -1104,7 +1104,7 @@ tasks:
 
           cp mongodb*/bin/* .
           rm -rf /data/install /data/multiversion
-          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6"
+          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "base" "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6"
           PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} multiVersion
 
 - name: noPassthrough
@@ -2387,7 +2387,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3600,7 +3599,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
