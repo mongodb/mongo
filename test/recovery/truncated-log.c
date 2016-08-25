@@ -45,10 +45,85 @@ static const char * const uri = "table:main";
     "create,log=(file_max=100K,archive=false,enabled),"		\
     "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(recover=on)"
+
 #define	LOG_FILE_1 "WiredTigerLog.0000000001"
 
 #define	K_SIZE	16
 #define	V_SIZE	256
+
+/*
+ * Write a new log record into the log via log print, then open up a log
+ * cursor and walk the log to make sure we can read it.  The reason for this
+ * test is that if there is a partial log record at the end of the previous
+ * log file and truncate does not exist, this tests that we can still read
+ * past that record.
+ */
+static void write_and_read_new(WT_SESSION *);
+static void
+write_and_read_new(WT_SESSION *session)
+{
+	WT_CURSOR *logc;
+	WT_ITEM logrec_key, logrec_value;
+	uint64_t txnid;
+	uint32_t fileid, log_file, log_offset, opcount, optype, rectype;
+	int ret;
+	bool saw_msg;
+
+	/*
+	 * Write a log record and force it to disk so we can read it.
+	 */
+	printf("Write log_printf record and verify.\n");
+	if ((ret = session->log_printf(session, "Test Log Record")) != 0)
+		testutil_die(ret, "log_printf");
+	if ((ret = session->log_flush(session, "sync=on")) != 0)
+		testutil_die(ret, "log_flush");
+	if ((ret = session->open_cursor(
+	    session, "log:", NULL, NULL, &logc)) != 0)
+		testutil_die(ret, "open_cursor: log");
+	if ((ret = session->open_cursor(
+	    session, "log:", NULL, NULL, &logc)) != 0)
+		testutil_die(ret, "open_cursor: log");
+	saw_msg = false;
+	while ((ret = logc->next(logc)) == 0) {
+		/*
+		 * We don't really need to get the key, but in case we want
+		 * the LSN for some message, get it.
+		 */
+		if ((ret = logc->get_key(logc,
+		    &log_file, &log_offset, &opcount)) != 0)
+			testutil_die(errno, "get_key");
+		if ((ret = logc->get_value(logc, &txnid, &rectype,
+		    &optype, &fileid, &logrec_key, &logrec_value)) != 0)
+			testutil_die(errno, "get_value");
+		/*
+		 * We should never see a record from log file 2.  We wrote
+		 * a record there, but then the record in log file 1 was
+		 * truncated to be a partial record, ending the log there.
+		 * So everything after that, including everything in log
+		 * file 2, is invalid until we get to log file 3 which is where
+		 * the post-recovery records will be written.
+		 */
+		if (log_file == 2)
+			testutil_die(EINVAL, "Found LSN in Log 2");
+#if 0
+		printf("LSN [%" PRIu32 "][%" PRIu32 "].%" PRIu32
+		    ": record type %" PRIu32 " optype %" PRIu32
+		    " txnid %" PRIu64 " fileid %" PRIu32 "\n",
+		    log_file, log_offset, opcount,
+		    rectype, optype, txnid, fileid);
+#endif
+		if (rectype == WT_LOGREC_MESSAGE) {
+			saw_msg = true;
+			printf("Application Record: %s\n",
+			    (char *)logrec_value.data);
+			break;
+		}
+	}
+	if ((ret = logc->close(logc)) != 0)
+		testutil_die(ret, "log cursor close");
+	if (!saw_msg)
+		testutil_die(EINVAL, "Did not traverse log printf record");
+}
 
 static void usage(void)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -127,6 +202,10 @@ fill_db(void)
 		if ((ret = cursor->insert(cursor)) != 0)
 			testutil_die(ret, "WT_CURSOR.insert");
 
+		/*
+		 * Walking the ever growing log can be slow, so only start
+		 * looking for the cross into log file 2 after a minimum.
+		 */
 		if (i > min_key) {
 			if ((ret = session->open_cursor(
 			    session, "log:", NULL, NULL, &logc)) != 0)
@@ -135,15 +214,26 @@ fill_db(void)
 				logc->set_key(logc,
 				    save_lsn.l.file, save_lsn.l.offset, 0);
 				if ((ret = logc->search(logc)) != 0)
-					testutil_die(errno, "search");
+					testutil_die(ret, "search");
 			}
 			while ((ret = logc->next(logc)) == 0) {
 				if ((ret = logc->get_key(logc,
 				    &lsn.l.file, &lsn.l.offset, &unused)) != 0)
-					testutil_die(errno, "get_key");
+					testutil_die(ret, "get_key");
+				/*
+				 * Save the LSN so that we know the offset
+				 * of the last LSN in log file 1 later.
+				 */
 				if (lsn.l.file < 2)
 					save_lsn = lsn;
 				else {
+					/*
+					 * If this is the first time through
+					 * that the key is larger than the
+					 * minimum key and we're already in
+					 * log file 2 then we did not calculate
+					 * correctly and the test should fail.
+					 */
 					if (first)
 						testutil_die(EINVAL,
 						    "min_key too high");
@@ -155,6 +245,8 @@ fill_db(void)
 				}
 			}
 			first = false;
+			if ((ret = logc->close(logc)) != 0)
+				testutil_die(ret, "log cursor close");
 		}
 	}
 	if (fclose(fp) != 0)
@@ -243,7 +335,9 @@ main(int argc, char *argv[])
 	if (offset > UINT64_MAX - V_SIZE)
 		testutil_die(ERANGE, "offset");
 	new_offset = offset + V_SIZE;
-	printf("Parent: Truncate to %" PRIu64 "\n", new_offset);
+	printf("Parent: Log file 1: Key %" PRIu32 " at %" PRIu64 "\n",
+	     max_key, offset);
+	printf("Parent: Truncate mid-record to %" PRIu64 "\n", new_offset);
 	if ((ret = truncate(LOG_FILE_1, (wt_off_t)new_offset)) != 0)
 		testutil_die(errno, "truncate");
 
@@ -263,13 +357,24 @@ main(int argc, char *argv[])
 	count = 0;
 	while ((ret = cursor->next(cursor)) == 0)
 		++count;
-	if ((ret = conn->close(conn, NULL)) != 0)
-		testutil_die(ret, "WT_CONNECTION:close");
+	/*
+	 * The max key in the saved file is the key we truncated, but the
+	 * key space starts at 0 and we're counting the records here, so we
+	 * expect the max key number of records.
+	 */
 	if (count > max_key) {
 		printf("expected %" PRIu32 " records found %" PRIu32 "\n",
 		    max_key, count);
 		return (EXIT_FAILURE);
 	}
 	printf("%" PRIu32 " records verified\n", count);
+
+	/*
+	 * Write a log record and then walk the log to make sure we can
+	 * read that log record that is beyond the truncated record.
+	 */
+	write_and_read_new(session);
+	if ((ret = conn->close(conn, NULL)) != 0)
+		testutil_die(ret, "WT_CONNECTION:close");
 	return (EXIT_SUCCESS);
 }
