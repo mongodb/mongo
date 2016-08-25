@@ -279,6 +279,13 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
             Status status = wasPreviouslyCanceled
                 ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
                 : swConn.getStatus();
+            if (status.code() == ErrorCodes::ExceededTimeLimit) {
+                _numTimedOutOps.fetchAndAdd(1);
+            }
+            if (status.code() != ErrorCodes::CallbackCanceled) {
+                _numFailedOps.fetchAndAdd(1);
+            }
+
             onFinish({status, now() - getConnectionStartTime});
             signalWorkAvailable();
             return;
