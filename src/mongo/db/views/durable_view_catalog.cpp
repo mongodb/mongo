@@ -92,6 +92,12 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
         valid &= viewName.isValid() && viewName.db() == _db->name();
         valid &= NamespaceString::validCollectionName(viewDef["viewOn"].str());
 
+        const bool hasPipeline = viewDef.hasField("pipeline");
+        valid &= hasPipeline;
+        if (hasPipeline) {
+            valid &= viewDef["pipeline"].type() == mongo::Array;
+        }
+
         if (!valid) {
             return {ErrorCodes::InvalidViewDefinition,
                     str::stream() << "found invalid view definition " << viewDef["_id"]
