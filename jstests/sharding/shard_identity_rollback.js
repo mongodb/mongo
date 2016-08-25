@@ -1,7 +1,7 @@
 /**
  * Tests that rolling back the insertion of the shardIdentity document on a shard causes the node
  * rolling it back to shut down.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_journaling]
  */
 
 (function() {
@@ -10,7 +10,7 @@
     var st = new ShardingTest({shards: 1});
 
     var replTest = new ReplSetTest({nodes: 3});
-    replTest.startSet({shardsvr: ''});
+    var nodes = replTest.startSet({shardsvr: ''});
     replTest.initiate();
 
     var priConn = replTest.getPrimary();
@@ -24,8 +24,8 @@
         clusterId: ObjectId()
     };
 
-    secondaries.forEach(function(secondary) {
-        assert.commandWorked(secondary.getDB('admin').runCommand(
+    nodes.forEach(function(node) {
+        assert.commandWorked(node.getDB('admin').runCommand(
             {configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));
     });
 
