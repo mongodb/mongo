@@ -12,6 +12,7 @@ API
 APIs
 ARG
 ARGS
+ASM
 ASYNC
 Addr
 Ailamaki
@@ -37,6 +38,7 @@ BZ
 Barack
 Bitfield
 Bitwise
+Brueckner
 Bsearch
 Btree
 Buf
@@ -59,6 +61,7 @@ CSV
 CURSORs
 CURSTD
 CallsCustDate
+Castagnoli
 Checkpointing
 Checksum
 Checksums
@@ -146,6 +149,7 @@ HFS
 HHHH
 HHHHLL
 HHHLL
+Hendrik
 HyperLevelDB
 IEC
 IEEE
@@ -156,6 +160,7 @@ INCR
 INIT
 INITIALIZER
 INMEM
+INSN
 INTL
 ISA
 ITEMs
@@ -206,6 +211,8 @@ MEMALIGN
 MERCHANTABILITY
 METADATA
 MONGODB
+MRXB
+MRXBOPC
 MSVC
 MULTI
 MULTIBLOCK
@@ -234,6 +241,7 @@ NOTFOUND
 NOTREACHED
 NOVALUE
 NUL
+NUM
 NetBSD
 NoAddr
 Noll
@@ -244,6 +252,7 @@ OUTBUFF
 OVFL
 ObWgfvgw
 Obama
+Opcode
 Outfmt
 PARAM
 POSIX
@@ -277,6 +286,7 @@ RMW
 RNG
 RPC
 RUNDIR
+RXB
 Radu
 ReadFile
 Readonly
@@ -346,6 +356,8 @@ Uryyb
 VARCHAR
 VLDB
 VMSG
+VR
+VX
 Vc
 Vfprintf
 Vigenere
@@ -414,6 +426,7 @@ bcr
 bdb
 beginthreadex
 bigram
+binutils
 bitcnt
 bitfield
 bitfields
@@ -501,6 +514,7 @@ conn
 connectionp
 const
 constantp
+consts
 cookiep
 copydoc
 copyin
@@ -901,6 +915,7 @@ onint
 online
 onpage
 oo
+opcode
 opendir
 openfile
 optimizations
@@ -965,6 +980,7 @@ qrrSS
 qsort
 quartile
 qup
+rN
 rS
 rb
 rbrace
@@ -1150,6 +1166,7 @@ usr
 utf
 util
 uu
+vN
 vW
 va
 valgrind
@@ -1169,6 +1186,7 @@ vsnprintf
 vtype
 vunpack
 vw
+vxr
 waitpid
 walk's
 warmup

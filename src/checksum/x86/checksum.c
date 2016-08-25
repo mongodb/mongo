@@ -1103,7 +1103,6 @@ static const uint32_t g_crc_slicing[8][256] = {
 #endif
 };
 
-#if !defined(__powerpc64__)
 /*
  * __wt_cksum_sw --
  *	Return a checksum for a chunk of memory, computed in software.
@@ -1172,7 +1171,6 @@ __wt_cksum_sw(const void *chunk, size_t len)
 #endif
 	return (~crc);
 }
-#endif
 
 #if (defined(__amd64) || defined(__x86_64))
 /*
@@ -1262,27 +1260,9 @@ __wt_cksum_hw(const void *chunk, size_t len)
 }
 #endif
 
-#if defined(__powerpc64__)
-
-unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p,
-    unsigned long len);
-
-/*
- * __wt_cksum_hw --
- *	Return a checksum for a chunk of memory, computed in hardware
- *	using 8 byte steps.
- */
-static uint32_t
-__wt_cksum_hw(const void *chunk, size_t len)
-{
-	return crc32_vpmsum(0, chunk, len);
-}
-#endif
-
 /*
  * __wt_cksum --
- *	Return a checksum for a chunk of memory using the fastest method
- * available.
+ *	WiredTiger: return a checksum for a chunk of memory.
  */
 uint32_t
 __wt_cksum(const void *chunk, size_t len)
@@ -1292,13 +1272,11 @@ __wt_cksum(const void *chunk, size_t len)
 
 /*
  * __wt_cksum_init --
- *	Detect CRC hardware and set the checksum function.
+ *	WiredTiger: detect CRC hardware and set the checksum function.
  */
 void
 __wt_cksum_init(void)
 {
-#define	CPUID_ECX_HAS_SSE42	(1 << 20)
-
 #if (defined(__amd64) || defined(__x86_64))
 	unsigned int eax, ebx, ecx, edx;
 
@@ -1307,6 +1285,7 @@ __wt_cksum_init(void)
 			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
 			      : "a" (1));
 
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
 	if (ecx & CPUID_ECX_HAS_SSE42)
 		__wt_cksum_func = __wt_cksum_hw;
 	else
@@ -1317,12 +1296,11 @@ __wt_cksum_init(void)
 
 	__cpuid(cpuInfo, 1);
 
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
 	if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
 		__wt_cksum_func = __wt_cksum_hw;
 	else
 		__wt_cksum_func = __wt_cksum_sw;
-#elif defined(__powerpc64__)
-	__wt_cksum_func = __wt_cksum_hw;
 #else
 	__wt_cksum_func = __wt_cksum_sw;
 #endif

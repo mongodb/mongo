@@ -46,7 +46,7 @@ of the WiredTiger library should comply with these copyrights.
 @row{\c src/support/hash_fnv.c, Authors, Public Domain}
 </table>
 
-@section license_crc32-vpmsum 3rd party software optionally included in the WiredTiger library: PPC64
+@section license_crc32-power8 3rd party software optionally included in the WiredTiger library: PPC64
 
 PPC64 and PPC64LE builds of the WiredTiger library binary include additional
 3rd party software, distributed under separate license terms. Redistribution
@@ -55,7 +55,18 @@ copyrights.
 
 <table>
 @hrow{Distribution Files, Copyright Holder, License}
-@row{\c src/support/power8/*, Anton Blanchard, <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a> or the <a href="http://www.gnu.org/licenses/gpl-2.0-standalone.html">GNU General Public License\, version 2 or later</a>}
+@row{\c src/support/power8/*, Anton Blanchard\, IBM Corp., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a> or the <a href="http://www.gnu.org/licenses/gpl-2.0-standalone.html">GNU General Public License\, version 2 or later</a>}
+</table>
+
+@section license_crc32-zseries 3rd party software optionally included in the WiredTiger library: s390x
+
+IBM z13 processor builds of the WiredTiger library binary include additional
+3rd party software, distributed under separate license terms. Redistribution
+of the WiredTiger library z13 builds should comply with these copyrights.
+
+<table>
+@hrow{Distribution Files, Copyright Holder, License}
+@row{\c src/support/zseries/*, IBM Corp., <a href="http://opensource.org/licenses/Apache-2.0">Apache License\, Version 2.0</a> or the <a href="http://www.gnu.org/licenses/gpl-2.0-standalone.html">GNU General Public License\, version 2 or later</a>}
 </table>
 
 @section license_leveldb 3rd party software optionally included in the WiredTiger library: LevelDB
