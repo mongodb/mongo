@@ -100,6 +100,12 @@ class ReplSource {
     /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
     BSONObj _me;
 
+    /**
+     * Flag to control if a handshake is done on a connection or not. Default to false
+     * until all databases are cloned.
+     */
+    bool _doHandshake = false;
+
     void resyncDrop(OperationContext* txn, const std::string& dbName);
     // call without the db mutex
     void syncToTailOfRemoteLog();
@@ -126,6 +132,8 @@ class ReplSource {
     void forceResync(OperationContext* txn, const char* requester);
 
     bool _connect(OplogReader* reader, const HostAndPort& host, const OID& myRID);
+
+    Status _updateIfDoneWithInitialSync();
 
 public:
     OplogReader oplogReader;
