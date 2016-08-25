@@ -5,6 +5,7 @@ AAAAAAAAAAAAA
 AAAAAAAAAAAAAAAA
 AAAAAAAAAAAAAAAAAA
 ABCDEFGHIJKLMNOPQRSTUVWXYZ
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 ADDR
 ADDRs
 AJ
@@ -420,6 +421,7 @@ autocommit
 autoconf
 automake
 bInheritHandle
+bal
 basecfg
 basho
 bcr
@@ -724,6 +726,7 @@ icount
 idx
 ifdef
 ifdef's
+iiSii
 iiii
 iiu
 ikey
@@ -923,6 +926,7 @@ optype
 ori
 os
 osfhandle
+other's
 ovfl
 ownp
 pR

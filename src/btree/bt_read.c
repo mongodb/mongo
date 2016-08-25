@@ -319,7 +319,15 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	/* Pages are usually small enough, check that first. */
 	if (page->memory_footprint < btree->splitmempage)
 		return (false);
-	else if (page->memory_footprint < btree->maxmempage)
+
+	/*
+	 * If this session has more than one hazard pointer, eviction will fail
+	 * and there is no point trying.
+	 */
+	if (__wt_hazard_count(session, page) > 1)
+		return (false);
+
+	if (page->memory_footprint < btree->maxmempage)
 		return (__wt_leaf_page_can_split(session, page));
 
 	/* Trigger eviction on the next page release. */
