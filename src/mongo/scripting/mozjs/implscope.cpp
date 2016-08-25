@@ -179,6 +179,10 @@ void MozJSImplScope::kill() {
     JS_RequestInterruptCallback(_runtime);
 }
 
+void MozJSImplScope::interrupt() {
+    JS_RequestInterruptCallback(_runtime);
+}
+
 bool MozJSImplScope::isKillPending() const {
     return _pendingKill.load();
 }
@@ -635,14 +639,16 @@ int MozJSImplScope::invoke(ScriptingFunction func,
 
     if (timeoutMs)
         _engine->getDeadlineMonitor().startDeadline(this, timeoutMs);
+    else {
+        _engine->getDeadlineMonitor().startDeadline(this, -1);
+    }
 
     JS::RootedValue out(_context);
     JS::RootedObject obj(_context, smrecv.toObjectOrNull());
 
     bool success = JS::Call(_context, obj, funcValue, args, &out);
 
-    if (timeoutMs)
-        _engine->getDeadlineMonitor().stopDeadline(this);
+    _engine->getDeadlineMonitor().stopDeadline(this);
 
     _checkErrorState(success);
 
@@ -680,15 +686,17 @@ bool MozJSImplScope::exec(StringData code,
     if (_checkErrorState(success, reportError, assertOnError))
         return false;
 
-    if (timeoutMs)
+    if (timeoutMs) {
         _engine->getDeadlineMonitor().startDeadline(this, timeoutMs);
+    } else {
+        _engine->getDeadlineMonitor().startDeadline(this, -1);
+    }
 
     JS::RootedValue out(_context);
 
     success = JS_ExecuteScript(_context, script, &out);
 
-    if (timeoutMs)
-        _engine->getDeadlineMonitor().stopDeadline(this);
+    _engine->getDeadlineMonitor().stopDeadline(this);
 
     if (_checkErrorState(success, reportError, assertOnError))
         return false;

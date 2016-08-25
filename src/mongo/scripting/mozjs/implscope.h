@@ -90,6 +90,8 @@ public:
 
     void kill();
 
+    void interrupt();
+
     bool isKillPending() const override;
 
     OperationContext* getOpContext() const;
