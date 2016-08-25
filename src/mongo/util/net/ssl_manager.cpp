@@ -1348,17 +1348,17 @@ StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerC
                                   "Unrecognized entity in MongoDBAuthorizationGrant");
                 }
             }
+            LOG(1) << "MONGODB-X509 authorization parsed the following roles from peer "
+                      "certificate: "
+                   << [&roles]() {
+                          StringBuilder sb;
+                          std::for_each(roles.begin(), roles.end(), [&sb](const RoleName& role) {
+                              sb << role.toString();
+                          });
+                          return sb.str();
+                      }();
         }
     }
-
-    LOG(1) << "MONGODB-X509 authorization parsed the following roles from peer certificate: "
-           << [&roles]() {
-                  StringBuilder sb;
-                  std::for_each(roles.begin(), roles.end(), [&sb](const RoleName& role) {
-                      sb << role.toString();
-                  });
-                  return sb.str();
-              }();
 
     return roles;
 }
