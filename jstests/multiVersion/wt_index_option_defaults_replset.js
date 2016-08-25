@@ -2,6 +2,8 @@
  * Creates a replica set with a 3.2 primary and a 3.0 secondary. Tests that the
  * "indexOptionDefaults" specified to collection creation are replicated by the 3.2 primary, but
  * ignored by the 3.0 secondary.
+ *
+ * @tags: [requires_wiredtiger]
  */
 (function() {
     'use strict';

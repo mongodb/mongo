@@ -1,6 +1,8 @@
 /**
  * Test the upgrade process for 2.6 ~~> 3.2 and 3.0 ~~> 3.2, where mmapv1 should continue to be the
  * default storage engine. Repeat the process with --directoryperdb set.
+ *
+ * @tags: [requires_mmapv1]
  */
 (function() {
     'use strict';
@@ -21,6 +23,11 @@
           directoryperdb: '',
         },
     ];
+
+    // Since this test requires not specifying the storageEngine, delete it before invoking test.
+    if (typeof TestData === "object" && TestData !== null) {
+        delete TestData.storageEngine;
+    }
 
     // The mongod should start up with mmapv1 when the --storageEngine flag is omitted, or when
     // --storageEngine=mmapv1 is explicitly specified.

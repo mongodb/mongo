@@ -1773,7 +1773,29 @@ tasks:
   - func: "run tests"
     vars:
       path_prefix: PATH=$PATH:/data/multiversion
-      resmoke_args: --suites=multiversion
+      resmoke_args: --suites=multiversion --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: multiversion_WT
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      path_prefix: PATH=$PATH:/data/multiversion
+      resmoke_args: --suites=multiversion --storageEngine=wiredTiger --excludeWithAnyTags=requires_mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: multiversion_multistorage_engine
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      path_prefix: PATH=$PATH:/data/multiversion
+      resmoke_args: --suites=multiversion_multistorage_engine
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -2970,6 +2992,8 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3364,6 +3388,7 @@ buildvariants:
   - name: mongosTest
   - name: mmap
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3484,6 +3509,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3601,6 +3627,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -4133,6 +4160,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -4361,6 +4389,8 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -5166,6 +5196,8 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
@@ -5387,6 +5419,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -5505,6 +5538,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -6294,6 +6328,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -6555,6 +6590,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -6874,6 +6910,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -6994,6 +7031,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -7529,6 +7567,8 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
@@ -7695,6 +7735,8 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
@@ -7842,6 +7884,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT

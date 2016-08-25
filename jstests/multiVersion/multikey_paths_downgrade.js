@@ -30,7 +30,7 @@
         noCleanData: true,
         // We explicitly set the storage engine as part of the options because not all versions
         // being tested automatically detect it from the storage.bson file.
-        storageEngine: jsTest.options().storageEngine || "wiredTiger",
+        storageEngine: jsTest.options().storageEngine,
     };
 
     if (defaultOptions.storageEngine === "mmapv1") {
