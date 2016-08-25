@@ -59,9 +59,7 @@ AS_CASE([$host_cpu],
 	[wt_cv_powerpc="no"])
 AM_CONDITIONAL([POWERPC_HOST], [test "$wt_cv_powerpc" = "yes"])
 AS_CASE([$host_cpu],
-	[amd*], [wt_cv_x86="yes"],
-	[x86*], [wt_cv_x86="yes"],
-	[wt_cv_x86="no"])
+	[amd*|i[[3456]]86*|pentium|x86*], [wt_cv_x86="yes"], [wt_cv_x86="no"])
 AM_CONDITIONAL([X86_HOST], [test "$wt_cv_x86" = "yes"])
 AS_CASE([$host_cpu],
 	[s390x*], [wt_cv_zseries="yes"],

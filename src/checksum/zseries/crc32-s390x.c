@@ -12,7 +12,7 @@
 #include "slicing-consts.h"
 
 #define VX_MIN_LEN		64
-#define VX_ALIGNMENT		16L
+#define VX_ALIGNMENT		16UL
 #define VX_ALIGN_MASK		(VX_ALIGNMENT - 1)
 
 /* Prototypes for functions in assembly files */
