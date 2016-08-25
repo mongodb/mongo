@@ -9,7 +9,6 @@ import graph_consts
 if sys.version_info >= (3, 0):
     basestring = str
 
-
 class Graph(object):
     """Graph class for storing the build dependency graph. The graph stores the
     directed edges as a nested dict of { RelationshipType: {From_Node: Set of
@@ -46,7 +45,7 @@ class Graph(object):
                     if edge["type"] not in edges:
                         edges[edge["type"]] = {}
 
-                    to_edges = set([e["id"] for e in edge["to_node"]])
+                    to_edges = set([str(e["id"]) for e in edge["to_node"]])
                     edges[edge["type"]][edge["from_node"]["id"]] = to_edges
 
                 self._nodes = nodes
@@ -70,6 +69,20 @@ class Graph(object):
     @property
     def edges(self):
         return copy.deepcopy(self._edges)
+
+    @nodes.setter
+    def nodes(self, value):
+        if isinstance(value,dict):
+            self._nodes = value
+        else:
+            raise TypeError("Nodes must be a dict")
+
+    @edges.setter
+    def edges(self, value):
+        if isinstance(value, dict):
+            self._edges = value
+        else:
+            raise TypeError("Edges must be a dict")
 
     def get_node(self, id):
         return self._nodes.get(id)
@@ -285,7 +298,7 @@ class NodeLib(NodeInterface):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def __str__(self):
+    def __repr__(self):
         return self.id
 
 
@@ -411,7 +424,7 @@ class NodeSymbol(NodeInterface):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def __str__(self):
+    def __repr__(self):
         return self.id
 
 
@@ -530,13 +543,47 @@ class NodeFile(NodeInterface):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def __str__(self):
+    def __repr__(self):
+        return self.id
+
+
+class NodeExe(NodeInterface):
+    def __init__(self, id, name, input=None):
+        if isinstance(input, dict):
+            should_fail = False
+            for k, v in input.iteritems():
+                try:
+                    if isinstance(v, list):
+                        setattr(self, k, set(v))
+                    else:
+                        setattr(self, k, v)
+                except AttributeError as e:
+                    logging.error("found something bad, {0}, {1}", e, type(e))
+                    should_fail = True
+            if should_fail:
+                raise Exception("Problem setting attribute for NodeExe")
+        else:
+            self._id = id
+            self.type = graph_consts.NODE_EXE
+            self._name = name
+            self.contained_files = set()
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def name(self):
+        return self._name
+
+    def __repr__(self):
         return self.id
 
 
 types = {graph_consts.NODE_LIB: NodeLib,
          graph_consts.NODE_SYM: NodeSymbol,
-         graph_consts.NODE_FILE: NodeFile}
+         graph_consts.NODE_FILE: NodeFile,
+         graph_consts.NODE_EXE: NodeExe,}
 
 
 def node_factory(id, nodetype, dict_source=None):
