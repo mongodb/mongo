@@ -4,9 +4,9 @@ import re
 import sys
 import os
 import tempfile
-import urllib2
-import urlparse
 import subprocess
+import json
+import urlparse
 import tarfile
 import signal
 import threading
@@ -15,7 +15,6 @@ import shutil
 import errno
 from contextlib import closing
 # To ensure it exists on the system
-import gzip
 import zipfile
 
 #
@@ -69,14 +68,38 @@ def version_tuple(version):
 
     return tuple(map(float, version_parts))
 
+
+def download_file(url, file_name):
+    """Returns True if download was successful. Raises error if download fails."""
+    proc = subprocess.Popen(["curl",
+                             "-L", "--silent",
+                             "--retry", "5",
+                             "--retry-max-time", "600",
+                             "--max-time", "120",
+                             "-o", file_name,
+                             url],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc.communicate()
+    error_code = proc.returncode
+    if not error_code:
+        error_code = proc.wait()
+    if not error_code:
+        return True
+
+    raise Exception("Failed to download %s with error %d" % (url, error_code))
+
+
 class MultiVersionDownloader :
 
-    def __init__(self, install_dir, link_dir, platform):
+    def __init__(self, install_dir, link_dir, edition, platform_arch):
         self.install_dir = install_dir
         self.link_dir = link_dir
-        match = re.compile("(.*)\/(.*)").match(platform)
-        self.platform = match.group(1)
-        self.arch = match.group(2)
+        self.edition = edition
+        match = re.compile("(.*)\/(.*)").match(platform_arch)
+        if match:
+            self.platform_arch = match.group(1).lower() + "_" + match.group(2).lower()
+        else:
+            self.platform_arch = platform_arch.lower()
         self._links = None
 
     @property
@@ -86,32 +109,22 @@ class MultiVersionDownloader :
         return self._links
 
     def download_links(self):
-        # This href is for community builds; enterprise builds are not browseable.
-        href = "http://dl.mongodb.org/dl/%s/%s" \
-               % (self.platform.lower(), self.arch)
-
-        attempts_remaining = 5
-        timeout_seconds = 10
-        while True:
-            try:
-                html = urllib2.urlopen(href, timeout = timeout_seconds).read()
-                break
-            except Exception as e:
-                print "fetching links failed (%s), retrying..." % e
-                attempts_remaining -= 1
-                if attempts_remaining == 0 :
-                    raise Exception("Failed to get links after multiple retries")
+        temp_file = tempfile.mktemp()
+        download_file("https://downloads.mongodb.org/full.json", temp_file)
+        with open(temp_file) as f:
+            full_json = json.load(f)
+        os.remove(temp_file)
+        if 'versions' not in full_json:
+            raise Exception("No versions field in JSON: \n" + str(full_json))
 
         links = {}
-        for line in html.split():
-            match = re.compile("http:.*/%s/mongodb-%s-%s-([^\"]*)\.(tgz|zip)" \
-                % (self.platform.lower(), self.platform.lower(), self.arch)).search(line)
-
-            if match == None: continue
-
-            link = match.group(0)
-            version = match.group(1)
-            links[version] = link
+        for json_version in full_json['versions']:
+            if 'version' in json_version and 'downloads' in json_version:
+                for download in json_version['downloads']:
+                    if 'target' in download and 'edition' in download and \
+                        download['target'] == self.platform_arch and \
+                        download['edition'] == self.edition:
+                            links[json_version['version']] = download['archive']['url']
 
         return links
 
@@ -154,18 +167,15 @@ class MultiVersionDownloader :
             print "Skipping download for version %s (%s) since the dest already exists '%s'" \
                 % (version, full_version, extract_dir)
         else:
-            temp_dir = tempfile.mkdtemp()
-            temp_file = tempfile.mktemp(suffix=file_suffix)
-    
-            data = urllib2.urlopen(url)
-    
             print "Downloading data for version %s (%s)..." % (version, full_version)
             print "Download url is %s" % url
-    
-            with open(temp_file, 'wb') as f:
-                f.write(data.read())
-                print "Uncompressing data for version %s (%s)..." % (version, full_version)
-    
+
+            temp_dir = tempfile.mkdtemp()
+            temp_file = tempfile.mktemp(suffix=file_suffix)
+            download_file(url, temp_file)
+
+            print "Uncompressing data for version %s (%s)..." % (version, full_version)
+            first_file = ''
             if file_suffix == ".zip":
                 # Support .zip downloads, used for Windows binaries.
                 with zipfile.ZipFile(temp_file) as zf:
@@ -173,7 +183,7 @@ class MultiVersionDownloader :
                     # to extract the binaries into inside 'self.install_dir'. The name of the root
                     # directory nearly always matches the parsed URL text, with the exception of
                     # versions such as "v3.2-latest" that instead contain the githash.
-                    extract_dir = os.path.dirname(zf.namelist()[0])
+                    first_file = zf.namelist()[0]
                     zf.extractall(temp_dir)
             elif file_suffix == ".tgz":
                 # Support .tgz downloads, used for Linux binaries.
@@ -182,20 +192,25 @@ class MultiVersionDownloader :
                     # to extract the binaries into inside 'self.install_dir'. The name of the root
                     # directory nearly always matches the parsed URL text, with the exception of
                     # versions such as "v3.2-latest" that instead contain the githash.
-                    extract_dir = os.path.dirname(tf.getnames()[0])
+                    first_file = tf.getnames()[0]
                     tf.extractall(path=temp_dir)
             else:
                 raise Exception("Unsupported file extension %s" % file_suffix)
-    
+
+            # Sometimes the zip will contain the root directory as the first file and
+            # os.path.dirname() will return ''.
+            extract_dir = os.path.dirname(first_file)
+            if not extract_dir:
+                extract_dir = first_file
             temp_install_dir = os.path.join(temp_dir, extract_dir)
-    
+
             # We may not have been able to determine whether we already downloaded the requested
             # version due to the ambiguity in the parsed URL text, so we check for it again using
             # the adjusted 'extract_dir' value.
             already_downloaded = os.path.isdir(os.path.join(self.install_dir, extract_dir))
             if not already_downloaded:
                 shutil.move(temp_install_dir, self.install_dir)
-    
+
             shutil.rmtree(temp_dir)
             os.remove(temp_file)
 
@@ -241,12 +256,18 @@ CL_HELP_MESSAGE = \
 """
 Downloads and installs particular mongodb versions (each binary is renamed to include its version)
 into an install directory and symlinks the binaries with versions to another directory. This script
-only supports community builds, not enterprise builds.
+supports community and enterprise builds.
 
-Usage: setup_multiversion_mongodb.py INSTALL_DIR LINK_DIR PLATFORM_AND_ARCH VERSION1 [VERSION2 VERSION3 ...]
+Usage: setup_multiversion_mongodb.py INSTALL_DIR LINK_DIR EDITION PLATFORM_AND_ARCH VERSION1 [VERSION2 VERSION3 ...]
 
-Ex: setup_multiversion_mongodb.py ./install ./link "Linux/x86_64" "2.0.6" "2.0.3-rc0" "2.0" "2.2" "2.3"
-Ex: setup_multiversion_mongodb.py ./install ./link "OSX/x86_64" "2.4" "2.2"
+EDITION is one of the following:
+    base (generic community builds)
+    enterprise
+    targeted (platform specific community builds, includes SSL)
+PLATFORM_AND_ARCH can be specified with just a platform, i.e., OSX, if it is supported.
+
+Ex: setup_multiversion_mongodb.py ./install ./link base "Linux/x86_64" "2.0.6" "2.0.3-rc0" "2.0" "2.2" "2.3"
+Ex: setup_multiversion_mongodb.py ./install ./link enterprise "OSX" "2.4" "2.2"
 
 After running the script you will have a directory structure like this:
 ./install/[mongodb-osx-x86_64-2.4.9, mongodb-osx-x86_64-2.2.7]
@@ -274,19 +295,24 @@ def parse_cl_args(args):
     link_dir = args[0]
 
     args = args[1:]
-    if len(args) == 0: raise_exception("Missing PLATFORM_AND_ARCH")
+    if len(args) == 0: raise_exception("Missing EDITION")
 
-    platform = args[0]
+    edition = args[0]
+    if edition not in ['base', 'enterprise', 'targeted']:
+        raise Exception("Unsupported edition %s" % edition)
 
     args = args[1:]
-    if re.compile(".*\/.*").match(platform) == None:
-        raise_exception("PLATFORM_AND_ARCH isn't of the correct format")
+    if len(args) == 0: raise_exception("Missing PLATFORM_AND_ARCH")
+
+    platform_arch = args[0]
+
+    args = args[1:]
 
     if len(args) == 0: raise_exception("Missing VERSION1")
 
     versions = args
 
-    return (MultiVersionDownloader(install_dir, link_dir, platform), versions)
+    return (MultiVersionDownloader(install_dir, link_dir, edition, platform_arch), versions)
 
 def main():
 
@@ -305,4 +331,3 @@ def main():
 
 if __name__ == '__main__':
   main()
-
