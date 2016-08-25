@@ -36,6 +36,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
@@ -306,7 +307,8 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
-        return Pipeline::checkAuthForCommand(client, dbname, cmdObj);
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
     }
 
     bool runParsed(OperationContext* txn,

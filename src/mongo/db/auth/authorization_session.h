@@ -174,6 +174,25 @@ public:
     // identifier.
     Status checkAuthForKillCursors(const NamespaceString& ns, long long cursorID);
 
+    // Checks if this connection has the privileges necessary to run the aggregation pipeline
+    // specified in 'cmdObj' on the namespace 'ns'.
+    Status checkAuthForAggregate(const NamespaceString& ns, const BSONObj& cmdObj);
+
+    // Checks if this connection has the privileges necessary to create 'ns' with the options
+    // supplied in 'cmdObj'.
+    Status checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj);
+
+    // Checks if this connection has the privileges necessary to modify 'ns' with the options
+    // supplied in 'cmdObj'.
+    Status checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj);
+
+    // Checks if this connection has the privileges necessary to create or modify the view 'ns'.
+    // Call this function after verifying that the user has the 'createCollection' or 'collMod'
+    // action, respectively.
+    //
+    // 'cmdObj' must have a String field named 'viewOn'.
+    Status checkAuthForCreateOrModifyView(const NamespaceString& ns, const BSONObj& cmdObj);
+
     // Checks if this connection has the privileges necessary to grant the given privilege
     // to a role.
     Status checkAuthorizedToGrantPrivilege(const Privilege& privilege);
@@ -273,6 +292,13 @@ private:
     // we should even be doing authorization checks in general.  Note: this may acquire a read
     // lock on the admin database (to update out-of-date user privilege information).
     bool _isAuthorizedForPrivilege(const Privilege& privilege);
+
+    // Helper for recursively checking for privileges in an aggregation pipeline.
+    void _addPrivilegesForStage(const std::string& db,
+                                const BSONObj& cmdObj,
+                                PrivilegeVector* requiredPrivileges,
+                                BSONObj stageSpec,
+                                bool haveRecursed = false);
 
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 

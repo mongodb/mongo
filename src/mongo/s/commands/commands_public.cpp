@@ -415,12 +415,12 @@ public:
 class CollectionModCmd : public AllShardsCollectionCommand {
 public:
     CollectionModCmd() : AllShardsCollectionCommand("collMod") {}
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::collMod);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+
+    virtual Status checkAuthForCommand(Client* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj);
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -505,23 +505,8 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        if (cmdObj["capped"].trueValue()) {
-            if (!authzSession->isAuthorizedForActionsOnResource(
-                    parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
-                return Status(ErrorCodes::Unauthorized, "unauthorized");
-            }
-        }
-
-        // ActionType::createCollection or ActionType::insert are both acceptable
-        if (authzSession->isAuthorizedForActionsOnResource(parseResourcePattern(dbname, cmdObj),
-                                                           ActionType::createCollection) ||
-            authzSession->isAuthorizedForActionsOnResource(parseResourcePattern(dbname, cmdObj),
-                                                           ActionType::insert)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj);
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;

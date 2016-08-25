@@ -1,101 +1,145 @@
 /**
  * Tests authorization special cases with views. These are special exceptions that prohibit certain
  * operations on views even if the user has an explicit privilege on that view.
+ *
+ * TODO(SERVER-25526): merge this test into jstests/auth/libs/commands_lib.js.
  */
 (function() {
     "use strict";
 
-    let mongod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+    function runTest(conn) {
+        // Create the admin user.
+        let adminDB = conn.getDB("admin");
+        assert.commandWorked(
+            adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
+        assert.eq(1, adminDB.auth("admin", "admin"));
 
-    // Create the admin user.
-    let adminDB = mongod.getDB("admin");
-    assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
-    assert.eq(1, adminDB.auth("admin", "admin"));
+        const viewsDBName = "views_authz";
+        let viewsDB = adminDB.getSiblingDB(viewsDBName);
+        viewsDB.dropAllUsers();
+        viewsDB.logout();
 
-    const viewsDBName = "views_authz";
-    let viewsDB = adminDB.getSiblingDB(viewsDBName);
-    viewsDB.dropAllUsers();
-    viewsDB.logout();
+        // Create a user who can read, create and modify a view 'view' and a read a namespace
+        // 'permitted' but does not have access to 'forbidden'.
+        assert.commandWorked(viewsDB.runCommand({
+            createRole: "readWriteView",
+            privileges: [
+                {
+                  resource: {db: viewsDBName, collection: "view"},
+                  actions: ["find", "createCollection", "collMod"]
+                },
+                {resource: {db: viewsDBName, collection: "view2"}, actions: ["find"]},
+                {resource: {db: viewsDBName, collection: "permitted"}, actions: ["find"]}
+            ],
+            roles: []
+        }));
+        assert.commandWorked(
+            viewsDB.runCommand({createUser: "viewUser", pwd: "pwd", roles: ["readWriteView"]}));
 
-    // Create a user who can read, create and modify a view 'view' and a read a namespace
-    // 'permitted' but does not have access to 'forbidden'.
-    assert.commandWorked(viewsDB.runCommand({
-        createRole: "readWriteView",
-        privileges: [
-            {
-              resource: {db: viewsDBName, collection: "view"},
-              actions: ["find", "createCollection", "collMod"]
-            },
-            {resource: {db: viewsDBName, collection: "view2"}, actions: ["find"]},
-            {resource: {db: viewsDBName, collection: "permitted"}, actions: ["find"]}
-        ],
-        roles: []
-    }));
-    assert.commandWorked(
-        viewsDB.runCommand({createUser: "viewUser", pwd: "pwd", roles: ["readWriteView"]}));
+        adminDB.logout();
+        assert.eq(1, viewsDB.auth("viewUser", "pwd"));
 
-    adminDB.logout();
-    assert.eq(1, viewsDB.auth("viewUser", "pwd"));
+        const lookupStage = {
+            $lookup: {from: "forbidden", localField: "x", foreignField: "x", as: "y"}
+        };
+        const graphLookupStage = {
+            $graphLookup: {
+                from: "forbidden",
+                startWith: [],
+                connectFromField: "x",
+                connectToField: "x",
+                as: "y"
+            }
+        };
 
-    const lookupStage = {$lookup: {from: "forbidden", localField: "x", foreignField: "x", as: "y"}};
-    const graphLookupStage = {
-        $graphLookup: {
-            from: "forbidden",
-            startWith: [],
-            connectFromField: "x",
-            connectToField: "x",
-            as: "y"
+        // You cannot create a view if you have both the 'createCollection' and 'find' actions on
+        // that view but not the 'find' action on all of the dependent namespaces.
+        assert.commandFailedWithCode(viewsDB.createView("view", "forbidden", []),
+                                     ErrorCodes.Unauthorized,
+                                     "created a readable view on an unreadable collection");
+        assert.commandFailedWithCode(
+            viewsDB.createView("view", "permitted", [lookupStage]),
+            ErrorCodes.Unauthorized,
+            "created a readable view on an unreadable collection via $lookup");
+        assert.commandFailedWithCode(
+            viewsDB.createView("view", "permitted", [graphLookupStage]),
+            ErrorCodes.Unauthorized,
+            "created a readable view on an unreadable collection via $graphLookup");
+        assert.commandFailedWithCode(
+            viewsDB.createView("view", "permitted", [{$facet: {a: [lookupStage]}}]),
+            ErrorCodes.Unauthorized,
+            "created a readable view on an unreadable collection via $lookup in a $facet");
+        assert.commandFailedWithCode(
+            viewsDB.createView("view", "permitted", [{$facet: {b: [graphLookupStage]}}]),
+            ErrorCodes.Unauthorized,
+            "created a readable view on an unreadable collection via $graphLookup in a $facet");
+
+        assert.commandWorked(viewsDB.createView("view", "permitted", [{$match: {x: 1}}]));
+
+        // You cannot modify a view if you have both the 'collMod' and 'find' actions on that view
+        // but not the 'find' action on all of the dependent namespaces.
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({collMod: "view", viewOn: "forbidden", pipeline: [{$match: {}}]}),
+            ErrorCodes.Unauthorized,
+            "modified a view to read an unreadable collection");
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({collMod: "view", viewOn: "permitted", pipeline: [lookupStage]}),
+            ErrorCodes.Unauthorized,
+            "modified a view to read an unreadable collection via $lookup");
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {collMod: "view", viewOn: "permitted", pipeline: [graphLookupStage]}),
+            ErrorCodes.Unauthorized,
+            "modified a view to read an unreadable collection via $graphLookup");
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {collMod: "view", viewOn: "permitted", pipeline: [{$facet: {a: [lookupStage]}}]}),
+            ErrorCodes.Unauthorized,
+            "modified a view to read an unreadable collection via $lookup in a $facet");
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({
+                collMod: "view",
+                viewOn: "permitted",
+                pipeline: [{$facet: {b: [graphLookupStage]}}]
+            }),
+            ErrorCodes.Unauthorized,
+            "modified a view to read an unreadable collection via $graphLookup in a $facet");
+
+        // Performing a find on a readable view returns a cursor that allows us to perform a getMore
+        // even if the underlying collection is unreadable.
+        // TODO(SERVER-24771): getMore does not work yet for sharded clusters
+        assert.eq(1, adminDB.auth("admin", "admin"));
+        let isMaster = adminDB.runCommand({isMaster: 1});
+        assert.commandWorked(isMaster);
+        const isMongos = (isMaster.msg === "isdbgrid");
+        if (!isMongos) {
+            assert.commandWorked(viewsDB.createView("view2", "forbidden", []));
+            for (let i = 0; i < 10; i++) {
+                assert.writeOK(viewsDB.forbidden.insert({x: 1}));
+            }
+            adminDB.logout();
+            assert.commandFailedWithCode(
+                viewsDB.runCommand({find: "forbidden"}),
+                ErrorCodes.Unauthorized,
+                "successfully performed a find on an unreadable namespace");
+            let res = viewsDB.runCommand({find: "view2", batchSize: 1});
+            assert.commandWorked(res, "could not perform a find on a readable view");
+            assert.eq(res.cursor.ns,
+                      "views_authz.view2",
+                      "performing find on a view does not return a cursor on the view namespace");
+            assert.commandWorked(viewsDB.runCommand({getMore: res.cursor.id, collection: "view2"}),
+                                 "could not perform getMore on a readable view");
         }
-    };
-
-    // You cannot create a view if you have both the 'createCollection' and 'find' actions on that
-    // view but not the 'find' action on all of the dependent namespaces.
-    assert.commandFailedWithCode(viewsDB.createView("view", "forbidden", []),
-                                 ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(viewsDB.createView("view", "permitted", [lookupStage]),
-                                 ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(viewsDB.createView("view", "permitted", [graphLookupStage]),
-                                 ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(
-        viewsDB.createView("view", "permitted", [{$facet: {a: [lookupStage]}}]),
-        ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(
-        viewsDB.createView("view", "permitted", [{$facet: {b: [graphLookupStage]}}]),
-        ErrorCodes.Unauthorized);
-
-    assert.commandWorked(viewsDB.createView("view", "permitted", [{$match: {x: 1}}]));
-
-    // You cannot modify a view if you have both the 'collMod' and 'find' actions on that view but
-    // not the 'find' action on all of the dependent namespaces.
-    assert.commandFailedWithCode(
-        viewsDB.runCommand({collMod: "view", viewOn: "forbidden", pipeline: [{$match: {}}]}),
-        ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(
-        viewsDB.runCommand({collMod: "view", viewOn: "permitted", pipeline: [lookupStage]}),
-        ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(
-        viewsDB.runCommand({collMod: "view", viewOn: "permitted", pipeline: [graphLookupStage]}),
-        ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(
-        viewsDB.runCommand(
-            {collMod: "view", viewOn: "permitted", pipeline: [{$facet: {a: [lookupStage]}}]}),
-        ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(
-        viewsDB.runCommand(
-            {collMod: "view", viewOn: "permitted", pipeline: [{$facet: {b: [graphLookupStage]}}]}),
-        ErrorCodes.Unauthorized);
-
-    // Performing a find on a readable view returns a cursor that allows us to perform a getMore
-    // even if the underlying collection is unreadable.
-    assert.eq(1, adminDB.auth("admin", "admin"));
-    assert.commandWorked(viewsDB.createView("view2", "forbidden", []));
-    for (let i = 0; i < 10; i++) {
-        assert.writeOK(viewsDB.forbidden.insert({x: 1}));
     }
-    adminDB.logout();
-    assert.commandFailedWithCode(viewsDB.runCommand({find: "forbidden"}), ErrorCodes.Unauthorized);
-    let res = viewsDB.runCommand({find: "view2", batchSize: 1});
-    assert.commandWorked(res);
-    assert.eq(res.cursor.ns, "views_authz.view2");
-    assert.commandWorked(viewsDB.runCommand({getMore: res.cursor.id, collection: "view2"}));
+
+    // Run the test on a standalone.
+    let mongod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+    runTest(mongod);
+    MongoRunner.stopMongod(mongod);
+
+    // Run the test on a sharded cluster.
+    let cluster = new ShardingTest(
+        {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
+    runTest(cluster);
+    cluster.stop();
 }());

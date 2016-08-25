@@ -77,7 +77,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
@@ -117,41 +116,6 @@ using std::ostringstream;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
-
-namespace {
-/**
- * Checks for additional required privileges when creating or modifying a view. Call this function
- * after verifying that the user has the "createCollection" or "collMod" action, respectively.
- *
- * 'cmdObj' must have a String field named 'viewOn'.
- */
-Status canCreateOrModifyView(Client* client,
-                             const std::string& dbname,
-                             const BSONObj& cmdObj,
-                             ResourcePattern resource) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-
-    // It's safe to allow a user to create or modify a view if they can't read it anyway.
-    if (!authzSession->isAuthorizedForActionsOnResource(resource, ActionType::find)) {
-        return Status::OK();
-    }
-
-    // The user can read the view they're trying to create/modify, so we must ensure that they also
-    // have the find action on all namespaces in "viewOn" and "pipeline". If "pipeline" is not
-    // specified, default to the empty pipeline.
-    auto viewPipeline =
-        cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
-
-    // This check ignores some invalid pipeline specifications. For example, if a user specifies a
-    // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
-    // will succeed but the pipeline will fail to parse later in Command::run().
-    return Pipeline::checkAuthForCommand(
-        client,
-        dbname,
-        BSON("aggregate" << cmdObj["viewOn"].checkAndGetStringData() << "pipeline"
-                         << viewPipeline));
-}
-}  // namespace
 
 class CmdShutdownMongoD : public CmdShutdown {
 public:
@@ -558,37 +522,10 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        auto cmdNsResource = parseResourcePattern(dbname, cmdObj);
-        if (cmdObj["capped"].trueValue()) {
-            if (!authzSession->isAuthorizedForActionsOnResource(cmdNsResource,
-                                                                ActionType::convertToCapped)) {
-                return Status(ErrorCodes::Unauthorized, "unauthorized");
-            }
-        }
-
-        const bool hasCreateCollectionAction = authzSession->isAuthorizedForActionsOnResource(
-            cmdNsResource, ActionType::createCollection);
-
-        // If attempting to create a view, check for additional required privileges.
-        if (cmdObj["viewOn"]) {
-            // You need the createCollection action on this namespace; the insert action is not
-            // sufficient.
-            if (!hasCreateCollectionAction) {
-                return Status(ErrorCodes::Unauthorized, "unauthorized");
-            }
-            return canCreateOrModifyView(client, dbname, cmdObj, cmdNsResource);
-        }
-
-        // To create a regular collection, ActionType::createCollection or ActionType::insert are
-        // both acceptable.
-        if (hasCreateCollectionAction ||
-            authzSession->isAuthorizedForActionsOnResource(cmdNsResource, ActionType::insert)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj);
     }
+
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
@@ -1006,19 +943,8 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        if (!authzSession->isAuthorizedForActionsOnResource(parseResourcePattern(dbname, cmdObj),
-                                                            ActionType::collMod)) {
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
-        }
-
-        // Check for additional required privileges if attempting to modify a view.
-        if (cmdObj["viewOn"] || cmdObj["pipeline"]) {
-            return canCreateOrModifyView(
-                client, dbname, cmdObj, parseResourcePattern(dbname, cmdObj));
-        }
-
-        return Status::OK();
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj);
     }
 
     bool run(OperationContext* txn,

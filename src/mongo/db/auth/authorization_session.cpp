@@ -43,15 +43,19 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+namespace dps = ::mongo::dotted_path_support;
 using std::vector;
 
 namespace {
@@ -176,6 +180,89 @@ PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
     }
 
     return defaultPrivileges;
+}
+
+void AuthorizationSession::_addPrivilegesForStage(const std::string& db,
+                                                  const BSONObj& cmdObj,
+                                                  PrivilegeVector* requiredPrivileges,
+                                                  BSONObj stageSpec,
+                                                  bool haveRecursed) {
+    StringData stageName = stageSpec.firstElementFieldName();
+    if (stageName == "$out" && stageSpec.firstElementType() == BSONType::String) {
+        NamespaceString outputNs(db, stageSpec.firstElement().str());
+        uassert(17139,
+                mongoutils::str::stream() << "Invalid $out target namespace, " << outputNs.ns(),
+                outputNs.isValid());
+
+        ActionSet actions;
+        actions.addAction(ActionType::remove);
+        actions.addAction(ActionType::insert);
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+            actions.addAction(ActionType::bypassDocumentValidation);
+        }
+        Privilege::addPrivilegeToPrivilegeVector(
+            requiredPrivileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
+    } else if (stageName == "$lookup" && stageSpec.firstElementType() == BSONType::Object) {
+        NamespaceString fromNs(db, stageSpec.firstElement()["from"].str());
+        Privilege::addPrivilegeToPrivilegeVector(
+            requiredPrivileges,
+            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
+    } else if (stageName == "$graphLookup" && stageSpec.firstElementType() == BSONType::Object) {
+        NamespaceString fromNs(db, stageSpec.firstElement()["from"].str());
+        Privilege::addPrivilegeToPrivilegeVector(
+            requiredPrivileges,
+            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
+    } else if (stageName == "$facet" && stageSpec.firstElementType() == BSONType::Object &&
+               !haveRecursed) {
+        // Add privileges of sub-stages, but only if we haven't recursed already. We don't want to
+        // get a stack overflow while checking privileges. If we ever allow a $facet stage inside of
+        // a $facet stage, this code will have to be modified to avoid causing a stack overflow, but
+        // still check all required privileges of nested stages.
+        for (auto&& subPipeline : stageSpec.firstElement().embeddedObject()) {
+            if (subPipeline.type() == BSONType::Array) {
+                for (auto&& subPipeStageSpec : subPipeline.embeddedObject()) {
+                    _addPrivilegesForStage(db,
+                                           cmdObj,
+                                           requiredPrivileges,
+                                           subPipeStageSpec.embeddedObjectUserCheck(),
+                                           true);
+                }
+            }
+        }
+    }
+}
+
+Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
+                                                   const BSONObj& cmdObj) {
+    std::string db(ns.db().toString());
+    auto inputResource = ResourcePattern::forExactNamespace(ns);
+    uassert(
+        17138, mongoutils::str::stream() << "Invalid input namespace, " << ns.ns(), ns.isValid());
+
+    PrivilegeVector privileges;
+
+    if (dps::extractElementAtPath(cmdObj, "pipeline.0.$indexStats")) {
+        Privilege::addPrivilegeToPrivilegeVector(
+            &privileges,
+            Privilege(ResourcePattern::forAnyNormalResource(), ActionType::indexStats));
+    } else if (dps::extractElementAtPath(cmdObj, "pipeline.0.$collStats")) {
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::collStats));
+    } else {
+        // If no source requiring an alternative permission scheme is specified then default to
+        // requiring find() privileges on the given namespace.
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::find));
+    }
+
+    BSONObj pipeline = cmdObj.getObjectField("pipeline");
+    for (auto&& stageElem : pipeline) {
+        _addPrivilegesForStage(db, cmdObj, &privileges, stageElem.embeddedObjectUserCheck());
+    }
+
+    if (isAuthorizedForPrivileges(privileges))
+        return Status::OK();
+    return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
 Status AuthorizationSession::checkAuthForFind(const NamespaceString& ns, bool hasTerm) {
@@ -328,6 +415,69 @@ Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
         }
     }
     return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj) {
+    if (cmdObj["capped"].trueValue() &&
+        !isAuthorizedForActionsOnNamespace(ns, ActionType::convertToCapped)) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
+
+    const bool hasCreateCollectionAction =
+        isAuthorizedForActionsOnNamespace(ns, ActionType::createCollection);
+
+    // If attempting to create a view, check for additional required privileges.
+    if (cmdObj["viewOn"]) {
+        // You need the createCollection action on this namespace; the insert action is not
+        // sufficient.
+        if (!hasCreateCollectionAction) {
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
+        }
+        return checkAuthForCreateOrModifyView(ns, cmdObj);
+    }
+
+    // To create a regular collection, ActionType::createCollection or ActionType::insert are
+    // both acceptable.
+    if (hasCreateCollectionAction || isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::Unauthorized, "unauthorized");
+}
+
+Status AuthorizationSession::checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj) {
+    if (!isAuthorizedForActionsOnNamespace(ns, ActionType::collMod)) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
+
+    // Check for additional required privileges if attempting to modify a view.
+    if (cmdObj["viewOn"] || cmdObj["pipeline"]) {
+        return checkAuthForCreateOrModifyView(ns, cmdObj);
+    }
+
+    return Status::OK();
+}
+
+Status AuthorizationSession::checkAuthForCreateOrModifyView(const NamespaceString& ns,
+                                                            const BSONObj& cmdObj) {
+    // It's safe to allow a user to create or modify a view if they can't read it anyway.
+    if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
+        return Status::OK();
+    }
+
+    // The user can read the view they're trying to create/modify, so we must ensure that they also
+    // have the find action on all namespaces in "viewOn" and "pipeline". If "pipeline" is not
+    // specified, default to the empty pipeline.
+    auto viewPipeline =
+        cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
+
+
+    // This check ignores some invalid pipeline specifications. For example, if a user specifies a
+    // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
+    // will succeed but the pipeline will fail to parse later in Command::run().
+    NamespaceString viewOnNss(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
+    return checkAuthForAggregate(
+        viewOnNss, BSON("aggregate" << viewOnNss.coll() << "pipeline" << viewPipeline));
 }
 
 Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& privilege) {

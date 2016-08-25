@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/aggregation_request.h"
@@ -99,7 +100,8 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
-        return Pipeline::checkAuthForCommand(client, dbname, cmdObj);
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
     }
 
     virtual bool run(OperationContext* txn,

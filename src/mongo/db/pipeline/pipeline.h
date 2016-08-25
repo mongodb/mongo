@@ -42,11 +42,10 @@
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
-class Client;
 class CollatorInterface;
 class DocumentSource;
-struct ExpressionContext;
 class OperationContext;
+struct ExpressionContext;
 
 /**
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
@@ -73,13 +72,6 @@ public:
      */
     static StatusWith<boost::intrusive_ptr<Pipeline>> create(
         SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    /**
-     * Helper to implement Command::checkAuthForCommand.
-     */
-    static Status checkAuthForCommand(Client* client,
-                                      const std::string& dbname,
-                                      const BSONObj& cmdObj);
 
     /**
      * Returns true if the provided aggregation command has a $out stage.
