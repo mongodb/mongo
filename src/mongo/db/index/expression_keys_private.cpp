@@ -146,12 +146,12 @@ void getS2GeoKeys(const BSONObj& document,
         for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
             BSONObjBuilder b;
             b.append("", *it);
-            out->insert(b.obj());
+            out->insert(b.obj().copy());
         }
     }
 
     if (0 == out->size()) {
-        BSONObjBuilder b;
+        BSONObjBuilder b(7);
         b.appendNull("");
         out->insert(b.obj());
     }
