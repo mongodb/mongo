@@ -91,11 +91,18 @@ public:
      * @param   task        the task to kill()
      * @param   timeoutMs   number of milliseconds before the deadline expires
      */
-    void startDeadline(_Task* const task, uint64_t timeoutMs) {
-        const auto deadline = Date_t::now() + Milliseconds(timeoutMs);
+    void startDeadline(_Task* const task, int64_t timeoutMs) {
+        Date_t deadline;
+        if (timeoutMs > 0) {
+            deadline = Date_t::now() + Milliseconds(timeoutMs);
+        } else {
+            deadline = Date_t::max();
+        }
         stdx::lock_guard<stdx::mutex> lk(_deadlineMutex);
 
-        _tasks[task] = deadline;
+        if (_tasks.find(task) == _tasks.end()) {
+            _tasks.emplace(task, deadline);
+        }
 
         if (deadline < _nearestDeadlineWallclock) {
             _nearestDeadlineWallclock = deadline;
@@ -121,14 +128,16 @@ private:
      */
     void deadlineMonitorThread() {
         stdx::unique_lock<stdx::mutex> lk(_deadlineMutex);
+        Date_t lastInterruptCycle = Date_t::now();
         while (!_inShutdown) {
             // get the next interval to wait
             const Date_t now = Date_t::now();
 
             // wait for a task to be added or a deadline to expire
             if (_nearestDeadlineWallclock > now) {
-                if (_nearestDeadlineWallclock == Date_t::max()) {
-                    _newDeadlineAvailable.wait(lk);
+                if (_nearestDeadlineWallclock == Date_t::max() ||
+                    _nearestDeadlineWallclock - now > Seconds{1}) {
+                    _newDeadlineAvailable.wait_for(lk, Seconds{1});
                 } else {
                     _newDeadlineAvailable.wait_until(lk,
                                                      _nearestDeadlineWallclock.toSystemTimePoint());
@@ -138,7 +147,7 @@ private:
 
             // set the next interval to wait for deadline completion
             _nearestDeadlineWallclock = Date_t::max();
-            typename TaskDeadlineMap::iterator i = _tasks.begin();
+            auto i = _tasks.begin();
             while (i != _tasks.end()) {
                 if (i->second < now) {
                     // deadline expired
@@ -152,10 +161,17 @@ private:
                     ++i;
                 }
             }
+
+            if (now - lastInterruptCycle > Seconds{1}) {
+                for (auto it : _tasks) {
+                    it.first->interrupt();
+                }
+                lastInterruptCycle = now;
+            }
         }
     }
 
-    typedef unordered_map<_Task*, Date_t> TaskDeadlineMap;
+    using TaskDeadlineMap = std::unordered_map<_Task*, Date_t>;
     TaskDeadlineMap _tasks;      // map of running tasks with deadlines
     stdx::mutex _deadlineMutex;  // protects all non-const members, except _monitorThread
     stdx::condition_variable _newDeadlineAvailable;    // Signaled for timeout, start and stop

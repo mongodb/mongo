@@ -175,6 +175,8 @@ public:
      */
     void kill();
 
+    void interrupt();
+
 private:
     template <typename Closure>
     void run(Closure&& closure);

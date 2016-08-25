@@ -72,6 +72,7 @@ public:
         if (_group)
             _group->noteKill();
     }
+    void interrupt() {}
     TaskGroup* _group;
     uint64_t _killed;
 };

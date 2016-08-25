@@ -244,6 +244,10 @@ void MozJSProxyScope::kill() {
     _implScope->kill();
 }
 
+void MozJSProxyScope::interrupt() {
+    _implScope->interrupt();
+}
+
 /**
  * Invokes a function on the implementation thread
  *
