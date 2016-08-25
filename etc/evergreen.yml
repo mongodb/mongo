@@ -548,7 +548,7 @@ tasks:
           ${decompress|unzip} mongodb*.${ext|tgz}
           cp mongodb*/bin/* .
           rm -rf /data/install /data/multiversion
-          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4"
+          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "base" "Linux/x86_64" "1.8" "2.0" "2.2" "2.4"
           PATH=$PATH:/data/multiversion ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} multiVersion
 
 - name: noPassthrough
@@ -1354,7 +1354,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: multiversion
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
