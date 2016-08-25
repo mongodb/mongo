@@ -384,10 +384,6 @@ functions:
 
         ${resmoke_wrapper} PATH="$path_value" ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
-        if [ "Windows_NT" = "$OS" ]; then
-          # Sentinel file to indicate that resmoke succeeded.
-          touch resmoke_succeeded
-        fi
 
   "do jepsen setup" :
     - command: shell.exec
@@ -631,26 +627,6 @@ pre:
           fi
   - command: shell.exec
     params:
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # Generate minidumps for all mongod process exits.
-        if [ "Windows_NT" = "$OS" ]; then
-          # Enable silent process monitoring of mongod.exe by setting GlobalFlag to 0x200.
-          REG ADD "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\mongod.exe" /v GlobalFlag /t REG_DWORD /d 0x200 /f
-          # Set the dump folder location to the current working directory.
-          REG ADD "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SilentProcessExit\\mongod.exe" /v LocalDumpFolder /t REG_SZ /d "$(cygpath -w $(pwd))" /f
-          # Set MINIDUMP_TYPE.
-          REG ADD "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SilentProcessExit\\mongod.exe" /v DumpType /t REG_DWORD /d 0x121 /f
-          # Cap the number of dumps to 10.
-          REG ADD "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SilentProcessExit\\mongod.exe" /v MaxNumberOfDumpFiles /t REG_DWORD /d 0xA /f
-          # Set the reporting mode to LOCAL_DUMP(0x2) | NOTIFICATION(0x4).
-          REG ADD "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SilentProcessExit\\mongod.exe" /v ReportingMode /t REG_DWORD /d 0x6 /f
-        fi
-
-  - command: shell.exec
-    params:
       system_log: true
       script: |
         set -o errexit
@@ -801,7 +777,6 @@ post:
       source_dir: "./"
       include:
         - "./**.core"
-        - "./**.dmp"  # Windows: SilentProcessExit minidumps
         - "./**.mdmp" # Windows: minidumps
   - command: s3.put
     params:
@@ -846,22 +821,6 @@ post:
 
         if [ -d "${scons_cache_path}" ]; then
             ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
-        fi
-  - command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # Undo changes made to generate minidumps on mongod process exits.
-        if [ "Windows_NT" = "$OS" ]; then
-          REG DELETE "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\mongod.exe" /f
-          REG DELETE "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SilentProcessExit\\mongod.exe" /f
-
-          if [ -f src/resmoke_succeeded ]; then
-            echo "Removing silent process exit minidumps after successful resmoke run"
-            rm -rf mongod.exe-\(PID-*
-          fi
         fi
   - func: "cleanup environment"
 
