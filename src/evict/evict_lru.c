@@ -19,6 +19,9 @@ static int  __evict_server(WT_SESSION_IMPL *, bool *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t);
 static int  __evict_walk_file(WT_SESSION_IMPL *, uint32_t, u_int, u_int *);
 
+#define	WT_EVICT_HAS_WORKERS(s)				\
+	(S2C(s)->evict_threads.current_threads > 1)
+
 /*
  * __evict_read_gen --
  *	Get the adjusted read generation for an eviction entry.
@@ -168,29 +171,31 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_thread_run --
- *	General wrapper for any eviction thread.
+ * __wt_evict_thread_run --
+ *	Starting point for an eviction thread.
  */
-static WT_THREAD_RET
-__evict_thread_run(void *arg)
+int
+__wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	bool did_work;
 
-	session = arg;
 	conn = S2C(session);
 	cache = conn->cache;
 
 #ifdef HAVE_DIAGNOSTIC
-	if (session == conn->evict_session)
-		WT_ERR(__wt_epoch(
-		    session, &cache->stuck_ts));	/* -Wuninitialized */
+	/*
+	 * Ensure the cache stuck timer is initialized when starting eviction
+	 */
+	if (thread->id == 0)
+		WT_ERR(__wt_epoch(session, &cache->stuck_ts));
 #endif
-	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
-		if (conn->evict_tid_set &&
+
+	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
+	    F_ISSET(thread, WT_THREAD_RUN)) {
+		if (conn->evict_server_running &&
 		    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
 			/*
 			 * Cannot use WT_WITH_PASS_LOCK because this is a try
@@ -214,29 +219,31 @@ __evict_thread_run(void *arg)
 			WT_ERR(__evict_helper(session));
 	}
 
-	if (session == conn->evict_session) {
-		/*
-		 * The eviction server is shutting down: in case any trees are
-		 * still open, clear all walks now so that they can be closed.
-		 */
+	/*
+	 * The only time the first eviction thread is stopped is on shutdown:
+	 * in case any trees are still open, clear all walks now so that they
+	 * can be closed.
+	 */
+	if (thread->id == 0) {
 		WT_WITH_PASS_LOCK(session, ret,
 		    ret = __evict_clear_all_walks(session));
 		WT_ERR(ret);
+		/*
+		 * The only two cases when the eviction server is expected to
+		 * stop are when recovery is finished or when the connection is
+		 * closing.
+		 */
+		WT_ASSERT(session,
+		    F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_RECOVERING));
 	}
+
 	__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction thread exiting");
 
-	/*
-	 * The only two cases when eviction workers are expected to stop are
-	 * when recovery is finished or when the connection is closing. Check
-	 * otherwise fewer eviction worker threads may be running than
-	 * expected.
-	 */
-	WT_ASSERT(session, F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_RECOVERING));
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
 	}
-	return (WT_THREAD_RET_VALUE);
+	return (ret);
 }
 
 /*
@@ -317,110 +324,31 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 }
 
 /*
- * __evict_workers_resize --
- *	Resize the array of eviction workers (as needed after a reconfigure).
- *	We don't do this during the reconfigure because the eviction server
- *	thread owns these structures.
- */
-static int
-__evict_workers_resize(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_EVICT_WORKER *workers;
-	size_t alloc;
-	uint32_t i, session_flags;
-
-	conn = S2C(session);
-	workers = NULL;			/* -Wconditional-uninitialized */
-
-	if (conn->evict_workers_alloc < conn->evict_workers_max) {
-		alloc = conn->evict_workers_alloc * sizeof(*workers);
-		WT_RET(__wt_realloc(session, &alloc,
-		    conn->evict_workers_max * sizeof(*workers),
-		    &conn->evict_workctx));
-		workers = conn->evict_workctx;
-	}
-
-	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
-		/*
-		 * Eviction worker threads get their own session.
-		 * Eviction worker threads may be called upon to perform slow
-		 * operations for the block manager.
-		 *
-		 * Eviction worker threads get their own lookaside table cursor
-		 * if the lookaside table is open.  Note that eviction is also
-		 * started during recovery, before the lookaside table is
-		 * created.
-		 */
-		session_flags = WT_SESSION_CAN_WAIT;
-		if (F_ISSET(conn, WT_CONN_LAS_OPEN))
-			FLD_SET(session_flags, WT_SESSION_LOOKASIDE_CURSOR);
-		WT_ERR(__wt_open_internal_session(conn, "eviction-worker",
-		    false, session_flags, &workers[i].session));
-		workers[i].id = i;
-
-		if (i < conn->evict_workers_min) {
-			++conn->evict_workers;
-			F_SET(&workers[i], WT_EVICT_WORKER_RUN);
-			WT_ERR(__wt_thread_create(workers[i].session,
-			    &workers[i].tid, __evict_thread_run,
-			    workers[i].session));
-		}
-	}
-
-err:	conn->evict_workers_alloc = conn->evict_workers_max;
-	return (ret);
-}
-
-/*
  * __wt_evict_create --
- *	Start the eviction server thread.
+ *	Start the eviction server.
  */
 int
 __wt_evict_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	uint32_t session_flags;
 
 	conn = S2C(session);
 
+	WT_ASSERT(session, conn->evict_threads_min > 0);
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_EVICTION_RUN);
 
-	/*
-	 * We need a session handle because we're reading/writing pages.
-	 *
-	 * The eviction server gets its own lookaside table cursor.
-	 *
-	 * If there's only a single eviction thread, it may be called upon to
-	 * perform slow operations for the block manager.  (The flag is not
-	 * reset if reconfigured later, but I doubt that's a problem.)
-	 */
-	session_flags = F_ISSET(conn, WT_CONN_LAS_OPEN) ?
-	    WT_SESSION_LOOKASIDE_CURSOR : 0;
-	if (conn->evict_workers_max == 0)
-		FLD_SET(session_flags, WT_SESSION_CAN_WAIT);
-	WT_RET(__wt_open_internal_session(conn,
-	    "eviction-server", false, session_flags, &conn->evict_session));
-	session = conn->evict_session;
+	/* Create the eviction thread group */
+	WT_RET(__wt_thread_group_create(session, &conn->evict_threads,
+	    "eviction-server", conn->evict_threads_min,
+	    conn->evict_threads_max, WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL,
+	    __wt_evict_thread_run));
 
-	/*
-	 * If eviction workers were configured, allocate sessions for them now.
-	 * This is done to reduce the chance that we will open new eviction
-	 * sessions after WT_CONNECTION::close is called.
+	/* 
+	 * Allow queues to be populated now that the eviction threads
+	 * are running.
 	 */
-	if (conn->evict_workers_max > 0)
-		WT_RET(__evict_workers_resize(session));
-
-	/*
-	 * Start the primary eviction server thread after the worker threads
-	 * have started to avoid it starting additional worker threads before
-	 * the worker's sessions are created.
-	 */
-	WT_RET(__wt_thread_create(
-	    session, &conn->evict_tid, __evict_thread_run, session));
-	conn->evict_tid_set = true;
+	conn->evict_server_running = true;
 
 	return (0);
 }
@@ -432,59 +360,33 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 int
 __wt_evict_destroy(WT_SESSION_IMPL *session)
 {
-	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_EVICT_WORKER *workers;
-	WT_SESSION *wt_session;
-	uint32_t i;
 
 	conn = S2C(session);
-	cache = conn->cache;
-	workers = conn->evict_workctx;
 
-	F_CLR(conn, WT_CONN_EVICTION_RUN);
+	/* We are done if the eviction server didn't start successfully. */
+	if (!conn->evict_server_running)
+		return (0);
+
+	/* Wait for any eviction thread group changes to stabilize. */
+	__wt_writelock(session, conn->evict_threads.lock);
 
 	/*
-	 * Wait for the main eviction thread to exit before waiting on the
-	 * helpers.  The eviction server spawns helper threads, so we can't
-	 * safely know how many helpers are running until the main thread is
-	 * done.
+	 * Signal the threads to finish and stop populating the queue.
 	 */
-	__wt_verbose(session, WT_VERB_EVICTSERVER, "waiting for main thread");
-	if (conn->evict_tid_set) {
-		__wt_evict_server_wake(session);
-		WT_TRET(__wt_thread_join(session, conn->evict_tid));
-		conn->evict_tid_set = false;
-	}
+	F_CLR(conn, WT_CONN_EVICTION_RUN);
+	conn->evict_server_running = false;
 
 	__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "waiting for helper threads");
-	for (i = 0; i < conn->evict_workers; i++) {
-		__wt_cond_signal(session, cache->evict_waiter_cond);
-		WT_TRET(__wt_thread_join(session, workers[i].tid));
-	}
-	conn->evict_workers = 0;
 
-	/* Handle shutdown when cleaning up after a failed open. */
-	if (conn->evict_workctx != NULL) {
-		for (i = 0; i < conn->evict_workers_alloc; i++) {
-			wt_session = &conn->evict_workctx[i].session->iface;
-			if (wt_session != NULL)
-				WT_TRET(wt_session->close(wt_session, NULL));
-		}
-		__wt_free(session, conn->evict_workctx);
-	}
-	conn->evict_workers_alloc = 0;
+	/*
+	 * We call the destroy function still holding the write lock.
+	 * It assumes it is called locked.
+	 */
+	WT_RET(__wt_thread_group_destroy(session, &conn->evict_threads));
 
-	if (conn->evict_session != NULL) {
-		wt_session = &conn->evict_session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-
-		conn->evict_session = NULL;
-	}
-
-	return (ret);
+	return (0);
 }
 
 /*
@@ -494,12 +396,13 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 static int
 __evict_helper(WT_SESSION_IMPL *session)
 {
-	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	cache = S2C(session)->cache;
+	conn = S2C(session);
+
 	if ((ret = __evict_lru_pages(session, false)) == WT_NOTFOUND)
-		__wt_cond_wait(session, cache->evict_waiter_cond, 10000);
+		__wt_cond_wait(session, conn->evict_threads.wait_cond, 10000);
 	else
 		WT_RET(ret);
 	return (0);
@@ -589,7 +492,6 @@ __evict_pass(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_EVICT_WORKER *worker;
 	uint64_t pages_evicted;
 	u_int loop;
 
@@ -639,21 +541,12 @@ __evict_pass(WT_SESSION_IMPL *session)
 		}
 
 		/*
-		 * Start a worker if we have capacity and we haven't reached
-		 * the eviction targets.
+		 * Try to start a new thread if we have capacity and haven't
+		 * reached the eviction targets.
 		 */
-		if (FLD_ISSET(cache->state, WT_EVICT_STATE_ALL) &&
-		    conn->evict_workers < conn->evict_workers_max) {
-			__wt_verbose(session, WT_VERB_EVICTSERVER,
-			    "Starting evict worker: %"PRIu32"\n",
-			    conn->evict_workers);
-			if (conn->evict_workers >= conn->evict_workers_alloc)
-				WT_RET(__evict_workers_resize(session));
-			worker = &conn->evict_workctx[conn->evict_workers++];
-			F_SET(worker, WT_EVICT_WORKER_RUN);
-			WT_RET(__wt_thread_create(session,
-			    &worker->tid, __evict_thread_run, worker->session));
-		}
+		if (FLD_ISSET(cache->state, WT_EVICT_STATE_ALL))
+			WT_RET(__wt_thread_group_start_one(
+			    session, &conn->evict_threads, false));
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "Eviction pass with: Max: %" PRIu64
@@ -882,11 +775,11 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 	uint64_t app_evict_percent, total_evict;
 
 	/*
-	 * The server will not help evict if the workers are coping with
+	 * The server will not help evict if the threads are coping with
 	 * eviction workload, that is, if fewer than the threshold of the
 	 * pages are evicted by application threads.
 	 */
-	if (is_server && S2C(session)->evict_workers > 1) {
+	if (is_server && WT_EVICT_HAS_WORKERS(session)) {
 		cache = S2C(session)->cache;
 		total_evict = cache->app_evicts +
 		    cache->server_evicts + cache->worker_evicts;
@@ -1035,7 +928,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	 * Signal any application or helper threads that may be waiting
 	 * to help with eviction.
 	 */
-	__wt_cond_signal(session, cache->evict_waiter_cond);
+	__wt_cond_signal(session, S2C(session)->evict_threads.wait_cond);
 
 	return (0);
 }
@@ -1551,7 +1444,7 @@ __evict_get_ref(
 	queue = urgent_queue->evict_current != NULL &&
 	    (FLD_ISSET(cache->state, WT_EVICT_STATE_AGGRESSIVE) ||
 	    (F_ISSET(session, WT_SESSION_INTERNAL) &&
-	    (!is_server || S2C(session)->evict_workers <= 1))) ?
+	    (!is_server || !WT_EVICT_HAS_WORKERS(session)))) ?
 	    urgent_queue : cache->evict_current_queue;
 
 	__wt_spin_unlock(session, &cache->evict_queue_lock);
@@ -1603,7 +1496,7 @@ __evict_get_ref(
 		 * may never be found again.
 		 */
 		if (is_server && queue != urgent_queue &&
-		    S2C(session)->evict_workers > 1 &&
+		    WT_EVICT_HAS_WORKERS(session) &&
 		    !__evict_check_entry_size(session, evict)) {
 			--evict;
 			break;
@@ -1723,6 +1616,13 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	cache = conn->cache;
 
 	/*
+	 * It is not safe to proceed if the eviction server threads aren't
+	 * setup yet.
+	 */
+	if (!conn->evict_server_running)
+		return (0);
+
+	/*
 	 * If the current transaction is keeping the oldest ID pinned, it is in
 	 * the middle of an operation.	This may prevent the oldest ID from
 	 * moving forward, leading to deadlock, so only evict what we can.
@@ -1786,7 +1686,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		case WT_NOTFOUND:
 			/* Allow the queue to re-populate before retrying. */
 			__wt_cond_wait(
-			    session, cache->evict_waiter_cond, 100000);
+			    session, conn->evict_threads.wait_cond, 100000);
 			cache->app_waits++;
 			break;
 		default:
@@ -1850,8 +1750,9 @@ done:	__wt_spin_unlock(session, &cache->evict_queue_lock);
 	if (queued) {
 		WT_STAT_FAST_CONN_INCR(
 		    session, cache_eviction_pages_queued_urgent);
-		if (S2C(session)->evict_workers > 1)
-			__wt_cond_signal(session, cache->evict_waiter_cond);
+		if (WT_EVICT_HAS_WORKERS(session))
+			__wt_cond_signal(session,
+			    S2C(session)->evict_threads.wait_cond);
 		else
 			__wt_evict_server_wake(session);
 	}

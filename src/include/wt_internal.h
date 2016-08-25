@@ -170,8 +170,6 @@ struct __wt_evict_entry;
     typedef struct __wt_evict_entry WT_EVICT_ENTRY;
 struct __wt_evict_queue;
     typedef struct __wt_evict_queue WT_EVICT_QUEUE;
-struct __wt_evict_worker;
-    typedef struct __wt_evict_worker WT_EVICT_WORKER;
 struct __wt_ext;
     typedef struct __wt_ext WT_EXT;
 struct __wt_extlist;
@@ -284,6 +282,10 @@ struct __wt_split_stash;
     typedef struct __wt_split_stash WT_SPLIT_STASH;
 struct __wt_table;
     typedef struct __wt_table WT_TABLE;
+struct __wt_thread;
+    typedef struct __wt_thread WT_THREAD;
+struct __wt_thread_group;
+    typedef struct __wt_thread_group WT_THREAD_GROUP;
 struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
@@ -348,6 +350,7 @@ union __wt_rand_state;
 #include "meta.h"
 #include "os.h"
 #include "schema.h"
+#include "thread_group.h"
 #include "txn.h"
 
 #include "session.h"			/* required by connection.h */

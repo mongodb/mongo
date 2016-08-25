@@ -42,18 +42,6 @@ struct __wt_evict_queue {
 	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
 };
 
-/*
- * WT_EVICT_WORKER --
- *	Encapsulation of an eviction worker thread.
- */
-struct __wt_evict_worker {
-	WT_SESSION_IMPL *session;
-	u_int id;
-	wt_thread_t tid;
-#define	WT_EVICT_WORKER_RUN	0x01
-	uint32_t flags;
-};
-
 /* Cache operations. */
 typedef enum __wt_cache_op {
 	WT_SYNC_CHECKPOINT,
@@ -109,8 +97,6 @@ struct __wt_cache {
 	 */
 	WT_CONDVAR *evict_cond;		/* Eviction server condition */
 	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
-	/* Condition signalled when the eviction server populates the queue */
-	WT_CONDVAR *evict_waiter_cond;
 
 	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */

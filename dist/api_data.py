@@ -519,6 +519,7 @@ connection_runtime_config = [
             'shared_cache',
             'split',
             'temporary',
+            'thread_group',
             'transaction',
             'verify',
             'version',

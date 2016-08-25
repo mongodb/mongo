@@ -1727,6 +1727,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "shared_cache",	WT_VERB_SHARED_CACHE },
 		{ "split",		WT_VERB_SPLIT },
 		{ "temporary",		WT_VERB_TEMPORARY },
+		{ "thread_group",	WT_VERB_THREAD_GROUP },
 		{ "transaction",	WT_VERB_TRANSACTION },
 		{ "verify",		WT_VERB_VERIFY },
 		{ "version",		WT_VERB_VERSION },
