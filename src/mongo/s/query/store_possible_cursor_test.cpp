@@ -64,6 +64,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     auto outgoingCursorResponse =
         storePossibleCursor(hostAndPort,
                             cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
+                            nss,
                             nullptr,  // TaskExecutor
                             getManager());
     ASSERT_OK(outgoingCursorResponse.getStatus());
@@ -81,6 +82,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
     auto outgoingCursorResponse = storePossibleCursor(hostAndPort,
                                                       fromjson("{ok: 1, cursor: {}}"),
+                                                      nss,
                                                       nullptr,  // TaskExecutor
                                                       getManager());
     ASSERT_NOT_OK(outgoingCursorResponse.getStatus());
@@ -94,6 +96,7 @@ TEST_F(StorePossibleCursorTest, PassesUpCommandResultIfItDoesNotDescribeACursor)
                                  << "cursor");
     auto outgoingCursorResponse = storePossibleCursor(hostAndPort,
                                                       notACursorObj,
+                                                      nss,
                                                       nullptr,  // TaskExecutor
                                                       getManager());
     ASSERT_OK(outgoingCursorResponse.getStatus());

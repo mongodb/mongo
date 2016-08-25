@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/commands/killcursors_common.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/killcursors_request.h"
 
@@ -45,7 +46,7 @@ public:
 
 private:
     Status _killCursor(OperationContext* txn, const NamespaceString& nss, CursorId cursorId) final {
-        std::unique_ptr<AutoGetCollectionForRead> ctx;
+        std::unique_ptr<AutoGetCollectionOrViewForRead> ctx;
 
         CursorManager* cursorManager;
         if (nss.isListIndexesCursorNS() || nss.isListCollectionsCursorNS()) {
@@ -54,8 +55,25 @@ private:
             // data within a collection.
             cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, nss);
+            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(txn, nss);
             Collection* collection = ctx->getCollection();
+            ViewDefinition* view = ctx->getView();
+            if (view) {
+                Database* db = ctx->getDb();
+                auto resolved = db->getViewCatalog()->resolveView(txn, nss);
+                if (!resolved.isOK()) {
+                    return resolved.getStatus();
+                }
+                ctx->releaseLocksForView();
+                Status status = _killCursor(txn, resolved.getValue().getNamespace(), cursorId);
+                {
+                    // Set the namespace of the curop back to the view namespace so ctx records
+                    // stats on this view namespace on destruction.
+                    stdx::lock_guard<Client>(*txn->getClient());
+                    CurOp::get(txn)->setNS_inlock(nss.ns());
+                }
+                return status;
+            }
             if (!collection) {
                 return {ErrorCodes::CursorNotFound,
                         str::stream() << "collection does not exist: " << nss.ns()};

@@ -79,8 +79,14 @@ public:
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         const std::string fullns = parseNs(dbname, cmdObj);
-        return ClusterAggregate::runAggregate(
-            txn, dbname, fullns, cmdObj, options, errmsg, &result);
+        const NamespaceString nss(fullns);
+
+        ClusterAggregate::Namespaces nsStruct;
+        nsStruct.requestedNss = nss;
+        nsStruct.executionNss = std::move(nss);
+        auto status = ClusterAggregate::runAggregate(txn, nsStruct, cmdObj, options, &result);
+        appendCommandStatus(result, status);
+        return status.isOK();
     }
 } clusterPipelineCmd;
 

@@ -171,14 +171,11 @@ public:
             root->pushBack(id);
         }
 
-        const std::string cursorNamespace = str::stream() << dbname << ".$cmd." << getName() << "."
-                                                          << ns.coll();
-        dassert(NamespaceString(cursorNamespace).isValid());
-        dassert(NamespaceString(cursorNamespace).isListIndexesCursorNS());
-        dassert(ns == NamespaceString(cursorNamespace).getTargetNSForListIndexes());
+        const NamespaceString cursorNss = NamespaceString::makeListIndexesNSS(dbname, ns.coll());
+        dassert(ns == cursorNss.getTargetNSForListIndexes());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(root), cursorNamespace, PlanExecutor::YIELD_MANUAL);
+            txn, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -210,12 +207,12 @@ public:
             ClientCursor* cursor =
                 new ClientCursor(CursorManager::getGlobalCursorManager(),
                                  exec.release(),
-                                 cursorNamespace,
+                                 cursorNss.ns(),
                                  txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
             cursorId = cursor->cursorid();
         }
 
-        appendCursorResponseObject(cursorId, cursorNamespace, firstBatch.arr(), &result);
+        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

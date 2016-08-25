@@ -226,7 +226,42 @@
         getDiagnosticData: {skip: isUnrelated},
         getLastError: {skip: isUnrelated},
         getLog: {skip: isUnrelated},
-        getMore: {skip: "TODO(SERVER-24724)"},
+        getMore: {
+            setup: function(conn) {
+                assert.writeOK(conn.collection.remove({}));
+                assert.writeOK(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
+            },
+            command: function(conn) {
+                function testGetMoreForCommand(cmd) {
+                    let res = conn.runCommand(cmd);
+                    assert.commandWorked(res, cmd);
+                    let cursor = res.cursor;
+                    assert.eq(cursor.ns,
+                              "test.view",
+                              "expected view namespace in cursor: " + tojson(cursor));
+                    let expectedFirstBatch = [{_id: 1}, {_id: 2}];
+                    assert.eq(cursor.firstBatch, expectedFirstBatch, "returned wrong firstBatch");
+                    let getmoreCmd = {getMore: cursor.id, collection: "view"};
+                    res = conn.runCommand(getmoreCmd);
+
+                    assert.commandWorked(res, getmoreCmd);
+                    assert.eq("test.view",
+                              res.cursor.ns,
+                              "expected view namespace in cursor: " + tojson(res));
+                }
+                // find command.
+                let findCmd = {find: "view", filter: {_id: {$gt: 0}}, batchSize: 2};
+                testGetMoreForCommand(findCmd);
+
+                // aggregate command.
+                let aggCmd = {
+                    aggregate: "view",
+                    pipeline: [{$match: {_id: {$gt: 0}}}],
+                    cursor: {batchSize: 2}
+                };
+                testGetMoreForCommand(aggCmd);
+            }
+        },
         getParameter: {skip: isUnrelated},
         getPrevError: {skip: isUnrelated},
         getShardMap: {skip: isUnrelated},
@@ -282,7 +317,36 @@
         isdbgrid: {skip: isUnrelated},
         isMaster: {skip: isUnrelated},
         journalLatencyTest: {skip: isUnrelated},
-        killCursors: {skip: "TODO(SERVER-24771)"},
+        killCursors: {
+            setup: function(conn) {
+                assert.writeOK(conn.collection.remove({}));
+                assert.writeOK(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
+            },
+            command: function(conn) {
+                // First get and check a partial result for an aggregate command.
+                let aggCmd = {aggregate: "view", pipeline: [], cursor: {batchSize: 2}};
+                let res = conn.runCommand(aggCmd);
+                assert.commandWorked(res, aggCmd);
+                let cursor = res.cursor;
+                assert.eq(
+                    cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+                let expectedFirstBatch = [{_id: 1}, {_id: 2}];
+                assert.eq(cursor.firstBatch, expectedFirstBatch, "find returned wrong firstBatch");
+
+                // Then check correct execution of the killCursors command.
+                let killCursorsCmd = {killCursors: "view", cursors: [cursor.id]};
+                res = conn.runCommand(killCursorsCmd);
+                assert.commandWorked(res, killCursorsCmd);
+                let expectedRes = {
+                    cursorsKilled: [cursor.id],
+                    cursorsNotFound: [],
+                    cursorsAlive: [],
+                    cursorsUnknown: [],
+                    ok: 1
+                };
+                assert.eq(expectedRes, res, "unexpected result for: " + tojson(killCursorsCmd));
+            }
+        },
         killOp: {skip: isUnrelated},
         listCollections: {skip: "tested in views/views_creation.js"},
         listCommands: {skip: isUnrelated},

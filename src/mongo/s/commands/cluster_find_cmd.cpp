@@ -38,6 +38,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_find.h"
 
@@ -137,16 +138,14 @@ public:
                 return aggCmd.getStatus();
             }
 
-            Command* c = Command::findCommand("aggregate");
             int queryOptions = 0;
-            std::string errMsg;
-
-            if (c->run(txn, dbname, aggCmd.getValue(), queryOptions, errMsg, *out)) {
-                return Status::OK();
-            }
-
-            BSONObj tmp = out->asTempObj();
-            return getStatusFromCommandResult(out->asTempObj());
+            ClusterAggregate::Namespaces nsStruct;
+            nsStruct.requestedNss = std::move(nss);
+            nsStruct.executionNss = std::move(resolvedView.getNamespace());
+            auto status =
+                ClusterAggregate::runAggregate(txn, nsStruct, aggCmd.getValue(), queryOptions, out);
+            appendCommandStatus(*out, status);
+            return status;
         }
 
         return result;
@@ -207,8 +206,17 @@ public:
                     return appendCommandStatus(result, aggCmd.getStatus());
                 }
 
-                return Command::findCommand("aggregate")
-                    ->run(txn, dbname, aggCmd.getValue(), options, errmsg, result);
+                // We pass both the underlying collection namespace and the view namespace here. The
+                // underlying collection namespace is used to execute the aggregation on mongoD. Any
+                // cursor returned will be registered under the view namespace so that subsequent
+                // getMore and killCursors calls against the view have access.
+                ClusterAggregate::Namespaces nsStruct;
+                nsStruct.requestedNss = std::move(nss);
+                nsStruct.executionNss = std::move(resolvedView.getNamespace());
+                auto status = ClusterAggregate::runAggregate(
+                    txn, nsStruct, aggCmd.getValue(), options, &result);
+                appendCommandStatus(result, status);
+                return status.isOK();
             }
 
             return appendCommandStatus(result, cursorId.getStatus());

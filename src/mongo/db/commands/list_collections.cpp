@@ -265,12 +265,10 @@ public:
             });
         }
 
-        const std::string cursorNamespace = str::stream() << dbname << ".$cmd." << getName();
-        dassert(NamespaceString(cursorNamespace).isValid());
-        dassert(NamespaceString(cursorNamespace).isListCollectionsCursorNS());
+        const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(root), cursorNamespace, PlanExecutor::YIELD_MANUAL);
+            txn, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -302,12 +300,12 @@ public:
             ClientCursor* cursor =
                 new ClientCursor(CursorManager::getGlobalCursorManager(),
                                  exec.release(),
-                                 cursorNamespace,
+                                 cursorNss.ns(),
                                  txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
             cursorId = cursor->cursorid();
         }
 
-        appendCursorResponseObject(cursorId, cursorNamespace, firstBatch.arr(), &result);
+        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

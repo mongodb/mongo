@@ -255,4 +255,21 @@ TEST(NamespaceStringTest, NamespaceStringParse4) {
     ASSERT_EQUALS((string) "abc", ns.db());
     ASSERT_EQUALS((string) "", ns.coll());
 }
+
+TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
+    NamespaceString ns = NamespaceString::makeListCollectionsNSS("DB");
+    ASSERT_EQUALS("DB", ns.db());
+    ASSERT_EQUALS("$cmd.listCollections", ns.coll());
+    ASSERT(ns.isValid());
+    ASSERT(ns.isListCollectionsCursorNS());
+}
+
+TEST(NamespaceStringTest, makeListIndexesNSIsCorrect) {
+    NamespaceString ns = NamespaceString::makeListIndexesNSS("DB", "COLL");
+    ASSERT_EQUALS("DB", ns.db());
+    ASSERT_EQUALS("$cmd.listIndexes.COLL", ns.coll());
+    ASSERT(ns.isValid());
+    ASSERT(ns.isListIndexesCursorNS());
+    ASSERT_EQUALS(NamespaceString("DB.COLL"), ns.getTargetNSForListIndexes());
+}
 }

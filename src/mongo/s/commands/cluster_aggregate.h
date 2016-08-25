@@ -31,7 +31,9 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/config.h"
@@ -45,13 +47,26 @@ class OperationContext;
  */
 class ClusterAggregate {
 public:
-    static bool runAggregate(OperationContext* txn,
-                             const std::string& dbname,
-                             const std::string& fullns,
-                             BSONObj& cmdObj,
-                             int options,
-                             std::string& errmsg,
-                             BSONObjBuilder* result);
+    /**
+     * 'requestedNss' is the namespace aggregation will register cursors under. This is the
+     * namespace which we will return in responses to aggregate / getMore commands, and it is the
+     * namespace we expect users to hand us inside any subsequent getMores. 'executionNss' is the
+     * namespace we will run the mongod aggregate and subsequent getMore's against.
+     */
+    struct Namespaces {
+        NamespaceString requestedNss;
+        NamespaceString executionNss;
+    };
+
+    /**
+     * Executes an aggregation command. 'cmdObj' specifies the aggregation to run. Fills in 'result'
+     * with the command response.
+     */
+    static Status runAggregate(OperationContext* txn,
+                               const Namespaces& namespaces,
+                               BSONObj cmdObj,
+                               int options,
+                               BSONObjBuilder* result);
 
 private:
     static std::vector<DocumentSourceMergeCursors::CursorDescriptor> parseCursors(
@@ -67,17 +82,16 @@ private:
     // multiple servers such as for replica sets. These also take care of registering
     // returned cursors.
     static BSONObj aggRunCommand(DBClientBase* conn,
-                                 const std::string& db,
+                                 const Namespaces& namespaces,
                                  BSONObj cmd,
                                  int queryOptions);
 
-    static bool aggPassthrough(OperationContext* txn,
-                               const std::string& dbname,
-                               std::shared_ptr<DBConfig> conf,
-                               BSONObj cmd,
-                               BSONObjBuilder* result,
-                               int queryOptions,
-                               std::string& errmsg);
+    static Status aggPassthrough(OperationContext* txn,
+                                 const Namespaces& namespaces,
+                                 std::shared_ptr<DBConfig> conf,
+                                 BSONObj cmd,
+                                 BSONObjBuilder* result,
+                                 int queryOptions);
 };
 
 }  // namespace mongo

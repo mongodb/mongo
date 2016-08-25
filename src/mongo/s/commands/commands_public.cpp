@@ -89,6 +89,7 @@ namespace {
 bool cursorCommandPassthrough(OperationContext* txn,
                               shared_ptr<DBConfig> conf,
                               const BSONObj& cmdObj,
+                              const NamespaceString& nss,
                               int options,
                               BSONObjBuilder* out) {
     const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
@@ -121,6 +122,7 @@ bool cursorCommandPassthrough(OperationContext* txn,
     StatusWith<BSONObj> transformedResponse =
         storePossibleCursor(HostAndPort(cursor->originalHost()),
                             response,
+                            nss,
                             Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(),
                             Grid::get(txn)->getCursorManager());
     if (!transformedResponse.isOK()) {
@@ -1734,12 +1736,14 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) final {
+        auto nss = NamespaceString::makeListCollectionsNSS(dbName);
+
         auto conf = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
         if (!conf.isOK()) {
             return appendEmptyResultSet(result, conf.getStatus(), dbName + ".$cmd.listCollections");
         }
 
-        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, options, &result);
+        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, nss, options, &result);
     }
 } cmdListCollections;
 
@@ -1782,7 +1786,12 @@ public:
             return appendCommandStatus(result, conf.getStatus());
         }
 
-        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, options, &result);
+        const NamespaceString targetNss(parseNs(dbName, cmdObj));
+        const NamespaceString commandNss =
+            NamespaceString::makeListIndexesNSS(targetNss.db(), targetNss.coll());
+        dassert(targetNss == commandNss.getTargetNSForListIndexes());
+
+        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, commandNss, options, &result);
     }
 
 } cmdListIndexes;

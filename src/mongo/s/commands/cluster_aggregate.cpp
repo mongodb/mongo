@@ -58,27 +58,27 @@
 
 namespace mongo {
 
-bool ClusterAggregate::runAggregate(OperationContext* txn,
-                                    const std::string& dbname,
-                                    const std::string& fullns,
-                                    BSONObj& cmdObj,
-                                    int options,
-                                    std::string& errmsg,
-                                    BSONObjBuilder* result) {
+Status ClusterAggregate::runAggregate(OperationContext* txn,
+                                      const Namespaces& namespaces,
+                                      BSONObj cmdObj,
+                                      int options,
+                                      BSONObjBuilder* result) {
+    auto dbname = namespaces.executionNss.db().toString();
     auto status = grid.catalogCache()->getDatabase(txn, dbname);
     if (!status.isOK()) {
-        return appendEmptyResultSet(*result, status.getStatus(), fullns);
+        appendEmptyResultSet(*result, status.getStatus(), namespaces.requestedNss.ns());
+        return Status::OK();
     }
 
     std::shared_ptr<DBConfig> conf = status.getValue();
 
     if (!conf->isShardingEnabled()) {
-        return aggPassthrough(txn, dbname, conf, cmdObj, result, options, errmsg);
+        return aggPassthrough(txn, namespaces, conf, cmdObj, result, options);
     }
 
-    auto request = AggregationRequest::parseFromBSON(NamespaceString(fullns), cmdObj);
+    auto request = AggregationRequest::parseFromBSON(namespaces.executionNss, cmdObj);
     if (!request.isOK()) {
-        return Command::appendCommandStatus(*result, request.getStatus());
+        return request.getStatus();
     }
 
     boost::intrusive_ptr<ExpressionContext> mergeCtx =
@@ -89,7 +89,7 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
     // Parse and optimize the pipeline specification.
     auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
     if (!pipeline.isOK()) {
-        return Command::appendCommandStatus(*result, pipeline.getStatus());
+        return pipeline.getStatus();
     }
 
     for (auto&& ns : pipeline.getValue()->getInvolvedCollections()) {
@@ -103,11 +103,11 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
         mergeCtx->resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
     }
 
-    if (!conf->isSharded(fullns)) {
-        return aggPassthrough(txn, dbname, conf, cmdObj, result, options, errmsg);
+    if (!conf->isSharded(namespaces.executionNss.ns())) {
+        return aggPassthrough(txn, namespaces, conf, cmdObj, result, options);
     }
 
-    ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, fullns);
+    ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, namespaces.executionNss.ns());
 
     // If there was no collation specified, but there is a default collation for the collation,
     // use that.
@@ -176,7 +176,7 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
                         dbname,
                         shardedCommand,
                         options,
-                        fullns,
+                        namespaces.executionNss.ns(),
                         shardQuery,
                         request.getValue().getCollation(),
                         &shardResults);
@@ -200,7 +200,7 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
                                              << shardResults[i].result["stages"]));
         }
 
-        return true;
+        return Status::OK();
     }
 
     if (!needSplit) {
@@ -210,10 +210,11 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
         const BSONObj reply =
             uassertStatusOK(storePossibleCursor(shardResults[0].target.getServers()[0],
                                                 shardResults[0].result,
+                                                namespaces.requestedNss,
                                                 executorPool->getArbitraryExecutor(),
                                                 grid.getCursorManager()));
         result->appendElements(reply);
-        return reply["ok"].trueValue();
+        return getStatusFromCommandResult(reply);
     }
 
     pipeline.getValue()->addInitialSource(
@@ -256,9 +257,11 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
     const auto& mergingShardId = needPrimaryShardMerger
         ? conf->getPrimaryId()
         : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
-    const auto mergingShard = grid.shardRegistry()->getShard(txn, mergingShardId);
+    const auto mergingShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, mergingShardId));
+
     ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
-    BSONObj mergedResults = aggRunCommand(conn.get(), dbname, mergeCmd.freeze().toBson(), options);
+    BSONObj mergedResults =
+        aggRunCommand(conn.get(), namespaces, mergeCmd.freeze().toBson(), options);
     conn.done();
 
     if (auto wcErrorElem = mergedResults["writeConcernError"]) {
@@ -269,7 +272,7 @@ bool ClusterAggregate::runAggregate(OperationContext* txn,
     // Also, propagates errmsg and code if ok == false.
     result->appendElementsUnique(mergedResults);
 
-    return mergedResults["ok"].trueValue();
+    return getStatusFromCommandResult(result->asTempObj());
 }
 
 std::vector<DocumentSourceMergeCursors::CursorDescriptor> ClusterAggregate::parseCursors(
@@ -376,7 +379,7 @@ void ClusterAggregate::killAllCursors(const std::vector<Strategy::CommandResult>
 }
 
 BSONObj ClusterAggregate::aggRunCommand(DBClientBase* conn,
-                                        const std::string& db,
+                                        const Namespaces& namespaces,
                                         BSONObj cmd,
                                         int queryOptions) {
     // Temporary hack. See comment on declaration for details.
@@ -385,7 +388,7 @@ BSONObj ClusterAggregate::aggRunCommand(DBClientBase* conn,
             "should only be running an aggregate command here",
             str::equals(cmd.firstElementFieldName(), "aggregate"));
 
-    auto cursor = conn->query(db + ".$cmd",
+    auto cursor = conn->query(namespaces.executionNss.db() + ".$cmd",
                               cmd,
                               -1,    // nToReturn
                               0,     // nToSkip
@@ -405,28 +408,32 @@ BSONObj ClusterAggregate::aggRunCommand(DBClientBase* conn,
     auto executorPool = grid.getExecutorPool();
     result = uassertStatusOK(storePossibleCursor(HostAndPort(cursor->originalHost()),
                                                  result,
+                                                 namespaces.requestedNss,
                                                  executorPool->getArbitraryExecutor(),
                                                  grid.getCursorManager()));
     return result;
 }
 
-bool ClusterAggregate::aggPassthrough(OperationContext* txn,
-                                      const std::string& dbname,
-                                      std::shared_ptr<DBConfig> conf,
-                                      BSONObj cmdObj,
-                                      BSONObjBuilder* out,
-                                      int queryOptions,
-                                      std::string& errmsg) {
+Status ClusterAggregate::aggPassthrough(OperationContext* txn,
+                                        const Namespaces& namespaces,
+                                        std::shared_ptr<DBConfig> conf,
+                                        BSONObj cmdObj,
+                                        BSONObjBuilder* out,
+                                        int queryOptions) {
     // Temporary hack. See comment on declaration for details.
-    const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
-    ShardConnection conn(shard->getConnString(), "");
-    BSONObj result = aggRunCommand(conn.get(), conf->name(), cmdObj, queryOptions);
+    auto shardStatus = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
+    if (!shardStatus.isOK()) {
+        return shardStatus.getStatus();
+    }
+
+    ShardConnection conn(shardStatus.getValue()->getConnString(), "");
+    BSONObj result = aggRunCommand(conn.get(), namespaces, cmdObj, queryOptions);
     conn.done();
 
     // First append the properly constructed writeConcernError. It will then be skipped
     // in appendElementsUnique.
     if (auto wcErrorElem = result["writeConcernError"]) {
-        appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, *out);
+        appendWriteConcernErrorToCmdResponse(shardStatus.getValue()->getId(), wcErrorElem, *out);
     }
 
     out->appendElementsUnique(result);
@@ -438,21 +445,28 @@ bool ClusterAggregate::aggPassthrough(OperationContext* txn,
         auto request = AggregationRequest::parseFromBSON(resolvedView.getNamespace(), cmdObj);
         if (!request.isOK()) {
             out->resetToEmpty();
-            return Command::appendCommandStatus(*out, request.getStatus());
+            return request.getStatus();
         }
 
         auto aggCmd = resolvedView.asExpandedViewAggregation(request.getValue());
         if (!aggCmd.isOK()) {
             out->resetToEmpty();
-            return Command::appendCommandStatus(*out, aggCmd.getStatus());
+            return aggCmd.getStatus();
         }
 
         out->resetToEmpty();
-        return Command::findCommand("aggregate")
-            ->run(txn, dbname, aggCmd.getValue(), queryOptions, errmsg, *out);
+
+        // We pass both the underlying collection namespace and the view namespace here. The
+        // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
+        // returned will be registered under the view namespace so that subsequent getMore and
+        // killCursors calls against the view have access.
+        Namespaces nsStruct;
+        nsStruct.requestedNss = namespaces.requestedNss;
+        nsStruct.executionNss = resolvedView.getNamespace();
+        return ClusterAggregate::runAggregate(txn, nsStruct, aggCmd.getValue(), queryOptions, out);
     }
 
-    return result["ok"].trueValue();
+    return getStatusFromCommandResult(result);
 }
 
 }  // namespace mongo
