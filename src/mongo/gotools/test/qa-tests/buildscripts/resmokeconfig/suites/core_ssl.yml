@@ -1,0 +1,38 @@
+selector:
+  js_test:
+    roots:
+        - jstests/bson/*.js
+        - jstests/dump/*.js
+        - jstests/export/*.js
+        - jstests/files/*.js
+        - jstests/import/*.js
+        - jstests/oplog/*.js
+        - jstests/restore/*.js
+        - jstests/stat/*.js
+        - jstests/top/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            useSSL: true
+        eval_prepend: "load('jstests/libs/servers.js'); load('jstests/libs/servers_misc.js');"
+        readMode: commands
+        ssl: ''
+        sslAllowInvalidCertificates: ''
+        sslCAFile: jstests/libs/ca.pem
+        sslPEMKeyFile: jstests/libs/client.pem
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+        sslMode: allowSSL
+        sslPEMKeyFile: jstests/libs/server.pem
+        sslCAFile: jstests/libs/ca.pem
+        sslWeakCertificateValidation: ''

@@ -1,0 +1,7 @@
+{
+    "net" : {
+        "http" : {
+            "JSONPEnabled" : false
+        }
+    }
+}

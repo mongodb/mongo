@@ -1,0 +1,1535 @@
+#######################################
+#    Tools Driver Config for MCI      #
+#######################################
+# default command type
+command_type: system
+
+# run the same task in the previous revision if the current task fails
+stepback: true
+disable_cleanup: true
+
+mongo_tools_variables:
+
+## List of tests to run on each buildvariant
+  mongo_tools_task_lists:
+    osx_1010_task_list: &osx_1010_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+      - name: legacy26
+      - name: legacy24
+      - name: qa-tests
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
+      - name: unit
+    osx_1010_ssl_task_list: &osx_1010_ssl_tasks
+      - name: dist
+      - name: qa-tests
+    solaris_task_list: &solaris_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+      - name: legacy26
+      - name: legacy24
+    ubuntu1204_task_list: &ubuntu1204_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+      - name: legacy28-wt
+      - name: lint-go
+      - name: lint-js
+      - name: qa-tests
+      - name: qa-tests-unstable
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
+      - name: qa-tests-wt
+      - name: text
+      - name: unit
+      - name: util
+      - name: vet
+    ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+      - name: qa-tests
+      - name: qa-tests-unstable
+    ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: kerberos
+      - name: legacy28
+      - name: legacy26
+      - name: legacy24
+      - name: qa-tests
+      - name: text
+      - name: util
+    ubuntu1204_race_task_list: &ubuntu1204_race_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+      - name: legacy28-wt
+      - name: legacy26
+      - name: legacy24
+      - name: qa-tests
+      - name: qa-tests-wt
+      - name: text
+      - name: unit
+      - name: util
+    windows_32_task_list: &windows_32_tasks
+      - name: db
+        distros:
+        - windows-64-vs2013-test
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+        distros:
+        - windows-64-vs2013-test
+      - name: legacy26
+        distros:
+        - windows-64-vs2013-test
+      - name: legacy24
+        distros:
+        - windows-64-vs2013-test
+      - name: unit
+    windows_64_task_list: &windows_64_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+        distros:
+        - windows-64-vs2013-test
+      - name: legacy26
+        distros:
+        - windows-64-vs2013-test
+      - name: legacy24
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-tests
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-dump-restore-archiving
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-dump-restore-gzip
+        distros:
+        - windows-64-vs2013-test
+      - name: unit
+    windows_64_ssl_task_list: &windows_64_ssl_tasks
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: legacy28
+      - name: qa-tests
+    windows_64_enterprise_task_list: &windows_64_enterprise_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: kerberos
+      - name: legacy28
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-tests
+        distros:
+        - windows-64-vs2013-test
+      - name: unit
+    rhel71_enterprise_task_list: &rhel71_enterprise_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      #- name: kerberos
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
+      - name: qa-tests
+      - name: qa-tests-unstable
+      - name: qa-tests-wt
+      - name: text
+      - name: util
+
+
+## Common mongodb arguments
+  mongod_arguments:
+    default: &mongod_default_startup_args
+      mongod_args: &mongod_default_startup_args_string "--port 33333"
+    ssl: &mongod_ssl_startup_args
+      mongod_args: "--port 33333 --sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem"
+    # Set storage engine as mmapv1 for 32 bit variants because WiredTiger requires 64 bit support.
+    win32: &mongod_win32_startup_args
+      mongod_args: "--port 33333 --storageEngine=mmapv1"
+
+  mongo_arguments:
+    default: &mongo_default_startup_args
+      mongo_args: &mongo_default_startup_args_string "--port 33333"
+    ssl: &mongo_ssl_startup_args
+      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates"
+
+functions:
+  "run legacy tests":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        mv ./mongodb/mongod${extension} .
+        mv ./mongodb/mongo${extension} .
+        mv ${test_path}/* .
+        chmod +x mongo*
+        python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} ${smoke_args} tool
+
+  "run qa-tests":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        set -e
+        mv ./mongodb/mongod${extension} .
+        mv ./mongodb/mongo${extension} .
+        mv ./mongodb/mongos${extension} .
+        mv test/qa-tests/* .
+        chmod +x mongo*
+        if [ -f bsondump ]; then
+          chmod +x bsondump
+        fi
+        rm -rf /data/install /data/multiversion
+        if [ "${multiversion_override}" != "skip" ]; then
+          python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} ${multiversion_override|2.6 2.4} --latest ${smoke_use_ssl} --os="${mongo_os}"
+        fi
+        chmod 400 jstests/libs/key*
+
+        PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
+
+  "build tool":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        echo "Building ${tool}..."
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
+        if [ '${library_path}' != '' ]; then
+            export ${library_path}
+        fi
+
+        # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
+        # use a wrapper if it's present on the system
+        #
+        if [ -d /opt/ldwrapper/bin ]
+        then
+          export PATH=/opt/ldwrapper/bin:$PATH
+        fi
+
+        sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
+        sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+
+        . ./set_gopath.sh
+        ${gorootvars} go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
+        ./bin/${tool} --version
+
+  "download mongod":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -x
+        mongotarget=$(if [ "${mongo_target}" ]; then echo "${mongo_target}"; else echo "${mongo_os}"; fi)
+        dlurl=$(python binaryurl.py --edition=${mongo_edition} --target=$mongotarget --version=${mongo_version})
+        filename=$(echo $dlurl | sed -e "s_.*/__")
+        mkdir mongodb
+        cd mongodb
+        curl -s $dlurl --output $filename
+        ${decompress} $filename
+        rm $filename
+        chmod +x ./mongodb-*/bin/*
+        if [ "${only_shell}" ]; then
+          mv -f ./mongodb-*/bin/mongo${extension} .
+        else
+          mv -f ./mongodb-*/bin/* .
+        fi
+        rm -rf ./mongodb-*
+
+  "fetch tool" :
+    command: s3.get
+    params:
+      bucket: mciuploads
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${tool}${extension}
+      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
+
+  "generate coverage html + text":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        if [ "${coverage}" = "true" ]; then
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
+          . ./set_gopath.sh
+          go tool cover -html=coverage.out -o coverage.html
+          go tool cover -func=coverage.out -o coverage.txt
+        fi;
+
+  "get buildnumber":
+    command: keyval.inc
+    params:
+      key: "${build_variant}_tools"
+      destination: "builder_num"
+
+  "move coverage data":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        if [ "${coverage}" = "true" ]; then
+          mv ${package}/coverage.out .
+        fi
+
+  "run unit test":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
+        . ./set_gopath.sh
+        if [ '${library_path}' != '' ]; then
+            export ${library_path}
+        fi
+        export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        export basedir=`pwd`
+        cd ${package}
+        go test ${coverage_args} ${args} ${build_tags} -test.v > unit.suite
+        export exitcode=$?
+        cat unit.suite
+        cp unit.suite $basedir/.
+        exit $exitcode
+
+  "setup integration test":
+    command: shell.exec
+    params:
+      working_dir: src
+      # Set up Kerberos stuff: run kinit if necessary, and add KDC to registry
+      # on Windows (see https://wiki.mongodb.com/display/DH/Testing+Kerberos)
+      script: |
+        if [ '${run_kinit}' = 'true' ]
+        then
+          echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC;
+        fi;
+        if [ "Windows_NT" = "$OS" ]; then
+          cmd /c "REG ADD HKLM\SYSTEM\ControlSet001\Control\Lsa\Kerberos\Domains\LDAPTEST.10GEN.CC /v KdcNames /d ldaptest.10gen.cc /t REG_MULTI_SZ /f"
+        fi;
+
+  "setup permissions":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        chmod 700 set_gopath.sh
+
+  "run tool unit tests":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
+        . ./set_gopath.sh
+
+        # run unit tests under common package
+        for i in "common/bsonutil" "common/json" "common/archive" "common/log" "common/options" "common/progress" "common/text"; do
+            cd $i
+            COMMON_SUBPKG=$(basename $i)
+            COVERAGE_ARGS=""
+            if [ "${run_coverage}" ]; then
+                COVERAGE_ARGS="-coverprofile=coverage_$COMMON_SUBPKG.out"
+            fi;
+            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags} -test.v > $COMMON_SUBPKG.suite
+            if [ $? -ne 0 ]; then
+                echo "suite failed, will exit with error on finish"
+                export exitcode=1
+            fi
+            cat $COMMON_SUBPKG.suite
+            cp $COMMON_SUBPKG.suite ../../
+            cd ../..
+        done
+
+        #TODO mongotop needs a test
+        for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
+            cd $i
+            COVERAGE_ARGS=""
+            if [ "${run_coverage}" ]; then
+                COVERAGE_ARGS="-coverprofile=coverage_$i.out"
+            fi;
+            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags} -test.v > $i.suite
+            if [ $? -ne 0 ]; then
+                echo "suite failed, will exit with error on finish"
+                export exitcode=1
+            fi
+            cat $i.suite
+            cp $i.suite ../.
+            cd ..
+        done
+        exit $exitcode
+
+  "run tool integration tests":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+            export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        fi;
+        . ./set_gopath.sh
+        if [ "${library_path}" != "" ]; then
+            export ${library_path}
+        fi;
+
+        if [ "${create_mongod_users_command}" != "" ]; then
+          export AUTH_USERNAME=${auth_username}
+          export AUTH_PASSWORD=${auth_password}
+          echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} ${mongo_args} admin
+        fi;
+
+        for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
+            cd $i
+            COVERAGE_ARGS=""
+            if [ "${run_coverage}" ]; then
+                COVERAGE_ARGS="-coverprofile=coverage_$i.out"
+            fi;
+            ${library_path} go test $COVERAGE_ARGS -test.v ${args} ${build_tags} > $i.suite
+            if [ $? -ne 0 ]; then
+                echo "suite failed, will exit with error on finish"
+                export exitcode=1
+            fi
+            cat $i.suite
+            cp $i.suite ../.
+            cd ..
+        done
+        exit $exitcode
+
+  "create coverage reports":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
+
+        . ./set_gopath.sh
+
+        for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
+            cd $i
+            perl -pe 's/.*src/github.com\/mongodb\/mongo-tools/' coverage_$i.out > coverage_$i_rewrite.out
+            ${library_path} go tool cover -html=coverage_$i_rewrite.out -o coverage_$i.html
+            ${library_path} go tool cover -func=coverage_$i_rewrite.out -o coverage_$i.txt
+            cd ..
+        done
+
+  "upload html coverage":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${coverage_pkg}/coverage_${coverage_pkg}.html
+      remote_file: mongo-tools/coverage/${coverage_pkg}/${task_id}.html
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/html
+      build_variants: ["ubuntu", "windows-64"]
+      display_name: ${coverage_pkg}-html
+
+  "upload text coverage":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${coverage_pkg}/coverage_${coverage_pkg}.txt
+      remote_file: mongo-tools/coverage/${coverage_pkg}/${task_id}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      build_variants: ["ubuntu", "windows-64"]
+      display_name: ${coverage_pkg}-text
+
+  "setup credentials" :
+    command: shell.exec
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        cat > mci.buildlogger <<END_OF_CREDS
+        slavename='${slave}'
+        passwd='${passwd}'
+        builder='MCI_${build_variant}'
+        build_num=${builder_num}
+        build_phase='${task_name}_${execution}'
+        END_OF_CREDS
+
+  "start mongod":
+    command: shell.exec
+    params:
+      working_dir: src
+      background: true
+      script: |
+        set -o verbose
+        rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
+        mkdir mongodb/${db_files_dir|db_files};
+        echo "Starting mongod...";
+        ./mongodb/mongod${extension} ${mongod_args} --dbpath mongodb/db_files --setParameter=enableTestCommands=1
+
+  "wait for mongod to be ready":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        SECONDS=0
+        while true ; do
+            ./mongodb/mongo${extension} ${mongo_args} </dev/null 2>/dev/null >/dev/null
+            if [ "$?" = "0" ]; then
+                echo "mongod ready";
+                exit 0
+            else
+                SECONDS=`expr $SECONDS + 1`
+                if [ $SECONDS -gt 20 ]; then
+                    echo "mongod not ready after 20 seconds"
+                    exit 1
+                fi
+                echo "waiting for mongod to be ready..." ;
+                sleep 1 ;
+            fi
+        done
+
+  "upload tool":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/bin/${tool}
+      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/octet-stream
+      display_name: ${tool}
+
+pre:
+  - command: shell.exec
+    params:
+      silent: true
+      script: |
+        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
+        rm -rf src /data/db/*
+        exit 0
+
+post:
+  - command: attach.results
+    params:
+      file_location: src/report.json
+  - command: shell.exec
+    params:
+      silent: true
+      script: |
+        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
+        exit 0
+  - command: gotest.parse_files
+    params:
+      files: ["src/*.suite"]
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf /data/db/*
+        exit 0
+
+
+tasks:
+- name: db
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/db"
+          - key: "args"
+            value: "-test.types=db"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "setup integration test"
+    - func: "run unit test"
+
+- name: dist
+  depends_on:
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          rm -rf bin/
+          mkdir bin
+    # bsondump
+    - func: "build tool"
+      vars:
+        tool: bsondump
+    - func: "upload tool"
+      vars:
+        tool: bsondump
+    # mongodump
+    - func: "build tool"
+      vars:
+        tool: mongodump
+    - func: "upload tool"
+      vars:
+        tool: mongodump
+    # mongoexport
+    - func: "build tool"
+      vars:
+        tool: mongoexport
+    - func: "upload tool"
+      vars:
+        tool: mongoexport
+    # mongofiles
+    - func: "build tool"
+      vars:
+        tool: mongofiles
+    - func: "upload tool"
+      vars:
+        tool: mongofiles
+    # mongoimport
+    - func: "build tool"
+      vars:
+        tool: mongoimport
+    - func: "upload tool"
+      vars:
+        tool: mongoimport
+    # mongooplog
+    - func: "build tool"
+      vars:
+        tool: mongooplog
+    - func: "upload tool"
+      vars:
+        tool: mongooplog
+    # mongorestore
+    - func: "build tool"
+      vars:
+        tool: mongorestore
+    - func: "upload tool"
+      vars:
+        tool: mongorestore
+    # mongostat
+    - func: "build tool"
+      vars:
+        tool: mongostat
+    - func: "upload tool"
+      vars:
+        tool: mongostat
+    # mongotop
+    - func: "build tool"
+      vars:
+        tool: mongotop
+    - func: "upload tool"
+      vars:
+        tool: mongotop
+
+- name: integration
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=${integration_test_args}"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "run tool integration tests"
+
+- name: integration-auth
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    # Concat auth args
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=${integration_test_args},auth"
+          - key: "mongod_args"
+            concat: " --auth"
+          - key: "auth_username"
+            value: "passwordIsTaco"
+          - key: "auth_password"
+            value: "Taco"
+          - key: "create_mongod_users_command"
+            value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "run tool integration tests"
+
+- name: kerberos
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    # Explicitly run ONLY Kerberos tests
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=kerberos"
+    - func: "setup integration test"
+    - func: "run tool integration tests"
+
+- name: legacy28
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.0"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "run legacy tests"
+      vars:
+        test_path: "test/legacy28"
+        smoke_args: "--authMechanism SCRAM-SHA-1"
+
+- name: legacy28-wt
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.0"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "run legacy tests"
+      vars:
+        test_path: "test/legacy28"
+        smoke_args: "--authMechanism SCRAM-SHA-1 --storageEngine=wiredTiger"
+
+- name: legacy26
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "2.6"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "run legacy tests"
+      vars:
+        test_path: "test/legacy26"
+        smoke_use_ssl: ""
+
+- name: legacy24
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "2.4"
+    - func: "download mongod"
+      vars:
+        mongo_version: "2.6"
+        only_shell: true
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "run legacy tests"
+      vars:
+        test_path: "test/legacy24"
+        smoke_use_ssl: ""
+
+- name: lint-go
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          retVal=$(. ./set_gopath.sh && go run vendor/src/github.com/3rf/mongo-lint/golint/golint.go mongo* bson* common/*);
+          if [ "$retVal" = "" ]; then exit 0; else echo $retVal; exit 1; fi;
+
+- name: lint-js
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          /opt/node/bin/npm install eslint@3.2
+          /opt/node/bin/node node_modules/eslint/bin/eslint.js test/qa-tests/jstests/**/*.js
+
+- name: qa-tests-unstable
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "latest"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongotop
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "core${resmoke_use_ssl}"
+
+- name: qa-tests
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongotop
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "core${resmoke_use_ssl}"
+
+- name: qa-dump-restore-archiving
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "restore_archive"
+
+- name: qa-dump-restore-gzip
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "restore_gzip"
+
+- name: qa-tests-wt
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongotop
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "core"
+        resmoke_args: "--storageEngine=wiredTiger ${resmoke_args}"
+
+- name: text
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/text"
+    - func: "run unit test"
+
+- name: unit
+  commands:
+    - command: expansions.update
+      params:
+        updates:
+          - key: "run_coverage"
+            value: "true"
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "run tool unit tests"
+    - func: "create coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongoimport"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongoexport"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongostat"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongooplog"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongodump"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongorestore"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+
+- name: util
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/util"
+    - func: "run unit test"
+
+- name: vet
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          . ./set_gopath.sh
+          go tool vet bsondump common mongo*
+
+buildvariants:
+#######################################
+#           OSX Buildvariant          #
+#######################################
+- name: osx-1010
+  display_name: OSX 10.10 64-bit
+  run_on:
+  - osx-1010
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "osx"
+    arch: "osx/x86_64"
+    build_tags: -tags "ssl"
+    resmoke_args: --excludeWithAnyTags=requires_many_files
+  tasks: *osx_1010_tasks
+
+- name: osx-1010-ssl
+  display_name: OSX 10.10 64-bit SSL
+  run_on:
+  - osx-1010
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "osx"
+    mongo_target: "osx-ssl"
+    arch: "osx/x86_64"
+    build_tags: -tags "ssl"
+    edition: ssl
+    resmoke_args: --excludeWithAnyTags=requires_many_files
+  tasks: *osx_1010_ssl_tasks
+
+#######################################
+#          Ubuntu Buildvariants       #
+#######################################
+
+- name: ubuntu
+  display_name: Linux 64-bit
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1204"
+    mongo_edition: "targeted"
+    build_tags: -tags "ssl"
+    arch: "linux/x86_64"
+    integration_test_args: integration
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
+  tasks: *ubuntu1204_tasks
+
+- name: ubuntu-ssl
+  display_name: Linux 64-bit SSL
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "ubuntu1204"
+    mongo_edition: "enterprise"
+    build_tags: -tags "ssl"
+    edition: ssl
+    arch: "linux/x86_64"
+    smoke_use_ssl: --use-ssl
+    resmoke_use_ssl: _ssl
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
+    integration_test_args: "integration,ssl"
+  tasks: *ubuntu1204_ssl_tasks
+
+- name: ubuntu-enterprise
+  display_name: Linux 64-bit Enterprise
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1204"
+    mongo_edition: "enterprise"
+    build_tags: -tags "ssl sasl"
+    smoke_use_ssl: --use-ssl
+    resmoke_use_ssl: _ssl
+    arch: "linux/x86_64"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
+  tasks: *ubuntu1204_enterprise_tasks
+
+- name: rhel71-ppc64le-enterprise
+  display_name: Linux PPC64LE RHEL 7.1 Enterprise
+  run_on:
+  - rhel71-power8-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel71"
+    mongo_edition: "enterprise"
+    # RHEL 7.1 PPC64LE machines kerberos setup does not work for mongo-tools
+    #build_tags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
+    build_tags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
+    resmoke_use_ssl: _ssl
+    library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
+    resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 4
+    multiversion_override: "skip"
+    arch: "linux/ppc64le"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *rhel71_enterprise_tasks
+
+#######################################
+#         Solaris Buildvariant        #
+#######################################
+- name: solaris
+  display_name: Solaris 64-bit
+  run_on:
+  - solaris
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "sunos5"
+    library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
+    build_tags: -gccgoflags "-lsocket -lnsl"
+    resmoke_args: --excludeWithAnyTags=requires_large_ram -j$(kstat cpu | sort -u | grep -c "^module")
+  tasks: *solaris_tasks
+
+#######################################
+#        Windows Buildvariants        #
+#######################################
+- name: windows-32
+  display_name: Windows 32-bit
+  run_on:
+  - windows-32
+  expansions:
+    <<: *mongod_win32_startup_args
+    <<: *mongo_default_startup_args
+    mongo_target: "windows_i686"
+    extension: .exe
+    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    resmoke_args: --excludeWithAnyTags=requires_large_ram
+    integration_test_args: "integration"
+  tasks: *windows_32_tasks
+
+- name: windows-64
+  display_name: Windows 64-bit
+  run_on:
+  - windows-64-vs2013-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "windows-64"
+    mongo_target: "windows_x86_64-2008plus"
+    resmoke_args: --excludeWithAnyTags=requires_large_ram
+    extension: .exe
+    arch: "win32/x86_64"
+    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    integration_test_args: "integration"
+  tasks: *windows_64_tasks
+
+- name: windows-64-ssl
+  display_name: Windows 64-bit SSL
+  run_on:
+  - windows-64-vs2013-compile
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "windows-64"
+    mongo_target: "windows_x86_64-2008plus-ssl"
+    build_tags: -tags "ssl"
+    edition: ssl
+    smoke_use_ssl: --use-ssl
+    resmoke_use_ssl: _ssl
+    resmoke_args: --excludeWithAnyTags=requires_large_ram,requires_mongo_24
+    multiversion_override: "2.6"
+    extension: .exe
+    arch: "win32/x86_64"
+    library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
+    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    integration_test_args: "integration,ssl"
+  tasks: *windows_64_ssl_tasks
+
+- name: windows-64-enterprise
+  display_name: Windows 64-bit Enterprise
+  run_on:
+  - windows-64-vs2013-compile
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "windows-64"
+    mongo_edition: "enterprise"
+    mongo_target: "windows"
+    build_tags: -tags "sasl ssl"
+    smoke_use_ssl: --use-ssl
+    resmoke_use_ssl: _ssl
+    resmoke_args: --excludeWithAnyTags=requires_large_ram,requires_mongo_24
+    multiversion_override: "2.6"
+    edition: enterprise
+    extension: .exe
+    arch: "win32/x86_64"
+    library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
+    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    integration_test_args: "integration"
+  tasks: *windows_64_enterprise_tasks
+
+#######################################
+#     Experimental Buildvariants      #
+#######################################
+
+- name: ubuntu-race
+  stepback: false
+  batchtime: 1440 # daily
+  display_name: z Race Detector Linux 64-bit
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1204"
+    mongo_edition: "enterprise"
+    build_tags: -tags "ssl"
+    arch: "linux/x86_64"
+    args: "-race"
+    resmoke_args: --excludeWithAnyTags=requires_large_ram
+    integration_test_args: integration
+  tasks: *ubuntu1204_race_tasks
+
+#######################################
+#     Dist only Buildvariants         #
+#######################################
+
+- name: suse11
+  display_name: SUSE 11 SSL
+  run_on:
+  - suse11-test
+  expansions:
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: suse12
+  display_name: SUSE 12 SSL
+  run_on:
+  - suse12-test
+  expansions:
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: rhel55
+  display_name: RHEL 5.5 SSL
+  run_on:
+  - rhel55
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: rhel62
+  display_name: RHEL 6.2 SSL
+  run_on:
+  - rhel62-test
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: rhel70
+  display_name: RHEL 7.0 SSL
+  run_on:
+  - rhel70
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: ubuntu1404
+  display_name: Ubuntu 14.04 SSL
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: debian71
+  display_name: Debian 7.1 SSL
+  run_on:
+  - debian71-test
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+  tasks:
+  - name: dist

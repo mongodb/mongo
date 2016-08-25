@@ -1,0 +1,13 @@
+gopkg.in/mgo.v2                         1e52f6152a9b262873f831bb5a94bcd29ef38c38    github.com/10gen/mgo
+gopkg.in/tomb.v2                        14b3d72120e8d10ea6e6b7f87f7175734b1faab8
+github.com/jtolds/gls                   8ddce2a84170772b95dd5d576c48d517b22cac63
+github.com/jacobsa/oglematchers         3ecefc49db07722beca986d9bb71ddd026b133f0
+github.com/smartystreets/assertions     287b4346dc4e71a038c346375a9d572453bc469b
+github.com/smartystreets/goconvey       bf58a9a1291224109919756b4dcc469c670cc7e4
+github.com/jessevdk/go-flags            97448c91aac742cbca3d020b3e769013a420a06f
+github.com/3rf/mongo-lint               3550fdcf1f43b89aaeabaa4559eaae6dc4407e42
+github.com/spacemonkeygo/openssl        688903e99b30b3f3a54c03f069085a246bf300b1    github.com/10gen/openssl
+github.com/howeyc/gopass                44476384cd4721b68705e72f19e95d1a3a504370
+github.com/nsf/termbox-go               0723e7c3d0a317dea811f0fbe4d6edd81908c971
+github.com/mattn/go-runewidth           d6bea18f789704b5f83375793155289da36a3c7f
+golang.org/x/crypto                     1f22c0103821b9390939b6776727195525381532

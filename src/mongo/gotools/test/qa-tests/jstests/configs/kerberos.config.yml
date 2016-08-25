@@ -1,0 +1,7 @@
+security:
+  authorization: enabled
+  sasl:
+    serviceName: mockservice
+    hostName: kdc.10gen.me
+setParameter:
+  authenticationMechanisms: GSSAPI
