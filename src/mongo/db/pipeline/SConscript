@@ -184,7 +184,6 @@ env.Library(
         ],
     LIBDEPS=[
         'document_value',
-        'document_value_test_util',
         'expression',
         'field_path',
     ]
@@ -419,6 +418,7 @@ env.CppUnitTest(
         'granularity_rounder_preferred_numbers_test.cpp',
     ],
     LIBDEPS=[
+        'document_value_test_util',
         'granularity_rounder',
     ],
 )
