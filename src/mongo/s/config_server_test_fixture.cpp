@@ -348,12 +348,13 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     auto config = getConfigShard();
     invariant(config);
 
-    auto insertResponse = config->runCommand(txn,
-                                             kReadPref,
-                                             ns.db().toString(),
-                                             request.toBSON(),
-                                             Shard::kDefaultConfigCommandTimeout,
-                                             Shard::RetryPolicy::kNoRetry);
+    auto insertResponse =
+        config->runCommandWithFixedRetryAttempts(txn,
+                                                 kReadPref,
+                                                 ns.db().toString(),
+                                                 request.toBSON(),
+                                                 Shard::kDefaultConfigCommandTimeout,
+                                                 Shard::RetryPolicy::kNoRetry);
 
     BatchedCommandResponse batchResponse;
     auto status = Shard::CommandResponse::processBatchWriteResponse(insertResponse, &batchResponse);
@@ -433,11 +434,12 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
                                                                      const NamespaceString& ns) {
     auto configShard = getConfigShard();
 
-    auto response = configShard->runCommand(txn,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            ns.db().toString(),
-                                            BSON("listIndexes" << ns.coll().toString()),
-                                            Shard::RetryPolicy::kIdempotent);
+    auto response = configShard->runCommandWithFixedRetryAttempts(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        ns.db().toString(),
+        BSON("listIndexes" << ns.coll().toString()),
+        Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {
         return response.getStatus();
     }

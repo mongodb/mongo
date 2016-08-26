@@ -60,12 +60,12 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardI
         return shardStatus.getStatus();
     }
 
-    auto listDatabasesStatus =
-        shardStatus.getValue()->runCommand(txn,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                           "admin",
-                                           BSON("listDatabases" << 1),
-                                           Shard::RetryPolicy::kIdempotent);
+    auto listDatabasesStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+        "admin",
+        BSON("listDatabases" << 1),
+        Shard::RetryPolicy::kIdempotent);
     if (!listDatabasesStatus.isOK()) {
         return std::move(listDatabasesStatus.getStatus());
     }
@@ -99,12 +99,12 @@ StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
         return shardStatus.getStatus();
     }
 
-    auto cmdStatus =
-        shardStatus.getValue()->runCommand(txn,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                           "admin",
-                                           cmd.obj(),
-                                           Shard::RetryPolicy::kIdempotent);
+    auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+        "admin",
+        cmd.obj(),
+        Shard::RetryPolicy::kIdempotent);
     if (!cmdStatus.isOK()) {
         return std::move(cmdStatus.getStatus());
     }
@@ -145,12 +145,12 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
         return shardStatus.getStatus();
     }
 
-    auto cmdStatus =
-        shardStatus.getValue()->runCommand(txn,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                           "admin",
-                                           cmd.obj(),
-                                           Shard::RetryPolicy::kIdempotent);
+    auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+        "admin",
+        cmd.obj(),
+        Shard::RetryPolicy::kIdempotent);
     if (!cmdStatus.isOK()) {
         return std::move(cmdStatus.getStatus());
     }
@@ -212,12 +212,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     if (!shardStatus.isOK()) {
         status = shardStatus.getStatus();
     } else {
-        auto cmdStatus =
-            shardStatus.getValue()->runCommand(txn,
-                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               "admin",
-                                               cmdObj,
-                                               Shard::RetryPolicy::kNotIdempotent);
+        auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            cmdObj,
+            Shard::RetryPolicy::kNotIdempotent);
         if (!cmdStatus.isOK()) {
             status = std::move(cmdStatus.getStatus());
         } else {

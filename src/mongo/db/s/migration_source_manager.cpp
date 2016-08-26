@@ -321,12 +321,13 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeCommitMigration);
 
-    auto commitChunkMigrationResponse = grid.shardRegistry()->getConfigShard()->runCommand(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        builder.obj(),
-        Shard::RetryPolicy::kIdempotent);
+    auto commitChunkMigrationResponse =
+        grid.shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            builder.obj(),
+            Shard::RetryPolicy::kIdempotent);
 
     if (MONGO_FAIL_POINT(migrationCommitNetworkError)) {
         commitChunkMigrationResponse = Status(

@@ -355,12 +355,13 @@ public:
         auto configCmdObj = request.toConfigCommandBSON(
             BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 
-        auto cmdResponseStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
-            txn,
-            kPrimaryOnlyReadPreference,
-            "admin",
-            configCmdObj,
-            Shard::RetryPolicy::kIdempotent);
+        auto cmdResponseStatus =
+            Grid::get(txn)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                txn,
+                kPrimaryOnlyReadPreference,
+                "admin",
+                configCmdObj,
+                Shard::RetryPolicy::kIdempotent);
 
         //
         // Refresh chunk metadata regardless of whether or not the split succeeded

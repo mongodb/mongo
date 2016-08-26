@@ -858,12 +858,12 @@ Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, BSONObjBuilder
         if (!shardStatus.isOK()) {
             return shardStatus.getStatus();
         }
-        auto cmdResult =
-            shardStatus.getValue()->runCommand(txn,
-                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               "admin",
-                                               cmdObj,
-                                               Shard::RetryPolicy::kIdempotent);
+        auto cmdResult = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            cmdObj,
+            Shard::RetryPolicy::kIdempotent);
         auto status = cmdResult.isOK() ? std::move(cmdResult.getValue().commandStatus)
                                        : std::move(cmdResult.getStatus());
         if (!status.isOK()) {

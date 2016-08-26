@@ -317,7 +317,7 @@ public:
         }
 
         auto applyOpsCommandResponse =
-            Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
+            Grid::get(txn)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
                 txn,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 nss.db().toString(),

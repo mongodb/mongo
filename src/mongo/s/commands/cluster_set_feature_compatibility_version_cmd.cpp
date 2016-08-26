@@ -112,12 +112,12 @@ public:
 
         // Forward to config shard, which will forward to all shards.
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto response =
-            configShard->runCommand(txn,
-                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                    dbname,
-                                    BSON("_configsvrSetFeatureCompatibilityVersion" << version),
-                                    Shard::RetryPolicy::kIdempotent);
+        auto response = configShard->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            dbname,
+            BSON("_configsvrSetFeatureCompatibilityVersion" << version),
+            Shard::RetryPolicy::kIdempotent);
         uassertStatusOK(response);
         uassertStatusOK(response.getValue().commandStatus);
 

@@ -84,12 +84,12 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result) override {
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto cmdResponse =
-            uassertStatusOK(configShard->runCommand(txn,
-                                                    kPrimaryOnlyReadPreference,
-                                                    "admin",
-                                                    BSON(_configsvrCommandName << 1),
-                                                    Shard::RetryPolicy::kIdempotent));
+        auto cmdResponse = uassertStatusOK(
+            configShard->runCommandWithFixedRetryAttempts(txn,
+                                                          kPrimaryOnlyReadPreference,
+                                                          "admin",
+                                                          BSON(_configsvrCommandName << 1),
+                                                          Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponse.commandStatus);
 
         // Append any return value from the response, which the config server returned

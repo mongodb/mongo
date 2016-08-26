@@ -1939,12 +1939,12 @@ Status ShardingCatalogManagerImpl::setFeatureCompatibilityVersionOnShards(
         }
         const auto shard = shardStatus.getValue();
 
-        auto response =
-            shard->runCommand(txn,
-                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                              "admin",
-                              BSON(FeatureCompatibilityVersion::kCommandName << version),
-                              Shard::RetryPolicy::kIdempotent);
+        auto response = shard->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            BSON(FeatureCompatibilityVersion::kCommandName << version),
+            Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
             return response.getStatus();
         }
