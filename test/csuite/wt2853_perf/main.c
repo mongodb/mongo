@@ -44,8 +44,8 @@
 
 void (*custom_die)(void) = NULL;
 
-void *thread_insert(void *);
-void *thread_get(void *);
+static void *thread_insert(void *);
+static void *thread_get(void *);
 
 #define	BLOOM		false
 #define	N_RECORDS	10000
@@ -135,8 +135,8 @@ main(int argc, char *argv[])
 	    &maincur));
 	maincur->set_key(maincur, N_RECORDS);
 	maincur->set_value(maincur, 54321, 0, "", 0, N_RECORDS);
-	maincur->insert(maincur);
-	maincur->close(maincur);
+	testutil_check(maincur->insert(maincur));
+	testutil_check(maincur->close(maincur));
 	testutil_check(session->close(session, NULL));
 
 	for (i = 0; i < N_INSERT_THREAD; ++i) {
@@ -183,13 +183,14 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-void *thread_insert(void *arg)
+static void *thread_insert(void *arg)
 {
 	TEST_OPTS *opts;
 	THREAD_ARGS *threadargs;
 	WT_CURSOR *maincur;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
+	double elapsed;
 	time_t prevtime, curtime; /* 1 second resolution is okay */
 	int bal, i, flag, key, post;
 	const char *extra = S1024;
@@ -197,7 +198,7 @@ void *thread_insert(void *arg)
 	threadargs = (THREAD_ARGS *)arg;
 	opts = threadargs->testopts;
 	testutil_check(__wt_random_init_seed(NULL, &rnd));
-	time(&prevtime);
+	(void)time(&prevtime);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));
@@ -211,7 +212,7 @@ void *thread_insert(void *arg)
 		 * that's okay.
 		 */
 		key = (int)(__wt_random(&rnd) % N_RECORDS);
-		session->begin_transaction(session, NULL);
+		testutil_check(session->begin_transaction(session, NULL));
 		maincur->set_key(maincur, key);
 		if (__wt_random(&rnd) % 2 == 0)
 			post = 54321;
@@ -226,35 +227,36 @@ void *thread_insert(void *arg)
 		}
 		maincur->set_value(maincur, post, bal, extra, flag, key);
 		testutil_check(maincur->insert(maincur));
-		maincur->reset(maincur);
-		session->commit_transaction(session, NULL);
+		testutil_check(maincur->reset(maincur));
+		testutil_check(session->commit_transaction(session, NULL));
 		if (i % 1000 == 0 && i != 0) {
 			if (i % 10000 == 0)
 				fprintf(stderr, "*");
 			else
 				fprintf(stderr, ".");
-			time(&curtime);
-			if (curtime - prevtime > 5) {
+			(void)time(&curtime);
+			if ((elapsed = difftime(curtime, prevtime)) > 5.0) {
 				fprintf(stderr, "\n"
-				    "GAP: %ld secs after %d inserts\n",
-				    curtime - prevtime, i);
+				    "GAP: %.0f secs after %d inserts\n",
+				    elapsed, i);
 				threadargs->nfail++;
 			}
 			prevtime = curtime;
 		}
 	}
-	maincur->close(maincur);
-	session->close(session, NULL);
+	testutil_check(maincur->close(maincur));
+	testutil_check(session->close(session, NULL));
 	return (NULL);
 }
 
-void *thread_get(void *arg)
+static void *thread_get(void *arg)
 {
 	SHARED_OPTS *sharedopts;
 	TEST_OPTS *opts;
 	THREAD_ARGS *threadargs;
 	WT_CURSOR *maincur, *postcur;
 	WT_SESSION *session;
+	double elapsed;
 	time_t prevtime, curtime; /* 1 second resolution is okay */
 	int bal, flag, key, key2, post, bal2, flag2, post2;
 	char *extra;
@@ -262,7 +264,7 @@ void *thread_get(void *arg)
 	threadargs = (THREAD_ARGS *)arg;
 	opts = threadargs->testopts;
 	sharedopts = threadargs->sharedopts;
-	time(&prevtime);
+	(void)time(&prevtime);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));
@@ -274,7 +276,7 @@ void *thread_get(void *arg)
 
 	for (threadargs->njoins = 0; threadargs->done == 0;
 	     threadargs->njoins++) {
-		session->begin_transaction(session, NULL);
+		testutil_check(session->begin_transaction(session, NULL));
 		postcur->set_key(postcur, 54321);
 		testutil_check(postcur->search(postcur));
 		while (postcur->next(postcur) == 0) {
@@ -289,7 +291,7 @@ void *thread_get(void *arg)
 			testutil_check(maincur->search(maincur));
 			testutil_check(maincur->get_value(maincur, &post2,
 			    &bal2, &extra, &flag2, &key2));
-			maincur->reset(maincur);
+			testutil_check(maincur->reset(maincur));
 			testutil_assert(key == key2);
 			testutil_assert(post == post2);
 			testutil_assert(bal == bal2);
@@ -305,19 +307,19 @@ void *thread_get(void *arg)
 		testutil_check(postcur->reset(postcur));
 		if (threadargs->njoins % 100 == 0)
 			fprintf(stderr, "G");
-		session->rollback_transaction(session, NULL);
+		testutil_check(session->rollback_transaction(session, NULL));
 
-		time(&curtime);
-		if (curtime - prevtime > 5) {
+		(void)time(&curtime);
+		if ((elapsed = difftime(curtime, prevtime)) > 5.0) {
 			fprintf(stderr, "\n"
-			    "GAP: %ld secs after %d gets\n",
-			    curtime - prevtime, threadargs->njoins);
+			    "GAP: %.0f secs after %d gets\n",
+			    elapsed, threadargs->njoins);
 			threadargs->nfail++;
 		}
 		prevtime = curtime;
 	}
 	testutil_check(postcur->close(postcur));
 	testutil_check(maincur->close(maincur));
-	session->close(session, NULL);
+	testutil_check(session->close(session, NULL));
 	return (NULL);
 }
