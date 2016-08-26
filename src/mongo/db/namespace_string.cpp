@@ -117,15 +117,14 @@ bool NamespaceString::isListIndexesCursorNS() const {
 }
 
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {
-    NamespaceString nss(dbName, StringData(str::stream() << listCollectionsCursorCol));
+    NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());
     dassert(nss.isListCollectionsCursorNS());
     return nss;
 }
 
 NamespaceString NamespaceString::makeListIndexesNSS(StringData dbName, StringData collectionName) {
-    NamespaceString nss(dbName,
-                        StringData(str::stream() << listIndexesCursorNSPrefix << collectionName));
+    NamespaceString nss(dbName, str::stream() << listIndexesCursorNSPrefix << collectionName);
     dassert(nss.isValid());
     dassert(nss.isListIndexesCursorNS());
     return nss;

@@ -446,6 +446,15 @@ public:
         return std::string(_buf.buf(), _buf.l);
     }
 
+    /**
+     * Returns a view of this string without copying.
+     *
+     * WARNING: the view expires when this StringBuilder is modified or destroyed.
+     */
+    StringData stringData() const {
+        return StringData(_buf.buf(), _buf.l);
+    }
+
     /** size of current std::string */
     int len() const {
         return _buf.l;

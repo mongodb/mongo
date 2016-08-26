@@ -131,8 +131,8 @@ boost::optional<Document> DocumentSourceOut::getNext() {
 
     // We will write all results into a temporary collection, then rename the temporary collection
     // to be the target collection once we are done.
-    _tempNs = NamespaceString(StringData(str::stream() << _outputNs.db() << ".tmp.agg_out."
-                                                       << aggOutCounter.addAndFetch(1)));
+    _tempNs = NamespaceString(str::stream() << _outputNs.db() << ".tmp.agg_out."
+                                            << aggOutCounter.addAndFetch(1));
     auto renameCommandObj =
         BSON("renameCollection" << _tempNs.ns() << "to" << _outputNs.ns() << "dropTarget" << true);
 
