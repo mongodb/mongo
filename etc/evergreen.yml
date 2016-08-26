@@ -787,14 +787,6 @@ post:
       optional: true
 
   # Gather and archive mongo coredumps.
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        file_list=$(find . -type f -maxdepth 1 -name core.*)
-        if [ -n "$file_list" ]; then
-            ${tar|tar} cvzf ../mongo-coredumps.tgz $file_list
-        fi
   - command: archive.targz_pack
     params:
       target: "mongo-coredumps.tgz"
