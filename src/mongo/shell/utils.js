@@ -178,8 +178,9 @@ jsTestOptions = function() {
             noJournalPrealloc: TestData.noJournalPrealloc,
             auth: TestData.auth,
             keyFile: TestData.keyFile,
-            authUser: "__system",
+            authUser: TestData.authUser || "__system",
             authPassword: TestData.keyFileData,
+            authenticationDatabase: TestData.authenticationDatabase || "admin",
             authMechanism: TestData.authMechanism,
             adminUser: TestData.adminUser || "admin",
             adminPassword: TestData.adminPassword || "password",
@@ -231,10 +232,9 @@ jsTest.authenticate = function(conn) {
             // Set authenticated to stop an infinite recursion from getDB calling
             // back into authenticate.
             conn.authenticated = true;
-            print("Authenticating as internal " + jsTestOptions().authUser +
-                  " user with mechanism " + DB.prototype._defaultAuthenticationMechanism +
-                  " on connection: " + conn);
-            conn.authenticated = conn.getDB('admin').auth({
+            print("Authenticating as user " + jsTestOptions().authUser + " with mechanism " +
+                  DB.prototype._defaultAuthenticationMechanism + " on connection: " + conn);
+            conn.authenticated = conn.getDB(jsTestOptions().authenticationDatabase).auth({
                 user: jsTestOptions().authUser,
                 pwd: jsTestOptions().authPassword,
             });
