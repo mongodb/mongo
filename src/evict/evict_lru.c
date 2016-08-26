@@ -403,6 +403,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 	 */
 	F_CLR(conn, WT_CONN_EVICTION_RUN);
 	conn->evict_server_running = false;
+	__wt_evict_server_wake(session);
 
 	__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "waiting for helper threads");

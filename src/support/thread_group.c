@@ -234,9 +234,6 @@ __wt_thread_group_resize(
 	    " from max: %" PRIu32 " -> %" PRIu32 "\n",
 	    group, group->min, new_min, group->max, new_max);
 
-	WT_ASSERT(session,
-	    !__wt_rwlock_islocked(session, group->lock));
-
 	__wt_writelock(session, group->lock);
 	WT_TRET(__thread_group_resize(
 	    session, group, new_min, new_max, flags));
