@@ -57,6 +57,7 @@ namespace repl {
 class LastVote;
 class ReplSettings;
 class ReplicationCoordinator;
+class ReplicationExecutor;
 
 using OnInitialSyncFinishedFn = stdx::function<void()>;
 using StartInitialSyncFn = stdx::function<void(OnInitialSyncFinishedFn callback)>;
@@ -315,6 +316,22 @@ public:
      * Returns true if the user specified to use the data replicator for initial sync.
      */
     virtual bool shouldUseDataReplicatorInitialSync() const = 0;
+
+    /*
+     * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,
+     * hence it must be called before multi-threaded operations start.
+     */
+    virtual void setupNoopWriter(Seconds waitTime) = 0;
+
+    /*
+     * Starts periodic noop writes to oplog.
+     */
+    virtual void startNoopWriter(OpTime) = 0;
+
+    /*
+     * Stops periodic noop writes to oplog.
+     */
+    virtual void stopNoopWriter() = 0;
 };
 
 }  // namespace repl

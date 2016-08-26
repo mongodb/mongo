@@ -125,6 +125,7 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     return builder.obj();
 }
 
+const Seconds kNoopWriterPeriod(10);
 }  // namespace
 
 BSONObj ReplicationCoordinatorImpl::SlaveInfo::toBSON() const {
@@ -345,6 +346,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     SlaveInfo selfInfo;
     selfInfo.self = true;
     _slaveInfo.push_back(selfInfo);
+
+    _externalState->setupNoopWriter(kNoopWriterPeriod);
 }
 
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
@@ -906,6 +909,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     _updateLastCommittedOpTime_inlock();
 
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
+    _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
 }
 
 Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
@@ -2704,6 +2708,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionCloseAllConnections:
             _externalState->closeConnections();
             _externalState->shardingOnStepDownHook();
+            _externalState->stopNoopWriter();
             break;
         case kActionWinElection: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);

@@ -52,6 +52,7 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 class SnapshotThread;
 class StorageInterface;
+class NoopWriter;
 
 class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordinatorExternalState,
                                                       public JournalListener {
@@ -115,6 +116,10 @@ public:
     // Methods from JournalListener.
     virtual JournalListener::Token getToken();
     virtual void onDurable(const JournalListener::Token& token);
+
+    virtual void setupNoopWriter(Seconds waitTime);
+    virtual void startNoopWriter(OpTime);
+    virtual void stopNoopWriter();
 
 private:
     /**
@@ -180,6 +185,9 @@ private:
 
     // Used by repl::multiApply() to apply the sync source's operations in parallel.
     std::unique_ptr<OldThreadPool> _writerPool;
+
+    // Writes a noop every 10 seconds.
+    std::unique_ptr<NoopWriter> _noopWriter;
 };
 
 }  // namespace repl

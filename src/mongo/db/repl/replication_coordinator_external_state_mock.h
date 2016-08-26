@@ -175,6 +175,21 @@ public:
      */
     void setAreSnapshotsEnabled(bool val);
 
+    /**
+     * Noop
+     */
+    virtual void setupNoopWriter(Seconds waitTime);
+
+    /**
+     * Noop
+     */
+    virtual void startNoopWriter(OpTime lastKnownOpTime);
+
+    /**
+     * Noop
+     */
+    virtual void stopNoopWriter();
+
 private:
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;

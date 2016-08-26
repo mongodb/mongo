@@ -52,6 +52,7 @@
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
@@ -291,6 +292,11 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
             // Clear the appliedThrough marker to indicate we are consistent with the top of the
             // oplog.
             _storageInterface->setAppliedThrough(txn, {});
+        }
+
+        if (_noopWriter) {
+            LOG(1) << "Stopping noop writer";
+            _noopWriter->stopWritingPeriodicNoops();
         }
 
         log() << "Stopping replication storage threads";
@@ -826,5 +832,20 @@ void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::T
     repl::getGlobalReplicationCoordinator()->setMyLastDurableOpTimeForward(token);
 }
 
+void ReplicationCoordinatorExternalStateImpl::startNoopWriter(OpTime opTime) {
+    invariant(_noopWriter);
+    _noopWriter->startWritingPeriodicNoops(opTime);
+}
+
+void ReplicationCoordinatorExternalStateImpl::stopNoopWriter() {
+    invariant(_noopWriter);
+    _noopWriter->stopWritingPeriodicNoops();
+}
+
+void ReplicationCoordinatorExternalStateImpl::setupNoopWriter(Seconds waitTime) {
+    invariant(!_noopWriter);
+
+    _noopWriter = stdx::make_unique<NoopWriter>(waitTime);
+}
 }  // namespace repl
 }  // namespace mongo

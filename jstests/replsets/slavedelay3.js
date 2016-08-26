@@ -12,7 +12,6 @@ config.members[2].priority = 0;
 
 replTest.initiate(config);
 var master = replTest.getPrimary().getDB(name);
-replTest.awaitReplication();
 
 var slaveConns = replTest.liveNodes.slaves;
 var slave = [];
@@ -24,7 +23,6 @@ for (var i in slaveConns) {
 
 waitForAllMembers(master);
 
-replTest.awaitReplication();
 nodes[0].disconnect(nodes[2]);
 
 master.foo.insert({x: 1});

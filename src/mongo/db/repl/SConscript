@@ -1055,6 +1055,7 @@ env.Library(
     source=[
         "initial_sync.cpp",
         "master_slave.cpp",
+        'noop_writer.cpp',
         "oplog.cpp",
         "oplogreader.cpp",
         "replication_coordinator_external_state_impl.cpp",

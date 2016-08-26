@@ -14,7 +14,7 @@
         var localDB = primaryConn.getDB('local');
 
         var oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
-        var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
+        var twoKSecTS = new Timestamp(oplogTS.ts.getTime() + 2000, 0);
 
         var term = -1;
         if (config.protocolVersion === 1) {
@@ -26,7 +26,7 @@
             assert.commandFailedWithCode(testDB.runCommand({
                 find: 'user',
                 filter: {x: 1},
-                readConcern: {afterOpTime: {ts: twoSecTS, t: term}},
+                readConcern: {afterOpTime: {ts: twoKSecTS, t: term}},
                 maxTimeMS: 5000,
             }),
                                          ErrorCodes.ExceededTimeLimit);
@@ -79,6 +79,7 @@
         var insertFunc = startParallelShell(
             "sleep(2100); db.user.insert({ y: 1 }, { writeConcern: { w: 2 }});", primaryConn.port);
 
+        var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
         var res = assert.commandWorked(testDB.runCommand({
             find: 'user',
             filter: {x: 1},

@@ -294,5 +294,10 @@ OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationC
     return fassertStatusOK(40297, _lastOpTime);
 }
 
+void ReplicationCoordinatorExternalStateMock::startNoopWriter(OpTime opTime) {}
+
+void ReplicationCoordinatorExternalStateMock::stopNoopWriter() {}
+
+void ReplicationCoordinatorExternalStateMock::setupNoopWriter(Seconds waitTime) {}
 }  // namespace repl
 }  // namespace mongo
