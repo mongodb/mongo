@@ -500,8 +500,7 @@ class Repo(object):
         file_list = [line.rstrip()
                 for line in gito.splitlines()
                     if (line.startswith("jstests") or line.startswith("src"))
-                        and not line.startswith("src/third_party/")
-                        and not line.startswith("src/mongo/gotools/")]
+                        and not line.startswith("src/third_party")]
 
         files_match = re.compile('\\.(h|cpp|js)$')
 
