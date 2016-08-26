@@ -138,8 +138,9 @@ public:
 
     /**
      * Runs the specified command returns the BSON command response plus parsed out Status of this
-     * response and write concern error (if present). Waits for up to the deadline for the
-     * OperationContext. Retries failed operations according to the given "retryPolicy".
+     * response and write concern error (if present). Retries failed operations according to the
+     * given "retryPolicy".  Retries indefinitely until/unless a non-retriable error is encountered,
+     * the maxTimeMs on the OperationContext expires, or the operation is interrupted.
      */
     StatusWith<CommandResponse> runCommand(OperationContext* txn,
                                            const ReadPreferenceSetting& readPref,

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -106,7 +107,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
-    MONGO_UNREACHABLE;
+    return runCommand(txn, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
@@ -115,6 +116,25 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const BSONObj& cmdObj,
                                                      Milliseconds maxTimeMSOverride,
                                                      RetryPolicy retryPolicy) {
+    while (true) {
+        auto interruptStatus = txn->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+
+        auto hostWithResponse = _runCommand(txn, readPref, dbName, maxTimeMSOverride, cmdObj);
+        auto swCmdResponse = std::move(hostWithResponse.commandResponse);
+        auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
+
+        if (isRetriableError(commandStatus.code(), retryPolicy)) {
+            LOG(2) << "Command " << redact(cmdObj)
+                   << " failed with retriable error and will be retried"
+                   << causedBy(redact(commandStatus));
+            continue;
+        }
+
+        return swCmdResponse;
+    }
     MONGO_UNREACHABLE;
 }
 
@@ -136,6 +156,11 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     Milliseconds maxTimeMSOverride,
     RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
+        auto interruptStatus = txn->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+
         auto hostWithResponse = _runCommand(txn, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto swCmdResponse = std::move(hostWithResponse.commandResponse);
         auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);

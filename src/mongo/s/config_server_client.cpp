@@ -51,7 +51,7 @@ Status moveChunk(OperationContext* txn,
                  bool waitForDelete) {
     auto shardRegistry = Grid::get(txn)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
-    auto cmdResponseStatus = shard->runCommandWithFixedRetryAttempts(
+    auto cmdResponseStatus = shard->runCommand(
         txn,
         kPrimaryOnlyReadPreference,
         "admin",
