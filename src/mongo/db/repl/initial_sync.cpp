@@ -96,8 +96,8 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         };
 
         if (ops.empty()) {
-            severe() << "got no ops for batch...";
-            fassertFailedNoTrace(18692);
+            // nothing came back last time, so go again
+            continue;
         }
 
         const BSONObj lastOp = ops.back().raw.getOwned();
