@@ -952,6 +952,33 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 }
 
 /*
+ * __log_truncate_file --
+ *	Truncate a log file to the specified offset.
+ *
+ *	If the underlying file system doesn't support truncate then we need to
+ *	zero out the rest of the file, doing an effective truncate.
+ */
+static int
+__log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP)) {
+		if ((ret = __wt_ftruncate(session, log_fh, offset)) != ENOTSUP)
+			return (ret);
+
+		F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
+	}
+
+	return (__log_zero(session, log_fh, offset, conn->log_file_max));
+}
+
+/*
  * __log_truncate --
  *	Truncate the log to the given LSN.  If this_log is set, it will only
  *	truncate the log file indicated in the given LSN.  If not set,
@@ -988,16 +1015,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 	 * before doing work, and if there's a not-supported error, turn off
 	 * future truncates.
 	 */
-	if (F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP))
-		return (0);
 	WT_ERR(__log_openfile(session, &log_fh, file_prefix, lsn->l.file, 0));
-	if ((ret = __wt_ftruncate(session, log_fh, lsn->l.offset)) != 0) {
-		if (ret == ENOTSUP) {
-			F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
-			ret = 0;
-		}
-		goto err;
-	}
+	WT_ERR(__log_truncate_file(session, log_fh, lsn->l.offset));
 	WT_ERR(__wt_fsync(session, log_fh, true));
 	WT_ERR(__wt_close(session, &log_fh));
 
@@ -1018,8 +1037,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 			 * If there are intervening files pre-allocated,
 			 * truncate them to the end of the log file header.
 			 */
-			WT_ERR(__wt_ftruncate(session,
-			    log_fh, WT_LOG_FIRST_RECORD));
+			WT_ERR(__log_truncate_file(
+			    session, log_fh, WT_LOG_FIRST_RECORD));
 			WT_ERR(__wt_fsync(session, log_fh, true));
 			WT_ERR(__wt_close(session, &log_fh));
 		}
