@@ -78,8 +78,13 @@
 
         assert.commandWorked(viewsDB.collection.reIndex(), makeErrorMessage("reIndex"));
 
-        assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),
-                             makeErrorMessage("compact"));
+        const storageEngine = jsTest.options().storageEngine;
+        if (storageEngine === "ephemeralForTest" || storageEngine === "inMemory") {
+            print("Not testing compact command on ephemeral storage engine " + storageEngine);
+        } else {
+            assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),
+                                 makeErrorMessage("compact"));
+        }
 
         assert.commandWorked(
             viewsDB.runCommand({collMod: "collection", validator: {x: {$type: "string"}}}),
