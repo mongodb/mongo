@@ -105,7 +105,7 @@ __wt_bloom_create(
 	*bloomp = bloom;
 	return (0);
 
-err:	(void)__wt_bloom_close(bloom);
+err:	WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 
@@ -166,7 +166,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	*bloomp = bloom;
 	return (0);
 
-err:	(void)__wt_bloom_close(bloom);
+err:	WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 

@@ -11,6 +11,11 @@
  * and unused function return values.
  */
 #define	WT_UNUSED(var)		(void)(var)
+#define	WT_IGNORE_RET(call) do {					\
+	int __ignored_ret;						\
+	__ignored_ret = (call);						\
+	WT_UNUSED(__ignored_ret);					\
+} while (0)
 
 #define	WT_DIVIDER	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 

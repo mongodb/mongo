@@ -264,6 +264,8 @@ transaction configuration string, relevant when populate_opts_per_txn
 is nonzero
 @par table_name (string, default=test)
 table name
+@par truncate_single_ops (boolean, default=false)
+Implement truncate via cursor remove instead of session API
 @par value_sz_max (unsigned int, default=1000)
 maximum value size when delta updates are present. Default disabled
 @par value_sz_min (unsigned int, default=1)

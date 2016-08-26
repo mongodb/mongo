@@ -31,14 +31,8 @@
 /* Define to 1 if you have the `fallocate' function. */
 /* #undef HAVE_FALLOCATE */
 
-/* Define to 1 if you have the `fcntl' function. */
-/* #undef HAVE_FCNTL 1  */
-
 /* Define to 1 if you have the `fdatasync' function. */
 /* #undef HAVE_FDATASYNC */
-
-/* Define to 1 if you have the `fread_unlocked' function. */
-/* #undef HAVE_FREAD_UNLOCKED */
 
 /* Define to 1 if you have the `ftruncate' function. */
 /* #undef HAVE_FTRUNCATE */

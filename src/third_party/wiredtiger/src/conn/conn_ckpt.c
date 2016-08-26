@@ -38,6 +38,15 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 	if (conn->ckpt_usecs != 0 ||
 	    (conn->ckpt_logsize != 0 &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
+		/*
+		 * If checkpointing based on log data, use a minimum of the
+		 * log file size.  The logging subsystem has already been
+		 * initialized.
+		 */
+		if (conn->ckpt_logsize != 0 &&
+		    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+			conn->ckpt_logsize = WT_MAX(
+			    conn->ckpt_logsize, conn->log_file_max);
 		/* Checkpoints are incompatible with in-memory configuration */
 		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
 		if (cval.val != 0)
@@ -76,8 +85,7 @@ __ckpt_server(void *arg)
 		 * NOTE: If the user only configured logsize, then usecs
 		 * will be 0 and this wait won't return until signalled.
 		 */
-		WT_ERR(
-		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
+		__wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs);
 
 		/* Checkpoint the database. */
 		WT_ERR(wt_session->checkpoint(wt_session, NULL));
@@ -93,7 +101,7 @@ __ckpt_server(void *arg)
 			 * signalled, do a tiny wait to clear it so we don't do
 			 * another checkpoint immediately.
 			 */
-			WT_ERR(__wt_cond_wait(session, conn->ckpt_cond, 1));
+			__wt_cond_wait(session, conn->ckpt_cond, 1);
 		}
 	}
 
@@ -191,7 +199,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 
 	F_CLR(conn, WT_CONN_SERVER_CHECKPOINT);
 	if (conn->ckpt_tid_set) {
-		WT_TRET(__wt_cond_signal(session, conn->ckpt_cond));
+		__wt_cond_signal(session, conn->ckpt_cond);
 		WT_TRET(__wt_thread_join(session, conn->ckpt_tid));
 		conn->ckpt_tid_set = false;
 	}
@@ -228,7 +236,7 @@ __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
 	conn = S2C(session);
 	WT_ASSERT(session, WT_CKPT_LOGSIZE(conn));
 	if (logsize >= conn->ckpt_logsize && !conn->ckpt_signalled) {
-		WT_RET(__wt_cond_signal(session, conn->ckpt_cond));
+		__wt_cond_signal(session, conn->ckpt_cond);
 		conn->ckpt_signalled = 1;
 	}
 	return (0);

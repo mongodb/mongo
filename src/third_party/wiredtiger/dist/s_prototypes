@@ -28,7 +28,7 @@ proto()
 	    -e 's/\* /\*/g' \
 	    -e 's/  */ /g' \
 	    -e 's/^/extern /' \
-	    -e 's/WT_GCC_FUNC_/WT_GCC_FUNC_DECL_/g' \
+	    -e 's/WT_GCC_FUNC_ATTRIBUTE/WT_GCC_FUNC_DECL_ATTRIBUTE/g' \
 	    -e '# If a line ends in #endif, appending a semicolon will result' \
 	    -e '# in an illegal expression, force an appended newline using' \
 	    -e '# the H command because substitute may not allow newline in' \
@@ -39,6 +39,9 @@ proto()
 		-e H \
 		-e x \
 	    -e '}' \
+	    -e '# Add the gcc warn_unused_result attribute to any external' \
+	    -e '# functions that return an int.' \
+	    -e '/^extern int /s/$/ WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))/' \
 	    -e 's/$/;/' \
 	    -e p < $1
 }
@@ -73,6 +76,8 @@ externs
 f=../src/include/extern.h
 l=`sed \
     -e '/^[a-z]/!d' \
+    -e '/\/checksum\/power8/d' \
+    -e '/\/checksum\/zseries/d' \
     -e '/os_posix/d' \
     -e '/os_win/d' \
     -e 's/[	 ].*$//' filelist`

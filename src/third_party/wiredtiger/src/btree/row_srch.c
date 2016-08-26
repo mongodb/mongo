@@ -775,7 +775,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 * traversing the skip list each time accumulates to real time.
 	 */
 	if (samples > 5000)
-		WT_RET(__wt_page_evict_soon(session, cbt->ref));
+		__wt_page_evict_soon(session, cbt->ref);
 
 	return (0);
 }

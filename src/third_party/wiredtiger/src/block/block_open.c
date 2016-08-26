@@ -150,7 +150,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	uint64_t bucket, hash;
 	uint32_t flags;
 
-	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
+	__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
 	conn = S2C(session);
 	*blockp = block = NULL;
@@ -248,14 +248,14 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	conn = S2C(session);
 
-	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK,
-	    "close: %s", block->name == NULL ? "" : block->name ));
+	__wt_verbose(session, WT_VERB_BLOCK,
+	    "close: %s", block->name == NULL ? "" : block->name );
 
 	__wt_spin_lock(session, &conn->block_lock);
 
 			/* Reference count is initialized to 1. */
 	if (block->ref == 0 || --block->ref == 0)
-		WT_TRET(__block_destroy(session, block));
+		ret = __block_destroy(session, block);
 
 	__wt_spin_unlock(session, &conn->block_lock);
 
@@ -362,13 +362,13 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
 		    desc->majorv, desc->minorv);
 
-	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
+	__wt_verbose(session, WT_VERB_BLOCK,
 	    "%s: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,
 	    block->name, desc->magic,
 	    desc->majorv, desc->minorv,
-	    desc->cksum));
+	    desc->cksum);
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);

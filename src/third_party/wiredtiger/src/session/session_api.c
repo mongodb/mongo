@@ -1500,7 +1500,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * our timeout.
 	 */
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
-		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
+		__wt_cond_signal(session, conn->log_file_cond);
 		WT_ERR(__wt_epoch(session, &now));
 		waited_ms = WT_TIMEDIFF_MS(now, start);
 		if (forever || waited_ms < timeout_ms)
@@ -1511,8 +1511,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 			 * computing the wait time in msecs and passing that
 			 * in, unchanged, as the usecs to wait).
 			 */
-			WT_ERR(__wt_cond_wait(
-			    session, log->log_sync_cond, waited_ms));
+			__wt_cond_wait(session, log->log_sync_cond, waited_ms);
 		else
 			WT_ERR(ETIMEDOUT);
 	}
@@ -1627,7 +1626,7 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_txn_named_snapshot_config(
 	    session, cfg, &has_create, &has_drop));
 
-	WT_ERR(__wt_writelock(session, txn_global->nsnap_rwlock));
+	__wt_writelock(session, txn_global->nsnap_rwlock);
 
 	/* Drop any snapshots to be removed first. */
 	if (has_drop)
@@ -1637,7 +1636,7 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 	if (has_create)
 		WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
 
-err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
+err:	__wt_writeunlock(session, txn_global->nsnap_rwlock);
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }

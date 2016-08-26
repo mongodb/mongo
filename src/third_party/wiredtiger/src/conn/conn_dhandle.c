@@ -12,19 +12,15 @@
  * __conn_dhandle_destroy --
  *	Destroy a data handle.
  */
-static int
+static void
 __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
-	WT_DECL_RET;
-
-	ret = __wt_rwlock_destroy(session, &dhandle->rwlock);
+	__wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
 	__wt_free(session, dhandle->handle);
 	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_overwrite_and_free(session, dhandle);
-
-	return (ret);
 }
 
 /*
@@ -83,7 +79,7 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	*dhandlep = dhandle;
 	return (0);
 
-err:	WT_TRET(__conn_dhandle_destroy(session, dhandle));
+err:	__conn_dhandle_destroy(session, dhandle);
 	return (ret);
 }
 
@@ -576,14 +572,14 @@ __wt_conn_dhandle_discard_single(
 	set_pass_intr = false;
 	if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
 		set_pass_intr = true;
-		(void)__wt_atomic_add32(&S2C(session)->cache->pass_intr, 1);
+		(void)__wt_atomic_addv32(&S2C(session)->cache->pass_intr, 1);
 	}
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    tret = __conn_dhandle_remove(session, final));
 	if (set_pass_intr)
-		(void)__wt_atomic_sub32(&S2C(session)->cache->pass_intr, 1);
+		(void)__wt_atomic_subv32(&S2C(session)->cache->pass_intr, 1);
 	WT_TRET(tret);
 
 	/*
@@ -591,7 +587,7 @@ __wt_conn_dhandle_discard_single(
 	 */
 	if (ret == 0 || final) {
 		__conn_btree_config_clear(session);
-		WT_TRET(__conn_dhandle_destroy(session, dhandle));
+		__conn_dhandle_destroy(session, dhandle);
 		session->dhandle = NULL;
 	}
 

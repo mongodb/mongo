@@ -163,7 +163,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 
 	/* Destroy locks. */
-	WT_TRET(__wt_rwlock_destroy(session, &btree->ovfl_lock));
+	__wt_rwlock_destroy(session, &btree->ovfl_lock);
 	__wt_spin_destroy(session, &btree->flush_lock);
 
 	/* Free allocated memory. */
@@ -212,8 +212,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		maj_version = cval.val;
 		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
 		min_version = cval.val;
-		WT_RET(__wt_verbose(session, WT_VERB_VERSION,
-		    "%" PRIu64 ".%" PRIu64, maj_version, min_version));
+		__wt_verbose(session, WT_VERB_VERSION,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
 	}
 
 	/* Get the file ID. */

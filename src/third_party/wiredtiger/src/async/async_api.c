@@ -89,7 +89,7 @@ setup:	op->format = af;
 
 err:
 	if (c != NULL)
-		(void)c->close(c);
+		WT_TRET(c->close(c));
 	__wt_free(session, af->uri);
 	__wt_free(session, af->config);
 	__wt_free(session, af->key_format);
@@ -489,7 +489,6 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	uint32_t i, workers;
 
 	conn = S2C(session);
@@ -540,16 +539,15 @@ retry:
 	(void)__wt_atomic_add64(&async->flush_gen, 1);
 	WT_ASSERT(session, async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
-	WT_ERR(__wt_async_op_enqueue(session, &async->flush_op));
+	WT_RET(__wt_async_op_enqueue(session, &async->flush_op));
 	while (async->flush_state != WT_ASYNC_FLUSH_COMPLETE)
-		WT_ERR(__wt_cond_wait(NULL, async->flush_cond, 100000));
+		__wt_cond_wait(NULL, async->flush_cond, 100000);
 	/*
 	 * Flush is done.  Clear the flags.
 	 */
 	async->flush_op.state = WT_ASYNCOP_FREE;
 	WT_PUBLISH(async->flush_state, WT_ASYNC_FLUSH_NONE);
-err:
-	return (ret);
+	return (0);
 }
 
 /*

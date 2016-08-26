@@ -40,7 +40,7 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 		 * to switching multiple times when only one switch is
 		 * required, creating very small chunks.
 		 */
-		WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
+		__wt_lsm_tree_readlock(session, lsm_tree);
 		if (lsm_tree->nchunks == 0 ||
 		    (clsm->dsk_gen == lsm_tree->dsk_gen &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))) {
@@ -48,7 +48,7 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 			ret = __wt_lsm_manager_push_entry(
 			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree);
 		}
-		WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
+		__wt_lsm_tree_readunlock(session, lsm_tree);
 	}
 
 	return (ret);
@@ -458,7 +458,7 @@ __clsm_open_cursors(
 
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
-	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
+	__wt_lsm_tree_readlock(session, lsm_tree);
 	locked = true;
 
 	/* Merge cursors have already figured out how many chunks they need. */
@@ -577,10 +577,10 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		if (close_range_end > close_range_start) {
 			saved_gen = lsm_tree->dsk_gen;
 			locked = false;
-			WT_ERR(__wt_lsm_tree_readunlock(session, lsm_tree));
+			__wt_lsm_tree_readunlock(session, lsm_tree);
 			WT_ERR(__clsm_close_cursors(
 			    clsm, close_range_start, close_range_end));
-			WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
+			__wt_lsm_tree_readlock(session, lsm_tree);
 			locked = true;
 			if (lsm_tree->dsk_gen != saved_gen)
 				goto retry;
@@ -698,7 +698,7 @@ err:
 	}
 #endif
 	if (locked)
-		WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
+		__wt_lsm_tree_readunlock(session, lsm_tree);
 	return (ret);
 }
 

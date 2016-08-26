@@ -323,7 +323,7 @@ __curlog_close(WT_CURSOR *cursor)
 
 	WT_ASSERT(session, FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
 	if (F_ISSET(cl, WT_CURLOG_ARCHIVE_LOCK))
-		WT_TRET(__wt_readunlock(session, conn->log->log_archive_lock));
+		__wt_readunlock(session, conn->log->log_archive_lock);
 
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
@@ -401,7 +401,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_log_force_write(session, 1, NULL));
 
 	/* Log cursors block archiving. */
-	WT_ERR(__wt_readlock(session, log->log_archive_lock));
+	__wt_readlock(session, log->log_archive_lock);
 	F_SET(cl, WT_CURLOG_ARCHIVE_LOCK);
 
 	if (0) {

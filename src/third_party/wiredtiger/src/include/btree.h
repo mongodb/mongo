@@ -131,6 +131,7 @@ struct __wt_btree {
 	uint64_t write_gen;		/* Write generation */
 
 	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
 	WT_REF	   *evict_ref;		/* Eviction thread's location */
 	uint64_t    evict_priority;	/* Relative priority of cached pages */

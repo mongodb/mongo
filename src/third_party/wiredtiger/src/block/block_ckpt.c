@@ -69,9 +69,9 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__ckpt_string(session, block, addr, tmp));
 		}
-		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "%s: load-checkpoint: %s", block->name,
-		    addr == NULL ? "[Empty]" : (const char *)tmp->data));
+		    addr == NULL ? "[Empty]" : (const char *)tmp->data);
 	}
 #endif
 
@@ -137,18 +137,9 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * that was done when the checkpoint was first written (re-writing the
 	 * checkpoint might possibly make it relevant here, but it's unlikely
 	 * enough I don't bother).
-	 *
-	 * If in-memory, we don't read or write the object, and the truncate
-	 * will unnecessarily allocate buffer space.
 	 */
-	if (!checkpoint && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
-		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
-		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
-
-		/* The truncate might fail, and that's OK. */
-		WT_ERR_BUSY_OK(
-		    __wt_block_truncate(session, block, ci->file_size));
-	}
+	if (!checkpoint)
+		WT_ERR(__wt_block_truncate(session, block, ci->file_size));
 
 	if (0) {
 err:		/*
@@ -190,9 +181,7 @@ __wt_block_checkpoint_unload(
 	 * checkpoints.
 	 */
 	if (!checkpoint) {
-		/* The truncate might fail, and that's OK. */
-		WT_TRET_BUSY_OK(
-		    __wt_block_truncate(session, block, block->size));
+		WT_TRET(__wt_block_truncate(session, block, block->size));
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);
@@ -515,9 +504,9 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__ckpt_string(
 			    session, block, ckpt->raw.data, tmp));
-			WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+			__wt_verbose(session, WT_VERB_CHECKPOINT,
 			    "%s: delete-checkpoint: %s: %s",
-			    block->name, ckpt->name, (const char *)tmp->data));
+			    block->name, ckpt->name, (const char *)tmp->data);
 		}
 #endif
 		/*
@@ -753,9 +742,9 @@ __ckpt_update(WT_SESSION_IMPL *session,
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__ckpt_string(session, block, ckpt->raw.data, tmp));
-		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "%s: create-checkpoint: %s: %s",
-		    block->name, ckpt->name, (const char *)tmp->data));
+		    block->name, ckpt->name, (const char *)tmp->data);
 	}
 
 err:	__wt_scr_free(session, &tmp);

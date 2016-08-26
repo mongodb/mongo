@@ -33,13 +33,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * Truncate the file to an allocation-size multiple of blocks (bytes
 	 * trailing the last block must be garbage, by definition).
 	 */
-	if (block->size > allocsize) {
+	len = allocsize;
+	if (block->size > allocsize)
 		len = (block->size / allocsize) * allocsize;
-		if (len != block->size)
-			WT_RET(__wt_block_truncate(session, block, len));
-	} else
-		len = allocsize;
-	block->live.file_size = len;
+	WT_RET(__wt_block_truncate(session, block, len));
 
 	/*
 	 * The file's first allocation-sized block is description information,
@@ -142,9 +139,9 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 			break;
 
 		/* Free the allocation-size block. */
-		WT_ERR(__wt_verbose(session, WT_VERB_SALVAGE,
+		__wt_verbose(session, WT_VERB_SALVAGE,
 		    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
-		    allocsize, (uintmax_t)offset));
+		    allocsize, (uintmax_t)offset);
 		WT_ERR(__wt_block_off_free(
 		    session, block, offset, (wt_off_t)allocsize));
 		block->slvg_off += allocsize;

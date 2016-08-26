@@ -60,7 +60,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 */
 	if (mod->rec_result == WT_PM_REC_REPLACE ||
 	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
-		WT_RET(__wt_fair_lock(session, &page->page_lock));
+		__wt_writelock(session, &page->page_lock);
 
 	if (mod->rec_result == WT_PM_REC_REPLACE)
 		ret = bm->compact_page_skip(bm, session,
@@ -80,7 +80,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	if (mod->rec_result == WT_PM_REC_REPLACE ||
 	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
-		WT_TRET(__wt_fair_unlock(session, &page->page_lock));
+		__wt_writeunlock(session, &page->page_lock);
 
 	return (ret);
 }

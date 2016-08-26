@@ -19,8 +19,8 @@ static WT_THREAD_RET __lsm_worker(void *);
 int
 __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
-	WT_RET(__wt_verbose(session, WT_VERB_LSM_MANAGER,
-	    "Start LSM worker %u type %#" PRIx32, args->id, args->type));
+	__wt_verbose(session, WT_VERB_LSM_MANAGER,
+	    "Start LSM worker %u type %#" PRIx32, args->id, args->type);
 	return (__wt_thread_create(session, &args->tid, __lsm_worker, args));
 }
 
@@ -58,9 +58,9 @@ __lsm_worker_general_op(
 		 * If we got a chunk to flush, checkpoint it.
 		 */
 		if (chunk != NULL) {
-			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			__wt_verbose(session, WT_VERB_LSM,
 			    "Flush%s chunk %" PRIu32 " %s",
-			    force ? " w/ force" : "", chunk->id, chunk->uri));
+			    force ? " w/ force" : "", chunk->id, chunk->uri);
 			ret = __wt_lsm_checkpoint_chunk(
 			    session, entry->lsm_tree, chunk);
 			WT_ASSERT(session, chunk->refcnt > 0);
@@ -154,8 +154,7 @@ __lsm_worker(void *arg)
 
 		/* Don't busy wait if there was any work to do. */
 		if (!progress) {
-			WT_ERR(
-			    __wt_cond_wait(session, cookie->work_cond, 10000));
+			__wt_cond_wait(session, cookie->work_cond, 10000);
 			continue;
 		}
 	}

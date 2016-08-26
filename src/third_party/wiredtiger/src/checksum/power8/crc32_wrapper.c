@@ -6,7 +6,7 @@
 #define VMX_ALIGN_MASK	(VMX_ALIGN-1)
 
 #ifdef REFLECT
-static unsigned int crc32_align(unsigned int crc, unsigned char *p,
+static unsigned int crc32_align(unsigned int crc, const unsigned char *p,
 			       unsigned long len)
 {
 	while (len--)
@@ -14,7 +14,7 @@ static unsigned int crc32_align(unsigned int crc, unsigned char *p,
 	return crc;
 }
 #else
-static unsigned int crc32_align(unsigned int crc, unsigned char *p,
+static unsigned int crc32_align(unsigned int crc, const unsigned char *p,
 				unsigned long len)
 {
 	while (len--)
@@ -23,13 +23,13 @@ static unsigned int crc32_align(unsigned int crc, unsigned char *p,
 }
 #endif
 
-unsigned int __crc32_vpmsum(unsigned int crc, unsigned char *p,
+unsigned int __crc32_vpmsum(unsigned int crc, const unsigned char *p,
 			    unsigned long len);
 
 /* -Werror=missing-prototypes */
-unsigned int crc32_vpmsum(unsigned int crc, unsigned char *p,
+unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p,
 			  unsigned long len);
-unsigned int crc32_vpmsum(unsigned int crc, unsigned char *p,
+unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p,
 			  unsigned long len)
 {
 	unsigned int prealign;
@@ -67,3 +67,25 @@ out:
 	return crc;
 }
 #endif
+
+#include "wt_internal.h"
+
+/*
+ * __wt_cksum --
+ *	WiredTiger: return a checksum for a chunk of memory.
+ */
+uint32_t
+__wt_cksum(const void *chunk, size_t len)
+{
+	return crc32_vpmsum(0, chunk, len);
+}
+
+/*
+ * __wt_cksum_init --
+ *	WiredTiger: detect CRC hardware and set the checksum function.
+ */
+void
+__wt_cksum_init(void)
+{
+	/* None needed. */
+}

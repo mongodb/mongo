@@ -197,7 +197,7 @@ class test_config04(wttest.WiredTigerTestCase):
 
         # Test an absolute path directory.
         if os.name == 'posix':
-            logdir = '/tmp/logdir'
+            logdir = os.path.abspath('absolutelogdir')
             os.mkdir(logdir)
             confstr = 'path=' + logdir
             self.common_log_test(confstr, logdir)

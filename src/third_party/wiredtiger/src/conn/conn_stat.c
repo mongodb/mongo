@@ -528,8 +528,7 @@ __statlog_server(void *arg)
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS)) {
 		/* Wait until the next event. */
-		WT_ERR(
-		    __wt_cond_wait(session, conn->stat_cond, conn->stat_usecs));
+		__wt_cond_wait(session, conn->stat_cond, conn->stat_usecs);
 
 		if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
 			WT_ERR(__statlog_log_one(session, &path, &tmp));
@@ -636,7 +635,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 	/* Stop the server thread. */
 	F_CLR(conn, WT_CONN_SERVER_STATISTICS);
 	if (conn->stat_tid_set) {
-		WT_TRET(__wt_cond_signal(session, conn->stat_cond));
+		__wt_cond_signal(session, conn->stat_cond);
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
 		conn->stat_tid_set = false;
 	}

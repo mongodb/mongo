@@ -141,11 +141,14 @@ util_flush(WT_SESSION *session, const char *uri)
 		return (util_err(session, errno, NULL));
 
 	(void)snprintf(buf, len, "target=(\"%s\")", uri);
-	if ((ret = session->checkpoint(session, buf)) != 0) {
-		ret = util_err(session, ret, "%s: session.checkpoint", uri);
-		(void)session->drop(session, uri, NULL);
-	}
-
+	ret = session->checkpoint(session, buf);
 	free(buf);
-	return (ret);
+
+	if (ret == 0)
+		return (0);
+
+	(void)util_err(session, ret, "%s: session.checkpoint", uri);
+	if ((ret = session->drop(session, uri, NULL)) != 0)
+		(void)util_err(session, ret, "%s: session.drop", uri);
+	return (1);
 }

@@ -20,7 +20,8 @@ if [ $# -ne 1 ]; then
 	    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
 	sed -e '/Makefile.in/d' \
 	    -e '/build_win\/wiredtiger_config.h/d' \
-	    -e '/checksum\/power8/d' |
+	    -e '/checksum\/power8/d' \
+	    -e '/checksum\/zseries/d' |
 	xargs $xp -n 1 -I{} sh ./dist/s_style {}
 else
 	# General style correction and cleanup for a single file
@@ -173,7 +174,7 @@ else
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([	 ,]\)u_quad\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
-	    -e 's/(void) \([a-zA-Z_]\)/(void)\1/' \
+	    -e 's/[	 ](void) \([a-zA-Z_]\)/(void)\1/' \
 	    -e '/for /!s/;;$/;/' \
 	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \

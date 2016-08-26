@@ -109,7 +109,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100" wiredtiger.dll libwiredtiger.lib
+            scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /w4133" wiredtiger.dll libwiredtiger.lib
 
   - name: fops
     depends_on:

@@ -64,6 +64,7 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 	# removed in the not-too-distant future.
 	# Apple clang version 4.1
 	#	(tags/Apple/clang-421.11.66) (based on LLVM 3.1svn)
+	w="$w -Wno-attributes"
 	w="$w -Wno-pedantic"
 	w="$w -Wno-unused-command-line-argument"
 

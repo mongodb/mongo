@@ -386,12 +386,12 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
 {
 	uint64_t f, frag, frags, i;
 
-	WT_RET(__wt_verbose(session, WT_VERB_VERIFY,
+	__wt_verbose(session, WT_VERB_VERIFY,
 	    "add file block%s%s%s at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
 	    type == NULL ? "" : " (",
 	    type == NULL ? "" : type,
 	    type == NULL ? "" : ")",
-	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size));
+	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/* Check each chunk against the total file size. */
 	if (offset + size > block->size)
@@ -491,9 +491,9 @@ __verify_ckptfrag_add(
 {
 	uint64_t f, frag, frags, i;
 
-	WT_RET(__wt_verbose(session, WT_VERB_VERIFY,
+	__wt_verbose(session, WT_VERB_VERIFY,
 	    "add checkpoint block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
-	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size));
+	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/*
 	 * Check each chunk against the checkpoint's size, a checkpoint should
