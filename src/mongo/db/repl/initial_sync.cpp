@@ -76,6 +76,9 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
                 return;
             }
 
+            // This code is only prepared for this to happen after inShutdown() becomes true.
+            invariant(!ops.mustShutdown());
+
             // nothing came back last time, so go again
             if (ops.empty())
                 continue;

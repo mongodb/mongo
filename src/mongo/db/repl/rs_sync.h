@@ -28,12 +28,7 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-
 
 namespace mongo {
 namespace repl {
@@ -41,30 +36,22 @@ class BackgroundSync;
 class ReplicationCoordinator;
 
 /**
- * This class is used to apply
- **/
+ * This class is used to apply oplog entries supplied by bgsync. It will automatically shutdown once
+ * bgsync shuts down.  Callers must not call into methods concurrently.
+ */
 class RSDataSync {
 public:
     RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord);
     ~RSDataSync();
     void startup();
-    void shutdown();
     void join();
 
 private:
     // Runs in a loop apply oplog entries from the buffer until this class cancels, or an error.
     void _run();
-    bool _isInShutdown() const;
 
-    // _mutex protects all of the class variables declared below.
-    mutable stdx::mutex _mutex;
-    // Thread doing the work.
-    std::unique_ptr<stdx::thread> _runThread;
-    // Set to true if shutdown() has been called.
-    bool _inShutdown = false;
-    // BackgroundSync instance that is paired to this instance.
+    stdx::thread _runThread;
     BackgroundSync* _bgsync;
-    // ReplicationCordinator instance.
     ReplicationCoordinator* _replCoord;
 };
 

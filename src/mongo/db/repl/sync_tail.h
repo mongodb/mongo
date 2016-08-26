@@ -105,7 +105,7 @@ public:
 
     static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
 
-    void oplogApplication(ReplicationCoordinator* replCoord, stdx::function<bool()> shouldShutdown);
+    void oplogApplication(ReplicationCoordinator* replCoord);
     bool peek(OperationContext* txn, BSONObj* obj);
 
     class OpQueue {
@@ -136,12 +136,29 @@ public:
         }
 
         void emplace_back(BSONObj obj) {
+            invariant(!_mustShutdown);
             _bytes += obj.objsize();
             _batch.emplace_back(std::move(obj));
         }
         void pop_back() {
             _bytes -= back().raw.objsize();
             _batch.pop_back();
+        }
+
+        /**
+         * A batch with this set indicates that the upstream stages of the pipeline are shutdown and
+         * no more batches will be coming.
+         *
+         * This can only happen with empty batches.
+         *
+         * TODO replace the empty object used to signal draining with this.
+         */
+        bool mustShutdown() const {
+            return _mustShutdown;
+        }
+        void setMustShutdownFlag() {
+            invariant(empty());
+            _mustShutdown = true;
         }
 
         /**
@@ -154,6 +171,7 @@ public:
     private:
         std::vector<OplogEntry> _batch;
         size_t _bytes;
+        bool _mustShutdown = false;
     };
 
     struct BatchLimits {
@@ -220,9 +238,8 @@ private:
  * Applies the operations described in the oplog entries contained in "ops" using the
  * "applyOperation" function.
  *
- * Returns ErrorCode::InterruptedAtShutdown if the node enters shutdown while applying ops,
- * ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary, and the OpTime of the
- * final operation applied otherwise.
+ * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary, and the OpTime
+ * of the final operation applied otherwise.
  *
  * Shared between here and MultiApplier.
  */

@@ -208,6 +208,7 @@ Status IndexBuilder::_build(OperationContext* txn,
 
             if (status.code() == ErrorCodes::InterruptedAtShutdown) {
                 // leave it as-if kill -9 happened. This will be handled on restart.
+                invariant(allowBackgroundBuilding);  // Foreground builds aren't interrupted.
                 indexer.abortWithoutCleanup();
             }
         } catch (const WriteConflictException& wce) {

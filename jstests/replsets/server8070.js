@@ -109,9 +109,8 @@ assert.eq(26,
           "collection size incorrect on node 3 before applying ops 25-75");
 
 jsTest.log("Allow 3 to apply ops 25-75");
-var rsSyncApplyStopResult3 =
-    member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
-assert.eq(1, rsSyncApplyStopResult3.ok, "member 3 rsSyncApplyStop admin command failed");
+assert.commandWorked(member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+                     "member 3 rsSyncApplyStop admin command failed");
 
 assert.soon(function() {
     var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
@@ -131,5 +130,8 @@ while ((new Date()).getTime() < end) {
     assert('ROLLBACK' !== member3.runCommand({replSetGetStatus: 1}).members[2].stateStr);
     sleep(30);
 }
+
+// Need to re-enable writes before clean shutdown.
+assert.commandWorked(member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
 
 replSet.stopSet();

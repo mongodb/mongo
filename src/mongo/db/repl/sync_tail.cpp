@@ -288,10 +288,6 @@ Status SyncTail::syncApply(OperationContext* txn,
                            ApplyOperationInLockFn applyOperationInLock,
                            ApplyCommandInLockFn applyCommandInLock,
                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    if (inShutdown()) {
-        return Status(ErrorCodes::InterruptedAtShutdown, "syncApply shutting down");
-    }
-
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(txn);
 
@@ -623,15 +619,8 @@ void fillWriterVectors(OperationContext* txn,
 // writes the oplog entries to the local oplog.
 OpTime SyncTail::multiApply(OperationContext* txn, MultiApplier::Operations ops) {
     auto applyOperation = [this](MultiApplier::OperationPtrs* ops) { _applyFunc(ops, this); };
-    auto status = repl::multiApply(txn, _writerPool.get(), std::move(ops), applyOperation);
-    if (!status.isOK()) {
-        if (status == ErrorCodes::InterruptedAtShutdown) {
-            return OpTime();
-        } else {
-            fassertStatusOK(34437, status);
-        }
-    }
-    return status.getValue();
+    return fassertStatusOK(
+        34437, repl::multiApply(txn, _writerPool.get(), std::move(ops), applyOperation));
 }
 
 namespace {
@@ -675,14 +664,13 @@ class SyncTail::OpQueueBatcher {
 public:
     OpQueueBatcher(SyncTail* syncTail) : _syncTail(syncTail), _thread([this] { run(); }) {}
     ~OpQueueBatcher() {
-        _inShutdown.store(true);
-        _cv.notify_all();
+        invariant(_isDead);
         _thread.join();
     }
 
     OpQueue getNextBatch(Seconds maxWaitTime) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (_ops.empty()) {
+        if (_ops.empty() && !_ops.mustShutdown()) {
             // We intentionally don't care about whether this returns due to signaling or timeout
             // since we do the same thing either way: return whatever is in _ops.
             (void)_cv.wait_for(lk, maxWaitTime.toSystemDuration());
@@ -710,7 +698,7 @@ private:
         BatchLimits batchLimits;
         batchLimits.bytes = std::min(oplogMaxSize / 10, size_t(replBatchLimitBytes));
 
-        while (!_inShutdown.load()) {
+        while (true) {
             const auto slaveDelay = replCoord->getSlaveDelaySecs();
             batchLimits.slaveDelayLatestTimestamp = (slaveDelay > Seconds(0))
                 ? (fastClockSource->now() - slaveDelay)
@@ -721,44 +709,50 @@ private:
 
             OpQueue ops;
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
-            while (!_inShutdown.load() &&
-                   !_syncTail->tryPopAndWaitForMore(&txn, &ops, batchLimits)) {
+            while (!_syncTail->tryPopAndWaitForMore(&txn, &ops, batchLimits)) {
             }
 
-            // For pausing replication in tests
-            while (MONGO_FAIL_POINT(rsSyncApplyStop) && !_inShutdown.load()) {
+            // For pausing replication in tests.
+            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+                // Tests should not trigger clean shutdown while that failpoint is active. If we
+                // think we need this, we need to think hard about what the behavior should be.
+                if (_syncTail->_networkQueue->inShutdown()) {
+                    severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
+                    fassertFailedNoTrace(40304);
+                }
                 sleepmillis(10);
             }
 
-            if (ops.empty()) {
+            if (ops.empty() && !ops.mustShutdown()) {
                 continue;  // Don't emit empty batches.
             }
 
             stdx::unique_lock<stdx::mutex> lk(_mutex);
-            while (!_ops.empty()) {
-                // Block until the previous batch has been taken.
-                if (_inShutdown.load())
-                    return;
-                _cv.wait(lk);
-            }
+            // Block until the previous batch has been taken.
+            _cv.wait(lk, [&] { return _ops.empty(); });
             _ops = std::move(ops);
             _cv.notify_all();
+            if (_ops.mustShutdown()) {
+                _isDead = true;
+                return;
+            }
         }
     }
 
-    AtomicWord<bool> _inShutdown;
     SyncTail* const _syncTail;
 
     stdx::mutex _mutex;  // Guards _ops.
     stdx::condition_variable _cv;
     OpQueue _ops;
 
+    // This only exists so the destructor invariants rather than deadlocking.
+    // TODO remove once we trust noexcept enough to mark oplogApplication() as noexcept.
+    bool _isDead = false;
+
     stdx::thread _thread;  // Must be last so all other members are initialized before starting.
 };
 
-/* tail an oplog.  ok to return, will be re-called. */
-void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
-                                stdx::function<bool()> shouldShutdown) {
+void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
     OpQueueBatcher batcher(this);
 
     const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
@@ -768,14 +762,18 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
             ? new ApplyBatchFinalizerForJournal(replCoord)
             : new ApplyBatchFinalizer(replCoord)};
 
-    while (!shouldShutdown()) {
+    while (true) {  // Exits on message from OpQueueBatcher.
         tryToGoLiveAsASecondary(&txn, replCoord);
 
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
         OpQueue ops = batcher.getNextBatch(Seconds(1));
-        if (ops.empty())
+        if (ops.empty()) {
+            if (ops.mustShutdown()) {
+                return;
+            }
             continue;  // Try again.
+        }
 
         if (ops.front().raw.isEmpty()) {
             // This means that the network thread has coalesced and we have processed all of its
@@ -788,7 +786,6 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
         }
 
         // Extract some info from ops that we'll need after releasing the batch below.
-        const size_t opsInBatch = ops.getCount();
         const auto firstOpTimeInBatch =
             fassertStatusOK(40299, OpTime::parseFromOplogEntry(ops.front().raw));
         const auto lastOpTimeInBatch =
@@ -805,17 +802,8 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord,
                                          << ")."));
         }
 
-
-        const bool fail = multiApply(&txn, ops.releaseBatch()).isNull();
-        if (fail) {
-            // fassert if oplog application failed for any reasons other than shutdown.
-            error() << "Failed to apply " << opsInBatch
-                    << " operations - batch start:" << firstOpTimeInBatch
-                    << " end:" << lastOpTimeInBatch;
-            fassert(34360, inShutdownStrict());
-            // Return without setting minvalid in the case of shutdown.
-            return;
-        }
+        // Do the work.
+        multiApply(&txn, ops.releaseBatch());
 
         // Update various things that care about our last applied optime.
         setNewTimestamp(lastOpTimeInBatch.getTimestamp());
@@ -841,9 +829,13 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
         if (!peek_success) {
             // If we don't have anything in the queue, wait a bit for something to appear.
             if (ops->empty()) {
-                // Block up to 1 second. We still return true in this case because we want this op
-                // to be the first in a new batch with a new start time.
-                _networkQueue->waitForMore(txn);
+                if (_networkQueue->inShutdown()) {
+                    ops->setMustShutdownFlag();
+                } else {
+                    // Block up to 1 second. We still return true in this case because we want this
+                    // op to be the first in a new batch with a new start time.
+                    _networkQueue->waitForMore(txn);
+                }
             }
 
             return true;
@@ -1046,8 +1038,7 @@ void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail*) {
         return SyncTail::syncApply(txn, op, convertUpdateToUpsert);
     };
 
-    auto status = multiSyncApply_noAbort(txn.get(), ops, syncApply);
-    fassertNoTrace(16359, status.isOK() || status == ErrorCodes::InterruptedAtShutdown);
+    fassertNoTrace(16359, multiSyncApply_noAbort(txn.get(), ops, syncApply));
 }
 
 Status multiSyncApply_noAbort(OperationContext* txn,
@@ -1122,14 +1113,8 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                 } catch (const DBException& e) {
                     // The group insert failed, log an error and fall through to the
                     // application of an individual op.
-                    if (e.toStatus() == ErrorCodes::InterruptedAtShutdown) {
-                        return e.toStatus();
-                    }
-
-                    str::stream msg;
-                    msg << "Error applying inserts in bulk " << causedBy(e)
-                        << " trying first insert as a lone insert";
-                    error() << std::string(msg);
+                    error() << "Error applying inserts in bulk " << causedBy(e)
+                            << " trying first insert as a lone insert";
 
                     // Avoid quadratic run time from failed insert by not retrying until we
                     // are beyond this group of ops.
@@ -1161,8 +1146,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 void multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st) {
     initializeWriterThread();
     auto txn = cc().makeOperationContext();
-    auto status = multiInitialSyncApply_noAbort(txn.get(), ops, st);
-    fassertNoTrace(15915, status.isOK() || status == ErrorCodes::InterruptedAtShutdown);
+    fassertNoTrace(15915, multiInitialSyncApply_noAbort(txn.get(), ops, st));
 }
 
 Status multiInitialSyncApply_noAbort(OperationContext* txn,
@@ -1276,14 +1260,9 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
 
         workerPool->join();
 
-        // We must check this before altering the MinValid document because setting inShutdown may
-        // have caused the oplog writers to abort early. This code (and its duplicate below) will go
-        // away once SERVER-25071 is done and clean shutdown drains the apply queue.
-        if (inShutdownStrict()) {
-            log() << "Cannot apply operations due to shutdown in progress";
-            return {ErrorCodes::InterruptedAtShutdown,
-                    "Cannot apply operations due to shutdown in progress"};
-        }
+        // Make sure nothing would have been killed before recording success.
+        // XXX consider removing after green patch build.
+        invariant(!txn->getServiceContext()->getKillAllOperations());
 
         storage->setOplogDeleteFromPoint(txn, Timestamp());
         storage->setMinValidToAtLeast(txn, ops.back().getOpTime());
@@ -1291,11 +1270,9 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         applyOps(&writerVectors, workerPool, applyOperation);
     }
 
-    if (inShutdownStrict()) {
-        log() << "Cannot apply operations due to shutdown in progress";
-        return {ErrorCodes::InterruptedAtShutdown,
-                "Cannot apply operations due to shutdown in progress"};
-    }
+    // Make sure nothing would have been killed before recording success.
+    // XXX consider removing after green patch build.
+    invariant(!txn->getServiceContext()->getKillAllOperations());
 
     // We have now written all database writes and updated the oplog to match.
     return ops.back().getOpTime();

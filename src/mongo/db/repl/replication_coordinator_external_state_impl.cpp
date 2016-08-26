@@ -222,7 +222,6 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     }
     lock->unlock();
 
-    log() << "stopping data replication threads";
     if (oldSSF) {
         oldSSF->join();
     }
@@ -234,7 +233,6 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
 
     if (oldApplier) {
         log() << "Stopping replication applier thread";
-        oldApplier->shutdown();
         oldApplier->join();
     }
 

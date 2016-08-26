@@ -1003,6 +1003,12 @@ static void shutdownTask() {
     log(LogComponent::kNetwork) << "shutdown: going to flush diaglog..." << endl;
     _diaglog.flush();
 
+    if (txn) {
+        // This can wait a long time while we drain the secondary's apply queue, especially if it is
+        // building an index.
+        repl::ReplicationCoordinator::get(txn)->shutdown(txn);
+    }
+
     if (serviceContext)
         serviceContext->setKillAllOperations();
 
@@ -1058,7 +1064,6 @@ static void shutdownTask() {
     stopFTDC();
 
     if (txn) {
-        repl::ReplicationCoordinator::get(txn)->shutdown(txn);
         ShardingState::get(txn)->shutDown(txn);
     }
 

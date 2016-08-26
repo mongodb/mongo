@@ -32,72 +32,34 @@
 
 #include "mongo/db/repl/rs_sync.h"
 
-#include <vector>
-
-#include "third_party/murmurhash3/MurmurHash3.h"
-
-#include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/rs_initialsync.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
-
-namespace {
-using LockGuard = stdx::lock_guard<stdx::mutex>;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-
-}  // namespace
 
 RSDataSync::RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord)
     : _bgsync(bgsync), _replCoord(replCoord) {}
 
 RSDataSync::~RSDataSync() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    DESTRUCTOR_GUARD(join(););
 }
 
 void RSDataSync::startup() {
-    LockGuard lk(_mutex);
-    _runThread = stdx::make_unique<stdx::thread>(&RSDataSync::_run, this);
-    _inShutdown = false;
-}
-
-void RSDataSync::shutdown() {
-    LockGuard lk(_mutex);
-    _inShutdown = true;
-}
-
-bool RSDataSync::_isInShutdown() const {
-    LockGuard lk(_mutex);
-    return _inShutdown;
+    invariant(!_runThread.joinable());
+    _runThread = stdx::thread(&RSDataSync::_run, this);
 }
 
 void RSDataSync::join() {
-    std::unique_ptr<stdx::thread> thr;
-    {
-        LockGuard lk(_mutex);
-        thr.swap(_runThread);
-    }
-    if (thr) {
-        thr->join();
+    if (_runThread.joinable()) {
+        invariant(_bgsync->inShutdown());
+        _runThread.join();
     }
 }
 
@@ -110,7 +72,7 @@ void RSDataSync::_run() {
     if (replSettings.isPrefetchIndexModeSet())
         _replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
 
-    while (!_isInShutdown()) {
+    while (!_bgsync->inShutdown()) {
         // After a reconfig, we may not be in the replica set anymore, so
         // check that we are in the set (and not an arbiter) before
         // trying to sync with other replicas.
@@ -145,17 +107,13 @@ void RSDataSync::_run() {
                 continue;
             }
 
-            SyncTail tail(_bgsync, multiSyncApply);
-            tail.oplogApplication(_replCoord, [this]() { return _isInShutdown(); });
+            SyncTail(_bgsync, multiSyncApply).oplogApplication(_replCoord);
         } catch (...) {
             auto status = exceptionToStatus();
             severe() << "Exception thrown in RSDataSync: " << status;
             std::terminate();
         }
     }
-
-    LockGuard lk(_mutex);
-    _inShutdown = false;
 }
 
 }  // namespace repl

@@ -50,5 +50,9 @@
         return false;
     }, 'Did not see any log entries containing the following message: ' + msg, 60000, 300);
 
+    // Can't do clean shutdown with this failpoint on.
+    delayedConfigSecondary.getDB('admin').adminCommand(
+        {configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+
     st.stop();
 }());
