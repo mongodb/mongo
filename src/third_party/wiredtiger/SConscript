@@ -139,6 +139,9 @@ condition_map = {
     'POSIX_HOST' : not env.TargetOSIs('windows'),
     'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
     'WINDOWS_HOST' : env.TargetOSIs('windows'),
+    # This isn't perfect. But should cover for our build environments
+    'X86_HOST' : env['TARGET_ARCH'] not in ('ppc64le', 's390x'),
+    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x'
 }
 
 def filtered_filelist(f):
@@ -146,7 +149,7 @@ def filtered_filelist(f):
         file_cond = line.split()
         if line.startswith("#") or len(file_cond) == 0:
             continue
-        if len(file_cond) == 1 or condition_map[file_cond[1]]:
+        if len(file_cond) == 1 or condition_map.get(file_cond[1], False):
             yield file_cond[0]
 
 filelistfile = 'dist/filelist'
