@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,6 +48,16 @@
 #define ASSERT_BSONOBJ_GTE(a, b) ASSERT_BSON_COMPARISON(BSONObjGTE, a, b)
 #define ASSERT_BSONOBJ_NE(a, b) ASSERT_BSON_COMPARISON(BSONObjNE, a, b)
 
+/**
+ * Use to compare two instances of type BSONElement under the default comparator in unit tests.
+ */
+#define ASSERT_BSONELT_EQ(a, b) ASSERT_BSON_COMPARISON(BSONElementEQ, a, b)
+#define ASSERT_BSONELT_LT(a, b) ASSERT_BSON_COMPARISON(BSONElementLT, a, b)
+#define ASSERT_BSONELT_LTE(a, b) ASSERT_BSON_COMPARISON(BSONElementLTE, a, b)
+#define ASSERT_BSONELT_GT(a, b) ASSERT_BSON_COMPARISON(BSONElementGT, a, b)
+#define ASSERT_BSONELT_GTE(a, b) ASSERT_BSON_COMPARISON(BSONElementGTE, a, b)
+#define ASSERT_BSONELT_NE(a, b) ASSERT_BSON_COMPARISON(BSONElementNE, a, b)
+
 namespace mongo {
 namespace unittest {
 
@@ -64,6 +75,13 @@ DECLARE_BSON_CMP_FUNC(BSONObj, LTE);
 DECLARE_BSON_CMP_FUNC(BSONObj, GT);
 DECLARE_BSON_CMP_FUNC(BSONObj, GTE);
 DECLARE_BSON_CMP_FUNC(BSONObj, NE);
+
+DECLARE_BSON_CMP_FUNC(BSONElement, EQ);
+DECLARE_BSON_CMP_FUNC(BSONElement, LT);
+DECLARE_BSON_CMP_FUNC(BSONElement, LTE);
+DECLARE_BSON_CMP_FUNC(BSONElement, GT);
+DECLARE_BSON_CMP_FUNC(BSONElement, GTE);
+DECLARE_BSON_CMP_FUNC(BSONElement, NE);
 #undef DECLARE_BSON_CMP_FUNC
 
 }  // namespace unittest

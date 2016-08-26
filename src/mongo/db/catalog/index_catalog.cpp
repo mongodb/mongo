@@ -36,6 +36,7 @@
 
 #include <vector>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
@@ -1117,7 +1118,7 @@ IndexDescriptor* IndexCatalog::findShardKeyPrefixedIndex(OperationContext* txn,
         if (desc->isPartial())
             continue;
 
-        if (!shardKey.isPrefixOf(desc->keyPattern()))
+        if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
             continue;
 
         if (!desc->isMultikey(txn) && hasSimpleCollation)

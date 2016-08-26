@@ -37,6 +37,7 @@
 #include <iostream>
 
 #include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
@@ -309,26 +310,29 @@ public:
 class IsPrefixOf : public Base {
 public:
     void run() {
+        SimpleBSONElementComparator eltCmp;
         {
             BSONObj k = BSON("x" << 1);
-            verify(!k.isPrefixOf(BSON("a" << 1)));
-            verify(k.isPrefixOf(BSON("x" << 1)));
-            verify(k.isPrefixOf(BSON("x" << 1 << "a" << 1)));
-            verify(!k.isPrefixOf(BSON("a" << 1 << "x" << 1)));
+            ASSERT(!k.isPrefixOf(BSON("a" << 1), eltCmp));
+            ASSERT(k.isPrefixOf(BSON("x" << 1), eltCmp));
+            ASSERT(k.isPrefixOf(BSON("x" << 1 << "a" << 1), eltCmp));
+            ASSERT(!k.isPrefixOf(BSON("a" << 1 << "x" << 1), eltCmp));
         }
         {
             BSONObj k = BSON("x" << 1 << "y" << 1);
-            verify(!k.isPrefixOf(BSON("x" << 1)));
-            verify(!k.isPrefixOf(BSON("x" << 1 << "z" << 1)));
-            verify(k.isPrefixOf(BSON("x" << 1 << "y" << 1)));
-            verify(k.isPrefixOf(BSON("x" << 1 << "y" << 1 << "z" << 1)));
+            ASSERT(!k.isPrefixOf(BSON("x" << 1), eltCmp));
+            ASSERT(!k.isPrefixOf(BSON("x" << 1 << "z" << 1), eltCmp));
+            ASSERT(k.isPrefixOf(BSON("x" << 1 << "y" << 1), eltCmp));
+            ASSERT(k.isPrefixOf(BSON("x" << 1 << "y" << 1 << "z" << 1), eltCmp));
         }
         {
             BSONObj k = BSON("x" << 1);
-            verify(!k.isPrefixOf(BSON("x"
-                                      << "hi")));
-            verify(k.isPrefixOf(BSON("x" << 1 << "a"
-                                         << "hi")));
+            ASSERT(!k.isPrefixOf(BSON("x"
+                                      << "hi"),
+                                 eltCmp));
+            ASSERT(k.isPrefixOf(BSON("x" << 1 << "a"
+                                         << "hi"),
+                                eltCmp));
         }
         {
             BSONObj k = BSON("x" << 1);

@@ -1797,7 +1797,7 @@ TEST(Document, ValueOfEphemeralObjectElementIsEmpty) {
     ASSERT_OK(root.pushBack(ephemeralObject));
     ASSERT_FALSE(ephemeralObject.hasValue());
     // NOTE: You really shouldn't rely on this behavior; this test is mostly for coverage.
-    ASSERT_EQUALS(mongo::BSONElement(), ephemeralObject.getValue());
+    ASSERT_BSONELT_EQ(mongo::BSONElement(), ephemeralObject.getValue());
 }
 
 TEST(Element, RemovingRemovedElementFails) {

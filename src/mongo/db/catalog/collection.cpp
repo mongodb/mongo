@@ -39,6 +39,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -606,7 +607,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 
     BSONElement oldId = oldDoc.value()["_id"];
-    if (!oldId.eoo() && (oldId != newDoc["_id"]))
+    if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
         return StatusWith<RecordId>(
             ErrorCodes::InternalError, "in Collection::updateDocument _id mismatch", 13596);
 

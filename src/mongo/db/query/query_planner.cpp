@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -253,7 +254,7 @@ QuerySolution* buildWholeIXSoln(const IndexEntry& index,
 }
 
 bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-    return query.getQueryRequest().getSort().isPrefixOf(kp);
+    return query.getQueryRequest().getSort().isPrefixOf(kp, SimpleBSONElementComparator::kInstance);
 }
 
 // static

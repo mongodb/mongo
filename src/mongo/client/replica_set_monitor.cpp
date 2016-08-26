@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/read_preference.h"
@@ -892,8 +893,10 @@ bool Node::matches(const ReadPreference pref) const {
 
 bool Node::matches(const BSONObj& tag) const {
     BSONForEach(tagCriteria, tag) {
-        if (this->tags[tagCriteria.fieldNameStringData()] != tagCriteria)
+        if (SimpleBSONElementComparator::kInstance.evaluate(
+                this->tags[tagCriteria.fieldNameStringData()] != tagCriteria)) {
             return false;
+        }
     }
 
     return true;

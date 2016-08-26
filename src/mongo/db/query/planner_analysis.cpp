@@ -33,6 +33,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
@@ -409,11 +410,12 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
         // See if it's the order we're looking for.
         BSONObj possibleSort = resultingSortBob.obj();
-        if (!desiredSort.isPrefixOf(possibleSort)) {
+        if (!desiredSort.isPrefixOf(possibleSort, SimpleBSONElementComparator::kInstance)) {
             // We can't get the sort order from the index scan. See if we can
             // get the sort by reversing the scan.
             BSONObj reversePossibleSort = QueryPlannerCommon::reverseSortObj(possibleSort);
-            if (!desiredSort.isPrefixOf(reversePossibleSort)) {
+            if (!desiredSort.isPrefixOf(reversePossibleSort,
+                                        SimpleBSONElementComparator::kInstance)) {
                 // Can't get the sort order from the reversed index scan either. Give up.
                 return false;
             } else {

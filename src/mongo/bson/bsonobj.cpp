@@ -192,14 +192,15 @@ size_t BSONObj::Hasher::operator()(const BSONObj& obj) const {
     return hash;
 }
 
-bool BSONObj::isPrefixOf(const BSONObj& otherObj) const {
+bool BSONObj::isPrefixOf(const BSONObj& otherObj,
+                         const BSONElement::ComparatorInterface& eltCmp) const {
     BSONObjIterator a(*this);
     BSONObjIterator b(otherObj);
 
     while (a.more() && b.more()) {
         BSONElement x = a.next();
         BSONElement y = b.next();
-        if (x != y)
+        if (eltCmp.evaluate(x != y))
             return false;
     }
 

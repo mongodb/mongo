@@ -32,6 +32,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -198,7 +199,7 @@ Status collMod(OperationContext* txn,
                 continue;
             }
 
-            if (oldExpireSecs != newExpireSecs) {
+            if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
                 result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
                 // Change the value of "expireAfterSeconds" on disk.
                 coll->getCatalogEntry()->updateTTLSetting(

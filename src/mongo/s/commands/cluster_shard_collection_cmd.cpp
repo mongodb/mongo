@@ -34,6 +34,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
@@ -349,7 +350,7 @@ public:
             BSONObj currentKey = idx["key"].embeddedObject();
             // Check 2.i. and 2.ii.
             if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
-                proposedKey.isPrefixOf(currentKey)) {
+                proposedKey.isPrefixOf(currentKey, SimpleBSONElementComparator::kInstance)) {
                 // We can't currently use hashed indexes with a non-default hash seed
                 // Check v.
                 // Note that this means that, for sharding, we only support one hashed index

@@ -189,6 +189,60 @@ TEST(UnitTestSelfTest, BSONObjGTE) {
                             << "bar"));
 }
 
+TEST(UnitTestSelfTest, BSONElementEQ) {
+    mongo::BSONObj obj1 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj2 = BSON("foo"
+                               << "bar");
+    ASSERT_BSONELT_EQ(obj1.firstElement(), obj2.firstElement());
+}
+
+TEST(UnitTestSelfTest, BSONElementNE) {
+    mongo::BSONObj obj1 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj2 = BSON("foo"
+                               << "baz");
+    ASSERT_BSONELT_NE(obj1.firstElement(), obj2.firstElement());
+}
+
+TEST(UnitTestSelfTest, BSONElementLT) {
+    mongo::BSONObj obj1 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj2 = BSON("foo"
+                               << "baz");
+    ASSERT_BSONELT_LT(obj1.firstElement(), obj2.firstElement());
+}
+
+TEST(UnitTestSelfTest, BSONElementLTE) {
+    mongo::BSONObj obj1 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj2 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj3 = BSON("foo"
+                               << "baz");
+    ASSERT_BSONELT_LTE(obj1.firstElement(), obj2.firstElement());
+    ASSERT_BSONELT_LTE(obj1.firstElement(), obj3.firstElement());
+}
+
+TEST(UnitTestSelfTest, BSONElementGT) {
+    mongo::BSONObj obj1 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj2 = BSON("foo"
+                               << "baz");
+    ASSERT_BSONELT_GT(obj2.firstElement(), obj1.firstElement());
+}
+
+TEST(UnitTestSelfTest, BSONElementGTE) {
+    mongo::BSONObj obj1 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj2 = BSON("foo"
+                               << "bar");
+    mongo::BSONObj obj3 = BSON("foo"
+                               << "baz");
+    ASSERT_BSONELT_GTE(obj3.firstElement(), obj2.firstElement());
+    ASSERT_BSONELT_GTE(obj2.firstElement(), obj1.firstElement());
+}
+
 DEATH_TEST(DeathTestSelfTest, TestDeath, "Invariant failure false") {
     invariant(false);
 }

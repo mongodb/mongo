@@ -55,5 +55,12 @@ GENERATE_BSON_CMP_FUNC(BSONObj, GT, SimpleBSONObjComparator::kInstance, >);
 GENERATE_BSON_CMP_FUNC(BSONObj, GTE, SimpleBSONObjComparator::kInstance, >=);
 GENERATE_BSON_CMP_FUNC(BSONObj, NE, SimpleBSONObjComparator::kInstance, !=);
 
+GENERATE_BSON_CMP_FUNC(BSONElement, EQ, SimpleBSONElementComparator::kInstance, ==);
+GENERATE_BSON_CMP_FUNC(BSONElement, LT, SimpleBSONElementComparator::kInstance, <);
+GENERATE_BSON_CMP_FUNC(BSONElement, LTE, SimpleBSONElementComparator::kInstance, <=);
+GENERATE_BSON_CMP_FUNC(BSONElement, GT, SimpleBSONElementComparator::kInstance, >);
+GENERATE_BSON_CMP_FUNC(BSONElement, GTE, SimpleBSONElementComparator::kInstance, >=);
+GENERATE_BSON_CMP_FUNC(BSONElement, NE, SimpleBSONElementComparator::kInstance, !=);
+
 }  // namespace unittest
 }  // namespace mongo

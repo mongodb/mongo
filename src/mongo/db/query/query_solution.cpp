@@ -31,6 +31,7 @@
 #include "mongo/db/query/query_solution.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -603,7 +604,8 @@ std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds&
         while (keyPatternIterator.more() && startKeyIterator.more() && endKeyIterator.more()) {
             BSONElement startKey = startKeyIterator.next();
             BSONElement endKey = endKeyIterator.next();
-            if (startKey != endKey || CollationIndexKey::isCollatableType(startKey.type())) {
+            if (SimpleBSONElementComparator::kInstance.evaluate(startKey != endKey) ||
+                CollationIndexKey::isCollatableType(startKey.type())) {
                 if (!rangeCanContainString(
                         startKey, endKey, (startKeyIterator.more() || bounds.endKeyInclusive))) {
                     // If the first non-point range cannot contain strings, we don't need to
@@ -689,7 +691,8 @@ void IndexScanNode::computeProperties() {
         BSONObjIterator endIter(bounds.endKey);
         while (keyIter.more() && startIter.more() && endIter.more()) {
             BSONElement key = keyIter.next();
-            if (startIter.next() == endIter.next()) {
+            if (SimpleBSONElementComparator::kInstance.evaluate(startIter.next() ==
+                                                                endIter.next())) {
                 equalityFields.insert(key.fieldName());
             }
         }

@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -140,7 +141,11 @@ struct DocID {
             return true;
         if (comp > 0)
             return false;
-        return _id < other._id;
+
+        const StringData::ComparatorInterface* stringComparator = nullptr;
+        BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                     stringComparator);
+        return eltCmp.evaluate(_id < other._id);
     }
 };
 

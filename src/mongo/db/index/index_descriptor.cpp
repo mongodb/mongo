@@ -30,7 +30,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/index_descriptor.h"
+
+#include <algorithm>
+
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -76,7 +82,16 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
     std::map<StringData, BSONElement> newOptionsMap;
     populateOptionsMap(newOptionsMap, other->infoObj());
 
-    return existingOptionsMap == newOptionsMap;
+    return existingOptionsMap.size() == newOptionsMap.size() &&
+        std::equal(existingOptionsMap.begin(),
+                   existingOptionsMap.end(),
+                   newOptionsMap.begin(),
+                   [](const std::pair<StringData, BSONElement>& lhs,
+                      const std::pair<StringData, BSONElement>& rhs) {
+                       return lhs.first == rhs.first &&
+                           SimpleBSONElementComparator::kInstance.evaluate(lhs.second ==
+                                                                           rhs.second);
+                   });
 }
 
 void IndexDescriptor::_checkOk() const {

@@ -29,13 +29,13 @@
 #pragma once
 
 #include "mongo/bson/bson_comparator_interface_base.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonelement.h"
 
 namespace mongo {
 
 /**
- * A BSONObj::ComparatorInterface is an abstract class for comparing BSONObj objects. Usage for
- * comparing two BSON objects, 'lhs' and 'rhs', where 'comparator' is an instance of a class
+ * A BSONElement::ComparatorInterface is an abstract class for comparing BSONElement objects. Usage
+ * for comparing two BSON elements, 'lhs' and 'rhs', where 'comparator' is an instance of a class
  * implementing this interface, is as shown below:
  *
  *  bool lessThan = comparator.evaluate(lhs < rhs);
@@ -50,53 +50,54 @@ namespace mongo {
  *
  * All methods are thread-safe.
  */
-class BSONObj::ComparatorInterface : public BSONComparatorInterfaceBase<BSONObj> {
+class BSONElement::ComparatorInterface : public BSONComparatorInterfaceBase<BSONElement> {
 public:
     /**
-     * Constructs a BSONObjSet whose equivalence classes are given by this comparator. This
+     * Constructs a BSONEltSet whose equivalence classes are given by this comparator. This
      * comparator must outlive the returned set.
      */
-    Set makeBSONObjSet(std::initializer_list<BSONObj> init = {}) const {
+    Set makeBSONEltSet(std::initializer_list<BSONElement> init = {}) const {
         return makeSet(init);
     }
 
     /**
-     * Constructs a BSONObjUnorderedSet whose equivalence classes are given by this
+     * Constructs a BSONEltUnorderedSet whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
-    UnorderedSet makeBSONObjUnorderedSet(std::initializer_list<BSONObj> init = {}) const {
+    UnorderedSet makeBSONEltUnorderedSet(std::initializer_list<BSONElement> init = {}) const {
         return makeUnorderedSet(init);
     }
 
     /**
-     * Constructs an ordered map from BSONObj to type ValueType whose ordering is given by this
-     * comparator.  This comparator must outlive the returned map.
+     * Constructs an ordered map from BSONElement to type ValueType whose ordering is given by this
+     * comparator. This comparator must outlive the returned map.
      */
     template <typename ValueType>
-    Map<ValueType> makeBSONObjIndexedMap(
-        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const {
+    Map<ValueType> makeBSONEltIndexedMap(
+        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const {
         return makeMap(init);
     }
 
     /**
-     * Constructs an unordered map from BSONObj to type ValueType whose ordering is given by this
-     * comparator. This comparator must outlive the returned map.
+     * Constructs an unordered map from BSONElement to type ValueType whose ordering is given by
+     * this comparator. This comparator must outlive the returned map.
      */
     template <typename ValueType>
-    UnorderedMap<ValueType> makeBSONObjIndexedUnorderedMap(
-        std::initializer_list<std::pair<const BSONObj, ValueType>> init = {}) const {
+    UnorderedMap<ValueType> makeBSONEltIndexedUnorderedMap(
+        std::initializer_list<std::pair<const BSONElement, ValueType>> init = {}) const {
         return makeUnorderedMap(init);
     }
 };
 
-using BSONObjSet = BSONComparatorInterfaceBase<BSONObj>::Set;
+using BSONEltSet = BSONComparatorInterfaceBase<BSONElement>::Set;
 
-using BSONObjUnorderedSet = BSONComparatorInterfaceBase<BSONObj>::UnorderedSet;
-
-template <typename ValueType>
-using BSONObjIndexedMap = BSONComparatorInterfaceBase<BSONObj>::Map<ValueType>;
+using BSONEltUnorderedSet = BSONComparatorInterfaceBase<BSONElement>::UnorderedSet;
 
 template <typename ValueType>
-using BSONObjIndexedUnorderedMap = BSONComparatorInterfaceBase<BSONObj>::UnorderedMap<ValueType>;
+using BSONEltIndexedMap = BSONComparatorInterfaceBase<BSONElement>::Map<ValueType>;
+
+template <typename ValueType>
+using BSONEltIndexedUnorderedMap =
+    BSONComparatorInterfaceBase<BSONElement>::UnorderedMap<ValueType>;
 
 }  // namespace mongo

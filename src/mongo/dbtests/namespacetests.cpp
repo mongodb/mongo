@@ -111,7 +111,7 @@ public:
 
         BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL, spec);
         ASSERT_EQUALS(NumberLong, missingField.firstElement().type());
-        ASSERT_EQUALS(nullFieldFromKey, missingField.firstElement());
+        ASSERT_BSONELT_EQ(nullFieldFromKey, missingField.firstElement());
     }
 };
 
@@ -143,7 +143,7 @@ public:
         // the right key).
         BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL, spec);
         ASSERT_EQUALS(NumberLong, missingField.firstElement().type());
-        ASSERT_EQUALS(nullFieldFromKey, missingField.firstElement());
+        ASSERT_BSONELT_EQ(nullFieldFromKey, missingField.firstElement());
     }
 };
 
