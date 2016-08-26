@@ -27,66 +27,16 @@
  *    then also delete it in the license file.
  */
 
-#include <iostream>
 #include <string>
 #include <vector>
 
 #include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/signal_handlers_synchronous.h"
-
-using mongo::Status;
 
 int main(int argc, char** argv, char** envp) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
-
-    namespace moe = ::mongo::optionenvironment;
-    moe::OptionsParser parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-    std::map<std::string, std::string> env;
-
-    // Register our allowed options with our OptionSection
-    auto listDesc = "List all test suites in this unit test.";
-    options.addOptionChaining("list", "list", moe::Switch, listDesc);
-    auto suiteDesc = "Test suite name. Specify --suite more than once to run multiple suites.";
-    options.addOptionChaining("suite", "suite", moe::StringVector, suiteDesc);
-    auto filterDesc = "Test case name filter. Specify the substring of the test names.";
-    options.addOptionChaining("filter", "filter", moe::String, filterDesc);
-    auto repeatDesc = "Specifies the number of runs for each test.";
-    options.addOptionChaining("repeat", "repeat", moe::Int, repeatDesc).setDefault(moe::Value(1));
-
-    std::vector<std::string> argVector;
-    for (int i = 0; i < argc; i++) {
-        argVector.push_back(std::string(argv[i]));
-    }
-    Status ret = parser.run(options, argVector, env, &environment);
-    if (!ret.isOK()) {
-        std::cerr << options.helpString();
-        return EXIT_FAILURE;
-    }
-
-    bool list;
-    moe::StringVector_t suites;
-    std::string filter;
-    int repeat;
-    environment.get("list", &list);
-    environment.get("suite", &suites);
-    environment.get("filter", &filter);
-    environment.get("repeat", &repeat);
-
-    if (list) {
-        auto suiteNames = ::mongo::unittest::getAllSuiteNames();
-        for (auto name : suiteNames) {
-            std::cout << name << std::endl;
-        }
-        return EXIT_SUCCESS;
-    }
-    return ::mongo::unittest::Suite::run(suites, filter, repeat);
+    return ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 }

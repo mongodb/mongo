@@ -260,18 +260,14 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
 
         bool passes = false;
 
+        log() << "\t going to run test: " << tc->getName() << std::endl;
+
         std::stringstream err;
         err << tc->getName() << "\t";
 
         try {
-            for (int x = 0; x < runsPerTest; x++) {
-                std::stringstream runTimes;
-                if (runsPerTest > 1) {
-                    runTimes << "  (" << x + 1 << "/" << runsPerTest << ")";
-                }
-                log() << "\t going to run test: " << tc->getName() << runTimes.str();
+            for (int x = 0; x < runsPerTest; x++)
                 tc->run();
-            }
             passes = true;
         } catch (const TestAssertionFailureException& ae) {
             err << ae.toString();
