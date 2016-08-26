@@ -38,6 +38,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -82,6 +83,8 @@ const Milliseconds kFindHostMaxBackOffTime(500);
 // TODO: Move to ReplicaSetMonitorManager
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
 ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
+
+MONGO_EXPORT_SERVER_PARAMETER(timeOutMonitoringReplicaSets, bool, true);
 
 // global background job responsible for checking every X amount of time
 class ReplicaSetMonitorWatcher : public BackgroundJob {
@@ -173,11 +176,18 @@ protected:
             m->startOrContinueRefresh().refreshAll();
 
             if (!m->isSetUsable()) {
-                log() << "Stopping periodic monitoring of set " << m->getName()
-                      << " because none of the hosts could be contacted for an extended period of "
-                         "time.";
+                if (timeOutMonitoringReplicaSets) {
+                    warning() << "Stopping periodic monitoring of set " << m->getName()
+                              << " because none of the hosts could be contacted for an extended "
+                                 "period of time.";
 
-                ReplicaSetMonitor::remove(m->getName());
+                    ReplicaSetMonitor::remove(m->getName());
+                } else {
+                    warning() << "Replica set " << m->getName()
+                              << " has been down for an extended period of time.  Monitoring of "
+                                 "this set will continue as the 'timeOutMonitoringReplicaSets' "
+                                 "server parameter is set to false";
+                }
             }
         }
     }
@@ -484,7 +494,7 @@ Refresher::Refresher(const SetStatePtr& setState)
 
 Refresher::NextStep Refresher::getNextStep() {
     // If the set is faulty, don't try anymore
-    if (!_set->isUsable()) {
+    if (!_set->isUsable() && timeOutMonitoringReplicaSets) {
         return NextStep(NextStep::DONE);
     }
 
@@ -539,11 +549,13 @@ Refresher::NextStep Refresher::getNextStep() {
             _set->consecutiveFailedScans = 0;
         } else {
             _set->consecutiveFailedScans++;
-            log() << "All nodes for set " << _set->name << " are down. "
-                  << "This has happened for " << _set->consecutiveFailedScans
-                  << " checks in a row. Polling will stop after "
-                  << maxConsecutiveFailedChecks - _set->consecutiveFailedScans
-                  << " more failed checks";
+            if (timeOutMonitoringReplicaSets) {
+                warning() << "All nodes for set " << _set->name << " are down. "
+                          << "This has happened for " << _set->consecutiveFailedScans
+                          << " checks in a row. Polling will stop after "
+                          << maxConsecutiveFailedChecks - _set->consecutiveFailedScans
+                          << " more failed checks";
+            }
         }
 
         // Makes sure all other Refreshers in this round return DONE
