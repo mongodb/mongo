@@ -21,8 +21,13 @@ struct __wt_thread {
 	int (*run_func)(WT_SESSION_IMPL *session, WT_THREAD *context);
 };
 
+/*
+ * Flags for thread group functions.
+ */
 #define	WT_THREAD_CAN_WAIT		0x01
-#define	WT_THREAD_PANIC_FAIL		0x02
+#define	WT_THREAD_CLOSE_ALL		0x02
+#define	WT_THREAD_FREE			0x04
+#define	WT_THREAD_PANIC_FAIL		0x08
 
 /*
  * WT_THREAD_GROUP --
