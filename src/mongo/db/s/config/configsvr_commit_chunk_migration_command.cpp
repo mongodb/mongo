@@ -37,14 +37,18 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
 namespace {
+
+MONGO_FP_DECLARE(migrationCommitError);
 
 /**
  * This command takes the chunk being migrated ("migratedChunk") and generates a new version for it
@@ -68,6 +72,7 @@ namespace {
  *   controlChunk: {min: <min_value>, max: <max_value>},  (optional)
  *   fromShard: "<from_shard_name>",
  *   toShard: "<to_shard_name>",
+ *   shardHasDistributedLock: true/false,
  * }
  *
  * Returns:
@@ -120,8 +125,7 @@ public:
             BSON(ChunkType::ns() << nss.ns() << ChunkType::min() << min << ChunkType::max() << max
                                  << ChunkType::shard()
                                  << shard);
-        // Must use kLocalReadConcern because using majority will set a flag on the recovery unit
-        // that conflicts with the subsequent writes in the CommitChunkMigration command.
+        // Must use local read concern because we're going to perform subsequent writes.
         auto findResponse = uassertStatusOK(
             Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                 txn,
@@ -200,6 +204,43 @@ public:
         return BSON("applyOps" << updates.arr());
     }
 
+    /**
+     * Assures that the balancer still holds the collection distributed lock for this collection. If
+     * it no longer does, uassert, because we don't know if the collection state has changed -- e.g.
+     * whether it was/is dropping, whether another imcompatible migration is running, etc..
+     */
+    void checkBalancerHasDistLock(OperationContext* txn,
+                                  const NamespaceString& nss,
+                                  const ChunkRange& chunkRange) {
+        auto balancerDistLockProcessID =
+            Grid::get(txn)->catalogClient(txn)->getDistLockManager()->getProcessID();
+
+        // Must use local read concern because we're going to perform subsequent writes.
+        auto lockQueryResponse = uassertStatusOK(
+            Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                txn,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                NamespaceString(LocksType::ConfigNS),
+                BSON(LocksType::process(balancerDistLockProcessID) << LocksType::name(nss.ns())),
+                BSONObj(),
+                boost::none));
+
+        invariant(lockQueryResponse.docs.size() <= 1);
+
+        if (MONGO_FAIL_POINT(migrationCommitError)) {
+            lockQueryResponse.docs.clear();
+        }
+
+        uassert(ErrorCodes::BalancerLostDistributedLock,
+                str::stream() << "The distributed lock for collection '" << nss.ns()
+                              << "' was lost by the balancer since this migration began. Cannot "
+                              << "proceed with the migration commit for chunk ("
+                              << chunkRange.toString()
+                              << ") because it could corrupt other operations.",
+                lockQueryResponse.docs.size() == 1);
+    }
+
     bool run(OperationContext* txn,
              const std::string& dbName,
              BSONObj& cmdObj,
@@ -221,6 +262,10 @@ public:
         // applyOps.
         Lock::GlobalWrite firstGlobalWriteLock(txn->lockState());
 
+        if (!commitChunkMigrationRequest.shardHasDistributedLock()) {
+            checkBalancerHasDistLock(txn, nss, commitChunkMigrationRequest.getMigratedChunkRange());
+        }
+
         // Check that migratedChunk and controlChunk are where they should be, on fromShard.
         checkChunkIsOnShard(txn,
                             nss,
@@ -240,8 +285,7 @@ public:
         // incremented major version of the result returned. Migrating chunk's minor version will
         // be 0, control chunk's minor version will be 1 (if control chunk is present).
 
-        // Must use kLocalReadConcern because using majority will set a flag on the recovery unit
-        // that conflicts with the subsequent writes.
+        // Must use local read concern because we're going to perform subsequent writes.
         auto findResponse = uassertStatusOK(
             Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                 txn,

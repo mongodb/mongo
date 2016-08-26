@@ -71,7 +71,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 
 }  // namespace
 
-MONGO_FP_DECLARE(failCommitMigrationCommand);
+MONGO_FP_DECLARE(migrationCommitNetworkError);
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeCommitMigration);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
@@ -314,7 +314,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                                  _args.getFromShardId(),
                                                  _args.getToShardId(),
                                                  migratedChunkType,
-                                                 controlChunkType);
+                                                 controlChunkType,
+                                                 _args.getTakeDistLock());
 
     builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
 
@@ -327,9 +328,9 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         builder.obj(),
         Shard::RetryPolicy::kIdempotent);
 
-    if (MONGO_FAIL_POINT(failCommitMigrationCommand)) {
+    if (MONGO_FAIL_POINT(migrationCommitNetworkError)) {
         commitChunkMigrationResponse = Status(
-            ErrorCodes::InternalError, "Failpoint 'failCommitMigrationCommand' generated error");
+            ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
     if (commitChunkMigrationResponse.isOK() &&
@@ -361,6 +362,12 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         css->refreshMetadata(
             txn, _committedMetadata->cloneMigrate(migratingChunkToForget, committedCollVersion));
         _committedMetadata = css->getMetadata();
+    } else if (commitChunkMigrationResponse.isOK() &&
+               commitChunkMigrationResponse.getValue().commandStatus ==
+                   ErrorCodes::BalancerLostDistributedLock) {
+        // We were unable to commit because the Balancer was no longer holding the collection
+        // distributed lock. No attempt to commit was made.
+        return commitChunkMigrationResponse.getValue().commandStatus;
     } else {
         // This could be an unrelated error (e.g. network error). Check whether the metadata update
         // succeeded by refreshing the collection metadata from the config server and checking that

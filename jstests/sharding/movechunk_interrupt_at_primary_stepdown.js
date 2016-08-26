@@ -1,5 +1,10 @@
 // Ensures that all pending move chunk operations get interrupted when the primary of the config
-// server steps down and then becomes primary again
+// server steps down and then becomes primary again. Then the migration can be rejoined, and a
+// success/failure response still returned to the caller.
+//
+// Also tests the failure of a migration commit command on the source shard of a migration, due to
+// the balancer being interrupted, failing to recover the active migrations, and releasing the
+// distributed lock.
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
@@ -9,12 +14,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Intentionally use a config server with 1 node so that the step down and promotion to primary
     // are guaranteed to happen on the same host
     var st = new ShardingTest({config: 1, shards: 2});
+    var mongos = st.s0;
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
+    assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));
     st.ensurePrimaryShard('TestDB', st.shard0.shardName);
-    assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {Key: 1}}));
+    assert.commandWorked(mongos.adminCommand({shardCollection: 'TestDB.TestColl', key: {Key: 1}}));
 
-    var coll = st.s0.getDB('TestDB').TestColl;
+    var coll = mongos.getDB('TestDB').TestColl;
 
     // We have one chunk initially
     assert.writeOK(coll.insert({Key: 0, Value: 'Test value'}));
@@ -25,7 +31,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var staticMongod = MongoRunner.runMongod({});
 
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
+        staticMongod, mongos.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
     waitForMigrateStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
     // Stepdown the primary in order to force the balancer to stop
@@ -37,16 +43,30 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Ensure a new primary is found promptly
     st.configRS.getPrimary(30000);
 
-    assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
-    assert.eq(0, st.s0.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
+    assert.eq(1, mongos.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
+    assert.eq(0, mongos.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
 
     unpauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
     // Ensure that migration succeeded
     joinMoveChunk();
 
-    assert.eq(0, st.s0.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
-    assert.eq(1, st.s0.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
+    assert.eq(0, mongos.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
+    assert.eq(1, mongos.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
+
+    // migrationCommitError -- tell the shard that the migration cannot be committed because the
+    // collection distlock was lost during the migration because the balancer was interrupted and
+    // the collection could be incompatible now with this migration.
+    assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
+        {configureFailPoint: 'migrationCommitError', mode: 'alwaysOn'}));
+
+    assert.commandFailedWithCode(
+        mongos.getDB("admin").runCommand(
+            {moveChunk: coll + "", find: {Key: 0}, to: st.shard0.shardName}),
+        ErrorCodes.BalancerLostDistributedLock);
+
+    assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
+        {configureFailPoint: 'migrationCommitError', mode: 'off'}));
 
     st.stop();
 })();

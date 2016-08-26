@@ -189,6 +189,7 @@ error_code("LinearizableReadConcernError", 187)
 error_code("IncompatibleServerVersion", 188)
 error_code("PrimarySteppedDown", 189)
 error_code("MasterSlaveConnectionFailure", 190)
+error_code("BalancerLostDistributedLock", 191)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

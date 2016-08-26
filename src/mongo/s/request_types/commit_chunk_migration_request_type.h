@@ -56,7 +56,8 @@ public:
                                 const ShardId& fromShard,
                                 const ShardId& toShard,
                                 const ChunkType& migratedChunkType,
-                                const boost::optional<ChunkType>& controlChunkType);
+                                const boost::optional<ChunkType>& controlChunkType,
+                                const bool& shardHasDistributedLock);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -80,6 +81,10 @@ public:
         return bool(_controlChunkRange);
     }
 
+    bool shardHasDistributedLock() {
+        return _shardHasDistributedLock;
+    }
+
 private:
     CommitChunkMigrationRequest(const NamespaceString& nss, const ChunkRange& range);
 
@@ -97,6 +102,9 @@ private:
 
     // Range of control chunk being moved, if it exists.
     boost::optional<ChunkRange> _controlChunkRange;
+
+    // Flag to indicate whether the shard has the distlock.
+    bool _shardHasDistributedLock;
 };
 
 }  // namespace mongo

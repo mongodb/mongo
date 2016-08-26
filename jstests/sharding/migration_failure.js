@@ -1,6 +1,8 @@
 //
 // Tests that migration failures before and after commit correctly recover when possible.
 //
+// Also checks that the collection version on a source shard updates correctly after a migration.
+//
 
 (function() {
     'use strict';
@@ -9,11 +11,10 @@
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
     var coll = mongos.getCollection("foo.bar");
 
     assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-    printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
+    printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
     assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
     assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
 
@@ -32,7 +33,7 @@
     oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
     assert.commandFailed(
-        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: shards[1]._id}));
+        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
     newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
@@ -46,20 +47,17 @@
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
         {configureFailPoint: 'failMigrationCommit', mode: 'off'}));
 
-    // failApplyChunkOps and failCommitMigrationCommand -- these mimic migration commit commands
-    // returning errors (e.g. network), whereupon the config server is queried to determine whether
-    // the commit was successful.
+    // migrationCommitNetworkError -- mimic migration commit command returning a network error,
+    // whereupon the config server is queried to determine that this commit was successful.
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {configureFailPoint: 'failApplyChunkOps', mode: 'alwaysOn'}));
-    assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {configureFailPoint: 'failCommitMigrationCommand', mode: 'alwaysOn'}));
+        {configureFailPoint: 'migrationCommitNetworkError', mode: 'alwaysOn'}));
 
     // Run a migration where there will still be chunks in the collection remaining on the shard
     // afterwards. This will cause the collection's shardVersion to be bumped higher.
     oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {_id: 1}, to: shards[1]._id}));
+        admin.runCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName}));
 
     newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
@@ -72,7 +70,7 @@
     oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: shards[1]._id}));
+        admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName}));
 
     newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
@@ -86,9 +84,7 @@
         0, newVersion.i, "The shard version should have reset, but the minor value is not zero");
 
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {configureFailPoint: 'failApplyChunkOps', mode: 'off'}));
-    assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {configureFailPoint: 'failCommitMigrationCommand', mode: 'off'}));
+        {configureFailPoint: 'migrationCommitNetworkError', mode: 'off'}));
 
     st.stop();
 

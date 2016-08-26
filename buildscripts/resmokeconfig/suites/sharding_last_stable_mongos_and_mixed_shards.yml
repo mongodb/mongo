@@ -14,6 +14,7 @@ selector:
     - jstests/sharding/add_shard_to_zone.js
     - jstests/sharding/remove_shard_from_zone.js
     - jstests/sharding/update_zone_key_range.js
+    - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
     # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
     - jstests/sharding/config_version_rollback.js
     # TODO Assumes mongod and mongos handle read on view. Enable when 3.4 becomes 'last-stable'.
