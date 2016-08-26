@@ -732,7 +732,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_epoch(session, &fsync_stop));
 	fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
 	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint_fsync_post);
-	WT_STAT_FAST_CONN_INCRV(session,
+	WT_STAT_FAST_CONN_SET(session,
 	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
 
 	WT_ERR(__checkpoint_verbose_track(session,

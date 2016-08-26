@@ -572,14 +572,14 @@ __wt_conn_dhandle_discard_single(
 	set_pass_intr = false;
 	if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
 		set_pass_intr = true;
-		(void)__wt_atomic_add32(&S2C(session)->cache->pass_intr, 1);
+		(void)__wt_atomic_addv32(&S2C(session)->cache->pass_intr, 1);
 	}
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    tret = __conn_dhandle_remove(session, final));
 	if (set_pass_intr)
-		(void)__wt_atomic_sub32(&S2C(session)->cache->pass_intr, 1);
+		(void)__wt_atomic_subv32(&S2C(session)->cache->pass_intr, 1);
 	WT_TRET(tret);
 
 	/*

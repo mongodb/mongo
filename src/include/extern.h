@@ -345,7 +345,7 @@ extern int __wt_evict_destroy(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBU
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern void __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref);
+extern bool __wt_page_evict_urgent(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v);
 extern void __wt_evict_priority_clear(WT_SESSION_IMPL *session);
 extern int __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

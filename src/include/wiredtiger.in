@@ -4289,15 +4289,15 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_NOT_EMPTY	1042
 /*! cache: eviction server evicting pages */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_EVICTING	1043
-/*! cache: eviction server populating queue, but not evicting pages */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_NOT_EVICTING	1044
 /*! cache: eviction server skipped very large page */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_TOOBIG	1045
+#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_TOOBIG	1044
 /*! cache: eviction server slept, because we did not make progress with
  * eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1046
+#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1045
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1047
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1046
+/*! cache: eviction state */
+#define	WT_STAT_CONN_CACHE_EVICTION_STATE		1047
 /*! cache: eviction worker thread evicting pages */
 #define	WT_STAT_CONN_CACHE_EVICTION_WORKER_EVICTING	1048
 /*! cache: failed eviction of pages that exceeded the in-memory maximum */

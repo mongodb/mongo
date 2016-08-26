@@ -1540,8 +1540,7 @@ execute_populate(CONFIG *cfg)
 		print_ops_sec = 0;
 	} else {
 		print_secs = (double)msecs / (double)MSEC_PER_SEC;
-		print_ops_sec =
-		    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC);
+		print_ops_sec = (uint64_t)(cfg->icount / print_secs);
 	}
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,

@@ -68,6 +68,18 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_page_evict_soon --
+ *      Set a page to be evicted as soon as possible.
+ */
+static inline void
+__wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_UNUSED(session);
+
+	ref->page->read_gen = WT_READGEN_OLDEST;
+}
+
+/*
  * __wt_cache_pages_inuse --
  *	Return the number of pages in use.
  */
@@ -188,7 +200,7 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	WT_CONNECTION_IMPL *conn;
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
-	u_int pct_full;
+	u_int pct_dirty, pct_full;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -212,24 +224,16 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	 * we involve the application thread.
 	 */
 	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
+	pct_dirty =
+	    (u_int)((100 * __wt_cache_dirty_leaf_inuse(cache)) / bytes_max);
+
 	if (pct_fullp != NULL)
-		*pct_fullp = pct_full;
+		*pct_fullp = (u_int)WT_MAX(0, 100 - WT_MIN(
+		    (int)cache->eviction_trigger - (int)pct_full,
+		    (int)cache->eviction_dirty_trigger - (int)pct_dirty));
 
-	if (pct_full > cache->eviction_trigger)
-		return (true);
-
-	/*
-	 * Check if there are too many dirty bytes in cache.
-	 *
-	 * We try to avoid penalizing read-only operations by only checking the
-	 * dirty limit once a transaction ID has been allocated, or if the last
-	 * transaction did an update.
-	 */
-	if (__wt_cache_dirty_leaf_inuse(cache) >
-	    (cache->eviction_dirty_trigger * bytes_max) / 100)
-		return (true);
-
-	return (false);
+	return (pct_full >= cache->eviction_trigger ||
+	    pct_dirty >= cache->eviction_dirty_trigger);
 }
 
 /*
