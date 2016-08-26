@@ -47,9 +47,11 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/cache/cache_las.c
-src/checksum/checksum.c
 src/checksum/power8/crc32.S		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
+src/checksum/x86/checksum.c		X86_HOST
+src/checksum/zseries/crc32-s390x.c	ZSERIES_HOST
+src/checksum/zseries/crc32le-vx.S	ZSERIES_HOST
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
@@ -145,6 +147,7 @@ src/os_win/os_sleep.c			WINDOWS_HOST
 src/os_win/os_snprintf.c		WINDOWS_HOST
 src/os_win/os_thread.c			WINDOWS_HOST
 src/os_win/os_time.c			WINDOWS_HOST
+src/os_win/os_utf8.c			WINDOWS_HOST
 src/os_win/os_vsnprintf.c		WINDOWS_HOST
 src/os_win/os_winerr.c			WINDOWS_HOST
 src/os_win/os_yield.c			WINDOWS_HOST
@@ -182,6 +185,7 @@ src/support/pow.c
 src/support/rand.c
 src/support/scratch.c
 src/support/stat.c
+src/support/thread_group.c
 src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c

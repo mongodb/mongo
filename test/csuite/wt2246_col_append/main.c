@@ -152,7 +152,5 @@ main(int argc, char *argv[])
 	    (ce - cs) / (double)CLOCKS_PER_SEC);
 
 	testutil_cleanup(opts);
-	/* NOTREACHED */
-
-	return (0);
+	return (EXIT_SUCCESS);
 }

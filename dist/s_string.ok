@@ -5,6 +5,7 @@ AAAAAAAAAAAAA
 AAAAAAAAAAAAAAAA
 AAAAAAAAAAAAAAAAAA
 ABCDEFGHIJKLMNOPQRSTUVWXYZ
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 ADDR
 ADDRs
 AJ
@@ -12,6 +13,7 @@ API
 APIs
 ARG
 ARGS
+ASM
 ASYNC
 Addr
 Ailamaki
@@ -37,6 +39,7 @@ BZ
 Barack
 Bitfield
 Bitwise
+Brueckner
 Bsearch
 Btree
 Buf
@@ -59,6 +62,7 @@ CSV
 CURSORs
 CURSTD
 CallsCustDate
+Castagnoli
 Checkpointing
 Checksum
 Checksums
@@ -67,9 +71,9 @@ CloseHandle
 Comparator
 Config
 Coverity
-CreateFileA
 CreateFileMapping
-CreateFileMappingA
+CreateFileMappingW
+CreateFileW
 Crummey
 CustomersPhone
 DECL
@@ -85,7 +89,7 @@ DbCursor
 DbEnv
 Decrement
 Decrypt
-DeleteFileA
+DeleteFileW
 EACCES
 EAGAIN
 EB
@@ -135,17 +139,18 @@ GIDs
 Gcc
 Geoff
 GetEnvironmentVariableA
-GetFileAttributesA
 GetFileAttributesEx
+GetFileAttributesW
 GetFileSizeEx
 GetLastError
-GetModuleHandleEx
+GetModuleHandleExW
 GetProcAddress
 Google
 HFS
 HHHH
 HHHHLL
 HHHLL
+Hendrik
 HyperLevelDB
 IEC
 IEEE
@@ -156,9 +161,11 @@ INCR
 INIT
 INITIALIZER
 INMEM
+INSN
 INTL
 ISA
 ITEMs
+InitializeCriticalSectionAndSpinCount
 Inline
 Intra
 Ippokratis
@@ -205,6 +212,8 @@ MEMALIGN
 MERCHANTABILITY
 METADATA
 MONGODB
+MRXB
+MRXBOPC
 MSVC
 MULTI
 MULTIBLOCK
@@ -219,8 +228,9 @@ Mewhort
 Mitzenmacher
 MongoDB
 MoveFile
-MoveFileA
+MoveFileW
 Multi
+MultiByteToWideChar
 Multithreaded
 Mutex
 MySecret
@@ -233,6 +243,7 @@ NOTFOUND
 NOTREACHED
 NOVALUE
 NUL
+NUM
 NetBSD
 NoAddr
 Noll
@@ -243,6 +254,7 @@ OUTBUFF
 OVFL
 ObWgfvgw
 Obama
+Opcode
 Outfmt
 PARAM
 POSIX
@@ -276,6 +288,7 @@ RMW
 RNG
 RPC
 RUNDIR
+RXB
 Radu
 ReadFile
 Readonly
@@ -345,6 +358,8 @@ Uryyb
 VARCHAR
 VLDB
 VMSG
+VR
+VX
 Vc
 Vfprintf
 Vigenere
@@ -362,6 +377,7 @@ Wconditional
 WeakHashLen
 Werror
 Wformat
+WideCharToMultiByte
 WinNT
 WiredTiger
 WiredTiger's
@@ -407,12 +423,14 @@ autocommit
 autoconf
 automake
 bInheritHandle
+bal
 basecfg
 basho
 bcr
 bdb
 beginthreadex
 bigram
+binutils
 bitcnt
 bitfield
 bitfields
@@ -500,6 +518,7 @@ conn
 connectionp
 const
 constantp
+consts
 cookiep
 copydoc
 copyin
@@ -629,6 +648,7 @@ fcntl
 fd
 fdatasync
 fdopen
+fextend
 ffc
 fflush
 ffs
@@ -706,7 +726,10 @@ iSh
 ibackup
 icount
 idx
+ifdef
 ifdef's
+iiSii
+iiii
 iiu
 ikey
 im
@@ -897,6 +920,7 @@ onint
 online
 onpage
 oo
+opcode
 opendir
 openfile
 optimizations
@@ -904,6 +928,7 @@ optype
 ori
 os
 osfhandle
+other's
 ovfl
 ownp
 pR
@@ -961,6 +986,7 @@ qrrSS
 qsort
 quartile
 qup
+rN
 rS
 rb
 rbrace
@@ -1146,6 +1172,7 @@ usr
 utf
 util
 uu
+vN
 vW
 va
 valgrind
@@ -1165,6 +1192,7 @@ vsnprintf
 vtype
 vunpack
 vw
+vxr
 waitpid
 walk's
 warmup

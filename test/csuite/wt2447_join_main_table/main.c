@@ -184,6 +184,5 @@ main(int argc, char *argv[])
 	testutil_assert(maincount == 2);
 
 	testutil_cleanup(opts);
-
-	return (0);
+	return (EXIT_SUCCESS);
 }

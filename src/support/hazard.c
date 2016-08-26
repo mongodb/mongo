@@ -238,6 +238,25 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 		    (void *)session);
 }
 
+/*
+ * __wt_hazard_count --
+ *	Count how many hazard pointers this session has on the given page.
+ */
+u_int
+__wt_hazard_count(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_HAZARD *hp;
+	u_int count;
+
+	for (count = 0, hp = session->hazard + session->hazard_size - 1;
+	    hp >= session->hazard;
+	    --hp)
+		if (hp->page == page)
+			++count;
+
+	return (count);
+}
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __hazard_dump --

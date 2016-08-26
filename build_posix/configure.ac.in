@@ -58,6 +58,13 @@ AS_CASE([$host_cpu],
 	[powerpc*], [wt_cv_powerpc="yes"],
 	[wt_cv_powerpc="no"])
 AM_CONDITIONAL([POWERPC_HOST], [test "$wt_cv_powerpc" = "yes"])
+AS_CASE([$host_cpu],
+	[amd*|i[[3456]]86*|pentium|x86*], [wt_cv_x86="yes"], [wt_cv_x86="no"])
+AM_CONDITIONAL([X86_HOST], [test "$wt_cv_x86" = "yes"])
+AS_CASE([$host_cpu],
+	[s390x*], [wt_cv_zseries="yes"],
+	[wt_cv_zseries="no"])
+AM_CONDITIONAL([ZSERIES_HOST], [test "$wt_cv_zseries" = "yes"])
 
 # This is a workaround as part of WT-2459. Currently, clang (v3.7) does not
 # support compiling the ASM code we have to perform the CRC checks on PowerPC.
@@ -121,9 +128,8 @@ AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 
 AC_CHECK_FUNCS([\
-	clock_gettime fallocate fcntl fread_unlocked ftruncate gettimeofday\
-	posix_fadvise posix_fallocate posix_madvise\
-	strtouq sync_file_range])
+	clock_gettime fallocate ftruncate gettimeofday posix_fadvise\
+	posix_fallocate posix_madvise strtouq sync_file_range])
 
 # OS X wrongly reports that it has fdatasync
 AS_CASE([$host_os], [darwin*], [], [AC_CHECK_FUNCS([fdatasync])])
@@ -227,6 +233,7 @@ AM_COND_IF([LEVELDB],
 AC_CONFIG_FILES([
 	Makefile
 	wiredtiger.h:src/include/wiredtiger.in
+	wiredtiger_ext.h:src/include/wiredtiger_ext.h
 	wiredtiger.pc:build_posix/wiredtiger.pc.in
 ])
 AC_OUTPUT

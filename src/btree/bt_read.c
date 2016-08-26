@@ -319,14 +319,22 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	/* Pages are usually small enough, check that first. */
 	if (page->memory_footprint < btree->splitmempage)
 		return (false);
-	else if (page->memory_footprint < btree->maxmempage)
+
+	/*
+	 * If this session has more than one hazard pointer, eviction will fail
+	 * and there is no point trying.
+	 */
+	if (__wt_hazard_count(session, page) > 1)
+		return (false);
+
+	if (page->memory_footprint < btree->maxmempage)
 		return (__wt_leaf_page_can_split(session, page));
 
 	/* Trigger eviction on the next page release. */
-	(void)__wt_page_evict_soon(session, ref);
+	__wt_page_evict_soon(session, ref);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
-	(void)__wt_txn_update_oldest(session, 0);
+	WT_IGNORE_RET(__wt_txn_update_oldest(session, 0));
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, ref, NULL));
@@ -599,14 +607,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			page = ref->page;
 			if (page->read_gen == WT_READGEN_NOTSET) {
 				if (evict_soon)
-					/*
-					 * Ignore error returns, since the
-					 * evict soon call is advisory and we
-					 * are holding a hazard pointer to the
-					 * page already.
-					 */
-					(void)__wt_page_evict_soon(
-					    session, ref);
+					__wt_page_evict_soon(session, ref);
 				else
 					__wt_cache_read_gen_new(session, page);
 			} else if (!LF_ISSET(WT_READ_NO_GEN))

@@ -186,6 +186,7 @@ bdb_remove(uint64_t keyno, int *notfoundp)
 	size_t size;
 	int ret;
 
+	size = 0;
 	key_gen(&keyitem, keyno);
 	key.data = (void *)keyitem.data;
 	key.size = (u_int32_t)keyitem.size;

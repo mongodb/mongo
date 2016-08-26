@@ -157,7 +157,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_cache_destroy(session));
 
 	/* Discard transaction state. */
-	WT_TRET(__wt_txn_global_destroy(session));
+	__wt_txn_global_destroy(session);
 
 	/* Close extensions, first calling any unload entry point. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
@@ -186,27 +186,18 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/*
-	 * The session's split stash isn't discarded during normal session close
-	 * because it may persist past the life of the session.  Discard it now.
+	 * The session split stash, hazard information and handle arrays aren't
+	 * discarded during normal session close, they persist past the life of
+	 * the session. Discard them now.
 	 */
-	if ((s = conn->sessions) != NULL)
-		for (i = 0; i < conn->session_size; ++s, ++i)
-			__wt_split_stash_discard_all(session, s);
-
-	/*
-	 * The session's hazard pointer memory isn't discarded during normal
-	 * session close because access to it isn't serialized.  Discard it
-	 * now.
-	 */
-	if ((s = conn->sessions) != NULL)
-		for (i = 0; i < conn->session_size; ++s, ++i) {
-			/*
-			 * If hash arrays were allocated, free them now.
-			 */
-			__wt_free(session, s->dhhash);
-			__wt_free(session, s->tablehash);
-			__wt_free(session, s->hazard);
-		}
+	if (!F_ISSET(conn, WT_CONN_LEAK_MEMORY))
+		if ((s = conn->sessions) != NULL)
+			for (i = 0; i < conn->session_size; ++s, ++i) {
+				__wt_free(session, s->dhhash);
+				__wt_free(session, s->tablehash);
+				__wt_split_stash_discard_all(session, s);
+				__wt_free(session, s->hazard);
+			}
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));

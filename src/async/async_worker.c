@@ -102,13 +102,12 @@ retry:
  * __async_flush_wait --
  *	Wait for the final worker to finish flushing.
  */
-static int
+static void
 __async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, uint64_t my_gen)
 {
 	while (async->flush_state == WT_ASYNC_FLUSHING &&
 	    async->flush_gen == my_gen)
-		WT_RET(__wt_cond_wait(session, async->flush_cond, 10000));
-	return (0);
+		__wt_cond_wait(session, async->flush_cond, 10000);
 }
 
 /*
@@ -326,15 +325,13 @@ __wt_async_worker(void *arg)
 				 */
 				WT_PUBLISH(async->flush_state,
 				    WT_ASYNC_FLUSH_COMPLETE);
-				WT_ERR(__wt_cond_signal(session,
-				    async->flush_cond));
+				__wt_cond_signal(session, async->flush_cond);
 			} else
 				/*
 				 * We need to wait for the last worker to
 				 * signal the condition.
 				 */
-				WT_ERR(__async_flush_wait(
-				    session, async, flush_gen));
+				__async_flush_wait(session, async, flush_gen);
 		}
 	}
 

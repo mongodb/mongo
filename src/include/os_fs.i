@@ -22,9 +22,9 @@ __wt_fs_directory_list(WT_SESSION_IMPL *session,
 	*dirlistp = NULL;
 	*countp = 0;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
+	__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: directory-list: %s prefix %s",
-	    dir, prefix == NULL ? "all" : prefix));
+	    dir, prefix == NULL ? "all" : prefix);
 
 	WT_RET(__wt_filename(session, dir, &path));
 
@@ -72,7 +72,7 @@ __wt_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 	WT_SESSION *wt_session;
 	char *path;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-exist", name));
+	__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-exist", name);
 
 	WT_RET(__wt_filename(session, name, &path));
 
@@ -98,7 +98,7 @@ __wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable)
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-remove", name));
+	__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-remove", name);
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -136,8 +136,8 @@ __wt_fs_rename(
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_FILEOPS, "%s to %s: file-rename", from, to));
+	__wt_verbose(
+	    session, WT_VERB_FILEOPS, "%s to %s: file-rename", from, to);
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -178,7 +178,7 @@ __wt_fs_size(WT_SESSION_IMPL *session, const char *name, wt_off_t *sizep)
 	WT_SESSION *wt_session;
 	char *path;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-size", name));
+	__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-size", name);
 
 	WT_RET(__wt_filename(session, name, &path));
 

@@ -1785,7 +1785,8 @@ struct __wt_connection {
 	 * Enabling the checkpoint server uses a session from the configured
 	 * session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log
-	 * record bytes to be written to the log between each checkpoint.  A
+	 * record bytes to be written to the log between each checkpoint.  If
+	 * non-zero\, this value will use a minimum of the log file size.  A
 	 * database can configure both log_size and wait to set an upper bound
 	 * for checkpoints; setting this value above 0 configures periodic
 	 * checkpoints., an integer between 0 and 2GB; default \c 0.}
@@ -1807,21 +1808,23 @@ struct __wt_connection {
 	 * number of threads currently running will vary depending on the
 	 * current eviction load., an integer between 1 and 20; default \c 1.}
 	 * @config{ ),,}
-	 * @config{eviction_dirty_target, continue evicting until the cache has
-	 * less dirty memory than the value\, as a percentage of the total cache
-	 * size.  Dirty pages will only be evicted if the cache is full enough
-	 * to trigger eviction., an integer between 1 and 99; default \c 5.}
-	 * @config{eviction_dirty_trigger, trigger eviction when the cache is
-	 * using this much memory for dirty content\, as a percentage of the
-	 * total cache size.  This setting only alters behavior if it is lower
-	 * than eviction_trigger., an integer between 1 and 99; default \c 20.}
-	 * @config{eviction_target, continue evicting until the cache has less
-	 * total memory than the value\, as a percentage of the total cache
-	 * size.  Must be less than \c eviction_trigger., an integer between 10
-	 * and 99; default \c 80.}
-	 * @config{eviction_trigger, trigger eviction when the cache is using
-	 * this much memory\, as a percentage of the total cache size., an
-	 * integer between 10 and 99; default \c 95.}
+	 * @config{eviction_dirty_target, perform eviction in worker threads
+	 * when the cache contains at least this much dirty content\, expressed
+	 * as a percentage of the total cache size., an integer between 1 and
+	 * 99; default \c 5.}
+	 * @config{eviction_dirty_trigger, trigger application threads to
+	 * perform eviction when the cache contains at least this much dirty
+	 * content\, expressed as a percentage of the total cache size.  This
+	 * setting only alters behavior if it is lower than eviction_trigger.,
+	 * an integer between 1 and 99; default \c 20.}
+	 * @config{eviction_target, perform eviction in worker threads when the
+	 * cache contains at least this much content\, expressed as a percentage
+	 * of the total cache size.  Must be less than \c eviction_trigger., an
+	 * integer between 10 and 99; default \c 80.}
+	 * @config{eviction_trigger, trigger application threads to perform
+	 * eviction when the cache contains at least this much content\,
+	 * expressed as a percentage of the total cache size., an integer
+	 * between 10 and 99; default \c 95.}
 	 * @config{file_manager = (, control how file handles are managed., a
 	 * set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_handle_minimum, number of
@@ -1924,8 +1927,8 @@ struct __wt_connection {
 	 * \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
 	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
 	 * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
-	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
-	 * empty.}
+	 * "thread_group"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
+	 * "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2201,14 +2204,14 @@ struct __wt_connection {
  * checkpoint server uses a session from the configured session_max., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
- * bytes to be written to the log between each checkpoint.  A database can
- * configure both log_size and wait to set an upper bound for checkpoints;
- * setting this value above 0 configures periodic checkpoints., an integer
- * between 0 and 2GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
- * seconds to wait between each checkpoint; setting this value above 0
- * configures periodic checkpoints., an integer between 0 and 100000; default \c
- * 0.}
+ * bytes to be written to the log between each checkpoint.  If non-zero\, this
+ * value will use a minimum of the log file size.  A database can configure both
+ * log_size and wait to set an upper bound for checkpoints; setting this value
+ * above 0 configures periodic checkpoints., an integer between 0 and 2GB;
+ * default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between
+ * each checkpoint; setting this value above 0 configures periodic checkpoints.,
+ * an integer between 0 and 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
@@ -2266,20 +2269,22 @@ struct __wt_connection {
  * current eviction load., an integer between 1 and 20; default \c 1.}
  * @config{
  * ),,}
- * @config{eviction_dirty_target, continue evicting until the cache has less
- * dirty memory than the value\, as a percentage of the total cache size.  Dirty
- * pages will only be evicted if the cache is full enough to trigger eviction.,
- * an integer between 1 and 99; default \c 5.}
- * @config{eviction_dirty_trigger, trigger eviction when the cache is using this
- * much memory for dirty content\, as a percentage of the total cache size.
- * This setting only alters behavior if it is lower than eviction_trigger., an
- * integer between 1 and 99; default \c 20.}
- * @config{eviction_target, continue evicting until the cache has less total
- * memory than the value\, as a percentage of the total cache size.  Must be
- * less than \c eviction_trigger., an integer between 10 and 99; default \c 80.}
- * @config{eviction_trigger, trigger eviction when the cache is using this much
- * memory\, as a percentage of the total cache size., an integer between 10 and
- * 99; default \c 95.}
+ * @config{eviction_dirty_target, perform eviction in worker threads when the
+ * cache contains at least this much dirty content\, expressed as a percentage
+ * of the total cache size., an integer between 1 and 99; default \c 5.}
+ * @config{eviction_dirty_trigger, trigger application threads to perform
+ * eviction when the cache contains at least this much dirty content\, expressed
+ * as a percentage of the total cache size.  This setting only alters behavior
+ * if it is lower than eviction_trigger., an integer between 1 and 99; default
+ * \c 20.}
+ * @config{eviction_target, perform eviction in worker threads when the cache
+ * contains at least this much content\, expressed as a percentage of the total
+ * cache size.  Must be less than \c eviction_trigger., an integer between 10
+ * and 99; default \c 80.}
+ * @config{eviction_trigger, trigger application threads to perform eviction
+ * when the cache contains at least this much content\, expressed as a
+ * percentage of the total cache size., an integer between 10 and 99; default \c
+ * 95.}
  * @config{exclusive, fail if the database already exists\, generally used with
  * the \c create option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
@@ -2440,7 +2445,8 @@ struct __wt_connection {
  * \c "handleops"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
  * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
  * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\,
- * \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
+ * \c "thread_group"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
+ * "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires
@@ -3923,48 +3929,54 @@ struct __wt_file_handle {
 	    WT_SESSION *session, wt_off_t offset, wt_off_t len, int advice);
 
 	/*!
-	 * Ensure disk space is allocated for the file, based on the POSIX
-	 * 1003.1 standard fallocate.
+	 * Extend the file.
 	 *
 	 * This method is not required, and should be set to NULL when not
 	 * supported by the file.
+	 *
+	 * Any allocated disk space must read as 0 bytes, and no existing file
+	 * data may change. Allocating all necessary underlying storage (not
+	 * changing just the file's metadata), is likely to result in increased
+	 * performance.
 	 *
 	 * This method is not called by multiple threads concurrently (on the
-	 * same file handle). If the file handle's fallocate method supports
-	 * concurrent calls, set the WT_FILE_HANDLE::fallocate_nolock method
-	 * instead.
+	 * same file handle). If the file handle's extension method supports
+	 * concurrent calls, set the WT_FILE_HANDLE::fh_extend_nolock method
+	 * instead. See @ref custom_file_systems for more information.
 	 *
 	 * @errors
 	 *
 	 * @param file_handle the WT_FILE_HANDLE
 	 * @param session the current WiredTiger session
-	 * @param offset the file offset
-	 * @param len the size of the advisory
+	 * @param offset desired file size after extension
 	 */
-	int (*fh_allocate)(WT_FILE_HANDLE *file_handle,
-	    WT_SESSION *session, wt_off_t, wt_off_t);
+	int (*fh_extend)(
+	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t offset);
 
 	/*!
-	 * Ensure disk space is allocated for the file, based on the POSIX
-	 * 1003.1 standard fallocate.
+	 * Extend the file.
 	 *
 	 * This method is not required, and should be set to NULL when not
 	 * supported by the file.
 	 *
+	 * Any allocated disk space must read as 0 bytes, and no existing file
+	 * data may change. Allocating all necessary underlying storage (not
+	 * only changing the file's metadata), is likely to result in increased
+	 * performance.
+	 *
 	 * This method may be called by multiple threads concurrently (on the
-	 * same file handle). If the file handle's fallocate method does not
-	 * support concurrent calls, set the WT_FILE_HANDLE::fallocate method
-	 * instead.
+	 * same file handle). If the file handle's extension method does not
+	 * support concurrent calls, set the WT_FILE_HANDLE::fh_extend method
+	 * instead. See @ref custom_file_systems for more information.
 	 *
 	 * @errors
 	 *
 	 * @param file_handle the WT_FILE_HANDLE
 	 * @param session the current WiredTiger session
-	 * @param offset the file offset
-	 * @param len the size of the advisory
+	 * @param offset desired file size after extension
 	 */
-	int (*fh_allocate_nolock)(WT_FILE_HANDLE *file_handle,
-	    WT_SESSION *session, wt_off_t, wt_off_t);
+	int (*fh_extend_nolock)(
+	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t offset);
 
 	/*!
 	 * Lock/unlock a file from the perspective of other processes running
@@ -4111,20 +4123,22 @@ struct __wt_file_handle {
 	int (*fh_sync_nowait)(WT_FILE_HANDLE *file_handle, WT_SESSION *session);
 
 	/*!
-	 * Lengthen or shorten a file to the specified length, based on the
-	 * POSIX 1003.1 standard ftruncate.
+	 * Truncate the file.
 	 *
-	 * This method is not required for read-only files, and should be set
-	 * to NULL when not supported by the file.
+	 * This method is not required, and should be set to NULL when not
+	 * supported by the file.
+	 *
+	 * This method is not called by multiple threads concurrently (on the
+	 * same file handle).
 	 *
 	 * @errors
 	 *
 	 * @param file_handle the WT_FILE_HANDLE
 	 * @param session the current WiredTiger session
-	 * @param length desired file size after truncate
+	 * @param offset desired file size after truncate
 	 */
 	int (*fh_truncate)(
-	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t length);
+	    WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t offset);
 
 	/*!
 	 * Write to a file, based on the POSIX 1003.1 standard pwrite.
@@ -4275,15 +4289,15 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_NOT_EMPTY	1042
 /*! cache: eviction server evicting pages */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_EVICTING	1043
-/*! cache: eviction server populating queue, but not evicting pages */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_NOT_EVICTING	1044
 /*! cache: eviction server skipped very large page */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_TOOBIG	1045
+#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_TOOBIG	1044
 /*! cache: eviction server slept, because we did not make progress with
  * eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1046
+#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1045
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1047
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1046
+/*! cache: eviction state */
+#define	WT_STAT_CONN_CACHE_EVICTION_STATE		1047
 /*! cache: eviction worker thread evicting pages */
 #define	WT_STAT_CONN_CACHE_EVICTION_WORKER_EVICTING	1048
 /*! cache: failed eviction of pages that exceeded the in-memory maximum */

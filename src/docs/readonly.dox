@@ -47,7 +47,8 @@ One unusual affect of read-only operations is the potential for multiple
 read-only database handles open on the same database at the same time.
 WiredTiger prevents multiple connection handles by writing a lock file,
 and this locking is done even in read-only mode. However, if the lock
-file cannot be written, opening in read-only mode is still allowed to
+file cannot be written, that is, if the WiredTiger home directory does not
+have write permission, opening in read-only mode is still allowed to
 proceed. For that reason, multiple read-only connection handles could
 be open at the same time. Normal locking occurs if the lock file can be
 written in read-only mode, preventing multiple database connections.

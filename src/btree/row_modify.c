@@ -279,7 +279,8 @@ __wt_update_alloc(
 		WT_UPDATE_DELETED_SET(*updp);
 	else {
 		(*updp)->size = WT_STORE_SIZE(size);
-		memcpy(WT_UPDATE_DATA(*updp), value->data, size);
+		if (size != 0)
+			memcpy(WT_UPDATE_DATA(*updp), value->data, size);
 	}
 
 	*sizep = WT_UPDATE_MEMSIZE(*updp);

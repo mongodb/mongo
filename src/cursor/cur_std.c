@@ -50,7 +50,7 @@ __wt_cursor_get_value_notsup(WT_CURSOR *cursor, ...)
 void
 __wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...)
 {
-	(void)__wt_cursor_notsup(cursor);
+	WT_IGNORE_RET(__wt_cursor_notsup(cursor));
 }
 
 /*
@@ -60,7 +60,7 @@ __wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...)
 void
 __wt_cursor_set_value_notsup(WT_CURSOR *cursor, ...)
 {
-	(void)__wt_cursor_notsup(cursor);
+	WT_IGNORE_RET(__wt_cursor_notsup(cursor));
 }
 
 /*

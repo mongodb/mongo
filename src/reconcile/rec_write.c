@@ -357,8 +357,8 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	page = ref->page;
 	mod = page->modify;
 
-	WT_RET(__wt_verbose(session,
-	    WT_VERB_RECONCILE, "%s", __wt_page_type_string(page->type)));
+	__wt_verbose(session,
+	    WT_VERB_RECONCILE, "%s", __wt_page_type_string(page->type));
 
 	/* We shouldn't get called with a clean page, that's an error. */
 	WT_ASSERT(session, __wt_page_is_modified(page));
@@ -372,7 +372,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 *    In-memory splits: reconciliation of an internal page cannot handle
 	 * a child page splitting during the reconciliation.
 	 */
-	WT_RET(__wt_fair_lock(session, &page->page_lock));
+	__wt_writelock(session, &page->page_lock);
 
 	/*
 	 * Check that transaction time always moves forward for a given page.
@@ -386,7 +386,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	/* Initialize the reconciliation structure for each new run. */
 	if ((ret = __rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile)) != 0) {
-		WT_TRET(__wt_fair_unlock(session, &page->page_lock));
+		__wt_writeunlock(session, &page->page_lock);
 		return (ret);
 	}
 	r = session->reconcile;
@@ -427,7 +427,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 
 	/* Release the reconciliation lock. */
-	WT_TRET(__wt_fair_unlock(session, &page->page_lock));
+	__wt_writeunlock(session, &page->page_lock);
 
 	/* Update statistics. */
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);
@@ -640,8 +640,8 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
-	    "root page split -> %" PRIu32 " pages", mod->mod_multi_entries));
+	__wt_verbose(session, WT_VERB_SPLIT,
+	    "root page split -> %" PRIu32 " pages", mod->mod_multi_entries);
 
 	/*
 	 * Create a new root page, initialize the array of child references,
@@ -3327,13 +3327,13 @@ supd_check_complete:
 #ifdef HAVE_VERBOSE
 	/* Output a verbose message if we create a page without many entries */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT) && r->entries < 6)
-		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		__wt_verbose(session, WT_VERB_SPLIT,
 		    "Reconciliation creating a page with %" PRIu32
 		    " entries, memory footprint %" PRIu64
 		    ", page count %" PRIu32 ", %s, split state: %d\n",
 		    r->entries, r->page->memory_footprint, r->bnd_next,
 		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",
-		    r->bnd_state));
+		    r->bnd_state);
 #endif
 
 	WT_ERR(__wt_bt_write(session, buf, addr, &addr_size,
@@ -5535,22 +5535,22 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_PAGE *page, WT_RECONCILE *r)
 
 	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &tkey));
-	WT_ERR(__wt_verbose(
-	    session, WT_VERB_SPLIT, "split: %" PRIu32 " pages", r->bnd_next));
+	__wt_verbose(
+	    session, WT_VERB_SPLIT, "split: %" PRIu32 " pages", r->bnd_next);
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+			__wt_verbose(session, WT_VERB_SPLIT,
 			    "starting key %s",
 			    __wt_buf_set_printable(
-			    session, bnd->key.data, bnd->key.size, tkey)));
+			    session, bnd->key.data, bnd->key.size, tkey));
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_VAR:
-			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-			    "starting recno %" PRIu64, bnd->recno));
+			__wt_verbose(session, WT_VERB_SPLIT,
+			    "starting recno %" PRIu64, bnd->recno);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
@@ -5637,8 +5637,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		WT_RET(__wt_verbose(
-		    session, WT_VERB_RECONCILE, "page %p empty", page));
+		__wt_verbose(session, WT_VERB_RECONCILE, "page %p empty", page);
 		WT_STAT_FAST_CONN_INCR(session, rec_page_delete);
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
@@ -5698,9 +5697,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		mod->rec_result = WT_PM_REC_REPLACE;
 		break;
 	default:					/* Page split */
-		WT_RET(__wt_verbose(session, WT_VERB_RECONCILE,
+		__wt_verbose(session, WT_VERB_RECONCILE,
 		    "page %p reconciled into %" PRIu32 " pages",
-		    page, r->bnd_next));
+		    page, r->bnd_next);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:

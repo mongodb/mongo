@@ -74,7 +74,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
-	too_big = page->memory_footprint > btree->splitmempage;
+	too_big = page->memory_footprint >= btree->splitmempage;
 	if ((ret = __wt_evict(session, ref, false)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
@@ -116,8 +116,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	page = ref->page;
 	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 
-	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
-	    "page %p (%s)", page, __wt_page_type_string(page->type)));
+	__wt_verbose(session, WT_VERB_EVICT,
+	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
 	 * Get exclusive access to the page and review it for conditions that
@@ -527,7 +527,9 @@ __evict_review(
 		else if (F_ISSET(cache, WT_CACHE_STUCK))
 			LF_SET(WT_EVICT_LOOKASIDE);
 		else if (!__wt_txn_visible_all(
-		    session, page->modify->update_txn))
+		    session, page->modify->update_txn) ||
+		    page->read_gen == WT_READGEN_OLDEST ||
+		    page->memory_footprint >= S2BT(session)->splitmempage)
 			LF_SET(WT_EVICT_UPDATE_RESTORE);
 
 		/*

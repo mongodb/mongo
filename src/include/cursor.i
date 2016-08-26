@@ -117,7 +117,7 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	 */
 	if (cbt->ref != NULL &&
 	    cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD)
-		WT_TRET(__wt_page_evict_soon(session, cbt->ref));
+		__wt_page_evict_soon(session, cbt->ref);
 	cbt->page_deleted_count = 0;
 
 	/*
@@ -127,7 +127,7 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	 *
 	 * Clear the reference regardless, so we don't try the release twice.
 	 */
-	WT_TRET(__wt_page_release(session, cbt->ref, 0));
+	ret = __wt_page_release(session, cbt->ref, 0);
 	cbt->ref = NULL;
 
 	return (ret);

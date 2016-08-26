@@ -376,7 +376,7 @@ __wt_txn_checkpoint_log(
 		 * that case.
 		 */
 		if (!S2C(session)->hot_backup && txn->full_ckpt)
-			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
+			__wt_log_ckpt(session, ckpt_lsn);
 
 		/* FALLTHROUGH */
 	case WT_TXN_LOG_CKPT_CLEANUP:

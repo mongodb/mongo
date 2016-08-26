@@ -194,6 +194,8 @@ DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "
     "is nonzero")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
+DEF_OPT_AS_BOOL(truncate_single_ops, 0,
+    "Implement truncate via cursor remove instead of session API")
 DEF_OPT_AS_UINT32(value_sz_max, 1000,
     "maximum value size when delta updates are present. Default disabled")
 DEF_OPT_AS_UINT32(value_sz_min, 1,

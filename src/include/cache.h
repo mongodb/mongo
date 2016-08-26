@@ -26,8 +26,8 @@ struct __wt_evict_entry {
 	uint64_t  score;		/* Relative eviction priority */
 };
 
-#define	WT_EVICT_URGENT_QUEUE	0	/* Urgent queue index */
-#define	WT_EVICT_QUEUE_MAX	3	/* Urgent plus two ordinary queues */
+#define	WT_EVICT_QUEUE_MAX	3	/* Two ordinary queues plus urgent */
+#define	WT_EVICT_URGENT_QUEUE	2	/* Urgent queue index */
 
 /*
  * WT_EVICT_QUEUE --
@@ -40,18 +40,6 @@ struct __wt_evict_queue {
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	uint32_t evict_entries;		/* LRU entries in the queue */
 	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
-};
-
-/*
- * WT_EVICT_WORKER --
- *	Encapsulation of an eviction worker thread.
- */
-struct __wt_evict_worker {
-	WT_SESSION_IMPL *session;
-	u_int id;
-	wt_thread_t tid;
-#define	WT_EVICT_WORKER_RUN	0x01
-	uint32_t flags;
 };
 
 /* Cache operations. */
@@ -109,8 +97,6 @@ struct __wt_cache {
 	 */
 	WT_CONDVAR *evict_cond;		/* Eviction server condition */
 	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
-	/* Condition signalled when the eviction server populates the queue */
-	WT_CONDVAR *evict_waiter_cond;
 
 	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */
@@ -124,14 +110,19 @@ struct __wt_cache {
 	 */
 	WT_SPINLOCK evict_pass_lock;	/* Eviction pass lock */
 	WT_SESSION_IMPL *walk_session;	/* Eviction pass session */
-	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
-	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
-	WT_EVICT_QUEUE *evict_current_queue;/* LRU current queue in use */
-	uint32_t evict_queue_fill;	/* LRU eviction queue index to fill */
-	uint32_t evict_slots;		/* LRU list eviction slots */
 	WT_DATA_HANDLE
 		*evict_file_next;	/* LRU next file to search */
-	uint32_t evict_max_refs_per_file;/* LRU pages per file per pass */
+	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
+	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
+	WT_EVICT_QUEUE *evict_current_queue; /* LRU current queue in use */
+	WT_EVICT_QUEUE *evict_fill_queue;    /* LRU next queue to fill */
+	WT_EVICT_QUEUE *evict_other_queue;   /* LRU queue not in use */
+	WT_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
+	uint32_t evict_slots;		/* LRU list eviction slots */
+#define	WT_EVICT_EMPTY_SCORE_BUMP	10
+#define	WT_EVICT_EMPTY_SCORE_CUTOFF	10
+	uint32_t evict_empty_score;	/* LRU score of how often queues are
+					   empty on refill. */
 
 	/*
 	 * Cache pool information.
@@ -153,15 +144,17 @@ struct __wt_cache {
 #define	WT_EVICT_STATE_AGGRESSIVE	0x01 /* Eviction isn't making progress:
 						try harder */
 #define	WT_EVICT_STATE_CLEAN		0x02 /* Evict clean pages */
-#define	WT_EVICT_STATE_DIRTY		0x04 /* Evict dirty pages */
-#define	WT_EVICT_STATE_SCRUB		0x08 /* Scrub dirty pages pages */
-#define	WT_EVICT_STATE_URGENT		0x10 /* Pages are in the urgent queue */
+#define	WT_EVICT_STATE_CLEAN_HARD	0x04 /* Clean % blocking app threads */
+#define	WT_EVICT_STATE_DIRTY		0x08 /* Evict dirty pages */
+#define	WT_EVICT_STATE_DIRTY_HARD	0x10 /* Dirty % blocking app threads */
+#define	WT_EVICT_STATE_SCRUB		0x20 /* Scrub dirty pages pages */
+#define	WT_EVICT_STATE_URGENT		0x40 /* Pages are in the urgent queue */
 #define	WT_EVICT_STATE_ALL	(WT_EVICT_STATE_CLEAN | WT_EVICT_STATE_DIRTY)
 	uint32_t state;
 	/*
 	 * Pass interrupt counter.
 	 */
-	uint32_t pass_intr;		/* Interrupt eviction pass. */
+	volatile uint32_t pass_intr;	/* Interrupt eviction pass. */
 
 	/*
 	 * Flags.

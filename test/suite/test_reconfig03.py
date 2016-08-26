@@ -54,5 +54,13 @@ class test_reconfig03(wttest.WiredTigerTestCase):
         time.sleep(1)
         self.conn.reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)")
 
+    def test_reconfig03_log_size(self):
+        #
+        # Reconfigure checkpoint based on log size.
+        #
+        self.conn.reconfigure("checkpoint=(log_size=20)")
+        self.conn.reconfigure("checkpoint=(log_size=1M)")
+        self.conn.reconfigure("checkpoint=(log_size=0)")
+
 if __name__ == '__main__':
     wttest.run()

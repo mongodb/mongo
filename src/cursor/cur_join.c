@@ -612,19 +612,17 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 
 	if (entry->bloom != NULL) {
 		/*
+		 * If the item is not in the Bloom filter, we return
+		 * immediately, otherwise, we still need to check the long
+		 * way, since it may be a false positive.
+		 *
 		 * If we don't own the Bloom filter, we must be sharing one
 		 * in a previous entry. So the shared filter has already
-		 * been checked and passed.
+		 * been checked and passed, we don't need to check it again.
+		 * We'll still need to check the long way.
 		 */
-		if (!F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
-			return (0);
-
-		/*
-		 * If the item is not in the Bloom filter, we return
-		 * immediately, otherwise, we still need to check the
-		 * long way.
-		 */
-		WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
+			WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
 		bloom_found = true;
 	}
 	if (entry->subjoin != NULL) {

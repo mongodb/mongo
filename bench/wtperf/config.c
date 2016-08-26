@@ -94,31 +94,42 @@ config_unescape(char *orig)
 }
 
 /*
- * config_assign --
- *	Assign the src config to the dest, any storage allocated in dest is
- * freed as a result.
+ * config_copy --
+ *	CONFIG structure initialization, based on a source configuration.
  */
 int
-config_assign(CONFIG *dest, const CONFIG *src)
+config_copy(CONFIG *dest, const CONFIG *src)
 {
 	CONFIG_QUEUE_ENTRY *conf_line, *tmp_line;
 	size_t i;
 	char *newstr, **pstr;
 
-	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
+
+	if (src->home != NULL)
+		dest->home = dstrdup(src->home);
+	if (src->monitor_dir != NULL)
+		dest->monitor_dir = dstrdup(src->monitor_dir);
+	if (src->partial_config != NULL)
+		dest->partial_config = dstrdup(src->partial_config);
+	if (src->reopen_config != NULL)
+		dest->reopen_config = dstrdup(src->reopen_config);
+	if (src->base_uri != NULL)
+		dest->base_uri = dstrdup(src->base_uri);
 
 	if (src->uris != NULL) {
 		dest->uris = dcalloc(src->table_count, sizeof(char *));
 		for (i = 0; i < src->table_count; i++)
 			dest->uris[i] = dstrdup(src->uris[i]);
 	}
+
+	if (src->async_config != NULL)
+		dest->async_config = dstrdup(src->async_config);
+
 	dest->ckptthreads = NULL;
 	dest->popthreads = NULL;
 	dest->workers = NULL;
 
-	if (src->base_uri != NULL)
-		dest->base_uri = dstrdup(src->base_uri);
 	if (src->workload != NULL) {
 		dest->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
 		memcpy(dest->workload,
@@ -159,6 +170,28 @@ config_free(CONFIG *cfg)
 	size_t i;
 	char **pstr;
 
+	free(cfg->home);
+	free(cfg->monitor_dir);
+	free(cfg->partial_config);
+	free(cfg->reopen_config);
+	free(cfg->base_uri);
+
+	if (cfg->uris != NULL) {
+		for (i = 0; i < cfg->table_count; i++)
+			free(cfg->uris[i]);
+		free(cfg->uris);
+	}
+
+	free(cfg->async_config);
+
+	free(cfg->ckptthreads);
+	free(cfg->popthreads);
+
+	free(cfg->workers);
+	free(cfg->workload);
+
+	cleanup_truncate_config(cfg);
+
 	while (!TAILQ_EMPTY(&cfg->config_head)) {
 		config_line = TAILQ_FIRST(&cfg->config_head);
 		TAILQ_REMOVE(&cfg->config_head, config_line, c);
@@ -174,20 +207,6 @@ config_free(CONFIG *cfg)
 			free(*pstr);
 			*pstr = NULL;
 		}
-	if (cfg->uris != NULL) {
-		for (i = 0; i < cfg->table_count; i++)
-			free(cfg->uris[i]);
-		free(cfg->uris);
-	}
-
-	cleanup_truncate_config(cfg);
-	free(cfg->base_uri);
-	free(cfg->ckptthreads);
-	free(cfg->partial_config);
-	free(cfg->popthreads);
-	free(cfg->reopen_config);
-	free(cfg->workers);
-	free(cfg->workload);
 }
 
 /*
@@ -390,9 +409,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	return (0);
 
 err:	if (group != NULL)
-		(void)group->close(group);
+		testutil_check(group->close(group));
 	if (scan != NULL)
-		(void)scan->close(scan);
+		testutil_check(scan->close(scan));
 
 	fprintf(stderr,
 	    "invalid thread configuration or scan error: %.*s\n",

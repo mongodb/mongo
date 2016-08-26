@@ -448,9 +448,10 @@ rotn_configure(ROTN_ENCRYPTOR *rotn_encryptor, WT_CONFIG_ARG *config)
 		    strlen("rotn_force_error") == k.len) {
 			rotn_encryptor->force_error = v.val == 0 ? 0 : 1;
 			continue;
-		}
-		else {
-			(void)config_parser->close(config_parser);
+		} else {
+			if ((ret = config_parser->close(config_parser)) != 0)
+				return (rotn_error(rotn_encryptor,
+				    NULL, ret, "WT_CONFIG_PARSER.close"));
 			return (rotn_error(rotn_encryptor, NULL, EINVAL,
 			    "unknown config key"));
 		}
