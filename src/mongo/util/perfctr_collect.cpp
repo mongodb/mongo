@@ -270,15 +270,10 @@ StatusWith<PerfCounterCollector::CounterInfo> PerfCounterCollector::addCounter(S
 
     bool hasSecondValue = false;
 
-    // Rate counters need time as a base
-    if ((counterInfo->dwType & PERF_COUNTER_DELTA) == PERF_COUNTER_DELTA ||
-        (counterInfo->dwType & PERF_COUNTER_FRACTION) == PERF_COUNTER_FRACTION ||
-        (counterInfo->dwType & PERF_ELAPSED_TIME) == PERF_ELAPSED_TIME) {
+    // Only include base for counters that need it
+    if ((counterInfo->dwType & PERF_COUNTER_PRECISION) == PERF_COUNTER_PRECISION) {
         secondName += " Base";
         hasSecondValue = true;
-    } else {
-        invariant(counterInfo->dwType == PERF_COUNTER_RAWCOUNT ||
-                  counterInfo->dwType == PERF_COUNTER_LARGE_RAWCOUNT);
     }
 
     // InstanceName is null for counters without instance names
@@ -403,21 +398,37 @@ Status PerfCounterCollector::collectCounters(const std::vector<CounterInfo>& cou
     for (const auto& counterInfo : counters) {
 
         DWORD dwType = 0;
-        PDH_RAW_COUNTER rawCounter = {0};
 
-        PDH_STATUS status = PdhGetRawCounterValue(counterInfo.handle, &dwType, &rawCounter);
-        if (status != ERROR_SUCCESS) {
-            return {ErrorCodes::WindowsPdhError,
-                    formatFunctionCallError("PdhGetRawCounterValue", status)};
-        }
+        // Elapsed Time is an unusual counter in that being able to control the sample period for
+        // the counter is uninteresting even though it is computed from two values. Just return the
+        // computed value instead.
+        if (counterInfo.type == PERF_ELAPSED_TIME) {
+            PDH_FMT_COUNTERVALUE counterValue = {0};
+            PDH_STATUS status = PdhGetFormattedCounterValue(
+                counterInfo.handle, PDH_FMT_DOUBLE, &dwType, &counterValue);
+            if (status != ERROR_SUCCESS) {
+                return {ErrorCodes::WindowsPdhError,
+                        formatFunctionCallError("PdhGetFormattedCounterValue", status)};
+            }
 
-        if (counterInfo.hasSecondValue) {
-            // Delta, Rate, and Elapsed Time counters require the second value in the raw counter
-            // information
-            builder->append(counterInfo.firstName, rawCounter.FirstValue);
-            builder->append(counterInfo.secondName, rawCounter.SecondValue);
+            builder->append(counterInfo.firstName, counterValue.doubleValue);
+
         } else {
-            builder->append(counterInfo.firstName, rawCounter.FirstValue);
+
+            PDH_RAW_COUNTER rawCounter = {0};
+            PDH_STATUS status = PdhGetRawCounterValue(counterInfo.handle, &dwType, &rawCounter);
+            if (status != ERROR_SUCCESS) {
+                return {ErrorCodes::WindowsPdhError,
+                        formatFunctionCallError("PdhGetRawCounterValue", status)};
+            }
+
+            if (counterInfo.hasSecondValue) {
+                // Precise counters require the second value in the raw counter information
+                builder->append(counterInfo.firstName, rawCounter.FirstValue);
+                builder->append(counterInfo.secondName, rawCounter.SecondValue);
+            } else {
+                builder->append(counterInfo.firstName, rawCounter.FirstValue);
+            }
         }
     }
 

@@ -92,6 +92,14 @@ StringMap toNestedStringMap(BSONObj& obj) {
     ASSERT_KEY(g "." c);                       \
     ASSERT_KEY(g "." c " Base");
 
+#define ASSERT_NESTED_GROUP_AND_RAW_COUNTER(g, p, c) \
+    ASSERT_KEY(g "." p "." c);                       \
+    ASSERT_NO_KEY(g "." p "." c " Base");
+
+#define ASSERT_NO_NESTED_GROUP_AND_RAW_COUNTER(g, p, c) \
+    ASSERT_NO_KEY(g "." p "." c);                       \
+    ASSERT_NO_KEY(g "." p "." c " Base");
+
 #define ASSERT_NESTED_GROUP_AND_NON_RAW_COUNTER(g, p, c) \
     ASSERT_KEY(g "." p "." c);                           \
     ASSERT_KEY(g "." p "." c " Base");
@@ -135,7 +143,7 @@ TEST(FTDCPerfCollector, TestSingleCounter) {
         COLLECT_COUNTERS;
 
         ASSERT_NO_TIMEBASE;
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Idle Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Idle Time");
     }
 }
 
@@ -254,15 +262,15 @@ TEST(FTDCPerfCollector, TestCounterTypes) {
         COLLECT_COUNTERS;
 
         ASSERT_TIMEBASE
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\Processor\\% Idle Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\Processor\\% Processor Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\System\\System Up Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\Processor\\% Idle Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\Processor\\% Processor Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\System\\System Up Time");
         ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\PhysicalDisk\\% Disk Write Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\PhysicalDisk\\Avg. Disk Bytes/Write");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\PhysicalDisk\\Avg. Disk Read Queue Length");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\PhysicalDisk\\Avg. Disk sec/Write");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\PhysicalDisk\\Disk Write Bytes/sec");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("misc", "\\PhysicalDisk\\Disk Writes/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\PhysicalDisk\\Avg. Disk Bytes/Write");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\PhysicalDisk\\Avg. Disk Read Queue Length");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\PhysicalDisk\\Avg. Disk sec/Write");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\PhysicalDisk\\Disk Write Bytes/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\PhysicalDisk\\Disk Writes/sec");
 
         ASSERT_GROUP_AND_RAW_COUNTER("misc", "\\System\\Processes");
     }
@@ -285,9 +293,9 @@ TEST(FTDCPerfCollector, TestMultipleCounterGroups) {
         COLLECT_COUNTERS;
 
         ASSERT_TIMEBASE
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Idle Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Processor Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("sys", "\\System\\System Up Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Idle Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Processor Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("sys", "\\System\\System Up Time");
 
         ASSERT_GROUP_AND_RAW_COUNTER("sys", "\\System\\Processes");
     }
@@ -311,17 +319,16 @@ TEST(FTDCPerfCollector, TestMultipleNestedCounterGroups) {
         ASSERT_TIMEBASE
 
         // We boldly assume that machines we test on have at least two processors
-        ASSERT_NESTED_GROUP_AND_NON_RAW_COUNTER("cpu", "0", "\\Processor\\% Idle Time");
-        ASSERT_NESTED_GROUP_AND_NON_RAW_COUNTER("cpu", "0", "\\Processor\\% Processor Time");
+        ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "0", "\\Processor\\% Idle Time");
+        ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "0", "\\Processor\\% Processor Time");
 
-        ASSERT_NESTED_GROUP_AND_NON_RAW_COUNTER("cpu", "1", "\\Processor\\% Idle Time");
-        ASSERT_NESTED_GROUP_AND_NON_RAW_COUNTER("cpu", "1", "\\Processor\\% Processor Time");
+        ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "1", "\\Processor\\% Idle Time");
+        ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "1", "\\Processor\\% Processor Time");
 
-        ASSERT_NO_NESTED_GROUP_AND_NON_RAW_COUNTER("cpu", "_Total", "\\Processor\\% Idle Time");
-        ASSERT_NO_NESTED_GROUP_AND_NON_RAW_COUNTER(
-            "cpu", "_Total", "\\Processor\\% Processor Time");
+        ASSERT_NO_NESTED_GROUP_AND_RAW_COUNTER("cpu", "_Total", "\\Processor\\% Idle Time");
+        ASSERT_NO_NESTED_GROUP_AND_RAW_COUNTER("cpu", "_Total", "\\Processor\\% Processor Time");
 
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("sys", "\\System\\System Up Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("sys", "\\System\\System Up Time");
         ASSERT_GROUP_AND_RAW_COUNTER("sys", "\\System\\Processes");
     }
 }
@@ -390,28 +397,28 @@ TEST(FTDCPerfCollector, TestLocalCounters) {
         COLLECT_COUNTERS;
         ASSERT_TIMEBASE
 
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Idle Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Interrupt Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Privileged Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% Processor Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\% User Time");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\Processor\\Interrupts/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Idle Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Interrupt Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Privileged Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% Processor Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\% User Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\Processor\\Interrupts/sec");
 
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\System\\Context Switches/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\System\\Context Switches/sec");
         ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\System\\Processes");
         ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\System\\Processor Queue Length");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("cpu", "\\System\\System Up Time");
+        ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\System\\System Up Time");
         ASSERT_GROUP_AND_RAW_COUNTER("cpu", "\\System\\Threads");
 
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Available Bytes");
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Cache Bytes");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("memory", "\\Memory\\Cache Faults/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Cache Faults/sec");
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Commit Limit");
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Committed Bytes");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("memory", "\\Memory\\Page Reads/sec");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("memory", "\\Memory\\Page Writes/sec");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("memory", "\\Memory\\Pages Input/sec");
-        ASSERT_GROUP_AND_NON_RAW_COUNTER("memory", "\\Memory\\Pages Output/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Page Reads/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Page Writes/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Pages Input/sec");
+        ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Pages Output/sec");
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\Pool Paged Resident Bytes");
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\System Cache Resident Bytes");
         ASSERT_GROUP_AND_RAW_COUNTER("memory", "\\Memory\\System Code Total Bytes");
