@@ -71,9 +71,9 @@ CloseHandle
 Comparator
 Config
 Coverity
-CreateFileA
 CreateFileMapping
-CreateFileMappingA
+CreateFileMappingW
+CreateFileW
 Crummey
 CustomersPhone
 DECL
@@ -89,7 +89,7 @@ DbCursor
 DbEnv
 Decrement
 Decrypt
-DeleteFileA
+DeleteFileW
 EACCES
 EAGAIN
 EB
@@ -139,11 +139,11 @@ GIDs
 Gcc
 Geoff
 GetEnvironmentVariableA
-GetFileAttributesA
 GetFileAttributesEx
+GetFileAttributesW
 GetFileSizeEx
 GetLastError
-GetModuleHandleEx
+GetModuleHandleExW
 GetProcAddress
 Google
 HFS
@@ -228,8 +228,9 @@ Mewhort
 Mitzenmacher
 MongoDB
 MoveFile
-MoveFileA
+MoveFileW
 Multi
+MultiByteToWideChar
 Multithreaded
 Mutex
 MySecret
@@ -376,6 +377,7 @@ Wconditional
 WeakHashLen
 Werror
 Wformat
+WideCharToMultiByte
 WinNT
 WiredTiger
 WiredTiger's

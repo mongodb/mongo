@@ -38,12 +38,12 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
 	__wt_verbose(session, WT_VERB_HANDLEOPS,
 	    "%s: memory-map: %" WT_SIZET_FMT " bytes", file_handle->name, len);
 
-	mapped_cookie = CreateFileMappingA(
+	mapped_cookie = CreateFileMappingW(
 	    win_fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (mapped_cookie == NULL) {
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s: memory-map: CreateFileMappingA: %s",
+		    "%s: memory-map: CreateFileMappingW: %s",
 		    file_handle->name,
 		    __wt_formatmessage(session, windows_error));
 		return (__wt_map_windows_error(windows_error));

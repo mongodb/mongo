@@ -147,6 +147,7 @@ src/os_win/os_sleep.c			WINDOWS_HOST
 src/os_win/os_snprintf.c		WINDOWS_HOST
 src/os_win/os_thread.c			WINDOWS_HOST
 src/os_win/os_time.c			WINDOWS_HOST
+src/os_win/os_utf8.c			WINDOWS_HOST
 src/os_win/os_vsnprintf.c		WINDOWS_HOST
 src/os_win/os_winerr.c			WINDOWS_HOST
 src/os_win/os_yield.c			WINDOWS_HOST
