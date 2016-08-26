@@ -68,11 +68,12 @@ StatusWith<string> retrieveShardMongoDVersion(OperationContext* txn, ShardId sha
     }
     auto shard = shardStatus.getValue();
 
-    auto commandResponse = shard->runCommand(txn,
-                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                             "admin",
-                                             BSON("serverStatus" << 1),
-                                             Shard::RetryPolicy::kIdempotent);
+    auto commandResponse =
+        shard->runCommandWithFixedRetryAttempts(txn,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                "admin",
+                                                BSON("serverStatus" << 1),
+                                                Shard::RetryPolicy::kIdempotent);
     if (!commandResponse.isOK()) {
         return commandResponse.getStatus();
     }

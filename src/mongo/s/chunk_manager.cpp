@@ -384,12 +384,12 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         auto primaryShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, primaryShardId));
         const NamespaceString nss{getns()};
 
-        auto result = uassertStatusOK(
-            primaryShard->runCommand(txn,
-                                     ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                     nss.db().toString(),
-                                     BSON("count" << nss.coll()),
-                                     Shard::RetryPolicy::kIdempotent));
+        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            nss.db().toString(),
+            BSON("count" << nss.coll()),
+            Shard::RetryPolicy::kIdempotent));
 
         long long numObjects = 0;
         uassertStatusOK(result.commandStatus);

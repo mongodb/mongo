@@ -103,19 +103,21 @@ StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(Na
     findAndModifyRequest.setWriteConcern(WriteConcernOptions(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(15)));
 
-    return _shardLocal->runCommand(_txn.get(),
-                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                   nss.db().toString(),
-                                   findAndModifyRequest.toBSON(),
-                                   Shard::RetryPolicy::kNoRetry);
+    return _shardLocal->runCommandWithFixedRetryAttempts(
+        _txn.get(),
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        nss.db().toString(),
+        findAndModifyRequest.toBSON(),
+        Shard::RetryPolicy::kNoRetry);
 }
 
 StatusWith<std::vector<BSONObj>> ShardLocalTest::getIndexes(NamespaceString nss) {
-    auto response = _shardLocal->runCommand(_txn.get(),
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            nss.db().toString(),
-                                            BSON("listIndexes" << nss.coll().toString()),
-                                            Shard::RetryPolicy::kIdempotent);
+    auto response = _shardLocal->runCommandWithFixedRetryAttempts(
+        _txn.get(),
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        nss.db().toString(),
+        BSON("listIndexes" << nss.coll().toString()),
+        Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {
         return response.getStatus();
     }
