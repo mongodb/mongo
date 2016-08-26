@@ -98,9 +98,11 @@ void quickExit(int code) {
     __lsan_do_leak_check();
 #endif
 
-#if defined(_WIN32) && defined(MONGO_CONFIG_DEBUG_BUILD)
-    // SERVER-23860: VS 2015 Debug Builds abort during _exit for unknown reasons.
-    // Bypass _exit CRT shutdown code and call ExitProcess directly instead.
+#if defined(_WIN32)
+    // SERVER-23860: VS 2015 Debug Builds abort and Release builds AV when _exit is called on
+    // multiple threads. Each call to _exit shuts down the CRT, and so subsequent calls into the
+    // CRT result in undefined behavior. Bypass _exit CRT shutdown code and call ExitProcess
+    // directly instead.
     ::ExitProcess(code);
 #else
     ::_exit(code);
