@@ -160,31 +160,6 @@ public:
                                            RetryPolicy retryPolicy);
 
     /**
-     * Same as runCommand, but will only retry failed operations up to 3 times, regardless of
-     * the retryPolicy or the remaining maxTimeMs.
-     * Wherever possible this method should be avoided in favor of runCommand.
-     */
-    StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
-        OperationContext* txn,
-        const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
-        const BSONObj& cmdObj,
-        RetryPolicy retryPolicy);
-
-    /**
-     * Same as runCommand, but will only retry failed operations up to 3 times, regardless of
-     * the retryPolicy or the remaining maxTimeMs.
-     * Wherever possible this method should be avoided in favor of runCommand.
-     */
-    StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
-        OperationContext* txn,
-        const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
-        const BSONObj& cmdObj,
-        Milliseconds maxTimeMSOverride,
-        RetryPolicy retryPolicy);
-
-    /**
      * Expects a single-entry batch wrtie command and runs it on the config server's primary using
      * the specified retry policy.
      */

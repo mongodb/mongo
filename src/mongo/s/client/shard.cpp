@@ -106,7 +106,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
-    MONGO_UNREACHABLE;
+    return runCommand(txn, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
@@ -115,26 +115,6 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
                                                      const BSONObj& cmdObj,
                                                      Milliseconds maxTimeMSOverride,
                                                      RetryPolicy retryPolicy) {
-    MONGO_UNREACHABLE;
-}
-
-StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj,
-    RetryPolicy retryPolicy) {
-    return runCommandWithFixedRetryAttempts(
-        txn, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
-}
-
-StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
-    const BSONObj& cmdObj,
-    Milliseconds maxTimeMSOverride,
-    RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
         auto hostWithResponse = _runCommand(txn, readPref, dbName, maxTimeMSOverride, cmdObj);
         auto swCmdResponse = std::move(hostWithResponse.commandResponse);

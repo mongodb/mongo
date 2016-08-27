@@ -178,13 +178,13 @@ Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Da
     request.setUpsert(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        _locksNS.db().toString(),
-        request.toBSON(),
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kNotIdempotent);
+    auto resultStatus =
+        _client->getConfigShard()->runCommand(txn,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              _locksNS.db().toString(),
+                                              request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
+                                              Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     return findAndModifyStatus.getStatus();
@@ -214,7 +214,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
+    auto resultStatus = _client->getConfigShard()->runCommand(
         txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
@@ -271,13 +271,13 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        _locksNS.db().toString(),
-        request.toBSON(),
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kNotIdempotent);
+    auto resultStatus =
+        _client->getConfigShard()->runCommand(txn,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              _locksNS.db().toString(),
+                                              request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
+                                              Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     if (!findAndModifyStatus.isOK()) {
@@ -316,13 +316,13 @@ Status DistLockCatalogImpl::unlock(OperationContext* txn,
 }
 
 Status DistLockCatalogImpl::_unlock(OperationContext* txn, const FindAndModifyRequest& request) {
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        _locksNS.db().toString(),
-        request.toBSON(),
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kIdempotent);
+    auto resultStatus =
+        _client->getConfigShard()->runCommand(txn,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              _locksNS.db().toString(),
+                                              request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
+                                              Shard::RetryPolicy::kIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     if (findAndModifyStatus == ErrorCodes::LockStateChangeFailed) {
@@ -351,13 +351,13 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 
     BSONObj cmdObj = request.toBSON();
 
-    auto response = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        _locksNS.db().toString(),
-        cmdObj,
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kIdempotent);
+    auto response =
+        _client->getConfigShard()->runCommand(txn,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              _locksNS.db().toString(),
+                                              cmdObj,
+                                              Shard::kDefaultConfigCommandTimeout,
+                                              Shard::RetryPolicy::kIdempotent);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -382,13 +382,12 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 }
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
-        txn,
-        kReadPref,
-        "admin",
-        BSON("serverStatus" << 1),
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kIdempotent);
+    auto resultStatus = _client->getConfigShard()->runCommand(txn,
+                                                              kReadPref,
+                                                              "admin",
+                                                              BSON("serverStatus" << 1),
+                                                              Shard::kDefaultConfigCommandTimeout,
+                                                              Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -474,13 +473,13 @@ Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(kMajorityWriteConcern);
 
-    auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        _locksNS.db().toString(),
-        request.toBSON(),
-        Shard::kDefaultConfigCommandTimeout,
-        Shard::RetryPolicy::kNotIdempotent);
+    auto resultStatus =
+        _client->getConfigShard()->runCommand(txn,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              _locksNS.db().toString(),
+                                              request.toBSON(),
+                                              Shard::kDefaultConfigCommandTimeout,
+                                              Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     return findAndModifyStatus.getStatus();

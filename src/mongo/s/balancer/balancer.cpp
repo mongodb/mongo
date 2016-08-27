@@ -450,12 +450,12 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
         }
         const auto s = shardStatus.getValue();
 
-        auto result = uassertStatusOK(
-            s->runCommandWithFixedRetryAttempts(txn,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
-                                                BSON("features" << 1),
-                                                Shard::RetryPolicy::kIdempotent));
+        auto result =
+            uassertStatusOK(s->runCommand(txn,
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          "admin",
+                                          BSON("features" << 1),
+                                          Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(result.commandStatus);
         BSONObj f = std::move(result.response);
 
@@ -467,23 +467,22 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                 log() << "error: 2 machines have " << x << " as oid machine piece: " << shardId
                       << " and " << oids[x];
 
-                result = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
-                    txn,
-                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    "admin",
-                    BSON("features" << 1 << "oidReset" << 1),
-                    Shard::RetryPolicy::kIdempotent));
+                result = uassertStatusOK(
+                    s->runCommand(txn,
+                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                  "admin",
+                                  BSON("features" << 1 << "oidReset" << 1),
+                                  Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(result.commandStatus);
 
                 auto otherShardStatus = shardingContext->shardRegistry()->getShard(txn, oids[x]);
                 if (otherShardStatus.isOK()) {
-                    result = uassertStatusOK(
-                        otherShardStatus.getValue()->runCommandWithFixedRetryAttempts(
-                            txn,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            "admin",
-                            BSON("features" << 1 << "oidReset" << 1),
-                            Shard::RetryPolicy::kIdempotent));
+                    result = uassertStatusOK(otherShardStatus.getValue()->runCommand(
+                        txn,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        "admin",
+                        BSON("features" << 1 << "oidReset" << 1),
+                        Shard::RetryPolicy::kIdempotent));
                     uassertStatusOK(result.commandStatus);
                 }
 

@@ -101,12 +101,12 @@ public:
             }
             const auto s = shardStatus.getValue();
 
-            auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
-                txn,
-                ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                "admin",
-                BSON("listDatabases" << 1),
-                Shard::RetryPolicy::kIdempotent));
+            auto response = uassertStatusOK(
+                s->runCommand(txn,
+                              ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                              "admin",
+                              BSON("listDatabases" << 1),
+                              Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             BSONObj x = std::move(response.response);
 

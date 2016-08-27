@@ -89,12 +89,12 @@ public:
         auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMongosCommand(cmdObj));
 
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(txn,
-                                                          kPrimaryOnlyReadPreference,
-                                                          "admin",
-                                                          parsedRequest.toCommandForConfig(),
-                                                          Shard::RetryPolicy::kIdempotent));
+        auto cmdResponseStatus =
+            uassertStatusOK(configShard->runCommand(txn,
+                                                    kPrimaryOnlyReadPreference,
+                                                    "admin",
+                                                    parsedRequest.toCommandForConfig(),
+                                                    Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
 
         string shardAdded;
