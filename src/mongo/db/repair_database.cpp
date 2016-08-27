@@ -140,7 +140,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
 
         Status status = validateBSON(data.data(), data.size());
         if (!status.isOK()) {
-            log() << "Invalid BSON detected at " << id << ": " << status << ". Deleting.";
+            log() << "Invalid BSON detected at " << id << ": " << redact(status) << ". Deleting.";
             cursor->save();  // 'data' is no longer valid.
             {
                 WriteUnitOfWork wunit(txn);

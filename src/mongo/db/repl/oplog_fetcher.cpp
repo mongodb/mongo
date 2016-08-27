@@ -319,7 +319,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     // if target cut connections between connecting and querying (for
     // example, because it stepped down) we might not have a cursor
     if (!result.isOK()) {
-        LOG(2) << "Error returned from oplog query: " << result.getStatus();
+        LOG(2) << "Error returned from oplog query: " << redact(result.getStatus());
         _onShutdown(result.getStatus());
         return;
     }

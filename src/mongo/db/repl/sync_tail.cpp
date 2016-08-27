@@ -304,7 +304,7 @@ Status SyncTail::syncApply(OperationContext* txn,
         // this is often a no-op
         // but can't be 100% sure
         if (!isNoOp) {
-            error() << "skipping bad op in oplog: " << op.toString();
+            error() << "skipping bad op in oplog: " << redact(op);
         }
         return Status::OK();
     }
@@ -385,7 +385,7 @@ Status SyncTail::syncApply(OperationContext* txn,
 
     // unknown opType
     str::stream ss;
-    ss << "bad opType '" << opType << "' in oplog entry: " << op.toString();
+    ss << "bad opType '" << opType << "' in oplog entry: " << redact(op);
     error() << std::string(ss);
     return Status(ErrorCodes::BadValue, ss);
 }
@@ -419,9 +419,9 @@ void prefetchOp(const BSONObj& op) {
                 prefetchPagesForReplicatedOp(&txn, db, op);
             }
         } catch (const DBException& e) {
-            LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;
+            LOG(2) << "ignoring exception in prefetchOp(): " << redact(e) << endl;
         } catch (const std::exception& e) {
-            log() << "Unhandled std::exception in prefetchOp(): " << e.what() << endl;
+            log() << "Unhandled std::exception in prefetchOp(): " << redact(e.what()) << endl;
             fassertFailed(16397);
         }
     }
@@ -865,7 +865,8 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
 
         if (curVersion != OplogEntry::kOplogVersion) {
             severe() << "expected oplog version " << OplogEntry::kOplogVersion
-                     << " but found version " << curVersion << " in oplog entry: " << entry.raw;
+                     << " but found version " << curVersion
+                     << " in oplog entry: " << redact(entry.raw);
             fassertFailedNoTrace(18820);
         }
     }
@@ -961,7 +962,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONO
         const BSONElement idElem = o.getObjectField(isUpdate ? "o2" : "o")["_id"];
 
         if (idElem.eoo()) {
-            severe() << "cannot fetch missing document without _id field: " << o.toString();
+            severe() << "cannot fetch missing document without _id field: " << redact(o);
             fassertFailedNoTrace(28742);
         }
 
@@ -974,7 +975,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONO
                       << "sync source, attempt " << retryCount << " of " << retryMax << endl;
             continue;  // try again
         } catch (DBException& e) {
-            error() << "assertion fetching missing object: " << e.what() << endl;
+            error() << "assertion fetching missing object: " << redact(e) << endl;
             throw;
         }
 
@@ -1002,7 +1003,7 @@ bool SyncTail::shouldRetry(OperationContext* txn, const BSONObj& o) {
         if (missingObj.isEmpty()) {
             log() << "missing object not found on source."
                      " presumably deleted later in oplog";
-            log() << "o2: " << o.getObjectField("o2").toString();
+            log() << "o2: " << redact(o.getObjectField("o2"));
             log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName();
 
             return false;
@@ -1018,7 +1019,7 @@ bool SyncTail::shouldRetry(OperationContext* txn, const BSONObj& o) {
                     str::stream() << "failed to insert missing doc: " << status.toString(),
                     status.isOK());
 
-            LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
+            LOG(1) << "inserted missing doc: " << redact(missingObj);
 
             wunit.commit();
             return true;
@@ -1113,7 +1114,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                 } catch (const DBException& e) {
                     // The group insert failed, log an error and fall through to the
                     // application of an individual op.
-                    error() << "Error applying inserts in bulk " << causedBy(e)
+                    error() << "Error applying inserts in bulk " << redact(e)
                             << " trying first insert as a lone insert";
 
                     // Avoid quadratic run time from failed insert by not retrying until we
@@ -1128,13 +1129,13 @@ Status multiSyncApply_noAbort(OperationContext* txn,
             const Status status = syncApply(txn, entry->raw, convertUpdatesToUpserts);
 
             if (!status.isOK()) {
-                severe() << "Error applying operation (" << entry->raw.toString()
-                         << "): " << status;
+                severe() << "Error applying operation (" << redact(entry->raw)
+                         << "): " << redact(status);
                 return status;
             }
         } catch (const DBException& e) {
-            severe() << "writer worker caught exception: " << causedBy(e)
-                     << " on: " << entry->raw.toString();
+            severe() << "writer worker caught exception: " << redact(e)
+                     << " on: " << redact(entry->raw);
             return e.toStatus();
         }
     }
@@ -1168,7 +1169,8 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
                 if (st->shouldRetry(txn, entry.raw)) {
                     const Status s2 = SyncTail::syncApply(txn, entry.raw, convertUpdatesToUpserts);
                     if (!s2.isOK()) {
-                        severe() << "Error applying operation (" << entry.raw << "): " << s2;
+                        severe() << "Error applying operation (" << redact(entry.raw)
+                                 << "): " << redact(s2);
                         return s2;
                     }
                 }
@@ -1187,7 +1189,8 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
                 continue;
             }
 
-            severe() << "writer worker caught exception: " << causedBy(e) << " on: " << entry.raw;
+            severe() << "writer worker caught exception: " << redact(e)
+                     << " on: " << redact(entry.raw);
             return e.toStatus();
         }
     }

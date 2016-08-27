@@ -314,7 +314,7 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
         const auto tsElem = entry["ts"];
         if (count == 1) {
             if (tsElem.eoo())
-                LOG(2) << "Oplog tail entry: " << entry;
+                LOG(2) << "Oplog tail entry: " << redact(entry);
             else
                 LOG(2) << "Oplog tail entry ts field: " << tsElem;
         }
@@ -653,7 +653,7 @@ Status applyOperation_inlock(OperationContext* txn,
                              const BSONObj& op,
                              bool convertUpdateToUpsert,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    LOG(3) << "applying op: " << op;
+    LOG(3) << "applying op: " << redact(op);
 
     OpCounters* opCounters = txn->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
@@ -871,7 +871,7 @@ Status applyOperation_inlock(OperationContext* txn,
             if (ur.modifiers) {
                 if (updateCriteria.nFields() == 1) {
                     // was a simple { _id : ... } update criteria
-                    string msg = str::stream() << "failed to apply update: " << op.toString();
+                    string msg = str::stream() << "failed to apply update: " << redact(op);
                     error() << msg;
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
@@ -887,7 +887,7 @@ Status applyOperation_inlock(OperationContext* txn,
                     // capped collections won't have an _id index
                     (!indexCatalog->haveIdIndex(txn) &&
                      Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
-                    string msg = str::stream() << "couldn't find doc: " << op.toString();
+                    string msg = str::stream() << "couldn't find doc: " << redact(op);
                     error() << msg;
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
@@ -899,7 +899,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 // (because we are idempotent),
                 // if an regular non-mod update fails the item is (presumably) missing.
                 if (!upsert) {
-                    string msg = str::stream() << "update of non-mod failed: " << op.toString();
+                    string msg = str::stream() << "update of non-mod failed: " << redact(op);
                     error() << msg;
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
@@ -1024,12 +1024,12 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
             }
             default:
                 if (_oplogCollectionName == masterSlaveOplogName) {
-                    error() << "Failed command " << o << " on " << nss.db() << " with status "
-                            << status << " during oplog application";
+                    error() << "Failed command " << redact(o) << " on " << nss.db()
+                            << " with status " << status << " during oplog application";
                 } else if (curOpToApply.acceptableErrors.find(status.code()) ==
                            curOpToApply.acceptableErrors.end()) {
-                    error() << "Failed command " << o << " on " << nss.db() << " with status "
-                            << status << " during oplog application";
+                    error() << "Failed command " << redact(o) << " on " << nss.db()
+                            << " with status " << status << " during oplog application";
                     return status;
                 }
             // fallthrough

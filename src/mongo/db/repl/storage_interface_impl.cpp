@@ -171,7 +171,7 @@ OpTime StorageInterfaceImpl::getMinValid(OperationContext* txn) const {
     }
 
     if (!opTimeStatus.isOK()) {
-        severe() << "Error parsing minvalid entry: " << doc
+        severe() << "Error parsing minvalid entry: " << redact(doc)
                  << ", with status:" << opTimeStatus.getStatus();
         fassertFailedNoTrace(40052);
     }

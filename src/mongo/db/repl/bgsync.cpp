@@ -184,12 +184,13 @@ void BackgroundSync::_run() {
         try {
             _runProducer();
         } catch (const DBException& e) {
-            std::string msg(str::stream() << "sync producer problem: " << e.toString());
+            std::string msg(str::stream() << "sync producer problem: " << redact(e));
             error() << msg;
             _replCoord->setMyHeartbeatMessage(msg);
             sleepmillis(100);  // sleep a bit to keep from hammering this thread with temp. errors.
         } catch (const std::exception& e2) {
-            severe() << "sync producer exception: " << e2.what();
+            // redact(std::exception&) doesn't work
+            severe() << "sync producer exception: " << redact(e2.what());
             fassertFailed(28546);
         }
     }
@@ -402,7 +403,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
         // This is bad because it means that our source
         // has not returned oplog entries in ascending ts order, and they need to be.
 
-        warning() << fetcherReturnStatus.toString();
+        warning() << redact(fetcherReturnStatus);
         // Do not blacklist the server here, it will be blacklisted when we try to reuse it,
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
@@ -432,7 +433,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
             lastOpTimeFetched = _lastOpTimeFetched;
         }
 
-        log() << "Starting rollback due to " << fetcherReturnStatus;
+        log() << "Starting rollback due to " << redact(fetcherReturnStatus);
 
         // Wait till all buffered oplog entries have drained and been applied.
         auto lastApplied = _replCoord->getMyLastAppliedOpTime();
@@ -467,7 +468,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
                   << source << " for " << blacklistDuration << ".";
         _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
     } else if (!fetcherReturnStatus.isOK()) {
-        warning() << "Fetcher error querying oplog: " << fetcherReturnStatus.toString();
+        warning() << "Fetcher error querying oplog: " << redact(fetcherReturnStatus);
     }
 }
 
@@ -597,7 +598,7 @@ void BackgroundSync::_rollback(OperationContext* txn,
     if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
         fassertNoTrace(28723, status);
     }
-    warning() << "rollback cannot proceed at this time (retrying later): " << status;
+    warning() << "rollback cannot proceed at this time (retrying later): " << redact(status);
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {
@@ -672,14 +673,15 @@ long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "readLastAppliedHash", rsOplogName);
     } catch (const DBException& ex) {
-        severe() << "Problem reading " << rsOplogName << ": " << ex.toStatus();
+        severe() << "Problem reading " << rsOplogName << ": " << redact(ex);
         fassertFailed(18904);
     }
     long long hash;
     auto status = bsonExtractIntegerField(oplogEntry, kHashFieldName, &hash);
     if (!status.isOK()) {
         severe() << "Most recent entry in " << rsOplogName << " is missing or has invalid \""
-                 << kHashFieldName << "\" field. Oplog entry: " << oplogEntry << ": " << status;
+                 << kHashFieldName << "\" field. Oplog entry: " << redact(oplogEntry) << ": "
+                 << redact(status);
         fassertFailed(18902);
     }
     return hash;

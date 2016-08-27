@@ -65,7 +65,7 @@ TaskRunner::NextAction runSingleTask(const TaskRunner::Task& task,
     try {
         return task(txn, status);
     } catch (...) {
-        log() << "Unhandled exception in task runner: " << exceptionToStatus();
+        log() << "Unhandled exception in task runner: " << redact(exceptionToStatus());
     }
     return TaskRunner::NextAction::kCancel;
 }
@@ -232,7 +232,7 @@ Status TaskRunner::runSynchronousTask(SynchronousTask func, TaskRunner::NextActi
                 log() << "done running the synchronous task.";
             } catch (...) {
                 returnStatus = exceptionToStatus();
-                error() << "Exception thrown in runSynchronousTask: " << returnStatus;
+                error() << "Exception thrown in runSynchronousTask: " << redact(returnStatus);
             }
         }
 

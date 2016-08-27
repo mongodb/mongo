@@ -353,7 +353,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     Status startStatus = _startCollectionCloner(*_currentCollectionClonerIter);
     if (!startStatus.isOK()) {
         LOG(1) << "    failed to start collection cloning on "
-               << _currentCollectionClonerIter->getSourceNamespace() << ": " << startStatus;
+               << _currentCollectionClonerIter->getSourceNamespace() << ": " << redact(startStatus);
         _finishCallback_inlock(lk, startStatus);
         return;
     }
@@ -385,7 +385,8 @@ void DatabaseCloner::_collectionClonerCallback(const Status& status, const Names
         Status startStatus = _startCollectionCloner(*_currentCollectionClonerIter);
         if (!startStatus.isOK()) {
             LOG(1) << "    failed to start collection cloning on "
-                   << _currentCollectionClonerIter->getSourceNamespace() << ": " << startStatus;
+                   << _currentCollectionClonerIter->getSourceNamespace() << ": "
+                   << redact(startStatus);
             _finishCallback_inlock(lk, startStatus);
             return;
         }

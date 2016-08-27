@@ -515,7 +515,7 @@ void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
                 return;
             } else {
                 log() << "resync of " << db << " from " << hostName
-                      << " failed due to: " << status.toString();
+                      << " failed due to: " << redact(status);
                 throw SyncException();
             }
         }
@@ -651,10 +651,12 @@ void ReplSource::applyCommand(OperationContext* txn, const BSONObj& op) {
             }
         }
     } catch (UserException& e) {
-        log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;
+        log() << "sync: caught user assertion " << redact(e) << " while applying op: " << redact(op)
+              << endl;
         ;
     } catch (DBException& e) {
-        log() << "sync: caught db exception " << e << " while applying op: " << op << endl;
+        log() << "sync: caught db exception " << redact(e) << " while applying op: " << redact(op)
+              << endl;
         ;
     }
 }
@@ -672,10 +674,12 @@ void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONO
             }
         }
     } catch (UserException& e) {
-        log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;
+        log() << "sync: caught user assertion " << redact(e) << " while applying op: " << redact(op)
+              << endl;
         ;
     } catch (DBException& e) {
-        log() << "sync: caught db exception " << e << " while applying op: " << op << endl;
+        log() << "sync: caught db exception " << redact(e) << " while applying op: " << redact(op)
+              << endl;
         ;
     }
 }
@@ -690,7 +694,7 @@ void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONO
 void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
                                                 BSONObj& op,
                                                 bool alreadyLocked) {
-    LOG(6) << "processing op: " << op << endl;
+    LOG(6) << "processing op: " << redact(op) << endl;
 
     if (op.getStringField("op")[0] == 'n')
         return;
@@ -700,11 +704,11 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
     nsToDatabase(ns, dbName);
 
     if (*ns == '.') {
-        log() << "skipping bad op in oplog: " << op.toString() << endl;
+        log() << "skipping bad op in oplog: " << redact(op) << endl;
         return;
     } else if (*ns == 0) {
         /*if( op.getStringField("op")[0] != 'n' )*/ {
-            log() << "halting replication, bad op in oplog:\n  " << op.toString() << endl;
+            log() << "halting replication, bad op in oplog:\n  " << redact(op) << endl;
             replAllDead = "bad object in oplog";
             throw SyncException();
         }
@@ -949,7 +953,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                 return restartSync;  // don't sleep;
             }
             default: {
-                error() << status;
+                error() << redact(status);
                 return forceReconnect;  // causes reconnect.
             }
         }
@@ -983,11 +987,11 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                     log() << "trying to slave off of a non-master" << '\n';
                     massert(13344, "trying to slave off of a non-master", false);
                 } else {
-                    error() << "$err reading remote oplog: " + err << '\n';
+                    error() << "$err reading remote oplog: " + redact(err) << '\n';
                     massert(10390, "got $err reading remote oplog", false);
                 }
             } else {
-                error() << "bad object read from remote oplog: " << op.toString() << '\n';
+                error() << "bad object read from remote oplog: " << redact(op) << '\n';
                 massert(10391, "bad object read from remote oplog", false);
             }
         }
@@ -1067,7 +1071,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                 BSONElement ts = op.getField("ts");
                 if (!(ts.type() == Date || ts.type() == bsonTimestamp)) {
                     log() << "sync error: problem querying remote oplog record" << endl;
-                    log() << "op: " << op.toString() << endl;
+                    log() << "op: " << redact(op) << endl;
                     log() << "halting replication" << endl;
                     replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
                     throw SyncException();
@@ -1213,17 +1217,17 @@ int _replMain(OperationContext* txn, ReplSource::SourceVector& sources, int& nAp
             return 10;
         } catch (AssertionException& e) {
             if (e.severe()) {
-                log() << "replMain AssertionException " << e.what() << endl;
+                log() << "replMain AssertionException " << redact(e) << endl;
                 return 60;
             } else {
-                log() << "AssertionException " << e.what() << endl;
+                log() << "AssertionException " << redact(e) << endl;
             }
             replInfo = "replMain caught AssertionException";
         } catch (const DBException& e) {
-            log() << "DBException " << e.what() << endl;
+            log() << "DBException " << redact(e) << endl;
             replInfo = "replMain caught DBException";
         } catch (const std::exception& e) {
-            log() << "std::exception " << e.what() << endl;
+            log() << "std::exception " << redact(e.what()) << endl;
             replInfo = "replMain caught std::exception";
         } catch (...) {
             log() << "unexpected exception during replication.  replication will halt" << endl;
@@ -1423,7 +1427,7 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
             }
         } catch (DBException& e) {
             log() << "ignoring assertion in pretouchN() " << a << ' ' << b << ' ' << i << ' '
-                  << e.toString() << endl;
+                  << redact(e) << endl;
         }
     }
 }

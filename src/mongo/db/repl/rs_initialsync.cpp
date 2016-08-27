@@ -144,7 +144,7 @@ bool _initialSyncClone(OperationContext* txn,
     Status status = cloner.copyDb(txn, db, host, options, nullptr, collections);
     if (!status.isOK()) {
         log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
-              << ".  " << status.toString();
+              << ".  " << redact(status);
         return false;
     }
 
@@ -532,7 +532,7 @@ void syncDoInitialSync(ReplicationCoordinatorExternalState* replicationCoordinat
                 error() << status;
             }
         } catch (const DBException& e) {
-            error() << e;
+            error() << redact(e);
             // Return if in shutdown
             if (inShutdown()) {
                 return;

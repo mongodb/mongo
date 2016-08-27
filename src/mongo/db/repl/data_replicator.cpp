@@ -180,7 +180,7 @@ StatusWith<BSONObj> getLatestOplogEntry(executor::TaskExecutor* exec,
     // wait for fetcher to get the oplog position.
     fetcher.join();
     if (statusToReturn.isOK()) {
-        LOG(2) << "returning last oplog entry: " << entry << ", from: " << source
+        LOG(2) << "returning last oplog entry: " << redact(entry) << ", from: " << source
                << ", ns: " << oplogNS;
         return entry;
     }
@@ -486,6 +486,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
             if (!cd.status.isOK()) {
                 error() << "Error while being called to drop/create oplog and drop users "
                         << "databases, oplogNS: " << _opts.localOplogNS
+                        // REDACT cd??
                         << " with status:" << cd.status.toString();
                 statusFromWrites = cd.status;
                 return;
@@ -814,13 +815,13 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
 }
 
 void DataReplicator::_onDataClonerFinish(const Status& status, HostAndPort syncSource) {
-    log() << "data clone finished, status: " << status.toString();
+    log() << "data clone finished, status: " << redact(status);
     if (status.code() == ErrorCodes::CallbackCanceled) {
         return;
     }
     if (!status.isOK()) {
         // Initial sync failed during cloning of databases
-        error() << "Failed to clone data due to '" << status << "'";
+        error() << "Failed to clone data due to '" << redact(status) << "'";
         _initialSyncState->status = status;
         _exec->signalEvent(_initialSyncState->finishEvent);
         return;
@@ -1081,7 +1082,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
         if (entry.getVersion() != OplogEntry::kOplogVersion) {
             std::string message = str::stream()
                 << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
-                << entry.getVersion() << " in oplog entry: " << entry.raw;
+                << entry.getVersion() << " in oplog entry: " << redact(entry.raw);
             severe() << message;
             return {ErrorCodes::BadValue, message};
         }
@@ -1131,7 +1132,7 @@ void DataReplicator::_onApplyBatchFinish(const Status& status,
     if (!status.isOK()) {
         switch (_state) {
             case DataReplicatorState::InitialSync:
-                error() << "Failed to apply batch due to '" << status << "'";
+                error() << "Failed to apply batch due to '" << redact(status) << "'";
                 _initialSyncState->status = status;
                 _exec->signalEvent(_initialSyncState->finishEvent);
                 return;
@@ -1193,7 +1194,7 @@ Status DataReplicator::_scheduleApplyBatch_inlock() {
 
     auto batchStatus = _getNextApplierBatch_inlock();
     if (!batchStatus.isOK()) {
-        warning() << "Failure creating next apply batch: " << batchStatus.getStatus();
+        warning() << "Failure creating next apply batch: " << redact(batchStatus.getStatus());
         return batchStatus.getStatus();
     }
     const Operations& ops = batchStatus.getValue();
@@ -1423,7 +1424,7 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
         invariant(!status.isOK());
         if (_state == DataReplicatorState::InitialSync) {
             // Do not change sync source, just log.
-            error() << "Error fetching oplog during initial sync: " << status;
+            error() << "Error fetching oplog during initial sync: " << redact(status);
             LockGuard lk(_mutex);
             invariant(_initialSyncState);
             _initialSyncState->status = status;
@@ -1459,8 +1460,9 @@ void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithH
                         syncSource = _syncSource;
                         _syncSource = HostAndPort();
                     }
-                    log() << "Blacklisting " << syncSource << " due to fetcher error: '" << status
-                          << "' for " << _opts.blacklistSyncSourcePenaltyForNetworkConnectionError
+                    log() << "Blacklisting " << syncSource << " due to fetcher error: '"
+                          << redact(status) << "' for "
+                          << _opts.blacklistSyncSourcePenaltyForNetworkConnectionError
                           << " until: " << until;
                     _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
                 }
@@ -1480,7 +1482,7 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
     HostAndPort syncSource = getSyncSource();
     auto rollbackStatus = _opts.rollbackFn(makeOpCtx().get(), lastOpTimeWritten.opTime, syncSource);
     if (!rollbackStatus.isOK()) {
-        error() << "Failed rollback: " << rollbackStatus;
+        error() << "Failed rollback: " << redact(rollbackStatus);
         Date_t until{_exec->now() + _opts.blacklistSyncSourcePenaltyForOplogStartMissing};
         HostAndPort syncSource;
         {
@@ -1491,8 +1493,8 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
             _fetcherPaused = false;
         }
         log() << "Blacklisting host: " << syncSource << " during rollback due to error: '"
-              << rollbackStatus << "' for " << _opts.blacklistSyncSourcePenaltyForOplogStartMissing
-              << " until: " << until;
+              << redact(rollbackStatus) << "' for "
+              << _opts.blacklistSyncSourcePenaltyForOplogStartMissing << " until: " << until;
         _opts.syncSourceSelector->blacklistSyncSource(syncSource, until);
     } else {
         // Go back to steady sync after a successful rollback.

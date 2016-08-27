@@ -110,7 +110,7 @@ void RSDataSync::_run() {
             SyncTail(_bgsync, multiSyncApply).oplogApplication(_replCoord);
         } catch (...) {
             auto status = exceptionToStatus();
-            severe() << "Exception thrown in RSDataSync: " << status;
+            severe() << "Exception thrown in RSDataSync: " << redact(status);
             std::terminate();
         }
     }

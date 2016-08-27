@@ -401,7 +401,7 @@ void CollectionCloner::_insertDocumentsCallback(const executor::TaskExecutor::Ca
 }
 
 void CollectionCloner::_finishCallback(const Status& status) {
-    LOG(1) << "CollectionCloner ns:" << _destNss << " finished with status: " << status;
+    LOG(1) << "CollectionCloner ns:" << _destNss << " finished with status: " << redact(status);
     // Copy the status so we can change it below if needed.
     auto finalStatus = status;
     bool callCollectionLoader = false;
@@ -413,7 +413,7 @@ void CollectionCloner::_finishCallback(const Status& status) {
             const auto loaderStatus = _collLoader->commit();
             if (!loaderStatus.isOK()) {
                 warning() << "Failed to commit changes to collection " << _destNss.ns() << ": "
-                          << loaderStatus;
+                          << redact(loaderStatus);
                 finalStatus = loaderStatus;
             }
         }
