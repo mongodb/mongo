@@ -229,8 +229,8 @@ public:
                 return true;
             }
 
-            log() << "request split points lookup for chunk " << nss.toString() << " " << min
-                  << " -->> " << max;
+            log() << "request split points lookup for chunk " << nss.toString() << " "
+                  << redact(min) << " -->> " << redact(max);
 
             // We'll use the average object size and number of object to find approximately how many
             // keys each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects,
@@ -292,15 +292,15 @@ public:
                             splitKeys.push_back(currKey.getOwned());
                             currCount = 0;
                             numChunks++;
-                            LOG(4) << "picked a split key: " << currKey;
+                            LOG(4) << "picked a split key: " << redact(currKey);
                         }
                     }
 
                     // Stop if we have enough split points.
                     if (maxSplitPoints && (numChunks >= maxSplitPoints)) {
                         log() << "max number of requested split points reached (" << numChunks
-                              << ") before the end of chunk " << nss.toString() << " " << min
-                              << " -->> " << max;
+                              << ") before the end of chunk " << nss.toString() << " "
+                              << redact(min) << " -->> " << redact(max);
                         break;
                     }
 
@@ -360,7 +360,7 @@ public:
 
             if (timer.millis() > serverGlobalParams.slowMS) {
                 warning() << "Finding the split vector for " << nss.toString() << " over "
-                          << keyPattern << " keyCount: " << keyCount
+                          << redact(keyPattern) << " keyCount: " << keyCount
                           << " numSplits: " << splitKeys.size() << " lookedAt: " << currCount
                           << " took " << timer.millis() << "ms";
             }

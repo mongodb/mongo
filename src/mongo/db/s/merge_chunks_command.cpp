@@ -169,7 +169,9 @@ bool mergeChunks(OperationContext* txn,
 
     if (!scopedDistLock.isOK()) {
         *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
-                           << " to merge chunks in [" << minKey << "," << maxKey << ")"
+                           << " to merge chunks in [" << redact(minKey) << "," << redact(maxKey)
+                           << ")"
+                           // REDACT??? Not sure how to handle the causedBy's
                            << causedBy(scopedDistLock.getStatus());
 
         warning() << *errMsg;
@@ -187,7 +189,7 @@ bool mergeChunks(OperationContext* txn,
 
     if (!status.isOK()) {
         *errMsg = str::stream() << "could not merge chunks, failed to refresh metadata for "
-                                << nss.ns() << causedBy(status.reason());
+                                << nss.ns() << redact(status);
 
         warning() << *errMsg;
         return false;
@@ -220,10 +222,10 @@ bool mergeChunks(OperationContext* txn,
     dassert(metadata->getShardVersion().equals(shardVersion));
 
     if (!metadata->isValidKey(minKey) || !metadata->isValidKey(maxKey)) {
-        *errMsg = stream() << "could not merge chunks, the range " << rangeToString(minKey, maxKey)
-                           << " is not valid"
+        *errMsg = stream() << "could not merge chunks, the range "
+                           << redact(rangeToString(minKey, maxKey)) << " is not valid"
                            << " for collection " << nss.ns() << " with key pattern "
-                           << metadata->getKeyPattern();
+                           << metadata->getKeyPattern().toString();
 
         warning() << *errMsg;
         return false;
@@ -250,8 +252,8 @@ bool mergeChunks(OperationContext* txn,
 
     if (chunksToMerge.empty()) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                           << " range starting at " << minKey << " and ending at " << maxKey
-                           << " does not belong to shard " << gss->getShardName();
+                           << " range starting at " << redact(minKey) << " and ending at "
+                           << redact(maxKey) << " does not belong to shard " << gss->getShardName();
 
         warning() << *errMsg;
         return false;
@@ -268,8 +270,8 @@ bool mergeChunks(OperationContext* txn,
 
     if (!minKeyInRange) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                           << " range starting at " << minKey << " does not belong to shard "
-                           << gss->getShardName();
+                           << " range starting at " << redact(minKey)
+                           << " does not belong to shard " << gss->getShardName();
 
         warning() << *errMsg;
         return false;
@@ -282,7 +284,7 @@ bool mergeChunks(OperationContext* txn,
 
     if (!maxKeyInRange) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                           << " range ending at " << maxKey << " does not belong to shard "
+                           << " range ending at " << redact(maxKey) << " does not belong to shard "
                            << gss->getShardName();
 
         warning() << *errMsg;
@@ -293,11 +295,12 @@ bool mergeChunks(OperationContext* txn,
     bool validRangeEndKey = lastDocMax.woCompare(maxKey) == 0;
 
     if (!validRangeStartKey || !validRangeEndKey) {
-        *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                           << " does not contain a chunk "
-                           << (!validRangeStartKey ? "starting at " + minKey.toString() : "")
-                           << (!validRangeStartKey && !validRangeEndKey ? " or " : "")
-                           << (!validRangeEndKey ? "ending at " + maxKey.toString() : "");
+        *errMsg =
+            stream() << "could not merge chunks, collection " << nss.ns()
+                     << " does not contain a chunk "
+                     << (!validRangeStartKey ? "starting at " + redact(minKey.toString()) : "")
+                     << (!validRangeStartKey && !validRangeEndKey ? " or " : "")
+                     << (!validRangeEndKey ? "ending at " + redact(maxKey.toString()) : "");
 
         warning() << *errMsg;
         return false;
@@ -305,7 +308,8 @@ bool mergeChunks(OperationContext* txn,
 
     if (chunksToMerge.size() == 1) {
         *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                           << " already contains chunk for " << rangeToString(minKey, maxKey);
+                           << " already contains chunk for "
+                           << redact(rangeToString(minKey, maxKey));
 
         warning() << *errMsg;
         return false;
@@ -314,10 +318,11 @@ bool mergeChunks(OperationContext* txn,
     // Look for hole in range
     for (size_t i = 1; i < chunksToMerge.size(); ++i) {
         if (chunksToMerge[i - 1].getMax().woCompare(chunksToMerge[i].getMin()) != 0) {
-            *errMsg =
-                stream() << "could not merge chunks, collection " << nss.ns()
-                         << " has a hole in the range " << rangeToString(minKey, maxKey) << " at "
-                         << rangeToString(chunksToMerge[i - 1].getMax(), chunksToMerge[i].getMin());
+            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
+                               << " has a hole in the range "
+                               << redact(rangeToString(minKey, maxKey)) << " at "
+                               << redact(rangeToString(chunksToMerge[i - 1].getMax(),
+                                                       chunksToMerge[i].getMin()));
 
             warning() << *errMsg;
             return false;
@@ -335,7 +340,7 @@ bool mergeChunks(OperationContext* txn,
 
     Status applyOpsStatus = runApplyOpsCmd(txn, chunksToMerge, shardVersion, mergeVersion);
     if (!applyOpsStatus.isOK()) {
-        warning() << applyOpsStatus;
+        warning() << redact(applyOpsStatus);
         return false;
     }
 

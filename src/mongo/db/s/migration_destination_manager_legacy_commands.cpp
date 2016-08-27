@@ -143,7 +143,8 @@ public:
         Status status = shardingState->refreshMetadataNow(txn, ns, &currentVersion);
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start recv'ing chunk "
-                                   << "[" << min << "," << max << ")" << causedBy(status.reason());
+                                   << "[" << redact(min) << "," << redact(max) << ")"
+                                   << redact(status);
 
             warning() << errmsg;
             return false;
@@ -160,8 +161,8 @@ public:
         auto statusWithFromShardConnectionString = ConnectionString::parse(cmdObj["from"].String());
         if (!statusWithFromShardConnectionString.isOK()) {
             errmsg = str::stream() << "cannot start recv'ing chunk "
-                                   << "[" << min << "," << max << ")"
-                                   << causedBy(statusWithFromShardConnectionString.getStatus());
+                                   << "[" << redact(min) << "," << redact(max) << ")"
+                                   << redact(statusWithFromShardConnectionString.getStatus());
 
             warning() << errmsg;
             return false;

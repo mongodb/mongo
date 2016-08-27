@@ -96,8 +96,9 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     BSONObj keyPattern = metadata->getKeyPattern();
     if (!startingFromKey.isEmpty()) {
         if (!metadata->isValidKey(startingFromKey)) {
-            *errMsg = stream() << "could not cleanup orphaned data, start key " << startingFromKey
-                               << " does not match shard key pattern " << keyPattern;
+            *errMsg = stream() << "could not cleanup orphaned data, start key "
+                               << redact(startingFromKey) << " does not match shard key pattern "
+                               << keyPattern;
 
             warning() << *errMsg;
             return CleanupResult_Error;
@@ -109,7 +110,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     KeyRange orphanRange;
     if (!metadata->getNextOrphanRange(startingFromKey, &orphanRange)) {
         LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-               << startingFromKey << ", no orphan ranges remain";
+               << redact(startingFromKey) << ", no orphan ranges remain";
 
         return CleanupResult_Done;
     }
@@ -117,8 +118,8 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     *stoppedAtKey = orphanRange.maxKey;
 
     LOG(0) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-           << startingFromKey << ", removing next orphan range"
-           << " [" << orphanRange.minKey << "," << orphanRange.maxKey << ")";
+           << redact(startingFromKey) << ", removing next orphan range"
+           << " [" << redact(orphanRange.minKey) << "," << redact(orphanRange.maxKey) << ")";
 
     // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
     // before delete.
@@ -132,7 +133,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     deleterOptions.removeSaverReason = "cleanup-cmd";
 
     if (!getDeleter()->deleteNow(txn, deleterOptions, errMsg)) {
-        warning() << *errMsg;
+        warning() << redact(*errMsg);
         return CleanupResult_Error;
     }
 
@@ -248,7 +249,7 @@ public:
                 warning() << "Shard version in transition detected while refreshing "
                           << "metadata for " << ns << " at version " << shardVersion;
             } else {
-                errmsg = str::stream() << "failed to refresh shard metadata: " << status.reason();
+                errmsg = str::stream() << "failed to refresh shard metadata: " << redact(status);
                 return false;
             }
         }

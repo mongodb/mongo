@@ -118,12 +118,13 @@ bool checkMetadataForSuccess(OperationContext* txn,
 
     ChunkType nextChunk;
     for (const auto& endKey : newChunkBounds) {
-        log() << "JESS: checking metadataAfterSplit for new chunk boundaries [" << startKey << ","
-              << endKey << ")";
+        log() << "checking metadataAfterSplit for new chunk boundaries [" << redact(startKey) << ","
+              << redact(endKey) << ")";
         // Check that all new chunks fit the new chunk boundaries
         if (!metadataAfterSplit->getNextChunk(startKey, &nextChunk) ||
             nextChunk.getMax().woCompare(endKey)) {
-            log() << "JESS: ERROR, found [" << startKey << "," << nextChunk.getMax() << ")";
+            log() << "ERROR, found [" << redact(startKey) << "," << redact(nextChunk.getMax())
+                  << ")";
             return false;
         }
 
@@ -249,7 +250,7 @@ public:
         // Initialize our current shard name in the shard state if needed
         shardingState->setShardName(shardName);
 
-        log() << "received splitChunk request: " << cmdObj;
+        log() << "received splitChunk request: " << redact(cmdObj);
 
         //
         // Lock the collection's metadata and get highest version for the current shard
@@ -262,8 +263,8 @@ public:
             txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
-                                   << " to split chunk [" << min << "," << max << ")"
-                                   << causedBy(scopedDistLock.getStatus());
+                                   << " to split chunk [" << redact(min) << "," << redact(max)
+                                   << ") " << redact(scopedDistLock.getStatus());
             warning() << errmsg;
             return false;
         }
@@ -274,8 +275,8 @@ public:
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
-                                   << "[" << min << "," << max << ")"
-                                   << causedBy(refreshStatus.reason());
+                                   << "[" << redact(min) << "," << redact(max) << ") "
+                                   << redact(refreshStatus);
 
             warning() << errmsg;
             return false;
@@ -284,7 +285,7 @@ public:
         if (shardVersion.majorVersion() == 0) {
             // It makes no sense to split if our version is zero and we have no chunks
             errmsg = str::stream() << "splitChunk cannot split chunk "
-                                   << "[" << min << "," << max << ")"
+                                   << "[" << redact(min) << "," << redact(max) << ") "
                                    << " with zero shard version";
 
             warning() << errmsg;
@@ -300,7 +301,7 @@ public:
         ChunkVersion expectedCollectionVersion = oss.getShardVersion(nss);
         if (expectedCollectionVersion.epoch() != shardVersion.epoch()) {
             std::string msg = str::stream() << "splitChunk cannot split chunk "
-                                            << "[" << min << "," << max << "), "
+                                            << "[" << redact(min) << "," << redact(max) << "), "
                                             << "collection may have been dropped. "
                                             << "current epoch: " << shardVersion.epoch()
                                             << ", cmd epoch: " << expectedCollectionVersion.epoch();
@@ -329,7 +330,7 @@ public:
             origChunk.getMax().woCompare(max)) {
             // Our boundaries are different from those passed in
             std::string msg = str::stream() << "splitChunk cannot find chunk "
-                                            << "[" << min << "," << max << ")"
+                                            << "[" << redact(min) << "," << redact(max) << ") "
                                             << " to split, the chunk boundaries may be stale";
             warning() << msg;
             throw SendStaleConfigException(
@@ -368,8 +369,8 @@ public:
         refreshStatus = shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersionAfterSplit);
 
         if (!refreshStatus.isOK()) {
-            errmsg = str::stream() << "failed to refresh metadata for split chunk [" << min << ","
-                                   << max << ")" << causedBy(refreshStatus.reason());
+            errmsg = str::stream() << "failed to refresh metadata for split chunk [" << redact(min)
+                                   << "," << redact(max) << ") " << redact(refreshStatus);
 
             warning() << errmsg;
             return false;
@@ -385,7 +386,7 @@ public:
         // Send stale epoch if epoch of request did not match epoch of collection
         if (commandStatus == ErrorCodes::StaleEpoch) {
             std::string msg = str::stream() << "splitChunk cannot split chunk "
-                                            << "[" << min << "," << max << "), "
+                                            << "[" << redact(min) << "," << redact(max) << "), "
                                             << "collection may have been dropped. "
                                             << "current epoch: " << collVersion.epoch()
                                             << ", cmd epoch: " << expectedCollectionVersion.epoch();
@@ -406,7 +407,8 @@ public:
         if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
             checkMetadataForSuccess(txn, nss, chunkRange, splitKeys)) {
 
-            LOG(1) << "splitChunk [" << min << "," << max << ") has already been committed.";
+            LOG(1) << "splitChunk [" << redact(min) << "," << redact(max)
+                   << ") has already been committed.";
         } else if (!commandStatus.isOK()) {
             return appendCommandStatus(result, commandStatus);
         } else if (!writeConcernStatus.isOK()) {

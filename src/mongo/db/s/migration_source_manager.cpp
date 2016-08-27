@@ -93,7 +93,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     const ChunkVersion expectedCollectionVersion = oss.getShardVersion(_args.getNss());
 
     log() << "Starting chunk migration for "
-          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+          << redact(ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString())
           << " with expected collection version " << expectedCollectionVersion;
 
     // Now that the collection is locked, snapshot the metadata and fetch the latest versions
@@ -367,7 +367,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         // the original chunks no longer exist.
 
         warning() << "Migration metadata commit may have failed: refreshing metadata to check"
-                  << causedBy(commitChunkMigrationResponse.getStatus());
+                  << redact(commitChunkMigrationResponse.getStatus());
 
         // Need to get the latest optime in case the refresh request goes to a secondary --
         // otherwise the read won't wait for the write that _configsvrCommitChunkMigration may have

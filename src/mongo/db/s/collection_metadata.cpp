@@ -148,8 +148,8 @@ std::unique_ptr<CollectionMetadata> CollectionMetadata::clonePlusPending(
         RangeVector pendingOverlap;
         getRangeMapOverlap(_pendingMap, chunk.getMin(), chunk.getMax(), &pendingOverlap);
 
-        warning() << "new pending chunk " << rangeToString(chunk.getMin(), chunk.getMax())
-                  << " overlaps existing pending chunks " << overlapToString(pendingOverlap)
+        warning() << "new pending chunk " << redact(rangeToString(chunk.getMin(), chunk.getMax()))
+                  << " overlaps existing pending chunks " << redact(overlapToString(pendingOverlap))
                   << ", a migration may not have completed";
 
         for (RangeVector::iterator it = pendingOverlap.begin(); it != pendingOverlap.end(); ++it) {

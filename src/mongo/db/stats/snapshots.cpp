@@ -109,7 +109,7 @@ void StatsSnapshotThread::run() {
         try {
             statsSnapshots.takeSnapshot();
         } catch (std::exception& e) {
-            log() << "ERROR in SnapshotThread: " << e.what() << endl;
+            log() << "ERROR in SnapshotThread: " << redact(e.what()) << endl;
         }
 
         sleepsecs(4);

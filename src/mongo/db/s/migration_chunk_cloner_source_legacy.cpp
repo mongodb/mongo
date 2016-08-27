@@ -353,7 +353,7 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* txn,
     BSONElement idElement = insertedDoc["_id"];
     if (idElement.eoo()) {
         warning() << "logInsertOp got a document with no _id field, ignoring inserted document: "
-                  << insertedDoc;
+                  << redact(insertedDoc);
         return;
     }
 
@@ -371,7 +371,7 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* txn,
     BSONElement idElement = updatedDoc["_id"];
     if (idElement.eoo()) {
         warning() << "logUpdateOp got a document with no _id field, ignoring updatedDoc: "
-                  << updatedDoc;
+                  << redact(updatedDoc);
         return;
     }
 
@@ -389,7 +389,7 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* txn,
     BSONElement idElement = deletedDocId["_id"];
     if (idElement.eoo()) {
         warning() << "logDeleteOp got a document with no _id field, ignoring deleted doc: "
-                  << deletedDocId;
+                  << redact(deletedDocId);
         return;
     }
 

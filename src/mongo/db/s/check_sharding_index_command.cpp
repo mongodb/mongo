@@ -187,8 +187,8 @@ public:
                     continue;
 
                 const string msg = str::stream()
-                    << "found missing value in key " << currKey << " for doc: "
-                    << (obj.hasField("_id") ? obj.toString() : obj["_id"].toString());
+                    << "found missing value in key " << redact(currKey)
+                    << " for doc: " << (obj.hasField("_id") ? redact(obj) : redact(obj["_id"]));
                 log() << "checkShardingIndex for '" << nss.toString() << "' failed: " << msg;
 
                 errmsg = msg;

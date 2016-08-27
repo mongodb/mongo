@@ -411,7 +411,7 @@ void MigrationDestinationManager::_migrateThread(std::string ns,
             _errmsg = e.what();
         }
 
-        error() << "migrate failed: " << e.what() << migrateLog;
+        error() << "migrate failed: " << redact(e.what()) << migrateLog;
     } catch (...) {
         {
             stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -426,7 +426,7 @@ void MigrationDestinationManager::_migrateThread(std::string ns,
         // Unprotect the range if needed/possible on unsuccessful TO migration
         Status status = _forgetPending(opCtx.get(), NamespaceString(ns), min, max, epoch);
         if (!status.isOK()) {
-            warning() << "Failed to remove pending range" << causedBy(status);
+            warning() << "Failed to remove pending range" << redact(causedBy(status));
         }
     }
 
@@ -448,7 +448,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
 
-    log() << "starting receiving-end of migration of chunk " << min << " -> " << max
+    log() << "starting receiving-end of migration of chunk " << redact(min) << " -> " << redact(max)
           << " for collection " << ns << " from " << fromShardConnString << " at epoch "
           << epoch.toString();
 
@@ -505,7 +505,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             Status status = userCreateNS(txn, db, ns, options, false);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << ns << "] "
-                          << " with options " << options << ": " << status;
+                          << " with options " << options << ": " << redact(status);
             }
             wuow.commit();
         }
@@ -574,7 +574,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             Status status = indexer.init(indexSpecsWithCollation);
             if (!status.isOK()) {
                 errmsg = str::stream() << "failed to create index before migrating data. "
-                                       << " error: " << status.toString();
+                                       << " error: " << redact(status);
                 warning() << errmsg;
                 setState(FAIL);
                 return;
@@ -583,7 +583,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             status = indexer.insertAllDocumentsInCollection();
             if (!status.isOK()) {
                 errmsg = str::stream() << "failed to create index before migrating data. "
-                                       << " error: " << status.toString();
+                                       << " error: " << redact(status);
                 warning() << errmsg;
                 setState(FAIL);
                 return;
@@ -624,7 +624,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         deleterOptions.removeSaverReason = "preCleanup";
 
         if (!getDeleter()->deleteNow(txn, deleterOptions, &errmsg)) {
-            warning() << "Failed to queue delete for migrate abort: " << errmsg;
+            warning() << "Failed to queue delete for migrate abort: " << redact(errmsg);
             setState(FAIL);
             return;
         }
@@ -653,7 +653,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         deleterOptions.onlyRemoveOrphanedDocs = true;
 
         if (!getDeleter()->queueDelete(txn, deleterOptions, NULL /* notifier */, &errMsg)) {
-            warning() << "Failed to queue delete for migrate abort: " << errMsg;
+            warning() << "Failed to queue delete for migrate abort: " << redact(errMsg);
         }
     }
 
@@ -670,7 +670,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                                   res)) {  // gets array of objects to copy, in disk order
                 setState(FAIL);
                 errmsg = "_migrateClone failed: ";
-                errmsg += res.toString();
+                errmsg += redact(res.toString());
                 error() << errmsg << migrateLog;
                 conn.done();
                 return;
@@ -697,8 +697,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                     if (willOverrideLocalId(
                             txn, ns, min, max, shardKeyPattern, cx.db(), docToClone, &localDoc)) {
                         string errMsg = str::stream() << "cannot migrate chunk, local document "
-                                                      << localDoc << " has same _id as cloned "
-                                                      << "remote document " << docToClone;
+                                                      << redact(localDoc)
+                                                      << " has same _id as cloned "
+                                                      << "remote document " << redact(docToClone);
 
                         warning() << errMsg;
 
@@ -755,8 +756,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             if (!conn->runCommand("admin", xferModsRequest, res)) {
                 setState(FAIL);
                 errmsg = "_transferMods failed: ";
-                errmsg += res.toString();
-                error() << "_transferMods failed: " << res << migrateLog;
+                errmsg += redact(res);
+                error() << "_transferMods failed: " << redact(res) << migrateLog;
                 conn.done();
                 return;
             }
@@ -852,7 +853,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
 
             BSONObj res;
             if (!conn->runCommand("admin", xferModsRequest, res)) {
-                log() << "_transferMods failed in STEADY state: " << res << migrateLog;
+                log() << "_transferMods failed in STEADY state: " << redact(res) << migrateLog;
                 errmsg = res.toString();
                 setState(FAIL);
                 conn.done();
@@ -1003,8 +1004,8 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* txn,
     if (!opReplicatedEnough(txn, lastOpApplied, writeConcern)) {
         repl::OpTime op(lastOpApplied);
         OCCASIONALLY warning() << "migrate commit waiting for a majority of slaves for '" << ns
-                               << "' " << min << " -> " << max << " waiting for: " << op
-                               << migrateLog;
+                               << "' " << redact(min) << " -> " << redact(max)
+                               << " waiting for: " << op << migrateLog;
         return false;
     }
 
@@ -1018,8 +1019,8 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* txn,
 
         // if durability is on, force a write to journal
         if (getDur().commitNow(txn)) {
-            log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max
-                  << migrateLog;
+            log() << "migrate commit flushed to journal for '" << ns << "' " << redact(min)
+                  << " -> " << redact(max) << migrateLog;
         }
     }
 
