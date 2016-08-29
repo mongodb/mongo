@@ -1319,7 +1319,10 @@ DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     assert.commandWorked(res, "aggregate failed");
 
     if ("cursor" in res) {
-        return new DBCommandCursor(res._mongo, res);
+        if (cmd["cursor"]["batchSize"] > 0) {
+            var batchSizeValue = cmd["cursor"]["batchSize"];
+        }
+        return new DBCommandCursor(res._mongo, res, batchSizeValue);
     }
 
     return res;
