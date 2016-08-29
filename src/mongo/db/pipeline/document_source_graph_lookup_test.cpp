@@ -62,7 +62,8 @@ using DocumentSourceGraphLookUpTest = AggregationContextFixture;
  */
 class MockMongodImplementation final : public DocumentSourceNeedsMongod::MongodInterface {
 public:
-    MockMongodImplementation(std::deque<Document> documents) : _documents(documents) {}
+    MockMongodImplementation(std::deque<DocumentSource::GetNextResult> results)
+        : _results(std::move(results)) {}
 
     void setOperationContext(OperationContext* opCtx) final {
         MONGO_UNREACHABLE;
@@ -117,7 +118,7 @@ public:
             return pipeline.getStatus();
         }
 
-        pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_documents));
+        pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_results));
         pipeline.getValue()->injectExpressionContext(expCtx);
         pipeline.getValue()->optimizePipeline();
 
@@ -125,17 +126,17 @@ public:
     }
 
 private:
-    std::deque<Document> _documents;
+    std::deque<DocumentSource::GetNextResult> _results;
 };
 
 TEST_F(DocumentSourceGraphLookUpTest,
        ShouldErrorWhenDoingInitialMatchIfDocumentInFromCollectionIsMissingId) {
     auto expCtx = getExpCtx();
 
-    std::deque<Document> inputs{Document{{"_id", 0}}};
+    std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = DocumentSourceMock::create(std::move(inputs));
 
-    std::deque<Document> fromContents{Document{{"to", 0}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
@@ -159,11 +160,11 @@ TEST_F(DocumentSourceGraphLookUpTest,
        ShouldErrorWhenExploringGraphIfDocumentInFromCollectionIsMissingId) {
     auto expCtx = getExpCtx();
 
-    std::deque<Document> inputs{Document{{"_id", 0}}};
+    std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = DocumentSourceMock::create(std::move(inputs));
 
-    std::deque<Document> fromContents{Document{{"_id", "a"}, {"to", 0}, {"from", 1}},
-                                      Document{{"to", 1}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{
+        Document{{"_id", "a"}, {"to", 0}, {"from", 1}}, Document{{"to", 1}}};
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
@@ -187,10 +188,10 @@ TEST_F(DocumentSourceGraphLookUpTest,
        ShouldErrorWhenHandlingUnwindIfDocumentInFromCollectionIsMissingId) {
     auto expCtx = getExpCtx();
 
-    std::deque<Document> inputs{Document{{"_id", 0}}};
+    std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = DocumentSourceMock::create(std::move(inputs));
 
-    std::deque<Document> fromContents{Document{{"to", 0}}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"to", 0}}};
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
@@ -227,14 +228,15 @@ TEST_F(DocumentSourceGraphLookUpTest,
        ShouldTraverseSubgraphIfIdOfDocumentsInFromCollectionAreNonUnique) {
     auto expCtx = getExpCtx();
 
-    std::deque<Document> inputs{Document{{"_id", 0}}};
+    std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = DocumentSourceMock::create(std::move(inputs));
 
     Document to0from1{{"_id", "a"}, {"to", 0}, {"from", 1}};
     Document to0from2{{"_id", "a"}, {"to", 0}, {"from", 2}};
     Document to1{{"_id", "b"}, {"to", 1}};
     Document to2{{"_id", "c"}, {"to", 2}};
-    std::deque<Document> fromContents{to1, to2, to0from1, to0from2};
+    std::deque<DocumentSource::GetNextResult> fromContents{
+        Document(to1), Document(to2), Document(to0from1), Document(to0from2)};
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};

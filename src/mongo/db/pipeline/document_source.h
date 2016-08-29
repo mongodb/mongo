@@ -1037,8 +1037,8 @@ private:
  */
 class DocumentSourceMock : public DocumentSource {
 public:
-    DocumentSourceMock(std::deque<Document> docs);
-    DocumentSourceMock(std::deque<Document> docs,
+    DocumentSourceMock(std::deque<GetNextResult> results);
+    DocumentSourceMock(std::deque<GetNextResult> results,
                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     GetNextResult getNext() override;
@@ -1054,8 +1054,10 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceMock> create();
 
-    static boost::intrusive_ptr<DocumentSourceMock> create(const Document& doc);
-    static boost::intrusive_ptr<DocumentSourceMock> create(std::deque<Document> documents);
+    static boost::intrusive_ptr<DocumentSourceMock> create(Document doc);
+
+    static boost::intrusive_ptr<DocumentSourceMock> create(const GetNextResult& result);
+    static boost::intrusive_ptr<DocumentSourceMock> create(std::deque<GetNextResult> results);
 
     static boost::intrusive_ptr<DocumentSourceMock> create(const char* json);
     static boost::intrusive_ptr<DocumentSourceMock> create(
@@ -1079,7 +1081,7 @@ public:
     }
 
     // Return documents from front of queue.
-    std::deque<Document> queue;
+    std::deque<GetNextResult> queue;
 
     bool isDisposed = false;
     bool isDetachedFromOpCtx = false;

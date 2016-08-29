@@ -104,7 +104,7 @@ protected:
         return "index";
     }
 
-    virtual deque<Document> inputData() {
+    virtual deque<DocumentSource::GetNextResult> inputData() {
         return {};
     }
 
@@ -259,7 +259,7 @@ class Empty : public CheckResultsBase {};
  * passed, the document is preserved.
  */
 class EmptyArray : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONArray())};
     }
     string expectedPreservedResultSetString() const override {
@@ -275,7 +275,7 @@ class EmptyArray : public CheckResultsBase {
  * passed, the document is preserved.
  */
 class MissingValue : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0)};
     }
     string expectedPreservedResultSetString() const override {
@@ -291,7 +291,7 @@ class MissingValue : public CheckResultsBase {
  * the document is preserved.
  */
 class Null : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONNULL)};
     }
     string expectedPreservedResultSetString() const override {
@@ -307,7 +307,7 @@ class Null : public CheckResultsBase {
  * passed, the document is preserved.
  */
 class Undefined : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONUndefined)};
     }
     string expectedPreservedResultSetString() const override {
@@ -320,7 +320,7 @@ class Undefined : public CheckResultsBase {
 
 /** Unwind an array with one value. */
 class OneValue : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(1))};
     }
     string expectedResultSetString() const override {
@@ -333,7 +333,7 @@ class OneValue : public CheckResultsBase {
 
 /** Unwind an array with two values. */
 class TwoValues : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(1 << 2))};
     }
     string expectedResultSetString() const override {
@@ -346,7 +346,7 @@ class TwoValues : public CheckResultsBase {
 
 /** Unwind an array with two values, one of which is null. */
 class ArrayWithNull : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(1 << BSONNULL))};
     }
     string expectedResultSetString() const override {
@@ -359,7 +359,7 @@ class ArrayWithNull : public CheckResultsBase {
 
 /** Unwind two documents with arrays. */
 class TwoDocuments : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(1 << 2)),
                 DOC("_id" << 1 << "a" << DOC_ARRAY(3 << 4))};
     }
@@ -374,7 +374,7 @@ class TwoDocuments : public CheckResultsBase {
 
 /** Unwind an array in a nested document. */
 class NestedArray : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC("b" << DOC_ARRAY(1 << 2) << "c" << 3))};
     }
     string unwindFieldPath() const override {
@@ -394,7 +394,7 @@ class NestedArray : public CheckResultsBase {
  * preserveNullAndEmptyArrays is specified.
  */
 class NonObjectParent : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << 4)};
     }
     string unwindFieldPath() const override {
@@ -410,7 +410,7 @@ class NonObjectParent : public CheckResultsBase {
 
 /** Unwind an array in a doubly nested document. */
 class DoubleNestedArray : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a"
                           << DOC("b" << DOC("d" << DOC_ARRAY(1 << 2) << "e" << 4) << "c" << 3))};
     }
@@ -428,7 +428,7 @@ class DoubleNestedArray : public CheckResultsBase {
 
 /** Unwind several documents in a row. */
 class SeveralDocuments : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(1 << 2 << 3)),
                 DOC("_id" << 1),
                 DOC("_id" << 2),
@@ -469,7 +469,7 @@ class SeveralDocuments : public CheckResultsBase {
 
 /** Unwind several more documents in a row. */
 class SeveralMoreDocuments : public CheckResultsBase {
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << BSONNULL),
                 DOC("_id" << 1),
                 DOC("_id" << 2 << "a" << DOC_ARRAY("a"
@@ -535,7 +535,7 @@ class IncludeArrayIndexSubObject : public CheckResultsBase {
     string indexPath() const override {
         return "b.index";
     }
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(0) << "b" << DOC("x" << 100)),
                 DOC("_id" << 1 << "a" << 1 << "b" << DOC("x" << 100)),
                 DOC("_id" << 2 << "b" << DOC("x" << 100))};
@@ -563,7 +563,7 @@ class IncludeArrayIndexOverrideExisting : public CheckResultsBase {
     string indexPath() const override {
         return "b";
     }
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(0) << "b" << 100),
                 DOC("_id" << 1 << "a" << 1 << "b" << 100),
                 DOC("_id" << 2 << "b" << 100)};
@@ -589,7 +589,7 @@ class IncludeArrayIndexOverrideExistingNested : public CheckResultsBase {
     string indexPath() const override {
         return "b.index";
     }
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << DOC_ARRAY(0) << "b" << 100),
                 DOC("_id" << 1 << "a" << 1 << "b" << 100),
                 DOC("_id" << 2 << "b" << 100)};
@@ -618,7 +618,7 @@ class IncludeArrayIndexOverrideUnwindPath : public CheckResultsBase {
     string indexPath() const override {
         return "a";
     }
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {
             DOC("_id" << 0 << "a" << DOC_ARRAY(5)), DOC("_id" << 1 << "a" << 1), DOC("_id" << 2)};
     }
@@ -644,7 +644,7 @@ class IncludeArrayIndexWithinUnwindPath : public CheckResultsBase {
     string indexPath() const override {
         return "a.index";
     }
-    deque<Document> inputData() override {
+    deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a"
                           << DOC_ARRAY(100 << DOC("b" << 1) << DOC("b" << 1 << "index" << -1)))};
     }

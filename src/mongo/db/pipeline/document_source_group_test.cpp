@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <deque>
 #include <map>
 #include <string>
 #include <vector>
@@ -53,6 +54,7 @@ namespace mongo {
 
 namespace {
 using boost::intrusive_ptr;
+using std::deque;
 using std::map;
 using std::string;
 using std::vector;
@@ -391,7 +393,7 @@ public:
     }
 
 protected:
-    virtual std::deque<Document> inputData() {
+    virtual deque<DocumentSource::GetNextResult> inputData() {
         return {};
     }
     virtual BSONObj groupSpec() {
@@ -444,7 +446,7 @@ class EmptyCollection : public CheckResultsBase {};
 
 /** A $group performed on a single document. */
 class SingleDocument : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("a" << 1)};
     }
     virtual BSONObj groupSpec() {
@@ -458,7 +460,7 @@ class SingleDocument : public CheckResultsBase {
 
 /** A $group performed on two values for a single key. */
 class TwoValuesSingleKey : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("a" << 1), DOC("a" << 2)};
     }
     virtual BSONObj groupSpec() {
@@ -472,7 +474,7 @@ class TwoValuesSingleKey : public CheckResultsBase {
 
 /** A $group performed on two values with one key each. */
 class TwoValuesTwoKeys : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("_id" << 0 << "a" << 1), DOC("_id" << 1 << "a" << 2)};
     }
     virtual BSONObj groupSpec() {
@@ -489,7 +491,7 @@ class TwoValuesTwoKeys : public CheckResultsBase {
 
 /** A $group performed on two values with two keys each. */
 class FourValuesTwoKeys : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("id" << 0 << "a" << 1),
                 DOC("id" << 1 << "a" << 2),
                 DOC("id" << 0 << "a" << 3),
@@ -509,7 +511,7 @@ class FourValuesTwoKeys : public CheckResultsBase {
 
 /** A $group performed on two values with two keys each and two accumulator operations. */
 class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("id" << 0 << "a" << 1),
                 DOC("id" << 1 << "a" << 2),
                 DOC("id" << 0 << "a" << 3),
@@ -531,7 +533,7 @@ class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
 
 /** Null and undefined _id values are grouped together. */
 class GroupNullUndefinedIds : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("a" << BSONNULL << "b" << 100), DOC("b" << 10)};
     }
     virtual BSONObj groupSpec() {
@@ -548,7 +550,7 @@ class GroupNullUndefinedIds : public CheckResultsBase {
 
 /** A complex _id expression. */
 class ComplexId : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("a"
                     << "de"
                     << "b"
@@ -579,7 +581,7 @@ class ComplexId : public CheckResultsBase {
 
 /** An undefined accumulator value is dropped. */
 class UndefinedAccumulatorValue : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {Document()};
     }
     virtual BSONObj groupSpec() {
@@ -954,7 +956,7 @@ public:
  * SERVER-6766
  */
 class StringConstantIdAndAccumulatorExpressions : public CheckResultsBase {
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {Document()};
     }
     BSONObj groupSpec() {
@@ -974,7 +976,7 @@ public:
         // Run standard base tests.
         CheckResultsBase::run();
     }
-    std::deque<Document> inputData() {
+    deque<DocumentSource::GetNextResult> inputData() {
         return {Document()};
     }
     BSONObj groupSpec() {

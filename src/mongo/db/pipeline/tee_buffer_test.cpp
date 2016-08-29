@@ -64,25 +64,25 @@ TEST(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
 }
 
 TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
-    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
+    std::deque<DocumentSource::GetNextResult> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = DocumentSourceMock::create(inputDocs);
     auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
 
     auto next = teeBuffer->getNext(0);
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.front());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.front().getDocument());
 
     next = teeBuffer->getNext(0);
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.back());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.back().getDocument());
 
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
 }
 
 TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
-    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
+    std::deque<DocumentSource::GetNextResult> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = DocumentSourceMock::create(inputDocs);
 
     const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
@@ -91,18 +91,18 @@ TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
 
     auto next = teeBuffer->getNext(0);
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.front());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.front().getDocument());
 
     next = teeBuffer->getNext(0);
     ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.back());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.back().getDocument());
 
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
 }
 
 TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsumers) {
-    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
+    std::deque<DocumentSource::GetNextResult> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = DocumentSourceMock::create(inputDocs);
 
     const size_t nConsumers = 2;
@@ -112,19 +112,19 @@ TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsume
 
     auto next0 = teeBuffer->getNext(0);
     ASSERT_TRUE(next0.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.front());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.front().getDocument());
 
     ASSERT_TRUE(teeBuffer->getNext(0).isPaused());  // Consumer #1 hasn't seen the first doc yet.
     ASSERT_TRUE(teeBuffer->getNext(0).isPaused());
 
     auto next1 = teeBuffer->getNext(1);
     ASSERT_TRUE(next1.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next1.getDocument(), inputDocs.front());
+    ASSERT_DOCUMENT_EQ(next1.getDocument(), inputDocs.front().getDocument());
 
     // Both consumers should be able to advance now. We'll advance consumer #1.
     next1 = teeBuffer->getNext(1);
     ASSERT_TRUE(next1.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next1.getDocument(), inputDocs.back());
+    ASSERT_DOCUMENT_EQ(next1.getDocument(), inputDocs.back().getDocument());
 
     // Consumer #1 should be blocked now. The next input is EOF, but the TeeBuffer didn't get that
     // far, since the first doc filled up the buffer.
@@ -134,7 +134,7 @@ TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsume
     // Now exhaust consumer #0.
     next0 = teeBuffer->getNext(0);
     ASSERT_TRUE(next0.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.back());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.back().getDocument());
 
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
@@ -145,7 +145,7 @@ TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsume
 }
 
 TEST(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDisposed) {
-    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
+    std::deque<DocumentSource::GetNextResult> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = DocumentSourceMock::create(inputDocs);
 
     const size_t nConsumers = 2;
@@ -155,7 +155,7 @@ TEST(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDisp
 
     auto next0 = teeBuffer->getNext(0);
     ASSERT_TRUE(next0.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.front());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.front().getDocument());
 
     ASSERT_TRUE(teeBuffer->getNext(0).isPaused());  // Consumer #1 hasn't seen the first doc yet.
     ASSERT_TRUE(teeBuffer->getNext(0).isPaused());
@@ -166,7 +166,7 @@ TEST(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDisp
     // Consumer #0 should be able to advance now.
     next0 = teeBuffer->getNext(0);
     ASSERT_TRUE(next0.isAdvanced());
-    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.back());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.back().getDocument());
 
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
     ASSERT_TRUE(teeBuffer->getNext(0).isEOF());

@@ -55,6 +55,7 @@ bool isMongos() {
 namespace {
 
 using boost::intrusive_ptr;
+using std::deque;
 using std::string;
 using std::vector;
 
@@ -184,7 +185,7 @@ TEST_F(DocumentSourceSortTest, OutputSort) {
 
 class DocumentSourceSortExecutionTest : public DocumentSourceSortTest {
 public:
-    void checkResults(std::deque<Document> inputDocs,
+    void checkResults(deque<DocumentSource::GetNextResult> inputDocs,
                       BSONObj sortSpec,
                       string expectedResultSetString) {
         createSort(sortSpec);

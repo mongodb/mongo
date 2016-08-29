@@ -40,9 +40,11 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+using std::deque;
+using std::vector;
 
 // Crutch.
 bool isMongos() {
@@ -193,7 +195,8 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
 
     auto facetStage = DocumentSourceFacet::create({{"results", pipeline}}, ctx);
 
-    deque<Document> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
+    deque<DocumentSource::GetNextResult> inputs = {
+        Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
     auto mock = DocumentSourceMock::create(inputs);
     facetStage->setSource(mock.get());
 
@@ -220,14 +223,18 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
     auto facetStage =
         DocumentSourceFacet::create({{"first", firstPipeline}, {"second", secondPipeline}}, ctx);
 
-    deque<Document> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
+    deque<DocumentSource::GetNextResult> inputs = {
+        Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}};
     auto mock = DocumentSourceMock::create(inputs);
     facetStage->setSource(mock.get());
 
     auto output = facetStage->getNext();
 
     // The output fields are in no guaranteed order.
-    vector<Value> expectedOutputs(inputs.begin(), inputs.end());
+    vector<Value> expectedOutputs;
+    for (auto&& input : inputs) {
+        expectedOutputs.emplace_back(input.releaseDocument());
+    }
     ASSERT(output.isAdvanced());
     ASSERT_EQ(output.getDocument().size(), 2UL);
     ASSERT_VALUE_EQ(output.getDocument()["first"], Value(expectedOutputs));
@@ -252,19 +259,23 @@ TEST_F(DocumentSourceFacetTest,
     auto facetStage =
         DocumentSourceFacet::create({{"all", passthroughPipe}, {"first", limitedPipe}}, ctx);
 
-    deque<Document> inputs = {
+    deque<DocumentSource::GetNextResult> inputs = {
         Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}, Document{{"_id", 3}}};
     auto mock = DocumentSourceMock::create(inputs);
     facetStage->setSource(mock.get());
 
+    vector<Value> expectedPassthroughOutput;
+    for (auto&& input : inputs) {
+        expectedPassthroughOutput.emplace_back(input.getDocument());
+    }
     auto output = facetStage->getNext();
 
     // The output fields are in no guaranteed order.
     ASSERT(output.isAdvanced());
     ASSERT_EQ(output.getDocument().size(), 2UL);
-    vector<Value> expectedPassthroughOutput(inputs.begin(), inputs.end());
     ASSERT_VALUE_EQ(output.getDocument()["all"], Value(expectedPassthroughOutput));
-    ASSERT_VALUE_EQ(output.getDocument()["first"], Value(vector<Value>{Value(inputs.front())}));
+    ASSERT_VALUE_EQ(output.getDocument()["first"],
+                    Value(vector<Value>{Value(expectedPassthroughOutput.front())}));
 
     // Should be exhausted now.
     ASSERT(facetStage->getNext().isEOF());
@@ -281,7 +292,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
 
     auto facetStage = DocumentSourceFacet::create({{"subPipe", pipeline}}, ctx);
 
-    deque<Document> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}};
+    deque<DocumentSource::GetNextResult> inputs = {Document{{"_id", 0}}, Document{{"_id", 1}}};
     auto mock = DocumentSourceMock::create(inputs);
     facetStage->setSource(mock.get());
 

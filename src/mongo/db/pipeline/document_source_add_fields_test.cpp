@@ -55,8 +55,7 @@ using AddFieldsTest = AggregationContextFixture;
 TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewFields) {
     auto addFields =
         DocumentSourceAddFields::create(BSON("e" << 2 << "b" << BSON("c" << 3)), getExpCtx());
-    auto mock =
-        DocumentSourceMock::create({Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}}});
+    auto mock = DocumentSourceMock::create(Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}});
     addFields->setSource(mock.get());
 
     auto next = addFields->getNext();
