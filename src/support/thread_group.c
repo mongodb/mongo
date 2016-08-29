@@ -206,8 +206,7 @@ err:	/*
 	 */
 	if (ret != 0) {
 		WT_TRET(__wt_thread_group_destroy(session, group));
-		WT_PANIC_RET(session, ret,
-		    "Error while resizing thread group");
+		WT_PANIC_RET(session, ret, "Error while resizing thread group");
 	}
 	return (ret);
 }
@@ -229,8 +228,7 @@ __wt_thread_group_resize(
 	    group, group->min, new_min, group->max, new_max);
 
 	__wt_writelock(session, group->lock);
-	WT_TRET(__thread_group_resize(
-	    session, group, new_min, new_max, flags));
+	WT_TRET(__thread_group_resize(session, group, new_min, new_max, flags));
 	__wt_writeunlock(session, group->lock);
 	return (ret);
 }
@@ -283,16 +281,14 @@ err:	if (ret != 0) {
  *	Shut down a thread group.  Our caller must hold the lock.
  */
 int
-__wt_thread_group_destroy(
-    WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
+__wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 {
 	WT_DECL_RET;
 
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
 	    "Destroying thread group: %p\n", group);
 
-	WT_ASSERT(session,
-	    __wt_rwlock_islocked(session, group->lock));
+	WT_ASSERT(session, __wt_rwlock_islocked(session, group->lock));
 
 	/* Shut down all threads and free associated resources. */
 	WT_TRET(__thread_group_shrink(session, group, 0));
