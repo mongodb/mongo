@@ -51,6 +51,12 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
         else:
             addr_base = soinfo.get("vmaddr", "0")
         addr = long(addr_base, 16) + long(frame["o"], 16)
+        # addr currently points to the return address which is the one *after* the call. x86 is
+        # variable length so going backwards is difficult. However llvm-symbolizer seems to do the
+        # right thing if we just subtract 1 byte here. This has the downside of also adjusting the
+        # address of instructions that cause signals (such as segfaults and divide-by-zero) which
+        # are already correct, but there doesn't seem to be a reliable way to detect that case.
+        addr -= 1
         frames.append(dict(path=dbg_path_resolver.get_dbg_file(soinfo),
                            buildId=soinfo.get("buildId", None),
                            offset=frame["o"],
@@ -145,7 +151,7 @@ def classic_output(frames, outfile, **kwargs):
         symbinfo = frame["symbinfo"]
         if len(symbinfo) > 0:
             for sframe in symbinfo:
-                outfile.write(" %(file)s:%(line)s  %(fn)s\n" % sframe)
+                outfile.write(" %(file)s:%(line)s:%(column)s: %(fn)s\n" % sframe)
         else:
             outfile.write(" %(path)s!!!\n" % symbinfo)
 
