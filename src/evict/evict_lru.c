@@ -573,7 +573,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		if (cache->evict_empty_score < WT_EVICT_EMPTY_SCORE_CUTOFF ||
 		    (!WT_EVICT_HAS_WORKERS(session) &&
 		    !__evict_queue_empty(cache->evict_urgent_queue)))
-			WT_RET_NOTFOUND_OK(__evict_lru_pages(session, true));
+			WT_RET(__evict_lru_pages(session, true));
 
 		/*
 		 * If we're making progress, keep going; if we're not making
@@ -801,12 +801,10 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 
 	/* If a worker thread found the queue empty, pause. */
 	if (ret == WT_NOTFOUND && !is_server &&
-	    F_ISSET(S2C(session), WT_CONN_EVICTION_RUN)) {
-		ret = 0;
+	    F_ISSET(S2C(session), WT_CONN_EVICTION_RUN))
 		__wt_cond_wait(session, conn->evict_threads.wait_cond, 10000);
-	}
 
-	return (ret);
+	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*

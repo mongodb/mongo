@@ -10,7 +10,7 @@ compression="snappy"
 populate_threads=1
 checkpoint_interval=60
 checkpoint_threads=1
-report_interval=5
+report_interval=10
 # Run for a longer duration to ensure checkpoints are completing.
 run_time=600
 # MongoDB always has multiple tables, and checkpoints behave differently when
@@ -18,3 +18,6 @@ run_time=600
 table_count=2
 threads=((count=6,updates=1))
 value_sz=1000
+sample_interval=10
+sample_rate=1
+warmup=120
