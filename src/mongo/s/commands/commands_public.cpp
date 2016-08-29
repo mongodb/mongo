@@ -1786,7 +1786,7 @@ public:
             return appendCommandStatus(result, conf.getStatus());
         }
 
-        const NamespaceString targetNss(parseNs(dbName, cmdObj));
+        const NamespaceString targetNss(parseNsCollectionRequired(dbName, cmdObj));
         const NamespaceString commandNss =
             NamespaceString::makeListIndexesNSS(targetNss.db(), targetNss.coll());
         dassert(targetNss == commandNss.getTargetNSForListIndexes());
