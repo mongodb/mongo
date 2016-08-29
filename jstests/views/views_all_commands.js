@@ -525,7 +525,7 @@
         updateUser: {skip: isUnrelated},
         updateZoneKeyRange: {skip: isUnrelated},
         usersInfo: {skip: isUnrelated},
-        validate: {command: {validate: "view"}, skip: "TODO(SERVER-24768)"},
+        validate: {command: {validate: "view"}, expectFailure: true},
         whatsmyuri: {skip: isUnrelated}
     };
 

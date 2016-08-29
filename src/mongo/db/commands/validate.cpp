@@ -114,6 +114,11 @@ public:
         Lock::CollectionLock collLk(txn->lockState(), ns_string.ns(), MODE_X);
         Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(ns_string) : NULL;
         if (!collection) {
+            if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(txn, ns_string.ns())) {
+                errmsg = "Cannot validate a view";
+                return appendCommandStatus(result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
+            }
+
             errmsg = "ns not found";
             return false;
         }
