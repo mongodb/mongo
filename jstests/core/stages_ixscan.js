@@ -11,6 +11,17 @@ for (var i = 0; i < N; ++i) {
 t.ensureIndex({foo: 1});
 t.ensureIndex({foo: 1, baz: 1});
 
+// Test that stageDebug fails if neither the keyPattern nor the index name are present.
+assert.commandFailed(db.runCommand({
+    stageDebug: {
+        collection: collname,
+        plan: {
+            ixscan:
+                {args: {startKey: {"": 20, endKey: {}, endKeyInclusive: true, direction: -1}}}
+        }
+    }
+}));
+
 // foo <= 20
 ixscan1 = {
     ixscan: {

@@ -293,6 +293,9 @@ public:
                         indexes.size() == 1);
                 desc = indexes[0];
             } else {
+                uassert(40306,
+                        str::stream() << "Index 'name' must be a string in: " << nodeArgs,
+                        nodeArgs["name"].type() == BSONType::String);
                 StringData name = nodeArgs["name"].valueStringData();
                 desc = collection->getIndexCatalog()->findIndexByName(txn, name);
                 uassert(40223, str::stream() << "Can't find index: " << name.toString(), desc);
