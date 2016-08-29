@@ -69,7 +69,7 @@
     assert.writeOK(bulk.execute());
 
     // Make sure the right amount of data is there
-    assert.eq(coll.count({my: 'test'}), toInsert / 2);
+    assert.eq(coll.find().itcount({my: 'test'}), toInsert / 2);
 
     st.stop();
 })();
