@@ -318,9 +318,9 @@ private:
     void _pauseApplier();
 
     StatusWith<Operations> _getNextApplierBatch_inlock();
-    void _onApplyBatchFinish(const StatusWith<Timestamp>&,
-                             const Operations&,
-                             const size_t numApplied);
+    void _onApplyBatchFinish(const Status& status,
+                             OpTimeWithHash lastApplied,
+                             std::size_t numApplied);
 
     // Called when the DatabasesCloner finishes.
     void _onDataClonerFinish(const Status& status, HostAndPort syncSource);

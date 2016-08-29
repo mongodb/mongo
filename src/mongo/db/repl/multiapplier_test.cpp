@@ -77,7 +77,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
         return Status(ErrorCodes::InternalError, "not implemented");
     };
-    auto callback = [](const StatusWith<Timestamp>&, const MultiApplier::Operations&) {};
+    auto callback = [](const Status&) {};
 
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -146,13 +146,8 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
         return operations.back().getOpTime();
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
-        callbackResult = result;
-        operationsApplied = operations;
-    };
+    auto callbackResult = getDetectableErrorStatus();
+    auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
     {
@@ -170,8 +165,6 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
     ASSERT_FALSE(multiApplyInvoked);
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, callbackResult);
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
@@ -187,13 +180,8 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
         return multiApplyError;
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
-        callbackResult = result;
-        operationsApplied = operations;
-    };
+    auto callbackResult = getDetectableErrorStatus();
+    auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
@@ -207,8 +195,6 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     ASSERT_TRUE(multiApplyInvoked);
 
     ASSERT_EQUALS(multiApplyError, callbackResult);
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCallbackStatus) {
@@ -225,13 +211,8 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
         return operations.back().getOpTime();
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
-        callbackResult = result;
-        operationsApplied = operations;
-    };
+    auto callbackResult = getDetectableErrorStatus();
+    auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
@@ -245,8 +226,6 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
     ASSERT_TRUE(multiApplyInvoked);
 
     ASSERT_EQUALS(multiApplyError, callbackResult);
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(
@@ -265,13 +244,10 @@ TEST_F(
         return operationsToApply.back().getOpTime();
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
+    auto callbackResult = getDetectableErrorStatus();
     OperationContext* callbackTxn = nullptr;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
+    auto callback = [&](const Status& result) {
         callbackResult = result;
-        operationsApplied = operations;
         callbackTxn = cc().getOperationContext();
     };
 
@@ -289,9 +265,6 @@ TEST_F(
     ASSERT_BSONOBJ_EQ(operations[0].raw, operationsToApply[0].raw);
 
     ASSERT_OK(callbackResult);
-    ASSERT_EQUALS(operations.back().getOpTime().getTimestamp(), callbackResult.getValue());
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsApplied[0].raw);
     ASSERT_FALSE(callbackTxn);
 }
 

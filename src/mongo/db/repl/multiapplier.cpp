@@ -132,7 +132,7 @@ void MultiApplier::join() {
 
 void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
     if (!cbd.status.isOK()) {
-        _finishCallback(cbd.status, _operations);
+        _finishCallback(cbd.status);
         return;
     }
 
@@ -145,15 +145,10 @@ void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
     } catch (...) {
         applyStatus = exceptionToStatus();
     }
-    if (!applyStatus.isOK()) {
-        _finishCallback(applyStatus.getStatus(), _operations);
-        return;
-    }
-    _finishCallback(applyStatus.getValue().getTimestamp(), _operations);
+    _finishCallback(applyStatus.getStatus());
 }
 
-void MultiApplier::_finishCallback(const StatusWith<Timestamp>& result,
-                                   const Operations& operations) {
+void MultiApplier::_finishCallback(const Status& result) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _active = false;
     _condition.notify_all();
@@ -161,19 +156,18 @@ void MultiApplier::_finishCallback(const StatusWith<Timestamp>& result,
     lk.unlock();
 
     // This instance may be destroyed during the "finish" call.
-    finish(result, operations);
+    finish(result);
 }
 
 namespace {
 
-void pauseBeforeCompletion(const StatusWith<Timestamp>& result,
-                           const MultiApplier::Operations& operationsOnCompletion,
+void pauseBeforeCompletion(const Status& result,
                            const PauseDataReplicatorFn& pauseDataReplicator,
                            const MultiApplier::CallbackFn& onCompletion) {
     if (result.isOK()) {
         pauseDataReplicator();
     }
-    onCompletion(result, operationsOnCompletion);
+    onCompletion(result);
 };
 
 }  // namespace
@@ -216,7 +210,6 @@ StatusWith<std::pair<std::unique_ptr<MultiApplier>, MultiApplier::Operations>> a
                                                            multiApply,
                                                            stdx::bind(pauseBeforeCompletion,
                                                                       stdx::placeholders::_1,
-                                                                      stdx::placeholders::_2,
                                                                       pauseDataReplicator,
                                                                       onCompletion))),
             operationsNotInRange);

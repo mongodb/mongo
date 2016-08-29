@@ -1118,21 +1118,25 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     return std::move(ops);
 }
 
-void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
-                                         const Operations& ops,
-                                         const size_t numApplied) {
+void DataReplicator::_onApplyBatchFinish(const Status& status,
+                                         OpTimeWithHash lastApplied,
+                                         std::size_t numApplied) {
+    if (ErrorCodes::CallbackCanceled == status) {
+        return;
+    }
+
     UniqueLock lk(_mutex);
     _applierActive = false;
 
-    if (!ts.isOK()) {
+    if (!status.isOK()) {
         switch (_state) {
             case DataReplicatorState::InitialSync:
-                error() << "Failed to apply batch due to '" << ts.getStatus() << "'";
-                _initialSyncState->status = ts.getStatus();
+                error() << "Failed to apply batch due to '" << status << "'";
+                _initialSyncState->status = status;
                 _exec->signalEvent(_initialSyncState->finishEvent);
                 return;
             default:
-                fassertFailedWithStatusNoTrace(40190, ts.getStatus());
+                fassertFailedWithStatusNoTrace(40190, status);
                 break;
         }
     }
@@ -1141,10 +1145,7 @@ void DataReplicator::_onApplyBatchFinish(const StatusWith<Timestamp>& ts,
         _initialSyncState->appliedOps += numApplied;
     }
 
-    // TODO: Change OplogFetcher to pass in a OpTimeWithHash, and wire up here instead of parsing.
-    const auto lastEntry = ops.back().raw;
-    const auto opTimeWithHashStatus = parseOpTimeWithHash(lastEntry);
-    _lastApplied = uassertStatusOK(opTimeWithHashStatus);
+    _lastApplied = lastApplied;
     lk.unlock();
 
     _opts.setMyLastOptime(_lastApplied.opTime);
@@ -1225,13 +1226,15 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
                                    stdx::placeholders::_2,
                                    stdx::placeholders::_3);
 
-    auto lambda = [this](const StatusWith<Timestamp>& ts, const Operations& theOps) {
-        if (ErrorCodes::CallbackCanceled == ts) {
-            return;
-        }
-
-        _onApplyBatchFinish(ts, theOps, theOps.size());
-    };
+    const auto lastEntry = ops.back().raw;
+    const auto opTimeWithHashStatus = parseOpTimeWithHash(lastEntry);
+    auto lastApplied = uassertStatusOK(opTimeWithHashStatus);
+    auto numApplied = ops.size();
+    auto lambda = stdx::bind(&DataReplicator::_onApplyBatchFinish,
+                             this,
+                             stdx::placeholders::_1,
+                             lastApplied,
+                             numApplied);
 
     invariant(!(_applier && _applier->isActive()));
     _applier = stdx::make_unique<MultiApplier>(_exec, ops, applierFn, multiApplyFn, lambda);

@@ -61,12 +61,9 @@ public:
     using OperationPtrs = std::vector<const OplogEntry*>;
 
     /**
-     * Callback function to report final status of applying operations along with
-     * list of operations (if applicable) that were not successfully applied.
-     * On success, returns the timestamp of the last operation applied together with an empty
-     * list of operations.
+     * Callback function to report final status of applying operations.
      */
-    using CallbackFn = stdx::function<void(const StatusWith<Timestamp>&, const Operations&)>;
+    using CallbackFn = stdx::function<void(const Status&)>;
 
     /**
      * Type of function to to apply a single operation. In production, this function
@@ -141,7 +138,7 @@ private:
      * DB worker callback function - applies all operations.
      */
     void _callback(const executor::TaskExecutor::CallbackArgs& cbd);
-    void _finishCallback(const StatusWith<Timestamp>& result, const Operations& operations);
+    void _finishCallback(const Status& result);
 
     // Not owned by us.
     executor::TaskExecutor* _executor;
