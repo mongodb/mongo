@@ -60,6 +60,14 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
                                   << " of type "
                                   << typeName(elem.type()),
                     elem.type() == BSONType::Object);
+            if (!elem["histograms"].eoo()) {
+                uassert(40305,
+                        str::stream() << "histograms option to latencyStats must be bool, got "
+                                      << elem
+                                      << "of type "
+                                      << typeName(elem.type()),
+                        elem["histograms"].isBoolean());
+            }
         } else if ("storageStats" == fieldName) {
             uassert(40279,
                     str::stream() << "storageStats argument must be an object, but got " << elem
@@ -85,8 +93,14 @@ boost::optional<Document> DocumentSourceCollStats::getNext() {
     BSONObjBuilder builder;
     builder.append("ns", pExpCtx->ns.ns());
     builder.appendDate("localTime", jsTime());
+
     if (_collStatsSpec.hasField("latencyStats")) {
-        _mongod->appendLatencyStats(pExpCtx->ns, &builder);
+        // If the latencyStats field exists, it must have been validated as an object when parsing.
+        bool includeHistograms = false;
+        if (_collStatsSpec["latencyStats"].type() == BSONType::Object) {
+            includeHistograms = _collStatsSpec["latencyStats"]["histograms"].boolean();
+        }
+        _mongod->appendLatencyStats(pExpCtx->ns, includeHistograms, &builder);
     }
 
     if (_collStatsSpec.hasField("storageStats")) {

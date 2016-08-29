@@ -377,6 +377,7 @@ public:
          * Appends operation latency statistics for collection "nss" to "builder"
          */
         virtual void appendLatencyStats(const NamespaceString& nss,
+                                        bool includeHistograms,
                                         BSONObjBuilder* builder) const = 0;
 
         /**

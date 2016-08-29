@@ -54,7 +54,7 @@ TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
         hist.increment(i, Command::ReadWriteType::kCommand);
     }
     BSONObjBuilder outBuilder;
-    hist.append(&outBuilder);
+    hist.append(false, &outBuilder);
     BSONObj out = outBuilder.done();
     ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets);
     ASSERT_EQUALS(out["writes"]["ops"].Long(), kMaxBuckets);
@@ -75,7 +75,7 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
     // The additional +1 because of the first boundary.
     uint64_t expectedSum = 3 * std::accumulate(kLowerBounds.begin(), kLowerBounds.end(), 0ULL) + 1;
     BSONObjBuilder outBuilder;
-    hist.append(&outBuilder);
+    hist.append(true, &outBuilder);
     BSONObj out = outBuilder.done();
     ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 

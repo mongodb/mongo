@@ -85,7 +85,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const final {
+    void appendLatencyStats(const NamespaceString& nss,
+                            bool showHistograms,
+                            BSONObjBuilder* builder) const final {
         MONGO_UNREACHABLE;
     }
 

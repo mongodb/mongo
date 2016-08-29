@@ -93,29 +93,31 @@ const std::array<uint64_t, OperationLatencyHistogram::kMaxBuckets>
 
 void OperationLatencyHistogram::_append(const HistogramData& data,
                                         const char* key,
+                                        bool includeHistograms,
                                         BSONObjBuilder* builder) const {
 
     BSONObjBuilder histogramBuilder(builder->subobjStart(key));
-    BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
-    for (int i = 0; i < kMaxBuckets; i++) {
-        if (data.buckets[i] == 0)
-            continue;
-        BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
-        entryBuilder.append("micros", static_cast<long long>(kLowerBounds[i]));
-        entryBuilder.append("count", static_cast<long long>(data.buckets[i]));
-        entryBuilder.doneFast();
+    if (includeHistograms) {
+        BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
+        for (int i = 0; i < kMaxBuckets; i++) {
+            if (data.buckets[i] == 0)
+                continue;
+            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
+            entryBuilder.append("micros", static_cast<long long>(kLowerBounds[i]));
+            entryBuilder.append("count", static_cast<long long>(data.buckets[i]));
+            entryBuilder.doneFast();
+        }
+        arrayBuilder.doneFast();
     }
-
-    arrayBuilder.doneFast();
     histogramBuilder.append("latency", static_cast<long long>(data.sum));
     histogramBuilder.append("ops", static_cast<long long>(data.entryCount));
     histogramBuilder.doneFast();
 }
 
-void OperationLatencyHistogram::append(BSONObjBuilder* builder) const {
-    _append(_reads, "reads", builder);
-    _append(_writes, "writes", builder);
-    _append(_commands, "commands", builder);
+void OperationLatencyHistogram::append(bool includeHistograms, BSONObjBuilder* builder) const {
+    _append(_reads, "reads", includeHistograms, builder);
+    _append(_writes, "writes", includeHistograms, builder);
+    _append(_commands, "commands", includeHistograms, builder);
 }
 
 // Computes the log base 2 of value, and checks for cases of split buckets.

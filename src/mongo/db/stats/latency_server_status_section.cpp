@@ -25,56 +25,37 @@
  * delete this exception statement from all source files in the program,
  * then also delete it in the license file.
  */
-#pragma once
 
-#include <array>
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/stats/top.h"
 
 namespace mongo {
-
-class BSONObjBuilder;
-
+namespace {
 /**
- * Stores statistics for latencies of read, write, and command operations.
- *
- * Note: This class is not thread-safe.
+ * Appends the global histogram to the server status.
  */
-class OperationLatencyHistogram {
+class GlobalHistogramServerStatusSection final : public ServerStatusSection {
 public:
-    static const int kMaxBuckets = 51;
+    GlobalHistogramServerStatusSection() : ServerStatusSection("opLatencies") {}
 
-    // Inclusive lower bounds of the histogram buckets.
-    static const std::array<uint64_t, kMaxBuckets> kLowerBounds;
+    bool includeByDefault() const {
+        return true;
+    }
 
-    /**
-     * Increments the bucket of the histogram based on the operation type.
-     */
-    void increment(uint64_t latency, Command::ReadWriteType type);
-
-    /**
-     * Appends the three histograms with latency totals and operation counts.
-     */
-    void append(bool includeHistograms, BSONObjBuilder* builder) const;
-
-private:
-    struct HistogramData {
-        std::array<uint64_t, kMaxBuckets> buckets{};
-        uint64_t entryCount = 0;
-        uint64_t sum = 0;
-    };
-
-    static int _getBucket(uint64_t latency);
-
-    static uint64_t _getBucketMicros(int bucket);
-
-    void _append(const HistogramData& data,
-                 const char* key,
-                 bool includeHistograms,
-                 BSONObjBuilder* builder) const;
-
-    void _incrementData(uint64_t latency, int bucket, HistogramData* data);
-
-    HistogramData _reads, _writes, _commands;
-};
+    BSONObj generateSection(OperationContext* txn, const BSONElement& configElem) const {
+        BSONObjBuilder latencyBuilder;
+        bool includeHistograms = false;
+        if (configElem.type() == BSONType::Object) {
+            includeHistograms = configElem.Obj()["histograms"].trueValue();
+        }
+        Top::get(txn->getServiceContext())
+            .appendGlobalLatencyStats(includeHistograms, &latencyBuilder);
+        return latencyBuilder.obj();
+    }
+} globalHistogramServerStatusSection;
+}  // namespace
 }  // namespace mongo

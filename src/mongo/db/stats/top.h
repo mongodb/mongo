@@ -104,7 +104,7 @@ public:
     /**
      * Appends the collection-level latency statistics
      */
-    void appendLatencyStats(StringData ns, BSONObjBuilder* builder);
+    void appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder);
 
     /**
      * Increments the global histogram.
@@ -116,7 +116,7 @@ public:
     /**
      * Appends the global latency statistics.
      */
-    void appendGlobalLatencyStats(BSONObjBuilder* builder);
+    void appendGlobalLatencyStats(bool includeHistograms, BSONObjBuilder* builder);
 
 private:
     void _appendToUsageMap(BSONObjBuilder& b, const UsageMap& map) const;

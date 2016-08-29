@@ -116,8 +116,11 @@ public:
         return collection->infoCache()->getIndexUsageStats();
     }
 
-    void appendLatencyStats(const NamespaceString& nss, BSONObjBuilder* builder) const final {
-        Top::get(_ctx->opCtx->getServiceContext()).appendLatencyStats(nss.ns(), builder);
+    void appendLatencyStats(const NamespaceString& nss,
+                            bool includeHistograms,
+                            BSONObjBuilder* builder) const final {
+        Top::get(_ctx->opCtx->getServiceContext())
+            .appendLatencyStats(nss.ns(), includeHistograms, builder);
     }
 
     Status appendStorageStats(const NamespaceString& nss,

@@ -32,7 +32,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
     ],
 )
 
@@ -71,6 +70,7 @@ env.Library(
     target='serveronly',
     source=[
         "fill_locker_info.cpp",
+        "latency_server_status_section.cpp",
         "lock_server_status_section.cpp",
         "range_deleter_server_status.cpp",
         "snapshots.cpp",

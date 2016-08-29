@@ -1761,8 +1761,9 @@ DBCollection.prototype._distinct = function(keyString, query) {
     return this._dbReadCommand({distinct: this._shortName, key: keyString, query: query || {}});
 };
 
-DBCollection.prototype.latencyStats = function() {
-    return this.aggregate([{$collStats: {latencyStats: {}}}]);
+DBCollection.prototype.latencyStats = function(options) {
+    options = options || {};
+    return this.aggregate([{$collStats: {latencyStats: options}}]);
 };
 
 /**
