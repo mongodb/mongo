@@ -47,14 +47,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/util/log.h"
 
-namespace {
-bool enableViews = true;
-}  // namespace
-
 namespace mongo {
-
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableViewsParameter(
-    ServerParameterSet::getGlobal(), "enableViews", &enableViews);
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -178,8 +171,12 @@ Status ViewCatalog::createView(OperationContext* txn,
                                const BSONArray& pipeline) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (!enableViews)
-        return Status(ErrorCodes::CommandNotSupported, "View support not enabled");
+    if (serverGlobalParams.featureCompatibilityVersion.load() ==
+        ServerGlobalParams::FeatureCompatibilityVersion_32) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "Cannot create view when the featureCompatibilityVersion is 3.2. See "
+                      "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
+    }
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
@@ -200,6 +197,13 @@ Status ViewCatalog::modifyView(OperationContext* txn,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (serverGlobalParams.featureCompatibilityVersion.load() ==
+        ServerGlobalParams::FeatureCompatibilityVersion_32) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "Cannot modify view when the featureCompatibilityVersion is 3.2. See "
+                      "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
+    }
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,

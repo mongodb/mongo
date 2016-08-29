@@ -96,7 +96,7 @@ bool legalClientSystemNS(StringData ns) {
     if (ns.find(".system.js") != string::npos)
         return true;
 
-    if (nsToCollectionSubstring(ns) == "system.views")
+    if (nsToCollectionSubstring(ns) == NamespaceString::kSystemDotViewsCol)
         return true;
 
     return false;
@@ -104,6 +104,7 @@ bool legalClientSystemNS(StringData ns) {
 
 const StringData NamespaceString::kAdminDb = "admin"_sd;
 const StringData NamespaceString::kLocalDb = "local"_sd;
+constexpr StringData NamespaceString::kSystemDotViewsCol;
 
 const NamespaceString NamespaceString::kConfigCollectionNamespace(kConfigCollection);
 

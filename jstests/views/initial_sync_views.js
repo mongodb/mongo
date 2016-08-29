@@ -10,8 +10,7 @@
     let testName = "initial_sync_views";
     let hostName = getHostName();
 
-    let replTest =
-        new ReplSetTest({name: testName, nodes: 1, nodeOptions: {setParameter: "enableViews=1"}});
+    let replTest = new ReplSetTest({name: testName, nodes: 1});
     replTest.startSet();
     replTest.initiate();
 

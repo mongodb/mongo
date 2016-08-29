@@ -8,7 +8,7 @@
 (function() {
     "use strict";
 
-    let conn = MongoRunner.runMongod({setParameter: "enableViews=1"});
+    let conn = MongoRunner.runMongod({});
 
     let viewsDB = conn.getDB("views_legacy");
     assert.commandWorked(viewsDB.dropDatabase());

@@ -23,5 +23,4 @@ executor:
         oplogSize: 511
         set_parameters:
           enableTestCommands: 1
-          enableViews: 1
       num_nodes: 2

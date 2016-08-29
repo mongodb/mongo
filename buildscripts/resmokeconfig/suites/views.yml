@@ -17,4 +17,3 @@ executor:
       mongod_options:
         set_parameters:
           enableTestCommands: 1
-          enableViews: 1

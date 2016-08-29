@@ -8,11 +8,7 @@
 (function() {
     "use strict";
 
-    let st = new ShardingTest({
-        name: "views_sharded",
-        shards: 2,
-        other: {shardOptions: {setParameter: "enableViews=1"}, enableBalancer: false}
-    });
+    let st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBalancer: false}});
 
     let mongos = st.s;
     let config = mongos.getDB("config");
