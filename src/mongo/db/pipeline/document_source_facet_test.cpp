@@ -490,5 +490,49 @@ TEST_F(DocumentSourceFacetTest, ShouldThrowIfAnyPipelineRequiresTextScoreButItIs
     ASSERT_THROWS(facetStage->getDependencies(&deps), UserException);
 }
 
+/**
+ * A dummy DocumentSource which needs to run on the primary shard.
+ */
+class DocumentSourceNeedsPrimaryShard final : public DocumentSourcePassthrough {
+public:
+    bool needsPrimaryShard() const final {
+        return true;
+    }
+
+    static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create() {
+        return new DocumentSourceNeedsPrimaryShard();
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrimaryShard) {
+    auto ctx = getExpCtx();
+
+    auto passthrough = DocumentSourcePassthrough::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({passthrough}, ctx));
+
+    auto needsPrimaryShard = DocumentSourceNeedsPrimaryShard::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({needsPrimaryShard}, ctx));
+
+    auto facetStage = DocumentSourceFacet::create(
+        {{"passthrough", firstPipeline}, {"needsPrimaryShard", secondPipeline}}, ctx);
+
+    ASSERT_TRUE(facetStage->needsPrimaryShard());
+}
+
+TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPrimaryShard) {
+    auto ctx = getExpCtx();
+
+    auto firstPassthrough = DocumentSourcePassthrough::create();
+    auto firstPipeline = unittest::assertGet(Pipeline::create({firstPassthrough}, ctx));
+
+    auto secondPassthrough = DocumentSourcePassthrough::create();
+    auto secondPipeline = unittest::assertGet(Pipeline::create({secondPassthrough}, ctx));
+
+    auto facetStage =
+        DocumentSourceFacet::create({{"first", firstPipeline}, {"second", secondPipeline}}, ctx);
+
+    ASSERT_FALSE(facetStage->needsPrimaryShard());
+}
+
 }  // namespace
 }  // namespace mongo

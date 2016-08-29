@@ -53,9 +53,6 @@ class Pipeline;
  * For example, {$facet: {facetA: [{$skip: 1}], facetB: [{$limit: 1}]}} would describe a $facet
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
- *
- * TODO SERVER-24154: Should inherit from SplittableDocumentSource so that it can split in a sharded
- * cluster.
  */
 class DocumentSourceFacet final : public DocumentSourceNeedsMongod,
                                   public SplittableDocumentSource {
@@ -98,6 +95,9 @@ public:
 
     /**
      * The $facet stage must be run on the merging shard.
+     *
+     * TODO SERVER-24154: Should be smarter about splitting so that parts of the sub-pipelines can
+     * potentially be run in parallel on multiple shards.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return nullptr;
@@ -111,6 +111,7 @@ public:
     void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext(OperationContext* opCtx) final;
+    bool needsPrimaryShard() const final;
 
 private:
     DocumentSourceFacet(StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,

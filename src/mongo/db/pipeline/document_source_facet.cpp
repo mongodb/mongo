@@ -150,6 +150,18 @@ void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) 
     }
 }
 
+bool DocumentSourceFacet::needsPrimaryShard() const {
+    // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
+    // This means that if any stage in any of the $facet pipelines requires the primary shard, then
+    // the entire $facet must happen on the merger, and the merger must be the primary shard.
+    for (auto&& facet : _facetPipelines) {
+        if (facet.second->needsPrimaryShardMerger()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
     for (auto&& facet : _facetPipelines) {
         auto subDepsTracker = facet.second->getDependencies(deps->getMetadataAvailable());
