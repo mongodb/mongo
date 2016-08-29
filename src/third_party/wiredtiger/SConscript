@@ -140,8 +140,9 @@ condition_map = {
     'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
     'WINDOWS_HOST' : env.TargetOSIs('windows'),
     # This isn't perfect. But should cover for our build environments
-    'X86_HOST' : env['TARGET_ARCH'] not in ('ppc64le', 's390x'),
-    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x'
+    # See WT-2873 for planned improvements
+    'X86_HOST' : not env['TARGET_ARCH'] == 'ppc64le' and not (env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "on"),
+    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "on",
 }
 
 def filtered_filelist(f):
