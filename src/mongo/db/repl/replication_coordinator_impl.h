@@ -553,6 +553,11 @@ private:
     typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
 
     /**
+     * Appends a "replicationProgress" section with data for each member in set.
+     */
+    void _appendSlaveInfoData_inlock(BSONObjBuilder* result);
+
+    /**
      * Looks up the SlaveInfo in _slaveInfo associated with the given RID and returns a pointer
      * to it, or returns NULL if there is no SlaveInfo with the given RID.
      */

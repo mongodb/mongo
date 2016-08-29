@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -1663,6 +1664,15 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
 
         if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout &&
             elapsed > Milliseconds{writeConcern.wTimeout}) {
+
+            if (Command::testCommandsEnabled) {
+                // log state of replica set on timeout to help with diagnosis.
+                BSONObjBuilder progress;
+                _appendSlaveInfoData_inlock(&progress);
+                log() << "Replication for failed WC: " << writeConcern.toBSON()
+                      << ", waitInfo:" << waitInfo.waiter.toBSON()
+                      << ", progress: " << progress.done();
+            }
             return StatusAndDuration(
                 Status(ErrorCodes::WriteConcernFailed, "waiting for replication timed out"),
                 elapsed);
@@ -2139,6 +2149,10 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
 
 void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _appendSlaveInfoData_inlock(result);
+}
+
+void ReplicationCoordinatorImpl::_appendSlaveInfoData_inlock(BSONObjBuilder* result) {
     BSONArrayBuilder replicationProgress(result->subarrayStart("replicationProgress"));
     {
         for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end();
