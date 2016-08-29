@@ -246,8 +246,8 @@ public:
         // Return an error if execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             log() << "Plan executor error during distinct command: "
-                  << PlanExecutor::statestr(state)
-                  << ", stats: " << Explain::getWinningPlanStats(executor.getValue().get());
+                  << redact(PlanExecutor::statestr(state))
+                  << ", stats: " << redact(Explain::getWinningPlanStats(executor.getValue().get()));
 
             return appendCommandStatus(result,
                                        Status(ErrorCodes::OperationFailed,

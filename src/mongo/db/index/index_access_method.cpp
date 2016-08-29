@@ -176,8 +176,8 @@ void IndexAccessMethod::removeOneKey(OperationContext* txn,
     try {
         _newInterface->unindex(txn, key, loc, dupsAllowed);
     } catch (AssertionException& e) {
-        log() << "Assertion failure: _unindex failed " << _descriptor->indexNamespace() << endl;
-        log() << "Assertion failure: _unindex failed: " << e.what() << "  key:" << key.toString()
+        log() << "Assertion failure: _unindex failed " << _descriptor->indexNamespace();
+        log() << "Assertion failure: _unindex failed: " << redact(e) << "  key:" << key.toString()
               << "  dl:" << loc;
         logContext();
     }

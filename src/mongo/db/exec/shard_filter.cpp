@@ -91,7 +91,7 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
                                   "query planning has failed");
 
                     // Fail loudly and cleanly in production, fatally in debug
-                    error() << status.toString();
+                    error() << redact(status);
                     dassert(false);
 
                     _ws->free(*out);
@@ -101,8 +101,7 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
 
                 // Skip this document with a warning - no shard key should not be possible
                 // unless manually inserting data into a shard
-                warning() << "no shard key found in document " << member->obj.value().toString()
-                          << " "
+                warning() << "no shard key found in document " << redact(member->obj.value()) << " "
                           << "for shard key pattern " << _metadata->getKeyPattern() << ", "
                           << "document may have been inserted manually into shard";
             }

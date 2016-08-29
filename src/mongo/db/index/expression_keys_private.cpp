@@ -571,7 +571,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
 
     if (keysToAdd.size() > params.maxKeysPerInsert) {
         warning() << "Insert of geo object generated a high number of keys."
-                  << " num keys: " << keysToAdd.size() << " obj inserted: " << obj;
+                  << " num keys: " << keysToAdd.size() << " obj inserted: " << redact(obj);
     }
 
     *keys = keysToAdd;

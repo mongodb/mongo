@@ -123,12 +123,12 @@ static void extractGeometries(const BSONObj& doc,
                     // Valid geometry element
                     geometries->push_back(stored.release());
                 } else {
-                    warning() << "geoNear stage read non-geometry element " << nextEl.toString()
-                              << " in array " << el.toString();
+                    warning() << "geoNear stage read non-geometry element " << redact(nextEl)
+                              << " in array " << redact(el);
                 }
             }
         } else {
-            warning() << "geoNear stage read non-geometry element " << el.toString();
+            warning() << "geoNear stage read non-geometry element " << redact(el);
         }
     }
 }

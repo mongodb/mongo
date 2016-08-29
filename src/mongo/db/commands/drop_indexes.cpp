@@ -126,7 +126,7 @@ public:
 
         const NamespaceString toReIndexNs = parseNsCollectionRequired(dbname, jsobj);
 
-        LOG(0) << "CMD: reIndex " << toReIndexNs << endl;
+        LOG(0) << "CMD: reIndex " << toReIndexNs;
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);

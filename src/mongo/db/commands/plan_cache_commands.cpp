@@ -311,7 +311,7 @@ Status PlanCacheClear::clear(OperationContext* txn,
         if (!planCache->contains(*cq)) {
             // Log if asked to clear non-existent query shape.
             LOG(1) << ns << ": query shape doesn't exist in PlanCache - "
-                   << cq->getQueryObj().toString() << "(sort: " << cq->getQueryRequest().getSort()
+                   << redact(cq->getQueryObj()) << "(sort: " << cq->getQueryRequest().getSort()
                    << "; projection: " << cq->getQueryRequest().getProj()
                    << "; collation: " << cq->getQueryRequest().getCollation() << ")";
             return Status::OK();
@@ -322,7 +322,7 @@ Status PlanCacheClear::clear(OperationContext* txn,
             return result;
         }
 
-        LOG(1) << ns << ": removed plan cache entry - " << cq->getQueryObj().toString()
+        LOG(1) << ns << ": removed plan cache entry - " << redact(cq->getQueryObj())
                << "(sort: " << cq->getQueryRequest().getSort()
                << "; projection: " << cq->getQueryRequest().getProj()
                << "; collation: " << cq->getQueryRequest().getCollation() << ")";

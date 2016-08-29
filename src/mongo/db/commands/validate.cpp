@@ -107,7 +107,7 @@ public:
         }
 
         if (!serverGlobalParams.quiet) {
-            LOG(0) << "CMD: validate " << ns << endl;
+            LOG(0) << "CMD: validate " << ns;
         }
 
         AutoGetDb ctx(txn, ns_string.db(), MODE_IX);

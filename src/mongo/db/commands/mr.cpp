@@ -792,7 +792,7 @@ State::~State() {
         try {
             dropTempCollections();
         } catch (std::exception& e) {
-            error() << "couldn't cleanup after map reduce: " << e.what() << endl;
+            error() << "couldn't cleanup after map reduce: " << e.what();
         }
     }
     if (_scope && !_scope->isKillPending() && _scope->getError().empty()) {
@@ -803,7 +803,7 @@ State::~State() {
             _scope->invoke(cleanup, 0, 0, 0, true);
         } catch (const DBException&) {
             // not important because properties will be reset if scope is reused
-            LOG(1) << "MapReduce terminated during state destruction" << endl;
+            LOG(1) << "MapReduce terminated during state destruction";
         }
     }
 }
@@ -946,7 +946,7 @@ void State::switchMode(bool jsMode) {
 }
 
 void State::bailFromJS() {
-    LOG(1) << "M/R: Switching from JS mode to mixed mode" << endl;
+    LOG(1) << "M/R: Switching from JS mode to mixed mode";
 
     // reduce and reemit into c++
     switchMode(false);
@@ -1232,7 +1232,7 @@ void State::reduceAndSpillInMemoryStateIfNeeded() {
             _scope->invoke(_reduceAll, 0, 0, 0, true);
             LOG(3) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt
                    << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis()
-                   << "ms" << endl;
+                   << "ms";
             return;
         }
     }
@@ -1246,12 +1246,12 @@ void State::reduceAndSpillInMemoryStateIfNeeded() {
         Timer t;
         reduceInMemory();
         LOG(3) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount
-               << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
+               << " newSize=" << _size << " time=" << t.millis() << "ms";
 
         // if size is still high, or values are not reducing well, dump
         if (_onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2)) {
             dumpToInc();
-            LOG(3) << "  MR - dumping to db" << endl;
+            LOG(3) << "  MR - dumping to db";
         }
     }
 }
@@ -1354,7 +1354,7 @@ public:
 
         Config config(dbname, cmd);
 
-        LOG(1) << "mr ns: " << config.ns << endl;
+        LOG(1) << "mr ns: " << config.ns;
 
         uassert(16149, "cannot run map reduce without the js engine", globalScriptEngine);
 
@@ -1616,19 +1616,19 @@ public:
                 return false;
             }
         } catch (SendStaleConfigException& e) {
-            log() << "mr detected stale config, should retry" << causedBy(e) << endl;
+            log() << "mr detected stale config, should retry" << redact(e);
             throw e;
         }
         // TODO:  The error handling code for queries is v. fragile,
         // *requires* rethrow AssertionExceptions - should probably fix.
         catch (AssertionException& e) {
-            log() << "mr failed, removing collection" << causedBy(e) << endl;
+            log() << "mr failed, removing collection" << redact(e);
             throw e;
         } catch (std::exception& e) {
-            log() << "mr failed, removing collection" << causedBy(e) << endl;
+            log() << "mr failed, removing collection" << causedBy(e);
             throw e;
         } catch (...) {
-            log() << "mr failed for unknown reason, removing collection" << endl;
+            log() << "mr failed for unknown reason, removing collection";
             throw;
         }
 

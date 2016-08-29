@@ -289,7 +289,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                     new MessageEventDetailsEncoder, writer.getValue())));
 
         if (serverGlobalParams.logAppend && exists) {
-            log() << "***** SERVER RESTARTED *****" << endl;
+            log() << "***** SERVER RESTARTED *****";
             Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
             if (!status.isOK())
                 return status;

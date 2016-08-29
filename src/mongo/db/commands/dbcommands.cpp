@@ -440,7 +440,7 @@ public:
         int was = _diaglog.setLevel(cmdObj.firstElement().numberInt());
         _diaglog.flush();
         if (!serverGlobalParams.quiet) {
-            LOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
+            LOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was;
         }
         result.append("was", was);
         result.append("note", deprecationWarning);
@@ -650,7 +650,7 @@ public:
                     if (partialOk) {
                         break;  // skipped chunk is probably on another shard
                     }
-                    log() << "should have chunk: " << n << " have:" << myn << endl;
+                    log() << "should have chunk: " << n << " have:" << myn;
                     dumpChunks(txn, ns, query, sort);
                     uassert(10040, "chunks out of order", n == myn);
                 }
@@ -852,7 +852,7 @@ public:
         }
 
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            warning() << "Internal error while reading " << ns << endl;
+            warning() << "Internal error while reading " << ns;
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::OperationFailed,
@@ -1398,7 +1398,7 @@ bool Command::run(OperationContext* txn,
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
             LOG(debugLevel) << "Command on database " << db
                             << " timed out waiting for read concern to be satisfied. Command: "
-                            << getRedactedCopyForLogging(request.getCommandArgs());
+                            << redact(getRedactedCopyForLogging(request.getCommandArgs()));
         }
 
         auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);

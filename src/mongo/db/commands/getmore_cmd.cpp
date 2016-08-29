@@ -543,7 +543,7 @@ public:
             nextBatch->abandon();
 
             error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
-                    << ", stats: " << Explain::getWinningPlanStats(exec);
+                    << ", stats: " << redact(Explain::getWinningPlanStats(exec));
 
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "GetMore command executor error: "

@@ -259,8 +259,7 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
     if (!reparsedPipeline.isOK()) {
         error() << "Aggregation command did not round trip through parsing and serialization "
                    "correctly. Input pipeline: "
-                << Value(request.getPipeline()).toString()
-                << ", serialized pipeline: " << Value(serialized).toString();
+                << Value(request.getPipeline()) << ", serialized pipeline: " << Value(serialized);
         fassertFailedWithStatusNoTrace(40175, reparsedPipeline.getStatus());
     }
 

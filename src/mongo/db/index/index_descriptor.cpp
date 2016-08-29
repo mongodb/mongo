@@ -93,11 +93,4 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
                                                                            rhs.second);
                    });
 }
-
-void IndexDescriptor::_checkOk() const {
-    if (_magic == 123987)
-        return;
-    log() << "uh oh: " << (void*)(this) << " " << _magic;
-    invariant(0);
-}
 }

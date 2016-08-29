@@ -58,8 +58,7 @@ public:
      * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
      */
     IndexDescriptor(Collection* collection, const std::string& accessMethodName, BSONObj infoObj)
-        : _magic(123987),
-          _collection(collection),
+        : _collection(collection),
           _accessMethodName(accessMethodName),
           _infoObj(infoObj.getOwned()),
           _numFields(infoObj.getObjectField("key").nFields()),
@@ -80,9 +79,6 @@ public:
         }
     }
 
-    ~IndexDescriptor() {
-        _magic = 555;
-    }
 
     //
     // Information about the key pattern.
@@ -94,7 +90,6 @@ public:
      * Example: {foo: 1, bar: -1}
      */
     const BSONObj& keyPattern() const {
-        _checkOk();
         return _keyPattern;
     }
 
@@ -108,7 +103,6 @@ public:
 
     // How many fields do we index / are in the key pattern?
     int getNumFields() const {
-        _checkOk();
         return _numFields;
     }
 
@@ -118,7 +112,6 @@ public:
 
     // Return the name of the index.
     const std::string& indexName() const {
-        _checkOk();
         return _indexName;
     }
 
@@ -163,17 +156,14 @@ public:
 
     // Is this index multikey?
     bool isMultikey(OperationContext* opCtx) const {
-        _checkOk();
         return _collection->getIndexCatalog()->isMultikey(opCtx, this);
     }
 
     MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const {
-        _checkOk();
         return _collection->getIndexCatalog()->getMultikeyPaths(opCtx, this);
     }
 
     bool isIdIndex() const {
-        _checkOk();
         return _isIdIndex;
     }
 
@@ -193,13 +183,11 @@ public:
 
     // Return a (rather compact) std::string representation.
     std::string toString() const {
-        _checkOk();
         return _infoObj.toString();
     }
 
     // Return the info object.
     const BSONObj& infoObj() const {
-        _checkOk();
         return _infoObj;
     }
 
@@ -229,10 +217,6 @@ public:
     }
 
 private:
-    void _checkOk() const;
-
-    int _magic;
-
     // Related catalog information of the parent collection
     Collection* _collection;
 

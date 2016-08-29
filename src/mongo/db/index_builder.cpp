@@ -101,7 +101,7 @@ void IndexBuilder::run() {
 
     Status status = _build(&txn, db, true, &dlk);
     if (!status.isOK()) {
-        error() << "IndexBuilder could not build index: " << status.toString();
+        error() << "IndexBuilder could not build index: " << redact(status);
         fassert(28555, ErrorCodes::isInterruption(status.code()));
     }
 }
@@ -193,7 +193,7 @@ Status IndexBuilder::_build(OperationContext* txn,
                     wunit.commit();
                 }
                 if (!status.isOK()) {
-                    error() << "bad status from index build: " << status;
+                    error() << "bad status from index build: " << redact(status);
                 }
             } catch (const DBException& e) {
                 status = e.toStatus();

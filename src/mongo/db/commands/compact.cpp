@@ -165,7 +165,7 @@ public:
         OldClientContext ctx(txn, nss.ns());
         BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
 
-        log() << "compact " << nss.ns() << " begin, options: " << compactOptions.toString();
+        log() << "compact " << nss.ns() << " begin, options: " << compactOptions;
 
         StatusWith<CompactStats> status = collection->compact(txn, &compactOptions);
         if (!status.isOK())

@@ -77,7 +77,7 @@ public:
         try {
             doRealWork();
         } catch (std::exception& e) {
-            error() << "FSyncLockThread exception: " << e.what() << endl;
+            error() << "FSyncLockThread exception: " << e.what();
         }
     }
 };
@@ -135,7 +135,7 @@ public:
         bool sync =
             !cmdObj["async"].trueValue();  // async means do an fsync, but return immediately
         bool lock = cmdObj["lock"].trueValue();
-        log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;
+        log() << "CMD fsync: sync:" << sync << " lock:" << lock;
         if (lock) {
             if (!sync) {
                 errmsg = "fsync: sync option must be true when using lock";
@@ -153,8 +153,8 @@ public:
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            log() << "db is now locked, no writes allowed. db.fsyncUnlock() to unlock" << endl;
-            log() << "    For more info see " << FSyncCommand::url() << endl;
+            log() << "db is now locked, no writes allowed. db.fsyncUnlock() to unlock";
+            log() << "    For more info see " << FSyncCommand::url();
             result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
             result.append("seeAlso", FSyncCommand::url());
 
@@ -243,7 +243,7 @@ void FSyncLockThread::doRealWork() {
     try {
         getDur().syncDataAndTruncateJournal(&txn);
     } catch (std::exception& e) {
-        error() << "error doing syncDataAndTruncateJournal: " << e.what() << endl;
+        error() << "error doing syncDataAndTruncateJournal: " << e.what();
         fsyncCmd.status = Status(ErrorCodes::CommandFailed, e.what());
         fsyncCmd._threadSync.notify_one();
         fsyncCmd.locked = false;
@@ -255,7 +255,7 @@ void FSyncLockThread::doRealWork() {
     try {
         storageEngine->flushAllFiles(true);
     } catch (std::exception& e) {
-        error() << "error doing flushAll: " << e.what() << endl;
+        error() << "error doing flushAll: " << e.what();
         fsyncCmd.status = Status(ErrorCodes::CommandFailed, e.what());
         fsyncCmd._threadSync.notify_one();
         fsyncCmd.locked = false;
@@ -267,7 +267,7 @@ void FSyncLockThread::doRealWork() {
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "beginBackup", "global");
     } catch (const DBException& e) {
-        error() << "storage engine unable to begin backup : " << e.toString() << endl;
+        error() << "storage engine unable to begin backup : " << e.toString();
         fsyncCmd.status = e.toStatus();
         fsyncCmd._threadSync.notify_one();
         fsyncCmd.locked = false;

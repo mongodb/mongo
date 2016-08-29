@@ -392,7 +392,7 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
     uassert(13004, str::stream() << "sent negative cursors to kill: " << n, n >= 1);
 
     if (n > 2000) {
-        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n << endl;
+        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n;
         verify(n < 30000);
     }
 
@@ -401,7 +401,7 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
     int found = CursorManager::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
 
     if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
-        LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n << endl;
+        LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n;
     }
 }
 
@@ -531,7 +531,7 @@ void (*reportEventToSystem)(const char* msg) = 0;
 void mongoAbort(const char* msg) {
     if (reportEventToSystem)
         reportEventToSystem(msg);
-    severe() << msg;
+    severe() << redact(msg);
     ::abort();
 }
 
@@ -624,7 +624,7 @@ void assembleResponse(OperationContext* txn,
 
         int len = strlen(p);
         if (len > 400)
-            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len << endl;
+            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len;
 
         if (strcmp("end", p) == 0)
             dbresponse.response.setData(opReply, "dbMsg end no longer supported");
@@ -640,7 +640,7 @@ void assembleResponse(OperationContext* txn,
                 logThreshold = 10;
                 receivedKillCursors(txn, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
-                log() << "    operation isn't supported: " << static_cast<int>(op) << endl;
+                log() << "    operation isn't supported: " << static_cast<int>(op);
                 currentOp.done();
                 shouldLogOpDebug = true;
             } else {
@@ -672,12 +672,12 @@ void assembleResponse(OperationContext* txn,
         } catch (const UserException& ue) {
             LastError::get(c).setLastError(ue.getCode(), ue.getInfo().msg);
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << ue.toString() << endl;
+                   << redact(ue);
             debug.exceptionInfo = ue.getInfo();
         } catch (const AssertionException& e) {
             LastError::get(c).setLastError(e.getCode(), e.getInfo().msg);
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << e.toString() << endl;
+                   << redact(e);
             debug.exceptionInfo = e.getInfo();
             shouldLogOpDebug = true;
         }
@@ -694,8 +694,7 @@ void assembleResponse(OperationContext* txn,
     if (shouldLogOpDebug || debug.executionTime > logThreshold) {
         Locker::LockerInfo lockerInfo;
         txn->lockState()->getLockerInfo(&lockerInfo);
-
-        log() << debug.report(&c, currentOp, lockerInfo.stats);
+        log() << redact(debug.report(&c, currentOp, lockerInfo.stats));
     }
 
     if (currentOp.shouldDBProfile(debug.executionTime)) {
@@ -729,14 +728,14 @@ void DiagLog::openFile() {
         log() << msg.ss.str();
         uasserted(ErrorCodes::FileStreamFailed, msg.ss.str());
     } else {
-        log() << "diagLogging using file " << name << endl;
+        log() << "diagLogging using file " << name;
     }
 }
 
 int DiagLog::setLevel(int newLevel) {
     stdx::lock_guard<stdx::mutex> lk(mutex);
     int old = level;
-    log() << "diagLogging level=" << newLevel << endl;
+    log() << "diagLogging level=" << newLevel;
     if (f == 0) {
         openFile();
     }
@@ -746,7 +745,7 @@ int DiagLog::setLevel(int newLevel) {
 
 void DiagLog::flush() {
     if (level) {
-        log() << "flushing diag log" << endl;
+        log() << "flushing diag log";
         stdx::lock_guard<stdx::mutex> lk(mutex);
         f->flush();
     }

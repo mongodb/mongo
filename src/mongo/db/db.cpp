@@ -355,7 +355,7 @@ void checkForCappedOplog(OperationContext* txn, Database* db) {
 }
 
 void repairDatabasesAndCheckVersion(OperationContext* txn) {
-    LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
+    LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
@@ -370,7 +370,7 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
         invariant(!storageGlobalParams.readOnly);
         for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
             const string dbName = *i;
-            LOG(1) << "    Repairing database: " << dbName << endl;
+            LOG(1) << "    Repairing database: " << dbName;
 
             fassert(18506, repairDatabase(txn, storageEngine, dbName));
         }
@@ -390,7 +390,7 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
 
     for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
         const string dbName = *i;
-        LOG(1) << "    Recovering database: " << dbName << endl;
+        LOG(1) << "    Recovering database: " << dbName;
 
         Database* db = dbHolder().openDb(txn, dbName);
         invariant(db);
@@ -409,7 +409,7 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
             }
             severe() << "Unable to start mongod due to an incompatibility with the data files and"
                         " this version of mongod: "
-                     << status;
+                     << redact(status);
             severe() << "Please consult our documentation when trying to downgrade to a previous"
                         " major release";
             quickExit(EXIT_NEED_UPGRADE);
@@ -462,7 +462,7 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
 
             const Status keyStatus = validateKeyPattern(key);
             if (!keyStatus.isOK()) {
-                log() << "Problem with index " << index << ": " << keyStatus.reason()
+                log() << "Problem with index " << index << ": " << redact(keyStatus)
                       << " This index can still be used however it cannot be rebuilt."
                       << " For more info see"
                       << " http://dochub.mongodb.org/core/index-validation" << startupWarningsLog;
@@ -501,7 +501,7 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
         }
     }
 
-    LOG(1) << "done repairDatabases" << endl;
+    LOG(1) << "done repairDatabases";
 }
 
 void _initWireSpec() {
@@ -568,7 +568,7 @@ ExitCode _initAndListen(int listenPort) {
     auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(options, sepPtr);
     auto res = transportLayer->setup();
     if (!res.isOK()) {
-        error() << "Failed to set up listener: " << res.toString();
+        error() << "Failed to set up listener: " << res;
         return EXIT_NET_ERROR;
     }
 
@@ -671,7 +671,7 @@ ExitCode _initAndListen(int listenPort) {
     repairDatabasesAndCheckVersion(startupOpCtx.get());
 
     if (storageGlobalParams.upgrade) {
-        log() << "finished checking dbs" << endl;
+        log() << "finished checking dbs";
         exitCleanly(EXIT_CLEAN);
     }
 
@@ -697,7 +697,7 @@ ExitCode _initAndListen(int listenPort) {
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
         Status status = authindex::verifySystemIndexes(startupOpCtx.get());
         if (!status.isOK()) {
-            log() << status.reason();
+            log() << redact(status);
             exitCleanly(EXIT_NEED_UPGRADE);
         }
 
@@ -709,7 +709,7 @@ ExitCode _initAndListen(int listenPort) {
             log() << "Auth schema version is incompatible: "
                   << "User and role management commands require auth data to have "
                   << "at least schema version " << AuthorizationManager::schemaVersion26Final
-                  << " but startup could not verify schema version: " << status.toString() << endl;
+                  << " but startup could not verify schema version: " << status;
             exitCleanly(EXIT_NEED_UPGRADE);
         }
         if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
@@ -718,7 +718,7 @@ ExitCode _initAndListen(int listenPort) {
                   << "at least schema version " << AuthorizationManager::schemaVersion26Final
                   << " but found " << foundSchemaVersion << ". In order to upgrade "
                   << "the auth schema, first downgrade MongoDB binaries to version "
-                  << "2.6 and then run the authSchemaUpgrade command." << endl;
+                  << "2.6 and then run the authSchemaUpgrade command.";
             exitCleanly(EXIT_NEED_UPGRADE);
         }
     } else if (globalAuthzManager->isAuthEnabled()) {
@@ -810,16 +810,16 @@ ExitCode initAndListen(int listenPort) {
     try {
         return _initAndListen(listenPort);
     } catch (DBException& e) {
-        log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
+        log() << "exception in initAndListen: " << e.toString() << ", terminating";
         return EXIT_UNCAUGHT;
     } catch (std::exception& e) {
         log() << "exception in initAndListen std::exception: " << e.what() << ", terminating";
         return EXIT_UNCAUGHT;
     } catch (int& n) {
-        log() << "exception in initAndListen int: " << n << ", terminating" << endl;
+        log() << "exception in initAndListen int: " << n << ", terminating";
         return EXIT_UNCAUGHT;
     } catch (...) {
-        log() << "exception in initAndListen, terminating" << endl;
+        log() << "exception in initAndListen, terminating";
         return EXIT_UNCAUGHT;
     }
 }
@@ -829,7 +829,7 @@ ExitCode initAndListen(int listenPort) {
 #if defined(_WIN32)
 ExitCode initService() {
     ntservice::reportStatus(SERVICE_RUNNING);
-    log() << "Service running" << endl;
+    log() << "Service running";
     return initAndListen(serverGlobalParams.port);
 }
 #endif

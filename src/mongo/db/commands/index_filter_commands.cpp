@@ -269,7 +269,7 @@ Status ClearFilters::clear(OperationContext* txn,
         // Remove entry from plan cache
         planCache->remove(*cq);
 
-        LOG(0) << "Removed index filter on " << ns << " " << cq->toStringShort();
+        LOG(0) << "Removed index filter on " << ns << " " << redact(cq->toStringShort());
 
         return Status::OK();
     }
@@ -396,7 +396,8 @@ Status SetFilter::set(OperationContext* txn,
     // Remove entry from plan cache.
     planCache->remove(*cq);
 
-    LOG(0) << "Index filter set on " << ns << " " << cq->toStringShort() << " " << indexesElt;
+    LOG(0) << "Index filter set on " << ns << " " << redact(cq->toStringShort()) << " "
+           << indexesElt;
 
     return Status::OK();
 }

@@ -215,7 +215,7 @@ void LockerImpl<IsForMMAPV1>::dump() const {
     }
     _lock.unlock();
 
-    log() << ss.str() << std::endl;
+    log() << ss.str();
 }
 
 

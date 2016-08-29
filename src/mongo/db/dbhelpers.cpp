@@ -429,8 +429,8 @@ long long Helpers::removeRange(OperationContext* txn,
             NamespaceString nss(ns);
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                 warning() << "stepped down from primary while deleting chunk; "
-                          << "orphaning data in " << ns << " in range [" << min << ", " << max
-                          << ")";
+                          << "orphaning data in " << ns << " in range [" << redact(min) << ", "
+                          << redact(max) << ")";
                 return numDeleted;
             }
 
@@ -518,14 +518,14 @@ Helpers::RemoveSaver::~RemoveSaver() {
         Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
             severe() << "Unable to finalize DataProtector while closing RemoveSaver: "
-                     << status.reason();
+                     << redact(status);
             fassertFailed(34350);
         }
 
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
         if (_out->fail()) {
             severe() << "Couldn't write finalized DataProtector data to: " << _file.string()
-                     << " for remove saving: " << errnoWithDescription();
+                     << " for remove saving: " << redact(errnoWithDescription());
             fassertFailed(34351);
         }
 
@@ -533,7 +533,7 @@ Helpers::RemoveSaver::~RemoveSaver() {
         status = _protector->finalizeTag(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
             severe() << "Unable to get finalizeTag from DataProtector while closing RemoveSaver: "
-                     << status.reason();
+                     << redact(status);
             fassertFailed(34352);
         }
         if (resultLen != _protector->getNumberOfBytesReservedForTag()) {
@@ -546,7 +546,7 @@ Helpers::RemoveSaver::~RemoveSaver() {
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
         if (_out->fail()) {
             severe() << "Couldn't write finalizeTag from DataProtector to: " << _file.string()
-                     << " for remove saving: " << errnoWithDescription();
+                     << " for remove saving: " << redact(errnoWithDescription());
             fassertFailed(34354);
         }
     }
@@ -558,7 +558,7 @@ Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
         _out.reset(new ofstream(_file.string().c_str(), ios_base::out | ios_base::binary));
         if (_out->fail()) {
             string msg = str::stream() << "couldn't create file: " << _file.string()
-                                       << " for remove saving: " << errnoWithDescription();
+                                       << " for remove saving: " << redact(errnoWithDescription());
             error() << msg;
             _out.reset();
             _out = 0;
@@ -591,7 +591,7 @@ Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
     _out->write(reinterpret_cast<const char*>(data), dataSize);
     if (_out->fail()) {
         string msg = str::stream() << "couldn't write document to file: " << _file.string()
-                                   << " for remove saving: " << errnoWithDescription();
+                                   << " for remove saving: " << redact(errnoWithDescription());
         error() << msg;
         return Status(ErrorCodes::OperationFailed, msg);
     }

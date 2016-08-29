@@ -81,7 +81,7 @@ public:
                      string& errmsg,
                      BSONObjBuilder& result) {
         string coll = cmdObj["godinsert"].valuestrsafe();
-        log() << "test only command godinsert invoked coll:" << coll << endl;
+        log() << "test only command godinsert invoked coll:" << coll;
         uassert(13049, "godinsert must specify a collection", !coll.empty());
         string ns = dbname + "." + coll;
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
@@ -160,7 +160,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        log() << "test only command sleep invoked" << endl;
+        log() << "test only command sleep invoked";
         long long millis = 0;
 
         if (cmdObj["secs"] || cmdObj["millis"]) {

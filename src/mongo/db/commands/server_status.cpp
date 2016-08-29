@@ -167,7 +167,7 @@ public:
         timeBuilder.appendNumber("at end", durationCount<Milliseconds>(runElapsed));
         if (runElapsed > Milliseconds(1000)) {
             BSONObj t = timeBuilder.obj();
-            log() << "serverStatus was very slow: " << t << endl;
+            log() << "serverStatus was very slow: " << t;
             result.append("timing", t);
         }
 

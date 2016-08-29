@@ -2468,7 +2468,7 @@ public:
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
                 warning() << "Could not update user " << userName
-                          << " in _mergeAuthzCollections command: " << status << endl;
+                          << " in _mergeAuthzCollections command: " << redact(status);
             }
         } else {
             auditCreateOrUpdateUser(userObj, true);
@@ -2476,7 +2476,7 @@ public:
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
                 warning() << "Could not insert user " << userName
-                          << " in _mergeAuthzCollections command: " << status << endl;
+                          << " in _mergeAuthzCollections command: " << redact(status);
             }
         }
         usersToDrop->erase(userName);
@@ -2506,7 +2506,7 @@ public:
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
                 warning() << "Could not update role " << roleName
-                          << " in _mergeAuthzCollections command: " << status << endl;
+                          << " in _mergeAuthzCollections command: " << redact(status);
             }
         } else {
             auditCreateOrUpdateRole(roleObj, true);
@@ -2514,7 +2514,7 @@ public:
             if (!status.isOK()) {
                 // Match the behavior of mongorestore to continue on failure
                 warning() << "Could not insert role " << roleName
-                          << " in _mergeAuthzCollections command: " << status << endl;
+                          << " in _mergeAuthzCollections command: " << redact(status);
             }
         }
         rolesToDrop->erase(roleName);
@@ -2733,7 +2733,7 @@ public:
  * Logs that the auth schema upgrade failed because of "status" and returns "status".
  */
 Status logUpgradeFailed(const Status& status) {
-    log() << "Auth schema upgrade failed with " << status;
+    log() << "Auth schema upgrade failed with " << redact(status);
     return status;
 }
 
