@@ -42,17 +42,22 @@ using parsed_aggregation_projection::ParsedAddFields;
 
 REGISTER_DOCUMENT_SOURCE(addFields, DocumentSourceAddFields::createFromBson);
 
+intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
+    BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(
+        new DocumentSourceSingleDocumentTransformation(
+            expCtx, ParsedAddFields::create(addFieldsSpec), "$addFields"));
+    addFields->injectExpressionContext(expCtx);
+    return addFields;
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-
-    // Confirm that the stage was called with an object.
     uassert(40272,
             str::stream() << "$addFields specification stage must be an object, got "
                           << typeName(elem.type()),
             elem.type() == Object);
 
-    // Create the AddFields aggregation stage.
-    return new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAddFields::create(elem.Obj()), "$addFields");
-};
+    return DocumentSourceAddFields::create(elem.Obj(), expCtx);
+}
 }

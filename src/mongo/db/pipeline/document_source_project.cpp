@@ -43,12 +43,18 @@ using parsed_aggregation_projection::ProjectionType;
 
 REGISTER_DOCUMENT_SOURCE(project, DocumentSourceProject::createFromBson);
 
+intrusive_ptr<DocumentSource> DocumentSourceProject::create(
+    BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
+        expCtx, ParsedAggregationProjection::create(projectSpec), "$project"));
+    project->injectExpressionContext(expCtx);
+    return project;
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(15969, "$project specification must be an object", elem.type() == Object);
-
-    return new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAggregationProjection::create(elem.Obj()), "$project");
+    return DocumentSourceProject::create(elem.Obj(), expCtx);
 }
 
 }  // namespace mongo

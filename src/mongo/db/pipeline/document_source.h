@@ -865,10 +865,13 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     /**
-      Create a filter.
+     * Convenience method for creating a $match stage.
+     */
+    static boost::intrusive_ptr<DocumentSourceMatch> create(
+        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-      @param pBsonElement the raw BSON specification for the filter
-      @returns the filter
+    /**
+     * Parses a $match stage from 'elem'.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
@@ -2063,6 +2066,15 @@ private:
  */
 class DocumentSourceProject final {
 public:
+    /**
+     * Convenience method to create a $project stage from 'projectSpec'.
+     */
+    static boost::intrusive_ptr<DocumentSource> create(
+        BSONObj projectSpec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Parses a $project stage from the user-supplied BSON.
+     */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -2076,8 +2088,17 @@ private:
  */
 class DocumentSourceAddFields final {
 public:
+    /**
+     * Convenience method for creating a $addFields stage from 'addFieldsSpec'.
+     */
+    static boost::intrusive_ptr<DocumentSource> create(
+        BSONObj addFieldsSpec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Parses a $addFields stage from the user-supplied BSON.
+     */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
     DocumentSourceAddFields() = default;

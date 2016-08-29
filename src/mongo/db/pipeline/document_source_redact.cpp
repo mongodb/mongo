@@ -84,10 +84,7 @@ Pipeline::SourceContainer::iterator DocumentSourceRedact::optimizeAt(
             // create an infinite number of $matches.
             Pipeline::SourceContainer::iterator returnItr = std::next(itr);
 
-            container->insert(
-                itr,
-                DocumentSourceMatch::createFromBson(
-                    BSON("$match" << redactSafePortion).firstElement(), this->pExpCtx));
+            container->insert(itr, DocumentSourceMatch::create(redactSafePortion, pExpCtx));
 
             return returnItr;
         }

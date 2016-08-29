@@ -211,7 +211,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         unittest::assertGet(Pipeline::create({inputMock, graphLookupStage, unwindStage}, expCtx));
     pipeline->optimizePipeline();
 
-    ASSERT_THROWS_CODE(pipeline->output()->getNext(), UserException, 40271);
+    ASSERT_THROWS_CODE(pipeline->getNext(), UserException, 40271);
 }
 
 bool arrayContains(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -252,7 +252,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
         std::make_shared<MockMongodImplementation>(std::move(fromContents)));
     auto pipeline = unittest::assertGet(Pipeline::create({inputMock, graphLookupStage}, expCtx));
 
-    auto next = pipeline->output()->getNext();
+    auto next = pipeline->getNext();
     ASSERT(next);
 
     ASSERT_EQ(2U, next->size());
@@ -269,14 +269,14 @@ TEST_F(DocumentSourceGraphLookUpTest,
         ASSERT(arrayContains(expCtx, resultsArray, Value(to1)));
         ASSERT_EQ(2U, resultsArray.size());
 
-        next = pipeline->output()->getNext();
+        next = pipeline->getNext();
         ASSERT(!next);
     } else if (arrayContains(expCtx, resultsArray, Value(to0from2))) {
         // If 'to0from2' was returned, then we should see 'to2' and nothing else.
         ASSERT(arrayContains(expCtx, resultsArray, Value(to2)));
         ASSERT_EQ(2U, resultsArray.size());
 
-        next = pipeline->output()->getNext();
+        next = pipeline->getNext();
         ASSERT(!next);
     } else {
         FAIL(str::stream() << "Expected either [ " << to0from1.toString() << " ] or [ "

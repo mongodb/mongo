@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012-2014 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,49 +31,31 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
 
-TEST(TruncateSort, SortTruncatesNormalField) {
-    SimpleBSONObjComparator bsonComparator{};
-    BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "c" << 1);
-    auto truncated =
-        DocumentSource::truncateSortSet(bsonComparator.makeBSONObjSet({sortKey}), {"b"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
-}
+// This provides access to getExpCtx(), but we'll use a different name for this test suite.
+using DocumentSourceRedactTest = AggregationContextFixture;
 
-TEST(DocumentSourceTruncateSort, SortTruncatesOnSubfield) {
-    SimpleBSONObjComparator bsonComparator{};
-    BSONObj sortKey = BSON("a" << 1 << "b.c" << 1 << "d" << 1);
-    auto truncated =
-        DocumentSource::truncateSortSet(bsonComparator.makeBSONObjSet({sortKey}), {"b"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
-}
+TEST_F(DocumentSourceRedactTest, ShouldCopyRedactSafePartOfMatchBeforeItself) {
+    BSONObj redactSpec = BSON("$redact"
+                              << "$$PRUNE");
+    auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
+    auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
 
-TEST(DocumentSourceTruncateSort, SortDoesNotTruncateOnParent) {
-    SimpleBSONObjComparator bsonComparator{};
-    BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "d" << 1);
-    auto truncated =
-        DocumentSource::truncateSortSet(bsonComparator.makeBSONObjSet({sortKey}), {"b.c"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1 << "b" << 1 << "d" << 1)), 1U);
-}
+    Pipeline::SourceContainer pipeline;
+    pipeline.push_back(redact);
+    pipeline.push_back(match);
 
-TEST(DocumentSourceTruncateSort, TruncateSortDedupsSortCorrectly) {
-    SimpleBSONObjComparator bsonComparator{};
-    BSONObj sortKeyOne = BSON("a" << 1 << "b" << 1);
-    BSONObj sortKeyTwo = BSON("a" << 1);
-    auto truncated = DocumentSource::truncateSortSet(
-        bsonComparator.makeBSONObjSet({sortKeyOne, sortKeyTwo}), {"b"});
-    ASSERT_EQUALS(truncated.size(), 1U);
-    ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
-}
+    pipeline.front()->optimizeAt(pipeline.begin(), &pipeline);
 
+    ASSERT_EQUALS(pipeline.size(), 3U);
+    ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline.front().get()));
+}
 }  // namespace
 }  // namespace mongo

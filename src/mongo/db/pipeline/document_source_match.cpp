@@ -450,13 +450,19 @@ static void uassertNoDisallowedClauses(BSONObj query) {
     }
 }
 
+intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
+    BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassertNoDisallowedClauses(filter);
+    intrusive_ptr<DocumentSourceMatch> match(new DocumentSourceMatch(filter, expCtx));
+    match->injectExpressionContext(expCtx);
+    return match;
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15959, "the match filter must be an expression in an object", elem.type() == Object);
 
-    uassertNoDisallowedClauses(elem.Obj());
-
-    return new DocumentSourceMatch(elem.Obj(), pExpCtx);
+    return DocumentSourceMatch::create(elem.Obj(), pExpCtx);
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {
