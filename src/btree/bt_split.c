@@ -2239,6 +2239,14 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	WT_ERR(__split_multi_inmem(session, page, multi, new));
 
 	/*
+	 * If the new page is modified, save the oldest ID from reconciliation
+	 * to avoid repeatedly attempting eviction on the same page.
+	 */
+	if (new->page->modify != NULL)
+		new->page->modify->last_oldest_id =
+		    page->modify->last_oldest_id;
+
+	/*
 	 * The rewrite succeeded, we can no longer fail.
 	 *
 	 * Finalize the move, discarding moved update lists from the original

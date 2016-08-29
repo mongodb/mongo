@@ -327,6 +327,13 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (__wt_hazard_count(session, page) > 1)
 		return (false);
 
+	/*
+	 * If we have already tried and the transaction state has not moved on,
+	 * eviction is highly likely to fail.
+	 */
+	if (page->modify->last_oldest_id == __wt_txn_oldest_id(session))
+		return (false);
+
 	if (page->memory_footprint < btree->maxmempage)
 		return (__wt_leaf_page_can_split(session, page));
 
