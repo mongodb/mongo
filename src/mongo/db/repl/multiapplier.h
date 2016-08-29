@@ -159,28 +159,5 @@ private:
     executor::TaskExecutor::CallbackHandle _dbWorkCallbackHandle;
 };
 
-
-/**
- * Applies operations (sorted by timestamp) up to and including 'lastTimestampToApply'.
- * If 'lastTimestampToApply' is found in  'operations':
- *     - The applier will be given a subset of 'operations' (includes 'lastTimestampToApply').
- *     - On success, the applier will invoke the 'pause' function just before reporting
- *       completion status.
- * Otherwise, all entries in 'operations' before 'lastTimestampToApply' will be forwarded to
- * the applier and the 'pause' function will be ignored.
- * If the applier is successfully created, returns the applier and a list of operations that
- * are skipped (operations with 'ts' field value after 'lastTimestampToApply).
- */
-using PauseDataReplicatorFn = stdx::function<void()>;
-
-StatusWith<std::pair<std::unique_ptr<MultiApplier>, MultiApplier::Operations>> applyUntilAndPause(
-    executor::TaskExecutor* executor,
-    const MultiApplier::Operations& operations,
-    const MultiApplier::ApplyOperationFn& applyOperation,
-    const MultiApplier::ApplyOperationFn& multiApply,
-    const Timestamp& lastTimestampToApply,
-    const PauseDataReplicatorFn& pauseDataReplicator,
-    const MultiApplier::CallbackFn& onCompletion);
-
 }  // namespace repl
 }  // namespace mongo
