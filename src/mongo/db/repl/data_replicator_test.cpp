@@ -1441,6 +1441,73 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"));
 }
 
+TEST_F(InitialSyncTest, DataReplicatorCreatesNewApplierForNextBatchBeforeDestroyingCurrentApplier) {
+    auto getRollbackIdResponse = BSON("ok" << 1 << "rbid" << 1);
+    auto noopOp1 = BSON("ts" << Timestamp(Seconds(1), 1U) << "h" << 1LL << "v"
+                             << OplogEntry::kOplogVersion
+                             << "ns"
+                             << ""
+                             << "op"
+                             << "n"
+                             << "o"
+                             << BSON("msg"
+                                     << "noop"));
+    auto createCollectionOp1 =
+        BSON("ts" << Timestamp(Seconds(2), 1U) << "h" << 1LL << "v" << OplogEntry::kOplogVersion
+                  << "ns"
+                  << "test.$cmd"
+                  << "op"
+                  << "c"
+                  << "o"
+                  << BSON("create"
+                          << "coll1"));
+    auto createCollectionOp2 =
+        BSON("ts" << Timestamp(Seconds(3), 1U) << "h" << 1LL << "v" << OplogEntry::kOplogVersion
+                  << "ns"
+                  << "test.$cmd"
+                  << "op"
+                  << "c"
+                  << "o"
+                  << BSON("create"
+                          << "coll2"));
+    const Responses responses = {
+        // pre-initial sync rollback checker request
+        {"replSetGetRBID", getRollbackIdResponse},
+        // get latest oplog ts - this should match the first op returned by the oplog fetcher
+        {"find",
+         BSON("ok" << 1 << "cursor" << BSON("id" << 0LL << "ns"
+                                                 << "local.oplog.rs"
+                                                 << "firstBatch"
+                                                 << BSON_ARRAY(noopOp1)))},
+        // oplog fetcher find - single set of results containing two commands that have to be
+        // applied in separate batches per batching logic
+        {"find",
+         BSON("ok" << 1 << "cursor" << BSON("id" << 0LL << "ns"
+                                                 << "local.oplog.rs"
+                                                 << "firstBatch"
+                                                 << BSON_ARRAY(noopOp1 << createCollectionOp1
+                                                                       << createCollectionOp2)))},
+        // Clone Start
+        // listDatabases - return empty list of databases since we're not testing the cloner.
+        {"listDatabases", BSON("ok" << 1 << "databases" << BSONArray())},
+        // get latest oplog ts - this should match the last op returned by the oplog fetcher
+        {"find",
+         BSON("ok" << 1 << "cursor" << BSON("id" << 0LL << "ns"
+                                                 << "local.oplog.rs"
+                                                 << "firstBatch"
+                                                 << BSON_ARRAY(createCollectionOp2)))},
+        // post-initial sync rollback checker request
+        {"replSetGetRBID", getRollbackIdResponse},
+    };
+
+    startSync(0);
+
+    setResponses(responses);
+    playResponses();
+    log() << "Done playing responses";
+    verifySync(getNet());
+    ASSERT_EQUALS(OplogEntry(createCollectionOp2).getOpTime(), _myLastOpTime);
+}
 
 class TestSyncSourceSelector2 : public SyncSourceSelector {
 

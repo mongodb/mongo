@@ -368,6 +368,7 @@ private:
     bool _applierActive = false;                                                // (M)
     bool _applierPaused = false;                                                // (X)
     std::unique_ptr<MultiApplier> _applier;                                     // (M)
+    std::unique_ptr<MultiApplier> _shuttingDownApplier;                         // (M)
     HostAndPort _syncSource;                                                    // (M)
     OpTimeWithHash _lastFetched;                                                // (MX)
     OpTimeWithHash _lastApplied;                                                // (MX)

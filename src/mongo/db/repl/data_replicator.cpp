@@ -881,6 +881,8 @@ bool DataReplicator::_anyActiveHandles_inlock() const {
     return _applierActive || (_oplogFetcher && _oplogFetcher->isActive()) ||
         (_initialSyncState && _initialSyncState->dbsCloner &&
          _initialSyncState->dbsCloner->isActive()) ||
+        (_applier && _applier->isActive()) ||
+        (_shuttingDownApplier && _shuttingDownApplier->isActive()) ||
         (_reporter && _reporter->isActive());
 }
 
@@ -889,6 +891,9 @@ void DataReplicator::_cancelAllHandles_inlock() {
         _oplogFetcher->shutdown();
     if (_applier)
         _applier->shutdown();
+    // No need to call shutdown() on _shuttingdownApplier. This applier is assigned when the most
+    // recent applier's finish callback has been invoked. Note that isActive() will still return
+    // true if the callback is still in progress.
     if (_reporter)
         _reporter->shutdown();
     if (_initialSyncState && _initialSyncState->dbsCloner &&
@@ -901,6 +906,7 @@ void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
     swapAndJoin_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
     swapAndJoin_inlock(lk, _oplogFetcher, "Waiting on oplog fetcher: ");
     swapAndJoin_inlock(lk, _applier, "Waiting on applier: ");
+    swapAndJoin_inlock(lk, _shuttingDownApplier, "Waiting on most recently completed applier: ");
     swapAndJoin_inlock(lk, _reporter, "Waiting on reporter: ");
     if (_initialSyncState) {
         swapAndJoin_inlock(lk, _initialSyncState->dbsCloner, "Waiting on databases cloner: ");
@@ -1127,6 +1133,8 @@ void DataReplicator::_onApplyBatchFinish(const Status& status,
 
     UniqueLock lk(_mutex);
     _applierActive = false;
+    // This might block in _shuttingDownApplier's destructor if it is still active here.
+    _shuttingDownApplier = std::move(_applier);
 
     if (!status.isOK()) {
         switch (_state) {

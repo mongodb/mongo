@@ -149,14 +149,11 @@ void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
 }
 
 void MultiApplier::_finishCallback(const Status& result) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _onCompletion(result);
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _active = false;
     _condition.notify_all();
-    auto finish = _onCompletion;
-    lk.unlock();
-
-    // This instance may be destroyed during the "finish" call.
-    finish(result);
 }
 
 }  // namespace repl
