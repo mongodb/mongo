@@ -83,9 +83,9 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     return collStats;
 }
 
-boost::optional<Document> DocumentSourceCollStats::getNext() {
+DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     if (_finished) {
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
 
     _finished = true;
@@ -116,7 +116,7 @@ boost::optional<Document> DocumentSourceCollStats::getNext() {
         }
     }
 
-    return Document(builder.obj());
+    return {Document(builder.obj())};
 }
 
 bool DocumentSourceCollStats::isValidInitialSource() const {

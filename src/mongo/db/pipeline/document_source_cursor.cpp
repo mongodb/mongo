@@ -59,19 +59,19 @@ const char* DocumentSourceCursor::getSourceName() const {
     return "$cursor";
 }
 
-boost::optional<Document> DocumentSourceCursor::getNext() {
+DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_currentBatch.empty()) {
         loadBatch();
 
-        if (_currentBatch.empty())  // exhausted the cursor
-            return boost::none;
+        if (_currentBatch.empty())
+            return GetNextResult::makeEOF();
     }
 
-    Document out = _currentBatch.front();
+    Document out = std::move(_currentBatch.front());
     _currentBatch.pop_front();
-    return out;
+    return std::move(out);
 }
 
 void DocumentSourceCursor::dispose() {

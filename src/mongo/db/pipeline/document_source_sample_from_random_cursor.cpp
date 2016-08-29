@@ -73,51 +73,62 @@ double smallestFromSampleOfUniform(PseudoRandom* prng, size_t N) {
 }
 }  // namespace
 
-boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNext() {
+DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_seenDocs->size() >= static_cast<size_t>(_size))
-        return {};
+        return GetNextResult::makeEOF();
 
-    auto doc = getNextNonDuplicateDocument();
-    if (!doc)
-        return {};
+    auto nextResult = getNextNonDuplicateDocument();
+    if (!nextResult.isAdvanced()) {
+        return nextResult;
+    }
 
     // Assign it a random value to enable merging by random value, attempting to avoid bias in that
     // process.
     auto& prng = pExpCtx->opCtx->getClient()->getPrng();
     _randMetaFieldVal -= smallestFromSampleOfUniform(&prng, _nDocsInColl);
 
-    MutableDocument md(std::move(*doc));
+    MutableDocument md(nextResult.releaseDocument());
     md.setRandMetaField(_randMetaFieldVal);
     return md.freeze();
 }
 
-boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNextNonDuplicateDocument() {
+DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDuplicateDocument() {
     // We may get duplicate documents back from the random cursor, and should not return duplicate
     // documents, so keep trying until we get a new one.
     const int kMaxAttempts = 100;
     for (int i = 0; i < kMaxAttempts; ++i) {
-        auto doc = pSource->getNext();
-        if (!doc)
-            return doc;
+        auto nextInput = pSource->getNext();
+        switch (nextInput.getStatus()) {
+            case GetNextResult::ReturnStatus::kAdvanced: {
+                auto idField = nextInput.getDocument()[_idField];
+                uassert(28793,
+                        str::stream()
+                            << "The optimized $sample stage requires all documents have a "
+                            << _idField
+                            << " field in order to de-duplicate results, but encountered a "
+                               "document without a "
+                            << _idField
+                            << " field: "
+                            << nextInput.getDocument().toString(),
+                        !idField.missing());
 
-        auto idField = (*doc)[_idField];
-        uassert(
-            28793,
-            str::stream()
-                << "The optimized $sample stage requires all documents have a "
-                << _idField
-                << " field in order to de-duplicate results, but encountered a document without a "
-                << _idField
-                << " field: "
-                << (*doc).toString(),
-            !idField.missing());
-
-        if (_seenDocs->insert(std::move(idField)).second) {
-            return doc;
+                if (_seenDocs->insert(std::move(idField)).second) {
+                    return nextInput;
+                }
+                LOG(1) << "$sample encountered duplicate document: "
+                       << nextInput.getDocument().toString();
+                break;  // Try again with the next document.
+            }
+            case GetNextResult::ReturnStatus::kPauseExecution: {
+                MONGO_UNREACHABLE;  // Our input should be a random cursor, which should never
+                                    // result in kPauseExecution.
+            }
+            case GetNextResult::ReturnStatus::kEOF: {
+                return nextInput;
+            }
         }
-        LOG(1) << "$sample encountered duplicate document: " << (*doc).toString() << std::endl;
     }
     uasserted(28799,
               str::stream() << "$sample stage could not find a non-duplicate document after "

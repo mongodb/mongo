@@ -50,17 +50,17 @@ const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }
 
-boost::optional<Document> DocumentSourceSingleDocumentTransformation::getNext() {
+DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::getNext() {
     pExpCtx->checkForInterrupt();
 
     // Get the next input document.
-    boost::optional<Document> input = pSource->getNext();
-    if (!input) {
-        return boost::none;
+    auto input = pSource->getNext();
+    if (!input.isAdvanced()) {
+        return input;
     }
 
     // Apply and return the document with added fields.
-    return _parsedTransform->applyTransformation(*input);
+    return _parsedTransform->applyTransformation(input.releaseDocument());
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimize() {

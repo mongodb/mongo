@@ -108,4 +108,7 @@ extern std::atomic<int> internalQueryExecYieldPeriodMS;  // NOLINT
 // Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
 const int64_t insertVectorMaxBytes = 256 * 1024;
 
+// The number of bytes to buffer at once during a $facet stage.
+extern std::atomic<int> internalQueryFacetBufferSizeBytes;  // NOLINT
+
 }  // namespace mongo

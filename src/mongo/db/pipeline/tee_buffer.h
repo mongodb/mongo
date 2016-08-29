@@ -28,61 +28,77 @@
 
 #pragma once
 
+#include <algorithm>
 #include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
 #include <vector>
 
+#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/query/query_knobs.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
-class Document;
-struct ExpressionContext;
-class Value;
-
 /**
  * This stage takes a stream of input documents and makes them available to multiple consumers. To
- * do so, it will buffer all incoming documents up to the configured memory limit, then provide
- * access to that buffer via an iterator.
- *
- * TODO SERVER-24153: This stage should be able to spill to disk if allowed to and the memory limit
- * has been exceeded.
+ * do so, it will batch incoming documents and allow each consumer to consume one batch at a time.
+ * As a consequence, consumers must be able to pause their execution to allow other consumers to
+ * process the batch before moving to the next batch.
  */
 class TeeBuffer : public RefCountable {
 public:
-    using const_iterator = std::vector<Document>::const_iterator;
-
-    static const uint64_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
-
+    /**
+     * Creates a TeeBuffer that will make results available to 'nConsumers' consumers. Note that
+     * 'bufferSizeBytes' is a soft cap, and may be exceeded by one document's worth (~16MB).
+     */
     static boost::intrusive_ptr<TeeBuffer> create(
-        uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes);
+        size_t nConsumers, int bufferSizeBytes = internalQueryFacetBufferSizeBytes);
 
     void setSource(const boost::intrusive_ptr<DocumentSource>& source) {
         _source = source;
     }
 
     /**
-     * Clears '_buffer'. Once dispose() is called, all iterators are invalid, and it is illegal to
-     * call begin() or end().
+     * Removes 'consumerId' as a consumer of this buffer. This is required to be called if a
+     * consumer will not consume all input.
      */
-    void dispose();
+    void dispose(size_t consumerId) {
+        _consumers[consumerId].stillInUse = false;
+        _consumers[consumerId].nLeftToReturn = 0;
+        if (std::none_of(_consumers.begin(), _consumers.end(), [](const ConsumerInfo& info) {
+                return info.stillInUse;
+            })) {
+            _buffer.clear();
+            _source->dispose();
+        }
+    }
 
     /**
-     * Populates the buffer by consuming all input from 'pSource'. This must be called before
-     * calling begin() or end().
+     * Retrieves the next document meant to be consumed by the pipeline given by 'consumerId'.
+     * Returns GetNextState::ResultState::kPauseExecution if this pipeline has consumed the whole
+     * buffer, but other consumers are still using it.
      */
-    void populate();
-
-    const_iterator begin() const;
-    const_iterator end() const;
+    DocumentSource::GetNextResult getNext(size_t consumerId);
 
 private:
-    TeeBuffer(uint64_t maxMemoryUsageBytes);
+    TeeBuffer(size_t nConsumers, size_t bufferSizeBytes);
 
-    bool _populated = false;
-    uint64_t _maxMemoryUsageBytes;
-    std::vector<Document> _buffer;
+    /**
+     * Clears '_buffer', then keeps requesting results from '_source' and pushing them all into
+     * '_buffer', until more than '_bufferSizeBytes' of documents have been returned, or until
+     * '_source' is exhausted.
+     */
+    void loadNextBatch();
+
     boost::intrusive_ptr<DocumentSource> _source;
+
+    const size_t _bufferSizeBytes;
+    std::vector<DocumentSource::GetNextResult> _buffer;
+
+    struct ConsumerInfo {
+        bool stillInUse = true;
+        int nLeftToReturn = 0;
+    };
+    std::vector<ConsumerInfo> _consumers;
 };
 }  // namespace mongo

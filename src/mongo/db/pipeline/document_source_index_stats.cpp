@@ -40,7 +40,7 @@ const char* DocumentSourceIndexStats::getSourceName() const {
     return "$indexStats";
 }
 
-boost::optional<Document> DocumentSourceIndexStats::getNext() {
+DocumentSource::GetNextResult DocumentSourceIndexStats::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_indexStatsMap.empty()) {
@@ -60,7 +60,7 @@ boost::optional<Document> DocumentSourceIndexStats::getNext() {
         return doc.freeze();
     }
 
-    return boost::none;
+    return GetNextResult::makeEOF();
 }
 
 DocumentSourceIndexStats::DocumentSourceIndexStats(const intrusive_ptr<ExpressionContext>& pExpCtx)

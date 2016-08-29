@@ -50,10 +50,11 @@ class DocumentSourceTeeConsumer : public DocumentSource {
 public:
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        size_t facetId,
         const boost::intrusive_ptr<TeeBuffer>& bufferSource);
 
     void dispose() final;
-    boost::optional<Document> getNext() final;
+    GetNextResult getNext() final;
 
     /**
      * Returns SEE_NEXT, since it requires no fields, and changes nothing about the documents.
@@ -66,10 +67,10 @@ public:
 
 private:
     DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              size_t facetId,
                               const boost::intrusive_ptr<TeeBuffer>& bufferSource);
 
-    bool _initialized = false;
+    size_t _facetId;
     boost::intrusive_ptr<TeeBuffer> _bufferSource;
-    TeeBuffer::const_iterator _iterator;
 };
 }  // namespace mongo

@@ -314,7 +314,7 @@ public:
 
         // Verify that the aggregation pipeline returns an error because its "inner" plan executor
         // has been killed due to the collection being dropped.
-        ASSERT_THROWS_CODE(pipeline->output()->getNext(), UserException, 16028);
+        ASSERT_THROWS_CODE(pipeline->getNext(), UserException, 16028);
 
         // Verify that the "outer" plan executor has been killed due to the collection being
         // dropped.

@@ -84,16 +84,16 @@ intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
     return new DocumentSourceMock(std::move(docs));
 }
 
-boost::optional<Document> DocumentSourceMock::getNext() {
+DocumentSource::GetNextResult DocumentSourceMock::getNext() {
     invariant(!isDisposed);
     invariant(!isDetachedFromOpCtx);
 
     if (queue.empty()) {
-        return {};
+        return GetNextResult::makeEOF();
     }
 
     Document doc = std::move(queue.front());
     queue.pop_front();
-    return {std::move(doc)};
+    return std::move(doc);
 }
 }

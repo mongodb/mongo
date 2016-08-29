@@ -43,11 +43,16 @@ const char* DocumentSourceBucketAuto::getSourceName() const {
     return "$bucketAuto";
 }
 
-boost::optional<Document> DocumentSourceBucketAuto::getNext() {
+DocumentSource::GetNextResult DocumentSourceBucketAuto::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (!_populated) {
-        populateSorter();
+        const auto populationResult = populateSorter();
+        if (populationResult.isPaused()) {
+            return populationResult;
+        }
+        invariant(populationResult.isEOF());
+
         populateBuckets();
 
         _populated = true;
@@ -56,7 +61,7 @@ boost::optional<Document> DocumentSourceBucketAuto::getNext() {
 
     if (_bucketsIterator == _buckets.end()) {
         dispose();
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
 
     return makeDocument(*(_bucketsIterator++));
@@ -77,7 +82,7 @@ DocumentSource::GetDepsReturn DocumentSourceBucketAuto::getDependencies(DepsTrac
     return EXHAUSTIVE_ALL;
 }
 
-void DocumentSourceBucketAuto::populateSorter() {
+DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     if (!_sorter) {
         SortOptions opts;
         opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
@@ -90,12 +95,13 @@ void DocumentSourceBucketAuto::populateSorter() {
         _sorter.reset(Sorter<Value, Document>::make(opts, comparator));
     }
 
-    _nDocuments = 0;
-    while (boost::optional<Document> next = pSource->getNext()) {
-        Document doc = *next;
-        _sorter->add(extractKey(doc), doc);
+    auto next = pSource->getNext();
+    for (; next.isAdvanced(); next = pSource->getNext()) {
+        auto nextDoc = next.releaseDocument();
+        _sorter->add(extractKey(nextDoc), nextDoc);
         _nDocuments++;
     }
+    return next;
 }
 
 Value DocumentSourceBucketAuto::extractKey(const Document& doc) {

@@ -48,21 +48,32 @@ const char* DocumentSourceSample::getSourceName() const {
     return "$sample";
 }
 
-boost::optional<Document> DocumentSourceSample::getNext() {
+DocumentSource::GetNextResult DocumentSourceSample::getNext() {
     if (_size == 0)
-        return {};
+        return GetNextResult::makeEOF();
 
     pExpCtx->checkForInterrupt();
 
     if (!_sortStage->isPopulated()) {
         // Exhaust source stage, add random metadata, and push all into sorter.
         PseudoRandom& prng = pExpCtx->opCtx->getClient()->getPrng();
-        while (boost::optional<Document> next = pSource->getNext()) {
-            MutableDocument doc(std::move(*next));
+        auto nextInput = pSource->getNext();
+        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+            MutableDocument doc(nextInput.releaseDocument());
             doc.setRandMetaField(prng.nextCanonicalDouble());
             _sortStage->loadDocument(doc.freeze());
         }
-        _sortStage->loadingDone();
+        switch (nextInput.getStatus()) {
+            case GetNextResult::ReturnStatus::kAdvanced: {
+                MONGO_UNREACHABLE;  // We consumed all advances above.
+            }
+            case GetNextResult::ReturnStatus::kPauseExecution: {
+                return nextInput;  // Propagate the pause.
+            }
+            case GetNextResult::ReturnStatus::kEOF: {
+                _sortStage->loadingDone();
+            }
+        }
     }
 
     invariant(_sortStage->isPopulated());

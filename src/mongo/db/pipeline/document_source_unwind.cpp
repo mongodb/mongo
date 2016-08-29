@@ -55,7 +55,7 @@ public:
      *
      * Returns boost::none if the array is exhausted.
      */
-    boost::optional<Document> getNext();
+    DocumentSource::GetNextResult getNext();
 
 private:
     // Tracks whether or not we can possibly return any more documents. Note we may return
@@ -100,11 +100,11 @@ void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
     _haveNext = true;
 }
 
-boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
+DocumentSource::GetNextResult DocumentSourceUnwind::Unwinder::getNext() {
     // WARNING: Any functional changes to this method must also be implemented in the unwinding
     // implementation of the $lookup stage.
     if (!_haveNext) {
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
 
     // Track which index this value came from. If 'includeArrayIndex' was specified, we will use
@@ -119,7 +119,7 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
             // Preserve documents with empty arrays if asked to, otherwise skip them.
             _haveNext = false;
             if (!_preserveNullAndEmptyArrays) {
-                return boost::none;
+                return GetNextResult::makeEOF();
             }
             _output.removeNestedField(_unwindPathFieldIndexes);
         } else {
@@ -138,7 +138,7 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
         // Preserve a nullish value if asked to, otherwise skip it.
         _haveNext = false;
         if (!_preserveNullAndEmptyArrays) {
-            return boost::none;
+            return GetNextResult::makeEOF();
         }
     } else {
         // Any non-nullish, non-array type should pass through.
@@ -183,23 +183,24 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
     return source;
 }
 
-boost::optional<Document> DocumentSourceUnwind::getNext() {
+DocumentSource::GetNextResult DocumentSourceUnwind::getNext() {
     pExpCtx->checkForInterrupt();
 
-    boost::optional<Document> out = _unwinder->getNext();
-    while (!out) {
+    auto nextOut = _unwinder->getNext();
+    while (nextOut.isEOF()) {
         // No more elements in array currently being unwound. This will loop if the input
         // document is missing the unwind field or has an empty array.
-        boost::optional<Document> input = pSource->getNext();
-        if (!input)
-            return boost::none;  // input exhausted
+        auto nextInput = pSource->getNext();
+        if (!nextInput.isAdvanced()) {
+            return nextInput;
+        }
 
         // Try to extract an output document from the new input document.
-        _unwinder->resetDocument(*input);
-        out = _unwinder->getNext();
+        _unwinder->resetDocument(nextInput.releaseDocument());
+        nextOut = _unwinder->getNext();
     }
 
-    return out;
+    return nextOut;
 }
 
 BSONObjSet DocumentSourceUnwind::getOutputSorts() {

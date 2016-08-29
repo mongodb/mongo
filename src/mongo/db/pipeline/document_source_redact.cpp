@@ -56,16 +56,17 @@ static const Value descendVal = Value("descend");
 static const Value pruneVal = Value("prune");
 static const Value keepVal = Value("keep");
 
-boost::optional<Document> DocumentSourceRedact::getNext() {
-    while (boost::optional<Document> in = pSource->getNext()) {
-        _variables->setRoot(*in);
-        _variables->setValue(_currentId, Value(*in));
+DocumentSource::GetNextResult DocumentSourceRedact::getNext() {
+    auto nextInput = pSource->getNext();
+    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+        _variables->setRoot(nextInput.getDocument());
+        _variables->setValue(_currentId, Value(nextInput.releaseDocument()));
         if (boost::optional<Document> result = redactObject()) {
-            return result;
+            return std::move(*result);
         }
     }
 
-    return boost::none;
+    return nextInput;
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceRedact::optimizeAt(

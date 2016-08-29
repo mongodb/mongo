@@ -46,7 +46,7 @@ using std::string;
 using std::vector;
 
 DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), populated(false), _mergingPresorted(false) {}
+    : DocumentSource(pExpCtx), _mergingPresorted(false) {}
 
 REGISTER_DOCUMENT_SOURCE(sort, DocumentSourceSort::createFromBson);
 
@@ -54,18 +54,23 @@ const char* DocumentSourceSort::getSourceName() const {
     return "$sort";
 }
 
-boost::optional<Document> DocumentSourceSort::getNext() {
+DocumentSource::GetNextResult DocumentSourceSort::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (!populated)
-        populate();
+    if (!_populated) {
+        const auto populationResult = populate();
+        if (populationResult.isPaused()) {
+            return populationResult;
+        }
+        invariant(populationResult.isEOF());
+    }
 
     if (!_output || !_output->more()) {
         // Need to be sure connections are marked as done so they can be returned to the connection
         // pool. This only needs to happen in the _mergingPresorted case, but it doesn't hurt to
         // always do it.
         dispose();
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
 
     return _output->next().second;
@@ -239,7 +244,7 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
     return opts;
 }
 
-void DocumentSourceSort::populate() {
+DocumentSource::GetNextResult DocumentSourceSort::populate() {
     if (_mergingPresorted) {
         typedef DocumentSourceMergeCursors DSCursors;
         if (DSCursors* castedSource = dynamic_cast<DSCursors*>(pSource)) {
@@ -247,16 +252,21 @@ void DocumentSourceSort::populate() {
         } else {
             msgasserted(17196, "can only mergePresorted from MergeCursors");
         }
+        return DocumentSource::GetNextResult::makeEOF();
     } else {
-        while (boost::optional<Document> next = pSource->getNext()) {
-            loadDocument(std::move(*next));
+        auto nextInput = pSource->getNext();
+        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+            loadDocument(nextInput.releaseDocument());
         }
-        loadingDone();
+        if (nextInput.isEOF()) {
+            loadingDone();
+        }
+        return nextInput;
     }
 }
 
 void DocumentSourceSort::loadDocument(const Document& doc) {
-    invariant(!populated);
+    invariant(!_populated);
     if (!_sorter) {
         _sorter.reset(MySorter::make(makeSortOptions(), Comparator(*this)));
     }
@@ -269,7 +279,7 @@ void DocumentSourceSort::loadingDone() {
     }
     _output.reset(_sorter->done());
     _sorter.reset();
-    populated = true;
+    _populated = true;
 }
 
 class DocumentSourceSort::IteratorFromCursor : public MySorter::Iterator {
@@ -297,7 +307,7 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
     }
 
     _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
-    populated = true;
+    _populated = true;
 }
 
 Value DocumentSourceSort::extractKey(const Document& d) const {

@@ -63,26 +63,26 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
     return getQuery().isEmpty() ? nullptr : this;
 }
 
-boost::optional<Document> DocumentSourceMatch::getNext() {
+DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
     pExpCtx->checkForInterrupt();
 
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
 
-    while (boost::optional<Document> next = pSource->getNext()) {
+    auto nextInput = pSource->getNext();
+    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
         // only serialize the fields we need to do the match.
-        if (_dependencies.needWholeDocument) {
-            if (_expression->matchesBSON(next->toBson())) {
-                return next;
-            }
-        } else if (_expression->matchesBSON(getObjectForMatch(*next, _dependencies.fields))) {
-            return next;
+        BSONObj toMatch = _dependencies.needWholeDocument
+            ? nextInput.getDocument().toBson()
+            : getObjectForMatch(nextInput.getDocument(), _dependencies.fields);
+
+        if (_expression->matchesBSON(toMatch)) {
+            return nextInput;
         }
     }
 
-    // We have exhausted the previous source.
-    return boost::none;
+    return nextInput;
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(

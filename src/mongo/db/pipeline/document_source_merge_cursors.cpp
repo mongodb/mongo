@@ -148,7 +148,7 @@ Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
     return Document::fromBsonWithMetaData(next);
 }
 
-boost::optional<Document> DocumentSourceMergeCursors::getNext() {
+DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
     if (_unstarted)
         start();
 
@@ -160,15 +160,15 @@ boost::optional<Document> DocumentSourceMergeCursors::getNext() {
     }
 
     if (_cursors.empty())
-        return boost::none;
+        return GetNextResult::makeEOF();
 
-    const Document next = nextSafeFrom(&((*_currentCursor)->cursor));
+    auto next = nextSafeFrom(&((*_currentCursor)->cursor));
 
     // advance _currentCursor, wrapping if needed
     if (++_currentCursor == _cursors.end())
         _currentCursor = _cursors.begin();
 
-    return next;
+    return std::move(next);
 }
 
 void DocumentSourceMergeCursors::dispose() {

@@ -46,14 +46,14 @@ const char* DocumentSourceGeoNear::getSourceName() const {
     return "$geoNear";
 }
 
-boost::optional<Document> DocumentSourceGeoNear::getNext() {
+DocumentSource::GetNextResult DocumentSourceGeoNear::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (!resultsIterator)
         runCommand();
 
     if (!resultsIterator->more())
-        return boost::none;
+        return GetNextResult::makeEOF();
 
     // each result from the geoNear command is wrapped in a wrapper object with "obj",
     // "dis" and maybe "loc" fields. We want to take the object from "obj" and inject the

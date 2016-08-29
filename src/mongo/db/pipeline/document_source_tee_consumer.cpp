@@ -42,35 +42,24 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
+                                                     size_t facetId,
                                                      const intrusive_ptr<TeeBuffer>& bufferSource)
-    : DocumentSource(expCtx), _bufferSource(bufferSource), _iterator() {}
+    : DocumentSource(expCtx), _facetId(facetId), _bufferSource(bufferSource) {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    size_t facetId,
     const boost::intrusive_ptr<TeeBuffer>& bufferSource) {
-    return new DocumentSourceTeeConsumer(expCtx, bufferSource);
+    return new DocumentSourceTeeConsumer(expCtx, facetId, bufferSource);
 }
 
-boost::optional<Document> DocumentSourceTeeConsumer::getNext() {
+DocumentSource::GetNextResult DocumentSourceTeeConsumer::getNext() {
     pExpCtx->checkForInterrupt();
-
-    if (!_initialized) {
-        _bufferSource->populate();
-        _initialized = true;
-        _iterator = _bufferSource->begin();
-    }
-
-    if (_iterator == _bufferSource->end()) {
-        return boost::none;
-    }
-
-    return {*_iterator++};
+    return _bufferSource->getNext(_facetId);
 }
 
 void DocumentSourceTeeConsumer::dispose() {
-    // Release our reference to the buffer. We shouldn't call dispose() on the buffer, since there
-    // might be other consumers that need to use it.
-    _bufferSource.reset();
+    _bufferSource->dispose(_facetId);
 }
 
 Value DocumentSourceTeeConsumer::serialize(bool explain) const {

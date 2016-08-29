@@ -54,7 +54,7 @@ const char* DocumentSourceGraphLookUp::getSourceName() const {
     return "$graphLookup";
 }
 
-boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
+DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_unwind) {
@@ -62,10 +62,12 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
     }
 
     // We aren't handling a $unwind, process the input document normally.
-    if (!(_input = pSource->getNext())) {
-        dispose();
-        return boost::none;
+    auto input = pSource->getNext();
+    if (!input.isAdvanced()) {
+        return input;
     }
+
+    _input = input.releaseDocument();
 
     performSearch();
 
@@ -87,7 +89,7 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNext() {
     return output.freeze();
 }
 
-boost::optional<Document> DocumentSourceGraphLookUp::getNextUnwound() {
+DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
     const boost::optional<FieldPath> indexPath((*_unwind)->indexPath());
 
     // If the unwind is not preserving empty arrays, we might have to process multiple inputs before
@@ -96,11 +98,13 @@ boost::optional<Document> DocumentSourceGraphLookUp::getNextUnwound() {
         if (_visited.empty()) {
             // No results are left for the current input, so we should move on to the next one and
             // perform a new search.
-            if (!(_input = pSource->getNext())) {
-                dispose();
-                return boost::none;
+
+            auto input = pSource->getNext();
+            if (!input.isAdvanced()) {
+                return input;
             }
 
+            _input = input.releaseDocument();
             performSearch();
             _visitedUsageBytes = 0;
             _outputIndex = 0;
@@ -171,7 +175,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             // We've already allocated space for the trailing $match stage in '_fromPipeline'.
             _fromPipeline.back() = *matchStage;
             auto pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
-            while (auto next = pipeline->output()->getNext()) {
+            while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
                             << "Documents in the '"

@@ -44,96 +44,132 @@ bool isMongos() {
 
 namespace {
 
-TEST(TeeBufferTest, ShouldProduceEmptyIteratorsWhenGivenNoInput) {
+TEST(TeeBufferTest, ShouldRequireAtLeastOneConsumer) {
+    ASSERT_THROWS_CODE(TeeBuffer::create(0), UserException, 40309);
+}
+
+TEST(TeeBufferTest, ShouldRequirePositiveBatchSize) {
+    ASSERT_THROWS_CODE(TeeBuffer::create(1, 0), UserException, 40310);
+    ASSERT_THROWS_CODE(TeeBuffer::create(1, -2), UserException, 40310);
+}
+
+TEST(TeeBufferTest, ShouldBeExhaustedIfInputIsExhausted) {
     auto mock = DocumentSourceMock::create();
-    auto teeBuffer = TeeBuffer::create();
+    auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
-    teeBuffer->populate();
 
-    // There are no inputs, so begin() should equal end().
-    ASSERT(teeBuffer->begin() == teeBuffer->end());
+    ASSERT(teeBuffer->getNext(0).isEOF());
+    ASSERT(teeBuffer->getNext(0).isEOF());
+    ASSERT(teeBuffer->getNext(0).isEOF());
 }
 
-TEST(TeeBufferTest, ShouldProvideIteratorOverSingleDocument) {
-    auto inputDoc = Document{{"a", 1}};
-    auto mock = DocumentSourceMock::create(inputDoc);
-    auto teeBuffer = TeeBuffer::create();
-    teeBuffer->setSource(mock.get());
-    teeBuffer->populate();
-
-    // Should be able to establish an iterator and get the document back.
-    auto it = teeBuffer->begin();
-    ASSERT(it != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*it, inputDoc);
-    ++it;
-    ASSERT(it == teeBuffer->end());
-}
-
-TEST(TeeBufferTest, ShouldProvideIteratorOverTwoDocuments) {
-    std::deque<Document> inputDocs = {Document{{"a", 1}}, Document{{"a", 2}}};
+TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfTheyFitInOneBatch) {
+    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = DocumentSourceMock::create(inputDocs);
-    auto teeBuffer = TeeBuffer::create();
+    auto teeBuffer = TeeBuffer::create(1);
     teeBuffer->setSource(mock.get());
-    teeBuffer->populate();
 
-    auto it = teeBuffer->begin();
-    ASSERT(it != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*it, inputDocs.front());
-    ++it;
-    ASSERT(it != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*it, inputDocs.back());
-    ++it;
-    ASSERT(it == teeBuffer->end());
+    auto next = teeBuffer->getNext(0);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.front());
+
+    next = teeBuffer->getNext(0);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.back());
+
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
 }
 
-TEST(TeeBufferTest, ShouldBeAbleToProvideMultipleIteratorsOverTheSameInputs) {
-    std::deque<Document> inputDocs = {Document{{"a", 1}}, Document{{"a", 2}}};
+TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
+    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
     auto mock = DocumentSourceMock::create(inputDocs);
-    auto teeBuffer = TeeBuffer::create();
-    teeBuffer->setSource(mock.get());
-    teeBuffer->populate();
 
-    auto firstIt = teeBuffer->begin();
-    auto secondIt = teeBuffer->begin();
-
-    // Advance both once.
-    ASSERT(firstIt != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*firstIt, inputDocs.front());
-    ++firstIt;
-    ASSERT(secondIt != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*secondIt, inputDocs.front());
-    ++secondIt;
-
-    // Advance them both again.
-    ASSERT(firstIt != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*firstIt, inputDocs.back());
-    ++firstIt;
-    ASSERT(secondIt != teeBuffer->end());
-    ASSERT_DOCUMENT_EQ(*secondIt, inputDocs.back());
-    ++secondIt;
-
-    // Assert they've both reached the end.
-    ASSERT(firstIt == teeBuffer->end());
-    ASSERT(secondIt == teeBuffer->end());
-}
-
-TEST(TeeBufferTest, ShouldErrorWhenBufferingTooManyDocuments) {
-    // Queue up at least 2000 bytes of input from a mock stage.
-    std::deque<Document> inputs;
-    auto largeStr = std::string(1000, 'y');
-    auto inputDoc = Document{{"x", largeStr}};
-    ASSERT_GTE(inputDoc.getApproximateSize(), 1000UL);
-    inputs.push_back(inputDoc);
-    inputs.push_back(Document{{"x", largeStr}});
-    auto mock = DocumentSourceMock::create(inputs);
-
-    const uint64_t maxMemoryUsageBytes = 1000;
-    auto teeBuffer = TeeBuffer::create(maxMemoryUsageBytes);
+    const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
+    auto teeBuffer = TeeBuffer::create(1, bufferBytes);
     teeBuffer->setSource(mock.get());
 
-    // Should exceed the configured memory limit.
-    ASSERT_THROWS(teeBuffer->populate(), UserException);
+    auto next = teeBuffer->getNext(0);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.front());
+
+    next = teeBuffer->getNext(0);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), inputDocs.back());
+
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
 }
 
+TEST(TeeBufferTest, ShouldTellConsumerToPauseIfItFinishesBatchBeforeOtherConsumers) {
+    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
+    auto mock = DocumentSourceMock::create(inputDocs);
+
+    const size_t nConsumers = 2;
+    const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
+    auto teeBuffer = TeeBuffer::create(nConsumers, bufferBytes);
+    teeBuffer->setSource(mock.get());
+
+    auto next0 = teeBuffer->getNext(0);
+    ASSERT_TRUE(next0.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.front());
+
+    ASSERT_TRUE(teeBuffer->getNext(0).isPaused());  // Consumer #1 hasn't seen the first doc yet.
+    ASSERT_TRUE(teeBuffer->getNext(0).isPaused());
+
+    auto next1 = teeBuffer->getNext(1);
+    ASSERT_TRUE(next1.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next1.getDocument(), inputDocs.front());
+
+    // Both consumers should be able to advance now. We'll advance consumer #1.
+    next1 = teeBuffer->getNext(1);
+    ASSERT_TRUE(next1.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next1.getDocument(), inputDocs.back());
+
+    // Consumer #1 should be blocked now. The next input is EOF, but the TeeBuffer didn't get that
+    // far, since the first doc filled up the buffer.
+    ASSERT_TRUE(teeBuffer->getNext(1).isPaused());
+    ASSERT_TRUE(teeBuffer->getNext(1).isPaused());
+
+    // Now exhaust consumer #0.
+    next0 = teeBuffer->getNext(0);
+    ASSERT_TRUE(next0.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.back());
+
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
+
+    // Consumer #1 will now realize it's exhausted.
+    ASSERT_TRUE(teeBuffer->getNext(1).isEOF());
+    ASSERT_TRUE(teeBuffer->getNext(1).isEOF());
+}
+
+TEST(TeeBufferTest, ShouldAllowOtherConsumersToAdvanceOnceTrailingConsumerIsDisposed) {
+    std::deque<Document> inputDocs{Document{{"a", 1}}, Document{{"a", 2}}};
+    auto mock = DocumentSourceMock::create(inputDocs);
+
+    const size_t nConsumers = 2;
+    const size_t bufferBytes = 1;  // Both docs won't fit in a single batch.
+    auto teeBuffer = TeeBuffer::create(nConsumers, bufferBytes);
+    teeBuffer->setSource(mock.get());
+
+    auto next0 = teeBuffer->getNext(0);
+    ASSERT_TRUE(next0.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.front());
+
+    ASSERT_TRUE(teeBuffer->getNext(0).isPaused());  // Consumer #1 hasn't seen the first doc yet.
+    ASSERT_TRUE(teeBuffer->getNext(0).isPaused());
+
+    // Kill consumer #1.
+    teeBuffer->dispose(1);
+
+    // Consumer #0 should be able to advance now.
+    next0 = teeBuffer->getNext(0);
+    ASSERT_TRUE(next0.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next0.getDocument(), inputDocs.back());
+
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
+    ASSERT_TRUE(teeBuffer->getNext(0).isEOF());
+}
 }  // namespace
 }  // namespace mongo

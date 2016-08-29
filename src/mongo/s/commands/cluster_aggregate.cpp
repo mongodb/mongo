@@ -247,7 +247,8 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
     }
 
     std::string outputNsOrEmpty;
-    if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pipeline.getValue()->output())) {
+    if (DocumentSourceOut* out =
+            dynamic_cast<DocumentSourceOut*>(pipeline.getValue()->getSources().back().get())) {
         outputNsOrEmpty = out->getOutputNs().ns();
     }
 

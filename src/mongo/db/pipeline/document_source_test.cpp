@@ -239,35 +239,35 @@ private:
 };
 
 TEST(Mock, OneDoc) {
-    auto doc = DOC("a" << 1);
+    auto doc = Document{{"a", 1}};
     auto source = DocumentSourceMock::create(doc);
-    ASSERT_DOCUMENT_EQ(*source->getNext(), doc);
-    ASSERT(!source->getNext());
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), doc);
+    ASSERT(source->getNext().isEOF());
 }
 
 TEST(Mock, DequeDocuments) {
     auto source = DocumentSourceMock::create({DOC("a" << 1), DOC("a" << 2)});
-    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 1));
-    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 2));
-    ASSERT(!source->getNext());
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), DOC("a" << 1));
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), DOC("a" << 2));
+    ASSERT(source->getNext().isEOF());
 }
 
 TEST(Mock, StringJSON) {
     auto source = DocumentSourceMock::create("{a : 1}");
-    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 1));
-    ASSERT(!source->getNext());
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), DOC("a" << 1));
+    ASSERT(source->getNext().isEOF());
 }
 
 TEST(Mock, DequeStringJSONs) {
     auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}"});
-    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 1));
-    ASSERT_DOCUMENT_EQ(*source->getNext(), DOC("a" << 2));
-    ASSERT(!source->getNext());
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), DOC("a" << 1));
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), DOC("a" << 2));
+    ASSERT(source->getNext().isEOF());
 }
 
 TEST(Mock, Empty) {
     auto source = DocumentSourceMock::create();
-    ASSERT(!source->getNext());
+    ASSERT(source->getNext().isEOF());
 }
 
 }  // namespace Mock
@@ -340,11 +340,11 @@ public:
         createLimit(1);
         limit()->setSource(source.get());
         // The limit's result is as expected.
-        boost::optional<Document> next = limit()->getNext();
-        ASSERT(bool(next));
-        ASSERT_VALUE_EQ(Value(1), next->getField("a"));
+        auto next = limit()->getNext();
+        ASSERT(next.isAdvanced());
+        ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
         // The limit is exhausted.
-        ASSERT(!limit()->getNext());
+        ASSERT(limit()->getNext().isEOF());
     }
 };
 
@@ -382,11 +382,12 @@ public:
         createLimit(1);
         limit()->setSource(match.get());
         // The limit is not exhauted.
-        boost::optional<Document> next = limit()->getNext();
-        ASSERT(bool(next));
-        ASSERT_VALUE_EQ(Value(1), next->getField("a"));
+        auto next = limit()->getNext();
+        ASSERT(next.isAdvanced());
+        std::cout << next.getDocument() << std::endl;
+        ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));
         // The limit is exhausted.
-        ASSERT(!limit()->getNext());
+        ASSERT(limit()->getNext().isEOF());
     }
 };
 
@@ -480,11 +481,11 @@ protected:
         return static_cast<DocumentSourceGroup*>(_group.get());
     }
     /** Assert that iterator state accessors consistently report the source is exhausted. */
-    void assertExhausted(const intrusive_ptr<DocumentSource>& source) const {
+    void assertEOF(const intrusive_ptr<DocumentSource>& source) const {
         // It should be safe to check doneness multiple times
-        ASSERT(!source->getNext());
-        ASSERT(!source->getNext());
-        ASSERT(!source->getNext());
+        ASSERT(source->getNext().isEOF());
+        ASSERT(source->getNext().isEOF());
+        ASSERT(source->getNext().isEOF());
     }
 
 private:
@@ -521,10 +522,10 @@ public:
         auto source = DocumentSourceMock::create(Document(doc()));
         group()->setSource(source.get());
         // A group result is available.
-        boost::optional<Document> next = group()->getNext();
-        ASSERT(bool(next));
+        auto next = group()->getNext();
+        ASSERT(next.isAdvanced());
         // The constant _id value from the $group spec is passed through.
-        ASSERT_BSONOBJ_EQ(expected(), next->toBson());
+        ASSERT_BSONOBJ_EQ(expected(), next.getDocument().toBson());
     }
 
 protected:
@@ -799,13 +800,13 @@ protected:
     void checkResultSet(const intrusive_ptr<DocumentSource>& sink) {
         // Load the results from the DocumentSourceGroup and sort them by _id.
         IdMap resultSet;
-        while (boost::optional<Document> current = sink->getNext()) {
+        for (auto output = sink->getNext(); output.isAdvanced(); output = sink->getNext()) {
             // Save the current result.
-            Value id = current->getField("_id");
-            resultSet[id] = *current;
+            Value id = output.getDocument().getField("_id");
+            resultSet[id] = output.releaseDocument();
         }
         // Verify the DocumentSourceGroup is exhausted.
-        assertExhausted(sink);
+        assertEOF(sink);
 
         // Convert results to BSON once they all have been retrieved (to detect any errors
         // resulting from incorrectly shared sub objects).
@@ -1029,22 +1030,22 @@ public:
         group()->setSource(source.get());
 
         auto res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id"), Value(0));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id"), Value(0));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("a"), Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("a"), Value(1));
 
-        assertExhausted(source);
+        assertEOF(source);
 
         res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id"), Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id"), Value(1));
 
-        assertExhausted(group());
+        assertEOF(group());
 
         BSONObjSet outputSort = group()->getOutputSorts();
         ASSERT_EQUALS(outputSort.size(), 1U);
@@ -1064,23 +1065,23 @@ public:
         group()->setSource(source.get());
 
         auto res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id")["x"], Value(1));
-        ASSERT_VALUE_EQ(res->getField("_id")["y"], Value(2));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["x"], Value(1));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["y"], Value(2));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id")["x"], Value(1));
-        ASSERT_VALUE_EQ(res->getField("_id")["y"], Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["x"], Value(1));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["y"], Value(1));
 
         res = source->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("a"), Value(2));
-        ASSERT_VALUE_EQ(res->getField("b"), Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("a"), Value(2));
+        ASSERT_VALUE_EQ(res.getDocument().getField("b"), Value(1));
 
-        assertExhausted(source);
+        assertEOF(source);
 
         BSONObjSet outputSort = group()->getOutputSorts();
         ASSERT_EQUALS(outputSort.size(), 2U);
@@ -1104,16 +1105,16 @@ public:
         group()->setSource(source.get());
 
         auto res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id")["x"]["y"]["z"], Value(3));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["x"]["y"]["z"], Value(3));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("a")["b"]["c"], Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("a")["b"]["c"], Value(1));
 
-        assertExhausted(source);
+        assertEOF(source);
 
         BSONObjSet outputSort = group()->getOutputSorts();
         ASSERT_EQUALS(outputSort.size(), 3U);
@@ -1140,17 +1141,17 @@ public:
         group()->setSource(source.get());
 
         auto res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["x"], Value(1));
-        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["y"], Value(1));
-        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["z"], Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["x"], Value(1));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["y"], Value(1));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["z"], Value(1));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("a"), Value(2));
-        ASSERT_VALUE_EQ(res->getField("b"), Value(3));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("a"), Value(2));
+        ASSERT_VALUE_EQ(res.getDocument().getField("b"), Value(3));
 
         BSONObjSet outputSort = group()->getOutputSorts();
 
@@ -1175,17 +1176,17 @@ public:
         group()->setSource(source.get());
 
         auto res = group()->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["x"], Value(5));
-        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["y"], Value(1));
-        ASSERT_VALUE_EQ(res->getField("_id")["sub"]["z"], Value("c"));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["x"], Value(5));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["y"], Value(1));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["z"], Value("c"));
 
         ASSERT_TRUE(group()->isStreaming());
 
         res = source->getNext();
-        ASSERT_TRUE(bool(res));
-        ASSERT_VALUE_EQ(res->getField("a"), Value(3));
-        ASSERT_VALUE_EQ(res->getField("b"), Value(1));
+        ASSERT_TRUE(res.isAdvanced());
+        ASSERT_VALUE_EQ(res.getDocument().getField("a"), Value(3));
+        ASSERT_VALUE_EQ(res.getDocument().getField("b"), Value(1));
 
         BSONObjSet outputSort = group()->getOutputSorts();
         ASSERT_EQUALS(outputSort.size(), 2U);
@@ -1399,10 +1400,10 @@ protected:
     /**
      * Assert that iterator state accessors consistently report the source is exhausted.
      */
-    void assertExhausted() const {
-        ASSERT(!_project->getNext());
-        ASSERT(!_project->getNext());
-        ASSERT(!_project->getNext());
+    void assertEOF() const {
+        ASSERT(_project->getNext().isEOF());
+        ASSERT(_project->getNext().isEOF());
+        ASSERT(_project->getNext().isEOF());
     }
 
 private:
@@ -1414,14 +1415,14 @@ TEST_F(ProjectStageTest, InclusionProjectionShouldRemoveUnspecifiedFields) {
     auto source = DocumentSourceMock::create("{_id: 0, a: 1, b: 1, c: {d: 1}}");
     project()->setSource(source.get());
     // The first result exists and is as expected.
-    boost::optional<Document> next = project()->getNext();
-    ASSERT_TRUE(next);
-    ASSERT_EQUALS(1, next->getField("a").getInt());
-    ASSERT(next->getField("b").missing());
+    auto next = project()->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getInt());
+    ASSERT(next.getDocument().getField("b").missing());
     // The _id field is included by default in the root document.
-    ASSERT_EQUALS(0, next->getField("_id").getInt());
+    ASSERT_EQUALS(0, next.getDocument().getField("_id").getInt());
     // The nested c.d inclusion.
-    ASSERT_EQUALS(1, (*next)["c"]["d"].getInt());
+    ASSERT_EQUALS(1, next.getDocument()["c"]["d"].getInt());
 };
 
 TEST_F(ProjectStageTest, ShouldOptimizeInnerExpressions) {
@@ -1450,17 +1451,17 @@ TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
     createProject(BSON("a" << true));
     auto source = DocumentSourceMock::create({"{a: 1, b: 2}", "{a: 3, b: 4}"});
     project()->setSource(source.get());
-    boost::optional<Document> next = project()->getNext();
-    ASSERT(bool(next));
-    ASSERT_EQUALS(1, next->getField("a").getInt());
-    ASSERT(next->getField("b").missing());
+    auto next = project()->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getInt());
+    ASSERT(next.getDocument().getField("b").missing());
 
     next = project()->getNext();
-    ASSERT(bool(next));
-    ASSERT_EQUALS(3, next->getField("a").getInt());
-    ASSERT(next->getField("b").missing());
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(3, next.getDocument().getField("a").getInt());
+    ASSERT(next.getDocument().getField("b").missing());
 
-    assertExhausted();
+    assertEOF();
 };
 
 /**
@@ -1471,17 +1472,17 @@ TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
     createProject(BSON("a" << false));
     auto source = DocumentSourceMock::create({"{a: 1, b: 2}", "{a: 3, b: 4}"});
     project()->setSource(source.get());
-    boost::optional<Document> next = project()->getNext();
-    ASSERT(bool(next));
-    ASSERT(next->getField("a").missing());
-    ASSERT_EQUALS(2, next->getField("b").getInt());
+    auto next = project()->getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT(next.getDocument().getField("a").missing());
+    ASSERT_EQUALS(2, next.getDocument().getField("b").getInt());
 
     next = project()->getNext();
-    ASSERT(bool(next));
-    ASSERT(next->getField("a").missing());
-    ASSERT_EQUALS(4, next->getField("b").getInt());
+    ASSERT(next.isAdvanced());
+    ASSERT(next.getDocument().getField("a").missing());
+    ASSERT_EQUALS(4, next.getDocument().getField("b").getInt());
 
-    assertExhausted();
+    assertEOF();
 };
 
 TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFields) {
@@ -1549,9 +1550,9 @@ protected:
      * Assert that iterator state accessors consistently report the source is exhausted.
      */
     void assertExhausted() const {
-        ASSERT(!_replaceRoot->getNext());
-        ASSERT(!_replaceRoot->getNext());
-        ASSERT(!_replaceRoot->getNext());
+        ASSERT(_replaceRoot->getNext().isEOF());
+        ASSERT(_replaceRoot->getNext().isEOF());
+        ASSERT(_replaceRoot->getNext().isEOF());
     }
 
     intrusive_ptr<DocumentSource> _replaceRoot;
@@ -1566,8 +1567,8 @@ TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocument) {
     Document subdoc = Document{{"b", 1}, {"c", "hello"}, {"d", Document{{"e", 2}}}};
     source()->queue.push_back(Document{{"a", subdoc}});
     auto next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, subdoc);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), subdoc);
     assertExhausted();
 }
 
@@ -1580,8 +1581,8 @@ TEST_F(ReplaceRootBasics, DottedFieldPathAsNewRootPromotesSubdocument) {
     Document subdoc = Document{{"c", 3}};
     source()->queue.push_back(Document{{"a", Document{{"b", subdoc}}}});
     auto next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, subdoc);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), subdoc);
     assertExhausted();
 }
 
@@ -1597,12 +1598,12 @@ TEST_F(ReplaceRootBasics, FieldPathAsNewRootPromotesSubdocumentInMultipleDocumen
 
     // Verify that the first document that comes out is the first document we put in.
     auto next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, subdoc1);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), subdoc1);
 
     next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, subdoc2);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), subdoc2);
     assertExhausted();
 }
 
@@ -1612,31 +1613,31 @@ TEST_F(ReplaceRootBasics, ExpressionObjectForNewRootReplacesRootWithThatObject) 
     createReplaceRoot(BSON("newRoot" << BSON("b" << 1)));
     source()->queue.push_back(Document{{"a", 2}});
     auto next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, (Document{{"b", 1}}));
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"b", 1}}));
     assertExhausted();
 
     BSONObj newObject = BSON("a" << 1 << "b" << 2 << "arr" << BSON_ARRAY(3 << 4 << 5));
     createReplaceRoot(BSON("newRoot" << newObject));
     source()->queue.push_back(Document{{"c", 2}});
     next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, Document(newObject));
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), Document(newObject));
     assertExhausted();
 
     createReplaceRoot(BSON("newRoot" << BSON("a" << BSON("b" << 1))));
     source()->queue.push_back(DOC("c" << 2));
     next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, (Document{{"a", Document{{"b", 1}}}}));
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", Document{{"b", 1}}}}));
     assertExhausted();
 
     createReplaceRoot(BSON("newRoot" << BSON("a"
                                              << "$b")));
     source()->queue.push_back(DOC("b" << 2));
     next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, (Document{{"a", 2}}));
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), (Document{{"a", 2}}));
     assertExhausted();
 }
 
@@ -1649,16 +1650,16 @@ TEST_F(ReplaceRootBasics, SystemVariableForNewRootReplacesRootWithThatObject) {
     Document inputDoc = Document{{"b", 2}};
     source()->queue.push_back(inputDoc);
     auto next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, inputDoc);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), inputDoc);
     assertExhausted();
 
     createReplaceRoot(BSON("newRoot"
                            << "$$ROOT"));
     source()->queue.push_back(inputDoc);
     next = replaceRoot()->getNext();
-    ASSERT_TRUE(bool(next));
-    ASSERT_DOCUMENT_EQ(*next, inputDoc);
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), inputDoc);
     assertExhausted();
 }
 
@@ -1852,15 +1853,16 @@ protected:
 
         boost::optional<Document> prevDoc;
         for (long long i = 0; i < nExpectedResults; i++) {
-            auto thisDoc = sample()->getNext();
-            ASSERT_TRUE(bool(thisDoc));
-            ASSERT_TRUE(thisDoc->hasRandMetaField());
+            auto nextResult = sample()->getNext();
+            ASSERT_TRUE(nextResult.isAdvanced());
+            auto thisDoc = nextResult.releaseDocument();
+            ASSERT_TRUE(thisDoc.hasRandMetaField());
             if (prevDoc) {
-                ASSERT_LTE(thisDoc->getRandMetaField(), prevDoc->getRandMetaField());
+                ASSERT_LTE(thisDoc.getRandMetaField(), prevDoc->getRandMetaField());
             }
             prevDoc = std::move(thisDoc);
         }
-        assertExhausted();
+        assertEOF();
     }
 
     /**
@@ -1875,10 +1877,10 @@ protected:
     /**
      * Assert that iterator state accessors consistently report the source is exhausted.
      */
-    void assertExhausted() const {
-        ASSERT(!_sample->getNext());
-        ASSERT(!_sample->getNext());
-        ASSERT(!_sample->getNext());
+    void assertEOF() const {
+        ASSERT(_sample->getNext().isEOF());
+        ASSERT(_sample->getNext().isEOF());
+        ASSERT(_sample->getNext().isEOF());
     }
 
 protected:
@@ -1908,7 +1910,7 @@ TEST_F(SampleBasics, ZeroSize) {
 /**
  * If the source stage is exhausted, the $sample stage should also be exhausted.
  */
-TEST_F(SampleBasics, SourceExhaustedBeforeSample) {
+TEST_F(SampleBasics, SourceEOFBeforeSample) {
     loadDocuments(5);
     checkResults(10, 5);
 }
@@ -1916,7 +1918,7 @@ TEST_F(SampleBasics, SourceExhaustedBeforeSample) {
 /**
  * A $sample stage should limit the number of results to the given size.
  */
-TEST_F(SampleBasics, SampleExhaustedBeforeSource) {
+TEST_F(SampleBasics, SampleEOFBeforeSource) {
     loadDocuments(10);
     checkResults(5, 5);
 }
@@ -1928,12 +1930,12 @@ TEST_F(SampleBasics, DocsUnmodified) {
     createSample(1);
     source()->queue.push_back(DOC("a" << 1 << "b" << DOC("c" << 2)));
     auto next = sample()->getNext();
-    ASSERT_TRUE(bool(next));
-    Document doc = *next;
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
     ASSERT_EQUALS(1, doc["a"].getInt());
     ASSERT_EQUALS(2, doc["b"]["c"].getInt());
     ASSERT_TRUE(doc.hasRandMetaField());
-    assertExhausted();
+    assertEOF();
 }
 
 /**
@@ -2003,7 +2005,7 @@ TEST_F(SampleFromRandomCursorBasics, ZeroSize) {
  * When sampling with a size smaller than the number of documents our source stage can produce,
  * there should be no more than the sample size output.
  */
-TEST_F(SampleFromRandomCursorBasics, SourceExhaustedBeforeSample) {
+TEST_F(SampleFromRandomCursorBasics, SourceEOFBeforeSample) {
     loadDocuments(5);
     checkResults(10, 5);
 }
@@ -2012,7 +2014,7 @@ TEST_F(SampleFromRandomCursorBasics, SourceExhaustedBeforeSample) {
  * When the source stage runs out of documents, the $sampleFromRandomCursors stage should be
  * exhausted.
  */
-TEST_F(SampleFromRandomCursorBasics, SampleExhaustedBeforeSource) {
+TEST_F(SampleFromRandomCursorBasics, SampleEOFBeforeSource) {
     loadDocuments(10);
     checkResults(5, 5);
 }
@@ -2024,12 +2026,12 @@ TEST_F(SampleFromRandomCursorBasics, DocsUnmodified) {
     createSample(1);
     source()->queue.push_back(DOC("_id" << 1 << "b" << DOC("c" << 2)));
     auto next = sample()->getNext();
-    ASSERT_TRUE(bool(next));
-    Document doc = *next;
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
     ASSERT_EQUALS(1, doc["_id"].getInt());
     ASSERT_EQUALS(2, doc["b"]["c"].getInt());
     ASSERT_TRUE(doc.hasRandMetaField());
-    assertExhausted();
+    assertEOF();
 }
 
 /**
@@ -2042,24 +2044,24 @@ TEST_F(SampleFromRandomCursorBasics, IgnoreDuplicates) {
     source()->queue.push_back(DOC("_id" << 2));
 
     auto next = sample()->getNext();
-    ASSERT_TRUE(bool(next));
-    Document doc = *next;
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
     ASSERT_EQUALS(1, doc["_id"].getInt());
     ASSERT_TRUE(doc.hasRandMetaField());
     double doc1Meta = doc.getRandMetaField();
 
     // Should ignore the duplicate {_id: 1}, and return {_id: 2}.
     next = sample()->getNext();
-    ASSERT_TRUE(bool(next));
-    doc = *next;
+    ASSERT_TRUE(next.isAdvanced());
+    doc = next.releaseDocument();
     ASSERT_EQUALS(2, doc["_id"].getInt());
     ASSERT_TRUE(doc.hasRandMetaField());
     double doc2Meta = doc.getRandMetaField();
     ASSERT_GTE(doc1Meta, doc2Meta);
 
     // Both stages should be exhausted.
-    ASSERT_FALSE(source()->getNext());
-    assertExhausted();
+    ASSERT_TRUE(source()->getNext().isEOF());
+    assertEOF();
 }
 
 /**
@@ -2072,7 +2074,7 @@ TEST_F(SampleFromRandomCursorBasics, TooManyDups) {
     }
 
     // First should be successful, it's not a duplicate.
-    ASSERT_TRUE(bool(sample()->getNext()));
+    ASSERT_TRUE(sample()->getNext().isAdvanced());
 
     // The rest are duplicates, should error.
     ASSERT_THROWS_CODE(sample()->getNext(), UserException, 28799);
@@ -2094,7 +2096,7 @@ TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
     source()->queue.push_back(DOC("non_id" << 2));
 
     // First should be successful.
-    ASSERT_TRUE(bool(sample()->getNext()));
+    ASSERT_TRUE(sample()->getNext().isAdvanced());
 
     ASSERT_THROWS_CODE(sample()->getNext(), UserException, 28793);
 }
@@ -2117,14 +2119,14 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
         source()->queue.push_back(DOC("_id" << 2));
 
         auto doc = sample()->getNext();
-        ASSERT_TRUE(bool(doc));
-        ASSERT_TRUE((*doc).hasRandMetaField());
-        firstTotal += (*doc).getRandMetaField();
+        ASSERT_TRUE(doc.isAdvanced());
+        ASSERT_TRUE(doc.getDocument().hasRandMetaField());
+        firstTotal += doc.getDocument().getRandMetaField();
 
         doc = sample()->getNext();
-        ASSERT_TRUE(bool(doc));
-        ASSERT_TRUE((*doc).hasRandMetaField());
-        secondTotal += (*doc).getRandMetaField();
+        ASSERT_TRUE(doc.isAdvanced());
+        ASSERT_TRUE(doc.getDocument().hasRandMetaField());
+        secondTotal += doc.getDocument().getRandMetaField();
     }
     // The average random meta value of the first document should be about 0.75. We assume that
     // 10000 trials is sufficient for us to apply the Central Limit Theorem. Using an error
@@ -2157,10 +2159,10 @@ protected:
         return dynamic_cast<DocumentSourceSort*>(_sort.get());
     }
     /** Assert that iterator state accessors consistently report the source is exhausted. */
-    void assertExhausted() const {
-        ASSERT(!_sort->getNext());
-        ASSERT(!_sort->getNext());
-        ASSERT(!_sort->getNext());
+    void assertEOF() const {
+        ASSERT(_sort->getNext().isEOF());
+        ASSERT(_sort->getNext().isEOF());
+        ASSERT(_sort->getNext().isEOF());
     }
 
 private:
@@ -2239,18 +2241,18 @@ public:
 
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
-        while (boost::optional<Document> current = sort()->getNext()) {
+        for (auto output = sort()->getNext(); output.isAdvanced(); output = sort()->getNext()) {
             // Get the current result.
-            resultSet.push_back(*current);
+            resultSet.push_back(output.releaseDocument());
         }
         // Verify the DocumentSourceUnwind is exhausted.
-        assertExhausted();
+        assertEOF();
 
         // Convert results to BSON once they all have been retrieved (to detect any errors
         // resulting from incorrectly shared sub objects).
         BSONArrayBuilder bsonResultSet;
-        for (vector<Document>::const_iterator i = resultSet.begin(); i != resultSet.end(); ++i) {
-            bsonResultSet << *i;
+        for (auto&& result : resultSet) {
+            bsonResultSet << result;
         }
         // Check the result set.
         ASSERT_BSONOBJ_EQ(expectedResultSet(), bsonResultSet.arr());
@@ -2303,8 +2305,8 @@ protected:
 
 private:
     void exhaust() {
-        while (sort()->getNext()) {
-            // do nothing
+        for (auto output = sort()->getNext(); !output.isEOF(); output = sort()->getNext()) {
+            invariant(!output.isPaused());  // do nothing
         }
     }
 };
@@ -2692,12 +2694,12 @@ private:
         _unwind->setSource(source.get());
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
-        while (boost::optional<Document> current = _unwind->getNext()) {
+        for (auto output = _unwind->getNext(); output.isAdvanced(); output = _unwind->getNext()) {
             // Get the current result.
-            resultSet.push_back(*current);
+            resultSet.push_back(output.releaseDocument());
         }
         // Verify the DocumentSourceUnwind is exhausted.
-        assertExhausted();
+        assertEOF();
 
         // Convert results to BSON once they all have been retrieved (to detect any errors resulting
         // from incorrectly shared sub objects).
@@ -2731,10 +2733,10 @@ private:
     }
 
     /** Assert that iterator state accessors consistently report the source is exhausted. */
-    void assertExhausted() const {
-        ASSERT(!_unwind->getNext());
-        ASSERT(!_unwind->getNext());
-        ASSERT(!_unwind->getNext());
+    void assertEOF() const {
+        ASSERT(_unwind->getNext().isEOF());
+        ASSERT(_unwind->getNext().isEOF());
+        ASSERT(_unwind->getNext().isEOF());
     }
 
     BSONObj expectedResultSet(bool preserveNullAndEmptyArrays, bool includeArrayIndex) const {
@@ -4193,8 +4195,9 @@ public:
         bucketAutoStage->setSource(source.get());
 
         vector<Document> results;
-        while (boost::optional<Document> next = bucketAutoStage->getNext()) {
-            results.push_back(*next);
+        for (auto next = bucketAutoStage->getNext(); next.isAdvanced();
+             next = bucketAutoStage->getNext()) {
+            results.push_back(next.releaseDocument());
         }
 
         return results;
@@ -4533,8 +4536,7 @@ TEST_F(BucketAutoTests, ReturnsNoBucketsWhenNoBucketsAreSpecifiedInCreate) {
     auto bucketAuto = DocumentSourceBucketAuto::create(ctx());
 
     bucketAuto->setSource(mock.get());
-    auto result = bucketAuto->getNext();
-    ASSERT(!result);
+    ASSERT(bucketAuto->getNext().isEOF());
 }
 
 TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
@@ -4796,9 +4798,9 @@ protected:
      * Assert that iterator state accessors consistently report the source is exhausted.
      */
     void assertExhausted() const {
-        ASSERT(!_addFields->getNext());
-        ASSERT(!_addFields->getNext());
-        ASSERT(!_addFields->getNext());
+        ASSERT(_addFields->getNext().isEOF());
+        ASSERT(_addFields->getNext().isEOF());
+        ASSERT(_addFields->getNext().isEOF());
     }
 
 private:
@@ -4811,10 +4813,10 @@ private:
 TEST_F(AddFieldsTest, KeepsUnspecifiedFieldsReplacesFieldsAndAddsNewFields) {
     createAddFields(BSON("e" << 2 << "b" << BSON("c" << 3)));
     source()->queue.push_back(Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}});
-    boost::optional<Document> next = addFields()->getNext();
-    ASSERT_TRUE(bool(next));
+    auto next = addFields()->getNext();
+    ASSERT_TRUE(next.isAdvanced());
     Document expected = Document{{"a", 1}, {"b", Document{{"c", 3}}}, {"d", 1}, {"e", 2}};
-    ASSERT_DOCUMENT_EQ(*next, expected);
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 }
 
 // Verify that the addFields stage optimizes expressions passed as input to added fields.
@@ -4844,15 +4846,15 @@ TEST_F(AddFieldsTest, ProcessesMultipleDocuments) {
     source()->queue.push_back(Document{{"a", 1}, {"b", 2}});
     source()->queue.push_back(Document{{"c", 3}, {"d", 4}});
 
-    boost::optional<Document> next = addFields()->getNext();
-    ASSERT(bool(next));
+    auto next = addFields()->getNext();
+    ASSERT_TRUE(next.isAdvanced());
     Document expected = Document{{"a", 10}, {"b", 2}};
-    ASSERT_DOCUMENT_EQ(*next, (Document{{"a", 10}, {"b", 2}}));
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
     next = addFields()->getNext();
-    ASSERT(bool(next));
+    ASSERT_TRUE(next.isAdvanced());
     expected = Document{{"c", 3}, {"d", 4}, {"a", 10}};
-    ASSERT_DOCUMENT_EQ(*next, expected);
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
     assertExhausted();
 }

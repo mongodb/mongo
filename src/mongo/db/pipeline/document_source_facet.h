@@ -34,7 +34,7 @@
 #include <vector>
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/util/string_map.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
 
@@ -43,7 +43,6 @@ class TeeBuffer;
 class DocumentSourceTeeConsumer;
 struct ExpressionContext;
 class NamespaceString;
-class Pipeline;
 
 /**
  * A $facet stage contains multiple sub-pipelines. Each input to the $facet stage will feed into
@@ -57,17 +56,25 @@ class Pipeline;
 class DocumentSourceFacet final : public DocumentSourceNeedsMongod,
                                   public SplittableDocumentSource {
 public:
+    struct FacetPipeline {
+        FacetPipeline(std::string name, boost::intrusive_ptr<Pipeline> pipeline)
+            : name(std::move(name)), pipeline(std::move(pipeline)) {}
+
+        std::string name;
+        boost::intrusive_ptr<Pipeline> pipeline;
+    };
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     static boost::intrusive_ptr<DocumentSourceFacet> create(
-        StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,
+        std::vector<FacetPipeline> facetPipelines,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Blocking call. Will consume all input and produces one output document.
      */
-    boost::optional<Document> getNext() final;
+    GetNextResult getNext() final;
 
     /**
      * Optimizes inner pipelines.
@@ -114,13 +121,13 @@ public:
     bool needsPrimaryShard() const final;
 
 private:
-    DocumentSourceFacet(StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,
+    DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     Value serialize(bool explain = false) const final;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
-    StringMap<boost::intrusive_ptr<Pipeline>> _facetPipelines;
+    std::vector<FacetPipeline> _facets;
 
     bool _done = false;
 };

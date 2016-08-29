@@ -151,11 +151,10 @@ public:
     /// The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 
-    /// The source that represents the output. Returns a non-owning pointer.
-    DocumentSource* output() {
-        invariant(!_sources.empty());
-        return _sources.back().get();
-    }
+    /**
+     * Returns the next result from the pipeline, or boost::none if there are no more results.
+     */
+    boost::optional<Document> getNext();
 
     /**
      * Write the pipeline's operators to a std::vector<Value>, with the

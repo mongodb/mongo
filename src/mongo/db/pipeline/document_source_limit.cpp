@@ -41,7 +41,7 @@ using boost::intrusive_ptr;
 
 DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                          long long limit)
-    : DocumentSource(pExpCtx), limit(limit), count(0) {}
+    : DocumentSource(pExpCtx), _limit(limit) {}
 
 REGISTER_DOCUMENT_SOURCE(limit, DocumentSourceLimit::createFromBson);
 
@@ -56,26 +56,33 @@ Pipeline::SourceContainer::iterator DocumentSourceLimit::optimizeAt(
     auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
 
     if (nextLimit) {
-        limit = std::min(limit, nextLimit->limit);
+        _limit = std::min(_limit, nextLimit->getLimit());
         container->erase(std::next(itr));
         return itr;
     }
     return std::next(itr);
 }
 
-boost::optional<Document> DocumentSourceLimit::getNext() {
+DocumentSource::GetNextResult DocumentSourceLimit::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (++count > limit) {
-        pSource->dispose();
-        return boost::none;
+    if (_nReturned >= _limit) {
+        return GetNextResult::makeEOF();
     }
 
-    return pSource->getNext();
+    auto nextInput = pSource->getNext();
+    if (nextInput.isAdvanced()) {
+        ++_nReturned;
+        if (_nReturned >= _limit) {
+            dispose();
+        }
+    }
+
+    return nextInput;
 }
 
 Value DocumentSourceLimit::serialize(bool explain) const {
-    return Value(DOC(getSourceName() << limit));
+    return Value(Document{{getSourceName(), _limit}});
 }
 
 intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(
