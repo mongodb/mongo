@@ -49,6 +49,7 @@ namespace mongo {
 namespace {
 
 MONGO_FP_DECLARE(migrationCommitError);
+MONGO_FP_DECLARE(migrationCommitVersionError);
 
 /**
  * This command takes the chunk being migrated ("migratedChunk") and generates a new version for it
@@ -72,6 +73,7 @@ MONGO_FP_DECLARE(migrationCommitError);
  *   controlChunk: {min: <min_value>, max: <max_value>},  (optional)
  *   fromShard: "<from_shard_name>",
  *   toShard: "<to_shard_name>",
+ *   fromShardCollectionVersion: <chunk_version>,
  *   shardHasDistributedLock: true/false,
  * }
  *
@@ -114,6 +116,58 @@ public:
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
+    }
+
+    /**
+     * Checks that the epoch in the version the shard sent with the command matches the epoch of the
+     * collection version found on the config server. It is possible for a migration to end up
+     * running partly without the protection of the distributed lock. This function checks that the
+     * collection has not been dropped and recreated since the migration began, unbeknown to the
+     * shard when the command was sent.
+     */
+    void checkCollectionVersionEpoch(OperationContext* txn,
+                                     const NamespaceString& nss,
+                                     const ChunkRange& chunkRange,
+                                     const ChunkVersion& shardCollectionVersion) {
+        auto findResponse = uassertStatusOK(
+            Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                txn,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                NamespaceString(ChunkType::ConfigNS),
+                BSON(ChunkType::ns() << nss.ns()),
+                BSONObj(),
+                1));
+
+        if (MONGO_FAIL_POINT(migrationCommitVersionError)) {
+            uassert(ErrorCodes::StaleEpoch,
+                    "failpoint 'migrationCommitVersionError' generated error",
+                    false);
+        }
+
+        uassert(ErrorCodes::IncompatibleShardingMetadata,
+                str::stream()
+                    << "Could not find any chunks for collection '"
+                    << nss.ns()
+                    << "'. The collection has been dropped since the migration began. Aborting "
+                    << "migration commit for chunk ("
+                    << chunkRange.toString()
+                    << ").",
+                !findResponse.docs.empty());
+
+        ChunkType chunk = uassertStatusOK(ChunkType::fromBSON(findResponse.docs.front()));
+
+        uassert(ErrorCodes::StaleEpoch,
+                str::stream() << "The collection '" << nss.ns()
+                              << "' has been dropped and recreated since the migration began."
+                              << " The config server's collection version epoch is now '"
+                              << chunk.getVersion().epoch().toString()
+                              << "', but the shard's is "
+                              << shardCollectionVersion.epoch().toString()
+                              << "'. Aborting migration commit for chunk ("
+                              << chunkRange.toString()
+                              << ").",
+                chunk.getVersion().hasEqualEpoch(shardCollectionVersion));
     }
 
     static void checkChunkIsOnShard(OperationContext* txn,
@@ -265,6 +319,11 @@ public:
         if (!commitChunkMigrationRequest.shardHasDistributedLock()) {
             checkBalancerHasDistLock(txn, nss, commitChunkMigrationRequest.getMigratedChunkRange());
         }
+
+        checkCollectionVersionEpoch(txn,
+                                    nss,
+                                    commitChunkMigrationRequest.getMigratedChunkRange(),
+                                    commitChunkMigrationRequest.getFromShardCollectionVersion());
 
         // Check that migratedChunk and controlChunk are where they should be, on fromShard.
         checkChunkIsOnShard(txn,

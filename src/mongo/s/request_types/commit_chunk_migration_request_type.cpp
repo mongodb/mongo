@@ -40,6 +40,7 @@ const char kFromShard[] = "fromShard";
 const char kToShard[] = "toShard";
 const char kMigratedChunk[] = "migratedChunk";
 const char kControlChunk[] = "controlChunk";
+const char kFromShardCollectionVersion[] = "fromShardCollectionVersion";
 const char kShardHasDistributedLock[] = "shardHasDistributedLock";
 
 /**
@@ -116,6 +117,16 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
     }
 
     {
+        auto statusWithChunkVersion =
+            ChunkVersion::parseFromBSONWithFieldForCommands(obj, kFromShardCollectionVersion);
+        if (statusWithChunkVersion.isOK()) {
+            request._fromShardCollectionVersion = std::move(statusWithChunkVersion.getValue());
+        } else if (statusWithChunkVersion != ErrorCodes::NoSuchKey) {
+            return statusWithChunkVersion.getStatus();
+        }
+    }
+
+    {
         Status shardHasDistLockStatus = bsonExtractBooleanField(
             obj, kShardHasDistributedLock, &request._shardHasDistributedLock);
         if (!shardHasDistLockStatus.isOK()) {
@@ -133,6 +144,7 @@ void CommitChunkMigrationRequest::appendAsCommand(
     const ShardId& toShard,
     const ChunkType& migratedChunkType,
     const boost::optional<ChunkType>& controlChunkType,
+    const ChunkVersion& fromShardCollectionVersion,
     const bool& shardHasDistributedLock) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
@@ -141,6 +153,7 @@ void CommitChunkMigrationRequest::appendAsCommand(
     builder->append(kFromShard, fromShard.toString());
     builder->append(kToShard, toShard.toString());
     builder->append(kMigratedChunk, migratedChunkType.toBSON());
+    fromShardCollectionVersion.appendWithFieldForCommands(builder, kFromShardCollectionVersion);
     builder->append(kShardHasDistributedLock, shardHasDistributedLock);
 
     if (controlChunkType) {

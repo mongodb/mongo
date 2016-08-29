@@ -68,5 +68,20 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
         {configureFailPoint: 'migrationCommitError', mode: 'off'}));
 
+    // migrationCommitVersionError -- tell the shard that the migration cannot be committed
+    // because the collection version epochs do not match, meaning the collection has been dropped
+    // since the migration began, which means the Balancer must have lost the distributed lock for
+    // a time.
+    assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
+        {configureFailPoint: 'migrationCommitVersionError', mode: 'alwaysOn'}));
+
+    assert.commandFailedWithCode(
+        mongos.getDB("admin").runCommand(
+            {moveChunk: coll + "", find: {Key: 0}, to: st.shard0.shardName}),
+        ErrorCodes.StaleEpoch);
+
+    assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
+        {configureFailPoint: 'migrationCommitVersionError', mode: 'off'}));
+
     st.stop();
 })();

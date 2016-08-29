@@ -290,7 +290,6 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                 str::stream() << "commit clone failed due to " << commitCloneStatus.toString()};
     }
 
-
     ChunkType migratedChunkType;
     migratedChunkType.setMin(_args.getMinKey());
     migratedChunkType.setMax(_args.getMaxKey());
@@ -315,6 +314,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                                  _args.getToShardId(),
                                                  migratedChunkType,
                                                  controlChunkType,
+                                                 _committedMetadata->getCollVersion(),
                                                  _args.getTakeDistLock());
 
     builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
@@ -363,19 +363,24 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         css->refreshMetadata(
             txn, _committedMetadata->cloneMigrate(migratingChunkToForget, committedCollVersion));
         _committedMetadata = css->getMetadata();
-    } else if (commitChunkMigrationResponse.isOK() &&
-               commitChunkMigrationResponse.getValue().commandStatus ==
-                   ErrorCodes::BalancerLostDistributedLock) {
-        // We were unable to commit because the Balancer was no longer holding the collection
-        // distributed lock. No attempt to commit was made.
-        return commitChunkMigrationResponse.getValue().commandStatus;
     } else {
         // This could be an unrelated error (e.g. network error). Check whether the metadata update
         // succeeded by refreshing the collection metadata from the config server and checking that
         // the original chunks no longer exist.
 
+        Status migrationErrorStatus(ErrorCodes::NotYetInitialized,
+                                    "Migration status not yet initialized.");
+        if (commitChunkMigrationResponse.getStatus().isOK()) {
+            invariant(!commitChunkMigrationResponse.getValue().commandStatus.isOK());
+            migrationErrorStatus = commitChunkMigrationResponse.getValue().commandStatus;
+        } else {
+            migrationErrorStatus = commitChunkMigrationResponse.getStatus();
+        }
+        invariant(migrationErrorStatus != ErrorCodes::NotYetInitialized &&
+                  migrationErrorStatus != ErrorCodes::OK);
+
         warning() << "Migration metadata commit may have failed: refreshing metadata to check"
-                  << redact(commitChunkMigrationResponse.getStatus());
+                  << redact(migrationErrorStatus);
 
         // Need to get the latest optime in case the refresh request goes to a secondary --
         // otherwise the read won't wait for the write that _configsvrCommitChunkMigration may have
@@ -398,7 +403,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                  << ","
                                  << _args.getMaxKey()
                                  << ") due to "
-                                 << causedBy(commitChunkMigrationResponse.getStatus())
+                                 << causedBy(migrationErrorStatus)
                                  << ", and updating the optime with a write before refreshing the "
                                  << "metadata also failed: "
                                  << causedBy(status)});
@@ -415,7 +420,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                        << ","
                                        << _args.getMaxKey()
                                        << ") due to "
-                                       << causedBy(commitChunkMigrationResponse.getStatus())
+                                       << causedBy(migrationErrorStatus)
                                        << ", and refreshing collection metadata failed: "
                                        << causedBy(refreshStatus)});
 
@@ -432,11 +437,12 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
 
                 // After refresh, the collection metadata indicates that the donor shard still owns
                 // the chunk, so no migration changes were written to the config server metadata.
+
                 return {
-                    commitChunkMigrationResponse.getStatus().code(),
+                    migrationErrorStatus.code(),
                     str::stream()
                         << "Migration was not committed, _configsvrCommitChunkMigration failed: "
-                        << causedBy(commitChunkMigrationResponse.getStatus())};
+                        << causedBy(migrationErrorStatus)};
             }
 
             if (controlChunkType) {
@@ -449,7 +455,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                     // untrue, then the control chunk was not committed, but the migrated chunk has
                     // been. This state is not recoverable.
                     fassertStatusOK(40138,
-                                    {commitChunkMigrationResponse.getStatus().code(),
+                                    {migrationErrorStatus.code(),
                                      str::stream()
                                          << "Migration was partially committed. The collection "
                                          << "version prior to commit was '"
@@ -457,7 +463,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                                          << "'. The new collection version is '"
                                          << refreshedCollVersion.toString()
                                          << ". State is unrecoverable. CommitChunkMigration error: "
-                                         << causedBy(commitChunkMigrationResponse.getStatus())});
+                                         << causedBy(migrationErrorStatus)});
                 }
             } else {
                 // There are no chunks remaining on this shard. The collection version should have

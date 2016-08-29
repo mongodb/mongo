@@ -64,12 +64,15 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
     controlChunkTypeTemp.setMax(kKey3);
     boost::optional<ChunkType> controlChunkType = std::move(controlChunkTypeTemp);
 
+    ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
+
     CommitChunkMigrationRequest::appendAsCommand(&builder,
                                                  kNamespaceString,
                                                  kShardId0,
                                                  kShardId1,
                                                  migratedChunkType,
                                                  controlChunkType,
+                                                 fromShardCollectionVersion,
                                                  kShardHasDistributedLock);
 
     BSONObj cmdObj = builder.obj();
@@ -85,6 +88,7 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
     ASSERT(request.hasControlChunkRange());
     ASSERT_BSONOBJ_EQ(kKey2, request.getControlChunkRange().getMin());
     ASSERT_BSONOBJ_EQ(kKey3, request.getControlChunkRange().getMax());
+    ASSERT_EQ(fromShardCollectionVersion, request.getFromShardCollectionVersion());
     ASSERT_EQ(kShardHasDistributedLock, request.shardHasDistributedLock());
 }
 
@@ -95,12 +99,15 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     migratedChunkType.setMin(kKey0);
     migratedChunkType.setMax(kKey1);
 
+    ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
+
     CommitChunkMigrationRequest::appendAsCommand(&builder,
                                                  kNamespaceString,
                                                  kShardId0,
                                                  kShardId1,
                                                  migratedChunkType,
                                                  boost::none,
+                                                 fromShardCollectionVersion,
                                                  kShardHasDistributedLock);
 
     BSONObj cmdObj = builder.obj();
@@ -114,6 +121,7 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunkRange().getMin());
     ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunkRange().getMax());
     ASSERT(!request.hasControlChunkRange());
+    ASSERT_EQ(fromShardCollectionVersion, request.getFromShardCollectionVersion());
     ASSERT_EQ(kShardHasDistributedLock, request.shardHasDistributedLock());
 }
 

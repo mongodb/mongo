@@ -57,6 +57,7 @@ public:
                                 const ShardId& toShard,
                                 const ChunkType& migratedChunkType,
                                 const boost::optional<ChunkType>& controlChunkType,
+                                const ChunkVersion& fromShardChunkVersion,
                                 const bool& shardHasDistributedLock);
 
     const NamespaceString& getNss() const {
@@ -81,6 +82,10 @@ public:
         return bool(_controlChunkRange);
     }
 
+    const ChunkVersion& getFromShardCollectionVersion() const {
+        return _fromShardCollectionVersion;
+    }
+
     bool shardHasDistributedLock() {
         return _shardHasDistributedLock;
     }
@@ -102,6 +107,9 @@ private:
 
     // Range of control chunk being moved, if it exists.
     boost::optional<ChunkRange> _controlChunkRange;
+
+    // Collection version of the source shard.
+    ChunkVersion _fromShardCollectionVersion;
 
     // Flag to indicate whether the shard has the distlock.
     bool _shardHasDistributedLock;
