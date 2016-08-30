@@ -2329,7 +2329,7 @@ main(int argc, char *argv[])
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
 	    cfg->session_count_idle > 0 || cfg->compress_ext != NULL ||
 	    cfg->async_config != NULL) {
-		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
+		req_len = strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
 		if (cfg->async_config != NULL)
@@ -2349,21 +2349,23 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s%s",
-		    cfg->conn_config,
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s",
 		    cfg->async_config ? cfg->async_config : "",
 		    cfg->compress_ext ? cfg->compress_ext : "",
-		    cfg->verbose > 1 ? ",": "",
-		    cfg->verbose > 1 ? debug_cconfig : "",
+		    cfg->verbose > 1 && strlen(debug_cconfig) ? ",": "",
+		    cfg->verbose > 1 &&
+			strlen(debug_cconfig) ? debug_cconfig : "",
 		    sess_cfg ? sess_cfg : "",
 		    user_cconfig ? ",": "",
 		    user_cconfig ? user_cconfig : "");
-		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
-			goto err;
+		if (strlen(cc_buf))
+			if ((ret = config_opt_str(
+			    cfg, "conn_config", cc_buf)) != 0)
+				goto err;
 	}
 	if (cfg->verbose > 1 || cfg->index ||
 	    user_tconfig != NULL || cfg->compress_table != NULL) {
-		req_len = strlen(cfg->table_config) + strlen(debug_tconfig) + 3;
+		req_len = strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
 		if (cfg->compress_table != NULL)
@@ -2374,16 +2376,18 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
-		    cfg->table_config,
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s",
 		    cfg->index ? INDEX_COL_NAMES : "",
 		    cfg->compress_table ? cfg->compress_table : "",
-		    cfg->verbose > 1 ? ",": "",
-		    cfg->verbose > 1 ? debug_tconfig : "",
+		    cfg->verbose > 1 && strlen(debug_tconfig) ? ",": "",
+		    cfg->verbose > 1 &&
+			strlen(debug_tconfig) ? debug_tconfig : "",
 		    user_tconfig ? ",": "",
 		    user_tconfig ? user_tconfig : "");
-		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
-			goto err;
+		if (strlen(tc_buf))
+			if ((ret = config_opt_str(
+			    cfg, "table_config", tc_buf)) != 0)
+				goto err;
 	}
 	if (cfg->log_partial && cfg->table_count > 1) {
 		req_len = strlen(cfg->table_config) +

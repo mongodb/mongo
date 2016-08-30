@@ -43,7 +43,7 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define	EXT_PFX	",extensions=("
 #define	EXT_SFX	")"
 #define	EXTPATH "../../ext/compressors/"		/* Extensions path */
-#define	BLKCMP_PFX	",block_compressor="
+#define	BLKCMP_PFX	"block_compressor="
 
 #define	LZ4_BLK BLKCMP_PFX "lz4"
 #define	LZ4_EXT							\
