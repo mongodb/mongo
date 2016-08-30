@@ -184,6 +184,16 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target="list_collections_filter_test",
+    source=[
+        "list_collections_filter_test.cpp"
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+    ],
+)
+
+env.CppUnitTest(
     target="index_filter_commands_test",
     source=[
         "index_filter_commands_test.cpp",

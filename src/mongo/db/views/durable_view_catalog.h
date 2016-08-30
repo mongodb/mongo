@@ -49,7 +49,7 @@ class OperationContext;
 class DurableViewCatalog {
 public:
     static constexpr StringData viewsCollectionName() {
-        return NamespaceString::kSystemDotViewsCol;
+        return NamespaceString::kSystemDotViewsCollectionName;
     }
 
     /**

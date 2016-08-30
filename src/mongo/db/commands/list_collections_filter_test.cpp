@@ -30,34 +30,42 @@
 
 #include "mongo/db/commands/list_collections_filter.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace {
 
-// TODO SERVER-25493: Remove $exists clause once MongoDB versions <= 3.2 are no longer supported.
-BSONObj ListCollectionsFilter::makeTypeCollectionFilter() {
-    return BSON("$or" << BSON_ARRAY(BSON("type"
-                                         << "collection")
-                                    << BSON("type" << BSON("$exists" << false))));
+using namespace mongo;
+
+TEST(ListCollectionsFilterTest, AddCollectionFilter) {
+    BSONObj filter = fromjson("{'options.capped': false}");
+    BSONObj expected = fromjson(
+        "{$and: ["
+        "{'options.capped': false}, "
+        "{$or: [{type: 'collection'}, {type: {$exists: false}}]}]}");
+
+    ASSERT_BSONOBJ_EQ(expected, ListCollectionsFilter::addTypeCollectionFilter(filter));
 }
 
-BSONObj ListCollectionsFilter::makeTypeViewFilter() {
-    return BSON("type"
-                << "view");
+TEST(ListCollectionsFilterTest, AddCollectionFilterToEmptyInputFilter) {
+    BSONObj filter;
+    BSONObj expected = fromjson("{$or: [{type: 'collection'}, {type: {$exists: false}}]}");
+
+    ASSERT_BSONOBJ_EQ(expected, ListCollectionsFilter::addTypeCollectionFilter(filter));
 }
 
-BSONObj ListCollectionsFilter::addTypeCollectionFilter(const BSONObj& filter) {
-    if (filter.isEmpty())
-        return makeTypeCollectionFilter();
+TEST(ListCollectionsFilterTest, AddViewFilter) {
+    BSONObj filter = fromjson("{'options.capped': false}");
+    BSONObj expected = fromjson("{$and: [{'options.capped': false}, {type: 'view'}]}");
 
-    return BSON("$and" << BSON_ARRAY(filter << makeTypeCollectionFilter()));
+    ASSERT_BSONOBJ_EQ(expected, ListCollectionsFilter::addTypeViewFilter(filter));
 }
 
-BSONObj ListCollectionsFilter::addTypeViewFilter(const BSONObj& filter) {
-    if (filter.isEmpty())
-        return makeTypeViewFilter();
+TEST(ListCollectionsFilterTest, AddViewFilterToEmptyInputFilter) {
+    BSONObj filter;
+    BSONObj expected = fromjson("{type: 'view'}");
 
-    return BSON("$and" << BSON_ARRAY(filter << makeTypeViewFilter()));
+    ASSERT_BSONOBJ_EQ(expected, ListCollectionsFilter::addTypeViewFilter(filter));
 }
 
-}  // namespace mongo
+}  // namespace

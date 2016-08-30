@@ -104,8 +104,8 @@
         cleanupOrphaned: {
             skip: "Tested in views/views_sharded.js",
         },
-        clone: {skip: "TODO(SERVER-24506)"},
-        cloneCollection: {skip: "TODO(SERVER-24506)"},
+        clone: {skip: "Tested in replsets/cloneDb.js"},
+        cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
         cloneCollectionAsCapped: {
             command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
             expectFailure: true,
@@ -118,7 +118,7 @@
         connPoolSync: {skip: isUnrelated},
         connectionStatus: {skip: isUnrelated},
         convertToCapped: {command: {convertToCapped: "view", size: 12345}, expectFailure: true},
-        copydb: {skip: "TODO(SERVER-24506)"},
+        copydb: {skip: "Tested in replsets/copydb.js"},
         copydbgetnonce: {skip: isUnrelated},
         copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},

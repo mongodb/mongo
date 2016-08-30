@@ -54,3 +54,13 @@ assert.writeOK(f.a.insert({}));
 assert.gt(f.system.profile.count(), 0);
 t.system.profile.drop();
 assert.commandFailed(t.cloneCollection("localhost:" + fromMongod.port, "system.profile"));
+
+// Check that cloning a view is disallowed.
+f.a.drop();
+t.a.drop();
+
+assert.commandWorked(f.createCollection("a"));
+assert.commandWorked(f.createView("viewA", "a", []));
+assert.commandFailedWithCode(t.cloneCollection("localhost:" + fromMongod.port, "viewA"),
+                             ErrorCodes.CommandNotSupportedOnView,
+                             "cloneCollection on view expected to fail");

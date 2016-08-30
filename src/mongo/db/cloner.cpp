@@ -155,6 +155,8 @@ struct Cloner::Fun {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", to_collection.ns());
         }
 
+        const bool isSystemViewsClone = to_collection.isSystemDotViews();
+
         while (i.moreInCurrentBatch()) {
             if (numSeen % 128 == 127) {
                 time_t now = time(0);
@@ -197,6 +199,23 @@ struct Cloner::Fun {
             }
 
             BSONObj tmp = i.nextSafe();
+
+            // If copying the system.views collection to a database with a different name, then any
+            // view definitions must be modified to refer to the 'to' database.
+            if (isSystemViewsClone && from_collection.db() != to_collection.db()) {
+                BSONObjBuilder bob;
+                for (auto&& item : tmp) {
+                    if (item.fieldNameStringData() == "_id") {
+                        auto viewNss = NamespaceString(item.checkAndGetStringData());
+
+                        bob.append("_id",
+                                   NamespaceString(to_collection.db(), viewNss.coll()).toString());
+                    } else {
+                        bob.append(item);
+                    }
+                }
+                tmp = bob.obj();
+            }
 
             /* assure object is valid.  note this will slow us down a little. */
             const Status status = validateBSON(tmp.objdata(), tmp.objsize());
@@ -396,6 +415,22 @@ bool Cloner::copyCollection(OperationContext* txn,
     if (!collList.empty()) {
         invariant(collList.size() <= 1);
         BSONObj col = collList.front();
+
+        // Confirm that 'col' is not a view.
+        {
+            std::string namespaceType;
+            auto status = bsonExtractStringField(col, "type", &namespaceType);
+
+            uassert(ErrorCodes::InternalError,
+                    str::stream() << "Collection 'type' expected to be a string: " << col,
+                    ErrorCodes::TypeMismatch != status.code());
+
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "copyCollection not supported for views. ns: "
+                                  << col["name"].valuestrsafe(),
+                    !(status.isOK() && namespaceType == "view"));
+        }
+
         if (col["options"].isABSONObj()) {
             options = col["options"].Obj();
         }

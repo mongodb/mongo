@@ -64,7 +64,7 @@ public:
     static const StringData kLocalDb;
 
     // Name for the system views collection
-    static constexpr StringData kSystemDotViewsCol = "system.views"_sd;
+    static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
@@ -166,7 +166,7 @@ public:
         return coll() == "system.profile";
     }
     bool isSystemDotViews() const {
-        return coll() == kSystemDotViewsCol;
+        return coll() == kSystemDotViewsCollectionName;
     }
     bool isConfigDB() const {
         return db() == "config";
