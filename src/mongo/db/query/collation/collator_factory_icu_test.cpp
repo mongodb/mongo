@@ -1063,6 +1063,131 @@ TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
     ASSERT_LT(comparisonKeyABB.getKeyData().compare(comparisonKeyBA.getKeyData()), 0);
 }
 
+TEST(CollatorFactoryICUTest, BackwardsTrueWithStrengthOneFails) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "backwards"
+                                              << true
+                                              << "strength"
+                                              << 1));
+    ASSERT_NOT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, BackwardsTrueWithStrengthTwoSucceeds) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "backwards"
+                                              << true
+                                              << "strength"
+                                              << 2));
+    ASSERT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthThreeSucceeds) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "strength"
+                                              << 3));
+    ASSERT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthThreeSucceeds) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "strength"
+                                              << 3));
+    ASSERT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithCaseLevelSucceeds) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "caseLevel"
+                                              << true
+                                              << "strength"
+                                              << 1));
+    ASSERT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithCaseLevelSucceeds) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "caseLevel"
+                                              << true
+                                              << "strength"
+                                              << 1));
+    ASSERT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstOffWithStrengthOneSucceeds) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "off"
+                                              << "strength"
+                                              << 1));
+    ASSERT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthOneFails) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "strength"
+                                              << 1));
+    ASSERT_NOT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthTwoFails) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "strength"
+                                              << 2));
+    ASSERT_NOT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthOneFails) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "strength"
+                                              << 1));
+    ASSERT_NOT_OK(collator.getStatus());
+}
+
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthTwoFails) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "strength"
+                                              << 2));
+    ASSERT_NOT_OK(collator.getStatus());
+}
+
 TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithArabicLocale) {
     CollatorFactoryICU factory;
     ASSERT_OK(factory

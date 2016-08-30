@@ -661,6 +661,39 @@ Status validateLocaleID(const BSONObj& spec,
     return Status::OK();
 }
 
+// Returns a non-OK status if 'spec' contains any invalid combinations of options.
+Status validateCollationSpec(const CollationSpec& spec) {
+    // The backwards option specifically means backwards secondary weighting, and therefore only
+    // affects the secondary comparison level. It has no effect at strength 1.
+    if (spec.backwards && spec.strength == CollationSpec::StrengthType::kPrimary) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << CollationSpec::kBackwardsField << "' is invalid with '"
+                              << CollationSpec::kStrengthField
+                              << "' of "
+                              << static_cast<int>(CollationSpec::StrengthType::kPrimary)
+                              << " in: "
+                              << spec.toBSON()};
+    }
+
+    // The caseFirst option only affects tertiary level or caseLevel comparisons. It will have no
+    // affect if caseLevel is off and strength is 1 or 2.
+    if (spec.caseFirst != CollationSpec::CaseFirstType::kOff && !spec.caseLevel &&
+        (spec.strength == CollationSpec::StrengthType::kPrimary ||
+         spec.strength == CollationSpec::StrengthType::kSecondary)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << CollationSpec::kCaseFirstField << "' is invalid unless '"
+                              << CollationSpec::kCaseLevelField
+                              << "' is on or '"
+                              << CollationSpec::kStrengthField
+                              << "' is greater than "
+                              << static_cast<int>(CollationSpec::StrengthType::kSecondary)
+                              << " in: "
+                              << spec.toBSON()};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
@@ -714,6 +747,11 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     auto parsedSpec = parseToCollationSpec(spec, userLocale.getName(), icuCollator.get());
     if (!parsedSpec.isOK()) {
         return parsedSpec.getStatus();
+    }
+
+    auto validateSpecStatus = validateCollationSpec(parsedSpec.getValue());
+    if (!validateSpecStatus.isOK()) {
+        return validateSpecStatus;
     }
 
     auto mongoCollator = stdx::make_unique<CollatorInterfaceICU>(std::move(parsedSpec.getValue()),
