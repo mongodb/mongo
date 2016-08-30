@@ -149,7 +149,9 @@ void (*snmpInit)() = NULL;
 
 extern int diagLogging;
 
-static const NamespaceString startupLogCollectionName("local.startup_log");
+namespace {
+
+const NamespaceString startupLogCollectionName("local.startup_log");
 
 #ifdef _WIN32
 ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -215,7 +217,7 @@ public:
     }
 };
 
-static void logStartup(OperationContext* txn) {
+void logStartup(OperationContext* txn) {
     BSONObjBuilder toLog;
     stringstream id;
     id << getHostNameCached() << "-" << jsTime().asInt64();
@@ -255,7 +257,7 @@ static void logStartup(OperationContext* txn) {
     wunit.commit();
 }
 
-static void checkForIdIndexes(OperationContext* txn, Database* db) {
+void checkForIdIndexes(OperationContext* txn, Database* db) {
     if (db->name() == "local") {
         // we do not need an _id index on anything in the local database
         return;
@@ -293,7 +295,7 @@ static void checkForIdIndexes(OperationContext* txn, Database* db) {
  * @returns the number of documents in local.system.replset or 0 if this was started with
  *          --replset.
  */
-static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* txn) {
+unsigned long long checkIfReplMissingFromCommandLine(OperationContext* txn) {
     // This is helpful for the query below to work as you can't open files when readlocked
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite lk(txn->lockState());
@@ -311,7 +313,7 @@ static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* tx
  * start up or get promoted to be replica set primaries, newer nodes clear the temp flags left by
  * these versions.
  */
-static bool isSubjectToSERVER23299(OperationContext* txn) {
+bool isSubjectToSERVER23299(OperationContext* txn) {
     dbHolder().openDb(txn, startupLogCollectionName.db());
     AutoGetCollectionForRead autoColl(txn, startupLogCollectionName);
     // No startup log or an empty one means either that the user was not running an affected
@@ -353,7 +355,7 @@ static bool isSubjectToSERVER23299(OperationContext* txn) {
     return true;
 }
 
-static void handleSERVER23299ForDb(OperationContext* txn, Database* db) {
+void handleSERVER23299ForDb(OperationContext* txn, Database* db) {
     log() << "Scanning " << db->name() << " db for SERVER-23299 eligibility";
     const auto dbEntry = db->getDatabaseCatalogEntry();
     list<string> collNames;
@@ -378,7 +380,7 @@ static void handleSERVER23299ForDb(OperationContext* txn, Database* db) {
  * Check that the oplog is capped, and abort the process if it is not.
  * Caller must lock DB before calling this function.
  */
-static void checkForCappedOplog(OperationContext* txn, Database* db) {
+void checkForCappedOplog(OperationContext* txn, Database* db) {
     const NamespaceString oplogNss(repl::rsOplogName);
     invariant(txn->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
     Collection* oplogCollection = db->getCollection(oplogNss);
@@ -389,7 +391,7 @@ static void checkForCappedOplog(OperationContext* txn, Database* db) {
     }
 }
 
-static void repairDatabasesAndCheckVersion(OperationContext* txn) {
+void repairDatabasesAndCheckVersion(OperationContext* txn) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
     ScopedTransaction transaction(txn, MODE_X);
@@ -523,7 +525,7 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     LOG(1) << "done repairDatabases" << endl;
 }
 
-static void _initWireSpec() {
+void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
     spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
@@ -533,8 +535,7 @@ static void _initWireSpec() {
     spec.maxWireVersionOutgoing = FIND_COMMAND;
 }
 
-
-static void _initAndListen(int listenPort) {
+void _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     _initWireSpec();
@@ -804,6 +805,8 @@ ExitCode initAndListen(int listenPort) {
         return EXIT_UNCAUGHT;
     }
 }
+
+}  // namespace
 
 #if defined(_WIN32)
 ExitCode initService() {
