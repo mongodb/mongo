@@ -414,18 +414,6 @@ Timestamp DataReplicator::_applyUntilAndPause(Timestamp untilTimestamp) {
     return _applyUntil(untilTimestamp);
 }
 
-StatusWith<Timestamp> DataReplicator::flushAndPause() {
-    //_run(&_pauseApplier);
-    UniqueLock lk(_mutex);
-    if (_applierActive) {
-        _applierPaused = true;
-        lk.unlock();
-        _applier->join();
-        lk.lock();
-    }
-    return StatusWith<Timestamp>(_lastApplied.opTime.getTimestamp());
-}
-
 void DataReplicator::_resetState_inlock(OperationContext* txn, OpTimeWithHash lastAppliedOpTime) {
     invariant(!_anyActiveHandles_inlock());
     _lastApplied = _lastFetched = lastAppliedOpTime;
@@ -801,7 +789,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     _reporterPaused = false;
     _fetcherPaused = false;
     _applierPaused = false;
-    _applierActive = false;
 
     _lastFetched = _lastApplied;
 
@@ -878,7 +865,7 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
 }
 
 bool DataReplicator::_anyActiveHandles_inlock() const {
-    return _applierActive || (_oplogFetcher && _oplogFetcher->isActive()) ||
+    return (_oplogFetcher && _oplogFetcher->isActive()) ||
         (_initialSyncState && _initialSyncState->dbsCloner &&
          _initialSyncState->dbsCloner->isActive()) ||
         (_applier && _applier->isActive()) ||
@@ -1022,11 +1009,10 @@ void DataReplicator::_doNextActions_Steady_inlock() {
     }
 
     // Check if no active apply and ops to apply
-    if (!_applierActive) {
+    if (!_applier || !_applier->isActive()) {
         if (_oplogBuffer && _oplogBuffer->getSize() > 0) {
             const auto scheduleStatus = _scheduleApplyBatch_inlock();
             if (!scheduleStatus.isOK()) {
-                _applierActive = false;
                 if (scheduleStatus != ErrorCodes::ShutdownInProgress) {
                     error() << "Error scheduling apply batch '" << scheduleStatus << "'.";
                     _applier.reset();
@@ -1036,8 +1022,6 @@ void DataReplicator::_doNextActions_Steady_inlock() {
         } else {
             LOG(3) << "Cannot apply a batch since we have nothing buffered.";
         }
-    } else if (_applierActive && !_applier->isActive()) {
-        error() << "ERROR: DataReplicator::_applierActive is false but _applier is not active.";
     }
 
     if (!_reporterPaused && (!_reporter || !_reporter->isActive()) && !_syncSource.empty()) {
@@ -1132,7 +1116,6 @@ void DataReplicator::_onApplyBatchFinish(const Status& status,
     }
 
     UniqueLock lk(_mutex);
-    _applierActive = false;
     // This might block in _shuttingDownApplier's destructor if it is still active here.
     _shuttingDownApplier = std::move(_applier);
 
@@ -1183,7 +1166,11 @@ Status DataReplicator::_scheduleApplyBatch() {
 }
 
 Status DataReplicator::_scheduleApplyBatch_inlock() {
-    if (_applierPaused || _applierActive) {
+    if (_applierPaused) {
+        return Status::OK();
+    }
+
+    if (_applier && _applier->isActive()) {
         return Status::OK();
     }
 
@@ -1206,7 +1193,6 @@ Status DataReplicator::_scheduleApplyBatch_inlock() {
     }
     const Operations& ops = batchStatus.getValue();
     if (ops.empty()) {
-        _applierActive = false;
         return _scheduleDoNextActions();
     }
     return _scheduleApplyBatch_inlock(ops);
@@ -1246,7 +1232,6 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
 
     invariant(!(_applier && _applier->isActive()));
     _applier = stdx::make_unique<MultiApplier>(_exec, ops, applierFn, multiApplyFn, lambda);
-    _applierActive = true;
     return _applier->startup();
 }
 
@@ -1379,7 +1364,7 @@ void DataReplicator::waitForShutdown() {
         LockGuard lk(_mutex);
         invariant(!_lastOplogEntryFetcher || !_lastOplogEntryFetcher->isActive());
         invariant(!_oplogFetcher || !_oplogFetcher->isActive());
-        invariant(!_applierActive);
+        invariant(!_applier || !_applier->isActive());
         invariant(!_reporter || !_reporter->isActive());
     }
 }

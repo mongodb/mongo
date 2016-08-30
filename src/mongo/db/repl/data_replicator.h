@@ -228,9 +228,6 @@ public:
     // Pauses replication and application
     Status pause();
 
-    // Pauses replication and waits to return until all un-applied ops have been applied
-    StatusWith<Timestamp> flushAndPause();
-
     // Called when a slave has progressed to a new oplog position
     void slavesHaveProgressed();
 
@@ -365,7 +362,6 @@ private:
     bool _reporterPaused = false;                                               // (M)
     Handle _reporterHandle;                                                     // (M)
     std::unique_ptr<Reporter> _reporter;                                        // (M)
-    bool _applierActive = false;                                                // (M)
     bool _applierPaused = false;                                                // (X)
     std::unique_ptr<MultiApplier> _applier;                                     // (M)
     std::unique_ptr<MultiApplier> _shuttingDownApplier;                         // (M)
