@@ -67,6 +67,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -98,6 +99,8 @@ using NextAction = Fetcher::NextAction;
 namespace {
 
 const char kLocalDB[] = "local";
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(numInitialSyncRetries, int, 9);
 
 void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -599,7 +602,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
                 _storage);
             lk.unlock();
 
-            const auto status = _dr->doInitialSync(txn);
+            const auto status = _dr->doInitialSync(txn, numInitialSyncRetries);
             // If it is interrupted by resync, we do not need to cleanup the DataReplicator.
             if (status == ErrorCodes::ShutdownInProgress) {
                 return;

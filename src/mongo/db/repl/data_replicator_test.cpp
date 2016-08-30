@@ -419,7 +419,7 @@ TEST_F(DataReplicatorTest, StartOk) {
 TEST_F(DataReplicatorTest, CannotInitialSyncAfterStart) {
     auto txn = makeOpCtx();
     ASSERT_EQ(getDR().start(txn.get()).code(), ErrorCodes::OK);
-    ASSERT_EQ(getDR().doInitialSync(txn.get()), ErrorCodes::AlreadyInitialized);
+    ASSERT_EQ(getDR().doInitialSync(txn.get(), 0), ErrorCodes::AlreadyInitialized);
 }
 
 // Used to run a Initial Sync in a separate thread, to avoid blocking test execution.

@@ -67,7 +67,6 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 }  // namespace
 
 
-extern const std::size_t kInitialSyncMaxRetries;
 extern const std::size_t kInitialSyncMaxConnectRetries;
 
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
@@ -236,15 +235,14 @@ public:
     void slavesHaveProgressed();
 
     // Just like initialSync but can be called any time.
-    StatusWith<Timestamp> resync(OperationContext* txn);
+    StatusWith<Timestamp> resync(OperationContext* txn, std::size_t maxRetries);
 
     /**
      *  Does an initial sync, with up to 'kInitialSyncMaxRetries' retries.
      *
      *  This should be the first method called after construction (see class comment).
      */
-    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn,
-                                             std::size_t maxRetries = kInitialSyncMaxRetries);
+    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn, std::size_t maxRetries);
 
     DataReplicatorState getState() const;
 

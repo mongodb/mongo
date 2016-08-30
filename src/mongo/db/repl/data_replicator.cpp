@@ -67,7 +67,6 @@
 namespace mongo {
 namespace repl {
 
-const std::size_t kInitialSyncMaxRetries = 9;
 const std::size_t kInitialSyncMaxConnectRetries = 10;
 
 // Failpoint for initial sync
@@ -444,7 +443,7 @@ void DataReplicator::slavesHaveProgressed() {
     }
 }
 
-StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn) {
+StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn, std::size_t maxRetries) {
     _shutdown(txn);
     // Drop databases and do initialSync();
     CBHStatus cbh = scheduleWork(_exec, [this](OperationContext* txn, const CallbackArgs& cbData) {
@@ -457,7 +456,7 @@ StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn) {
 
     _exec->wait(cbh.getValue());
 
-    auto status = doInitialSync(txn);
+    auto status = doInitialSync(txn, maxRetries);
     if (status.isOK()) {
         return status.getValue().opTime.getTimestamp();
     } else {
