@@ -221,11 +221,11 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
 
 	if (!start) {
 		__wt_verbose(session, WT_VERB_COMPACT,
-		    "pages reviewed: %" PRIuMAX, block->compact_pages_reviewed);
+		    "pages reviewed: %" PRIu64, block->compact_pages_reviewed);
 		__wt_verbose(session, WT_VERB_COMPACT,
-		    "pages skipped: %" PRIuMAX, block->compact_pages_skipped);
+		    "pages skipped: %" PRIu64, block->compact_pages_skipped);
 		__wt_verbose(session, WT_VERB_COMPACT,
-		    "pages written: %" PRIuMAX, block->compact_pages_written);
+		    "pages written: %" PRIu64, block->compact_pages_written);
 	}
 
 	__wt_verbose(session, WT_VERB_COMPACT,

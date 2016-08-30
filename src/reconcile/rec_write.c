@@ -3329,7 +3329,7 @@ supd_check_complete:
 	if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT) && r->entries < 6)
 		__wt_verbose(session, WT_VERB_SPLIT,
 		    "Reconciliation creating a page with %" PRIu32
-		    " entries, memory footprint %" PRIu64
+		    " entries, memory footprint %" WT_SIZET_FMT
 		    ", page count %" PRIu32 ", %s, split state: %d\n",
 		    r->entries, r->page->memory_footprint, r->bnd_next,
 		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",

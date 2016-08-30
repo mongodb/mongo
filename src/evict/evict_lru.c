@@ -1384,7 +1384,8 @@ fast:		/* If the page can't be evicted, give up. */
 		    ++internal_pages;
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
-		    "select: %p, size %" PRIu64, page, page->memory_footprint);
+		    "select: %p, size %" WT_SIZET_FMT,
+		    page, page->memory_footprint);
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
