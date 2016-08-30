@@ -103,7 +103,11 @@
             // Aggregate can be either a read or a write depending on whether it has a $out stage.
             // $out is required to be the last stage of the pipeline.
             var stages = obj.pipeline;
-            var hasOut = stages && (stages.length !== 0) && ('$out' in stages[stages.length - 1]);
+            const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
+                ? stages[stages.length - 1]
+                : undefined;
+            const hasOut =
+                lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
             if (hasOut) {
                 emulateWriteConcern = true;
             } else {

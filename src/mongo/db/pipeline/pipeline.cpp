@@ -126,12 +126,16 @@ void Pipeline::optimizePipeline() {
 }
 
 bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
-    if (cmd.hasField("pipeline") == false) {
+    auto pipelineElement = cmd["pipeline"];
+    if (pipelineElement.type() != BSONType::Array) {
         return false;
     }
 
-    auto stages = cmd["pipeline"].Array();
-    for (auto stage : stages) {
+    for (auto stage : pipelineElement.Obj()) {
+        if (stage.type() != BSONType::Object) {
+            return false;
+        }
+
         if (stage.Obj().hasField("$out")) {
             return true;
         }
