@@ -699,7 +699,7 @@ public:
         s->setObject("z", BSON("z" << (long long)(4)));
         ASSERT(s->exec("y = {y:z.z.top}", "foo", false, true, false));
         out = s->getObject("y");
-        ASSERT_EQUALS(Undefined, out.firstElement().type());
+        ASSERT_EQUALS(NumberDouble, out.firstElement().type());
 
         ASSERT(s->exec("x = {x:z.z.floatApprox}", "foo", false, true, false));
         out = s->getObject("x");

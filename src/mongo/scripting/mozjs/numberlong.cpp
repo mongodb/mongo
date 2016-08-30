@@ -30,6 +30,7 @@
 
 #include "mongo/scripting/mozjs/numberlong.h"
 
+#include <boost/optional.hpp>
 #include <js/Conversions.h>
 
 #include "mongo/scripting/mozjs/implscope.h"
@@ -38,6 +39,7 @@
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/represent_as.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -127,27 +129,13 @@ void NumberLongInfo::Functions::floatApprox::call(JSContext* cx, JS::CallArgs ar
 }
 
 void NumberLongInfo::Functions::top::call(JSContext* cx, JS::CallArgs args) {
-    int64_t numLong = NumberLongInfo::ToNumberLong(cx, args.thisv());
-
-    // values above 2^53 are not accurately represented in JS
-    if (numLong == INT64_MIN || std::abs(numLong) >= 9007199254740992LL) {
-        auto val64 = static_cast<unsigned long long>(numLong);
-        ValueReader(cx, args.rval()).fromDouble(val64 >> 32);
-    } else {
-        args.rval().setUndefined();
-    }
+    auto numULong = static_cast<uint64_t>(NumberLongInfo::ToNumberLong(cx, args.thisv()));
+    ValueReader(cx, args.rval()).fromDouble(numULong >> 32);
 }
 
 void NumberLongInfo::Functions::bottom::call(JSContext* cx, JS::CallArgs args) {
-    int64_t numLong = NumberLongInfo::ToNumberLong(cx, args.thisv());
-
-    // values above 2^53 are not accurately represented in JS
-    if (numLong == INT64_MIN || std::abs(numLong) >= 9007199254740992LL) {
-        auto val64 = static_cast<unsigned long long>(numLong);
-        ValueReader(cx, args.rval()).fromDouble(val64 & 0x00000000FFFFFFFF);
-    } else {
-        args.rval().setUndefined();
-    }
+    auto numULong = static_cast<uint64_t>(NumberLongInfo::ToNumberLong(cx, args.thisv()));
+    ValueReader(cx, args.rval()).fromDouble(numULong & 0x00000000FFFFFFFF);
 }
 
 void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
@@ -173,39 +161,33 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
         if (arg.isInt32()) {
             numLong = arg.toInt32();
         } else if (arg.isDouble()) {
-            numLong = arg.toDouble();
-        } else {
-            std::string str = ValueWriter(cx, arg).toString();
-            int64_t val;
+            auto opt = representAs<int64_t>(arg.toDouble());
+            uassert(ErrorCodes::BadValue,
+                    "number passed to NumberLong must be representable as an int64_t",
+                    opt);
+            numLong = *opt;
+        } else if (arg.isString()) {
             // For string values we call strtoll because we expect non-number string
             // values to fail rather than return 0 (which is the behavior of ToInt64).
-            if (arg.isString())
-                val = parseLL(str.c_str());
-            // Otherwise we call the toNumber on the js value to get the int64_t value.
-            else
-                val = ValueWriter(cx, arg).toInt64();
-
-            numLong = val;
+            std::string str = ValueWriter(cx, arg).toString();
+            numLong = parseLL(str.c_str());
+        } else {
+            numLong = ValueWriter(cx, arg).toInt64();
         }
     } else {
-        if (!args.get(0).isNumber())
-            uasserted(ErrorCodes::BadValue, "floatApprox must be a number");
+        uassert(ErrorCodes::BadValue, "floatApprox must be a number", args.get(0).isNumber());
+        uassert(ErrorCodes::BadValue, "top must be a number", args.get(1).isNumber());
+        uassert(ErrorCodes::BadValue, "bottom must be a number", args.get(2).isNumber());
 
-        double top = 0;
-        if (args.get(1).isNumber())
-            top = static_cast<double>(static_cast<uint32_t>(args.get(1).toNumber()));
+        auto topOpt = representAs<uint32_t>(args.get(1).toNumber());
+        uassert(ErrorCodes::BadValue, "top must be a 32 bit unsigned number", topOpt);
+        uint64_t top = *topOpt;
 
-        if (!args.get(1).isNumber() || args.get(1).toNumber() != top)
-            uasserted(ErrorCodes::BadValue, "top must be a 32 bit unsigned number");
+        auto botOpt = representAs<uint32_t>(args.get(2).toNumber());
+        uassert(ErrorCodes::BadValue, "bottom must be a 32 bit unsigned number", botOpt);
+        uint64_t bot = *botOpt;
 
-        double bot = 0;
-        if (args.get(2).isNumber())
-            bot = static_cast<double>(static_cast<uint32_t>(args.get(2).toNumber()));
-
-        if (!args.get(2).isNumber() || args.get(2).toNumber() != bot)
-            uasserted(ErrorCodes::BadValue, "bottom must be a 32 bit unsigned number");
-
-        numLong = (static_cast<uint64_t>(top) << 32) + static_cast<uint64_t>(bot);
+        numLong = (top << 32) + bot;
     }
 
     JS_SetPrivate(thisv, new int64_t(numLong));
