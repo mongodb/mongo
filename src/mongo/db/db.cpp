@@ -337,6 +337,21 @@ static void handleSERVER23299ForDb(OperationContext* txn, Database* db) {
     log() << "Done scanning " << db->name() << " for SERVER-23299 eligibility";
 }
 
+/**
+ * Check that the oplog is capped, and abort the process if it is not.
+ * Caller must lock DB before calling this function.
+ */
+static void checkForCappedOplog(OperationContext* txn, Database* db) {
+    const NamespaceString oplogNss(repl::rsOplogName);
+    invariant(txn->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
+    Collection* oplogCollection = db->getCollection(oplogNss);
+    if (oplogCollection && !oplogCollection->isCapped()) {
+        severe() << "The oplog collection " << oplogNss
+                 << " is not capped; a capped oplog is a requirement for replication to function.";
+        fassertFailedNoTrace(40115);
+    }
+}
+
 static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
@@ -470,7 +485,7 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
             // Ensure oplog is capped (mmap does not guarantee order of inserts on noncapped
             // collections)
             if (db->name() == "local") {
-                repl::checkForCappedOplog(txn, db);
+                checkForCappedOplog(txn, db);
             }
         }
 
