@@ -1943,7 +1943,7 @@ __slvg_row_build_leaf(
 			if (cmp >= 0)
 				break;
 			__wt_verbose(session, WT_VERB_SALVAGE,
-			    "%s merge discarding leading key %.*s",
+			    "%s merge discarding leading key %s",
 			    __wt_addr_string(session,
 			    trk->trk_addr, trk->trk_addr_size, ss->tmp1),
 			    __wt_buf_set_printable(
@@ -1963,7 +1963,7 @@ __slvg_row_build_leaf(
 			if (cmp < 0)
 				break;
 			__wt_verbose(session, WT_VERB_SALVAGE,
-			    "%s merge discarding trailing key %.*s",
+			    "%s merge discarding trailing key %s",
 			    __wt_addr_string(session,
 			    trk->trk_addr, trk->trk_addr_size, ss->tmp1),
 			    __wt_buf_set_printable(

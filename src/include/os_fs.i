@@ -23,7 +23,7 @@ __wt_fs_directory_list(WT_SESSION_IMPL *session,
 	*countp = 0;
 
 	__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: directory-list: %s prefix %s",
+	    "%s: directory-list: prefix %s",
 	    dir, prefix == NULL ? "all" : prefix);
 
 	WT_RET(__wt_filename(session, dir, &path));

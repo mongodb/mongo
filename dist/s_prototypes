@@ -46,7 +46,7 @@ proto()
 	    -e p < $1
 }
 
-# proto --
+# externs --
 #	generate the list of prototypes given a file list
 externs()
 {
