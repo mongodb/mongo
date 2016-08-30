@@ -112,9 +112,16 @@
     assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "a"}),
                                  ErrorCodes.GraphContainsCycle,
                                  "collmod changed view to create a cycle");
+
+    // Check that collMod disallows the specification of invalid pipelines.
+    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", pipeline: {}}),
+                                 ErrorCodes.InvalidOptions,
+                                 "collMod modified view to have invalid pipeline");
+    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", pipeline: {0: {$limit: 7}}}),
+                                 ErrorCodes.InvalidOptions,
+                                 "collMod modified view to have invalid pipeline");
     clear();
 
     // Check that invalid pipelines are disallowed.
     makeView("a", "b", [{"$lookup": {from: "a"}}], 4572);  // 4572 is for missing $lookup fields
-
 }());

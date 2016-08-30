@@ -243,7 +243,7 @@ Status collMod(OperationContext* txn,
                                      "'pipeline' option only supported on a view");
                 continue;
             }
-            if (!e.isABSONObj()) {
+            if (e.type() != mongo::Array) {
                 errorStatus =
                     Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
                 continue;
