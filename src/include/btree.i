@@ -1260,11 +1260,10 @@ __wt_page_can_evict(
 		return (false);
 
 	/*
-	 * If the page is clean but has modifications that
-	 * appear too new to evict, skip it.
+	 * If the page is clean but has modifications that appear too new to
+	 * evict, skip it.
 	 */
-	if (!modified && mod != NULL &&
-	    !__wt_txn_visible_all(session, mod->rec_max_txn))
+	if (!modified && !__wt_txn_visible_all(session, mod->rec_max_txn))
 		return (false);
 
 	return (true);
