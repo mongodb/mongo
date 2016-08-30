@@ -212,10 +212,10 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         // Mirror what happens if the config.version document is rolled back.
         ON_BLOCK_EXIT([&] {
             operationContext()->setReplicatedWrites(true);
-            getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+            replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
         });
         operationContext()->setReplicatedWrites(false);
-        getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
+        replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
         ASSERT_OK(
             catalogClient()->removeConfigDocuments(operationContext(),
                                                    VersionType::ConfigNS,

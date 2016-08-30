@@ -28,92 +28,31 @@
 
 #pragma once
 
-#include <utility>
-
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/executor/network_test_env.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/net/message_port_mock.h"
+#include "mongo/s/mongod_test_fixture.h"
 
 namespace mongo {
 
 class BSONObj;
-class CatalogCache;
-struct ChunkVersion;
-class CollectionType;
-class ReplSetDistLockManager;
+class ChunkType;
 class NamespaceString;
 class Shard;
-class ShardFactoryMock;
 class ShardingCatalogClient;
-class ShardingCatalogClientImpl;
 class ShardingCatalogManager;
-class ShardingCatalogManagerImpl;
-class RemoteCommandTargeterFactoryMock;
-class RemoteCommandTargeterMock;
 class ShardRegistry;
 class ShardType;
 template <typename T>
 class StatusWith;
 
-namespace executor {
-class NetworkInterfaceMock;
-class TaskExecutor;
-}  // namespace executor
-
-namespace repl {
-class ReplicationCoordinatorMock;
-}
-
 /**
- * Sets up the mocked out objects for testing the catalog manager and catalog client with the
- * remote interface backed by the NetworkTestEnv and config server as the local storage engine.
+ * Provides config-specific functionality in addition to the mock storage engine and mock network
+ * provided by MongodTestFixture.
  */
-class ConfigServerTestFixture : public ServiceContextMongoDTest {
+class ConfigServerTestFixture : public MongodTestFixture {
 public:
     ConfigServerTestFixture();
     ~ConfigServerTestFixture();
 
-    static const Seconds kFutureTimeout;
-
-    template <typename Lambda>
-    executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(
-        Lambda&& func) const {
-        return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
-    }
-
-    ShardingCatalogClient* catalogClient() const;
-
-    ShardingCatalogManager* catalogManager() const;
-
-    /**
-     * Prefer catalogClient() method over this as much as possible.
-     */
-    ShardingCatalogClientImpl* getCatalogClient() const;
-
-    ShardRegistry* shardRegistry() const;
-
-    RemoteCommandTargeterFactoryMock* targeterFactory() const;
-
     std::shared_ptr<Shard> getConfigShard() const;
-
-    executor::NetworkInterfaceMock* network() const;
-
-    executor::NetworkInterfaceMock* networkForAddShard() const;
-
-    executor::TaskExecutor* executor() const;
-
-    executor::TaskExecutor* executorForAddShard() const;
-
-    MessagingPortMock* getMessagingPort() const;
-
-    ReplSetDistLockManager* distLock() const;
-
-    OperationContext* operationContext() const;
-
-    repl::ReplicationCoordinatorMock* getReplicationCoordinator() const;
 
     /**
      * Insert a document to this config server to the specified namespace.
@@ -128,19 +67,6 @@ public:
     StatusWith<BSONObj> findOneOnConfigCollection(OperationContext* txn,
                                                   const NamespaceString& ns,
                                                   const BSONObj& filter);
-
-    /**
-     * Blocking methods, which receive one message from the network and respond using the
-     * responses returned from the input function. This is a syntactic sugar for simple,
-     * single request + response or find tests.
-     */
-    void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
-    // Same as onCommand but run against _addShardNetworkTestEnv
-    void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
-    void onCommandWithMetadata(executor::NetworkTestEnv::OnCommandWithMetadataFunction func);
-    void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
-    void onFindWithMetadataCommand(
-        executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
 
     /**
      * Setup the config.shards collection to contain the given shards.
@@ -168,36 +94,52 @@ public:
      */
     StatusWith<std::vector<BSONObj>> getIndexes(OperationContext* txn, const NamespaceString& ns);
 
-    void setUp() override;
-
-    void tearDown() override;
-
-    void shutdownExecutor();
+    /**
+     * Returns the stored raw pointer to the addShard TaskExecutor's NetworkInterface.
+     */
+    executor::NetworkInterfaceMock* networkForAddShard() const;
 
     /**
-     * Checks that the given command has the expected settings for read after opTime.
+     * Returns the stored raw pointer to the addShard TaskExecutor.
      */
-    void checkReadConcern(const BSONObj& cmdObj,
-                          const Timestamp& expectedTS,
-                          long long expectedTerm) const;
+    executor::TaskExecutor* executorForAddShard() const;
+
+    /**
+     * Same as MongodTestFixture::onCommand but run against _addShardNetworkTestEnv.
+     */
+    void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
+
+protected:
+    /**
+     * Sets this node up as a mongod with sharding components for ClusterRole::ConfigServer.
+     */
+    void setUp() override;
+
+    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override;
+
+    std::unique_ptr<DistLockManager> makeDistLockManager(
+        std::unique_ptr<DistLockCatalog> distLockCatalog) override;
+
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
+        std::unique_ptr<DistLockManager> distLockManager) override;
+
+    std::unique_ptr<ShardingCatalogManager> makeShardingCatalogManager(
+        ShardingCatalogClient* catalogClient) override;
+
+    std::unique_ptr<CatalogCache> makeCatalogCache() override;
+
+    std::unique_ptr<ClusterCursorManager> makeClusterCursorManager() override;
+
+    std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override;
 
 private:
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<MessagingPortMock> _messagePort;
-
-    RemoteCommandTargeterFactoryMock* _targeterFactory;
-
-    executor::NetworkInterfaceMock* _mockNetwork;
+    // Since these are currently private members of the real ShardingCatalogManager, we store a raw
+    // pointer to them here.
     executor::NetworkInterfaceMock* _mockNetworkForAddShard;
-    executor::TaskExecutor* _executor;
     executor::TaskExecutor* _executorForAddShard;
-    std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
+
+    // Allows for processing tasks through the NetworkInterfaceMock/ThreadPoolMock subsystem.
     std::unique_ptr<executor::NetworkTestEnv> _addShardNetworkTestEnv;
-    ReplSetDistLockManager* _distLockManager = nullptr;
-    ShardingCatalogClientImpl* _catalogClient = nullptr;
-    ShardingCatalogManagerImpl* _catalogManager = nullptr;
-    repl::ReplicationCoordinatorMock* _replCoord = nullptr;
 };
 
 }  // namespace mongo
