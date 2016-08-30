@@ -469,7 +469,9 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
             checkForIdIndexes(txn, db);
             // Ensure oplog is capped (mmap does not guarantee order of inserts on noncapped
             // collections)
-            repl::checkForCappedOplog(txn);
+            if (db->name() == "local") {
+                repl::checkForCappedOplog(txn, db);
+            }
         }
 
         if (shouldDoCleanupForSERVER23299) {
