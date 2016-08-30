@@ -48,9 +48,9 @@ const char kShardName[] = "shard";
 }  // unnamed namespace
 
 MergeChunkRequest::MergeChunkRequest(NamespaceString nss,
+                                     string shardName,
                                      OID epoch,
-                                     vector<BSONObj> chunkBoundaries,
-                                     string shardName)
+                                     vector<BSONObj> chunkBoundaries)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
       _chunkBoundaries(std::move(chunkBoundaries)),
@@ -94,7 +94,7 @@ StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BS
     }
 
     auto request = MergeChunkRequest(
-        NamespaceString(ns), std::move(epoch), std::move(chunkBoundaries), std::move(shardName));
+        NamespaceString(ns), std::move(shardName), std::move(epoch), std::move(chunkBoundaries));
     Status validationStatus = request._validate();
     if (!validationStatus.isOK()) {
         return validationStatus;

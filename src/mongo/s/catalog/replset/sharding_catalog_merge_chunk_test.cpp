@@ -361,5 +361,63 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ASSERT_EQ(ErrorCodes::StaleEpoch, mergeStatus);
 }
 
+TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    // Construct chunk to be merged
+    auto chunk2(chunk);
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkBound = BSON("a" << 5);
+    auto chunkMax = BSON("a" << 10);
+    // first chunk boundaries
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkBound);
+    // second chunk boundaries
+    chunk2.setMin(chunkBound);
+    chunk2.setMax(chunkMax);
+
+    std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
+
+    ChunkType mergedChunk(chunk);
+    auto mergedVersion = chunk.getVersion();
+    mergedVersion.incMinor();
+    mergedChunk.setVersion(mergedVersion);
+    mergedChunk.setMax(chunkMax);
+
+    setupChunks({mergedChunk});
+
+    ASSERT_EQ(ErrorCodes::BadValue,
+              catalogManager()->commitChunkMerge(operationContext(),
+                                                 NamespaceString("TestDB.TestColl"),
+                                                 origVersion.epoch(),
+                                                 chunkBoundaries,
+                                                 "shard0000"));
+
+    // Verify that no change to config.chunks happened.
+    auto findResponse = uassertStatusOK(
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
+                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 boost::none));
+
+    const auto& chunksVector = findResponse.docs;
+
+    // There should be exactly one chunk left in the collection
+    ASSERT_EQ(1u, chunksVector.size());
+
+    // MergedChunk should have range [chunkMin, chunkMax]
+    ChunkType foundChunk = uassertStatusOK(ChunkType::fromBSON(chunksVector.front()));
+    ASSERT_BSONOBJ_EQ(mergedChunk.toBSON(), foundChunk.toBSON());
+}
+
 }  // namespace
 }  // namespace mongo

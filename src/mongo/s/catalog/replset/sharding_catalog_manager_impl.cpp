@@ -102,7 +102,7 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
 */
-void appendShortVersion(BufBuilder* b, const ChunkType& chunk) {
+void _appendShortVersion(BufBuilder* b, const ChunkType& chunk) {
     BSONObjBuilder bb(*b);
     bb.append(ChunkType::min(), chunk.getMin());
     bb.append(ChunkType::max(), chunk.getMax());
@@ -226,6 +226,69 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* txn,
 
     return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),
                       shardKeyPattern.extendRangeBound(range.getMax(), false));
+}
+
+BSONArray _buildMergeChunksApplyOpsUpdates(const std::vector<ChunkType>& chunksToMerge,
+                                           const ChunkVersion& mergeVersion) {
+    BSONArrayBuilder updates;
+
+    // Build an update operation to expand the first chunk into the newly merged chunk
+    {
+        BSONObjBuilder op;
+        op.append("op", "u");
+        op.appendBool("b", false);  // no upsert
+        op.append("ns", ChunkType::ConfigNS);
+
+        // expand first chunk into newly merged chunk
+        ChunkType mergedChunk(chunksToMerge.front());
+        mergedChunk.setMax(chunksToMerge.back().getMax());
+
+        // fill in additional details for sending through applyOps
+        mergedChunk.setVersion(mergeVersion);
+
+        // add the new chunk information as the update object
+        op.append("o", mergedChunk.toBSON());
+
+        // query object
+        op.append("o2", BSON(ChunkType::name(mergedChunk.getName())));
+
+        updates.append(op.obj());
+    }
+
+    // Build update operations to delete the rest of the chunks to be merged. Remember not
+    // to delete the first chunk we're expanding
+    for (size_t i = 1; i < chunksToMerge.size(); ++i) {
+        BSONObjBuilder op;
+        op.append("op", "d");
+        op.append("ns", ChunkType::ConfigNS);
+
+        op.append("o", BSON(ChunkType::name(chunksToMerge[i].getName())));
+
+        updates.append(op.obj());
+    }
+
+    return updates.arr();
+}
+
+BSONArray _buildMergeChunksApplyOpsPrecond(const std::vector<ChunkType>& chunksToMerge,
+                                           const ChunkVersion& collVersion) {
+    BSONArrayBuilder preCond;
+
+    for (auto chunk : chunksToMerge) {
+        BSONObjBuilder b;
+        b.append("ns", ChunkType::ConfigNS);
+        b.append(
+            "q",
+            BSON("query" << BSON(ChunkType::ns(chunk.getNS()) << ChunkType::min(chunk.getMin())
+                                                              << ChunkType::max(chunk.getMax()))
+                         << "orderby"
+                         << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+        b.append("res",
+                 BSON(ChunkType::DEPRECATED_epoch(collVersion.epoch())
+                      << ChunkType::shard(chunk.getShard().toString())));
+        preCond.append(b.obj());
+    }
+    return preCond.arr();
 }
 
 }  // namespace
@@ -1212,8 +1275,8 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     }
 
     if (newChunks.size() == 2) {
-        _appendShortVersion(logDetail.subobjStart("left"), newChunks[0]);
-        _appendShortVersion(logDetail.subobjStart("right"), newChunks[1]);
+        _appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
+        _appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
 
         grid.catalogClient(txn)->logChange(
             txn, "split", ns.ns(), logDetail.obj(), WriteConcernOptions());
@@ -1227,7 +1290,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
             chunkDetail.appendElements(beforeDetailObj);
             chunkDetail.append("number", i + 1);
             chunkDetail.append("of", newChunksSize);
-            _appendShortVersion(chunkDetail.subobjStart("chunk"), newChunks[i]);
+            _appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
 
             grid.catalogClient(txn)->logChange(
                 txn, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions());
@@ -1305,62 +1368,14 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     ChunkVersion mergeVersion = collVersion;
     mergeVersion.incMinor();
 
-    BSONArrayBuilder updates;
-
-    // Build an update operation to expand the first chunk into the newly merged chunk
-    {
-        BSONObjBuilder op;
-        op.append("op", "u");
-        op.appendBool("b", false);
-        op.append("ns", ChunkType::ConfigNS);
-
-        // expand first chunk into newly merged chunk
-        ChunkType mergedChunk(chunksToMerge.front());
-        mergedChunk.setMax(chunksToMerge.back().getMax());
-
-        // fill in additional details for sending through applyOps
-        mergedChunk.setVersion(mergeVersion);
-
-        // add the new chunk information as the update object
-        op.append("o", mergedChunk.toBSON());
-
-        // query object
-        op.append("o2", BSON(ChunkType::name(mergedChunk.getName())));
-
-        updates.append(op.obj());
-    }
-
-    // Build update operations to delete the rest of the chunks to be merged. Remember not
-    // to delete the first chunk we're expanding
-    for (size_t i = 1; i < chunksToMerge.size(); ++i) {
-        BSONObjBuilder op;
-        op.append("op", "d");
-        op.append("ns", ChunkType::ConfigNS);
-
-        op.append("o", BSON(ChunkType::name(chunksToMerge[i].getName())));
-
-        updates.append(op.obj());
-    }
-
-    BSONArrayBuilder preCond;
-    {
-        BSONObjBuilder b;
-        b.append("ns", ChunkType::ConfigNS);
-        b.append("q",
-                 BSON("query" << BSON(ChunkType::ns(ns.ns())) << "orderby"
-                              << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
-        {
-            BSONObjBuilder bb(b.subobjStart("res"));
-            collVersion.addToBSON(bb, ChunkType::DEPRECATED_lastmod());
-        }
-        preCond.append(b.obj());
-    }
+    auto updates = _buildMergeChunksApplyOpsUpdates(chunksToMerge, mergeVersion);
+    auto preCond = _buildMergeChunksApplyOpsPrecond(chunksToMerge, collVersion);
 
     // apply the batch of updates to remote and local metadata
     Status applyOpsStatus =
         grid.catalogClient(txn)->applyChunkOpsDeprecated(txn,
-                                                         updates.arr(),
-                                                         preCond.arr(),
+                                                         updates,
+                                                         preCond,
                                                          ns.ns(),
                                                          mergeVersion,
                                                          WriteConcernOptions(),
@@ -1384,15 +1399,6 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
         txn, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions());
 
     return applyOpsStatus;
-}
-
-void ShardingCatalogManagerImpl::_appendShortVersion(BufBuilder& b, const ChunkType& chunk) {
-    BSONObjBuilder bb(b);
-    bb.append(ChunkType::min(), chunk.getMin());
-    bb.append(ChunkType::max(), chunk.getMax());
-    if (chunk.isVersionSet())
-        chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
-    bb.done();
 }
 
 void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) {

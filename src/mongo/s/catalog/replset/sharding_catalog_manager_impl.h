@@ -195,11 +195,6 @@ private:
     StatusWith<std::vector<ShardType>> _getAllShardingUnawareShards(OperationContext* txn);
 
     /**
-     * Append min, max and version information from chunk to the buffer for logChange purposes.
-     */
-    void _appendShortVersion(BufBuilder& b, const ChunkType& chunk);
-
-    /**
      * Callback function used when rescheduling an addShard task after the first attempt failed.
      * Checks if the callback has been canceled, and if not, proceeds to call
      * _scheduleAddShardTask.

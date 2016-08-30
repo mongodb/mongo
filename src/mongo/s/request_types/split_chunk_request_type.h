@@ -45,10 +45,10 @@ namespace mongo {
 class SplitChunkRequest {
 public:
     SplitChunkRequest(NamespaceString nss,
+                      std::string shardName,
                       OID epoch,
                       ChunkRange chunkRange,
-                      std::vector<BSONObj> splitPoints,
-                      std::string shardName);
+                      std::vector<BSONObj> splitPoints);
 
     /**
      * Parses the provided BSON content as the internal _configsvrSplitChunk command, and if

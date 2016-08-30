@@ -44,9 +44,9 @@ namespace mongo {
 class MergeChunkRequest {
 public:
     MergeChunkRequest(NamespaceString nss,
+                      std::string shardName,
                       OID epoch,
-                      std::vector<BSONObj> chunkBoundaries,
-                      std::string shardName);
+                      std::vector<BSONObj> chunkBoundaries);
 
     /**
      * Parses the provided BSON content as the internal _configsvrMergeChunk command, and if
