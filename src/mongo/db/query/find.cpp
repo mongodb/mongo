@@ -213,7 +213,7 @@ void generateBatch(int ntoreturn,
 
     if (PlanExecutor::DEAD == *state || PlanExecutor::FAILURE == *state) {
         // Propagate this error to caller.
-        error() << "getMore executor error, stats: " << Explain::getWinningPlanStats(exec);
+        error() << "getMore executor error, stats: " << redact(Explain::getWinningPlanStats(exec));
         uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
     }
 }
@@ -277,7 +277,7 @@ Message getMore(OperationContext* txn,
         cursorManager = collection->getCursorManager();
     }
 
-    LOG(5) << "Running getMore, cursorid: " << cursorid << endl;
+    LOG(5) << "Running getMore, cursorid: " << cursorid;
 
     // This checks to make sure the operation is allowed on a replicated node.  Since we are not
     // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -456,14 +456,14 @@ Message getMore(OperationContext* txn,
             curOp.debug().cursorExhausted = true;
 
             LOG(5) << "getMore NOT saving client cursor, ended with state "
-                   << PlanExecutor::statestr(state) << endl;
+                   << PlanExecutor::statestr(state);
         } else {
             // Continue caching the ClientCursor.
             cc->incPos(numResults);
             exec->saveState();
             exec->detachFromOperationContext();
             LOG(5) << "getMore saving client cursor ended with state "
-                   << PlanExecutor::statestr(state) << endl;
+                   << PlanExecutor::statestr(state);
 
             // Possibly note slave's position in the oplog.
             if ((cc->queryOptions() & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -514,8 +514,8 @@ std::string runQuery(OperationContext* txn,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     invariant(cq.get());
 
-    LOG(5) << "Running query:\n" << cq->toString();
-    LOG(2) << "Running query: " << cq->toStringShort();
+    LOG(5) << "Running query:\n" << redact(cq->toString());
+    LOG(2) << "Running query: " << redact(cq->toStringShort());
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
     AutoGetCollectionForRead ctx(txn, nss);
@@ -613,8 +613,8 @@ std::string runQuery(OperationContext* txn,
 
         if (FindCommon::enoughForFirstBatch(qr, numResults)) {
             LOG(5) << "Enough for first batch, wantMore=" << qr.wantMore()
-                   << " ntoreturn=" << qr.getNToReturn().value_or(0) << " numResults=" << numResults
-                   << endl;
+                   << " ntoreturn=" << qr.getNToReturn().value_or(0)
+                   << " numResults=" << numResults;
             break;
         }
     }
@@ -630,7 +630,7 @@ std::string runQuery(OperationContext* txn,
     // Caller expects exceptions thrown in certain cases.
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
-                << ", stats: " << Explain::getWinningPlanStats(exec.get());
+                << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
         uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
     }
 
@@ -660,7 +660,7 @@ std::string runQuery(OperationContext* txn,
         ccId = cc->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
-               << " results" << endl;
+               << " results";
 
         // TODO document
         if (qr.isOplogReplay() && !slaveReadTill.isNull()) {
@@ -680,7 +680,7 @@ std::string runQuery(OperationContext* txn,
 
         endQueryOp(txn, collection, *cc->getExecutor(), numResults, ccId);
     } else {
-        LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
+        LOG(5) << "Not caching executor but returning " << numResults << " results.";
         endQueryOp(txn, collection, *exec, numResults, ccId);
     }
 

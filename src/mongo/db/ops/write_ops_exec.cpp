@@ -100,8 +100,8 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
                     curOp->getReadWriteType());
 
         if (!curOp->debug().exceptionInfo.empty()) {
-            LOG(3) << "Caught Assertion in " << logicalOpToString(curOp->getLogicalOp()) << ": "
-                   << curOp->debug().exceptionInfo.toString();
+            LOG(3) << "Caught Assertion in " << redact(logicalOpToString(curOp->getLogicalOp()))
+                   << ": " << curOp->debug().exceptionInfo.toString();
         }
 
         const bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
@@ -112,7 +112,7 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
         if (logAll || logSlow) {
             Locker::LockerInfo lockerInfo;
             txn->lockState()->getLockerInfo(&lockerInfo);
-            log() << curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats);
+            log() << redact(curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats));
         }
 
         if (curOp->shouldDBProfile(executionTimeMs)) {
@@ -122,7 +122,7 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
         // We need to ignore all errors here. We don't want a successful op to fail because of a
         // failure to record stats. We also don't want to replace the error reported for an op that
         // is failing.
-        log() << "Ignoring error from finishCurOp: " << ex.toString();
+        log() << "Ignoring error from finishCurOp: " << redact(ex);
     }
 }
 

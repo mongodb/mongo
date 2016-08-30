@@ -590,8 +590,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
             verify(0);
         }
     } else {
-        warning() << "Planner error, trying to build bounds for expression: " << expr->toString()
-                  << endl;
+        warning() << "Planner error, trying to build bounds for expression: "
+                  << redact(expr->toString());
         verify(0);
     }
 }
@@ -891,9 +891,9 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
     }
 
     if (!bounds->isValidFor(kp, scanDir)) {
-        log() << "INVALID BOUNDS: " << bounds->toString() << endl
-              << "kp = " << kp.toString() << endl
-              << "scanDir = " << scanDir << endl;
+        log() << "INVALID BOUNDS: " << redact(bounds->toString()) << endl
+              << "kp = " << redact(kp) << endl
+              << "scanDir = " << scanDir;
         invariant(0);
     }
 }

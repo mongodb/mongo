@@ -580,13 +580,13 @@ void printMongodHelp(const moe::OptionSection& options) {
 namespace {
 void sysRuntimeInfo() {
 #if defined(_SC_PAGE_SIZE)
-    log() << "  page size: " << (int)sysconf(_SC_PAGE_SIZE) << endl;
+    log() << "  page size: " << (int)sysconf(_SC_PAGE_SIZE);
 #endif
 #if defined(_SC_PHYS_PAGES)
-    log() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
+    log() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES);
 #endif
 #if defined(_SC_AVPHYS_PAGES)
-    log() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
+    log() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES);
 #endif
 }
 }  // namespace
@@ -1315,7 +1315,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         // trying to make this stand out more like startup warnings
         log() << endl;
         warning() << "32-bit servers don't have journaling enabled by default. "
-                  << "Please use --journal if you want durability." << endl;
+                  << "Please use --journal if you want durability.";
         log() << endl;
     }
 

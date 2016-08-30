@@ -494,7 +494,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
     if (sorts.end() != sorts.find(reverseSort)) {
         QueryPlannerCommon::reverseScans(solnRoot);
-        LOG(5) << "Reversing ixscan to provide sort. Result: " << solnRoot->toString() << endl;
+        LOG(5) << "Reversing ixscan to provide sort. Result: " << redact(solnRoot->toString());
         return solnRoot;
     }
 
@@ -712,14 +712,14 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
 
     // Project the results.
     if (NULL != query.getProj()) {
-        LOG(5) << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
-        LOG(5) << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
+        LOG(5) << "PROJECTION: fetched status: " << solnRoot->fetched();
+        LOG(5) << "PROJECTION: Current plan is:\n" << redact(solnRoot->toString());
 
         ProjectionNode::ProjectionType projType = ProjectionNode::DEFAULT;
         BSONObj coveredKeyObj;
 
         if (query.getProj()->requiresDocument()) {
-            LOG(5) << "PROJECTION: claims to require doc adding fetch.\n";
+            LOG(5) << "PROJECTION: claims to require doc adding fetch.";
             // If the projection requires the entire document, somebody must fetch.
             if (!solnRoot->fetched()) {
                 FetchNode* fetch = new FetchNode();
@@ -730,18 +730,18 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             // The only way we're here is if it's a simple projection.  That is, we can pick out
             // the fields we want to include and they're not dotted.  So we want to execute the
             // projection in the fast-path simple fashion.  Just don't know which fast path yet.
-            LOG(5) << "PROJECTION: requires fields\n";
+            LOG(5) << "PROJECTION: requires fields";
             const vector<StringData>& fields = query.getProj()->getRequiredFields();
             bool covered = true;
             for (size_t i = 0; i < fields.size(); ++i) {
                 if (!solnRoot->hasField(fields[i].toString())) {
-                    LOG(5) << "PROJECTION: not covered due to field " << fields[i] << endl;
+                    LOG(5) << "PROJECTION: not covered due to field " << fields[i];
                     covered = false;
                     break;
                 }
             }
 
-            LOG(5) << "PROJECTION: is covered?: = " << covered << endl;
+            LOG(5) << "PROJECTION: is covered?: = " << covered;
 
             // If any field is missing from the list of fields the projection wants,
             // a fetch is required.

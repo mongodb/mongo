@@ -665,7 +665,7 @@ Status PlanCache::add(const CanonicalQuery& query,
 
     if (NULL != evictedEntry.get()) {
         LOG(1) << _ns << ": plan cache maximum size exceeded - "
-               << "removed least recently used entry " << evictedEntry->toString();
+               << "removed least recently used entry " << redact(evictedEntry->toString());
     }
 
     return Status::OK();

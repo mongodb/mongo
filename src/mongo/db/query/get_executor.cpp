@@ -246,7 +246,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     if (NULL == collection) {
         const string& ns = canonicalQuery->ns();
         LOG(2) << "Collection " << ns << " does not exist."
-               << " Using EOF plan: " << canonicalQuery->toStringShort();
+               << " Using EOF plan: " << redact(canonicalQuery->toStringShort());
         root = make_unique<EOFStage>(opCtx);
         return PrepareExecutionResult(
             std::move(canonicalQuery), std::move(querySolution), std::move(root));
@@ -268,7 +268,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
     // If we have an _id index we can use an idhack plan.
     if (descriptor && IDHackStage::supportsQuery(collection, *canonicalQuery)) {
-        LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
+        LOG(2) << "Using idhack: " << redact(canonicalQuery->toStringShort());
 
         root = make_unique<IDHackStage>(opCtx, collection, canonicalQuery.get(), ws, descriptor);
 
@@ -337,7 +337,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
         if (status.isOK()) {
             if ((plannerParams.options & QueryPlannerParams::IS_COUNT) && turnIxscanIntoCount(qs)) {
-                LOG(2) << "Using fast count: " << canonicalQuery->toStringShort();
+                LOG(2) << "Using fast count: " << redact(canonicalQuery->toStringShort());
             }
 
             PlanStage* rawRoot;
@@ -362,7 +362,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
     if (internalQueryPlanOrChildrenIndependently &&
         SubplanStage::canUseSubplanning(*canonicalQuery)) {
-        LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
+        LOG(2) << "Running query as sub-queries: " << redact(canonicalQuery->toStringShort());
 
         root =
             make_unique<SubplanStage>(opCtx, collection, ws, plannerParams, canonicalQuery.get());
@@ -403,8 +403,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                     opCtx, collection, *canonicalQuery, *solutions[i], ws, &rawRoot));
                 root.reset(rawRoot);
 
-                LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                       << ", planSummary: " << Explain::getPlanSummary(root.get());
+                LOG(2) << "Using fast count: " << redact(canonicalQuery->toStringShort())
+                       << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
                 querySolution.reset(solutions[i]);
                 return PrepareExecutionResult(
@@ -421,8 +421,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         root.reset(rawRoot);
 
         LOG(2) << "Only one plan is available; it will be run but will not be cached. "
-               << canonicalQuery->toStringShort()
-               << ", planSummary: " << Explain::getPlanSummary(root.get());
+               << redact(canonicalQuery->toStringShort())
+               << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
         querySolution.reset(solutions[0]);
         return PrepareExecutionResult(
@@ -729,7 +729,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
             // reporting machinery always assumes that the root stage for a delete operation is
             // a DeleteStage, so in this case we put a DeleteStage on top of an EOFStage.
             LOG(2) << "Collection " << nss.ns() << " does not exist."
-                   << " Using EOF stage: " << unparsedQuery.toString();
+                   << " Using EOF stage: " << redact(unparsedQuery);
             auto deleteStage = make_unique<DeleteStage>(
                 txn, deleteStageParams, ws.get(), nullptr, new EOFStage(txn));
             return PlanExecutor::make(txn, std::move(ws), std::move(deleteStage), nss.ns(), policy);
@@ -752,7 +752,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
 
         if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
             request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-            LOG(2) << "Using idhack: " << unparsedQuery.toString();
+            LOG(2) << "Using idhack: " << redact(unparsedQuery);
 
             PlanStage* idHackStage =
                 new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
@@ -894,7 +894,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
             // reporting machinery always assumes that the root stage for an update operation is
             // an UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
             LOG(2) << "Collection " << nsString.ns() << " does not exist."
-                   << " Using EOF stage: " << unparsedQuery.toString();
+                   << " Using EOF stage: " << redact(unparsedQuery);
             auto updateStage = make_unique<UpdateStage>(
                 txn, updateStageParams, ws.get(), collection, new EOFStage(txn));
             return PlanExecutor::make(
@@ -908,7 +908,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
 
         if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
             request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-            LOG(2) << "Using idhack: " << unparsedQuery.toString();
+            LOG(2) << "Using idhack: " << redact(unparsedQuery);
 
             PlanStage* idHackStage =
                 new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
@@ -1515,8 +1515,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         verify(StageBuilder::build(txn, collection, *cq, *soln, ws.get(), &rawRoot));
         unique_ptr<PlanStage> root(rawRoot);
 
-        LOG(2) << "Using fast distinct: " << cq->toStringShort()
-               << ", planSummary: " << Explain::getPlanSummary(root.get());
+        LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
+               << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
         return PlanExecutor::make(txn,
                                   std::move(ws),
@@ -1551,8 +1551,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
             verify(StageBuilder::build(txn, collection, *cq, *currentSolution, ws.get(), &rawRoot));
             unique_ptr<PlanStage> root(rawRoot);
 
-            LOG(2) << "Using fast distinct: " << cq->toStringShort()
-                   << ", planSummary: " << Explain::getPlanSummary(root.get());
+            LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
+                   << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
             return PlanExecutor::make(txn,
                                       std::move(ws),

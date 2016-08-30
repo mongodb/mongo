@@ -109,8 +109,6 @@ Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) 
 
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    // log() << "\t ComparisonMatchExpression e: " << e << " _rhs: " << _rhs << "\n"
-    //<< toString() << std::endl;
 
     if (e.canonicalType() != _rhs.canonicalType()) {
         // some special cases
@@ -149,8 +147,6 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e) const
     }
 
     int x = compareElementValues(e, _rhs, _collator);
-
-    // log() << "\t\t" << x << endl;
 
     switch (matchType()) {
         case LT:

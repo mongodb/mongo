@@ -1441,7 +1441,7 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
 //
 
 void PlanEnumerator::tagMemo(size_t id) {
-    LOG(5) << "Tagging memoID " << id << endl;
+    LOG(5) << "Tagging memoID " << id;
     NodeAssignment* assign = _memo[id];
     verify(NULL != assign);
 
