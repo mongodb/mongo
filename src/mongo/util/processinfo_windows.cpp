@@ -326,12 +326,8 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
                         //
                         if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
                             if (isKB2731284OrLaterUpdateInstalled()) {
-                                log() << "Hotfix KB2731284 or later update is installed, no need "
-                                         "to zero-out data files";
                                 fileZeroNeeded = false;
                             } else {
-                                log() << "Hotfix KB2731284 or later update is not installed, will "
-                                         "zero-out data files";
                                 fileZeroNeeded = true;
                             }
                         }
