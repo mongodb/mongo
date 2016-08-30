@@ -4291,8 +4291,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_EVICTING	1043
 /*! cache: eviction server skipped very large page */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_TOOBIG	1044
-/*! cache: eviction server slept, because we did not make progress with
- * eviction */
+/*!
+ * cache: eviction server slept, because we did not make progress with
+ * eviction
+ */
 #define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1045
 /*! cache: eviction server unable to reach eviction goal */
 #define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1046
@@ -4612,18 +4614,24 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_CHECKPOINT			1203
 /*! transaction: transaction failures due to cache overflow */
 #define	WT_STAT_CONN_TXN_FAIL_CACHE			1204
-/*! transaction: transaction fsync calls for checkpoint after allocating
- * the transaction ID */
+/*!
+ * transaction: transaction fsync calls for checkpoint after allocating
+ * the transaction ID
+ */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1205
-/*! transaction: transaction fsync duration for checkpoint after
- * allocating the transaction ID (usecs) */
+/*!
+ * transaction: transaction fsync duration for checkpoint after
+ * allocating the transaction ID (usecs)
+ */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1206
 /*! transaction: transaction range of IDs currently pinned */
 #define	WT_STAT_CONN_TXN_PINNED_RANGE			1207
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
 #define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1208
-/*! transaction: transaction range of IDs currently pinned by named
- * snapshots */
+/*!
+ * transaction: transaction range of IDs currently pinned by named
+ * snapshots
+ */
 #define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1209
 /*! transaction: transaction sync calls */
 #define	WT_STAT_CONN_TXN_SYNC				1210
@@ -4654,8 +4662,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2006
 /*! LSM: highest merge generation in the LSM tree */
 #define	WT_STAT_DSRC_LSM_GENERATION_MAX			2007
-/*! LSM: queries that could have benefited from a Bloom filter that did
- * not exist */
+/*!
+ * LSM: queries that could have benefited from a Bloom filter that did
+ * not exist
+ */
 #define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2008
 /*! LSM: sleep for LSM checkpoint throttle */
 #define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2009
@@ -4685,15 +4695,30 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BLOCK_MINOR			2021
 /*! btree: btree checkpoint generation */
 #define	WT_STAT_DSRC_BTREE_CHECKPOINT_GENERATION	2022
-/*! btree: column-store fixed-size leaf pages */
+/*!
+ * btree: column-store fixed-size leaf pages, only reported if
+ * statistics=all is set
+ */
 #define	WT_STAT_DSRC_BTREE_COLUMN_FIX			2023
-/*! btree: column-store internal pages */
+/*!
+ * btree: column-store internal pages, only reported if statistics=all is
+ * set
+ */
 #define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		2024
-/*! btree: column-store variable-size RLE encoded values */
+/*!
+ * btree: column-store variable-size RLE encoded values, only reported if
+ * statistics=all is set
+ */
 #define	WT_STAT_DSRC_BTREE_COLUMN_RLE			2025
-/*! btree: column-store variable-size deleted values */
+/*!
+ * btree: column-store variable-size deleted values, only reported if
+ * statistics=all is set
+ */
 #define	WT_STAT_DSRC_BTREE_COLUMN_DELETED		2026
-/*! btree: column-store variable-size leaf pages */
+/*!
+ * btree: column-store variable-size leaf pages, only reported if
+ * statistics=all is set
+ */
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		2027
 /*! btree: fixed-record size */
 #define	WT_STAT_DSRC_BTREE_FIXED_LEN			2028
@@ -4709,15 +4734,21 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BTREE_MAXLEAFVALUE			2033
 /*! btree: maximum tree depth */
 #define	WT_STAT_DSRC_BTREE_MAXIMUM_DEPTH		2034
-/*! btree: number of key/value pairs */
+/*!
+ * btree: number of key/value pairs, only reported if statistics=all is
+ * set
+ */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			2035
-/*! btree: overflow pages */
+/*! btree: overflow pages, only reported if statistics=all is set */
 #define	WT_STAT_DSRC_BTREE_OVERFLOW			2036
 /*! btree: pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		2037
-/*! btree: row-store internal pages */
+/*!
+ * btree: row-store internal pages, only reported if statistics=all is
+ * set
+ */
 #define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			2038
-/*! btree: row-store leaf pages */
+/*! btree: row-store leaf pages, only reported if statistics=all is set */
 #define	WT_STAT_DSRC_BTREE_ROW_LEAF			2039
 /*! cache: bytes currently in the cache */
 #define	WT_STAT_DSRC_CACHE_BYTES_INUSE			2040
@@ -4811,8 +4842,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_DICTIONARY			2084
 /*! reconciliation: fast-path pages deleted */
 #define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2085
-/*! reconciliation: internal page key bytes discarded using suffix
- * compression */
+/*!
+ * reconciliation: internal page key bytes discarded using suffix
+ * compression
+ */
 #define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2086
 /*! reconciliation: internal page multi-block writes */
 #define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2087
