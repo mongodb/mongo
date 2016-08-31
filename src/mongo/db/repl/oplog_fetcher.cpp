@@ -40,6 +40,7 @@
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -248,6 +249,10 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* exec,
                            EnqueueDocumentsFn enqueueDocumentsFn,
                            OnShutdownCallbackFn onShutdownCallbackFn)
     : _dataReplicatorExternalState(dataReplicatorExternalState),
+      _enqueueDocumentsFn(enqueueDocumentsFn),
+      _awaitDataTimeout(calculateAwaitDataTimeout(config)),
+      _onShutdownCallbackFn(onShutdownCallbackFn),
+      _lastFetched(lastFetched),
       _fetcher(exec,
                source,
                oplogNSS.db().toString(),
@@ -255,11 +260,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* exec,
                stdx::bind(
                    &OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
                uassertStatusOK(makeMetadataObject(config.getProtocolVersion() == 1LL)),
-               config.getElectionTimeoutPeriod()),
-      _enqueueDocumentsFn(enqueueDocumentsFn),
-      _awaitDataTimeout(calculateAwaitDataTimeout(config)),
-      _onShutdownCallbackFn(onShutdownCallbackFn),
-      _lastFetched(lastFetched) {
+               config.getElectionTimeoutPeriod()) {
     uassert(ErrorCodes::BadValue, "null last optime fetched", !lastFetched.opTime.isNull());
     uassert(ErrorCodes::InvalidReplicaSetConfig,
             "uninitialized replica set configuration",
@@ -268,6 +269,10 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* exec,
     uassert(ErrorCodes::BadValue, "null onShutdownCallback function", onShutdownCallbackFn);
 
     readersCreatedStats.increment();
+}
+
+OplogFetcher::~OplogFetcher() {
+    DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
 std::string OplogFetcher::toString() const {
