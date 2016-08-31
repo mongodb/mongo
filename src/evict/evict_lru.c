@@ -569,6 +569,10 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * pages to evict.  If the rate of queuing pages is high
 		 * enough, this score will go to zero, in which case the
 		 * eviction server might as well help out with eviction.
+		 *
+		 * Also, if there is a single eviction server thread with no
+		 * workers, it must service the urgent queue in case all
+		 * application threads are busy.
 		 */
 		if (cache->evict_empty_score < WT_EVICT_EMPTY_SCORE_CUTOFF ||
 		    (!WT_EVICT_HAS_WORKERS(session) &&
@@ -706,7 +710,6 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	 */
 	F_SET(btree, WT_BTREE_NO_EVICTION);
 	(void)__wt_atomic_addv32(&cache->pass_intr, 1);
-	WT_FULL_BARRIER();
 
 	/* Clear any existing LRU eviction walk for the file. */
 	WT_WITH_PASS_LOCK(session, ret,
@@ -823,7 +826,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	/* Age out the score of how much the queue has been empty recently. */
-	cache->evict_empty_score = (99 * cache->evict_empty_score) / 100;
+	if (cache->evict_empty_score > 0)
+		--cache->evict_empty_score;
 
 	/* Fill the next queue (that isn't the urgent queue). */
 	queue = cache->evict_fill_queue;
@@ -847,16 +851,27 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	if ((ret = __evict_walk(cache->walk_session, queue)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
-	/* Make sure the other queue is current before locking. */
-	if (cache->evict_current_queue != other_queue) {
-		__wt_spin_lock(session, &cache->evict_queue_lock);
-		cache->evict_other_queue = queue;
-		cache->evict_current_queue = other_queue;
-		__wt_spin_unlock(session, &cache->evict_queue_lock);
-	}
+	/*
+	 * If the queue we are filling is empty, pages are being requested
+	 * faster than they are being queued.
+	 */
+	if (__evict_queue_empty(queue)) {
+		cache->evict_empty_score = WT_MIN(WT_EVICT_EMPTY_SCORE_MAX,
+		    cache->evict_empty_score + WT_EVICT_EMPTY_SCORE_BUMP);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
+	} else
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &queue->evict_lock);
+
+	/*
+	 * We have locked the queue: in the (unusual) case where we are filling
+	 * the current queue, mark it empty so that subsequent requests switch
+	 * to the other queue.
+	 */
+	if (queue == cache->evict_current_queue)
+		queue->evict_current = NULL;
 
 	entries = queue->evict_entries;
 	qsort(queue->evict_queue,
@@ -938,18 +953,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 			cache->read_gen_oldest = read_gen_oldest;
 		}
 	}
-
-	if (__evict_queue_empty(queue)) {
-		/*
-		 * This score varies between 0 (if the queue hasn't been empty
-		 * for a long time) and 100 (if the queue has been empty the
-		 * last 10 times we filled up.
-		 */
-		cache->evict_empty_score = WT_MIN(100,
-		    cache->evict_empty_score + WT_EVICT_EMPTY_SCORE_BUMP);
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
-	} else
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
 
 	queue->evict_current = queue->evict_queue;
 	__wt_spin_unlock(session, &queue->evict_lock);
@@ -1166,7 +1169,7 @@ __evict_push_candidate(WT_SESSION_IMPL *session,
 
 	/*
 	 * Threads can race to queue a page (e.g., an ordinary LRU walk can
-	 * race with a page being queued for urgent eviction.
+	 * race with a page being queued for urgent eviction).
 	 */
 	orig_flags = new_flags = ref->page->flags_atomic;
 	FLD_SET(new_flags, WT_PAGE_EVICT_LRU);

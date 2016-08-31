@@ -115,14 +115,24 @@ struct __wt_cache {
 	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
 	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
 	WT_EVICT_QUEUE *evict_current_queue; /* LRU current queue in use */
-	WT_EVICT_QUEUE *evict_fill_queue;    /* LRU next queue to fill */
+	WT_EVICT_QUEUE *evict_fill_queue;    /* LRU next queue to fill.
+						This is usually the same as the
+						"other" queue but under heavy
+						load the eviction server will
+						start filling the current queue
+						before it switches. */
 	WT_EVICT_QUEUE *evict_other_queue;   /* LRU queue not in use */
 	WT_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
 	uint32_t evict_slots;		/* LRU list eviction slots */
 #define	WT_EVICT_EMPTY_SCORE_BUMP	10
 #define	WT_EVICT_EMPTY_SCORE_CUTOFF	10
+#define	WT_EVICT_EMPTY_SCORE_MAX	100
 	uint32_t evict_empty_score;	/* LRU score of how often queues are
-					   empty on refill. */
+					   empty on refill.  This score varies
+					   between 0 (if the queue hasn't been
+					   empty for a long time) and 100 (if
+					   the queue has been empty the last 10
+					   times we filled up.  */
 
 	/*
 	 * Cache pool information.
