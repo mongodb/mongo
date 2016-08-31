@@ -314,7 +314,7 @@ public:
                 errmsg = str::stream()
                     << "could not refresh metadata for " << ns << " with requested shard version "
                     << requestedVersion.toString() << ", stored shard version is "
-                    << currVersion.toString() << redact(status);
+                    << currVersion.toString() << causedBy(redact(status));
 
                 warning() << errmsg;
 

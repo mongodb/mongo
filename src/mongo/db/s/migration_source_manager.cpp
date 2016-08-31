@@ -380,7 +380,7 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                   migrationErrorStatus != ErrorCodes::OK);
 
         warning() << "Migration metadata commit may have failed: refreshing metadata to check"
-                  << redact(migrationErrorStatus);
+                  << causedBy(redact(migrationErrorStatus));
 
         // Need to get the latest optime in case the refresh request goes to a secondary --
         // otherwise the read won't wait for the write that _configsvrCommitChunkMigration may have

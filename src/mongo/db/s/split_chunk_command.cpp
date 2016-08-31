@@ -264,7 +264,7 @@ public:
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
                                    << " to split chunk [" << redact(min) << "," << redact(max)
-                                   << ") " << redact(scopedDistLock.getStatus());
+                                   << ") " << causedBy(redact(scopedDistLock.getStatus()));
             warning() << errmsg;
             return false;
         }
@@ -276,7 +276,7 @@ public:
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
                                    << "[" << redact(min) << "," << redact(max) << ") "
-                                   << redact(refreshStatus);
+                                   << causedBy(redact(refreshStatus));
 
             warning() << errmsg;
             return false;
@@ -371,7 +371,7 @@ public:
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "failed to refresh metadata for split chunk [" << redact(min)
-                                   << "," << redact(max) << ") " << redact(refreshStatus);
+                                   << "," << redact(max) << ") " << causedBy(redact(refreshStatus));
 
             warning() << errmsg;
             return false;

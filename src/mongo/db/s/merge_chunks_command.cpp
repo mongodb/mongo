@@ -170,9 +170,7 @@ bool mergeChunks(OperationContext* txn,
     if (!scopedDistLock.isOK()) {
         *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
                            << " to merge chunks in [" << redact(minKey) << "," << redact(maxKey)
-                           << ")"
-                           // REDACT??? Not sure how to handle the causedBy's
-                           << causedBy(scopedDistLock.getStatus());
+                           << ") " << causedBy(scopedDistLock.getStatus());
 
         warning() << *errMsg;
         return false;
@@ -189,7 +187,7 @@ bool mergeChunks(OperationContext* txn,
 
     if (!status.isOK()) {
         *errMsg = str::stream() << "could not merge chunks, failed to refresh metadata for "
-                                << nss.ns() << redact(status);
+                                << nss.ns() << causedBy(redact(status));
 
         warning() << *errMsg;
         return false;

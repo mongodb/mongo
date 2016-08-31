@@ -144,7 +144,7 @@ public:
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start recv'ing chunk "
                                    << "[" << redact(min) << "," << redact(max) << ")"
-                                   << redact(status);
+                                   << causedBy(redact(status));
 
             warning() << errmsg;
             return false;
@@ -160,9 +160,10 @@ public:
 
         auto statusWithFromShardConnectionString = ConnectionString::parse(cmdObj["from"].String());
         if (!statusWithFromShardConnectionString.isOK()) {
-            errmsg = str::stream() << "cannot start recv'ing chunk "
-                                   << "[" << redact(min) << "," << redact(max) << ")"
-                                   << redact(statusWithFromShardConnectionString.getStatus());
+            errmsg = str::stream()
+                << "cannot start recv'ing chunk "
+                << "[" << redact(min) << "," << redact(max) << ")"
+                << causedBy(redact(statusWithFromShardConnectionString.getStatus()));
 
             warning() << errmsg;
             return false;

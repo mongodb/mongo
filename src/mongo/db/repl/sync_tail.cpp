@@ -1114,7 +1114,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                 } catch (const DBException& e) {
                     // The group insert failed, log an error and fall through to the
                     // application of an individual op.
-                    error() << "Error applying inserts in bulk " << redact(e)
+                    error() << "Error applying inserts in bulk " << causedBy(redact(e))
                             << " trying first insert as a lone insert";
 
                     // Avoid quadratic run time from failed insert by not retrying until we
@@ -1130,7 +1130,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 
             if (!status.isOK()) {
                 severe() << "Error applying operation (" << redact(entry->raw)
-                         << "): " << redact(status);
+                         << "): " << causedBy(redact(status));
                 return status;
             }
         } catch (const DBException& e) {
@@ -1189,7 +1189,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
                 continue;
             }
 
-            severe() << "writer worker caught exception: " << redact(e)
+            severe() << "writer worker caught exception: " << causedBy(redact(e))
                      << " on: " << redact(entry.raw);
             return e.toStatus();
         }
