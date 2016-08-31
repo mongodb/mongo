@@ -103,7 +103,10 @@ public:
     bool inShutdown() const;
 
 private:
+    void _destroy(Session& session) override;
+
     struct Connection {
+        bool ended;
         std::unique_ptr<Session> session;
         SSLPeerInfo peerInfo;
     };

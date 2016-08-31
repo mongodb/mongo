@@ -43,20 +43,16 @@ AtomicUInt64 sessionIdCounter(0);
 
 }  // namespace
 
-const Status Session::ClosedStatus =
-    Status(ErrorCodes::TransportSessionClosed, "Session is closed.");
-
 Session::Session(HostAndPort remote, HostAndPort local, TransportLayer* tl)
-    : _ended(false),
-      _id(sessionIdCounter.addAndFetch(1)),
+    : _id(sessionIdCounter.addAndFetch(1)),
       _remote(std::move(remote)),
       _local(std::move(local)),
       _tags(kEmptyTagMask),
       _tl(tl) {}
 
 Session::~Session() {
-    if (_tl != nullptr && !_ended) {
-        _tl->end(*this);
+    if (_tl != nullptr) {
+        _tl->_destroy(*this);
     }
 }
 
@@ -65,7 +61,7 @@ Session::Session(Session&& other)
       _remote(std::move(other._remote)),
       _local(std::move(other._local)),
       _tl(other._tl) {
-    // We do not want to call tl->end() on moved-from Sessions.
+    // We do not want to call tl->destroy() on moved-from Sessions.
     other._tl = nullptr;
 }
 
@@ -98,13 +94,6 @@ Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
 
 SSLPeerInfo Session::getX509PeerInfo() const {
     return _tl->getX509PeerInfo(*this);
-}
-
-void Session::end() {
-    if (!_ended) {
-        _ended = true;
-        _tl->end(*this);
-    }
 }
 
 }  // namespace transport

@@ -117,6 +117,11 @@ void ServiceEntryPointMongod::_sessionLoop(Session* session) {
                 break;
             }
 
+            // Our session may have been closed internally.
+            if (status == TransportLayer::TicketSessionClosedStatus) {
+                break;
+            }
+
             uassertStatusOK(status);
         }
 

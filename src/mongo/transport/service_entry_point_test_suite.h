@@ -146,6 +146,7 @@ private:
         stdx::function<Status(transport::Ticket)> _wait;
         stdx::function<void(transport::Ticket, TicketCallback)> _asyncWait;
         stdx::function<void(const transport::Session&)> _end;
+        stdx::function<void(transport::Session& session)> _destroy_hook;
         stdx::function<void(transport::Session::TagMask tags)> _endAllSessions =
             [](transport::Session::TagMask tags) {};
         stdx::function<Status(void)> _start = [] { return Status::OK(); };
@@ -162,6 +163,9 @@ private:
 
         // Reset all hooks to their defaults
         void _resetHooks();
+
+    private:
+        void _destroy(transport::Session& session) override;
     };
 
     std::unique_ptr<MockTLHarness> _tl;

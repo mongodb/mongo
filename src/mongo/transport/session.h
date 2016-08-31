@@ -144,25 +144,11 @@ public:
         return _tl;
     }
 
-    /*
-     * End the session.
-     */
-    void end();
-
-    /*
-     * Return true if the session ended, false otherwise.
-     */
-    bool ended() const {
-        return _ended;
-    }
-
     MessageCompressorManager& getCompressorManager() {
         return _messageCompressorManager;
     }
 
 private:
-    bool _ended = false;
-
     Id _id;
 
     HostAndPort _remote;

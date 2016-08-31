@@ -88,6 +88,8 @@ public:
     void shutdown() override;
 
 private:
+    void _destroy(Session& session) override;
+
     void _handleNewConnection(std::unique_ptr<AbstractMessagingPort> amp);
 
     Status _runTicket(Ticket ticket);
@@ -139,11 +141,7 @@ private:
      */
     struct Connection {
         Connection(std::unique_ptr<AbstractMessagingPort> port, bool ended, Session::TagMask tags)
-            : amp(std::move(port)),
-              connectionId(amp->connectionId()),
-              tags(tags),
-              inUse(false),
-              ended(false) {}
+            : amp(std::move(port)), connectionId(amp->connectionId()), tags(tags) {}
 
         std::unique_ptr<AbstractMessagingPort> amp;
 
@@ -151,8 +149,8 @@ private:
 
         boost::optional<SSLPeerInfo> sslPeerInfo;
         Session::TagMask tags;
-        bool inUse;
-        bool ended;
+        bool inUse = false;
+        bool ended = false;
     };
 
     ServiceEntryPoint* _sep;

@@ -60,6 +60,9 @@ public:
     static const Status SessionUnknownStatus;
     static const Status ShutdownStatus;
     static const Status TicketSessionUnknownStatus;
+    static const Status TicketSessionClosedStatus;
+
+    friend class Session;
 
     /**
      * Stats for sessions open in the Transport Layer.
@@ -218,6 +221,13 @@ protected:
     TransportLayer* getTicketTransportLayer(const Ticket& ticket) {
         return ticket._tl;
     }
+
+private:
+    /**
+     * Destroys any information linked to this Session in the TransportLayer.
+     * This should only be called from within Session's destructor.
+     */
+    virtual void _destroy(Session& session) = 0;
 };
 
 }  // namespace transport

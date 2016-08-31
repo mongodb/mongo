@@ -78,6 +78,8 @@ public:
     Status addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl);
 
 private:
+    void _destroy(Session& session) override;
+
     template <typename Callable>
     void _foreach(Callable&& cb);
 

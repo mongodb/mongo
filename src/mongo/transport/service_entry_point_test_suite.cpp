@@ -91,6 +91,7 @@ void setPingCommand(Message* m) {
 
 // Some default method implementations
 const auto kDefaultEnd = [](const Session& session) { return; };
+const auto kDefaultDestroyHook = [](Session& session) { return; };
 const auto kDefaultAsyncWait = [](Ticket, TicketCallback cb) { cb(Status::OK()); };
 const auto kNoopFunction = [] { return; };
 
@@ -218,11 +219,16 @@ void ServiceEntryPointTestSuite::MockTLHarness::_resetHooks() {
     _wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultWait, this, _1);
     _asyncWait = kDefaultAsyncWait;
     _end = kDefaultEnd;
+    _destroy_hook = kDefaultDestroyHook;
 }
 
 ServiceEntryPointTestSuite::MockTicket* ServiceEntryPointTestSuite::MockTLHarness::getMockTicket(
     const transport::Ticket& ticket) {
     return dynamic_cast<ServiceEntryPointTestSuite::MockTicket*>(getTicketImpl(ticket));
+}
+
+void ServiceEntryPointTestSuite::MockTLHarness::_destroy(Session& session) {
+    return _destroy_hook(session);
 }
 
 void ServiceEntryPointTestSuite::setUp() {
@@ -245,7 +251,7 @@ void ServiceEntryPointTestSuite::noLifeCycleTest() {
     _tl->_wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitError, _tl.get(), _1);
 
     // Step 3: SEP destroys the session, which calls end()
-    _tl->_end = [&testComplete](const Session&) { testComplete.set_value(); };
+    _tl->_destroy_hook = [&testComplete](const Session&) { testComplete.set_value(); };
 
     // Kick off the SEP
     Session s(HostAndPort(), HostAndPort(), _tl.get());
@@ -274,7 +280,7 @@ void ServiceEntryPointTestSuite::halfLifeCycleTest() {
     };
 
     // Step 5: SEP destroys the session, which calls end()
-    _tl->_end = [&testComplete](const Session&) { testComplete.set_value(); };
+    _tl->_destroy_hook = [&testComplete](const Session&) { testComplete.set_value(); };
 
     // Kick off the SEP
     Session s(HostAndPort(), HostAndPort(), _tl.get());
@@ -300,7 +306,7 @@ void ServiceEntryPointTestSuite::fullLifeCycleTest() {
     // Step 5: SEP gets a ticket to source a Message
     // Step 6: SEP calls wait() on the ticket and receives and error
     // Step 7: SEP destroys the session, which calls end()
-    _tl->_end = [&testComplete](const Session& session) { testComplete.set_value(); };
+    _tl->_destroy_hook = [&testComplete](const Session& session) { testComplete.set_value(); };
 
     // Kick off the SEP
     Session s(HostAndPort(), HostAndPort(), _tl.get());
@@ -354,7 +360,7 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     // Step 7: SEP calls sourceMessage() for B, gets tB3
     // Step 8: SEP calls wait() for tB3, gets an error
     // Step 9: SEP calls end(B)
-    _tl->_end = [this, idA, idB, &resumeA, &testComplete](const Session& session) {
+    _tl->_destroy_hook = [this, idA, idB, &resumeA, &testComplete](const Session& session) {
 
         // When end(B) is called, time to resume session A
         if (session.id() == idB) {
@@ -442,7 +448,7 @@ void ServiceEntryPointTestSuite::burstStressTest(int numSessions,
     };
 
     // When we end the last session, end the test.
-    _tl->_end = [&allSessionsComplete, numSessions, &ended](const Session& session) {
+    _tl->_destroy_hook = [&allSessionsComplete, numSessions, &ended](const Session& session) {
         if (ended.fetchAndAdd(1) == (numSessions - 1)) {
             allSessionsComplete.set_value();
         }

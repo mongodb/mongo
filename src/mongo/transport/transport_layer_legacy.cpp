@@ -197,18 +197,9 @@ void TransportLayerLegacy::registerTags(const Session& session) {
 
 void TransportLayerLegacy::_endSession_inlock(
     decltype(TransportLayerLegacy::_connections.begin()) conn) {
+    conn->second.ended = true;
     conn->second.amp->shutdown();
-
-    // If the amp is in use it means that we're in the middle of fulfilling the ticket in _runTicket
-    // and can't erase it immediately.
-    //
-    // In that case we'll rely on _runTicket to do the removal for us later
-    if (conn->second.inUse) {
-        conn->second.ended = true;
-    } else {
-        Listener::globalTicketHolder.release();
-        _connections.erase(conn);
-    }
+    Listener::globalTicketHolder.release();
 }
 
 void TransportLayerLegacy::endAllSessions(Session::TagMask tags) {
@@ -239,6 +230,19 @@ void TransportLayerLegacy::shutdown() {
     endAllSessions(Session::kEmptyTagMask);
 }
 
+void TransportLayerLegacy::_destroy(Session& session) {
+    stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
+    auto conn = _connections.find(session.id());
+
+    invariant(conn != _connections.end());
+    if (!conn->second.ended) {
+        _endSession_inlock(conn);
+    }
+
+    invariant(!conn->second.inUse);
+    _connections.erase(conn);
+}
+
 Status TransportLayerLegacy::_runTicket(Ticket ticket) {
     if (!_running.load()) {
         return TransportLayer::ShutdownStatus;
@@ -253,9 +257,15 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
     {
         stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
 
+        // Error if we cannot find the session.
         auto conn = _connections.find(ticket.sessionId());
         if (conn == _connections.end()) {
             return TransportLayer::TicketSessionUnknownStatus;
+        }
+
+        // Error if we find the session but its connection is closed.
+        if (conn->second.ended) {
+            return TransportLayer::TicketSessionClosedStatus;
         }
 
         // "check out" the port
@@ -282,11 +292,6 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
         }
 #endif
         conn->second.inUse = false;
-
-        if (conn->second.ended) {
-            Listener::globalTicketHolder.release();
-            _connections.erase(conn);
-        }
     }
 
     return res;

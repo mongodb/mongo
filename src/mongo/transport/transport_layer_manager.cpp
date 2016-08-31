@@ -124,5 +124,9 @@ Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<Transpor
     return ptr->start();
 }
 
+void TransportLayerManager::_destroy(Session& session) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace transport
 }  // namespace mongo
