@@ -453,6 +453,25 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return opts;
     };
 
+    var _mongodVersionSupportsNoopWrites = function(version) {
+        if (version === "latest" || version === "" || version === undefined) {
+            return true;
+        }
+        var versionParts =
+            convertVersionStringToArray(version).slice(0, 3).map(part => parseInt(part, 10));
+        if (versionParts.length === 2) {
+            versionParts.push(Infinity);
+        }
+
+        if (versionParts[0] > 3 || (versionParts[0] === 3 && versionParts[1] > 3) ||
+            (versionParts[0] === 3 && versionParts[1] === 3 && versionParts[2] >= 12)) {
+            // Replication noop writes were added in 3.3.12.
+            return true;
+        }
+
+        return false;
+    };
+
     /**
      * @option {object} opts
      *
@@ -475,6 +494,16 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         opts.dbpath = MongoRunner.toRealDir(opts.dbpath || "$dataDir/mongod-$port", opts.pathOpts);
 
         opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
+
+        if (!_mongodVersionSupportsNoopWrites(opts.binVersion) && opts.setParameter &&
+            opts.setParameter.writePeriodicNoops != undefined) {
+            // Remove the 'writePeriodicNoops' setParameter from mongods running a version that
+            // won't recognize it.
+            print("Removing 'writePeriodNoops' setParameter with value " +
+                  opts.setParameter.writePeriodNoops +
+                  " because it isn't compatibile with mongod running version " + opts.binVersion);
+            delete opts.setParameter.writePeriodicNoops;
+        }
 
         if (!opts.logFile && opts.useLogFiles) {
             opts.logFile = opts.dbpath + "/mongod.log";

@@ -1234,6 +1234,10 @@ var ReplSetTest = function(opts) {
         var pathOpts = {node: n, set: this.name};
         options.pathOpts = Object.merge(options.pathOpts || {}, pathOpts);
 
+        // Turn off periodic noop writes for replica sets by default.
+        options.setParameter = options.setParameter || {};
+        options.setParameter.writePeriodicNoops = options.setParameter.writePeriodicNoops || false;
+
         if (tojson(options) != tojson({}))
             printjson(options);
 

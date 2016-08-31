@@ -30,11 +30,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
 
@@ -42,6 +44,8 @@ namespace mongo {
 namespace repl {
 
 namespace {
+
+MONGO_EXPORT_SERVER_PARAMETER(writePeriodicNoops, bool, true);
 
 const auto kMsgObj = BSON("msg"
                           << "periodic noop");
@@ -156,13 +160,18 @@ void NoopWriter::_writeNoop(OperationContext* txn) {
         LOG(1) << "Not scheduling a noop write. Last known OpTime: " << _lastKnownOpTime
                << " != last primary OpTime: " << lastAppliedOpTime;
     } else {
-        LOG(1) << "Writing noop to oplog";
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            WriteUnitOfWork uow(txn);
-            txn->getClient()->getServiceContext()->getOpObserver()->onOpMessage(txn, kMsgObj);
-            uow.commit();
+        if (writePeriodicNoops) {
+            const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
+            LOG(logLevel)
+                << "Writing noop to oplog as there has been no writes to this replica set in over "
+                << _writeInterval;
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork uow(txn);
+                txn->getClient()->getServiceContext()->getOpObserver()->onOpMessage(txn, kMsgObj);
+                uow.commit();
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeNoop", rsOplogName);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeNoop", rsOplogName);
     }
 
     _lastKnownOpTime = replCoord->getMyLastAppliedOpTime();
