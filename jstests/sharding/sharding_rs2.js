@@ -56,7 +56,7 @@
     assert.eq(2, countNodes(), "A1");
 
     var rs = s.rs0;
-    rs.add();
+    rs.add({'shardsvr': ""});
     try {
         rs.reInitiate();
     } catch (e) {

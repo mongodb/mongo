@@ -19,7 +19,7 @@
     });
 
     // add a node to shard rs
-    rs.add();
+    rs.add({'shardsvr': ''});
     rs.reInitiate();
     rs.awaitSecondaryNodes();
 

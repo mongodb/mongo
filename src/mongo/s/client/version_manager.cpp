@@ -361,6 +361,10 @@ bool checkShardVersion(OperationContext* txn,
         return true;
     }
 
+    // If the shard rejected the setShardVersion, return the error to the user.
+    int errCode = result["code"].numberInt();
+    uassert(errCode, result["errmsg"].String(), errCode != ErrorCodes::NoShardingEnabled);
+
     LOG(1) << "       setShardVersion failed!\n" << result;
 
     if (result["need_authoritative"].trueValue())

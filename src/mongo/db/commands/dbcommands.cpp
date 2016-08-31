@@ -1304,14 +1304,14 @@ void Command::execCommand(OperationContext* txn,
             if (oss.hasShardVersion()) {
                 if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
                     uassertStatusOK(
-                        {ErrorCodes::IllegalOperation,
+                        {ErrorCodes::NoShardingEnabled,
                          "Cannot accept sharding commands if not started with --shardsvr"});
                 } else if (!shardingState->enabled()) {
                     // TODO(esha): Once 3.4 ships, we no longer need to support initializing
                     // sharding awareness through commands, so just reject all sharding commands.
                     if (!shardingState->commandInitializesShardingAwareness(
                             request.getCommandName().toString())) {
-                        uassertStatusOK({ErrorCodes::IllegalOperation,
+                        uassertStatusOK({ErrorCodes::NoShardingEnabled,
                                          str::stream()
                                              << "Received a command with sharding chunk version "
                                                 "information but this node is not sharding aware: "

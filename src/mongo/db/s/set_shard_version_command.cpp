@@ -94,6 +94,12 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
+
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+            uassertStatusOK({ErrorCodes::NoShardingEnabled,
+                             "Cannot accept sharding commands if not started with --shardsvr"});
+        }
+
         // Steps
         // 1. check basic config
         // 2. extract params from command
