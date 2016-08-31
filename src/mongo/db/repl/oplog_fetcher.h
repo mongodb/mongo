@@ -130,7 +130,7 @@ public:
                  EnqueueDocumentsFn enqueueDocumentsFn,
                  OnShutdownCallbackFn onShutdownCallbackFn);
 
-    virtual ~OplogFetcher() = default;
+    virtual ~OplogFetcher();
 
     std::string toString() const;
 
@@ -201,19 +201,20 @@ private:
     void _onShutdown(Status status);
     void _onShutdown(Status status, OpTimeWithHash opTimeWithHash);
 
+    // Protects member data of this OplogFetcher.
+    mutable stdx::mutex _mutex;
+
     DataReplicatorExternalState* _dataReplicatorExternalState;
-    Fetcher _fetcher;
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
     const OnShutdownCallbackFn _onShutdownCallbackFn;
-
-    // Protects member data of this Fetcher.
-    mutable stdx::mutex _mutex;
 
     // Used to validate start of first batch of results from the remote oplog
     // tailing query and to keep track of the last known operation consumed via
     // "_enqueueDocumentsFn".
     OpTimeWithHash _lastFetched;
+
+    Fetcher _fetcher;
 };
 
 }  // namespace repl
