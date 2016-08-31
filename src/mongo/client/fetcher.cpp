@@ -280,7 +280,8 @@ bool Fetcher::_isInShutdown() const {
 }
 
 Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
-    if (_isInShutdown()) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_inShutdown) {
         return Status(ErrorCodes::CallbackCanceled,
                       "fetcher was shut down after previous batch was processed");
     }
@@ -293,7 +294,6 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
         return scheduleResult.getStatus();
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _getMoreCallbackHandle = scheduleResult.getValue();
 
     return Status::OK();
