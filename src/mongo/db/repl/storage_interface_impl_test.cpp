@@ -366,6 +366,38 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_STRING_CONTAINS(status.reason(), "Collection::insertDocument got document without _id");
 }
 
+TEST_F(StorageInterfaceImplTest,
+       InsertDocumentsInsertsDocumentsOneAtATimeWhenAllAtOnceInsertingFails) {
+    // Create a collection that does not support all-at-once inserting.
+    auto txn = getClient()->makeOperationContext();
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = 1024 * 1024;
+    createCollection(txn.get(), nss, options);
+    // StorageInterfaceImpl::insertDocuments should fall back on inserting the batch one at a time.
+    StorageInterfaceImpl storageInterface(nss);
+    auto doc1 = BSON("_id" << 1);
+    auto doc2 = BSON("_id" << 2);
+    std::vector<BSONObj> docs({doc1, doc2});
+    // Confirm that Collection::insertDocuments fails to insert the batch all at once.
+    {
+        AutoGetCollection autoCollection(txn.get(), nss, MODE_IX);
+        WriteUnitOfWork wunit(txn.get());
+        ASSERT_EQUALS(ErrorCodes::OperationCannotBeBatched,
+                      autoCollection.getCollection()->insertDocuments(
+                          txn.get(), docs.begin(), docs.cend(), nullptr, false));
+    }
+    ASSERT_OK(storageInterface.insertDocuments(txn.get(), nss, docs));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn.get(), nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
     // Create fake oplog collection to hold operations.
     auto txn = getClient()->makeOperationContext();

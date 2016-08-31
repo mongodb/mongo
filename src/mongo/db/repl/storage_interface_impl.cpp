@@ -312,6 +312,34 @@ Status StorageInterfaceImpl::insertDocument(OperationContext* txn,
     return insertDocuments(txn, nss, {doc});
 }
 
+namespace {
+
+Status insertDocumentsSingleBatch(OperationContext* txn,
+                                  const NamespaceString& nss,
+                                  std::vector<BSONObj>::const_iterator begin,
+                                  std::vector<BSONObj>::const_iterator end) {
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetCollection autoColl(txn, nss, MODE_IX);
+    auto collection = autoColl.getCollection();
+    if (!collection) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "The collection must exist before inserting documents, ns:"
+                              << nss.ns()};
+    }
+
+    WriteUnitOfWork wunit(txn);
+    OpDebug* const nullOpDebug = nullptr;
+    auto status = collection->insertDocuments(txn, begin, end, nullOpDebug, false);
+    if (!status.isOK()) {
+        return status;
+    }
+    wunit.commit();
+
+    return Status::OK();
+}
+
+}  // namespace
+
 Status StorageInterfaceImpl::insertDocuments(OperationContext* txn,
                                              const NamespaceString& nss,
                                              const std::vector<BSONObj>& docs) {
@@ -320,26 +348,28 @@ Status StorageInterfaceImpl::insertDocuments(OperationContext* txn,
                 str::stream() << "unable to insert documents into " << nss.ns()
                               << " - no documents provided"};
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetCollection autoColl(txn, nss, MODE_IX);
-        auto collection = autoColl.getCollection();
-        if (!collection) {
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "The collection must exist before inserting documents, ns:"
-                                  << nss.ns()};
-        }
 
-        WriteUnitOfWork wunit(txn);
-        OpDebug* const nullOpDebug = nullptr;
-        auto status =
-            collection->insertDocuments(txn, docs.begin(), docs.end(), nullOpDebug, false);
-        if (!status.isOK()) {
-            return status;
+    if (docs.size() > 1U) {
+        try {
+            if (insertDocumentsSingleBatch(txn, nss, docs.cbegin(), docs.cend()).isOK()) {
+                return Status::OK();
+            }
+        } catch (...) {
+            // Ignore this failure and behave as-if we never tried to do the combined batch insert.
+            // The loop below will handle reporting any non-transient errors.
         }
-        wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "StorageInterfaceImpl::insertDocuments", nss.ns());
+
+    // Try to insert the batch one-at-a-time because the batch failed all-at-once inserting.
+    for (auto it = docs.cbegin(); it != docs.cend(); ++it) {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            auto status = insertDocumentsSingleBatch(txn, nss, it, it + 1);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "StorageInterfaceImpl::insertDocuments", nss.ns());
+    }
 
     return Status::OK();
 }
