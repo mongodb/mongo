@@ -26,11 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/types.h>
 #include <string.h>
 #include <stdio.h>
 
-#include "queue.h"
 #include "config_opt.h"
 
 static const CONFIG_OPT config_opts[] = {

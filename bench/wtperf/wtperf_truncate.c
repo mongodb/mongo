@@ -35,9 +35,8 @@ decode_key(char *key_buf)
 }
 
 int
-setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session)
-{
-	CONFIG_OPTS *opts;
+setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
+
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	WORKLOAD *workload;
@@ -46,7 +45,6 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session)
 	int ret;
 	uint64_t end_point, final_stone_gap, i, start_point;
 
-	opts = cfg->opts;
 	end_point = final_stone_gap = start_point = 0;
 	trunc_cfg = &thread->trunc_cfg;
 	workload = thread->workload;
@@ -106,7 +104,7 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session)
 		for (i = 1; i <= trunc_cfg->needed_stones; i++) {
 			truncate_item =
 			    dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-			truncate_item->key = dcalloc(opts->key_sz, 1);
+			truncate_item->key = dcalloc(cfg->key_sz, 1);
 			generate_key(
 			    cfg, truncate_item->key, trunc_cfg->stone_gap * i);
 			truncate_item->diff =
@@ -126,18 +124,16 @@ err:	if ((ret = cursor->close(cursor)) != 0) {
 
 int
 run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
-    WT_CURSOR *cursor, WT_SESSION *session, int *truncatedp)
-{
-	CONFIG_OPTS *opts;
+    WT_CURSOR *cursor, WT_SESSION *session, int *truncatedp) {
+
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	char *next_key;
 	int ret, t_ret;
 	uint64_t used_stone_gap;
 
-	opts = cfg->opts;
-	trunc_cfg = &thread->trunc_cfg;
 	ret = 0;
+	trunc_cfg = &thread->trunc_cfg;
 
 	*truncatedp = 0;
 	/* Update the total inserts */
@@ -174,7 +170,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += used_stone_gap;
 		truncate_item = dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-		truncate_item->key = dcalloc(opts->key_sz, 1);
+		truncate_item->key = dcalloc(cfg->key_sz, 1);
 		generate_key(cfg, truncate_item->key, trunc_cfg->last_key);
 		truncate_item->diff = used_stone_gap;
 		TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
@@ -194,7 +190,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	 * Truncate the content via a single truncate call or a cursor walk
 	 * depending on the configuration.
 	 */
-	if (opts->truncate_single_ops) {
+	if (cfg->truncate_single_ops) {
 		while ((ret = cursor->next(cursor)) == 0) {
 			testutil_check(cursor->get_key(cursor, &next_key));
 			if (strcmp(next_key, truncate_item->key) == 0)

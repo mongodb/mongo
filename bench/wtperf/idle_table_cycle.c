@@ -32,28 +32,25 @@ static int
 check_timing(CONFIG *cfg,
     const char *name, struct timespec start, struct timespec *stop)
 {
-	CONFIG_OPTS *opts;
 	uint64_t last_interval;
 	int ret;
-
-	opts = cfg->opts;
 
 	if ((ret = __wt_epoch(NULL, stop)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "Get time failed in cycle_idle_tables.");
-		cfg->error = true;
+		cfg->error = ret;
 		return (ret);
 	}
 
 	last_interval = (uint64_t)(WT_TIMEDIFF_SEC(*stop, start));
 
-	if (last_interval > opts->idle_table_cycle) {
+	if (last_interval > cfg->idle_table_cycle) {
 		lprintf(cfg, ret, 0,
 		    "Cycling idle table failed because %s took %" PRIu64
 		    " seconds which is longer than configured acceptable"
 		    " maximum of %" PRIu32 ".",
-		    name, last_interval, opts->idle_table_cycle);
-		cfg->error = true;
+		    name, last_interval, cfg->idle_table_cycle);
+		cfg->error = ETIMEDOUT;
 		return (ETIMEDOUT);
 	}
 	return (0);
@@ -68,18 +65,16 @@ cycle_idle_tables(void *arg)
 {
 	struct timespec start, stop;
 	CONFIG *cfg;
-	CONFIG_OPTS *opts;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
+	WT_CURSOR *cursor;
 	int cycle_count, ret;
 	char uri[512];
 
 	cfg = (CONFIG *)arg;
-	opts = cfg->opts;
 	cycle_count = 0;
 
 	if ((ret = cfg->conn->open_session(
-	    cfg->conn, NULL, opts->sess_config, &session)) != 0) {
+	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "Error opening a session on %s", cfg->home);
 		return (NULL);
@@ -94,18 +89,18 @@ cycle_idle_tables(void *arg)
 		if ((ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0,
 			     "Get time failed in cycle_idle_tables.");
-			cfg->error = true;
+			cfg->error = ret;
 			return (NULL);
 		}
 
 		/* Create a table. */
 		if ((ret = session->create(
-		    session, uri, opts->table_config)) != 0) {
+		    session, uri, cfg->table_config)) != 0) {
 			if (ret == EBUSY)
 				continue;
 			lprintf(cfg, ret, 0,
 			     "Table create failed in cycle_idle_tables.");
-			cfg->error = true;
+			cfg->error = ret;
 			return (NULL);
 		}
 		if (check_timing(cfg, "create", start, &stop) != 0)
@@ -117,13 +112,13 @@ cycle_idle_tables(void *arg)
 		    session, uri, NULL, NULL, &cursor)) != 0) {
 			lprintf(cfg, ret, 0,
 			     "Cursor open failed in cycle_idle_tables.");
-			cfg->error = true;
+			cfg->error = ret;
 			return (NULL);
 		}
 		if ((ret = cursor->close(cursor)) != 0) {
 			lprintf(cfg, ret, 0,
 			     "Cursor close failed in cycle_idle_tables.");
-			cfg->error = true;
+			cfg->error = ret;
 			return (NULL);
 		}
 		if (check_timing(cfg, "cursor", start, &stop) != 0)
@@ -141,7 +136,7 @@ cycle_idle_tables(void *arg)
 		if (ret != 0 && ret != EBUSY) {
 			lprintf(cfg, ret, 0,
 			     "Table drop failed in cycle_idle_tables.");
-			cfg->error = true;
+			cfg->error = ret;
 			return (NULL);
 		}
 		if (check_timing(cfg, "drop", start, &stop) != 0)
@@ -161,19 +156,17 @@ cycle_idle_tables(void *arg)
 int
 start_idle_table_cycle(CONFIG *cfg, pthread_t *idle_table_cycle_thread)
 {
-	CONFIG_OPTS *opts;
 	pthread_t thread_id;
 	int ret;
 
-	opts = cfg->opts;
-
-	if (opts->idle_table_cycle == 0)
+	if (cfg->idle_table_cycle == 0)
 		return (0);
 
 	cfg->idle_cycle_run = true;
 	if ((ret = pthread_create(
 	    &thread_id, NULL, cycle_idle_tables, cfg)) != 0) {
-		lprintf(cfg, ret, 0, "Error creating idle table cycle thread.");
+		lprintf(
+		    cfg, ret, 0, "Error creating idle table cycle thread.");
 		cfg->idle_cycle_run = false;
 		return (ret);
 	}
@@ -185,12 +178,9 @@ start_idle_table_cycle(CONFIG *cfg, pthread_t *idle_table_cycle_thread)
 int
 stop_idle_table_cycle(CONFIG *cfg, pthread_t idle_table_cycle_thread)
 {
-	CONFIG_OPTS *opts;
 	int ret;
 
-	opts = cfg->opts;
-
-	if (opts->idle_table_cycle == 0 || !cfg->idle_cycle_run)
+	if (cfg->idle_table_cycle == 0 || !cfg->idle_cycle_run)
 		return (0);
 
 	cfg->idle_cycle_run = false;

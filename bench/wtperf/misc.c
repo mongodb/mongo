@@ -32,20 +32,18 @@
 int
 setup_log_file(CONFIG *cfg)
 {
-	CONFIG_OPTS *opts;
 	int ret;
 	char *fname;
 
-	opts = cfg->opts;
 	ret = 0;
 
-	if (opts->verbose < 1)
+	if (cfg->verbose < 1)
 		return (0);
 
 	fname = dcalloc(strlen(cfg->monitor_dir) +
-	    strlen(opts->table_name) + strlen(".stat") + 2, 1);
+	    strlen(cfg->table_name) + strlen(".stat") + 2, 1);
 
-	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, opts->table_name);
+	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
 	cfg->logf = fopen(fname, "w");
 	if (cfg->logf == NULL) {
 		ret = errno;
@@ -66,18 +64,15 @@ setup_log_file(CONFIG *cfg)
 void
 lprintf(const CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 {
-	CONFIG_OPTS *opts;
 	va_list ap;
 
-	opts = cfg->opts;
-
-	if (err == 0 && level <= opts->verbose) {
+	if (err == 0 && level <= cfg->verbose) {
 		va_start(ap, fmt);
 		vfprintf(cfg->logf, fmt, ap);
 		va_end(ap);
 		fprintf(cfg->logf, "\n");
 
-		if (level < opts->verbose) {
+		if (level < cfg->verbose) {
 			va_start(ap, fmt);
 			vprintf(fmt, ap);
 			va_end(ap);

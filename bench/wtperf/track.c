@@ -34,16 +34,14 @@
 uint64_t
 sum_pop_ops(CONFIG *cfg)
 {
-	CONFIG_OPTS *opts;
 	CONFIG_THREAD *thread;
 	uint64_t total;
 	u_int i;
 
-	opts = cfg->opts;
 	total = 0;
 
 	for (i = 0, thread = cfg->popthreads;
-	    thread != NULL && i < opts->populate_threads; ++i, ++thread)
+	    thread != NULL && i < cfg->populate_threads; ++i, ++thread)
 		total += thread->insert.ops;
 	return (total);
 }
@@ -54,16 +52,14 @@ sum_pop_ops(CONFIG *cfg)
 uint64_t
 sum_ckpt_ops(CONFIG *cfg)
 {
-	CONFIG_OPTS *opts;
 	CONFIG_THREAD *thread;
 	uint64_t total;
 	u_int i;
 
-	opts = cfg->opts;
 	total = 0;
 
 	for (i = 0, thread = cfg->ckptthreads;
-	    thread != NULL && i < opts->checkpoint_threads; ++i, ++thread)
+	    thread != NULL && i < cfg->checkpoint_threads; ++i, ++thread)
 		total += thread->ckpt.ops;
 	return (total);
 }
@@ -74,20 +70,17 @@ sum_ckpt_ops(CONFIG *cfg)
 static uint64_t
 sum_ops(CONFIG *cfg, size_t field_offset)
 {
-	CONFIG_OPTS *opts;
 	CONFIG_THREAD *thread;
 	uint64_t total;
 	int64_t i, th_cnt;
 
-	opts = cfg->opts;
 	total = 0;
-
 	if (cfg->popthreads == NULL) {
 		thread = cfg->workers;
 		th_cnt = cfg->workers_cnt;
 	} else {
 		thread = cfg->popthreads;
-		th_cnt = opts->populate_threads;
+		th_cnt = cfg->populate_threads;
 	}
 	for (i = 0; thread != NULL && i < th_cnt; ++i, ++thread)
 		total += ((TRACK *)((uint8_t *)thread + field_offset))->ops;
@@ -124,14 +117,12 @@ static void
 latency_op(CONFIG *cfg,
     size_t field_offset, uint32_t *avgp, uint32_t *minp, uint32_t *maxp)
 {
-	CONFIG_OPTS *opts;
 	CONFIG_THREAD *thread;
 	TRACK *track;
 	uint64_t ops, latency, tmp;
 	int64_t i, th_cnt;
 	uint32_t max, min;
 
-	opts = cfg->opts;
 	ops = latency = 0;
 	max = 0;
 	min = UINT32_MAX;
@@ -141,7 +132,7 @@ latency_op(CONFIG *cfg,
 		th_cnt = cfg->workers_cnt;
 	} else {
 		thread = cfg->popthreads;
-		th_cnt = opts->populate_threads;
+		th_cnt = cfg->populate_threads;
 	}
 	for (i = 0; thread != NULL && i < th_cnt; ++i, ++thread) {
 		track = (TRACK *)((uint8_t *)thread + field_offset);
