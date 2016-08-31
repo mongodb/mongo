@@ -145,7 +145,7 @@ bool ShardingState::enabled() const {
 ConnectionString ShardingState::getConfigServer(OperationContext* txn) {
     invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return grid.shardRegistry()->getConfigServerConnectionString();
+    return Grid::get(txn)->shardRegistry()->getConfigServerConnectionString();
 }
 
 string ShardingState::getShardName() {
