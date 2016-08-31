@@ -38,14 +38,14 @@
 
 #ifdef OPT_DEFINE_DESC
 #define	DEF_OPT_AS_BOOL(name, initval, desc)				\
-	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG_OPTS, name) },
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
 	{ #name, desc, initval, CONFIG_STRING_TYPE,                    \
-	offsetof(CONFIG, name) },
+	offsetof(CONFIG_OPTS, name) },
 #define	DEF_OPT_AS_STRING(name, initval, desc)				\
-	{ #name, desc, initval, STRING_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, initval, STRING_TYPE, offsetof(CONFIG_OPTS, name) },
 #define	DEF_OPT_AS_UINT32(name, initval, desc)				\
-	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG_OPTS, name) },
 #endif
 
 #ifdef OPT_DEFINE_DEFAULT
