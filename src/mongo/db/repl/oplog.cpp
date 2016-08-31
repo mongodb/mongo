@@ -1078,11 +1078,13 @@ void signalOplogWaiters() {
     }
 }
 
-void checkForCappedOplog(OperationContext* txn, Database* db) {
+void checkForCappedOplog(OperationContext* txn) {
     invariant(!_oplogCollectionName.empty());
     const NamespaceString oplogNss(_oplogCollectionName);
-    invariant(txn->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
-    Collection* oplogCollection = db->getCollection(oplogNss);
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetDb autoDb(txn, oplogNss.db(), MODE_IX);
+    Lock::CollectionLock oplogCollectionLock(txn->lockState(), oplogNss.ns(), MODE_X);
+    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
         severe() << "The oplog collection " << _oplogCollectionName
                  << " is not capped; a capped oplog is a requirement for replication to function.";
