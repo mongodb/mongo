@@ -28,7 +28,6 @@
 
 #include <sys/types.h>
 #include <string.h>
-#include <stdint.h>
 #include <stdio.h>
 
 #include "queue.h"
