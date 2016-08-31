@@ -32,13 +32,15 @@
 #include <vector>
 
 #include "mongo/s/catalog/dist_lock_manager.h"
+
+#include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
 
 class DistLockManagerMock : public DistLockManager {
 public:
-    DistLockManagerMock();
+    DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalog);
 
     virtual ~DistLockManagerMock() = default;
 
@@ -77,6 +79,12 @@ private:
         DistLockHandle lockID;
         std::string name;
     };
+
+
+    /**
+     * Unused, but needed so that test code mirrors the ownership semantics of production code.
+     */
+    const std::unique_ptr<DistLockCatalog> _catalog;
 
     std::vector<LockInfo> _locks;
     Status _lockReturnStatus;

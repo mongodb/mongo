@@ -122,7 +122,7 @@ void ShardingTestFixture::setUp() {
     auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
 
-    auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
+    auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>(nullptr);
     _distLockManager = uniqueDistLockManager.get();
     std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
         stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));

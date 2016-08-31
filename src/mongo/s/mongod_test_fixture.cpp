@@ -302,9 +302,9 @@ Status MongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 }
 
 void MongodTestFixture::tearDown() {
-    // Only shut down components that were actually initialized.
+    // Only shut down components that were actually initialized and not already shut down.
 
-    if (Grid::get(operationContext())->getExecutorPool()) {
+    if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
         Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
     }
 
@@ -354,6 +354,12 @@ ClusterCursorManager* MongodTestFixture::clusterCursorManager() const {
 executor::TaskExecutorPool* MongodTestFixture::executorPool() const {
     invariant(Grid::get(operationContext())->getExecutorPool());
     return Grid::get(operationContext())->getExecutorPool();
+}
+
+void MongodTestFixture::shutdownExecutorPool() {
+    invariant(!_executorPoolShutDown);
+    executorPool()->shutdownAndJoin();
+    _executorPoolShutDown = true;
 }
 
 executor::NetworkInterfaceMock* MongodTestFixture::network() const {

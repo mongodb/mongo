@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
@@ -45,21 +44,21 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/balancer/balancer_configuration.h"
-#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/mongod_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -90,32 +89,15 @@ const Seconds kLockExpiration(10);
  * Basic fixture for ReplSetDistLockManager that starts it up before the test begins
  * and shuts it down when a test finishes.
  */
-class ReplSetDistLockManagerFixture : public mongo::unittest::Test {
+class ReplSetDistLockManagerFixture : public MongodTestFixture {
 public:
-    ReplSetDistLockManagerFixture()
-        : _dummyDoNotUse(stdx::make_unique<DistLockCatalogMock>()),
-          _mockCatalog(_dummyDoNotUse.get()),
-          _processID("test") {
-        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-        _mgr = stdx::make_unique<ReplSetDistLockManager>(getGlobalServiceContext(),
-                                                         _processID,
-                                                         std::move(_dummyDoNotUse),
-                                                         kPingInterval,
-                                                         kLockExpiration);
-    }
-
-    /**
-     * Returns the lock manager instance that is being tested.
-     */
-    ReplSetDistLockManager* getMgr() {
-        return _mgr.get();
-    }
-
     /**
      * Returns the mocked catalog used by the lock manager being tested.
      */
     DistLockCatalogMock* getMockCatalog() {
-        return _mockCatalog;
+        auto distLockCatalogMock = dynamic_cast<DistLockCatalogMock*>(distLockCatalog());
+        invariant(distLockCatalogMock);
+        return distLockCatalogMock;
     }
 
     /**
@@ -125,70 +107,54 @@ public:
         return _processID;
     }
 
-    OperationContext* txn() {
-        return &_txn;
-    }
-
 protected:
     virtual std::unique_ptr<TickSource> makeTickSource() {
         return stdx::make_unique<SystemTickSource>();
     }
 
     void setUp() override {
-        getGlobalServiceContext()->setTickSource(makeTickSource());
+        MongodTestFixture::setUp();
 
-        // Set up grid just so that the config shard is accessible via the ShardRegistry.
+        getServiceContext()->setTickSource(makeTickSource());
+
+        // Initialize sharding components as a shard server.
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         ConnectionString configCS = ConnectionString::forReplicaSet(
             "configReplSet", std::vector<HostAndPort>{HostAndPort{"config"}});
-
-        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
-        auto targeterFactoryPtr = targeterFactory.get();
-
-        ShardFactory::BuilderCallable setBuilder =
-            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-                return stdx::make_unique<ShardRemote>(
-                    shardId, connStr, targeterFactoryPtr->create(connStr));
-            };
-
-        ShardFactory::BuilderCallable masterBuilder =
-            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-                return stdx::make_unique<ShardRemote>(
-                    shardId, connStr, targeterFactoryPtr->create(connStr));
-            };
-
-        ShardFactory::BuildersMap buildersMap{
-            {ConnectionString::SET, std::move(setBuilder)},
-            {ConnectionString::MASTER, std::move(masterBuilder)},
-        };
-
-        auto shardFactory =
-            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
-
-        auto shardRegistry = stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS);
-        grid.init(nullptr,
-                  nullptr,
-                  nullptr,
-                  std::move(shardRegistry),
-                  nullptr,
-                  stdx::make_unique<BalancerConfiguration>(),
-                  nullptr,
-                  nullptr);
-
-        _mgr->startUp();
+        uassertStatusOK(initializeGlobalShardingStateForMongodForTest(configCS));
     }
 
     void tearDown() override {
         // Don't care about what shutDown passes to stopPing here.
-        _mockCatalog->expectStopPing([](StringData) {}, Status::OK());
-        _mgr->shutDown(txn());
-        grid.clearForUnitTests();
+        getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
+        MongodTestFixture::tearDown();
     }
 
-    std::unique_ptr<DistLockCatalogMock> _dummyDoNotUse;  // dummy placeholder
-    DistLockCatalogMock* _mockCatalog;
-    string _processID;
-    std::unique_ptr<ReplSetDistLockManager> _mgr;
-    OperationContextNoop _txn;
+    std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
+        return stdx::make_unique<DistLockCatalogMock>();
+    }
+
+    std::unique_ptr<DistLockManager> makeDistLockManager(
+        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
+        invariant(distLockCatalog);
+        return stdx::make_unique<ReplSetDistLockManager>(getServiceContext(),
+                                                         _processID,
+                                                         std::move(distLockCatalog),
+                                                         kPingInterval,
+                                                         kLockExpiration);
+    }
+
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
+        std::unique_ptr<DistLockManager> distLockManager) {
+        return std::move(stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager)));
+    }
+
+    std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() {
+        return stdx::make_unique<BalancerConfiguration>();
+    }
+
+private:
+    string _processID = "test";
 };
 
 class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
@@ -272,11 +238,11 @@ TEST_F(ReplSetDistLockManagerFixture, BasicLockLifeCycle) {
     OID unlockSessionIDPassed;
 
     {
-        auto lockStatus = getMgr()->lock(txn(),
-                                         lockName,
-                                         whyMsg,
-                                         DistLockManager::kSingleLockAttemptTimeout,
-                                         DistLockManager::kDefaultLockRetryInterval);
+        auto lockStatus = distLock()->lock(operationContext(),
+                                           lockName,
+                                           whyMsg,
+                                           DistLockManager::kSingleLockAttemptTimeout,
+                                           DistLockManager::kDefaultLockRetryInterval);
         ASSERT_OK(lockStatus.getStatus());
 
         getMockCatalog()->expectNoGrabLock();
@@ -410,8 +376,8 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
     OID unlockSessionIDPassed;
 
     {
-        auto lockStatus =
-            getMgr()->lock(txn(), lockName, whyMsg, Milliseconds(10), Milliseconds(1));
+        auto lockStatus = distLock()->lock(
+            operationContext(), lockName, whyMsg, Milliseconds(10), Milliseconds(1));
         ASSERT_OK(lockStatus.getStatus());
 
         getMockCatalog()->expectNoGrabLock();
@@ -512,8 +478,8 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
         Status::OK());
 
     {
-        auto lockStatus =
-            getMgr()->lock(txn(), lockName, whyMsg, Milliseconds(10), Milliseconds(1));
+        auto lockStatus = distLock()->lock(
+            operationContext(), lockName, whyMsg, Milliseconds(10), Milliseconds(1));
         ASSERT_NOT_OK(lockStatus.getStatus());
     }
 
@@ -529,7 +495,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -552,7 +518,8 @@ TEST_F(ReplSetDistLockManagerFixture, LockBusyNoRetry) {
     getMockCatalog()->expectGetLockByName([](StringData) {},
                                           {ErrorCodes::LockNotFound, "not found!"});
 
-    auto status = getMgr()->lock(txn(), "", "", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status =
+        distLock()->lock(operationContext(), "", "", Milliseconds(0), Milliseconds(0)).getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
 }
@@ -603,7 +570,9 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockRetryTimeout) {
                                           {ErrorCodes::LockNotFound, "not found!"});
 
     auto lockStatus =
-        getMgr()->lock(txn(), lockName, whyMsg, Milliseconds(5), Milliseconds(1)).getStatus();
+        distLock()
+            ->lock(operationContext(), lockName, whyMsg, Milliseconds(5), Milliseconds(1))
+            .getStatus();
     ASSERT_NOT_OK(lockStatus);
 
     ASSERT_EQUALS(ErrorCodes::LockBusy, lockStatus.code());
@@ -657,7 +626,9 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
         Status::OK());
 
     auto lockStatus =
-        getMgr()->lock(txn(), lockName, whyMsg, Milliseconds(10), Milliseconds(1)).getStatus();
+        distLock()
+            ->lock(operationContext(), lockName, whyMsg, Milliseconds(10), Milliseconds(1))
+            .getStatus();
     ASSERT_NOT_OK(lockStatus);
     ASSERT_EQUALS(ErrorCodes::ExceededMemoryLimit, lockStatus.code());
 
@@ -673,7 +644,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -719,7 +690,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -784,7 +755,10 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
                          StringData why) { lockSessionID = lockSessionIDArg; },
         retLockDoc);
 
-    { auto lockStatus = getMgr()->lock(txn(), "test", "why", Milliseconds(0), Milliseconds(0)); }
+    {
+        auto lockStatus =
+            distLock()->lock(operationContext(), "test", "why", Milliseconds(0), Milliseconds(0));
+    }
 
     bool didTimeout = false;
     {
@@ -798,7 +772,7 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -882,8 +856,10 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
         retLockDoc);
 
     {
-        auto lockStatus = getMgr()->lock(txn(), "test", "why", Milliseconds(0), Milliseconds(0));
-        auto otherStatus = getMgr()->lock(txn(), "lock", "why", Milliseconds(0), Milliseconds(0));
+        auto lockStatus =
+            distLock()->lock(operationContext(), "test", "why", Milliseconds(0), Milliseconds(0));
+        auto otherStatus =
+            distLock()->lock(operationContext(), "lock", "why", Milliseconds(0), Milliseconds(0));
     }
 
     bool didTimeout = false;
@@ -899,7 +875,7 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -925,7 +901,7 @@ TEST_F(ReplSetDistLockManagerFixture, CleanupPingOnShutdown) {
         },
         Status::OK());
 
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
     ASSERT_TRUE(stopPingCalled);
 }
 
@@ -948,7 +924,8 @@ TEST_F(ReplSetDistLockManagerFixture, CheckLockStatusOK) {
         retLockDoc);
 
 
-    auto lockStatus = getMgr()->lock(txn(), "a", "", Milliseconds(0), Milliseconds(0));
+    auto lockStatus =
+        distLock()->lock(operationContext(), "a", "", Milliseconds(0), Milliseconds(0));
     ASSERT_OK(lockStatus.getStatus());
 
     getMockCatalog()->expectNoGrabLock();
@@ -986,7 +963,8 @@ TEST_F(ReplSetDistLockManagerFixture, CheckLockStatusNoLongerOwn) {
         retLockDoc);
 
 
-    auto lockStatus = getMgr()->lock(txn(), "a", "", Milliseconds(0), Milliseconds(0));
+    auto lockStatus =
+        distLock()->lock(operationContext(), "a", "", Milliseconds(0), Milliseconds(0));
     ASSERT_OK(lockStatus.getStatus());
 
     getMockCatalog()->expectNoGrabLock();
@@ -1025,7 +1003,8 @@ TEST_F(ReplSetDistLockManagerFixture, CheckLockStatusError) {
         retLockDoc);
 
 
-    auto lockStatus = getMgr()->lock(txn(), "a", "", Milliseconds(0), Milliseconds(0));
+    auto lockStatus =
+        distLock()->lock(operationContext(), "a", "", Milliseconds(0), Milliseconds(0));
     ASSERT_OK(lockStatus.getStatus());
 
     getMockCatalog()->expectNoGrabLock();
@@ -1087,8 +1066,9 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingAfterLockExpiration) {
 
     // First attempt will record the ping data.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1118,7 +1098,8 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingAfterLockExpiration) {
 
     // Second attempt should overtake lock.
     {
-        auto lockStatus = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0));
+        auto lockStatus =
+            distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0));
 
         ASSERT_OK(lockStatus.getStatus());
 
@@ -1186,8 +1167,8 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingWithSessionID) {
         },
         currentLockDoc);
 
-    auto distLockHandleStatus = getMgr()->lockWithSessionID(
-        txn(), "bar", "foo", passedLockSessionID, Milliseconds(0), Milliseconds(0));
+    auto distLockHandleStatus = distLock()->lockWithSessionID(
+        operationContext(), "bar", "foo", passedLockSessionID, Milliseconds(0), Milliseconds(0));
     ASSERT_OK(distLockHandleStatus.getStatus());
 
     getMockCatalog()->expectNoGrabLock();
@@ -1222,8 +1203,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfExpirationHasNotElapsed) {
 
     // First attempt will record the ping data.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1234,8 +1216,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfExpirationHasNotElapsed) {
 
     // Second attempt should still not overtake lock.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1263,7 +1246,9 @@ TEST_F(ReplSetDistLockManagerFixture, GetPingErrorWhileOvertaking) {
         [](StringData process) { ASSERT_EQUALS("otherProcess", process); },
         {ErrorCodes::NetworkTimeout, "bad test network"});
 
-    auto status = getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status = distLock()
+                      ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::NetworkTimeout, status.code());
 }
@@ -1290,7 +1275,9 @@ TEST_F(ReplSetDistLockManagerFixture, GetInvalidPingDocumentWhileOvertaking) {
     getMockCatalog()->expectGetPing(
         [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, invalidPing);
 
-    auto status = getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status = distLock()
+                      ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
 }
@@ -1323,7 +1310,9 @@ TEST_F(ReplSetDistLockManagerFixture, GetServerInfoErrorWhileOvertaking) {
     getMockCatalog()->expectGetServerInfo([]() {},
                                           {ErrorCodes::NetworkTimeout, "bad test network"});
 
-    auto status = getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status = distLock()
+                      ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::NetworkTimeout, status.code());
 }
@@ -1338,7 +1327,9 @@ TEST_F(ReplSetDistLockManagerFixture, GetLockErrorWhileOvertaking) {
     getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
                                           {ErrorCodes::NetworkTimeout, "bad test network"});
 
-    auto status = getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status = distLock()
+                      ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::NetworkTimeout, status.code());
 }
@@ -1353,7 +1344,9 @@ TEST_F(ReplSetDistLockManagerFixture, GetLockDisappearedWhileOvertaking) {
     getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
                                           {ErrorCodes::LockNotFound, "disappeared!"});
 
-    auto status = getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status = distLock()
+                      ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
 }
@@ -1405,8 +1398,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfPingIsActive) {
             [&getServerInfoCallCount]() { getServerInfoCallCount++; },
             DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1440,7 +1434,8 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfPingIsActive) {
     OID unlockSessionIDPassed;
 
     {
-        auto lockStatus = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0));
+        auto lockStatus =
+            distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0));
 
         ASSERT_OK(lockStatus.getStatus());
 
@@ -1504,8 +1499,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfOwnerJustChanged) {
             [&getServerInfoCallCount]() { getServerInfoCallCount++; },
             DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1539,7 +1535,8 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfOwnerJustChanged) {
     OID unlockSessionIDPassed;
 
     {
-        auto lockStatus = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0));
+        auto lockStatus =
+            distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0));
 
         ASSERT_OK(lockStatus.getStatus());
 
@@ -1606,8 +1603,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
             [&getServerInfoCallCount]() { getServerInfoCallCount++; },
             DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
 
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1641,7 +1639,8 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
     OID unlockSessionIDPassed;
 
     {
-        auto lockStatus = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0));
+        auto lockStatus =
+            distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0));
 
         ASSERT_OK(lockStatus.getStatus());
 
@@ -1699,8 +1698,9 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
 
     // First attempt will record the ping data.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1739,7 +1739,8 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
         Status::OK());
 
     // Second attempt should overtake lock.
-    auto lockStatus = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0));
+    auto lockStatus =
+        distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0));
 
     ASSERT_NOT_OK(lockStatus.getStatus());
 
@@ -1755,7 +1756,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown(txn());
+    distLock()->shutDown(operationContext());
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -1806,8 +1807,9 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingFailed) {
 
     // First attempt will record the ping data.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1833,8 +1835,9 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingFailed) {
         {ErrorCodes::LockStateChangeFailed, "nmod 0"});
 
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1881,8 +1884,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfConfigServerClockGoesBackw
 
     // First attempt will record the ping data.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1894,8 +1898,9 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfConfigServerClockGoesBackw
 
     // Second attempt should not overtake lock.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -1921,9 +1926,10 @@ TEST_F(ReplSetDistLockManagerFixture, LockAcquisitionRetriesOnNetworkErrorSucces
 
     getMockCatalog()->expectUnLock([&](const OID& lockSessionID) {}, Status::OK());
 
-    auto status = getMgr()
-                      ->lock(txn(), "LockName", "Lock reason", Milliseconds(0), Milliseconds(0))
-                      .getStatus();
+    auto status =
+        distLock()
+            ->lock(operationContext(), "LockName", "Lock reason", Milliseconds(0), Milliseconds(0))
+            .getStatus();
     ASSERT_OK(status);
 }
 
@@ -1934,7 +1940,9 @@ TEST_F(ReplSetDistLockManagerFixture, LockAcquisitionRetriesOnInterruptionNeverS
 
     getMockCatalog()->expectUnLock([&](const OID& lockSessionID) {}, Status::OK());
 
-    auto status = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0)).getStatus();
+    auto status = distLock()
+                      ->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
     ASSERT_NOT_OK(status);
 }
 
@@ -1974,8 +1982,9 @@ TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
 
     // First attempt will record the ping data.
     {
-        auto status =
-            getMgr()->lock(txn(), "bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        auto status = distLock()
+                          ->lock(operationContext(), "bar", "", Milliseconds(0), Milliseconds(0))
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
@@ -2021,8 +2030,9 @@ TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
 
     // Second attempt should overtake lock.
     {
-        ASSERT_OK(
-            getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0)).getStatus());
+        ASSERT_OK(distLock()
+                      ->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0))
+                      .getStatus());
     }
 }
 

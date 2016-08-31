@@ -103,6 +103,14 @@ public:
     ClusterCursorManager* clusterCursorManager() const;
     executor::TaskExecutorPool* executorPool() const;
 
+    /**
+     * Shuts down the TaskExecutorPool and remembers that it has been shut down, so that it is not
+     * shut down again on tearDown.
+     *
+     * Not safe to call from multiple threads.
+     */
+    void shutdownExecutorPool();
+
     // Syntactic sugar for getting executor and networking components off the Grid's executor pool,
     // if they have been initialized.
 
@@ -260,6 +268,9 @@ private:
 
     // Allows for processing tasks through the NetworkInterfaceMock/ThreadPoolMock subsystem.
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
+
+    // Records if a component has been shut down, so that it is only shut down once.
+    bool _executorPoolShutDown = false;
 };
 
 }  // namespace mongo

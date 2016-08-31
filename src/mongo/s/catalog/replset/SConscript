@@ -46,15 +46,9 @@ env.CppUnitTest(
     LIBDEPS=[
         'dist_lock_catalog_impl',
         'replset_dist_lock_manager',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/executor/network_test_env',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/sharding_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/s/mongod_test_fixture',
     ]
 )
 

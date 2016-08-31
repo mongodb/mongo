@@ -59,8 +59,8 @@ void NoLockFuncSet(StringData name,
 
 }  // namespace
 
-DistLockManagerMock::DistLockManagerMock()
-    : _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
+DistLockManagerMock::DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalog)
+    : _catalog(std::move(catalog)), _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
 
 void DistLockManagerMock::startUp() {}
 
