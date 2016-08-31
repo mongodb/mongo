@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -178,6 +178,8 @@ Status waitForWriteConcern(OperationContext* txn,
                            const OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result) {
+    LOG(2) << "Waiting for write concern. OpTime: " << replOpTime
+           << ", write concern: " << writeConcern.toBSON();
     auto replCoord = repl::ReplicationCoordinator::get(txn);
 
     // Next handle blocking on disk
