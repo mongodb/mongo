@@ -194,3 +194,15 @@ assert.throws(function() {
 assert.throws(function() {
     NumberLong("0").compare({'replSet2Members': 6});
 });
+
+// Test auto complete
+var getCompletions = function(prefix) {
+    shellAutocomplete(prefix);
+    return __autocomplete__;
+};
+
+var myNumberLong = new NumberLong();
+var completions = getCompletions('myNumberLong.');
+assert(completions.indexOf('myNumberLong.floatApprox') >= 0);
+assert(completions.indexOf('myNumberLong.top') >= 0);
+assert(completions.indexOf('myNumberLong.bottom') >= 0);
