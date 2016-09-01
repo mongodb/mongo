@@ -273,7 +273,7 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
-	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
+	bool		 ckpt_signalled;/* Checkpoint signalled */
 
 	uint64_t  ckpt_usecs;		/* Checkpoint timer */
 	uint64_t  ckpt_time_max;	/* Checkpoint time min/max */

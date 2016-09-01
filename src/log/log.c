@@ -1349,8 +1349,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	yield_count = 0;
 	if (freep != NULL)
 		*freep = 1;
-	release_buffered =
-	    WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
+	release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
 	release_bytes = release_buffered + slot->slot_unbuffered;
 
 	/*
@@ -1363,7 +1362,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	 */
 	if (WT_CKPT_LOGSIZE(conn)) {
 		log->log_written += (wt_off_t)release_bytes;
-		WT_RET(__wt_checkpoint_signal(session, log->log_written));
+		__wt_checkpoint_signal(session, log->log_written);
 	}
 
 	/* Write the buffered records */
