@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/s/mongod_test_fixture.h"
+#include "mongo/s/sharding_mongod_test_fixture.h"
 
 namespace mongo {
 

@@ -37,7 +37,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/mongod_test_fixture.h"
+#include "mongo/s/sharding_mongod_test_fixture.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 

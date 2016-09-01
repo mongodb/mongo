@@ -48,7 +48,7 @@ env.CppUnitTest(
         'replset_dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
-        '$BUILD_DIR/mongo/s/mongod_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
     ]
 )
 

@@ -169,7 +169,7 @@ env.CppUnitTest(
         'sharding_state_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/mongod_test_fixture',
+        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
     ],
 )
 

@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/mongod_test_fixture.h"
+#include "mongo/s/sharding_mongod_test_fixture.h"
 
 #include <algorithm>
 #include <vector>

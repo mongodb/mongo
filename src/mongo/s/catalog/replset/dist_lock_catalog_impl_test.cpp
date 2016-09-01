@@ -53,7 +53,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/mongod_test_fixture.h"
+#include "mongo/s/sharding_mongod_test_fixture.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"

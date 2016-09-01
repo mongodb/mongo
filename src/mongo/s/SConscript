@@ -115,14 +115,14 @@ env.Library(
         'config_server_test_fixture.cpp',
     ],
     LIBDEPS=[
-        'mongod_test_fixture',
+        'sharding_mongod_test_fixture',
     ],
 )
 
 env.Library(
-    target='mongod_test_fixture',
+    target='sharding_mongod_test_fixture',
     source=[
-        'mongod_test_fixture.cpp',
+        'sharding_mongod_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
