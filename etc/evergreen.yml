@@ -4713,6 +4713,33 @@ buildvariants:
     distros:
     - rhel70-small
 
+- name: enterprise-windows-64-2k8-debug-unoptimized
+  display_name: Enterprise Windows 2008R2 DEBUG (Unoptimized)
+  modules:
+  - enterprise
+  run_on:
+  - windows-64-vs2015-small
+  batchtime: 1440 # 1 day
+  expansions:
+    platform_decompress: unzip
+    tooltags: "-tags 'ssl sasl'"
+    exe: ".exe"
+    gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
+    content_type: application/zip
+    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2008plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    ext: zip
+    use_scons_cache: true
+  tasks:
+  # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
+  # It has a minimal amount of tasks because unoptimized builds are slow, which causes
+  # timing-sensitive tests to fail.
+  - name: compile
+    distros:
+    - windows-64-vs2015-large
+  - name: audit_WT
+  # Do not add more tasks to this list.
+
 ###########################################
 #             OSX buildvariants           #
 ###########################################
