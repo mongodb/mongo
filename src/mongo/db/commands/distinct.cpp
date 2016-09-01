@@ -58,6 +58,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -125,6 +126,14 @@ public:
             return parsedDistinct.getStatus();
         }
 
+        if (!parsedDistinct.getValue().getQuery()->getQueryRequest().getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibilityVersion.load() ==
+                ServerGlobalParams::FeatureCompatibilityVersion_32) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
+        }
+
         AutoGetCollectionOrViewForRead ctx(txn, ns);
         Collection* collection = ctx.getCollection();
 
@@ -164,6 +173,16 @@ public:
         auto parsedDistinct = ParsedDistinct::parse(txn, nss, cmdObj, extensionsCallback, false);
         if (!parsedDistinct.isOK()) {
             return appendCommandStatus(result, parsedDistinct.getStatus());
+        }
+
+        if (!parsedDistinct.getValue().getQuery()->getQueryRequest().getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibilityVersion.load() ==
+                ServerGlobalParams::FeatureCompatibilityVersion_32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
         AutoGetCollectionOrViewForRead ctx(txn, ns);

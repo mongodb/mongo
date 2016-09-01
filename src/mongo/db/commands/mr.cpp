@@ -68,6 +68,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk.h"
@@ -1353,6 +1354,16 @@ public:
         auto curOp = CurOp::get(txn);
 
         Config config(dbname, cmd);
+
+        if (!config.collation.isEmpty() &&
+            serverGlobalParams.featureCompatibilityVersion.load() ==
+                ServerGlobalParams::FeatureCompatibilityVersion_32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
+        }
 
         LOG(1) << "mr ns: " << config.ns;
 

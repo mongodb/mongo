@@ -58,6 +58,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
@@ -296,6 +297,13 @@ Status collatorCompatibleWithPipeline(OperationContext* txn,
         }
     }
     return Status::OK();
+}
+
+bool isMergePipeline(const std::vector<BSONObj>& pipeline) {
+    if (pipeline.empty()) {
+        return false;
+    }
+    return pipeline[0].hasField("$mergeCursors");
 }
 
 class PipelineCommand : public Command {
@@ -627,6 +635,22 @@ public:
         auto request = AggregationRequest::parseFromBSON(nss, cmdObj);
         if (!request.isOK()) {
             return appendCommandStatus(result, request.getStatus());
+        }
+
+        // If the featureCompatibilityVersion is 3.2, we disallow collation from the user. However,
+        // operations should still respect the collection default collation. The mongos attaches the
+        // collection default collation to the merger pipeline, since the merger may not have the
+        // collection metadata. So the merger needs to accept a collation, and we rely on the shards
+        // to reject collations from the user.
+        if (!request.getValue().getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibilityVersion.load() ==
+                ServerGlobalParams::FeatureCompatibilityVersion_32 &&
+            !isMergePipeline(request.getValue().getPipeline())) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
         return runParsed(txn, nss, request.getValue(), cmdObj, errmsg, result);

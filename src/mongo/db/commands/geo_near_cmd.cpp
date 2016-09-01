@@ -53,6 +53,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/range_preserver.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
 
@@ -182,6 +183,15 @@ public:
             if (collationEltStatus.isOK()) {
                 collation = collationElt.Obj();
             }
+        }
+        if (!collation.isEmpty() &&
+            serverGlobalParams.featureCompatibilityVersion.load() ==
+                ServerGlobalParams::FeatureCompatibilityVersion_32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
         long long numWanted = 100;
