@@ -343,12 +343,6 @@ Status insertDocumentsSingleBatch(OperationContext* txn,
 Status StorageInterfaceImpl::insertDocuments(OperationContext* txn,
                                              const NamespaceString& nss,
                                              const std::vector<BSONObj>& docs) {
-    if (docs.empty()) {
-        return {ErrorCodes::EmptyArrayOperation,
-                str::stream() << "unable to insert documents into " << nss.ns()
-                              << " - no documents provided"};
-    }
-
     if (docs.size() > 1U) {
         try {
             if (insertDocumentsSingleBatch(txn, nss, docs.cbegin(), docs.cend()).isOK()) {

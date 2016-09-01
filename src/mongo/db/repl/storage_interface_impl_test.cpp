@@ -341,13 +341,12 @@ TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
     ASSERT(status.isOK());
 }
 
-TEST_F(StorageInterfaceImplTest,
-       InsertDocumentsReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
-    NamespaceString nss("local." + _agent.getTestName());
-    StorageInterfaceImpl storageInterface(nss);
+TEST_F(StorageInterfaceImplTest, InsertDocumentsReturnsOKWhenNoOperationsAreGiven) {
     auto txn = getClient()->makeOperationContext();
-    ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation,
-                  storageInterface.insertDocuments(txn.get(), nss, {}));
+    NamespaceString nss("local." + _agent.getTestName());
+    createCollection(txn.get(), nss);
+    StorageInterfaceImpl storageInterface(nss);
+    ASSERT_OK(storageInterface.insertDocuments(txn.get(), nss, {}));
 }
 
 TEST_F(StorageInterfaceImplTest,
