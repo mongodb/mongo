@@ -1263,19 +1263,11 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
 
         workerPool->join();
 
-        // Make sure nothing would have been killed before recording success.
-        // XXX consider removing after green patch build.
-        invariant(!txn->getServiceContext()->getKillAllOperations());
-
         storage->setOplogDeleteFromPoint(txn, Timestamp());
         storage->setMinValidToAtLeast(txn, ops.back().getOpTime());
 
         applyOps(&writerVectors, workerPool, applyOperation);
     }
-
-    // Make sure nothing would have been killed before recording success.
-    // XXX consider removing after green patch build.
-    invariant(!txn->getServiceContext()->getKillAllOperations());
 
     // We have now written all database writes and updated the oplog to match.
     return ops.back().getOpTime();
