@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
@@ -113,8 +114,31 @@ private:
         return *state->thing;
     }
 
-private:
     std::shared_ptr<State> _state = std::make_shared<State>();
+};
+
+class CountdownLatch {
+public:
+    CountdownLatch(uint32_t count) : _count(count) {}
+
+    void countDown() {
+        if (_count.load() == 0) {
+            return;
+        }
+        if (_count.subtractAndFetch(1) == 0) {
+            _cv.notify_all();
+        }
+    }
+
+    void await() {
+        stdx::unique_lock<stdx::mutex> lk(_mtx);
+        _cv.wait(lk, [&] { return _count.load() == 0; });
+    }
+
+private:
+    stdx::condition_variable _cv;
+    stdx::mutex _mtx;
+    AtomicUInt32 _count;
 };
 
 namespace helpers {
