@@ -91,7 +91,6 @@ void OpObserver::onInserts(OperationContext* txn,
     }
     if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(txn, nss);
-        DurableViewCatalog::confirm34FeatureCompatibilityVersion();
     }
 }
 
@@ -118,7 +117,6 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     NamespaceString nss(args.ns);
     if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(txn, nss);
-        DurableViewCatalog::confirm34FeatureCompatibilityVersion();
     }
 
     if (args.ns == FeatureCompatibilityVersion::kCollection) {

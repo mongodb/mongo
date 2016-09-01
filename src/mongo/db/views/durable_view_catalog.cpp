@@ -59,15 +59,6 @@ void DurableViewCatalog::onExternalChange(OperationContext* txn, const Namespace
     }
 }
 
-void DurableViewCatalog::confirm34FeatureCompatibilityVersion() {
-    uassert(40307,
-            "Cannot perform inserts or updates on system.views collection when "
-            "the featureCompatibilityVersion is 3.2. See "
-            "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-            serverGlobalParams.featureCompatibilityVersion.load() !=
-                ServerGlobalParams::FeatureCompatibilityVersion_32);
-}
-
 // DurableViewCatalogImpl
 
 const std::string& DurableViewCatalogImpl::getName() const {

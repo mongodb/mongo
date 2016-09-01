@@ -58,11 +58,6 @@ public:
      */
     static void onExternalChange(OperationContext* txn, const NamespaceString& name);
 
-    /**
-     * Throws if featureCompatibilityVersion is 3.2.
-     */
-    static void confirm34FeatureCompatibilityVersion();
-
     using Callback = stdx::function<void(const BSONObj& view)>;
     virtual Status iterate(OperationContext* txn, Callback callback) = 0;
     virtual void upsert(OperationContext* txn,

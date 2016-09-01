@@ -25,16 +25,6 @@
     // We can update a view when the featureCompatibilityVersion is 3.4.
     assert.commandWorked(viewsDB.runCommand({collMod: "view", pipeline: []}));
 
-    // We can perform inserts on the system.views collection when the featureCompatibilityVersion is
-    // 3.4.
-    assert.writeOK(viewsDB.system.views.insert(
-        {_id: "views_feature_compatibility_version.view2", viewOn: "collection", pipeline: []}));
-
-    // We can perform updates on the system.views collection when the featureCompatibilityVersion is
-    // 3.4.
-    assert.writeOK(viewsDB.system.views.update({_id: "views_feature_compatibility_version.view2"},
-                                               {$set: {viewOn: "collection2"}}));
-
     // We can perform deletes on the system.views collection when the featureCompatibilityVersion is
     // 3.4.
     assert.writeOK(viewsDB.system.views.remove({_id: "views_feature_compatibility_version.view2"}));
@@ -64,16 +54,6 @@
     // featureCompatibilityVersion is 3.2.
     assert.commandFailed(viewsDB.runCommand({create: "view"}));
     assert.writeError(viewsDB.view.insert({a: 5}));
-
-    // We cannot perform inserts on the system.views collection when the featureCompatibilityVersion
-    // is 3.2.
-    assert.writeError(viewsDB.system.views.insert(
-        {_id: "views_feature_compatibility_version.view2", viewOn: "collection", pipeline: []}));
-
-    // We cannot perform updates on the system.views collection when the featureCompatibilityVersion
-    // is 3.2.
-    assert.writeError(viewsDB.system.views.update({_id: "views_feature_compatibility_version.view"},
-                                                  {$set: {viewOn: "collection2"}}));
 
     // We can drop a view namespace when the featureCompatibilityVersion is 3.2.
     assert.eq(true, viewsDB.view.drop());
