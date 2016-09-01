@@ -546,7 +546,7 @@ Status ModifierPush::apply() const {
 
     // Handle negative starting positions as a distance from the end of the array.
     if (_startPosition < 0) {
-        if (_preparedState->arrayPreModSize + _startPosition < 0) {
+        if (size_t(abs(_startPosition)) > _preparedState->arrayPreModSize) {
             _preparedState->startPosition = 0;
         } else {
             _preparedState->startPosition = size_t(_preparedState->arrayPreModSize + _startPosition);
