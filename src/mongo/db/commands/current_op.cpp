@@ -149,7 +149,7 @@ public:
             client->reportState(infoBuilder);
 
             const auto& clientMetadata =
-                ClientMetadataIsMasterState::get(txn->getClient()).getClientMetadata();
+                ClientMetadataIsMasterState::get(client).getClientMetadata();
             if (clientMetadata) {
                 auto appName = clientMetadata.get().getApplicationName();
                 if (!appName.empty()) {
