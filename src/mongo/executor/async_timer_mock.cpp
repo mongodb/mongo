@@ -105,7 +105,7 @@ void AsyncTimerFactoryMock::fastForward(Milliseconds time) {
     stdx::lock_guard<stdx::mutex> lk(_timersMutex);
 
     // erase after iterating to be safe
-    std::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> expired;
+    stdx::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> expired;
     for (auto elem = _timers.begin(); elem != _timers.end(); elem++) {
         auto timer = *elem;
 

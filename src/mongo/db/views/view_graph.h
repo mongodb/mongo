@@ -27,12 +27,12 @@
 */
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -87,8 +87,8 @@ private:
     struct Node {
         // Note, a view may refer to the same child more than once, but we only need to know the
         // set of children and parents, since we do not need to traverse duplicates.
-        std::unordered_set<uint64_t> parents;
-        std::unordered_set<uint64_t> children;
+        stdx::unordered_set<uint64_t> parents;
+        stdx::unordered_set<uint64_t> children;
         std::string ns;
     };
 
@@ -98,7 +98,7 @@ private:
         int height = 0;
     };
 
-    using HeightMap = std::unordered_map<uint64_t, NodeHeight>;
+    using HeightMap = stdx::unordered_map<uint64_t, NodeHeight>;
 
     /**
      * Recursively traverses parents of this node and computes their heights. Returns an error
@@ -127,7 +127,7 @@ private:
 
     // Maps node ids to nodes. There is a 1-1 correspondance with _namespaceIds, hence the lifetime
     // of a node is the same as the lifetime as its corresponding node id.
-    std::unordered_map<uint64_t, Node> _graph;
+    stdx::unordered_map<uint64_t, Node> _graph;
     static uint64_t _idCounter;
 };
 }  // namespace mongo

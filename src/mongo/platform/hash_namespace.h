@@ -28,7 +28,20 @@
 #pragma once
 
 #include <functional>
+#if defined(_WIN32)
+#include <boost/functional/hash.hpp>
+#endif
 
+#if defined(_WIN32)
+#define MONGO_HASH_NAMESPACE_START namespace boost {
+#else
 #define MONGO_HASH_NAMESPACE_START namespace std {
+#endif
+
 #define MONGO_HASH_NAMESPACE_END }
+
+#if defined(_WIN32)
+#define MONGO_HASH_NAMESPACE boost
+#else
 #define MONGO_HASH_NAMESPACE std
+#endif

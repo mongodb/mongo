@@ -31,10 +31,10 @@
 #include <initializer_list>
 #include <map>
 #include <set>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -117,13 +117,13 @@ public:
 
     using Set = std::set<T, LessThan>;
 
-    using UnorderedSet = std::unordered_set<T, Hasher, EqualTo>;
+    using UnorderedSet = stdx::unordered_set<T, Hasher, EqualTo>;
 
     template <typename ValueType>
     using Map = std::map<T, ValueType, LessThan>;
 
     template <typename ValueType>
-    using UnorderedMap = std::unordered_map<T, ValueType, Hasher, EqualTo>;
+    using UnorderedMap = stdx::unordered_map<T, ValueType, Hasher, EqualTo>;
 
     virtual ~BSONComparatorInterfaceBase() = default;
 

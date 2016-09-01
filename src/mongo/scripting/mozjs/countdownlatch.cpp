@@ -30,12 +30,11 @@
 
 #include "mongo/scripting/mozjs/countdownlatch.h"
 
-#include <unordered_map>
-
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 namespace mozjs {
@@ -119,7 +118,7 @@ private:
         return iter->second;
     }
 
-    using Map = std::unordered_map<int32_t, std::shared_ptr<Latch>>;
+    using Map = stdx::unordered_map<int32_t, std::shared_ptr<Latch>>;
 
     stdx::mutex _mutex;
     Map _latches;

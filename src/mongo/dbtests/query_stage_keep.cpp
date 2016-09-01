@@ -217,7 +217,7 @@ public:
         // This condition triggers SERVER-15580 (the new flagging causes a rehash of the
         // unordered_set "WorkingSet::_flagged", which invalidates all iterators, which were
         // previously being dereferenced in KeepMutationsStage::work()).
-        // Note that std::unordered_set<>::insert() triggers a rehash if the new number of
+        // Note that stdx::unordered_set<>::insert() triggers a rehash if the new number of
         // elements is greater than or equal to max_load_factor()*bucket_count().
         size_t rehashSize =
             static_cast<size_t>(ws.getFlagged().max_load_factor() * ws.getFlagged().bucket_count());

@@ -35,8 +35,6 @@
 #include <memory>
 #include <string>
 #include <system_error>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -56,6 +54,8 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/net/message.h"
 
@@ -506,8 +506,8 @@ private:
     // If it is necessary to hold this lock while accessing a particular operation with
     // an AccessControl object, take this lock first, always.
     stdx::mutex _inProgressMutex;
-    std::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
-    std::unordered_set<TaskExecutor::CallbackHandle> _inGetConnection;
+    stdx::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
+    stdx::unordered_set<TaskExecutor::CallbackHandle> _inGetConnection;
 
     // Operation counters
     AtomicUInt64 _numCanceledOps;

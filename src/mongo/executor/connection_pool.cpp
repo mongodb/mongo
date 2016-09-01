@@ -101,7 +101,7 @@ public:
 
 private:
     using OwnedConnection = std::unique_ptr<ConnectionInterface>;
-    using OwnershipPool = std::unordered_map<ConnectionInterface*, OwnedConnection>;
+    using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
     using Request = std::pair<Date_t, GetConnectionCallback>;
     struct RequestComparator {
         bool operator()(const Request& a, const Request& b) {

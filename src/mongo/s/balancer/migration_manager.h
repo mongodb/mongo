@@ -30,7 +30,6 @@
 
 #include <list>
 #include <map>
-#include <unordered_map>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -42,6 +41,7 @@
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -164,7 +164,7 @@ private:
     };
 
     using CollectionMigrationsStateMap =
-        std::unordered_map<NamespaceString, CollectionMigrationsState>;
+        stdx::unordered_map<NamespaceString, CollectionMigrationsState>;
 
     /**
      * Optionally takes the collection distributed lock and schedules a chunk migration with the

@@ -28,9 +28,9 @@
 #pragma once
 
 #include <string>
-#include <unordered_set>
 
 #include "mongo/db/auth/role_name.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -39,12 +39,12 @@ namespace mongo {
  * outside of the networking stack.
  */
 struct SSLPeerInfo {
-    SSLPeerInfo(std::string subjectName, std::unordered_set<RoleName> roles)
+    SSLPeerInfo(std::string subjectName, stdx::unordered_set<RoleName> roles)
         : subjectName(std::move(subjectName)), roles(std::move(roles)) {}
     SSLPeerInfo() = default;
 
     std::string subjectName;
-    std::unordered_set<RoleName> roles;
+    stdx::unordered_set<RoleName> roles;
 };
 
 }  // namespace mongo

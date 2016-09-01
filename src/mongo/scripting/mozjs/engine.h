@@ -29,11 +29,11 @@
 #pragma once
 
 #include <jsapi.h>
-#include <unordered_map>
 
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -89,7 +89,7 @@ private:
      */
     stdx::mutex _globalInterruptLock;
 
-    using OpIdToScopeMap = std::unordered_map<unsigned, MozJSImplScope*>;
+    using OpIdToScopeMap = stdx::unordered_map<unsigned, MozJSImplScope*>;
     OpIdToScopeMap _opToScopeMap;  // map of mongo op ids to scopes (protected by
                                    // _globalInterruptLock).
 

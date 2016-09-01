@@ -1200,7 +1200,7 @@ intrusive_ptr<ExpressionObject> ExpressionObject::create(
 intrusive_ptr<ExpressionObject> ExpressionObject::parse(BSONObj obj,
                                                         const VariablesParseState& vps) {
     // Make sure we don't have any duplicate field names.
-    std::unordered_set<string> specifiedFields;
+    stdx::unordered_set<string> specifiedFields;
 
     vector<pair<string, intrusive_ptr<Expression>>> expressions;
     for (auto&& elem : obj) {

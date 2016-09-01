@@ -28,11 +28,10 @@
 
 #pragma once
 
-#include <unordered_map>
-
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/net/listen.h"
@@ -162,7 +161,7 @@ private:
     stdx::thread _listenerThread;
 
     mutable stdx::mutex _connectionsMutex;
-    std::unordered_map<Session::Id, Connection> _connections;
+    stdx::unordered_map<Session::Id, Connection> _connections;
 
     void _endSession_inlock(decltype(_connections.begin()) conn);
 

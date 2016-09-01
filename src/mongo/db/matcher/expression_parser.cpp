@@ -661,7 +661,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
         }
 
         // Search the string-int map for the typeAlias (case-sensitive).
-        std::unordered_map<std::string, BSONType>::const_iterator it =
+        stdx::unordered_map<std::string, BSONType>::const_iterator it =
             TypeMatchExpression::typeAliasMap.find(typeAlias);
         if (it == TypeMatchExpression::typeAliasMap.end()) {
             std::stringstream ss;

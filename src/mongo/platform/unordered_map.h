@@ -27,10 +27,10 @@
 
 #pragma once
 
-#include <unordered_map>
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
-using std::unordered_map;
+using stdx::unordered_map;
 
 }  // namespace mongo

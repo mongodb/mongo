@@ -31,7 +31,6 @@
 #include <deque>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "mongo/base/string_data.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
@@ -41,6 +40,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -146,7 +146,7 @@ private:
     stdx::condition_variable _shutDownCV;  // (M)
 
     // Map of lockName to last ping information.
-    std::unordered_map<std::string, DistLockPingInfo> _pingHistory;  // (M)
+    stdx::unordered_map<std::string, DistLockPingInfo> _pingHistory;  // (M)
 };
 
 }  // namespace mongo

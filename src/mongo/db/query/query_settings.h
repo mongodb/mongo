@@ -51,7 +51,7 @@ private:
 
 public:
     AllowedIndicesFilter(const BSONObjSet& indexKeyPatterns,
-                         const std::unordered_set<std::string>& indexNames);
+                         const stdx::unordered_set<std::string>& indexNames);
     AllowedIndicesFilter(AllowedIndicesFilter&& other) = default;
 
     AllowedIndicesFilter& operator=(AllowedIndicesFilter&& other) = default;
@@ -69,7 +69,7 @@ public:
     // we will use to override the indexes retrieved from
     // the index catalog.
     BSONObjSet indexKeyPatterns;
-    std::unordered_set<std::string> indexNames;
+    stdx::unordered_set<std::string> indexNames;
 };
 
 /**
@@ -85,7 +85,7 @@ public:
                       const BSONObj& projection,
                       const BSONObj& collation,
                       const BSONObjSet& indexKeyPatterns,
-                      const std::unordered_set<std::string>& indexNames);
+                      const stdx::unordered_set<std::string>& indexNames);
 
     // query, sort, projection, and collation collectively represent the query shape that we are
     // storing hint overrides for.
@@ -98,7 +98,7 @@ public:
     // we will use to override the indexes retrieved from
     // the index catalog.
     BSONObjSet indexKeyPatterns;
-    std::unordered_set<std::string> indexNames;
+    stdx::unordered_set<std::string> indexNames;
 };
 
 /**
@@ -129,7 +129,7 @@ public:
     void setAllowedIndices(const CanonicalQuery& canonicalQuery,
                            const PlanCacheKey& key,
                            const BSONObjSet& indexKeyPatterns,
-                           const std::unordered_set<std::string>& indexNames);
+                           const stdx::unordered_set<std::string>& indexNames);
 
     /**
      * Removes single entry from query settings. No effect if query shape is not found.

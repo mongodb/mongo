@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -36,6 +35,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -161,7 +161,7 @@ private:
     WorkingSetID _freeList;
 
     // An insert-only set of WorkingSetIDs that have been flagged for review.
-    std::unordered_set<WorkingSetID> _flagged;
+    stdx::unordered_set<WorkingSetID> _flagged;
 
     // Contains ids of WSMs that may need to be adjusted when we next yield.
     std::vector<WorkingSetID> _yieldSensitiveIds;

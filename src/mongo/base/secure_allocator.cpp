@@ -32,7 +32,6 @@
 #include "mongo/base/secure_allocator.h"
 
 #include <memory>
-#include <unordered_map>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -46,6 +45,7 @@
 #include "mongo/base/init.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -323,7 +323,7 @@ private:
 
 // See secure_allocator_details::allocate for a more detailed comment on what these are used for
 stdx::mutex allocatorMutex;  // Protects the values below
-std::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
+stdx::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
 std::shared_ptr<Allocation> lastAllocation = nullptr;
 
 }  // namespace

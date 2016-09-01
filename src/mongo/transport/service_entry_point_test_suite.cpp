@@ -33,8 +33,6 @@
 #include "mongo/transport/service_entry_point_test_suite.h"
 
 #include <boost/optional.hpp>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,6 +42,8 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
@@ -151,7 +151,7 @@ void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
 
 SSLPeerInfo ServiceEntryPointTestSuite::MockTLHarness::getX509PeerInfo(
     const Session& session) const {
-    return SSLPeerInfo("mock", {});
+    return SSLPeerInfo("mock", stdx::unordered_set<RoleName>{});
 }
 
 void ServiceEntryPointTestSuite::MockTLHarness::registerTags(const Session& session) {}
@@ -395,7 +395,7 @@ void ServiceEntryPointTestSuite::burstStressTest(int numSessions,
     auto allCompleteFuture = allSessionsComplete.get_future();
 
     stdx::mutex cyclesLock;
-    std::unordered_map<Session::Id, int> completedCycles;
+    stdx::unordered_map<Session::Id, int> completedCycles;
 
     _tl->_resetHooks();
 

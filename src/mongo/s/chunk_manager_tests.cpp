@@ -82,7 +82,7 @@ protected:
     static const int numSplitPoints = 100;
 
     void genUniqueRandomSplitKeys(const string& keyName, vector<BSONObj>* splitKeys) {
-        std::unordered_set<int> uniquePoints;
+        stdx::unordered_set<int> uniquePoints;
         while (static_cast<int>(uniquePoints.size()) < numSplitPoints) {
             uniquePoints.insert(rand(numSplitPoints * 10));
         }

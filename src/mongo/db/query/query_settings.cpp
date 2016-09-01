@@ -38,7 +38,7 @@ namespace mongo {
 //
 
 AllowedIndicesFilter::AllowedIndicesFilter(const BSONObjSet& indexKeyPatterns,
-                                           const std::unordered_set<std::string>& indexNames)
+                                           const stdx::unordered_set<std::string>& indexNames)
     : indexKeyPatterns(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
       indexNames(indexNames) {
     for (BSONObjSet::const_iterator i = indexKeyPatterns.begin(); i != indexKeyPatterns.end();
@@ -57,7 +57,7 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
                                      const BSONObj& projection,
                                      const BSONObj& collation,
                                      const BSONObjSet& indexKeyPatterns,
-                                     const std::unordered_set<std::string>& indexNames)
+                                     const stdx::unordered_set<std::string>& indexNames)
     : query(query.getOwned()),
       sort(sort.getOwned()),
       projection(projection.getOwned()),
@@ -100,7 +100,7 @@ std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
 void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
                                       const PlanCacheKey& key,
                                       const BSONObjSet& indexKeyPatterns,
-                                      const std::unordered_set<std::string>& indexNames) {
+                                      const stdx::unordered_set<std::string>& indexNames) {
     const QueryRequest& qr = canonicalQuery.getQueryRequest();
     const BSONObj& query = qr.getFilter();
     const BSONObj& sort = qr.getSort();

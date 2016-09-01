@@ -32,7 +32,6 @@
 
 #include <cmath>
 #include <pcrecpp.h>
-#include <unordered_map>
 
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
@@ -406,7 +405,7 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 const std::string TypeMatchExpression::kMatchesAllNumbersAlias = "number";
 
-const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
+const stdx::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
     {typeName(NumberDouble), NumberDouble},
     {typeName(String), String},
     {typeName(Object), Object},

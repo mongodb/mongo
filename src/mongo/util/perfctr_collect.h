@@ -33,7 +33,6 @@
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -41,6 +40,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -124,10 +124,10 @@ private:
 
 private:
     // Vector of counters which are not sub-grouped by instance name.
-    std::unordered_map<std::string, std::vector<std::string>> _counters;
+    stdx::unordered_map<std::string, std::vector<std::string>> _counters;
 
     // Vector of counters sub grouped by instance name.
-    std::unordered_map<std::string, std::vector<std::string>> _nestedCounters;
+    stdx::unordered_map<std::string, std::vector<std::string>> _nestedCounters;
 };
 
 /**

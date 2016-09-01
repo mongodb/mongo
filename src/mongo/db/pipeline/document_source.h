@@ -34,7 +34,6 @@
 #include <deque>
 #include <list>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -59,6 +58,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

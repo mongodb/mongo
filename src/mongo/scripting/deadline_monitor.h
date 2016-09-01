@@ -172,7 +172,7 @@ private:
         }
     }
 
-    using TaskDeadlineMap = std::unordered_map<_Task*, Date_t>;
+    using TaskDeadlineMap = stdx::unordered_map<_Task*, Date_t>;
     TaskDeadlineMap _tasks;      // map of running tasks with deadlines
     stdx::mutex _deadlineMutex;  // protects all non-const members, except _monitorThread
     stdx::condition_variable _newDeadlineAvailable;    // Signaled for timeout, start and stop

@@ -30,12 +30,11 @@
 
 #pragma once
 
-#include <unordered_map>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace pcrecpp {
 class RE;
@@ -405,7 +404,7 @@ private:
 class TypeMatchExpression : public MatchExpression {
 public:
     static const std::string kMatchesAllNumbersAlias;
-    static const std::unordered_map<std::string, BSONType> typeAliasMap;
+    static const stdx::unordered_map<std::string, BSONType> typeAliasMap;
 
     TypeMatchExpression() : MatchExpression(TYPE_OPERATOR) {}
 

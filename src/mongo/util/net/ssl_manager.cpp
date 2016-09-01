@@ -296,7 +296,7 @@ private:
                                       Date_t* serverNotAfter);
 
 
-    StatusWith<std::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
+    StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
     /** @return true if was successful, otherwise false */
     bool _setupPEM(SSL_CTX* context, const std::string& keyFile, const std::string& password);
@@ -1160,7 +1160,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
     std::string peerSubjectName = getCertificateSubjectName(peerCert);
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
 
-    StatusWith<std::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
+    StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {
         return swPeerCertificateRoles.getStatus();
     }
@@ -1227,7 +1227,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubjectName, std::unordered_set<RoleName>()));
+    return boost::make_optional(SSLPeerInfo(peerSubjectName, stdx::unordered_set<RoleName>()));
 }
 
 
@@ -1242,7 +1242,7 @@ SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConne
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
 }
 
-StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
+StatusWith<stdx::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
     // exts is owned by the peerCert
     STACK_OF(X509_EXTENSION)* exts = peerCert->cert_info->extensions;
 
@@ -1254,7 +1254,7 @@ StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerC
     ASN1_OBJECT* rolesObj = OBJ_nid2obj(_rolesNid);
 
     // Search all certificate extensions for our own
-    std::unordered_set<RoleName> roles;
+    stdx::unordered_set<RoleName> roles;
     for (int i = 0; i < extCount; i++) {
         X509_EXTENSION* ex = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT* obj = X509_EXTENSION_get_object(ex);

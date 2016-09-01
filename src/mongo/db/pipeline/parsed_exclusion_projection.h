@@ -30,10 +30,10 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -81,10 +81,10 @@ private:
     Value applyProjectionToValue(Value val) const;
 
     // Fields excluded at this level.
-    std::unordered_set<std::string> _excludedFields;
+    stdx::unordered_set<std::string> _excludedFields;
 
     std::string _pathToNode;
-    std::unordered_map<std::string, std::unique_ptr<ExclusionNode>> _children;
+    stdx::unordered_map<std::string, std::unique_ptr<ExclusionNode>> _children;
 };
 
 /**

@@ -29,7 +29,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -43,6 +42,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/time_support.h"
 
@@ -276,7 +276,7 @@ private:
     friend class ScopedRegisterMigration;
 
     // Map from a namespace into the sharding state for each collection we have
-    typedef std::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>
+    typedef stdx::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>
         CollectionShardingStateMap;
 
     // Progress of the sharding state initialization

@@ -34,13 +34,13 @@
 
 #include <boost/optional.hpp>
 #include <string>
-#include <unordered_set>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -90,8 +90,8 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
  */
 void testAllowedIndices(std::vector<IndexEntry> indexes,
                         BSONObjSet keyPatterns,
-                        std::unordered_set<std::string> indexNames,
-                        std::unordered_set<std::string> expectedFilteredNames) {
+                        stdx::unordered_set<std::string> indexNames,
+                        stdx::unordered_set<std::string> expectedFilteredNames) {
     PlanCache planCache;
     QuerySettings querySettings;
 
@@ -124,7 +124,7 @@ TEST(GetExecutorTest, GetAllowedIndices) {
          IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
          IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1, b: 1}")}),
-        {},
+        stdx::unordered_set<std::string>{},
         {"a_1_b_1"});
 }
 
@@ -137,8 +137,8 @@ TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
          IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
          IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{nosuchfield: 1}")}),
-        {},
-        {});
+        stdx::unordered_set<std::string>{},
+        stdx::unordered_set<std::string>{});
 }
 
 // This test case shows how to force query execution to use
@@ -147,7 +147,7 @@ TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
     testAllowedIndices(
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: -1}"), "a_-1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
-        {},
+        stdx::unordered_set<std::string>{},
         {"a_-1"});
 }
 
@@ -165,7 +165,7 @@ TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
     testAllowedIndices(
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
-        {},
+        stdx::unordered_set<std::string>{},
         {"a_1", "a_1:en"});
 }
 

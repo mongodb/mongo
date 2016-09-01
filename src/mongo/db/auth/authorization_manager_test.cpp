@@ -256,10 +256,10 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
         authzManager->acquireUser(txn.get(), UserName("CN=mongodb.com", "$external"), &x509User));
     ASSERT(x509User->isValid());
 
-    std::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
-                                               RoleName("readWrite", "test")};
+    stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
+                                                RoleName("readWrite", "test")};
     RoleNameIterator roles = x509User->getRoles();
-    std::unordered_set<RoleName> acquiredRoles;
+    stdx::unordered_set<RoleName> acquiredRoles;
     while (roles.more()) {
         acquiredRoles.insert(roles.next());
     }

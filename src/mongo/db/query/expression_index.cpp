@@ -29,6 +29,7 @@
 #include "mongo/db/query/expression_index.h"
 
 #include <iostream>
+#include <unordered_set>
 
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/r2_region_coverer.h"
@@ -186,7 +187,7 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
                                                         const S2IndexingParams& indexParams,
                                                         OrderedIntervalList* oilOut) {
     // There may be duplicates when going up parent cells if two cells share a parent
-    std::unordered_set<S2CellId> exactSet;
+    std::unordered_set<S2CellId> exactSet;  // NOLINT
     for (const S2CellId& interval : intervalSet) {
         S2CellId coveredCell = interval;
         // Look at the cells that cover us.  We want to look at every cell that contains the

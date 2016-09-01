@@ -28,11 +28,11 @@
 
 #pragma once
 
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 namespace executor {
@@ -129,7 +129,7 @@ public:
 
 private:
     stdx::mutex _timersMutex;
-    std::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> _timers;
+    stdx::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> _timers;
 };
 
 }  // namespace executor

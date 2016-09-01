@@ -32,7 +32,6 @@
 
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/init.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/log.h"
 
 
@@ -366,7 +366,7 @@ Status SetFilter::set(OperationContext* txn,
                       "required field indexes must contain at least one index");
     }
     BSONObjSet indexes = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    std::unordered_set<std::string> indexNames;
+    stdx::unordered_set<std::string> indexNames;
     for (vector<BSONElement>::const_iterator i = indexesEltArray.begin();
          i != indexesEltArray.end();
          ++i) {

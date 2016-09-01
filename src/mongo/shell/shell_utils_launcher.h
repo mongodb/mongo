@@ -89,8 +89,8 @@ public:
     void getRegisteredPids(std::vector<ProcessId>& pids);
 
 private:
-    std::unordered_map<int, ProcessId> _portToPidMap;
-    std::unordered_map<ProcessId, int> _outputs;
+    stdx::unordered_map<int, ProcessId> _portToPidMap;
+    stdx::unordered_map<ProcessId, int> _outputs;
     mutable stdx::recursive_mutex _mutex;
 
 #ifdef _WIN32

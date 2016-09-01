@@ -33,7 +33,6 @@
 #include "mongo/db/views/durable_view_catalog.h"
 
 #include <string>
-#include <unordered_set>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"

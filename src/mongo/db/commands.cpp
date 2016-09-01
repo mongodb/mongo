@@ -353,22 +353,22 @@ void Command::generateErrorResponse(OperationContext* txn,
 }
 
 namespace {
-const std::unordered_set<std::string> userManagementCommands{"createUser",
-                                                             "updateUser",
-                                                             "dropUser",
-                                                             "dropAllUsersFromDatabase",
-                                                             "grantRolesToUser",
-                                                             "revokeRolesFromUser",
-                                                             "createRole",
-                                                             "updateRole",
-                                                             "dropRole",
-                                                             "dropAllRolesFromDatabase",
-                                                             "grantPrivilegesToRole",
-                                                             "revokePrivilegesFromRole",
-                                                             "grantRolesToRole",
-                                                             "revokeRolesFromRole",
-                                                             "_mergeAuthzCollections",
-                                                             "authSchemaUpgrade"};
+const stdx::unordered_set<std::string> userManagementCommands{"createUser",
+                                                              "updateUser",
+                                                              "dropUser",
+                                                              "dropAllUsersFromDatabase",
+                                                              "grantRolesToUser",
+                                                              "revokeRolesFromUser",
+                                                              "createRole",
+                                                              "updateRole",
+                                                              "dropRole",
+                                                              "dropAllRolesFromDatabase",
+                                                              "grantPrivilegesToRole",
+                                                              "revokePrivilegesFromRole",
+                                                              "grantRolesToRole",
+                                                              "revokeRolesFromRole",
+                                                              "_mergeAuthzCollections",
+                                                              "authSchemaUpgrade"};
 }  // namespace
 
 bool Command::isUserManagementCommand(const std::string& name) {
