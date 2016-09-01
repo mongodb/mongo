@@ -49,11 +49,6 @@
 
 namespace mongo {
 
-namespace {
-const Status kInternalErrorStatus{ErrorCodes::InternalError,
-                                  "Invalid to check for write concern error if command failed"};
-}  // namespace
-
 ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
     // Currently ShardLocal only works for config servers. If we ever start using ShardLocal on
     // shards we'll need to consider how to handle shards.
@@ -140,10 +135,7 @@ Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* txn,
         BSONObj responseMetadata = commandResponse->getMetadata().getOwned();
 
         Status commandStatus = getStatusFromCommandResult(responseReply);
-        Status writeConcernStatus = kInternalErrorStatus;
-        if (commandStatus.isOK()) {
-            writeConcernStatus = getWriteConcernStatusFromCommandResult(responseReply);
-        }
+        Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseReply);
 
         return Shard::HostWithResponse(boost::none,
                                        Shard::CommandResponse{std::move(responseReply),

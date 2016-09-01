@@ -64,9 +64,6 @@ using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
 
 namespace {
 
-const Status kInternalErrorStatus{ErrorCodes::InternalError,
-                                  "Invalid to check for write concern error if command failed"};
-
 const BSONObj kNoMetadata(rpc::makeEmptyMetadata());
 
 // Include kReplSetMetadataFieldName in a request to get the shard's ReplSetMetadata in the
