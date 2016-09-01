@@ -599,18 +599,26 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    cache_eviction_server_slept);
 			__wt_cond_wait(session, cache->evict_cond, WT_THOUSAND);
 
-			if (loop == 100) {
-				/*
-				 * Mark the cache as stuck if we need space
-				 * and aren't evicting any pages.
-				 */
+			/*
+			 * Keep trying for long enough that we should be able
+			 * to evict a page if the server isn't interfering.
+			 */
+			if (loop < 100)
+				continue;
+
+			/*
+			 * Mark the cache as stuck if we need space and aren't
+			 * evicting any pages.
+			 */
+			if (FLD_ISSET(cache->state,
+			    (WT_EVICT_STATE_CLEAN_HARD |
+			    WT_EVICT_STATE_DIRTY_HARD)))
 				F_SET(cache, WT_CACHE_STUCK);
-				WT_STAT_FAST_CONN_INCR(
-				    session, cache_eviction_slow);
-				__wt_verbose(session, WT_VERB_EVICTSERVER,
-				    "unable to reach eviction goal");
-				break;
-			}
+
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_slow);
+			__wt_verbose(session, WT_VERB_EVICTSERVER,
+			    "unable to reach eviction goal");
+			break;
 		} else {
 			loop = 0;
 			pages_evicted = cache->pages_evict;
@@ -856,8 +864,11 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	 * faster than they are being queued.
 	 */
 	if (__evict_queue_empty(queue)) {
-		cache->evict_empty_score = WT_MIN(WT_EVICT_EMPTY_SCORE_MAX,
-		    cache->evict_empty_score + WT_EVICT_EMPTY_SCORE_BUMP);
+		if (__wt_eviction_needed(session, NULL))
+			cache->evict_empty_score =
+			    WT_MIN(WT_EVICT_EMPTY_SCORE_MAX,
+			    cache->evict_empty_score +
+			    WT_EVICT_EMPTY_SCORE_BUMP);
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
 	} else
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
