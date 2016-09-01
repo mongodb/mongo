@@ -30,6 +30,8 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/pipeline/accumulation_statement.h"
+
 namespace mongo {
 
 using boost::intrusive_ptr;
@@ -371,13 +373,10 @@ void DocumentSourceBucketAuto::parseGroupByExpression(const BSONElement& groupBy
     }
 }
 
-void DocumentSourceBucketAuto::addAccumulator(StringData fieldName,
-                                              Accumulator::Factory accumulatorFactory,
-                                              const intrusive_ptr<Expression>& expression) {
-
-    _fieldNames.push_back(fieldName.toString());
-    _accumulatorFactories.push_back(accumulatorFactory);
-    _expressions.push_back(expression);
+void DocumentSourceBucketAuto::addAccumulator(AccumulationStatement accumulationStatement) {
+    _fieldNames.push_back(accumulationStatement.fieldName);
+    _accumulatorFactories.push_back(accumulationStatement.factory);
+    _expressions.push_back(accumulationStatement.expression);
 }
 
 void DocumentSourceBucketAuto::setGranularity(string granularity) {
@@ -434,14 +433,8 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
 
             outputFieldSpecified = true;
             for (auto&& outputField : argument.embeddedObject()) {
-                auto parsedAccumulator = Accumulator::parseAccumulator(outputField, vps);
-
-                auto fieldName = parsedAccumulator.first;
-                auto accExpression = parsedAccumulator.second;
-                auto factory =
-                    Accumulator::getFactory(outputField.embeddedObject().firstElementFieldName());
-
-                bucketAuto->addAccumulator(fieldName, factory, accExpression);
+                bucketAuto->addAccumulator(
+                    AccumulationStatement::parseAccumulationStatement(outputField, vps));
             }
         } else if ("granularity" == argName) {
             uassert(40261,
@@ -461,9 +454,9 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
 
     // If there is no output field specified, then add the default one.
     if (!outputFieldSpecified) {
-        bucketAuto->addAccumulator("count"_sd,
-                                   Accumulator::getFactory("$sum"),
-                                   ExpressionConstant::create(pExpCtx, Value(1)));
+        bucketAuto->addAccumulator({"count",
+                                    AccumulationStatement::getFactory("$sum"),
+                                    ExpressionConstant::create(pExpCtx, Value(1))});
     }
 
     bucketAuto->_variables.reset(new Variables(idGenerator.getIdCount()));

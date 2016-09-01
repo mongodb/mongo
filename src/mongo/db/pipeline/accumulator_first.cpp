@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
+
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {

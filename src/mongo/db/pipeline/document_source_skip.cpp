@@ -39,8 +39,9 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx) {}
+DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                       long long nToSkip)
+    : DocumentSource(pExpCtx), _nToSkip(nToSkip) {}
 
 REGISTER_DOCUMENT_SOURCE(skip, DocumentSourceSkip::createFromBson);
 
@@ -88,10 +89,10 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
 }
 
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceSkip> pSource(new DocumentSourceSkip(pExpCtx));
-    pSource->injectExpressionContext(pExpCtx);
-    return pSource;
+    const intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip) {
+    intrusive_ptr<DocumentSourceSkip> skip(new DocumentSourceSkip(pExpCtx, nToSkip));
+    skip->injectExpressionContext(pExpCtx);
+    return skip;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
@@ -99,12 +100,9 @@ intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
     uassert(15972,
             str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
             elem.isNumber());
+    auto nToSkip = elem.numberLong();
+    uassert(15956, "Argument to $skip cannot be negative", nToSkip >= 0);
 
-    intrusive_ptr<DocumentSourceSkip> pSkip(DocumentSourceSkip::create(pExpCtx));
-
-    pSkip->_nToSkip = elem.numberLong();
-    uassert(15956, "Argument to $skip cannot be negative", pSkip->_nToSkip >= 0);
-
-    return pSkip;
+    return DocumentSourceSkip::create(pExpCtx, nToSkip);
 }
 }

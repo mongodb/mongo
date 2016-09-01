@@ -313,12 +313,10 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
     //   skippedOne: [{$skip: 1}],
     //   skippedTwo: [{$skip: 2}]
     // }}
-    auto firstSkip = DocumentSourceSkip::create(ctx);
-    firstSkip->setSkip(1);
+    auto firstSkip = DocumentSourceSkip::create(ctx, 1);
     auto firstPipeline = uassertStatusOK(Pipeline::create({firstSkip}, ctx));
 
-    auto secondSkip = DocumentSourceSkip::create(ctx);
-    secondSkip->setSkip(2);
+    auto secondSkip = DocumentSourceSkip::create(ctx, 2);
     auto secondPipeline = uassertStatusOK(Pipeline::create({secondSkip}, ctx));
 
     auto facetStage = DocumentSourceFacet::create(

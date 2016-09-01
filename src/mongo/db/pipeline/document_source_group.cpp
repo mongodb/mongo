@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -36,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -263,35 +265,94 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
 }
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceGroup> source(new DocumentSourceGroup(pExpCtx));
-    source->injectExpressionContext(pExpCtx);
-    return source;
+    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    const boost::intrusive_ptr<Expression>& groupByExpression,
+    std::vector<AccumulationStatement> accumulationStatements,
+    Variables::Id numVariables,
+    size_t maxMemoryUsageBytes) {
+    intrusive_ptr<DocumentSourceGroup> groupStage(
+        new DocumentSourceGroup(pExpCtx, maxMemoryUsageBytes));
+    groupStage->setIdExpression(groupByExpression);
+    for (auto&& statement : accumulationStatements) {
+        groupStage->addAccumulator(statement);
+    }
+    groupStage->_variables = stdx::make_unique<Variables>(numVariables);
+    groupStage->injectExpressionContext(pExpCtx);
+    return groupStage;
 }
 
-DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx)
+DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                         size_t maxMemoryUsageBytes)
     : DocumentSource(pExpCtx),
       _doingMerge(false),
-      _maxMemoryUsageBytes(100 * 1024 * 1024),
+      _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _inputSort(BSONObj()),
       _streaming(false),
       _initialized(false),
       _spilled(false),
       _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {}
 
-void DocumentSourceGroup::addAccumulator(const std::string& fieldName,
-                                         Accumulator::Factory accumulatorFactory,
-                                         const intrusive_ptr<Expression>& pExpression) {
-    vFieldName.push_back(fieldName);
-    vpAccumulatorFactory.push_back(accumulatorFactory);
-    vpExpression.push_back(pExpression);
+void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationStatement) {
+    vFieldName.push_back(accumulationStatement.fieldName);
+    vpAccumulatorFactory.push_back(accumulationStatement.factory);
+    vpExpression.push_back(accumulationStatement.expression);
+}
+
+namespace {
+
+intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContext> expCtx,
+                                            BSONElement groupField,
+                                            const VariablesParseState& vps) {
+    if (groupField.type() == Object && !groupField.Obj().isEmpty()) {
+        // {_id: {}} is treated as grouping on a constant, not an expression
+
+        const BSONObj idKeyObj = groupField.Obj();
+        if (idKeyObj.firstElementFieldName()[0] == '$') {
+            // grouping on a $op expression
+            return Expression::parseObject(idKeyObj, vps);
+        } else {
+            for (auto&& field : idKeyObj) {
+                uassert(17390,
+                        "$group does not support inclusion-style expressions",
+                        !field.isNumber() && field.type() != Bool);
+            }
+            return ExpressionObject::parse(idKeyObj, vps);
+        }
+    } else if (groupField.type() == String && groupField.valuestr()[0] == '$') {
+        // grouping on a field path.
+        return ExpressionFieldPath::parse(groupField.str(), vps);
+    } else {
+        // constant id - single group
+        return ExpressionConstant::create(expCtx, Value(groupField));
+    }
+}
+
+}  // namespace
+
+void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression> idExpression) {
+
+    if (auto object = dynamic_cast<ExpressionObject*>(idExpression.get())) {
+        auto& childExpressions = object->getChildExpressions();
+        invariant(!childExpressions.empty());  // We expect to have converted an empty object into a
+                                               // constant expression.
+
+        // grouping on an "artificial" object. Rather than create the object for each input
+        // in initialize(), instead group on the output of the raw expressions. The artificial
+        // object will be created at the end in makeDocument() while outputting results.
+        for (auto&& childExpPair : childExpressions) {
+            _idFieldNames.push_back(childExpPair.first);
+            _idExpressions.push_back(childExpPair.second);
+        }
+    } else {
+        _idExpressions.push_back(idExpression);
+    }
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15947, "a group's fields must be specified in an object", elem.type() == Object);
 
-    intrusive_ptr<DocumentSourceGroup> pGroup(DocumentSourceGroup::create(pExpCtx));
+    intrusive_ptr<DocumentSourceGroup> pGroup(new DocumentSourceGroup(pExpCtx));
 
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
@@ -304,24 +365,16 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
         if (str::equals(pFieldName, "_id")) {
             uassert(
                 15948, "a group's _id may only be specified once", pGroup->_idExpressions.empty());
-            pGroup->parseIdExpression(groupField, vps);
+            pGroup->setIdExpression(parseIdExpression(pExpCtx, groupField, vps));
             invariant(!pGroup->_idExpressions.empty());
         } else if (str::equals(pFieldName, "$doingMerge")) {
             massert(17030, "$doingMerge should be true if present", groupField.Bool());
 
             pGroup->setDoingMerge(true);
         } else {
-            /*
-              Treat as a projection field with the additional ability to
-              add aggregation operators.
-            */
-            auto parsedAccumulator = Accumulator::parseAccumulator(groupField, vps);
-            auto fieldName = parsedAccumulator.first.toString();
-            auto accExpression = parsedAccumulator.second;
-            auto factory =
-                Accumulator::getFactory(groupField.embeddedObject().firstElementFieldName());
-
-            pGroup->addAccumulator(fieldName, factory, accExpression);
+            // Any other field will be treated as an accumulator specification.
+            pGroup->addAccumulator(
+                AccumulationStatement::parseAccumulationStatement(groupField, vps));
         }
     }
 
@@ -751,37 +804,6 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
 }
 
 
-void DocumentSourceGroup::parseIdExpression(BSONElement groupField,
-                                            const VariablesParseState& vps) {
-    if (groupField.type() == Object && !groupField.Obj().isEmpty()) {
-        // {_id: {}} is treated as grouping on a constant, not an expression
-
-        const BSONObj idKeyObj = groupField.Obj();
-        if (idKeyObj.firstElementFieldName()[0] == '$') {
-            // grouping on a $op expression
-            _idExpressions.push_back(Expression::parseObject(idKeyObj, vps));
-        } else {
-            // grouping on an "artificial" object. Rather than create the object for each input
-            // in initialize(), instead group on the output of the raw expressions. The artificial
-            // object will be created at the end in makeDocument() while outputting results.
-            BSONForEach(field, idKeyObj) {
-                uassert(17390,
-                        "$group does not support inclusion-style expressions",
-                        !field.isNumber() && field.type() != Bool);
-
-                _idFieldNames.push_back(field.fieldName());
-                _idExpressions.push_back(Expression::parseOperand(field, vps));
-            }
-        }
-    } else if (groupField.type() == String && groupField.valuestr()[0] == '$') {
-        // grouping on a field path.
-        _idExpressions.push_back(ExpressionFieldPath::parse(groupField.str(), vps));
-    } else {
-        // constant id - single group
-        _idExpressions.push_back(ExpressionConstant::create(pExpCtx, Value(groupField)));
-    }
-}
-
 Value DocumentSourceGroup::computeId(Variables* vars) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
@@ -845,13 +867,13 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
-    intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pExpCtx));
+    intrusive_ptr<DocumentSourceGroup> pMerger(new DocumentSourceGroup(pExpCtx));
     pMerger->setDoingMerge(true);
 
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
     /* the merger will use the same grouping key */
-    pMerger->_idExpressions.push_back(ExpressionFieldPath::parse("$$ROOT._id", vps));
+    pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id", vps));
 
     const size_t n = vFieldName.size();
     for (size_t i = 0; i < n; ++i) {
@@ -863,12 +885,13 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
           expression or constant.  Here, we accumulate the output of the
           same name from the prior group.
         */
-        pMerger->addAccumulator(vFieldName[i],
-                                vpAccumulatorFactory[i],
-                                ExpressionFieldPath::parse("$$ROOT." + vFieldName[i], vps));
+        pMerger->addAccumulator({vFieldName[i],
+                                 vpAccumulatorFactory[i],
+                                 ExpressionFieldPath::parse("$$ROOT." + vFieldName[i], vps)});
     }
 
     pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));
+    pMerger->injectExpressionContext(pExpCtx);
 
     return pMerger;
 }

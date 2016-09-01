@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
@@ -47,10 +48,10 @@ using std::string;
  * evaluate to the expected results.
  */
 static void assertExpectedResults(
-    std::string accumulator,
+    std::string accumulatorName,
     const intrusive_ptr<ExpressionContext>& expCtx,
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
-    auto factory = Accumulator::getFactory(accumulator);
+    auto factory = AccumulationStatement::getFactory(accumulatorName);
     for (auto&& op : operations) {
         try {
             // Asserts that result equals expected result when not sharded.

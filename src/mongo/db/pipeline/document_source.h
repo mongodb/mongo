@@ -45,6 +45,7 @@
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
@@ -668,6 +669,8 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
+    static const size_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
+
     // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
@@ -677,28 +680,32 @@ public:
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final;
 
+    /**
+     * Convenience method for creating a new $group stage.
+     */
     static boost::intrusive_ptr<DocumentSourceGroup> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<Expression>& groupByExpression,
+        std::vector<AccumulationStatement> accumulationStatement,
+        Variables::Id numVariables,
+        size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     /**
-     * This is a convenience method that uses create(), and operates on a BSONElement that has been
-     * determined to be an Object with an element named $group.
+     * Parses 'elem' into a $group stage, or throws a UserException if 'elem' was an invalid
+     * specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
-     * Add an accumulator.
-     *
-     * Accumulators become fields in the Documents that result from grouping. Each unique group
-     * document must have it's own accumulator; the accumulator factory is used to create that.
-     *
-     * 'fieldName' is the name the accumulator result will have in the result documents and
-     * 'AccumulatorFactory' is used to create the accumulator for the group field.
+     * Add an accumulator, which will become a field in each Document that results from grouping.
      */
-    void addAccumulator(const std::string& fieldName,
-                        Accumulator::Factory accumulatorFactory,
-                        const boost::intrusive_ptr<Expression>& pExpression);
+    void addAccumulator(AccumulationStatement accumulationStatement);
+
+    /**
+     * Sets the expression to use to determine the group id of each document.
+     */
+    void setIdExpression(const boost::intrusive_ptr<Expression> idExpression);
 
     /**
      * Tell this source if it is doing a merge from shards. Defaults to false.
@@ -719,7 +726,8 @@ protected:
     void doInjectExpressionContext() final;
 
 private:
-    explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                 size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     /**
      * getNext() dispatches to one of these three depending on what type of $group it is. All three
@@ -756,11 +764,6 @@ private:
     std::shared_ptr<Sorter<Value, Value>::Iterator> spill();
 
     Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
-
-    /**
-     * Parses the raw id expression into _idExpressions and possibly _idFieldNames.
-     */
-    void parseIdExpression(BSONElement groupField, const VariablesParseState& vps);
 
     /**
      * Computes the internal representation of the group key.
@@ -1593,15 +1596,6 @@ public:
         return SEE_NEXT;  // This doesn't affect needed fields
     }
 
-    /**
-      Create a new skipping DocumentSource.
-
-      @param pExpCtx the expression context
-      @returns the DocumentSource
-     */
-    static boost::intrusive_ptr<DocumentSourceSkip> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
     // Virtuals for SplittableDocumentSource
     // Need to run on rounter. Can't run on shards.
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
@@ -1619,21 +1613,22 @@ public:
     }
 
     /**
-      Create a skipping DocumentSource from BSON.
+     * Convenience method for creating a $skip stage.
+     */
+    static boost::intrusive_ptr<DocumentSourceSkip> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip);
 
-      This is a convenience method that uses the above, and operates on
-      a BSONElement that has been deteremined to be an Object with an
-      element named $skip.
-
-      @param pBsonElement the BSONELement that defines the skip
-      @param pExpCtx the expression context
-      @returns the grouping DocumentSource
+    /**
+     * Parses the user-supplied BSON into a $skip stage.
+     *
+     * Throws a UserException if 'elem' is an invalid $skip specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceSkip(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                long long nToSkip);
 
     long long _nToSkip = 0;
     long long _nSkippedSoFar = 0;
@@ -1822,6 +1817,15 @@ public:
                                            const FieldPath& localFieldName,
                                            const std::string& foreignFieldName,
                                            const BSONObj& additionalFilter);
+
+    /**
+     * Helper to absorb an $unwind stage. Only used for testing this special behavior.
+     */
+    void setUnwindStage(const boost::intrusive_ptr<DocumentSourceUnwind>& unwind) {
+        invariant(!_handlingUnwind);
+        _unwindSrc = unwind;
+        _handlingUnwind = true;
+    }
 
 protected:
     void doInjectExpressionContext() final;
@@ -2196,11 +2200,9 @@ private:
     void populateBuckets();
 
     /**
-     * Adds an accumulator to this stage.
+     * Add an accumulator, which will become a field in each output bucket.
      */
-    void addAccumulator(StringData fieldName,
-                        Accumulator::Factory accumulatorFactory,
-                        const boost::intrusive_ptr<Expression>& expression);
+    void addAccumulator(AccumulationStatement accumulationStatement);
 
     /**
      * Adds the document in 'entry' to 'bucket' by updating the accumulators in 'bucket'.
