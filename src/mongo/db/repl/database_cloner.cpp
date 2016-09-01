@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -58,8 +59,8 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
 
-// The number of retries for the listCollections commands.
-const int numListCollectionsRetries = 1;
+// The number of attempts for the listCollections commands.
+MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);
 
 /**
  * Default listCollections predicate.
@@ -115,7 +116,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                               rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                               RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::makeRetryPolicy(
-                                  numListCollectionsRetries,
+                                  numInitialSyncListCollectionsAttempts,
                                   executor::RemoteCommandRequest::kNoTimeout,
                                   RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _startCollectionCloner([](CollectionCloner& cloner) { return cloner.startup(); }) {

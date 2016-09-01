@@ -66,9 +66,6 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 }  // namespace
 
-
-extern const std::size_t kInitialSyncMaxConnectRetries;
-
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
 MONGO_FP_FORWARD_DECLARE(failInitSyncWithBufferedEntriesLeft);
@@ -232,14 +229,14 @@ public:
     void slavesHaveProgressed();
 
     // Just like initialSync but can be called any time.
-    StatusWith<Timestamp> resync(OperationContext* txn, std::size_t maxRetries);
+    StatusWith<Timestamp> resync(OperationContext* txn, std::size_t maxAttempts);
 
     /**
-     *  Does an initial sync, with up to 'kInitialSyncMaxRetries' retries.
+     *  Does an initial sync, with the provided number of attempts.
      *
      *  This should be the first method called after construction (see class comment).
      */
-    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn, std::size_t maxRetries);
+    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn, std::size_t maxAttempts);
 
     DataReplicatorState getState() const;
 

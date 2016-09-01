@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
@@ -52,10 +53,10 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 // The batchSize to use for the query to get all documents from the collection.
 // 16MB max batch size / 12 byte min doc size * 10 (for good measure) = batchSize to use.
 const auto batchSize = (16 * 1024 * 1024) / 12 * 10;
-// The number of retries for the listIndexes commands.
-const size_t numListIndexesRetries = 1;
-// The number of retries for the find command, which gets the data.
-const size_t numFindRetries = 3;
+// The number of attempts for the listIndexes commands.
+MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListIndexesAttempts, int, 3);
+// The number of attempts for the find command, which gets the data.
+MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
 }  // namespace
 
 CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
@@ -86,7 +87,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                           rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                           RemoteCommandRequest::kNoTimeout,
                           RemoteCommandRetryScheduler::makeRetryPolicy(
-                              numListIndexesRetries,
+                              numInitialSyncListIndexesAttempts,
                               executor::RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _findFetcher(
@@ -104,7 +105,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
           RemoteCommandRequest::kNoTimeout,
           RemoteCommandRetryScheduler::makeRetryPolicy(
-              numFindRetries,
+              numInitialSyncCollectionFindAttempts,
               executor::RemoteCommandRequest::kNoTimeout,
               RemoteCommandRetryScheduler::kAllRetriableErrors)),
 

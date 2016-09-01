@@ -52,6 +52,7 @@
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -66,8 +67,6 @@
 
 namespace mongo {
 namespace repl {
-
-const std::size_t kInitialSyncMaxConnectRetries = 10;
 
 // Failpoint for initial sync
 MONGO_FP_DECLARE(failInitialSyncWithBadHost);
@@ -98,8 +97,11 @@ using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 
-// The number of retries for the find command.
-const size_t numFindRetries = 3;
+// The number of attempts to connect to a sync source.
+MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncConnectAttempts, int, 10);
+
+// The number of attempts to call find on the remote oplog.
+MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncOplogFindAttempts, int, 3);
 
 Counter64 initialSyncFailedAttempts;
 Counter64 initialSyncFailures;
@@ -431,7 +433,7 @@ void DataReplicator::slavesHaveProgressed() {
     }
 }
 
-StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn, std::size_t maxRetries) {
+StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn, std::size_t maxAttempts) {
     _shutdown(txn);
     // Drop databases and do initialSync();
     CBHStatus cbh = scheduleWork(_exec, [this](OperationContext* txn, const CallbackArgs& cbData) {
@@ -444,7 +446,7 @@ StatusWith<Timestamp> DataReplicator::resync(OperationContext* txn, std::size_t 
 
     _exec->wait(cbh.getValue());
 
-    auto status = doInitialSync(txn, maxRetries);
+    auto status = doInitialSync(txn, maxAttempts);
     if (status.isOK()) {
         return status.getValue().opTime.getTimestamp();
     } else {
@@ -646,7 +648,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
 }
 
 StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
-                                                         std::size_t maxRetries) {
+                                                         std::size_t maxAttempts) {
     if (!txn) {
         std::string msg = "Initial Sync attempted but no OperationContext*, so aborting.";
         error() << msg;
@@ -688,7 +690,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     _storage->setInitialSyncFlag(txn);
     lk.lock();
 
-    _stats.maxFailedInitialSyncAttempts = maxRetries + 1;
+    _stats.maxFailedInitialSyncAttempts = maxAttempts;
     _stats.failedInitialSyncAttempts = 0;
     while (_stats.failedInitialSyncAttempts < _stats.maxFailedInitialSyncAttempts) {
         Status attemptErrorStatus(Status::OK());
@@ -707,14 +709,14 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
 
         if (attemptErrorStatus.isOK()) {
             if (_syncSource.empty()) {
-                for (std::size_t i = 0; i < kInitialSyncMaxConnectRetries; ++i) {
+                for (int i = 0; i < numInitialSyncConnectAttempts; ++i) {
                     attemptErrorStatus = _ensureGoodSyncSource_inlock();
                     if (attemptErrorStatus.isOK()) {
                         break;
                     }
                     LOG(1) << "Error getting sync source: '" << attemptErrorStatus.toString()
                            << "', trying again in " << _opts.syncSourceRetryWait << ". Attempt "
-                           << i + 1 << " of " << kInitialSyncMaxConnectRetries;
+                           << i + 1 << " of " << numInitialSyncConnectAttempts.load();
                     sleepmillis(durationCount<Milliseconds>(_opts.syncSourceRetryWait));
                 }
             }
@@ -826,7 +828,7 @@ void DataReplicator::_onDataClonerFinish(const Status& status, HostAndPort syncS
         rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
         RemoteCommandRequest::kNoTimeout,
         RemoteCommandRetryScheduler::makeRetryPolicy(
-            numFindRetries,
+            numInitialSyncOplogFindAttempts,
             executor::RemoteCommandRequest::kNoTimeout,
             RemoteCommandRetryScheduler::kAllRetriableErrors));
     Status scheduleStatus = _lastOplogEntryFetcher->schedule();

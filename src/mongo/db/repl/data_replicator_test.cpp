@@ -419,14 +419,14 @@ TEST_F(DataReplicatorTest, StartOk) {
 TEST_F(DataReplicatorTest, CannotInitialSyncAfterStart) {
     auto txn = makeOpCtx();
     ASSERT_EQ(getDR().start(txn.get()).code(), ErrorCodes::OK);
-    ASSERT_EQ(getDR().doInitialSync(txn.get(), 0), ErrorCodes::AlreadyInitialized);
+    ASSERT_EQ(getDR().doInitialSync(txn.get(), 1), ErrorCodes::AlreadyInitialized);
 }
 
 // Used to run a Initial Sync in a separate thread, to avoid blocking test execution.
 class InitialSyncBackgroundRunner {
 public:
-    InitialSyncBackgroundRunner(DataReplicator* dr, std::size_t maxRetries)
-        : _dr(dr), _maxRetries(maxRetries) {}
+    InitialSyncBackgroundRunner(DataReplicator* dr, std::size_t maxAttempts)
+        : _dr(dr), _maxAttempts(maxAttempts) {}
 
     ~InitialSyncBackgroundRunner() {
         if (_thread) {
@@ -479,7 +479,7 @@ private:
         _condVar.notify_all();
         lk.unlock();
 
-        auto result = _dr->doInitialSync(txn.get(), _maxRetries);  // blocking
+        auto result = _dr->doInitialSync(txn.get(), _maxAttempts);  // blocking
 
         lk.lock();
         _result = result;
@@ -489,7 +489,7 @@ private:
     StatusWith<OpTimeWithHash> _result{ErrorCodes::NotYetInitialized, "InitialSync not started."};
 
     DataReplicator* _dr;
-    const std::size_t _maxRetries;
+    const std::size_t _maxAttempts;
     std::unique_ptr<stdx::thread> _thread;
     stdx::condition_variable _condVar;
 };
@@ -534,9 +534,9 @@ protected:
         _responses = resps;
     }
 
-    void startSync(std::size_t maxRetries) {
+    void startSync(std::size_t maxAttempts) {
         DataReplicator* dr = &(getDR());
-        _isbr.reset(new InitialSyncBackgroundRunner(dr, maxRetries));
+        _isbr.reset(new InitialSyncBackgroundRunner(dr, maxAttempts));
         _isbr->run();
     }
 
@@ -742,7 +742,7 @@ TEST_F(InitialSyncTest, Complete) {
     auto txn = makeOpCtx();
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
-    startSync(0);
+    startSync(1);
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
@@ -831,7 +831,7 @@ TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCl
     auto txn = makeOpCtx();
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
-    startSync(0);
+    startSync(1);
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
@@ -873,7 +873,7 @@ TEST_F(InitialSyncTest, Failpoint) {
     _myLastOpTime = opTime1;
     _memberState = MemberState::RS_SECONDARY;
 
-    startSync(0);
+    startSync(1);
 
     verifySync(getNet(), ErrorCodes::InvalidSyncSource);
 }
@@ -906,7 +906,7 @@ TEST_F(InitialSyncTest, FailsOnClone) {
         {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
 
     };
-    startSync(0);
+    startSync(1);
     setResponses(responses);
     playResponses();
     verifySync(getNet(), ErrorCodes::FailedToParse);
@@ -964,7 +964,7 @@ TEST_F(InitialSyncTest, FailOnRollback) {
             {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:2}")},
         };
 
-    startSync(0);
+    startSync(1);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponses();
@@ -1022,7 +1022,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
             // shutting the executor down.
         };
 
-    startSync(0);
+    startSync(1);
     numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponses();
@@ -1049,7 +1049,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
                            << ", op:'i', o:{_id:1, a:1}}]}}")},
     };
 
-    startSync(0);
+    startSync(1);
 
     setResponses(responses);
     playResponses();
@@ -1140,7 +1140,7 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
             // Applier starts ...
         };
 
-    startSync(0);
+    startSync(1);
 
     numGetMoreOplogEntriesMax = 10;
     setResponses({responses.begin(), responses.end() - 4});
@@ -1206,7 +1206,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
             // Applier starts ...
         };
 
-    startSync(1);
+    startSync(2);
 
     numGetMoreOplogEntriesMax = 6;
     setResponses(responses);
@@ -1323,7 +1323,7 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
             // Applier starts ...
         };
 
-    startSync(1);
+    startSync(2);
 
     // Play first 2 responses to ensure data replicator has started the oplog fetcher.
     setResponses({failedResponses.begin(), failedResponses.begin() + 2});
@@ -1500,7 +1500,7 @@ TEST_F(InitialSyncTest, DataReplicatorCreatesNewApplierForNextBatchBeforeDestroy
         {"replSetGetRBID", getRollbackIdResponse},
     };
 
-    startSync(0);
+    startSync(1);
 
     setResponses(responses);
     playResponses();

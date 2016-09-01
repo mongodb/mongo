@@ -100,7 +100,7 @@ namespace {
 
 const char kLocalDB[] = "local";
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(numInitialSyncRetries, int, 9);
+MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncAttempts, int, 10);
 
 void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -602,7 +602,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
                 _storage);
             lk.unlock();
 
-            const auto status = _dr->doInitialSync(txn, numInitialSyncRetries);
+            const auto status = _dr->doInitialSync(txn, numInitialSyncAttempts);
             // If it is interrupted by resync, we do not need to cleanup the DataReplicator.
             if (status == ErrorCodes::ShutdownInProgress) {
                 return;
