@@ -110,7 +110,7 @@ private:
     bool _slicePresent;
     int64_t _slice;
     bool _sortPresent;
-    size_t _startPosition;
+    int _startPosition;
 
     PatternElementCmp _sort;
 
