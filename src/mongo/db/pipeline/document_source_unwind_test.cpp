@@ -693,6 +693,30 @@ TEST_F(UnwindStageTest, TruncatesOutputSortAtUnwoundPath) {
     ASSERT_EQUALS(1U, outputSort.count(BSON("a" << 1)));
 }
 
+TEST_F(UnwindStageTest, ShouldPropagatePauses) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = boost::none;
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+    auto source =
+        DocumentSourceMock::create({Document{{"array", vector<Value>{Value(1), Value(2)}}},
+                                    DocumentSource::GetNextResult::makePauseExecution(),
+                                    Document{{"array", vector<Value>{Value(1), Value(2)}}}});
+
+    unwind->setSource(source.get());
+
+    ASSERT_TRUE(unwind->getNext().isAdvanced());
+    ASSERT_TRUE(unwind->getNext().isAdvanced());
+
+    ASSERT_TRUE(unwind->getNext().isPaused());
+
+    ASSERT_TRUE(unwind->getNext().isAdvanced());
+    ASSERT_TRUE(unwind->getNext().isAdvanced());
+
+    ASSERT_TRUE(unwind->getNext().isEOF());
+    ASSERT_TRUE(unwind->getNext().isEOF());
+}
+
 //
 // Error cases.
 //

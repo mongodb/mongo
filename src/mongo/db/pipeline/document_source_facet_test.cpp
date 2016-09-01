@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -299,6 +300,23 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
     auto output = facetStage->getNext();
     ASSERT(output.isAdvanced());
     ASSERT_DOCUMENT_EQ(output.getDocument(), Document(fromjson("{subPipe: [{_id: 0}, {_id: 1}]}")));
+}
+
+// TODO: DocumentSourceFacet will have to propagate pauses if we ever allow nested $facets.
+DEATH_TEST_F(DocumentSourceFacetTest,
+             ShouldFailIfGivenPausedInput,
+             "Invariant failure !input.isPaused()") {
+    auto ctx = getExpCtx();
+
+    auto firstDummy = DocumentSourcePassthrough::create();
+    auto pipeline = uassertStatusOK(Pipeline::create({firstDummy}, ctx));
+
+    auto facetStage = DocumentSourceFacet::create({{"subPipe", pipeline}}, ctx);
+
+    auto mock = DocumentSourceMock::create(DocumentSource::GetNextResult::makePauseExecution());
+    facetStage->setSource(mock.get());
+
+    facetStage->getNext();  // This should cause a crash.
 }
 
 //

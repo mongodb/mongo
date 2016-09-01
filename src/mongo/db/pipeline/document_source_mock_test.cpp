@@ -43,9 +43,19 @@ TEST(DocumentSourceMockTest, OneDoc) {
     ASSERT(source->getNext().isEOF());
 }
 
-TEST(DocumentSourceMockTest, DequeDocuments) {
+TEST(DocumentSourceMockTest, ShouldBeConstructableFromInitializerListOfDocuments) {
     auto source = DocumentSourceMock::create({Document{{"a", 1}}, Document{{"a", 2}}});
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
+    ASSERT(source->getNext().isEOF());
+}
+
+TEST(DocumentSourceMockTest, ShouldBeConstructableFromDequeOfResults) {
+    auto source = DocumentSourceMock::create({Document{{"a", 1}},
+                                              DocumentSource::GetNextResult::makePauseExecution(),
+                                              Document{{"a", 2}}});
+    ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 1}}));
+    ASSERT_TRUE(source->getNext().isPaused());
     ASSERT_DOCUMENT_EQ(source->getNext().getDocument(), (Document{{"a", 2}}));
     ASSERT(source->getNext().isEOF());
 }

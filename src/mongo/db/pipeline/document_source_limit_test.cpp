@@ -99,5 +99,27 @@ TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }
 
+TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
+    auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
+    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document()});
+    limit->setSource(mock.get());
+
+    ASSERT_TRUE(limit->getNext().isPaused());
+    ASSERT_TRUE(limit->getNext().isAdvanced());
+    ASSERT_TRUE(limit->getNext().isPaused());
+    ASSERT_TRUE(limit->getNext().isAdvanced());
+
+    // We've reached the limit.
+    ASSERT_TRUE(mock->isDisposed);
+    ASSERT_TRUE(limit->getNext().isEOF());
+    ASSERT_TRUE(limit->getNext().isEOF());
+    ASSERT_TRUE(limit->getNext().isEOF());
+}
+
 }  // namespace
 }  // namespace mongo

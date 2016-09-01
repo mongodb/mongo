@@ -28,53 +28,41 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
-using DocumentSourceRedactTest = AggregationContextFixture;
+using DocumentSourceSkipTest = AggregationContextFixture;
 
-TEST_F(DocumentSourceRedactTest, ShouldCopyRedactSafePartOfMatchBeforeItself) {
-    BSONObj redactSpec = BSON("$redact"
-                              << "$$PRUNE");
-    auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
-    auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
-
-    Pipeline::SourceContainer pipeline;
-    pipeline.push_back(redact);
-    pipeline.push_back(match);
-
-    pipeline.front()->optimizeAt(pipeline.begin(), &pipeline);
-
-    ASSERT_EQUALS(pipeline.size(), 3U);
-    ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline.front().get()));
-}
-
-TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
-    auto redactSpec = BSON("$redact"
-                           << "$$KEEP");
-    auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
-    auto mock = DocumentSourceMock::create({Document{{"_id", 0}},
+TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
+    auto skip = DocumentSourceSkip::create(getExpCtx(), 2);
+    auto mock = DocumentSourceMock::create({Document(),
                                             DocumentSource::GetNextResult::makePauseExecution(),
-                                            Document{{"_id", 1}},
+                                            Document(),
+                                            Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
                                             DocumentSource::GetNextResult::makePauseExecution()});
-    redact->setSource(mock.get());
+    skip->setSource(mock.get());
 
-    // The $redact is keeping everything, so we should see everything from the mock, then EOF.
-    ASSERT_TRUE(redact->getNext().isAdvanced());
-    ASSERT_TRUE(redact->getNext().isPaused());
-    ASSERT_TRUE(redact->getNext().isAdvanced());
-    ASSERT_TRUE(redact->getNext().isPaused());
-    ASSERT_TRUE(redact->getNext().isEOF());
-    ASSERT_TRUE(redact->getNext().isEOF());
+    // Skip the first document.
+    ASSERT_TRUE(skip->getNext().isPaused());
+
+    // Skip one more, then advance.
+    ASSERT_TRUE(skip->getNext().isAdvanced());
+
+    ASSERT_TRUE(skip->getNext().isPaused());
+    ASSERT_TRUE(skip->getNext().isPaused());
+
+    ASSERT_TRUE(skip->getNext().isEOF());
+    ASSERT_TRUE(skip->getNext().isEOF());
+    ASSERT_TRUE(skip->getNext().isEOF());
 }
+
 }  // namespace
 }  // namespace mongo

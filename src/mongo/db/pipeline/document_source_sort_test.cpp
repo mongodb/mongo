@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -347,6 +348,123 @@ TEST_F(DocumentSourceSortExecutionTest, ExtractArrayValues) {
                   Document{{"_id", 1}, {"a", DOC_ARRAY(DOC("b" << 1) << DOC("b" << 1))}}},
                  BSON("a.b" << 1),
                  "[{_id:1,a:[{b:1},{b:1}]},{_id:0,a:[{b:1},{b:2}]}]");
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
+    auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
+    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"a", 0}},
+                                            DocumentSource::GetNextResult::makePauseExecution()});
+    sort->setSource(mock.get());
+
+    // Should propagate the first pause.
+    ASSERT_TRUE(sort->getNext().isPaused());
+
+    // Should load the single document, then pause.
+    ASSERT_TRUE(sort->getNext().isPaused());
+
+    // Now it should start giving results.
+    auto result = sort->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"a", 0}}));
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
+    auto sort = DocumentSourceSort::create(getExpCtx(), BSON("a" << 1));
+    auto mock = DocumentSourceMock::create({Document{{"a", 1}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"a", 0}}});
+    sort->setSource(mock.get());
+
+    // Should load the first document, then propagate the pause.
+    ASSERT_TRUE(sort->getNext().isPaused());
+
+    // Should finish loading and start yielding results in sorted order.
+    auto result = sort->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"a", 0}}));
+
+    result = sort->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"a", 1}}));
+
+    ASSERT_TRUE(sort->getNext().isEOF());
+    ASSERT_TRUE(sort->getNext().isEOF());
+    ASSERT_TRUE(sort->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
+    auto expCtx = getExpCtx();
+
+    // Allow the $sort stage to spill to disk.
+    unittest::TempDir tempDir("DocumentSourceSortTest");
+    expCtx->tempDir = tempDir.path();
+    expCtx->extSortAllowed = true;
+    const size_t maxMemoryUsageBytes = 1000;
+
+    auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
+
+    string largeStr(maxMemoryUsageBytes, 'x');
+    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"_id", 1}, {"largeStr", largeStr}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"_id", 2}, {"largeStr", largeStr}}});
+    sort->setSource(mock.get());
+
+    // There were 2 pauses, so we should expect 2 paused results before any results can be returned.
+    ASSERT_TRUE(sort->getNext().isPaused());
+    ASSERT_TRUE(sort->getNext().isPaused());
+
+    // Now we expect to get the results back, sorted by _id descending.
+    auto next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["_id"], Value(2));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["_id"], Value(1));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["_id"], Value(0));
+}
+
+TEST_F(DocumentSourceSortExecutionTest,
+       ShouldErrorIfNotAllowedToSpillToDiskAndResultSetIsTooLarge) {
+    auto expCtx = getExpCtx();
+    expCtx->extSortAllowed = false;
+    const size_t maxMemoryUsageBytes = 1000;
+
+    auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
+
+    string largeStr(maxMemoryUsageBytes, 'x');
+    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                            Document{{"_id", 1}, {"largeStr", largeStr}}});
+    sort->setSource(mock.get());
+
+    ASSERT_THROWS_CODE(sort->getNext(), UserException, 16819);
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
+    auto expCtx = getExpCtx();
+    expCtx->extSortAllowed = false;
+    const size_t maxMemoryUsageBytes = 1000;
+
+    auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
+
+    string largeStr(maxMemoryUsageBytes / 2, 'x');
+    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"_id", 1}, {"largeStr", largeStr}},
+                                            Document{{"_id", 2}, {"largeStr", largeStr}}});
+    sort->setSource(mock.get());
+
+    // The first getNext() should pause.
+    ASSERT_TRUE(sort->getNext().isPaused());
+
+    // The next should realize it's used too much memory.
+    ASSERT_THROWS_CODE(sort->getNext(), UserException, 16819);
 }
 
 }  // namespace

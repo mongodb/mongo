@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <deque>
 #include <vector>
 
 #include "mongo/bson/bsonmisc.h"
@@ -37,12 +38,15 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/stub_mongod_interface.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 namespace {
 using boost::intrusive_ptr;
+using std::deque;
 using std::vector;
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
@@ -123,6 +127,146 @@ TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
                                               << BSON("foreign" << BSON("$eq" << regex))
                                               << BSON("foreign" << BSON("$eq" << Value(2)))))
                      << BSONObj()))));
+}
+
+//
+// Execution tests.
+//
+
+/**
+ * A mock MongodInterface which allows mocking a foreign pipeline.
+ */
+class MockMongodInterface final : public StubMongodInterface {
+public:
+    MockMongodInterface(deque<DocumentSource::GetNextResult> mockResults)
+        : _mockResults(std::move(mockResults)) {}
+
+    bool isSharded(const NamespaceString& ns) final {
+        return false;
+    }
+
+    StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+        if (!pipeline.isOK()) {
+            return pipeline.getStatus();
+        }
+
+        pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_mockResults));
+        pipeline.getValue()->injectExpressionContext(expCtx);
+        pipeline.getValue()->optimizePipeline();
+
+        return pipeline;
+    }
+
+private:
+    deque<DocumentSource::GetNextResult> _mockResults;
+};
+
+TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+
+    // Set up the $lookup stage.
+    auto lookupSpec = Document{{"$lookup",
+                                Document{{"from", fromNs.coll()},
+                                         {"localField", "foreignId"},
+                                         {"foreignField", "_id"},
+                                         {"as", "foreignDocs"}}}}
+                          .toBson();
+    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
+
+    // Mock its input, pausing every other result.
+    auto mockLocalSource =
+        DocumentSourceMock::create({Document{{"foreignId", 0}},
+                                    DocumentSource::GetNextResult::makePauseExecution(),
+                                    Document{{"foreignId", 1}},
+                                    DocumentSource::GetNextResult::makePauseExecution()});
+
+    lookup->setSource(mockLocalSource.get());
+    lookup->injectExpressionContext(expCtx);
+
+    // Mock out the foreign collection.
+    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
+                                                             Document{{"_id", 1}}};
+    lookup->injectMongodInterface(
+        std::make_shared<MockMongodInterface>(std::move(mockForeignContents)));
+
+    auto next = lookup->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.releaseDocument(),
+        (Document{{"foreignId", 0}, {"foreignDocs", vector<Value>{Value(Document{{"_id", 0}})}}}));
+
+    ASSERT_TRUE(lookup->getNext().isPaused());
+
+    next = lookup->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.releaseDocument(),
+        (Document{{"foreignId", 1}, {"foreignDocs", vector<Value>{Value(Document{{"_id", 1}})}}}));
+
+    ASSERT_TRUE(lookup->getNext().isPaused());
+
+    ASSERT_TRUE(lookup->getNext().isEOF());
+    ASSERT_TRUE(lookup->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+
+    // Set up the $lookup stage.
+    auto lookupSpec = Document{{"$lookup",
+                                Document{{"from", fromNs.coll()},
+                                         {"localField", "foreignId"},
+                                         {"foreignField", "_id"},
+                                         {"as", "foreignDoc"}}}}
+                          .toBson();
+    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
+
+    const bool preserveNullAndEmptyArrays = false;
+    const boost::optional<std::string> includeArrayIndex = boost::none;
+    lookup->setUnwindStage(DocumentSourceUnwind::create(
+        expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
+
+    // Mock its input, pausing every other result.
+    auto mockLocalSource =
+        DocumentSourceMock::create({Document{{"foreignId", 0}},
+                                    DocumentSource::GetNextResult::makePauseExecution(),
+                                    Document{{"foreignId", 1}},
+                                    DocumentSource::GetNextResult::makePauseExecution()});
+    lookup->setSource(mockLocalSource.get());
+
+    lookup->injectExpressionContext(expCtx);
+
+    // Mock out the foreign collection.
+    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
+                                                             Document{{"_id", 1}}};
+    lookup->injectMongodInterface(
+        std::make_shared<MockMongodInterface>(std::move(mockForeignContents)));
+
+    auto next = lookup->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"foreignId", 0}, {"foreignDoc", Document{{"_id", 0}}}}));
+
+    ASSERT_TRUE(lookup->getNext().isPaused());
+
+    next = lookup->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"foreignId", 1}, {"foreignDoc", Document{{"_id", 1}}}}));
+
+    ASSERT_TRUE(lookup->getNext().isPaused());
+
+    ASSERT_TRUE(lookup->getNext().isEOF());
+    ASSERT_TRUE(lookup->getNext().isEOF());
 }
 
 }  // namespace

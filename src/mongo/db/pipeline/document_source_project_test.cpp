@@ -134,6 +134,28 @@ TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
     ASSERT(project->getNext().isEOF());
 }
 
+TEST_F(ProjectStageTest, ShouldPropagatePauses) {
+    auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx());
+    auto source = DocumentSourceMock::create({Document(),
+                                              DocumentSource::GetNextResult::makePauseExecution(),
+                                              Document(),
+                                              DocumentSource::GetNextResult::makePauseExecution(),
+                                              Document(),
+                                              DocumentSource::GetNextResult::makePauseExecution()});
+    project->setSource(source.get());
+
+    ASSERT_TRUE(project->getNext().isAdvanced());
+    ASSERT_TRUE(project->getNext().isPaused());
+    ASSERT_TRUE(project->getNext().isAdvanced());
+    ASSERT_TRUE(project->getNext().isPaused());
+    ASSERT_TRUE(project->getNext().isAdvanced());
+    ASSERT_TRUE(project->getNext().isPaused());
+
+    ASSERT(project->getNext().isEOF());
+    ASSERT(project->getNext().isEOF());
+    ASSERT(project->getNext().isEOF());
+}
+
 TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFields) {
     auto project = DocumentSourceProject::create(
         fromjson("{a: true, x: '$b', y: {$and: ['$c','$d']}, z: {$meta: 'textScore'}}"),

@@ -38,15 +38,18 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -60,6 +63,133 @@ using std::string;
 using std::vector;
 
 static const char* const ns = "unittests.document_source_group_tests";
+
+// This provides access to getExpCtx(), but we'll use a different name for this test suite.
+using DocumentSourceGroupTest = AggregationContextFixture;
+
+TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
+    auto expCtx = getExpCtx();
+    expCtx->inRouter = true;  // Disallow external sort.
+                              // This is the only way to do this in a debug build.
+    AccumulationStatement countStatement{"count",
+                                         AccumulationStatement::getFactory("$sum"),
+                                         ExpressionConstant::create(expCtx, Value(1))};
+    auto group = DocumentSourceGroup::create(
+        expCtx, ExpressionConstant::create(expCtx, Value(BSONNULL)), {countStatement}, 0);
+    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document(),
+                                            Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document()});
+    group->setSource(mock.get());
+
+    // There were 3 pauses, so we should expect 3 paused results before any results can be returned.
+    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(group->getNext().isPaused());
+
+    // There were 4 documents, so we expect a count of 4.
+    auto result = group->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"_id", BSONNULL}, {"count", 4}}));
+}
+
+TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
+    auto expCtx = getExpCtx();
+
+    // Allow the $group stage to spill to disk.
+    TempDir tempDir("DocumentSourceGroupTest");
+    expCtx->tempDir = tempDir.path();
+    expCtx->extSortAllowed = true;
+    const size_t maxMemoryUsageBytes = 1000;
+
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    AccumulationStatement pushStatement{"spaceHog",
+                                        AccumulationStatement::getFactory("$push"),
+                                        ExpressionFieldPath::parse("$largeStr", vps)};
+    auto groupByExpression = ExpressionFieldPath::parse("$_id", vps);
+    auto group = DocumentSourceGroup::create(
+        expCtx, groupByExpression, {pushStatement}, idGen.getIdCount(), maxMemoryUsageBytes);
+
+    string largeStr(maxMemoryUsageBytes, 'x');
+    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"_id", 1}, {"largeStr", largeStr}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"_id", 2}, {"largeStr", largeStr}}});
+    group->setSource(mock.get());
+
+    // There were 2 pauses, so we should expect 2 paused results before any results can be returned.
+    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(group->getNext().isPaused());
+
+    // Now we expect to get the results back, although in no particular order.
+    stdx::unordered_set<int> idSet;
+    for (auto result = group->getNext(); result.isAdvanced(); result = group->getNext()) {
+        idSet.insert(result.releaseDocument()["_id"].coerceToInt());
+    }
+    ASSERT_TRUE(group->getNext().isEOF());
+
+    ASSERT_EQ(idSet.size(), 3UL);
+    ASSERT_EQ(idSet.count(0), 1UL);
+    ASSERT_EQ(idSet.count(1), 1UL);
+    ASSERT_EQ(idSet.count(2), 1UL);
+}
+
+TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSetIsTooLarge) {
+    auto expCtx = getExpCtx();
+    const size_t maxMemoryUsageBytes = 1000;
+    expCtx->inRouter = true;  // Disallow external sort.
+                              // This is the only way to do this in a debug build.
+
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    AccumulationStatement pushStatement{"spaceHog",
+                                        AccumulationStatement::getFactory("$push"),
+                                        ExpressionFieldPath::parse("$largeStr", vps)};
+    auto groupByExpression = ExpressionFieldPath::parse("$_id", vps);
+    auto group = DocumentSourceGroup::create(
+        expCtx, groupByExpression, {pushStatement}, idGen.getIdCount(), maxMemoryUsageBytes);
+
+    string largeStr(maxMemoryUsageBytes, 'x');
+    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                            Document{{"_id", 1}, {"largeStr", largeStr}}});
+    group->setSource(mock.get());
+
+    ASSERT_THROWS_CODE(group->getNext(), UserException, 16945);
+}
+
+TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
+    auto expCtx = getExpCtx();
+    const size_t maxMemoryUsageBytes = 1000;
+    expCtx->inRouter = true;  // Disallow external sort.
+                              // This is the only way to do this in a debug build.
+
+    VariablesIdGenerator idGen;
+    VariablesParseState vps(&idGen);
+    AccumulationStatement pushStatement{"spaceHog",
+                                        AccumulationStatement::getFactory("$push"),
+                                        ExpressionFieldPath::parse("$largeStr", vps)};
+    auto groupByExpression = ExpressionFieldPath::parse("$_id", vps);
+    auto group = DocumentSourceGroup::create(
+        expCtx, groupByExpression, {pushStatement}, idGen.getIdCount(), maxMemoryUsageBytes);
+
+    string largeStr(maxMemoryUsageBytes / 2, 'x');
+    auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"_id", 1}, {"largeStr", largeStr}},
+                                            Document{{"_id", 2}, {"largeStr", largeStr}}});
+    group->setSource(mock.get());
+
+    // The first getNext() should pause.
+    ASSERT_TRUE(group->getNext().isPaused());
+
+    // The next should realize it's used too much memory.
+    ASSERT_THROWS_CODE(group->getNext(), UserException, 16945);
+}
 
 BSONObj toBson(const intrusive_ptr<DocumentSource>& source) {
     vector<Value> arr;

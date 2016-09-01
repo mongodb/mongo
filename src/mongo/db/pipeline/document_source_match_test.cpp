@@ -302,6 +302,29 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
                                "{c:1}]}"));
 }
 
+TEST_F(DocumentSourceMatchTest, ShouldPropagatePauses) {
+    auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
+    auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"a", 1}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"a", 2}},
+                                            Document{{"a", 2}},
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"a", 1}}});
+    match->setSource(mock.get());
+
+    ASSERT_TRUE(match->getNext().isPaused());
+    ASSERT_TRUE(match->getNext().isAdvanced());
+    ASSERT_TRUE(match->getNext().isPaused());
+
+    // {a: 2} doesn't match, should go directly to the next pause.
+    ASSERT_TRUE(match->getNext().isPaused());
+    ASSERT_TRUE(match->getNext().isAdvanced());
+    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(match->getNext().isEOF());
+    ASSERT_TRUE(match->getNext().isEOF());
+}
+
 TEST(ObjectForMatch, ShouldExtractTopLevelFieldIfDottedFieldNeeded) {
     Document input(fromjson("{a: 1, b: {c: 1, d: 1}}"));
     BSONObj expected = fromjson("{b: {c: 1, d: 1}}");

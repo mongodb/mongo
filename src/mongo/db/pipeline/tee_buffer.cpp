@@ -81,13 +81,6 @@ void TeeBuffer::loadNextBatch() {
 
     auto input = _source->getNext();
     for (; input.isAdvanced(); input = _source->getNext()) {
-
-        // For the following reasons, we invariant that we never get a paused input:
-        //   - TeeBuffer is the only place where a paused GetNextReturn will be returned.
-        //   - The $facet stage is the only stage that uses TeeBuffer.
-        //   - We currently disallow nested $facet stages.
-        invariant(!input.isPaused());
-
         bytesInBuffer += input.getDocument().getApproximateSize();
         _buffer.push_back(std::move(input));
 
@@ -95,6 +88,12 @@ void TeeBuffer::loadNextBatch() {
             break;  // Need to break here so we don't get the next input and accidentally ignore it.
         }
     }
+
+    // For the following reasons, we invariant that we never get a paused input:
+    //   - TeeBuffer is the only place where a paused GetNextReturn will be returned.
+    //   - The $facet stage is the only stage that uses TeeBuffer.
+    //   - We currently disallow nested $facet stages.
+    invariant(!input.isPaused());
 
     // Populate the pending returns.
     for (size_t consumerId = 0; consumerId < _consumers.size(); ++consumerId) {

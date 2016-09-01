@@ -107,10 +107,10 @@ long long DocumentSourceSort::getLimit() const {
     return limitSrc ? limitSrc->getLimit() : -1;
 }
 
-void DocumentSourceSort::addKey(const string& fieldPath, bool ascending) {
+void DocumentSourceSort::addKey(StringData fieldPath, bool ascending) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
-    vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath, vps));
+    vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath.toString(), vps));
     vAscending.push_back(ascending);
 }
 
@@ -173,16 +173,19 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
 }
 
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx, BSONObj sortOrder, long long limit) {
-    intrusive_ptr<DocumentSourceSort> pSort = new DocumentSourceSort(pExpCtx);
+    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    BSONObj sortOrder,
+    long long limit,
+    uint64_t maxMemoryUsageBytes) {
+    intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
+    pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes;
     pSort->injectExpressionContext(pExpCtx);
     pSort->_sort = sortOrder.getOwned();
 
-    /* check for then iterate over the sort object */
-    BSONForEach(keyField, sortOrder) {
-        const char* fieldName = keyField.fieldName();
+    for (auto&& keyField : sortOrder) {
+        auto fieldName = keyField.fieldNameStringData();
 
-        if (str::equals(fieldName, "$mergePresorted")) {
+        if ("$mergePresorted" == fieldName) {
             verify(keyField.Bool());
             pSort->_mergingPresorted = true;
             continue;
@@ -235,7 +238,7 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
     if (limitSrc)
         opts.limit = limitSrc->getLimit();
 
-    opts.maxMemoryUsageBytes = 100 * 1024 * 1024;
+    opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
     if (pExpCtx->extSortAllowed && !pExpCtx->inRouter) {
         opts.extSortAllowed = true;
         opts.tempDir = pExpCtx->tempDir;

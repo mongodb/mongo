@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
@@ -179,6 +180,25 @@ TEST_F(SampleBasics, DocsUnmodified) {
     ASSERT_EQUALS(1, doc["a"].getInt());
     ASSERT_EQUALS(2, doc["b"]["c"].getInt());
     ASSERT_TRUE(doc.hasRandMetaField());
+    assertEOF();
+}
+
+TEST_F(SampleBasics, ShouldPropagatePauses) {
+    createSample(2);
+    source()->queue.push_back(Document());
+    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+    source()->queue.push_back(Document());
+    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+    source()->queue.push_back(Document());
+    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+
+    // The $sample stage needs to populate itself, so should propagate all three pauses before
+    // returning any results.
+    ASSERT_TRUE(sample()->getNext().isPaused());
+    ASSERT_TRUE(sample()->getNext().isPaused());
+    ASSERT_TRUE(sample()->getNext().isPaused());
+    ASSERT_TRUE(sample()->getNext().isAdvanced());
+    ASSERT_TRUE(sample()->getNext().isAdvanced());
     assertEOF();
 }
 
@@ -383,5 +403,18 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
     ASSERT_GTE(secondTotal / nTrials, 0.48);
     ASSERT_LTE(secondTotal / nTrials, 0.52);
 }
+
+DEATH_TEST_F(SampleFromRandomCursorBasics,
+             ShouldFailIfGivenPausedInput,
+             "Invariant failure Hit a MONGO_UNREACHABLE!") {
+    createSample(2);
+    source()->queue.push_back(Document{{"_id", 1}});
+    source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());
+
+    // Should see the first result, then see a pause and fail.
+    ASSERT_TRUE(sample()->getNext().isAdvanced());
+    sample()->getNext();
+}
+
 }  // namespace
 }  // namespace mongo

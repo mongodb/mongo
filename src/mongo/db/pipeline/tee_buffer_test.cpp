@@ -90,6 +90,7 @@ TEST(TeeBufferTest, ShouldProvideAllResultsWithoutPauseIfOnlyOneConsumer) {
     teeBuffer->setSource(mock.get());
 
     auto next = teeBuffer->getNext(0);
+    ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.getDocument(), inputs.front().getDocument());
 
     next = teeBuffer->getNext(0);

@@ -450,6 +450,7 @@ void DocumentSourceGraphLookUp::doReattachToOperationContext(OperationContext* o
 }
 
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString from,
     std::string as,
     std::string connectFromField,
@@ -458,7 +459,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<BSONObj> additionalFilter,
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc)
     : DocumentSourceNeedsMongod(expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
@@ -469,7 +470,8 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _depthField(depthField),
       _maxDepth(maxDepth),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<BSONObj>()),
-      _cache(expCtx->getValueComparator()) {}
+      _cache(expCtx->getValueComparator()),
+      _unwind(unwindSrc) {}
 
 intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
@@ -480,9 +482,11 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     intrusive_ptr<Expression> startWith,
     boost::optional<BSONObj> additionalFilter,
     boost::optional<FieldPath> depthField,
-    boost::optional<long long> maxDepth) {
+    boost::optional<long long> maxDepth,
+    boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc) {
     intrusive_ptr<DocumentSourceGraphLookUp> source(
-        new DocumentSourceGraphLookUp(std::move(fromNs),
+        new DocumentSourceGraphLookUp(expCtx,
+                                      std::move(fromNs),
                                       std::move(asField),
                                       std::move(connectFromField),
                                       std::move(connectToField),
@@ -490,7 +494,7 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
                                       additionalFilter,
                                       depthField,
                                       maxDepth,
-                                      expCtx));
+                                      unwindSrc));
     source->_variables.reset(new Variables());
 
     source->injectExpressionContext(expCtx);
@@ -595,7 +599,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             !isMissingRequiredField);
 
     intrusive_ptr<DocumentSourceGraphLookUp> newSource(
-        new DocumentSourceGraphLookUp(std::move(from),
+        new DocumentSourceGraphLookUp(expCtx,
+                                      std::move(from),
                                       std::move(as),
                                       std::move(connectFromField),
                                       std::move(connectToField),
@@ -603,7 +608,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                                       additionalFilter,
                                       depthField,
                                       maxDepth,
-                                      expCtx));
+                                      boost::none));
 
     newSource->_variables.reset(new Variables(idGenerator.getIdCount()));
 

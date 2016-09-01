@@ -308,6 +308,39 @@ TEST_F(BucketAutoTests, RespectsCanonicalTypeOrderingOfValues) {
     ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 'a', max : 'b'}, count : 2}")));
 }
 
+TEST_F(BucketAutoTests, ShouldPropagatePauses) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}");
+    auto bucketAutoStage = createBucketAuto(bucketAutoSpec);
+    auto source = DocumentSourceMock::create({Document{{"x", 1}},
+                                              DocumentSource::GetNextResult::makePauseExecution(),
+                                              Document{{"x", 2}},
+                                              Document{{"x", 3}},
+                                              DocumentSource::GetNextResult::makePauseExecution(),
+                                              Document{{"x", 4}},
+                                              DocumentSource::GetNextResult::makePauseExecution()});
+    bucketAutoStage->setSource(source.get());
+
+    // The $bucketAuto stage needs to consume all inputs before returning any output, so we should
+    // see all three pauses before any advances.
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       Document(fromjson("{_id : {min : 1, max : 3}, count : 2}")));
+
+    next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       Document(fromjson("{_id : {min : 3, max : 4}, count : 2}")));
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+}
+
 TEST_F(BucketAutoTests, SourceNameIsBucketAuto) {
     auto bucketAuto = createBucketAuto(fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2}}"));
     ASSERT_EQUALS(string(bucketAuto->getSourceName()), "$bucketAuto");
@@ -509,20 +542,38 @@ TEST_F(BucketAutoTests, FailsWithInvalidOutputFieldName) {
     ASSERT_THROWS_CODE(createBucketAuto(spec), UserException, 40236);
 }
 
-TEST_F(BucketAutoTests, FailsWhenBufferingTooManyDocuments) {
+TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
+    const uint64_t maxMemoryUsageBytes = 1000;
     deque<DocumentSource::GetNextResult> inputs;
-    auto largeStr = string(1000, 'b');
+    auto largeStr = string(maxMemoryUsageBytes, 'b');
     auto inputDoc = Document{{"a", largeStr}};
-    ASSERT_GTE(inputDoc.getApproximateSize(), 1000UL);
+    ASSERT_GTE(inputDoc.getApproximateSize(), maxMemoryUsageBytes);
     inputs.emplace_back(std::move(inputDoc));
     inputs.emplace_back(Document{{"a", largeStr}});
     auto mock = DocumentSourceMock::create(inputs);
 
-    const uint64_t maxMemoryUsageBytes = 1000;
     const int numBuckets = 1;
     auto bucketAuto =
         DocumentSourceBucketAuto::create(getExpCtx(), numBuckets, maxMemoryUsageBytes);
     bucketAuto->setSource(mock.get());
+    ASSERT_THROWS_CODE(bucketAuto->getNext(), UserException, 16819);
+}
+
+TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocumentsEvenIfPaused) {
+    const uint64_t maxMemoryUsageBytes = 1000;
+    auto largeStr = string(maxMemoryUsageBytes / 2, 'b');
+    auto inputDoc = Document{{"a", largeStr}};
+    ASSERT_GT(inputDoc.getApproximateSize(), maxMemoryUsageBytes / 2);
+
+    auto mock = DocumentSourceMock::create({std::move(inputDoc),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document{{"a", largeStr}}});
+
+    const int numBuckets = 1;
+    auto bucketAuto =
+        DocumentSourceBucketAuto::create(getExpCtx(), numBuckets, maxMemoryUsageBytes);
+    bucketAuto->setSource(mock.get());
+    ASSERT_TRUE(bucketAuto->getNext().isPaused());
     ASSERT_THROWS_CODE(bucketAuto->getNext(), UserException, 16819);
 }
 

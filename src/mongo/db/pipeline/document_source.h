@@ -1418,6 +1418,8 @@ private:
 
 class DocumentSourceSort final : public DocumentSource, public SplittableDocumentSource {
 public:
+    static const uint64_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
+
     // virtuals from DocumentSource
     GetNextResult getNext() final;
     const char* getSourceName() const final;
@@ -1441,42 +1443,27 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
-    /**
-      Add sort key field.
-
-      Adds a sort key field to the key being built up.  A concatenated
-      key is built up by calling this repeatedly.
-
-      @param fieldPath the field path to the key component
-      @param ascending if true, use the key for an ascending sort,
-        otherwise, use it for descending
-    */
-    void addKey(const std::string& fieldPath, bool ascending);
-
     /// Write out a Document whose contents are the sort key.
     Document serializeSortKey(bool explain) const;
 
     /**
-      Create a sorting DocumentSource from BSON.
-
-      This is a convenience method that uses the above, and operates on
-      a BSONElement that has been deteremined to be an Object with an
-      element named $group.
-
-      @param pBsonElement the BSONELement that defines the group
-      @param pExpCtx the expression context for the pipeline
-      @returns the grouping DocumentSource
+     * Parses a $sort stage from the user-supplied BSON.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    /// Create a DocumentSourceSort with a given sort and (optional) limit
+    /**
+     * Convenience method for creating a $sort stage.
+     */
     static boost::intrusive_ptr<DocumentSourceSort> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         BSONObj sortOrder,
-        long long limit = -1);
+        long long limit = -1,
+        uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes);
 
-    /// returns -1 for no limit
+    /**
+     * Returns -1 for no limit.
+     */
     long long getLimit() const;
 
     /**
@@ -1510,8 +1497,13 @@ private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     Value serialize(bool explain = false) const final {
-        verify(false);  // should call addToBsonArray instead
+        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
     }
+
+    /**
+     * Helper to add a sort key to this stage.
+     */
+    void addKey(StringData fieldPath, bool ascending);
 
     /**
      * Before returning anything, we have to consume all input and sort it. This method consumes all
@@ -1568,6 +1560,7 @@ private:
 
     boost::intrusive_ptr<DocumentSourceLimit> limitSrc;
 
+    uint64_t _maxMemoryUsageBytes;
     bool _done;
     bool _mergingPresorted;
     std::unique_ptr<MySorter> _sorter;
@@ -1912,7 +1905,8 @@ public:
         boost::intrusive_ptr<Expression> startWith,
         boost::optional<BSONObj> additionalFilter,
         boost::optional<FieldPath> depthField,
-        boost::optional<long long> maxDepth);
+        boost::optional<long long> maxDepth,
+        boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -1921,15 +1915,17 @@ protected:
     void doInjectExpressionContext() final;
 
 private:
-    DocumentSourceGraphLookUp(NamespaceString from,
-                              std::string as,
-                              std::string connectFromField,
-                              std::string connectToField,
-                              boost::intrusive_ptr<Expression> startWith,
-                              boost::optional<BSONObj> additionalFilter,
-                              boost::optional<FieldPath> depthField,
-                              boost::optional<long long> maxDepth,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    DocumentSourceGraphLookUp(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        NamespaceString from,
+        std::string as,
+        std::string connectFromField,
+        std::string connectToField,
+        boost::intrusive_ptr<Expression> startWith,
+        boost::optional<BSONObj> additionalFilter,
+        boost::optional<FieldPath> depthField,
+        boost::optional<long long> maxDepth,
+        boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
     Value serialize(bool explain = false) const final {
         // Should not be called; use serializeToArray instead.

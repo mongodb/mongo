@@ -132,5 +132,23 @@ TEST_F(AddFieldsTest, ShouldAddReferencedFieldsToDependencies) {
     ASSERT_EQUALS(true, dependencies.getNeedTextScore());
 }
 
+TEST_F(AddFieldsTest, ShouldPropagatePauses) {
+    auto addFields = DocumentSourceAddFields::create(BSON("a" << 10), getExpCtx());
+    auto mock = DocumentSourceMock::create({Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution(),
+                                            Document(),
+                                            DocumentSource::GetNextResult::makePauseExecution()});
+    addFields->setSource(mock.get());
+
+    ASSERT_TRUE(addFields->getNext().isAdvanced());
+    ASSERT_TRUE(addFields->getNext().isPaused());
+    ASSERT_TRUE(addFields->getNext().isAdvanced());
+    ASSERT_TRUE(addFields->getNext().isPaused());
+
+    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
 }  // namespace
 }  // namespace mongo
