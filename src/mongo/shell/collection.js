@@ -771,6 +771,19 @@ DBCollection.prototype.findAndModify = function(args) {
 };
 
 DBCollection.prototype.renameCollection = function(newName, dropTarget) {
+    if (arguments.length === 1 && typeof newName === 'object') {
+        if (newName.hasOwnProperty('dropTarget')) {
+            dropTarget = newName['dropTarget'];
+        }
+        newName = newName['to'];
+    }
+    if (typeof dropTarget === 'undefined') {
+        dropTarget = false;
+    }
+    if (typeof newName !== 'string' || typeof dropTarget !== 'boolean') {
+        throw Error(
+            'renameCollection must either take a string and an optional boolean or an object.');
+    }
     return this._db._adminCommand({
         renameCollection: this._fullName,
         to: this._db._name + "." + newName,
