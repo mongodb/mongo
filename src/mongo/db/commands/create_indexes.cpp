@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -55,6 +56,68 @@
 namespace mongo {
 
 using std::string;
+
+namespace {
+
+const StringData kIndexesFieldName = "indexes"_sd;
+
+/**
+ * Parses the index specifications from 'cmdObj', validates them, and returns equivalent index
+ * specifications that have any missing attributes filled in. If any index specification is
+ * malformed, then an error status is returned.
+ */
+StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(const NamespaceString& ns,
+                                                            const BSONObj& cmdObj) {
+    bool hasIndexesField = false;
+
+    std::vector<BSONObj> indexSpecs;
+    for (auto&& cmdElem : cmdObj) {
+        auto cmdElemFieldName = cmdElem.fieldNameStringData();
+
+        if (kIndexesFieldName == cmdElemFieldName) {
+            if (cmdElem.type() != BSONType::Array) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << kIndexesFieldName
+                                      << "' must be an array, but got "
+                                      << typeName(cmdElem.type())};
+            }
+
+            for (auto&& indexesElem : cmdElem.Obj()) {
+                if (indexesElem.type() != BSONType::Object) {
+                    return {ErrorCodes::TypeMismatch,
+                            str::stream() << "The elements of the '" << kIndexesFieldName
+                                          << "' array must be objects, but got "
+                                          << typeName(indexesElem.type())};
+                }
+
+                auto indexSpec = validateIndexSpec(indexesElem.Obj(), ns);
+                if (!indexSpec.isOK()) {
+                    return indexSpec.getStatus();
+                }
+                indexSpecs.push_back(std::move(indexSpec.getValue()));
+            }
+
+            hasIndexesField = true;
+        } else {
+            // TODO SERVER-769: Validate top-level options to the "createIndexes" command.
+            continue;
+        }
+    }
+
+    if (!hasIndexesField) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "The '" << kIndexesFieldName
+                              << "' field is a required argument of the createIndexes command"};
+    }
+
+    if (indexSpecs.empty()) {
+        return {ErrorCodes::BadValue, "Must specify at least one index to create"};
+    }
+
+    return indexSpecs;
+}
+
+}  // namespace
 
 /**
  * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
@@ -81,14 +144,6 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-
-    BSONObj _addNsToSpec(const NamespaceString& ns, const BSONObj& obj) {
-        BSONObjBuilder b;
-        b.append("ns", ns.ns());
-        b.appendElements(obj);
-        return b.obj();
-    }
-
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
@@ -101,79 +156,11 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        if (cmdObj["indexes"].type() != Array) {
-            errmsg = "indexes has to be an array";
-            result.append("cmdObj", cmdObj);
-            return false;
+        auto specsWithStatus = parseAndValidateIndexSpecs(ns, cmdObj);
+        if (!specsWithStatus.isOK()) {
+            return appendCommandStatus(result, specsWithStatus.getStatus());
         }
-
-        std::vector<BSONObj> specs;
-        {
-            BSONObjIterator i(cmdObj["indexes"].Obj());
-            while (i.more()) {
-                BSONElement e = i.next();
-                if (e.type() != Object) {
-                    errmsg = "everything in indexes has to be an Object";
-                    result.append("cmdObj", cmdObj);
-                    return false;
-                }
-
-                // Verify that there are no duplicate keys
-                BSONElement indexKey = e.Obj()["key"];
-                if (indexKey.type() != Object) {
-                    errmsg = "missing 'key' property in index spec";
-                    result.append("cmdObj", cmdObj);
-                    return false;
-                }
-                BSONObjIterator it(indexKey.Obj());
-                std::vector<StringData> keys;
-                while (it.more()) {
-                    BSONElement e = it.next();
-                    StringData fieldName(e.fieldName(), e.fieldNameSize());
-                    if (std::find(keys.begin(), keys.end(), fieldName) != keys.end()) {
-                        errmsg = str::stream() << "duplicate keys detected in index spec: "
-                                               << indexKey;
-                        return false;
-                    }
-                    keys.push_back(fieldName);
-                }
-                specs.push_back(e.Obj());
-            }
-        }
-
-        if (specs.size() == 0) {
-            errmsg = "no indexes to add";
-            return false;
-        }
-
-        // check specs
-        for (size_t i = 0; i < specs.size(); i++) {
-            BSONObj spec = specs[i];
-            if (spec["ns"].eoo()) {
-                spec = _addNsToSpec(ns, spec);
-                specs[i] = spec;
-            }
-
-            if (spec["ns"].type() != String) {
-                errmsg = "ns field must be a string";
-                result.append("spec", spec);
-                return false;
-            }
-
-            std::string nsFromUser = spec["ns"].String();
-            if (nsFromUser.empty()) {
-                errmsg = "ns field cannot be an empty string";
-                result.append("spec", spec);
-                return false;
-            }
-
-            if (ns != nsFromUser) {
-                errmsg = str::stream() << "value of ns field '" << nsFromUser
-                                       << "' doesn't match namespace " << ns.ns();
-                result.append("spec", spec);
-                return false;
-            }
-        }
+        auto specs = std::move(specsWithStatus.getValue());
 
         // now we know we have to create index(es)
         // Note: createIndexes command does not currently respect shard versioning.
@@ -244,13 +231,6 @@ public:
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
-            }
-            if (spec["v"].isNumber() && spec["v"].numberInt() == 0) {
-                return appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::CannotCreateIndex,
-                           str::stream() << "illegal index specification: " << spec << ". "
-                                         << "The option v:0 cannot be passed explicitly"));
             }
         }
 

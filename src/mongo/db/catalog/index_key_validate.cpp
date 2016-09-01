@@ -33,14 +33,25 @@
 #include <cmath>
 #include <limits>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::string;
+
+namespace {
+const int kIndexVersionV0 = 0;
+
+const StringData kKeyPatternFieldName = "key"_sd;
+const StringData kNamespaceFieldName = "ns"_sd;
+const StringData kVersionFieldName = "v"_sd;
+}  // namespace
 
 Status validateKeyPattern(const BSONObj& key) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
@@ -128,5 +139,98 @@ Status validateKeyPattern(const BSONObj& key) {
     }
 
     return Status::OK();
+}
+
+StatusWith<BSONObj> validateIndexSpec(const BSONObj& indexSpec,
+                                      const NamespaceString& expectedNamespace) {
+    bool hasKeyPatternField = false;
+    bool hasNamespaceField = false;
+
+    for (auto&& indexSpecElem : indexSpec) {
+        auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+        if (kKeyPatternFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << kKeyPatternFieldName
+                                      << "' must be an object, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+
+            std::vector<StringData> keys;
+            for (auto&& keyElem : indexSpecElem.Obj()) {
+                auto keyElemFieldName = keyElem.fieldNameStringData();
+                if (std::find(keys.begin(), keys.end(), keyElemFieldName) != keys.end()) {
+                    return {ErrorCodes::BadValue,
+                            str::stream() << "The field '" << keyElemFieldName
+                                          << "' appears multiple times in the index key pattern "
+                                          << indexSpecElem.Obj()};
+                }
+                keys.push_back(keyElemFieldName);
+            }
+
+            hasKeyPatternField = true;
+        } else if (kNamespaceFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << kNamespaceFieldName
+                                      << "' must be a string, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+
+            StringData ns = indexSpecElem.valueStringData();
+            if (ns.empty()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "The field '" << kNamespaceFieldName
+                                      << "' cannot be an empty string"};
+            }
+
+            if (ns != expectedNamespace.ns()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "The value of the field '" << kNamespaceFieldName << "' ("
+                                      << ns
+                                      << ") doesn't match the namespace '"
+                                      << expectedNamespace.ns()
+                                      << "'"};
+            }
+
+            hasNamespaceField = true;
+        } else if (kVersionFieldName == indexSpecElemFieldName) {
+            if (!indexSpecElem.isNumber()) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << kVersionFieldName
+                                      << "' must be a number, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+
+            if (kIndexVersionV0 == indexSpecElem.numberInt()) {
+                return {ErrorCodes::CannotCreateIndex,
+                        str::stream() << "Invalid index specification " << indexSpec
+                                      << "; cannot create an index with "
+                                      << kVersionFieldName
+                                      << "="
+                                      << kIndexVersionV0};
+            }
+        } else {
+            // TODO SERVER-769: Validate index options specified in the "createIndexes" command.
+            continue;
+        }
+    }
+
+    if (!hasKeyPatternField) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "The '" << kKeyPatternFieldName
+                              << "' field is a required property of an index specification"};
+    }
+
+    if (!hasNamespaceField) {
+        // We create a new index specification with the 'ns' field set as 'expectedNamespace' if the
+        // field was omitted.
+        BSONObjBuilder bob;
+        bob.append(kNamespaceFieldName, expectedNamespace.ns());
+        bob.appendElements(indexSpec);
+        return bob.obj();
+    }
+
+    return indexSpec;
 }
 }  // namespace mongo

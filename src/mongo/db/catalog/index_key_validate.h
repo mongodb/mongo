@@ -28,13 +28,23 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-
 namespace mongo {
 class BSONObj;
+class NamespaceString;
+class Status;
+template <typename T>
+class StatusWith;
 
 /**
  * Checks if the key is valid for building an index.
  */
 Status validateKeyPattern(const BSONObj& key);
+
+/**
+ * Validates the index specification 'indexSpec' and returns an equivalent index specification that
+ * has any missing attributes filled in. If the index specification is malformed, then an error
+ * status is returned.
+ */
+StatusWith<BSONObj> validateIndexSpec(const BSONObj& indexSpec,
+                                      const NamespaceString& expectedNamespace);
 }  // namespace mongo
