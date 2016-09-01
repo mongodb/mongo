@@ -445,8 +445,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "declare this is a config db of a cluster; default port 27019; "
                            "default dir /data/configdb")
         .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("shardsvr")
-        .incompatibleWith("nojournal");
+        .incompatibleWith("shardsvr");
 
     sharding_options
         .addOptionChaining("shardsvr",
