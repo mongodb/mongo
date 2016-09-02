@@ -174,44 +174,60 @@ class IntermediateInitialSync(JsCustomBehavior):
 
     DEFAULT_N = CleanEveryN.DEFAULT_N
 
-    def __init__(self, logger, fixture, n=DEFAULT_N):
+    def __init__(self, logger, fixture, useResync=False, n=DEFAULT_N):
         description = "Intermediate Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
         JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
 
+        self.useResync = useResync
         self.n = n
         self.tests_run = 0
 
     def after_test(self, test, test_report):
         self.tests_run += 1
+        # If we have not run 'n' tests yet, skip this hook.
+        if self.tests_run < self.n:
+            return
+        self.tests_run = 0
+
         sync_node = self.fixture.get_initial_sync_node();
         sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        description = "{0} after running '{1}'".format(self.description, test.short_name())
 
-        if self.tests_run >= self.n:
-            self.tests_run = 0
+        teardown_success = True
+        if self.useResync:
+            self.logger.info("Calling resync on initial sync node...")
+            cmd = bson.SON([("resync", 1)])
+            try:
+                sync_node_conn.admin.command(cmd)
+            except pymongo.errors.OperationFailure as err:
+                self.logger.exception("{0} failed".format(description))
+                test_report.addFailure(self.hook_test_case, sys.exc_info())
+                raise errors.TestFailure(err.args[0])
+        else:
             teardown_success = sync_node.teardown()
 
             self.logger.info("Starting the initial sync node back up again...")
             sync_node.setup()
             sync_node.await_ready()
 
-            # Do initial sync round.
-            self.logger.info("Waiting for initial sync node to go into SECONDARY state")
-            cmd = bson.SON([("replSetTest", 1),
-                            ("waitForMemberState", 2),
-                            ("timeoutMillis", 20 * 60 * 1000)])
-            try:
-                sync_node_conn.admin.command(cmd)
-            except self.hook_test_case.failureException as err:
-                self.logger.exception("{0} failed".format(description))
-                test_report.addFailure(self.hook_test_case, sys.exc_info())
-                raise errors.TestFailure(err.args[0])
+        # Do initial sync round.
+        self.logger.info("Waiting for initial sync node to go into SECONDARY state")
+        cmd = bson.SON([("replSetTest", 1),
+                        ("waitForMemberState", 2),
+                        ("timeoutMillis", 20 * 60 * 1000)])
+        try:
+            sync_node_conn.admin.command(cmd)
+        except pymongo.errors.OperationFailure as err:
+            self.logger.exception("{0} failed".format(description))
+            test_report.addFailure(self.hook_test_case, sys.exc_info())
+            raise errors.TestFailure(err.args[0])
 
-            # Run data validation and dbhash checking.
-            JsCustomBehavior.after_test(self, test, test_report)
+        # Run data validation and dbhash checking.
+        JsCustomBehavior.after_test(self, test, test_report)
 
-            if not teardown_success:
-                raise errors.TestFailure("%s did not exit cleanly" % (sync_node))
+        if not teardown_success:
+            raise errors.TestFailure("%s did not exit cleanly" % (sync_node))
 
 class ValidateCollections(JsCustomBehavior):
     """
