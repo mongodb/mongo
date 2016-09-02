@@ -1745,6 +1745,9 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
                    shardType,
                    std::move(targeter));
 
+    if (isRetry) {
+        log() << "Retrying upsert of shardIdentity document into shard " << shardType.getName();
+    }
     _trackAddShardHandle_inlock(shardType.getName(),
                                 _executorForAddShard->scheduleRemoteCommand(request, callback));
 }

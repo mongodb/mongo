@@ -23,13 +23,15 @@
         var skipControlMongoS = false;
 
         var configOptions = arguments[0].other.configOptions;
-        if (configOptions && configOptions.binVersion == "last-stable") {
+        if (configOptions &&
+            (configOptions.binVersion == "last-stable" || configOptions.binVersion == "3.2")) {
             skipControlMongoS = true;
         }
 
         // Check if config server options were specified as an array instead.
         if (arguments[0].config && Array.isArray(arguments[0].config) &&
-            arguments[0].config[0].binVersion == "last-stable") {
+            (arguments[0].config[0].binVersion == "last-stable" ||
+             arguments[0].config[0].binVersion == "3.2")) {
             skipControlMongoS = true;
         }
 
