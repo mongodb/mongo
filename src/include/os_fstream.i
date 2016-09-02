@@ -49,9 +49,6 @@ static inline int
 __wt_vfprintf(
     WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va_list ap)
 {
-	__wt_verbose(
-	    session, WT_VERB_HANDLEOPS, "%s: handle-printf", fstr->name);
-
 	return (fstr->fstr_printf(session, fstr, fmt, ap));
 }
 
