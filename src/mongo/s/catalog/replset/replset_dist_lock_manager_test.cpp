@@ -146,7 +146,7 @@ protected:
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) {
-        return std::move(stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager)));
+        return stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
     }
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() {

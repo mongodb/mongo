@@ -97,17 +97,17 @@ protected:
 
     std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
         invariant(shardRegistry);
-        return std::move(stdx::make_unique<DistLockCatalogImpl>(shardRegistry));
+        return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
     }
 
     std::unique_ptr<DistLockManager> makeDistLockManager(
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return std::move(stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog)));
+        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
-        return std::move(stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager)));
+        return stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
     }
 };
 
