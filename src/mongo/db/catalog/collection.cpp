@@ -68,11 +68,16 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
+// Used below to fail during inserts.
+MONGO_FP_DECLARE(failCollectionInserts);
+
 const auto bannedExpressionsInValidators = std::set<StringData>{
     "$geoNear", "$near", "$nearSphere", "$text", "$where",
 };
@@ -369,6 +374,20 @@ Status Collection::insertDocuments(OperationContext* txn,
                                    OpDebug* opDebug,
                                    bool enforceQuota,
                                    bool fromMigrate) {
+
+    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
+        const BSONObj& data = extraData.getData();
+        const auto collElem = data["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || _ns == collElem.str()) {
+            const std::string msg = str::stream()
+                << "Failpoint (failCollectionInserts) has been enabled (" << data
+                << "), so rejecting insert (first doc): " << *begin;
+            log() << msg;
+            return {ErrorCodes::FailPointEnabled, msg};
+        }
+    }
+
     // Should really be done in the collection object at creation and updated on index create.
     const bool hasIdIndex = _indexCatalog.findIdIndex(txn);
 
@@ -418,6 +437,20 @@ Status Collection::insertDocument(OperationContext* txn,
                                   const BSONObj& doc,
                                   const std::vector<MultiIndexBlock*>& indexBlocks,
                                   bool enforceQuota) {
+
+    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
+        const BSONObj& data = extraData.getData();
+        const auto collElem = data["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || _ns == collElem.str()) {
+            const std::string msg = str::stream()
+                << "Failpoint (failCollectionInserts) has been enabled (" << data
+                << "), so rejecting insert: " << doc;
+            log() << msg;
+            return {ErrorCodes::FailPointEnabled, msg};
+        }
+    }
+
     {
         auto status = checkValidation(txn, doc);
         if (!status.isOK())

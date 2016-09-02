@@ -84,6 +84,11 @@ public:
     virtual BSONObj toBSON() const override;
 
 private:
+    void _releaseResources();
+    Status _runTaskReleaseResourcesOnFailure(
+        TaskRunner::SynchronousTask task,
+        TaskRunner::NextAction nextAction = TaskRunner::NextAction::kKeepOperationContext);
+
     std::unique_ptr<OldThreadPool> _threadPool;
     std::unique_ptr<TaskRunner> _runner;
     std::unique_ptr<AutoGetCollection> _autoColl;
@@ -91,9 +96,8 @@ private:
     OperationContext* _txn = nullptr;
     Collection* _coll = nullptr;
     NamespaceString _nss;
-    MultiIndexBlock _idIndexBlock;
-    MultiIndexBlock _secondaryIndexesBlock;
-    bool _hasSecondaryIndexes = false;
+    std::unique_ptr<MultiIndexBlock> _idIndexBlock;
+    std::unique_ptr<MultiIndexBlock> _secondaryIndexesBlock;
     BSONObj _idIndexSpec;
     Stats _stats;
 };
