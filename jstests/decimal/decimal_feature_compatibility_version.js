@@ -28,12 +28,8 @@
     assert.eq("3.2", res.featureCompatibilityVersion);
 
     // Decimals cannot be inserted when the featureCompatibilityVersion is 3.2.
-    // TODO SERVER-23972: Inserting decimals should also fail in legacy write mode when
-    // featureCompatibilityVersion is 3.2.
-    if (decimalDB.getMongo().writeMode() === "commands") {
-        assert.writeErrorWithCode(decimalDB.collection.insert({a: NumberDecimal(2.0)}),
-                                  ErrorCodes.InvalidBSON);
-    }
+    assert.writeErrorWithCode(decimalDB.collection.insert({a: NumberDecimal(2.0)}),
+                              ErrorCodes.InvalidBSON);
 
     // Decimals cannot be used in queries when the featureCompatibilityVersion is 3.2.
     assert.throws(function() {

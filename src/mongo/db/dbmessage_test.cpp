@@ -135,7 +135,7 @@ TEST(DBMessage1, GoodInsert2) {
 
     ASSERT_EQUALS(39, d1.pullInt());
     BSONObj bo2 = d1.nextJsObj();
-    ASSERT_THROWS(d1.nextJsObj(), MsgAssertionException);
+    ASSERT_THROWS(d1.nextJsObj(), UserException);
 }
 
 

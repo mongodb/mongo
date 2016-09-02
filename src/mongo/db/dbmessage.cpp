@@ -32,6 +32,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/strnlen.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/transport/session.h"
 
 namespace mongo {
@@ -120,16 +121,14 @@ const char* DbMessage::getArray(size_t count) const {
 }
 
 BSONObj DbMessage::nextJsObj() {
-    massert(10304,
+    uassert(ErrorCodes::InvalidBSON,
             "Client Error: Remaining data too small for BSON object",
             _nextjsobj != NULL && _theEnd - _nextjsobj >= 5);
 
     if (serverGlobalParams.objcheck) {
-        // TODO SERVER-23972: Change BSONVersion::kLatest to
-        // Validator<BSONObj>::enabledBSONVersion() so that we disallow decimal inserts in legacy
-        // write mode if decimal is disabled.
-        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj, BSONVersion::kLatest);
-        massert(10307,
+        Status status = validateBSON(
+            _nextjsobj, _theEnd - _nextjsobj, Validator<BSONObj>::enabledBSONVersion());
+        uassert(ErrorCodes::InvalidBSON,
                 str::stream() << "Client Error: bad object in message: " << status.reason(),
                 status.isOK());
     }
