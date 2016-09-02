@@ -111,7 +111,7 @@
             expectFailure: true,
         },
         collMod: {command: {collMod: "view", viewOn: "other", pipeline: []}},
-        collStats: {command: {collStats: "view"}, skip: "TODO(SERVER-24568)"},
+        collStats: {skip: "Tested in views/views_coll_stats.js"},
         compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
         configureFailPoint: {skip: isUnrelated},
         connPoolStats: {skip: isUnrelated},
@@ -170,7 +170,7 @@
                 assert.eq(hash1, hash3, "hash should be the same again after removing 'view2'");
             }
         },
-        dbStats: {command: {dbStats: 1}, skip: "TODO(SERVER-24568)"},
+        dbStats: {skip: "TODO(SERVER-25948)"},
         delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
         diagLogging: {skip: isUnrelated},
         distinct: {command: {distinct: "view", key: "_id"}},
@@ -273,40 +273,9 @@
         },
         getnonce: {skip: isUnrelated},
         godinsert: {skip: isAnInternalCommand},
-        grantPrivilegesToRole: {
-            command: {
-                grantPrivilegesToRole: "testrole",
-                privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}]
-            },
-            setup: function(conn) {
-                assert.commandWorked(
-                    conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
-            },
-            teardown: function(conn) {
-                assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
-            }
-        },
-        grantRolesToRole: {
-            command: {grantRolesToRole: "testrole", roles: ["read"]},
-            setup: function(conn) {
-                assert.commandWorked(
-                    conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
-            },
-            teardown: function(conn) {
-                assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
-            }
-        },
-        grantRolesToUser: {
-            command: {grantRolesToUser: "testuser", roles: ["read"]},
-            setup: function(conn) {
-                assert.commandWorked(
-                    conn.runCommand({createUser: "testuser", pwd: "testpass", roles: []}));
-            },
-            teardown: function(conn) {
-                assert.commandWorked(conn.runCommand({dropAllUsersFromDatabase: 1}));
-            },
-            skip: "TODO(SERVER-24724)"
-        },
+        grantPrivilegesToRole: {skip: "tested in auth/commands_user_defined_roles.js"},
+        grantRolesToRole: {skip: isUnrelated},
+        grantRolesToUser: {skip: isUnrelated},
         group: {
             command: {group: {ns: "test.view", key: "x", $reduce: function() {}, initial: {}}},
         },
@@ -502,7 +471,7 @@
             expectFailure: true,
         },
         stageDebug: {skip: isAnInternalCommand},
-        top: {command: {top: "view"}, isAdminCommand: true, skip: "TODO(SERVER-24568)"},
+        top: {skip: "tested in views/views_stats.js"},
         touch: {
             command: {touch: "view", data: true},
             expectFailure: true,
