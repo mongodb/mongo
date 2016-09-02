@@ -41,8 +41,6 @@ class BSONObj;
 class CatalogCache;
 class ShardingCatalogClient;
 class ShardingCatalogClientImpl;
-class ShardingCatalogManager;
-class ShardingCatalogManagerImpl;
 struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
