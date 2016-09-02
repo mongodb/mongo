@@ -219,8 +219,9 @@ ElectionTimingTest.calculateElectionTimeoutLimitMillis = function(primary) {
     }
     var assertSoonIntervalMillis = 200;  // from assert.js
     var applierDrainWaitMillis = 1000;   // from SyncTail::tryPopAndWaitForMore()
+    var padding = 5000;                  // extra padding for slow hosts
     var electionTimeoutLimitMillis =
         (1 + electionTimeoutOffsetLimitFraction) * electionTimeoutMillis + applierDrainWaitMillis +
-        assertSoonIntervalMillis;
+        assertSoonIntervalMillis + padding;
     return electionTimeoutLimitMillis;
 };
