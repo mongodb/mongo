@@ -38,9 +38,11 @@ namespace mongo {
 namespace stdx {
 
 #if defined(_WIN32)
-using ::boost::unordered_set;  // NOLINT
+using ::boost::unordered_set;       // NOLINT
+using ::boost::unordered_multiset;  // NOLINT
 #else
-using ::std::unordered_set;  // NOLINT
+using ::std::unordered_set;       // NOLINT
+using ::std::unordered_multiset;  // NOLINT
 #endif
 
 }  // namespace stdx

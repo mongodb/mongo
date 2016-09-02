@@ -1645,6 +1645,8 @@ def make_polyfill_regex():
     'try_to_lock',
     'unique_lock',
     'unordered_map',
+    'unordered_multimap',
+    'unordered_multiset',
     'unordered_set',
   ]
 
