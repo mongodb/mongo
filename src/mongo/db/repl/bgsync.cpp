@@ -539,9 +539,16 @@ void BackgroundSync::waitForMore(OperationContext* txn) {
 void BackgroundSync::consume(OperationContext* txn) {
     // this is just to get the op off the queue, it's been peeked at
     // and queued for application already
-    BSONObj op = _oplogBuffer->blockingPop(txn);
-    bufferCountGauge.decrement(1);
-    bufferSizeGauge.decrement(getSize(op));
+    BSONObj op;
+    if (_oplogBuffer->tryPop(txn, &op)) {
+        bufferCountGauge.decrement(1);
+        bufferSizeGauge.decrement(getSize(op));
+    } else {
+        invariant(inShutdown());
+        // This means that shutdown() was called between the consumer's calls to peek() and
+        // consume(). shutdown() cleared the buffer so there is nothing for us to consume here.
+        // Since our postcondition is already met, it is safe to return successfully.
+    }
 }
 
 void BackgroundSync::_rollback(OperationContext* txn,

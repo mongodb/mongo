@@ -171,14 +171,6 @@ bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
     return _doPop_inlock(txn, value);
 }
 
-OplogBuffer::Value OplogBufferCollection::blockingPop(OperationContext* txn) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _cvNoLongerEmpty.wait(lk, [&]() { return _count != 0; });
-    BSONObj value;
-    _doPop_inlock(txn, &value);
-    return value;
-}
-
 bool OplogBufferCollection::blockingPeek(OperationContext* txn,
                                          Value* value,
                                          Seconds waitDuration) {

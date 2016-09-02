@@ -146,12 +146,6 @@ public:
     virtual bool tryPop(OperationContext* txn, Value* value) = 0;
 
     /**
-     * Pops the last operation in the oplog buffer.
-     * If the oplog buffer is empty, waits until an operation is pushed.
-     */
-    virtual Value blockingPop(OperationContext* txn) = 0;
-
-    /**
      * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
      * Otherwise, returns true and sets "value" to last item in oplog buffer.
