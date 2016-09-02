@@ -253,9 +253,10 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     std::unique_ptr<CollectionBulkLoader> loaderToReturn;
 
     auto status = runner->runSynchronousTask([&](OperationContext* txn) -> Status {
-        // We are not replicating nor validating these writes.
+        // We are not replicating nor validating writes under this OperationContext*.
+        // The OperationContext* is used for all writes to the (newly) cloned collection.
         txn->setReplicatedWrites(false);
-        DisableDocumentValidation validationDisabler(txn);
+        documentValidationDisabled(txn) = true;
 
         // Retry if WCE.
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
