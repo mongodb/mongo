@@ -307,15 +307,16 @@ wts_init(void)
 
 	/*
 	 * Ensure that we can service at least one operation per-thread
-	 * concurrently without filling the cache with pinned pages. We
-	 * choose a multiplier of three because the max configurations control
-	 * on disk size and in memory pages are often significantly larger
-	 * than their disk counterparts.
+	 * concurrently without filling the cache with pinned pages. We choose
+	 * a multiplier of three because the max configurations control on disk
+	 * size and in memory pages are often significantly larger than their
+	 * disk counterparts.  We also apply the default eviction_dirty_trigger
+	 * of 20% so that workloads don't get stuck with dirty pages in cache.
 	 */
 	maxintlpage = 1U << g.c_intl_page_max;
 	maxleafpage = 1U << g.c_leaf_page_max;
 	while (3 * g.c_threads * (maxintlpage + maxleafpage) >
-	    g.c_cache << 20) {
+	    (g.c_cache << 20) / 5) {
 		if (maxleafpage <= 512 && maxintlpage <= 512)
 			break;
 		if (maxintlpage > 512)
