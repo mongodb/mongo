@@ -33,8 +33,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
@@ -535,7 +537,10 @@ static void assertContains(const EqualityMatches& equalities, const BSONObj& wra
     if (it == equalities.end()) {
         FAIL(stream() << "Equality matches did not contain path \"" << path << "\"");
     }
-    if (!it->second->getData().valuesEqual(value)) {
+
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                 &SimpleStringDataComparator::kInstance);
+    if (eltCmp.evaluate(it->second->getData() != value)) {
         FAIL(stream() << "Equality match at path \"" << path << "\" contains value "
                       << it->second->getData()
                       << ", not value "
@@ -834,7 +839,9 @@ static void assertParent(const EqualityMatches& equalities,
                       << "\"");
     }
 
-    if (!parentEl.valuesEqual(value)) {
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                 &SimpleStringDataComparator::kInstance);
+    if (eltCmp.evaluate(parentEl != value)) {
         FAIL(stream() << "Equality match parent for \"" << pathStr << "\" at path \"" << parentPath
                       << "\" contains value "
                       << parentEl

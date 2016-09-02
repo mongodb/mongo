@@ -34,6 +34,7 @@
 #include <pcrecpp.h>
 #include <unordered_map>
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
@@ -78,7 +79,9 @@ bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
         return false;
     }
 
-    return path() == realOther->path() && _rhs.valuesEqual(realOther->_rhs);
+    const StringData::ComparatorInterface* stringComparator = nullptr;
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
+    return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
 }
 
 

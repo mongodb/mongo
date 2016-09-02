@@ -32,7 +32,9 @@
 #include <map>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/field_ref.h"
@@ -44,20 +46,22 @@
 
 namespace {
 
-using mongo::BSONObj;
 using mongo::BSONElement;
+using mongo::BSONElementComparator;
+using mongo::BSONObj;
 using mongo::BSONObjIterator;
 using mongo::CollatorInterfaceMock;
 using mongo::FieldRef;
-using mongo::fromjson;
-using mongo::mutablebson::Document;
 using mongo::OperationContext;
 using mongo::OwnedPointerVector;
 using mongo::QueryTestServiceContext;
 using mongo::ServiceContext;
+using mongo::SimpleStringDataComparator;
 using mongo::StringData;
 using mongo::UpdateDriver;
 using mongo::UpdateIndexData;
+using mongo::fromjson;
+using mongo::mutablebson::Document;
 using mongoutils::str::stream;
 
 TEST(Parse, Normal) {
@@ -199,7 +203,9 @@ static void assertSameFields(const BSONObj& docA, const BSONObj& docB);
  * ignoring element order.
  */
 static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
-    if (elA.type() != elB.type() || (!elA.isABSONObj() && !elA.valuesEqual(elB))) {
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                 &SimpleStringDataComparator::kInstance);
+    if (elA.type() != elB.type() || (!elA.isABSONObj() && eltCmp.evaluate(elA != elB))) {
         FAIL(stream() << "element " << elA << " not equal to " << elB);
     } else if (elA.type() == mongo::Array) {
         std::vector<BSONElement> elsA = elA.Array();

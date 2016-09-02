@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -170,7 +171,10 @@ public:
                 }
                 BSONElement currKeyElt = i.next();
 
-                if (!currKeyElt.eoo() && !currKeyElt.valuesEqual(missingField))
+                const StringData::ComparatorInterface* stringComparator = nullptr;
+                BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                             stringComparator);
+                if (!currKeyElt.eoo() && eltCmp.evaluate(currKeyElt != missingField))
                     continue;
 
                 // This is a fetch, but it's OK.  The underlying code won't throw a page fault

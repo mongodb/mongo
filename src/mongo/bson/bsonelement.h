@@ -542,16 +542,6 @@ public:
         return DeferredComparison(DeferredComparison::Type::kNE, *this, other);
     }
 
-    /** like operator== but doesn't check the fieldname,
-        just the value.
-
-        TODO: Delete this method. Callers should use the appropriate
-        BSONElement::ComparatorInterface instead.
-    */
-    bool valuesEqual(const BSONElement& r) const {
-        return woCompare(r, false) == 0;
-    }
-
     /**
      * Functor compatible with std::hash for std::unordered_{map,set}
      * Warning: The hash function is subject to change. Do not use in cases where hashes need
