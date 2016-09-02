@@ -197,7 +197,9 @@ jsTestOptions = function() {
             mongosBinVersion: TestData.mongosBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
-            skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions
+            skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
+            forceValidationWithFeatureCompatibilityVersion:
+                TestData.forceValidationWithFeatureCompatibilityVersion
         });
     }
     return _jsTestOptions;

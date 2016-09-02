@@ -21,6 +21,11 @@
     // Decimals can be inserted when the featureCompatibilityVersion is 3.4.
     assert.writeOK(decimalDB.collection.insert({a: NumberDecimal(2.0)}));
 
+    // Collection containing decimals is valid when the featureCompatibilityVersion is 3.4.
+    res = decimalDB.collection.validate({full: true});
+    assert.commandWorked(res);
+    assert.eq(true, res.valid, tojson(res));
+
     // Ensure the featureCompatibilityVersion is 3.2.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
     res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
@@ -38,6 +43,11 @@
 
     // Decimals can be read when the featureCompatibilityVersion is 3.2.
     assert.eq(decimalDB.collection.findOne().a, NumberDecimal(2.0));
+
+    // Collection containing decimals is invalid when the featureCompatibilityVersion is 3.2.
+    res = decimalDB.collection.validate({full: true});
+    assert.commandWorked(res);
+    assert.eq(false, res.valid, tojson(res));
 
     MongoRunner.stopMongod(conn);
 }());

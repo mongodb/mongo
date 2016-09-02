@@ -68,6 +68,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
@@ -1057,11 +1058,8 @@ public:
 
     virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
         BSONObj recordBson = record.toBson();
-
-        // Use the latest BSON validation version. We do not say the collection is invalid for
-        // containing decimal data, even if decimal is disabled.
-        const Status status =
-            validateBSON(recordBson.objdata(), recordBson.objsize(), BSONVersion::kLatest);
+        const Status status = validateBSON(
+            recordBson.objdata(), recordBson.objsize(), Validator<BSONObj>::enabledBSONVersion());
         if (status.isOK()) {
             *dataSize = recordBson.objsize();
         } else {

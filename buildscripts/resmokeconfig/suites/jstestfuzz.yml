@@ -14,6 +14,7 @@ executor:
         global_vars:
           TestData:
             skipValidationOnInvalidViewDefinitions: true
+            forceValidationWithFeatureCompatibilityVersion: "3.4"
     fixture:
       class: MongoDFixture
       mongod_options:
