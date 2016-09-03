@@ -54,8 +54,7 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
  */
 static inline void
 __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
-WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)))
-WT_GCC_FUNC_DECL_ATTRIBUTE((cold));
+WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 
 /*
  * __wt_verbose --
