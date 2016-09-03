@@ -3517,114 +3517,66 @@ TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
 
 namespace SubstrBytes {
 
-class ExpectedResultBase {
-public:
-    virtual ~ExpectedResultBase() {}
-    void run() {
-        intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
-        BSONObj specObj = BSON("" << spec());
-        BSONElement specElement = specObj.firstElement();
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
-        expression->injectExpressionContext(expCtx);
-        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
-    }
+TEST(ExpressionSubstrBytesTest, DoesHandleNullInMiddle) {
+    assertExpectedResults("$substrBytes",
+                          {{{Value("a\0b"_sd), Value(0), Value(3)}, Value("a\0b"_sd)}});
+}
 
-protected:
-    virtual string str() = 0;
-    virtual int offset() = 0;
-    virtual int length() = 0;
-    virtual string expectedResult() = 0;
+TEST(ExpressionSubstrBytesTest, DoesHandleNullAtBeginning) {
+    assertExpectedResults("$substrBytes",
+                          {{{Value("a\0b"_sd), Value(1), Value(2)}, Value("\0b"_sd)}});
+}
 
-private:
-    BSONObj spec() {
-        return BSON("$substrBytes" << BSON_ARRAY(str() << offset() << length()));
-    }
-};
+TEST(ExpressionSubstrBytesTest, DoesHandleNullAtEnd) {
+    assertExpectedResults("$substrBytes",
+                          {{{Value("a\0b"_sd), Value(0), Value(2)}, Value("a\0"_sd)}});
+}
 
-/** Retrieve a full string containing a null character. */
-class FullNull : public ExpectedResultBase {
-    string str() {
-        return string("a\0b", 3);
-    }
-    int offset() {
-        return 0;
-    }
-    int length() {
-        return 3;
-    }
-    string expectedResult() {
-        return str();
-    }
-};
+TEST(ExpressionSubstrBytesTest, DoesDropBeginningNull) {
+    assertExpectedResults("$substrBytes", {{{Value("\0b"_sd), Value(1), Value(1)}, Value("b"_sd)}});
+}
 
-/** Retrieve a substring beginning with a null character. */
-class BeginAtNull : public ExpectedResultBase {
-    string str() {
-        return string("a\0b", 3);
-    }
-    int offset() {
-        return 1;
-    }
-    int length() {
-        return 2;
-    }
-    string expectedResult() {
-        return string("\0b", 2);
-    }
-};
+TEST(ExpressionSubstrBytesTest, DoesDropEndingNull) {
+    assertExpectedResults("$substrBytes", {{{Value("a\0"_sd), Value(0), Value(1)}, Value("a"_sd)}});
+}
 
-/** Retrieve a substring ending with a null character. */
-class EndAtNull : public ExpectedResultBase {
-    string str() {
-        return string("a\0b", 3);
-    }
-    int offset() {
-        return 0;
-    }
-    int length() {
-        return 2;
-    }
-    string expectedResult() {
-        return string("a\0", 2);
-    }
-};
+TEST(ExpressionSubstrBytesTest, DoesRejectNegativeOffset) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
 
-/** Drop a beginning null character. */
-class DropBeginningNull : public ExpectedResultBase {
-    string str() {
-        return string("\0b", 2);
-    }
-    int offset() {
-        return 1;
-    }
-    int length() {
-        return 1;
-    }
-    string expectedResult() {
-        return "b";
-    }
-};
+    const auto expr =
+        Expression::parseExpression(BSON("$substrBytes" << BSON_ARRAY("abc"_sd << -1 << 1)), vps);
+    ASSERT_THROWS_CODE({ expr->evaluate(Document()); }, UserException, 40188);
+}
 
-/** Drop an ending null character. */
-class DropEndingNull : public ExpectedResultBase {
-    string str() {
-        return string("a\0", 2);
-    }
-    int offset() {
-        return 0;
-    }
-    int length() {
-        return 1;
-    }
-    string expectedResult() {
-        return "a";
-    }
-};
+TEST(ExpressionSubstrBytesTest, DoesRejectNegativeLength) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
 
-}  // namespace Substr
+    const auto expr =
+        Expression::parseExpression(BSON("$substrBytes" << BSON_ARRAY("abc"_sd << 1 << -1)), vps);
+    ASSERT_THROWS_CODE({ expr->evaluate(Document()); }, UserException, 40189);
+}
+
+TEST(ExpressionSubstrBytesTest, DoesRejectNonintegralOffset) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+
+    const auto expr =
+        Expression::parseExpression(BSON("$substrBytes" << BSON_ARRAY("abc"_sd << 0.5 << 1)), vps);
+    ASSERT_THROWS_CODE({ expr->evaluate(Document()); }, UserException, 40313);
+}
+
+TEST(ExpressionSubstrBytesTest, DoesRejectNonintegralLength) {
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+
+    const auto expr =
+        Expression::parseExpression(BSON("$substrBytes" << BSON_ARRAY("abc"_sd << 0 << 0.5)), vps);
+    ASSERT_THROWS_CODE({ expr->evaluate(Document()); }, UserException, 40314);
+}
+
+}  // namespace SubstrBytes
 
 namespace SubstrCP {
 
@@ -4156,12 +4108,6 @@ public:
         add<Strcasecmp::NullMiddleLt>();
         add<Strcasecmp::NullMiddleEq>();
         add<Strcasecmp::NullMiddleGt>();
-
-        add<SubstrBytes::FullNull>();
-        add<SubstrBytes::BeginAtNull>();
-        add<SubstrBytes::EndAtNull>();
-        add<SubstrBytes::DropBeginningNull>();
-        add<SubstrBytes::DropEndingNull>();
 
         add<ToLower::NullBegin>();
         add<ToLower::NullMiddle>();

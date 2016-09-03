@@ -3333,17 +3333,38 @@ Value ExpressionSubstrBytes::evaluateInternal(Variables* vars) const {
                           << ":  starting index must be a numeric type (is BSON type "
                           << typeName(pLower.getType())
                           << ")",
-            (pLower.getType() == NumberInt || pLower.getType() == NumberLong ||
-             pLower.getType() == NumberDouble));
+            pLower.numeric());
+
+    uassert(40313,
+            str::stream() << getOpName()
+                          << ": starting index cannot be represented as a 32-bit integral value: "
+                          << pLower.toString(),
+            pLower.integral());
     uassert(16035,
             str::stream() << getOpName() << ":  length must be a numeric type (is BSON type "
                           << typeName(pLength.getType())
                           << ")",
-            (pLength.getType() == NumberInt || pLength.getType() == NumberLong ||
-             pLength.getType() == NumberDouble));
+            pLength.numeric());
+    uassert(40314,
+            str::stream() << getOpName()
+                          << ": length cannot be represented as a 32-bit integral value: "
+                          << pLength.toString(),
+            pLength.integral());
 
-    string::size_type lower = static_cast<string::size_type>(pLower.coerceToLong());
-    string::size_type length = static_cast<string::size_type>(pLength.coerceToLong());
+    int lowerVal = pLower.coerceToInt();
+    int lengthVal = pLength.coerceToInt();
+
+    uassert(40188,
+            str::stream() << getOpName() << ": starting index must be a nonnegative value, found: "
+                          << lowerVal,
+            lowerVal >= 0);
+    uassert(40189,
+            str::stream() << getOpName() << ": length must be a nonnegative value, found: "
+                          << lengthVal,
+            lengthVal >= 0);
+
+    string::size_type lower = static_cast<string::size_type>(lowerVal);
+    string::size_type length = static_cast<string::size_type>(lengthVal);
 
     uassert(28656,
             str::stream() << getOpName()
