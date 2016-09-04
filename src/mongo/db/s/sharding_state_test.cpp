@@ -63,7 +63,17 @@ protected:
         _shardingState.setGlobalInitMethodForTest([&](OperationContext* txn,
                                                       const ConnectionString& configConnStr,
                                                       StringData distLockProcessId) {
-            return initializeGlobalShardingStateForMongodForTest(configConnStr);
+            auto status = initializeGlobalShardingStateForMongodForTest(configConnStr);
+            if (!status.isOK()) {
+                return status;
+            }
+            // Set the ConnectionString return value on the mock targeter so that later calls to
+            // the targeter's getConnString() return the appropriate value.
+            auto configTargeter =
+                RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
+            configTargeter->setConnectionStringReturnValue(configConnStr);
+
+            return Status::OK();
         });
     }
 

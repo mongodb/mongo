@@ -209,18 +209,7 @@ std::unique_ptr<ShardRegistry> MongodTestFixture::makeShardRegistry(
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    auto shardRegistry = stdx::make_unique<ShardRegistry>(std::move(shardFactory), configConnStr);
-    shardRegistry->init();
-
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        // Set the ConnectionString return value on the mock targeter so that later calls to
-        // the targeter's getConnString() return the appropriate value.
-        auto configTargeter =
-            RemoteCommandTargeterMock::get(shardRegistry->getConfigShard()->getTargeter());
-        configTargeter->setConnectionStringReturnValue(configConnStr);
-    }
-
-    return shardRegistry;
+    return stdx::make_unique<ShardRegistry>(std::move(shardFactory), configConnStr);
 }
 
 std::unique_ptr<DistLockCatalog> MongodTestFixture::makeDistLockCatalog(

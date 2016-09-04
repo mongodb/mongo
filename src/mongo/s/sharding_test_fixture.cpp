@@ -121,7 +121,6 @@ void ShardingTestFixture::setUp() {
 
     auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
-    executorPool->startup();
 
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>(nullptr);
     _distLockManager = uniqueDistLockManager.get();
@@ -162,7 +161,7 @@ void ShardingTestFixture::setUp() {
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
-    shardRegistry->init();
+    executorPool->startup();
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.

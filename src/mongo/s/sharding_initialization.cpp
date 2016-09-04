@@ -154,7 +154,6 @@ Status initializeGlobalShardingState(OperationContext* txn,
     executorPool->startup();
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
-    shardRegistry->init();
 
     auto catalogClient =
         makeCatalogClient(txn->getServiceContext(), shardRegistry.get(), distLockProcessId);
