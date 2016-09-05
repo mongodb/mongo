@@ -157,6 +157,12 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
                 isRegisteredStorageEngine(storageGlobalParams.engine));
     }
 
+    const std::string repairpath = storageGlobalParams.repairpath;
+    uassert(40311,
+            str::stream() << "Cannot start server. The command line option '--repairpath'"
+                          << " is only supported by the mmapv1 storage engine",
+            repairpath.empty() || repairpath == dbpath || storageGlobalParams.engine == "mmapv1");
+
     const StorageEngine::Factory* factory = _storageFactories[storageGlobalParams.engine];
 
     uassert(18656,
