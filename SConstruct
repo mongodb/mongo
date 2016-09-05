@@ -395,10 +395,10 @@ add_option('use-cpu-profiler',
 )
 
 add_option('build-fast-and-loose',
-    choices=['on', 'off'],
+    choices=['on', 'off', 'auto'],
     const='on',
-    default='on',
-    help='looser dependency checking, ignored for --release builds',
+    default='auto',
+    help='looser dependency checking',
     nargs='?',
     type='choice',
 )
@@ -1290,10 +1290,12 @@ if link_model.startswith("dynamic"):
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
-# Ignore requests to build fast and loose for release builds.
-# Also ignore fast-and-loose option if the scons cache is enabled (see SERVER-19088)
-if get_option('build-fast-and-loose') == "on" and \
-    not has_option('release') and not has_option('cache'):
+# Enable the fast decider if exlicltly requested or if in 'auto' mode and not in conflict with other
+# options.
+if get_option('build-fast-and-loose') == 'on' or \
+   (get_option('build-fast-and-loose') == 'auto' and \
+    not has_option('release') and \
+    not has_option('cache')):
     # See http://www.scons.org/wiki/GoFastButton for details
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
