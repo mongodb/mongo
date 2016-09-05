@@ -528,6 +528,7 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
+	log_table_cursor = NULL;	/* -Wconditional-initialized */
 	ops = 0;
 	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
