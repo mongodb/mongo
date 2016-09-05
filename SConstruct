@@ -497,6 +497,15 @@ add_option('use-s390x-crc32',
     type='choice',
 )
 
+add_option('git-decider',
+    choices=["on", "off"],
+    const='on',
+    default="off",
+    help="Use git metadata for out-of-date detection for source files",
+    nargs='?',
+    type="choice",
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -1299,6 +1308,13 @@ if get_option('build-fast-and-loose') == 'on' or \
     # See http://www.scons.org/wiki/GoFastButton for details
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
+
+# If the user has requested the git decider, enable it if it is available. We want to do this after
+# we set the basic decider above, so that we 'chain' to that one.
+if get_option('git-decider') == 'on':
+    git_decider = Tool('git_decider')
+    if git_decider.exists(env):
+        git_decider(env)
 
 # On non-windows platforms, we may need to differentiate between flags being used to target an
 # executable (like -fPIE), vs those being used to target a (shared) library (like -fPIC). To do so,
