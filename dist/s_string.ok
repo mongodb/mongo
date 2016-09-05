@@ -328,6 +328,7 @@ StoreLoad
 StoreStore
 TAILQ
 TCMalloc
+TESTUTIL
 TODO
 TORTIOUS
 TSO

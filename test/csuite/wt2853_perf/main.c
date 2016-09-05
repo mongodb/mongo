@@ -86,6 +86,9 @@ main(int argc, char *argv[])
 
 	opts = &_opts;
 	sharedopts = &_sharedopts;
+
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 	memset(sharedopts, 0, sizeof(*sharedopts));
 	memset(insert_args, 0, sizeof(insert_args));
