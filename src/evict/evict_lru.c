@@ -1399,7 +1399,7 @@ fast:		/* If the page can't be evicted, give up. */
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" WT_SIZET_FMT,
-		    page, page->memory_footprint);
+		    (void *)page, page->memory_footprint);
 	}
 	WT_RET_NOTFOUND_OK(ret);
 

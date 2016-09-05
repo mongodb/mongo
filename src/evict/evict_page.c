@@ -117,7 +117,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 
 	__wt_verbose(session, WT_VERB_EVICT,
-	    "page %p (%s)", page, __wt_page_type_string(page->type));
+	    "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
 	/*
 	 * Get exclusive access to the page and review it for conditions that

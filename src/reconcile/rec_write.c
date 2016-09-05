@@ -5637,7 +5637,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		__wt_verbose(session, WT_VERB_RECONCILE, "page %p empty", page);
+		__wt_verbose(
+		    session, WT_VERB_RECONCILE, "page %p empty", (void *)page);
 		WT_STAT_FAST_CONN_INCR(session, rec_page_delete);
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
@@ -5699,7 +5700,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	default:					/* Page split */
 		__wt_verbose(session, WT_VERB_RECONCILE,
 		    "page %p reconciled into %" PRIu32 " pages",
-		    page, r->bnd_next);
+		    (void *)page, r->bnd_next);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:

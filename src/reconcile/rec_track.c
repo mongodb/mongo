@@ -46,7 +46,7 @@ __ovfl_discard_verbose(
 	    "discard: %s%s%p %s",
 	    tag == NULL ? "" : tag,
 	    tag == NULL ? "" : ": ",
-	    page,
+	    (void *)page,
 	    __wt_addr_string(session, unpack->data, unpack->size, tmp));
 
 	__wt_scr_free(session, &tmp);
@@ -180,7 +180,7 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session,
 	    "reuse: %s%s%p %s (%s%s%s) {%.*s}",
 	    tag == NULL ? "" : tag,
 	    tag == NULL ? "" : ": ",
-	    page,
+	    (void *)page,
 	    __wt_addr_string(
 		session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size, tmp),
 	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) ? "inuse" : "",
@@ -578,7 +578,7 @@ __ovfl_txnc_verbose(WT_SESSION_IMPL *session,
 	    "txn-cache: %s%s%p %s %" PRIu64 " {%.*s}",
 	    tag == NULL ? "" : tag,
 	    tag == NULL ? "" : ": ",
-	    page,
+	    (void *)page,
 	    __wt_addr_string(
 		session, WT_OVFL_TXNC_ADDR(txnc), txnc->addr_size, tmp),
 	    txnc->current,
