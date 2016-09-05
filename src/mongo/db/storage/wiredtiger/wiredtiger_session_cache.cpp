@@ -297,13 +297,16 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         return;
     }
 
-    // This checks that we are only caching idle sessions and not something which might hold
-    // locks or otherwise prevent truncation.
     {
         WT_SESSION* ss = session->getSession();
         uint64_t range;
+        // This checks that we are only caching idle sessions and not something which might hold
+        // locks or otherwise prevent truncation.
         invariantWTOK(ss->transaction_pinned_range(ss, &range));
         invariant(range == 0);
+
+        // Release resources in the session we're about to cache.
+        invariantWTOK(ss->reset(ss));
     }
 
     // If the cursor epoch has moved on, close all cursors in the session.
