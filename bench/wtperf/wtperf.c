@@ -37,6 +37,7 @@ static const CONFIG default_cfg = {
 	NULL,				/* partial logging */
 	NULL,				/* reopen config */
 	NULL,				/* base_uri */
+	NULL,				/* log_table_uri */
 	NULL,				/* uris */
 	NULL,				/* conn */
 	NULL,				/* logf */
@@ -55,6 +56,7 @@ static const CONFIG default_cfg = {
 	0,				/* truncate operations */
 	0,				/* update operations */
 	0,				/* insert key */
+	0,				/* log like table key */
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
@@ -512,11 +514,11 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor, *tmp_cursor;
+	WT_CURSOR **cursors, *cursor, *log_table_cursor, *tmp_cursor;
 	WT_SESSION *session;
 	size_t i;
 	int64_t ops, ops_per_txn;
-	uint64_t next_val, usecs;
+	uint64_t log_id, next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
@@ -560,6 +562,16 @@ worker(void *arg)
 			goto err;
 		}
 	}
+	if (cfg->log_like_table) {
+		if ((ret = session->open_cursor(session,
+		    cfg->log_table_uri, NULL, NULL, &log_table_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "worker: WT_SESSION.open_cursor: %s",
+			    cfg->log_table_uri);
+			goto err;
+		}
+	}
+
 	/* Setup the timer for throttling. */
 	if (thread->workload->throttle != 0)
 		setup_throttle(thread);
@@ -575,7 +587,7 @@ worker(void *arg)
 	op = thread->workload->ops;
 	op_end = op + sizeof(thread->workload->ops);
 
-	if (ops_per_txn != 0 &&
+	if ((ops_per_txn != 0 || cfg->log_like_table) &&
 		(ret = session->begin_transaction(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "First transaction begin failed");
 		goto err;
@@ -768,6 +780,20 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			goto err;		/* can't happen */
 		}
 
+		/* Update the log-like table. */
+		if (cfg->log_like_table &&
+		    (*op != WORKER_READ && *op != WORKER_TRUNCATE)) {
+			log_id = __wt_atomic_add64(&cfg->log_like_table_key, 1);
+			log_table_cursor->set_key(log_table_cursor, log_id);
+			log_table_cursor->set_value(
+			    log_table_cursor, value_buf);
+			if ((ret =
+			    log_table_cursor->insert(log_table_cursor)) != 0) {
+				lprintf(cfg, ret, 0, "Cursor insert failed");
+				goto err;
+			}
+		}
+
 		/* Release the cursor, if we have multiple tables. */
 		if (cfg->table_count > 1 && ret == 0 &&
 		    *op != WORKER_INSERT && *op != WORKER_INSERT_RMW) {
@@ -793,8 +819,12 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			++trk->ops;
 		}
 
-		/* Commit our work if configured for explicit transactions */
-		if (ops_per_txn != 0 && ops++ % ops_per_txn == 0) {
+		/*
+		 * Commit the transaction if grouping operations together
+		 * or tracking changes in our log table.
+		 */
+		if ((cfg->log_like_table && ops_per_txn == 0) ||
+		    (ops_per_txn != 0 && ops++ % ops_per_txn == 0)) {
 			if ((ret = session->commit_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -819,6 +849,7 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 		 */
 		if (--thread->throttle_cfg.ops_count == 0)
 			worker_throttle(thread);
+
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -1879,6 +1910,10 @@ create_uris(CONFIG *cfg)
 		else
 			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
+
+	/* Create the log-like-table URI. */
+	cfg->log_table_uri = dcalloc(base_uri_len + 11, 1);
+	sprintf(cfg->log_table_uri, "%s_log_table", cfg->base_uri);
 }
 
 static int
@@ -1904,6 +1939,11 @@ create_tables(CONFIG *cfg)
 			    "Error creating idle table %s", buf);
 			return (ret);
 		}
+	}
+	if (cfg->log_like_table && (ret = session->create(session,
+	    cfg->log_table_uri, "key_format=Q,value_format=S")) != 0) {
+		lprintf(cfg, ret, 0, "Error creating log table %s", buf);
+		return (ret);
 	}
 
 	for (i = 0; i < cfg->table_count; i++) {
