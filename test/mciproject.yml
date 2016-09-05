@@ -128,6 +128,20 @@ tasks:
               ./test/fops/t
             fi
 
+  - name: format
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch binaries"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            # format assumes we run it from the format directory
+            cmd.exe /c "cd test\\format && ..\\..\\t_format.exe reverse=0 encryption=none logging_compression=none runs=20"
+
 buildvariants:
 - name: ubuntu1404
   display_name: Ubuntu 14.04
@@ -165,6 +179,7 @@ buildvariants:
     - name: compile
     - name: compile-windows-alt
     - name: unit-test
+    #- name: format  - Enable when we have a solution for hangs and crashses
     - name: fops
 
 - name: osx-1010

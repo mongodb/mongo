@@ -239,7 +239,7 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
-typedef struct {
+typedef struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) {
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
 	uint64_t search;			/* operations */
@@ -261,7 +261,7 @@ typedef struct {
 #define	TINFO_COMPLETE	2			/* Finished */
 #define	TINFO_JOINED	3			/* Resolved */
 	volatile int state;			/* state */
-} TINFO WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT);
+} TINFO;
 
 #ifdef HAVE_BERKELEY_DB
 void	 bdb_close(void);

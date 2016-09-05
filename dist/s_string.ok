@@ -643,6 +643,7 @@ extlist
 fadvise
 fallocate
 fblocks
+fc
 fclose
 fcntl
 fd

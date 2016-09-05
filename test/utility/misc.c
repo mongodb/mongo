@@ -82,12 +82,22 @@ testutil_clean_work_dir(char *dir)
 	int ret;
 	char *buf;
 
+#ifdef _WIN32
 	/* Additional bytes for the Windows rd command. */
+	len = 2 * strlen(dir) + strlen(RM_COMMAND) +
+		strlen(DIR_EXISTS_COMMAND) + 4;
+	if ((buf = malloc(len)) == NULL)
+		testutil_die(ENOMEM, "Failed to allocate memory");
+
+	snprintf(buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir,
+		 RM_COMMAND, dir);
+#else
 	len = strlen(dir) + strlen(RM_COMMAND) + 1;
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
+#endif
 
 	if ((ret = system(buf)) != 0 && ret != ENOENT)
 		testutil_die(ret, "%s", buf);
