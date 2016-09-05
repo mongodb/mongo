@@ -916,6 +916,9 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    "join cursor has not yet been joined with any other "
 		    "cursors");
 
+	/* Get a consistent view of our subordinate cursors if appropriate. */
+	WT_RET(__wt_txn_cursor_op(session));
+
 	if (F_ISSET((WT_CURSOR *)cjoin, WT_CURSTD_RAW))
 		config = &raw_cfg[0];
 	else
