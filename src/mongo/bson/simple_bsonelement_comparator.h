@@ -45,6 +45,11 @@ public:
     int compare(const BSONElement& lhs, const BSONElement& rhs) const final {
         return lhs.woCompare(rhs, true, nullptr);
     }
+
+    void hash_combine(size_t& seed, const BSONElement& toHash) const final {
+        const bool considerFieldName = true;
+        hashCombineBSONElement(seed, toHash, considerFieldName, nullptr);
+    }
 };
 
 }  // namespace mongo

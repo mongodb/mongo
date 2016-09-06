@@ -30,6 +30,10 @@
 
 #include "mongo/db/query/collation/collator_interface_mock.h"
 
+#include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
@@ -217,6 +221,158 @@ TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedMapOfStringsRespec
     ASSERT_EQ(map.size(), 2U);
     ASSERT_EQ(map["FoO"], 2);
     ASSERT_EQ(map["fooZ"], 3);
+}
+
+TEST(CollatorInterfaceMockSelfTest, BSONObjsEqualUnderCollatorHashEqually) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    SimpleBSONObjComparator bsonCmpConsiderCase;
+    BSONObjComparator bsonCmpIgnoreCase(
+        BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &toLowerCollator);
+    BSONObj obj1 = BSON("a"
+                        << "foo");
+    BSONObj obj2 = BSON("a"
+                        << "FOO");
+    ASSERT_NE(bsonCmpConsiderCase.hash(obj1), bsonCmpConsiderCase.hash(obj2));
+    ASSERT_EQ(bsonCmpIgnoreCase.hash(obj1), bsonCmpIgnoreCase.hash(obj2));
+}
+
+TEST(CollatorInterfaceMockSelfTest, BSONObjsEqualUnderCollatorHashEquallyNested) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    SimpleBSONObjComparator bsonCmpConsiderCase;
+    BSONObjComparator bsonCmpIgnoreCase(
+        BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &toLowerCollator);
+    BSONObj obj1 = BSON("a" << 1 << "b" << BSON("c"
+                                                << "foo"));
+    BSONObj obj2 = BSON("a" << 1 << "b" << BSON("c"
+                                                << "FOO"));
+    ASSERT_NE(bsonCmpConsiderCase.hash(obj1), bsonCmpConsiderCase.hash(obj2));
+    ASSERT_EQ(bsonCmpIgnoreCase.hash(obj1), bsonCmpIgnoreCase.hash(obj2));
+}
+
+TEST(CollatorInterfaceMockSelfTest, BSONElementsEqualUnderCollatorHashEqually) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    SimpleBSONElementComparator bsonCmpConsiderCase;
+    BSONElementComparator bsonCmpIgnoreCase(BSONElementComparator::FieldNamesMode::kConsider,
+                                            &toLowerCollator);
+    BSONObj obj1 = BSON("a"
+                        << "foo");
+    BSONObj obj2 = BSON("a"
+                        << "FOO");
+    BSONElement elt1 = obj1.firstElement();
+    BSONElement elt2 = obj2.firstElement();
+    ASSERT_NE(bsonCmpConsiderCase.hash(elt1), bsonCmpConsiderCase.hash(elt2));
+    ASSERT_EQ(bsonCmpIgnoreCase.hash(elt1), bsonCmpIgnoreCase.hash(elt2));
+}
+
+TEST(CollatorInterfaceMockSelfTest, BSONElementsEqualUnderCollatorHashEquallyNested) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    SimpleBSONElementComparator bsonCmpConsiderCase;
+    BSONElementComparator bsonCmpIgnoreCase(BSONElementComparator::FieldNamesMode::kConsider,
+                                            &toLowerCollator);
+    BSONObj obj1 = BSON("a" << BSON("b"
+                                    << "foo"
+                                    << "c"
+                                    << BSON("d"
+                                            << "BaR")));
+    BSONObj obj2 = BSON("a" << BSON("b"
+                                    << "FOO"
+                                    << "c"
+                                    << BSON("d"
+                                            << "bar")));
+    BSONElement elt1 = obj1.firstElement();
+    BSONElement elt2 = obj2.firstElement();
+    ASSERT_NE(bsonCmpConsiderCase.hash(elt1), bsonCmpConsiderCase.hash(elt2));
+    ASSERT_EQ(bsonCmpIgnoreCase.hash(elt1), bsonCmpIgnoreCase.hash(elt2));
+}
+
+TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedSetOfBSONObjRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    BSONObjComparator bsonCmpIgnoreCase(
+        BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &toLowerCollator);
+    auto set = bsonCmpIgnoreCase.makeBSONObjUnorderedSet();
+    set.insert(BSON("a"
+                    << "foo"));
+    set.insert(BSON("a"
+                    << "FOO"));
+    set.insert(BSON("a"
+                    << "FOOz"));
+    ASSERT_EQ(set.size(), 2U);
+    ASSERT_EQ(set.count(BSON("a"
+                             << "FoO")),
+              1U);
+    ASSERT_EQ(set.count(BSON("a"
+                             << "fooZ")),
+              1U);
+}
+
+TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedMapOfBSONObjRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    BSONObjComparator bsonCmpIgnoreCase(
+        BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &toLowerCollator);
+    auto map = bsonCmpIgnoreCase.makeBSONObjIndexedUnorderedMap<int>();
+    map[BSON("a"
+             << "foo")] = 1;
+    map[BSON("a"
+             << "FOO")] = 2;
+    map[BSON("a"
+             << "FOOz")] = 3;
+    ASSERT_EQ(map.size(), 2U);
+    ASSERT_EQ(map[BSON("a"
+                       << "FoO")],
+              2);
+    ASSERT_EQ(map[BSON("a"
+                       << "fooZ")],
+              3);
+}
+
+TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedSetOfBSONElementRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    BSONElementComparator bsonCmpIgnoreCase(BSONElementComparator::FieldNamesMode::kConsider,
+                                            &toLowerCollator);
+    auto set = bsonCmpIgnoreCase.makeBSONEltUnorderedSet();
+
+    BSONObj obj1 = BSON("a" << BSON("b"
+                                    << "foo"));
+    set.insert(obj1.firstElement());
+    BSONObj obj2 = BSON("a" << BSON("b"
+                                    << "FOO"));
+    set.insert(obj2.firstElement());
+    BSONObj obj3 = BSON("a" << BSON("b"
+                                    << "FOOz"));
+    set.insert(obj3.firstElement());
+
+    ASSERT_EQ(set.size(), 2U);
+    BSONObj obj4 = BSON("a" << BSON("b"
+                                    << "FoO"));
+    ASSERT_EQ(set.count(obj4.firstElement()), 1U);
+    BSONObj obj5 = BSON("a" << BSON("b"
+                                    << "fooZ"));
+    ASSERT_EQ(set.count(obj5.firstElement()), 1U);
+}
+
+TEST(CollatorInterfaceMockSelfTest, CollatorGeneratedUnorderedMapOfBSONElementRespectsCollation) {
+    CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
+    BSONElementComparator bsonCmpIgnoreCase(BSONElementComparator::FieldNamesMode::kConsider,
+                                            &toLowerCollator);
+    auto map = bsonCmpIgnoreCase.makeBSONEltIndexedUnorderedMap<int>();
+
+    BSONObj obj1 = BSON("a" << BSON("b"
+                                    << "foo"));
+    map[obj1.firstElement()] = 1;
+    BSONObj obj2 = BSON("a" << BSON("b"
+                                    << "FOO"));
+    map[obj2.firstElement()] = 2;
+    BSONObj obj3 = BSON("a" << BSON("b"
+                                    << "FOOz"));
+    map[obj3.firstElement()] = 3;
+
+    ASSERT_EQ(map.size(), 2U);
+    BSONObj obj4 = BSON("a" << BSON("b"
+                                    << "FoO"));
+    ASSERT_EQ(map[obj4.firstElement()], 2);
+    BSONObj obj5 = BSON("a" << BSON("b"
+                                    << "fooZ"));
+    ASSERT_EQ(map[obj5.firstElement()], 3);
 }
 
 }  // namespace

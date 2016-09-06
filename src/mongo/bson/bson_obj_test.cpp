@@ -25,6 +25,10 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/platform/decimal128.h"
@@ -507,6 +511,37 @@ TEST(BSONObjCompare, NumericBounds) {
 
     ASSERT_LT(l.woCompare(r), 0);
     ASSERT_GT(r.woCompare(l), 0);
+}
+
+TEST(BSONObjCompare, BSONObjHashingIgnoresTopLevelFieldNamesWhenRequested) {
+    BSONObj obj1 = fromjson("{a: {b: 1}, c: {d: 1}}");
+    BSONObj obj2 = fromjson("{A: {b: 1}, C: {d: 1}}");
+    BSONObj obj3 = fromjson("{A: {B: 1}, C: {D: 1}}");
+
+    SimpleBSONObjComparator bsonCmpConsiderFieldNames;
+    BSONObjComparator bsonCmpIgnoreFieldNames(
+        BSONObj(), BSONObjComparator::FieldNamesMode::kIgnore, nullptr);
+
+    ASSERT_NE(bsonCmpConsiderFieldNames.hash(obj1), bsonCmpConsiderFieldNames.hash(obj2));
+    ASSERT_EQ(bsonCmpIgnoreFieldNames.hash(obj1), bsonCmpIgnoreFieldNames.hash(obj2));
+    ASSERT_NE(bsonCmpIgnoreFieldNames.hash(obj1), bsonCmpIgnoreFieldNames.hash(obj3));
+}
+
+TEST(BSONObjCompare, BSONElementHashingIgnoresEltFieldNameWhenRequested) {
+    BSONObj obj1 = fromjson("{a: {b: 1}}");
+    BSONObj obj2 = fromjson("{A: {b: 1}}");
+    BSONObj obj3 = fromjson("{A: {B: 1}}");
+
+    SimpleBSONElementComparator bsonCmpConsiderFieldNames;
+    BSONElementComparator bsonCmpIgnoreFieldNames(BSONElementComparator::FieldNamesMode::kIgnore,
+                                                  nullptr);
+
+    ASSERT_NE(bsonCmpConsiderFieldNames.hash(obj1.firstElement()),
+              bsonCmpConsiderFieldNames.hash(obj2.firstElement()));
+    ASSERT_EQ(bsonCmpIgnoreFieldNames.hash(obj1.firstElement()),
+              bsonCmpIgnoreFieldNames.hash(obj2.firstElement()));
+    ASSERT_NE(bsonCmpIgnoreFieldNames.hash(obj1.firstElement()),
+              bsonCmpIgnoreFieldNames.hash(obj3.firstElement()));
 }
 
 TEST(Looping, Cpp11Basic) {

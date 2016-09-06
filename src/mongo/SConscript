@@ -69,6 +69,7 @@ baseSource=[
     'base/status.cpp',
     'base/string_data.cpp',
     'base/validate_locale.cpp',
+    'bson/bson_comparator_interface_base.cpp',
     'bson/bson_validate.cpp',
     'bson/bsonelement.cpp',
     'bson/bsonmisc.cpp',

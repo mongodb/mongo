@@ -66,6 +66,11 @@ public:
         return lhs.woCompare(rhs, _ordering, considerFieldName, _stringComparator);
     }
 
+    void hash_combine(size_t& seed, const BSONObj& toHash) const final {
+        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
+        hashCombineBSONObj(seed, toHash, considerFieldName, _stringComparator);
+    }
+
 private:
     BSONObj _ordering;
     FieldNamesMode _fieldNamesMode;

@@ -62,6 +62,11 @@ public:
         return lhs.woCompare(rhs, considerFieldName, _stringComparator);
     }
 
+    void hash_combine(size_t& seed, const BSONElement& toHash) const final {
+        const bool considerFieldName = (_fieldNamesMode == FieldNamesMode::kConsider);
+        hashCombineBSONElement(seed, toHash, considerFieldName, _stringComparator);
+    }
+
 private:
     FieldNamesMode _fieldNamesMode;
     const StringData::ComparatorInterface* _stringComparator;

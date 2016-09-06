@@ -38,6 +38,7 @@
 #include <memory>
 
 #include "mongo/base/counter.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -593,7 +594,7 @@ void fillWriterVectors(OperationContext* txn,
             // collation-aware hashing of BSONElement.
             if (supportsDocLocking && !collProperties.isCapped && !collProperties.collator) {
                 BSONElement id = op.getIdElement();
-                const size_t idHash = BSONElement::Hasher()(id);
+                const size_t idHash = SimpleBSONElementComparator::kInstance.hash(id);
                 MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
             }
 
