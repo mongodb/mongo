@@ -41,7 +41,7 @@ using unittest::assertGet;
 
 TEST(SplitChunkRequest, BasicValidConfigCommand) {
     auto request =
-        assertGet(SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+        assertGet(SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                  << "TestDB.TestColl"
                                                                  << "collEpoch"
                                                                  << OID("7fffffff0000000000000001")
@@ -62,7 +62,7 @@ TEST(SplitChunkRequest, BasicValidConfigCommand) {
 
 TEST(SplitChunkRequest, ValidWithMultipleSplits) {
     auto request = assertGet(SplitChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrSplitChunk"
+        BSON("_configsvrCommitChunkSplit"
              << "TestDB.TestColl"
              << "collEpoch"
              << OID("7fffffff0000000000000001")
@@ -83,7 +83,7 @@ TEST(SplitChunkRequest, ValidWithMultipleSplits) {
 }
 
 TEST(SplitChunkRequest, ConfigCommandtoBSON) {
-    BSONObj serializedRequest = BSON("_configsvrSplitChunk"
+    BSONObj serializedRequest = BSON("_configsvrCommitChunkSplit"
                                      << "TestDB.TestColl"
                                      << "collEpoch"
                                      << OID("7fffffff0000000000000001")
@@ -122,7 +122,7 @@ TEST(SplitChunkRequest, MissingNamespaceErrors) {
 }
 
 TEST(SplitChunkRequest, MissingCollEpochErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "min"
                                                                   << BSON("a" << 1)
@@ -136,7 +136,7 @@ TEST(SplitChunkRequest, MissingCollEpochErrors) {
 }
 
 TEST(SplitChunkRequest, MissingChunkToSplitErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -150,7 +150,7 @@ TEST(SplitChunkRequest, MissingChunkToSplitErrors) {
 }
 
 TEST(SplitChunkRequest, MissingSplitPointErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -164,7 +164,7 @@ TEST(SplitChunkRequest, MissingSplitPointErrors) {
 }
 
 TEST(SplitChunkRequest, MissingShardNameErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -178,20 +178,21 @@ TEST(SplitChunkRequest, MissingShardNameErrors) {
 }
 
 TEST(SplitChunkRequest, WrongNamespaceTypeErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON(
-        "_configsvrSplitChunk" << 1234 << "collEpoch" << OID("7fffffff0000000000000001") << "min"
-                               << BSON("a" << 1)
-                               << "max"
-                               << BSON("a" << 10)
-                               << "splitPoints"
-                               << BSON_ARRAY(BSON("a" << 5))
-                               << "shard"
-                               << "shard0000"));
+    auto request = SplitChunkRequest::parseFromConfigCommand(
+        BSON("_configsvrCommitChunkSplit" << 1234 << "collEpoch" << OID("7fffffff0000000000000001")
+                                          << "min"
+                                          << BSON("a" << 1)
+                                          << "max"
+                                          << BSON("a" << 10)
+                                          << "splitPoints"
+                                          << BSON_ARRAY(BSON("a" << 5))
+                                          << "shard"
+                                          << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
 TEST(SplitChunkRequest, WrongCollEpochTypeErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << 1234
@@ -207,7 +208,7 @@ TEST(SplitChunkRequest, WrongCollEpochTypeErrors) {
 }
 
 TEST(SplitChunkRequest, WrongChunkToSplitTypeErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -223,7 +224,7 @@ TEST(SplitChunkRequest, WrongChunkToSplitTypeErrors) {
 }
 
 TEST(SplitChunkRequest, WrongSplitPointTypeErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -239,7 +240,7 @@ TEST(SplitChunkRequest, WrongSplitPointTypeErrors) {
 }
 
 TEST(SplitChunkRequest, WrongShardNameTypeErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -255,7 +256,7 @@ TEST(SplitChunkRequest, WrongShardNameTypeErrors) {
 }
 
 TEST(SplitChunkRequest, InvalidNamespaceErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << ""
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -271,7 +272,7 @@ TEST(SplitChunkRequest, InvalidNamespaceErrors) {
 }
 
 TEST(SplitChunkRequest, EmptyChunkToSplitErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -287,7 +288,7 @@ TEST(SplitChunkRequest, EmptyChunkToSplitErrors) {
 }
 
 TEST(SplitChunkRequest, EmptySplitPointsErrors) {
-    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrSplitChunk"
+    auto request = SplitChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkSplit"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")

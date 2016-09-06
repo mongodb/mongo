@@ -40,7 +40,7 @@ using std::vector;
 
 namespace {
 
-const char kConfigsvrMergeChunk[] = "_configsvrMergeChunk";
+const char kConfigsvrMergeChunk[] = "_configsvrCommitChunkMerge";
 const char kCollEpoch[] = "collEpoch";
 const char kChunkBoundaries[] = "chunkBoundaries";
 const char kShardName[] = "shard";

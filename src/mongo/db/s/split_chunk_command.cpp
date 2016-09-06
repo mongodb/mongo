@@ -402,10 +402,10 @@ public:
         }
 
         //
-        // If _configsvrSplitChunk returned an error, look at this shard's metadata to determine if
-        // the split actually did happen. This can happen if there's a network error getting the
-        // response from the first call to _configsvrSplitChunk, but it actually succeeds, thus the
-        // automatic retry fails with a precondition violation, for example.
+        // If _configsvrCommitChunkSplit returned an error, look at this shard's metadata to
+        // determine if  the split actually did happen. This can happen if there's a network error
+        // getting the response from the first call to _configsvrCommitChunkSplit, but it actually
+        // succeeds, thus the automatic retry fails with a precondition violation, for example.
         //
         if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
             _checkMetadataForSuccess(txn, nss, chunkRange, splitKeys)) {

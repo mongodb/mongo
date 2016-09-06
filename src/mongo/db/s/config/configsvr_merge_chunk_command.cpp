@@ -52,7 +52,7 @@ using std::string;
  *
  * Format:
  * {
- *   _configsvrMergeChunk: <string namespace>,
+ *   _configsvrCommitChunkMerge: <string namespace>,
  *   collEpoch: <OID epoch>,
  *   chunkBoundaries: [
  *      <BSONObj key1>,
@@ -65,7 +65,7 @@ using std::string;
  */
 class ConfigSvrMergeChunkCommand : public Command {
 public:
-    ConfigSvrMergeChunkCommand() : Command("_configsvrMergeChunk") {}
+    ConfigSvrMergeChunkCommand() : Command("_configsvrCommitChunkMerge") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is sent by a shard to the sharding config server. Do "
@@ -106,7 +106,7 @@ public:
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrMergeChunk can only be run on config servers");
+                      "_configsvrCommitChunkMerge can only be run on config servers");
         }
 
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));

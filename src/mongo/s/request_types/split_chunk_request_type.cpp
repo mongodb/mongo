@@ -40,7 +40,7 @@ using std::vector;
 
 namespace {
 
-const char kConfigsvrSplitChunk[] = "_configsvrSplitChunk";
+const char kConfigsvrSplitChunk[] = "_configsvrCommitChunkSplit";
 const char kCollEpoch[] = "collEpoch";
 const char kSplitPoints[] = "splitPoints";
 const char kShardName[] = "shard";

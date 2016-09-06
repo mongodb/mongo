@@ -52,7 +52,7 @@ using std::string;
  *
  * Format:
  * {
- *   _configsvrSplitChunk: <string namespace>,
+ *   _configsvrCommitChunkSplit: <string namespace>,
  *   collEpoch: <OID epoch>,
  *   min: <BSONObj chunkToSplitMin>,
  *   max: <BSONObj chunkToSplitMax>,
@@ -63,7 +63,7 @@ using std::string;
  */
 class ConfigSvrSplitChunkCommand : public Command {
 public:
-    ConfigSvrSplitChunkCommand() : Command("_configsvrSplitChunk") {}
+    ConfigSvrSplitChunkCommand() : Command("_configsvrCommitChunkSplit") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is sent by a shard to the sharding config server. Do "
@@ -104,7 +104,7 @@ public:
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrSplitChunk can only be run on config servers");
+                      "_configsvrCommitChunkSplit can only be run on config servers");
         }
 
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));

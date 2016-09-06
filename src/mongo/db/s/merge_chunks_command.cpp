@@ -263,7 +263,7 @@ Status mergeChunks(OperationContext* txn,
     }
 
     //
-    // Run _configsvrMergeChunks.
+    // Run _configsvrCommitChunkMerge.
     //
     MergeChunkRequest request{
         nss, shardingState->getShardName(), shardVersion.epoch(), chunkBoundaries};
@@ -279,7 +279,7 @@ Status mergeChunks(OperationContext* txn,
 
     //
     // Refresh metadata to pick up new chunk definitions (regardless of the results returned from
-    // running _configsvrMergeChunk).
+    // running _configsvrCommitChunkMerge).
     //
     {
         ChunkVersion shardVersionAfterMerge;
@@ -301,10 +301,10 @@ Status mergeChunks(OperationContext* txn,
         return cmdResponseStatus.getStatus();
     }
 
-    // If _configsvrMergeChunk returned an error, look at this shard's metadata to determine if
-    // the merge actually did happen. This can happen if there's a network error getting the
-    // response from the first call to _configsvrMergeChunk, but it actually succeeds, thus the
-    // automatic retry fails with a precondition violation, for example.
+    // If _configsvrCommitChunkMerge returned an error, look at this shard's metadata to determine
+    // if the merge actually did happen. This can happen if there's a network error getting the
+    // response from the first call to _configsvrCommitChunkMerge, but it actually succeeds, thus
+    // the automatic retry fails with a precondition violation, for example.
     auto commandStatus = std::move(cmdResponseStatus.getValue().commandStatus);
     auto writeConcernStatus = std::move(cmdResponseStatus.getValue().writeConcernStatus);
 

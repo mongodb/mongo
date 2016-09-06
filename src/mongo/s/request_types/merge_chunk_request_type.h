@@ -49,11 +49,11 @@ public:
                       std::vector<BSONObj> chunkBoundaries);
 
     /**
-     * Parses the provided BSON content as the internal _configsvrMergeChunk command, and if
+     * Parses the provided BSON content as the internal _configsvrCommitChunkMerge command, and if
      * it contains the correct types, constructs a MergeChunkRequest object from it.
      *
      * {
-     *   _configsvrMergeChunk: <NamespaceString nss>,
+     *   _configsvrCommitChunkMerge: <NamespaceString nss>,
      *   collEpoch: <OID epoch>,
      *   chunkBoundaries: [
      *       <BSONObj key1>,
@@ -73,7 +73,7 @@ public:
     BSONObj toConfigCommandBSON(const BSONObj& writeConcern);
 
     /**
-     * Creates a serialized BSONObj of the internal _configsvrMergeChunk command from this
+     * Creates a serialized BSONObj of the internal _configsvCommitChunkMerge command from this
      * MergeChunkRequest instance.
      */
     void appendAsConfigCommand(BSONObjBuilder* cmdBuilder);

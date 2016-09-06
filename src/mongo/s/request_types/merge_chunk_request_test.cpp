@@ -41,7 +41,7 @@ using unittest::assertGet;
 
 TEST(MergeChunkRequest, BasicValidConfigCommand) {
     auto request = assertGet(MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "collEpoch"
              << OID("7fffffff0000000000000001")
@@ -59,7 +59,7 @@ TEST(MergeChunkRequest, BasicValidConfigCommand) {
 
 TEST(MergeChunkRequest, ConfigCommandtoBSON) {
     BSONObj serializedRequest =
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "collEpoch"
              << OID("7fffffff0000000000000001")
@@ -93,7 +93,7 @@ TEST(MergeChunkRequest, MissingNameSpaceErrors) {
 
 TEST(MergeChunkRequest, MissingCollEpochErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "chunkBoundaries"
              << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
@@ -103,7 +103,7 @@ TEST(MergeChunkRequest, MissingCollEpochErrors) {
 }
 
 TEST(MergeChunkRequest, MissingChunkBoundariesErrors) {
-    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrMergeChunk"
+    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkMerge"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -114,7 +114,7 @@ TEST(MergeChunkRequest, MissingChunkBoundariesErrors) {
 
 TEST(MergeChunkRequest, MissingShardNameErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "collEpoch"
              << OID("7fffffff0000000000000001")
@@ -124,18 +124,19 @@ TEST(MergeChunkRequest, MissingShardNameErrors) {
 }
 
 TEST(MergeChunkRequest, WrongNamespaceTypeErrors) {
-    auto request = MergeChunkRequest::parseFromConfigCommand(BSON(
-        "_configsvrMergeChunk" << 1234 << "collEpoch" << OID("7fffffff0000000000000001")
-                               << "chunkBoundaries"
-                               << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
-                               << "shard"
-                               << "shard0000"));
+    auto request = MergeChunkRequest::parseFromConfigCommand(
+        BSON("_configsvrCommitChunkMerge" << 1234 << "collEpoch" << OID("7fffffff0000000000000001")
+                                          << "chunkBoundaries"
+                                          << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5)
+                                                                       << BSON("a" << 10))
+                                          << "shard"
+                                          << "shard0000"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
 TEST(MergeChunkRequest, WrongCollEpochTypeErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "collEpoch"
              << 1234
@@ -147,7 +148,7 @@ TEST(MergeChunkRequest, WrongCollEpochTypeErrors) {
 }
 
 TEST(MergeChunkRequest, WrongChunkBoundariesTypeErrors) {
-    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrMergeChunk"
+    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkMerge"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -160,7 +161,7 @@ TEST(MergeChunkRequest, WrongChunkBoundariesTypeErrors) {
 
 TEST(MergeChunkRequest, WrongShardNameTypeErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "collEpoch"
              << OID("7fffffff0000000000000001")
@@ -173,7 +174,7 @@ TEST(MergeChunkRequest, WrongShardNameTypeErrors) {
 
 TEST(MergeChunkRequest, InvalidNamespaceErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << ""
              << "collEpoch"
              << OID("7fffffff0000000000000001")
@@ -185,7 +186,7 @@ TEST(MergeChunkRequest, InvalidNamespaceErrors) {
 }
 
 TEST(MergeChunkRequest, EmptyChunkBoundariesErrors) {
-    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrMergeChunk"
+    auto request = MergeChunkRequest::parseFromConfigCommand(BSON("_configsvrCommitChunkMerge"
                                                                   << "TestDB.TestColl"
                                                                   << "collEpoch"
                                                                   << OID("7fffffff0000000000000001")
@@ -198,7 +199,7 @@ TEST(MergeChunkRequest, EmptyChunkBoundariesErrors) {
 
 TEST(MergeChunkRequest, TooFewChunkBoundariesErrors) {
     auto request = MergeChunkRequest::parseFromConfigCommand(
-        BSON("_configsvrMergeChunk"
+        BSON("_configsvrCommitChunkMerge"
              << "TestDB.TestColl"
              << "collEpoch"
              << OID("7fffffff0000000000000001")
