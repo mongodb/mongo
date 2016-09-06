@@ -22,6 +22,10 @@ env.Program('console_test', 'console_test.cpp',
                 LIBDEPS=['$BUILD_DIR/mongo/base',
                          '$BUILD_DIR/mongo/unittest/unittest_main'])
 
+env.CppUnitTest('log_component_settings_test', 'log_component_settings_test.cpp',
+                LIBDEPS=['$BUILD_DIR/mongo/base',
+                         '$BUILD_DIR/mongo/unittest/concurrency'])
+
 env.CppUnitTest('log_test', 'log_test.cpp',
                 LIBDEPS=['$BUILD_DIR/mongo/base'])
 
