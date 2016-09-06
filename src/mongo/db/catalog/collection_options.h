@@ -111,7 +111,7 @@ struct CollectionOptions {
     std::string validationAction;
     std::string validationLevel;
 
-    // The collection's default collation.
+    // The namespace's default collation.
     BSONObj collation;
 
     // View-related options.

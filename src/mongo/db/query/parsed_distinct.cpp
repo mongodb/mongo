@@ -81,11 +81,6 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     }
     aggregationBuilder.append(kCollationField, qr.getCollation());
 
-    // TODO(SERVER-25186): Views may not override the collation of the underlying collection.
-    if (!qr.getCollation().isEmpty())
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << kCollationField << " cannot be specified on a view"};
-
     // Specify the 'cursor' option so that aggregation uses the cursor interface.
     aggregationBuilder.append("cursor", BSONObj());
 

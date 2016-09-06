@@ -88,7 +88,7 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
         bool valid = true;
         for (const BSONElement& e : viewDef) {
             std::string name(e.fieldName());
-            valid &= name == "_id" || name == "viewOn" || name == "pipeline";
+            valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation";
         }
         NamespaceString viewName(viewDef["_id"].str());
         valid &= viewName.isValid() && viewName.db() == _db->name();
@@ -100,6 +100,9 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
             valid &= viewDef["pipeline"].type() == mongo::Array;
         }
 
+        valid &=
+            (!viewDef.hasField("collation") || viewDef["collation"].type() == BSONType::Object);
+
         if (!valid) {
             return {ErrorCodes::InvalidViewDefinition,
                     str::stream() << "found invalid view definition " << viewDef["_id"]
@@ -108,7 +111,10 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
                                   << "'"};
         }
 
-        callback(viewDef);
+        Status callbackStatus = callback(viewDef);
+        if (!callbackStatus.isOK()) {
+            return callbackStatus;
+        }
     }
     return Status::OK();
 }

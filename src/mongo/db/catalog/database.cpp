@@ -547,7 +547,7 @@ Status Database::createView(OperationContext* txn,
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid namespace name for a view: " + nss.toString());
 
-    return _views.createView(txn, nss, viewOnNss, BSONArray(options.pipeline));
+    return _views.createView(txn, nss, viewOnNss, BSONArray(options.pipeline), options.collation);
 }
 
 

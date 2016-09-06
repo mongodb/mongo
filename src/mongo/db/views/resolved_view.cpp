@@ -67,12 +67,6 @@ ResolvedView ResolvedView::fromBSON(BSONObj commandResponseObj) {
 
 StatusWith<BSONObj> ResolvedView::asExpandedViewAggregation(
     const AggregationRequest& request) const {
-    if (!request.getCollation().isEmpty()) {
-        // TODO(SERVER-25186): Views may not override the collation of the underlying collection.
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "collation not supported on a view."};
-    }
-
     BSONObjBuilder aggregationBuilder;
     // Perform the aggregation on the resolved namespace.
     aggregationBuilder.append("aggregate", _namespace.coll());

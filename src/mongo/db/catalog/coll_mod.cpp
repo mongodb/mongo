@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/coll_mod.h"
 
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/background.h"
@@ -57,12 +58,9 @@ Status collMod(OperationContext* txn,
     Collection* coll = db ? db->getCollection(nss) : nullptr;
 
     // May also modify a view instead of a collection.
-    boost::optional<ViewDefinition> view;
+    std::shared_ptr<ViewDefinition> view;
     if (db && !coll) {
-        auto sharedView = db->getViewCatalog()->lookup(txn, nss.ns());
-        if (sharedView) {
-            view = {*sharedView};
-        }
+        view = db->getViewCatalog()->lookup(txn, nss.ns());
     }
 
     // This can kill all cursors so don't allow running it while a background operation is in

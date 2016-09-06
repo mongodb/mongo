@@ -30,6 +30,8 @@
 
 #include "mongo/db/views/view.h"
 
+#include <memory>
+
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -37,12 +39,19 @@ namespace mongo {
 ViewDefinition::ViewDefinition(StringData dbName,
                                StringData viewName,
                                StringData viewOnName,
-                               const BSONObj& pipeline)
-    : _viewNss(dbName, viewName), _viewOnNss(dbName, viewOnName) {
+                               const BSONObj& pipeline,
+                               std::unique_ptr<CollatorInterface> collator)
+    : _viewNss(dbName, viewName), _viewOnNss(dbName, viewOnName), _collator(std::move(collator)) {
     for (BSONElement e : pipeline) {
         _pipeline.push_back(e.Obj().getOwned());
     }
 }
+
+ViewDefinition::ViewDefinition(const ViewDefinition& other)
+    : _viewNss(other._viewNss),
+      _viewOnNss(other._viewOnNss),
+      _collator(CollatorInterface::cloneCollator(other._collator.get())),
+      _pipeline(other._pipeline) {}
 
 void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
     invariant(_viewNss.db() == viewOnNss.db());

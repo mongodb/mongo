@@ -61,8 +61,7 @@
     assert.eq(explainPlan["stages"][0]["$cursor"]["queryPlanner"]["namespace"],
               "views_distinct.coll");
 
-    // TODO(SERVER-25186): Cannot specify a collation when running distinct on a view.
     assert.commandFailedWithCode(
         viewsDB.runCommand({distinct: "identityView", key: "state", collation: {locale: "en_US"}}),
-        ErrorCodes.InvalidPipelineOperator);
+        ErrorCodes.OptionNotSupportedOnView);
 }());

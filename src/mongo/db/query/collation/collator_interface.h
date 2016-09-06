@@ -148,6 +148,16 @@ public:
         return (*lhs == *rhs);
     }
 
+    /**
+     * Returns a clone of 'collator'. If 'collator' is nullptr, returns the null collator.
+     */
+    static std::unique_ptr<CollatorInterface> cloneCollator(const CollatorInterface* collator) {
+        if (!collator) {
+            return {nullptr};
+        }
+        return collator->clone();
+    }
+
 protected:
     static ComparisonKey makeComparisonKey(std::string key) {
         return ComparisonKey(std::move(key));

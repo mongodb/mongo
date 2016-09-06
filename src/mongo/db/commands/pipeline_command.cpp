@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
@@ -268,6 +269,35 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
     return reparsedPipeline.getValue();
 }
 
+/**
+ * Returns Status::OK if each view namespace in 'pipeline' has a default collator equivalent to
+ * 'collator'. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
+ */
+Status collatorCompatibleWithPipeline(OperationContext* txn,
+                                      Database* db,
+                                      const CollatorInterface* collator,
+                                      const intrusive_ptr<Pipeline> pipeline) {
+    if (!db || !pipeline) {
+        return Status::OK();
+    }
+    for (auto&& potentialViewNs : pipeline->getInvolvedCollections()) {
+        if (db->getCollection(potentialViewNs.ns())) {
+            continue;
+        }
+
+        auto view = db->getViewCatalog()->lookup(txn, potentialViewNs.ns());
+        if (!view) {
+            continue;
+        }
+        if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collator)) {
+            return {ErrorCodes::OptionNotSupportedOnView,
+                    str::stream() << "Cannot override default collation of view "
+                                  << potentialViewNs.ns()};
+        }
+    }
+    return Status::OK();
+}
+
 class PipelineCommand : public Command {
 public:
     PipelineCommand()
@@ -365,6 +395,23 @@ public:
             // prohibit yielding.)
             auto view = ctx.getView();
             if (view && !startsWithCollStats()) {
+                // Check that the default collation of 'view' is compatible with the
+                // operation's collation. The check is skipped if the 'request' has the empty
+                // collation, which means that no collation was specified.
+                if (!request.getCollation().isEmpty()) {
+                    auto operationCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                                 ->makeFromBSON(request.getCollation());
+                    if (!operationCollator.isOK()) {
+                        return appendCommandStatus(result, operationCollator.getStatus());
+                    }
+                    if (!CollatorInterface::collatorsMatch(view->defaultCollator(),
+                                                           operationCollator.getValue().get())) {
+                        return appendCommandStatus(result,
+                                                   {ErrorCodes::OptionNotSupportedOnView,
+                                                    "Cannot override a view's default collation"});
+                    }
+                }
+
                 auto viewDefinition =
                     ViewShardingCheck::getResolvedViewIfSharded(txn, ctx.getDb(), view);
                 if (!viewDefinition.isOK()) {
@@ -394,6 +441,9 @@ public:
                 if (!newRequest.isOK()) {
                     return appendCommandStatus(result, newRequest.getStatus());
                 }
+                newRequest.getValue().setCollation(view->defaultCollator()
+                                                       ? view->defaultCollator()->getSpec().toBSON()
+                                                       : CollationSpec::kSimpleSpec);
 
                 bool status = runParsed(
                     txn, origNss, newRequest.getValue(), newCmd.getValue(), errmsg, result);
@@ -412,6 +462,14 @@ public:
                 collection->getDefaultCollator()) {
                 invariant(!expCtx->getCollator());
                 expCtx->setCollator(collection->getDefaultCollator()->clone());
+            }
+
+            // Check that the view's collation matches the collation of any views involved
+            // in the pipeline.
+            auto pipelineCollationStatus =
+                collatorCompatibleWithPipeline(txn, ctx.getDb(), expCtx->getCollator(), pipeline);
+            if (!pipelineCollationStatus.isOK()) {
+                return appendCommandStatus(result, pipelineCollationStatus);
             }
 
             // Propagate the ExpressionContext throughout all of the pipeline's stages and

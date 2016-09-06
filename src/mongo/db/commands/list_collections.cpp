@@ -128,8 +128,15 @@ BSONObj buildViewBson(const ViewDefinition& view) {
     BSONObjBuilder b;
     b.append("name", view.name().coll());
     b.append("type", "view");
-    BSONObj options = BSON("viewOn" << view.viewOn().coll() << "pipeline" << view.pipeline());
-    b.append("options", options);
+
+    BSONObjBuilder optionsBuilder(b.subobjStart("options"));
+    optionsBuilder.append("viewOn", view.viewOn().coll());
+    optionsBuilder.append("pipeline", view.pipeline());
+    if (view.defaultCollator()) {
+        optionsBuilder.append("collation", view.defaultCollator()->getSpec().toBSON());
+    }
+    optionsBuilder.doneFast();
+
     BSONObj info = BSON("readOnly" << true);
     b.append("info", info);
     return b.obj();

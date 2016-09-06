@@ -53,11 +53,9 @@
     assert.commandWorked(explainPlan);
     assert.eq(explainPlan["stages"][0]["$cursor"]["queryPlanner"]["namespace"], "views_count.coll");
 
-    // TODO(SERVER-25186): For now, views may not override the collation of the underling
-    // collection.
     assert.commandFailedWithCode(
         viewsDB.runCommand({count: "identityView", collation: {locale: "en_US"}}),
-        ErrorCodes.InvalidPipelineOperator);
+        ErrorCodes.OptionNotSupportedOnView);
 
     // Hint cannot be used when counting on a view.
     assert.commandFailedWithCode(viewsDB.runCommand({count: "identityView", hint: "_id_"}),
