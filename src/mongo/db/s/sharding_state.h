@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -149,9 +149,10 @@ public:
     CollectionShardingState* getNS(const std::string& ns, OperationContext* txn);
 
     /**
-     * Clears the collection metadata cache after step down.
+     * Iterates through all known sharded collections and marks them (in memory only) as not sharded
+     * so that no filtering will be happening for slaveOk queries.
      */
-    void clearCollectionMetadata();
+    void markCollectionsNotShardedAtStepdown();
 
     /**
      * Refreshes the local metadata based on whether the expected version is higher than what we
@@ -199,12 +200,6 @@ public:
      */
     Status updateShardIdentityConfigString(OperationContext* txn,
                                            const std::string& newConnectionString);
-
-    /**
-     * TESTING ONLY
-     * Uninstalls the metadata for a given collection.
-     */
-    void resetMetadata(const std::string& ns);
 
     /**
      * If there are no migrations running on this shard, registers an active migration with the
@@ -281,7 +276,7 @@ private:
     friend class ScopedRegisterMigration;
 
     // Map from a namespace into the sharding state for each collection we have
-    typedef std::map<std::string, std::unique_ptr<CollectionShardingState>>
+    typedef std::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>
         CollectionShardingStateMap;
 
     // Progress of the sharding state initialization

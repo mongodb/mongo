@@ -165,6 +165,10 @@ void CollectionShardingState::refreshMetadata(OperationContext* txn,
     _metadataManager.refreshActiveMetadata(std::move(newMetadata));
 }
 
+void CollectionShardingState::markNotShardedAtStepdown() {
+    _metadataManager.refreshActiveMetadata(nullptr);
+}
+
 void CollectionShardingState::beginReceive(const ChunkRange& range) {
     _metadataManager.beginReceive(range);
 }

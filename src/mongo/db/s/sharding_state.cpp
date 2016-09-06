@@ -241,17 +241,12 @@ CollectionShardingState* ShardingState::getNS(const std::string& ns, OperationCo
     return it->second.get();
 }
 
-void ShardingState::clearCollectionMetadata() {
+void ShardingState::markCollectionsNotShardedAtStepdown() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _collections.clear();
-}
-
-void ShardingState::resetMetadata(const string& ns) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    warning() << "resetting metadata for " << ns << ", this should only be used in testing";
-
-    _collections.erase(ns);
+    for (auto& coll : _collections) {
+        auto& css = coll.second;
+        css->markNotShardedAtStepdown();
+    }
 }
 
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {

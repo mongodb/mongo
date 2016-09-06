@@ -99,6 +99,12 @@ public:
     void refreshMetadata(OperationContext* txn, std::unique_ptr<CollectionMetadata> newMetadata);
 
     /**
+     * Marks the collection as not sharded at stepdown time so that no filtering will occur for
+     * slaveOk queries.
+     */
+    void markNotShardedAtStepdown();
+
+    /**
      * Modifies the collection's sharding state to indicate that it is beginning to receive the
      * given ChunkRange.
      */

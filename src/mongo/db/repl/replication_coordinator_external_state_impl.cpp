@@ -622,7 +622,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         Balancer::get(getGlobalServiceContext())->stopThread();
     }
 
-    ShardingState::get(getGlobalServiceContext())->clearCollectionMetadata();
+    ShardingState::get(getGlobalServiceContext())->markCollectionsNotShardedAtStepdown();
 }
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
@@ -708,7 +708,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
     // There is a slight chance that some stale metadata might have been loaded before the latest
     // optime has been recovered, so throw out everything that we have up to now
-    ShardingState::get(txn)->clearCollectionMetadata();
+    ShardingState::get(txn)->markCollectionsNotShardedAtStepdown();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
