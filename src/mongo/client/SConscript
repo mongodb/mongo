@@ -179,13 +179,13 @@ env.Library(
 env.Library(
     target='remote_command_targeter',
     source=[
-        'remote_command_targeter.cpp',
         'remote_command_targeter_factory_impl.cpp',
         'remote_command_targeter_rs.cpp',
         'remote_command_targeter_standalone.cpp',
     ],
     LIBDEPS=[
         'clientdriver',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 

@@ -685,8 +685,7 @@ Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
     }
 
     // TODO: Pass down an OperationContext* to use here.
-    auto findHostStatus = shard->getTargeter()->findHost(
-        readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(nullptr));
+    auto findHostStatus = shard->getTargeter()->findHostWithMaxWait(readPref, Seconds{20});
     if (!findHostStatus.isOK()) {
         return findHostStatus.getStatus();
     }

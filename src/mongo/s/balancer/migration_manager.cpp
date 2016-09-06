@@ -327,8 +327,7 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
 
     const auto fromShard = fromShardStatus.getValue();
     auto fromHostStatus =
-        fromShard->getTargeter()->findHost(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+        fromShard->getTargeter()->findHost(txn, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!fromHostStatus.isOK()) {
         return std::make_shared<Notification<Status>>(std::move(fromHostStatus.getStatus()));
     }

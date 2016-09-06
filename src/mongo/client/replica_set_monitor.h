@@ -80,6 +80,8 @@ public:
      *   wait for one to become available for up to the specified time and periodically refresh
      *   the view of the set. The call may return with an error earlier than the specified value,
      *   if none of the known hosts for the set are reachable within some number of attempts.
+     *   Note that if a maxWait of 0ms is specified, this method may still attempt to contact
+     *   every host in the replica set up to one time.
      *
      * Known errors are:
      *  FailedToSatisfyReadPreference, if node cannot be found, which matches the read preference.

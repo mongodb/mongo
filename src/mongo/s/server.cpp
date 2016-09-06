@@ -131,6 +131,7 @@ static ExitCode initService();
 // prior execution of mongo initializers or the existence of threads.
 static void cleanupTask() {
     {
+        auto serviceContext = getGlobalServiceContext();
         Client::initThreadIfNotAlready();
         Client& client = cc();
         ServiceContext::UniqueOperationContext uniqueTxn;
@@ -139,6 +140,9 @@ static void cleanupTask() {
             uniqueTxn = client.makeOperationContext();
             txn = uniqueTxn.get();
         }
+
+        if (serviceContext)
+            serviceContext->setKillAllOperations();
 
         auto cursorManager = grid.getCursorManager();
         cursorManager->shutdown();

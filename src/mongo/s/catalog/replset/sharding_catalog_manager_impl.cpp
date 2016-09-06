@@ -325,8 +325,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
     RemoteCommandTargeter* targeter,
     const std::string& dbName,
     const BSONObj& cmdObj) {
-    auto host = targeter->findHost(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                   RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+    auto host = targeter->findHost(txn, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -1712,8 +1711,8 @@ void ShardingCatalogManagerImpl::_scheduleAddShardTask(
 
     // Schedule the shardIdentity upsert request to run immediately, and track the handle.
 
-    auto swHost = targeter->findHost(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                     Milliseconds(kDefaultFindHostMaxWaitTime));
+    auto swHost = targeter->findHostWithMaxWait(ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                Milliseconds(kDefaultFindHostMaxWaitTime));
     if (!swHost.isOK()) {
         // A 3.2 mongos must have previously successfully communicated with hosts in this shard,
         // so a failure to find a host here is probably transient, and it is safe to retry.

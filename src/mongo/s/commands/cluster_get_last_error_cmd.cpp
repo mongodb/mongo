@@ -117,7 +117,7 @@ public:
                 break;
             }
             auto shard = shardStatus.getValue();
-            auto swHostAndPort = shard->getTargeter()->findHost(readPref);
+            auto swHostAndPort = shard->getTargeter()->findHostNoWait(readPref);
             if (!swHostAndPort.isOK()) {
                 status = swHostAndPort.getStatus();
                 break;

@@ -198,7 +198,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
         }
         auto recipientShard = recipientShardStatus.getValue();
 
-        auto shardHostStatus = recipientShard->getTargeter()->findHost(
+        auto shardHostStatus = recipientShard->getTargeter()->findHostNoWait(
             ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         if (!shardHostStatus.isOK()) {
             return shardHostStatus.getStatus();

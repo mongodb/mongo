@@ -36,6 +36,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -59,9 +60,32 @@ ConnectionString RemoteCommandTargeterRS::connectionString() {
     return fassertStatusOK(28712, ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref,
-                                                          Milliseconds maxWait) {
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
+    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _rsMonitor->getHostOrRefresh(readPref, maxWait);
+}
+
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* txn,
+                                                          const ReadPreferenceSetting& readPref) {
+    auto clock = txn->getServiceContext()->getFastClockSource();
+    auto startDate = clock->now();
+    while (true) {
+        const auto interruptStatus = txn->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+        const auto host = _rsMonitor->getHostOrRefresh(readPref, Milliseconds::zero());
+        if (host.getStatus() != ErrorCodes::FailedToSatisfyReadPreference) {
+            return host;
+        }
+        // Enforce a 20-second ceiling on the time spent looking for a host. This conforms with the
+        // behavior used throughout mongos prior to version 3.4, but is not fundamentally desirable.
+        // See comment in remote_command_targeter.h for details.
+        if (clock->now() - startDate > Seconds{20}) {
+            return host;
+        }
+        sleepFor(Milliseconds{500});
+    }
 }
 
 void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host) {

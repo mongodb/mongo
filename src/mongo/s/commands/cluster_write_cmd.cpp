@@ -271,7 +271,7 @@ private:
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
-            auto swHostAndPort = shardStatus.getValue()->getTargeter()->findHost(readPref);
+            auto swHostAndPort = shardStatus.getValue()->getTargeter()->findHostNoWait(readPref);
             if (!swHostAndPort.isOK()) {
                 return swHostAndPort.getStatus();
             }

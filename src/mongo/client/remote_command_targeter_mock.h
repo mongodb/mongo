@@ -54,8 +54,11 @@ public:
      * Returns the return value last set by setFindHostReturnValue.
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     Milliseconds maxWait) override;
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override;
+
+    StatusWith<HostAndPort> findHost(OperationContext* txn,
+                                     const ReadPreferenceSetting& readPref) override;
 
     /**
      * No-op for the mock.

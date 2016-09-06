@@ -176,8 +176,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
     if (getId() == "config") {
         readPrefWithMinOpTime.minOpTime = grid.configOpTime();
     }
-    const auto host = _targeter->findHost(readPrefWithMinOpTime,
-                                          RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+    const auto host = _targeter->findHost(txn, readPrefWithMinOpTime);
     if (!host.isOK()) {
         return Shard::HostWithResponse(boost::none, host.getStatus());
     }
@@ -244,8 +243,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
     readPrefWithMinOpTime.minOpTime = grid.configOpTime();
 
-    const auto host = _targeter->findHost(readPrefWithMinOpTime,
-                                          RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+    const auto host = _targeter->findHost(txn, readPrefWithMinOpTime);
     if (!host.isOK()) {
         return host.getStatus();
     }

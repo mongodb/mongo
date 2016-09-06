@@ -47,9 +47,14 @@ public:
         return _mock->connectionString();
     }
 
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     Milliseconds maxWait) override {
-        return _mock->findHost(readPref, maxWait);
+    StatusWith<HostAndPort> findHost(OperationContext* txn,
+                                     const ReadPreferenceSetting& readPref) override {
+        return _mock->findHost(txn, readPref);
+    }
+
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override {
+        return _mock->findHostWithMaxWait(readPref, maxWait);
     }
 
     void markHostNotMaster(const HostAndPort& host) override {

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -58,19 +59,38 @@ public:
     virtual ConnectionString connectionString() = 0;
 
     /**
-     * Obtains a host, which matches the read preferences specified by readPref, blocking for the
+     * Finds a host matching readPref blocking up to 20 seconds or until the given operation is
+     * interrupted or its deadline expires.
+     *
+     * TODO(schwerin): Once operation max-time behavior is more uniformly integrated into sharding,
+     * remove the 20-second ceiling on wait time.
+     */
+    virtual StatusWith<HostAndPort> findHost(OperationContext* txn,
+                                             const ReadPreferenceSetting& readPref) = 0;
+
+
+    /**
+     * Finds a host that matches the read preference specified by readPref, blocking for up to
      * specified maxWait milliseconds, if a match cannot be found immediately.
      *
-     * Specifying a maxWait of zero means non-blocking. I.e., the call will just check the in-memory
-     * cached view of the replica set's host state and won't wait for it to be refreshed if it is
-     * found to be stale.
-     *
-     * Returns OK and a host and port to use for the specified read preference or an ErrorCode.
-     * Known error codes are:
-     *   All error codes which can be returned by ReplicaSetMonitor::getHostOrRefresh.
+     * DEPRECATED. Prefer findHost(OperationContext*, const ReadPreferenceSetting&), whenever
+     * an OperationContext is available.
      */
-    virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                             Milliseconds maxWait = Milliseconds(0)) = 0;
+    virtual StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                        Milliseconds maxWait) = 0;
+
+    /**
+     * Finds a host matching the given read preference, giving up if a match is not found promptly.
+     *
+     * This method may still engage in blocking networking calls, but will attempt contact every
+     * member of the replica set at most one time.
+     *
+     * TODO(schwerin): Change this implementation to not perform any networking, once existing
+     * callers have been shown to be safe with this behavior or changed to call findHost.
+     */
+    StatusWith<HostAndPort> findHostNoWait(const ReadPreferenceSetting& readPref) {
+        return findHostWithMaxWait(readPref, Milliseconds::zero());
+    }
 
     /**
      * Reports to the targeter that a NotMaster response was received when communicating with
@@ -85,14 +105,6 @@ public:
      * giving out the same host on a subsequent request.
      */
     virtual void markHostUnreachable(const HostAndPort& host) = 0;
-
-    /**
-     * Based on the remaining time of the operation and the default max wait time for findHost,
-     * selects an appropriate value to pass to the maxWait argument of the findHost method, so it
-     * has high likelyhood in returning on time and also leaving time for the rest of the call to
-     * complete.
-     */
-    static Milliseconds selectFindHostMaxWaitTime(OperationContext* txn);
 
 protected:
     RemoteCommandTargeter() = default;

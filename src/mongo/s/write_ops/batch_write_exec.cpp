@@ -190,7 +190,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                 } else {
                     auto shard = shardStatus.getValue();
 
-                    auto swHostAndPort = shard->getTargeter()->findHost(readPref);
+                    auto swHostAndPort = shard->getTargeter()->findHostNoWait(readPref);
                     if (!swHostAndPort.isOK()) {
 
                         // Record a resolve failure
