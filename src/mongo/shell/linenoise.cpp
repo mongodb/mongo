@@ -101,6 +101,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
@@ -2762,10 +2763,16 @@ int linenoiseHistorySetMaxLen(int len) {
 /* Save the history in the specified file. On success 0 is returned
  * otherwise -1 is returned. */
 int linenoiseHistorySave(const char* filename) {
+    mode_t old_umask = umask(S_IXUSR|S_IRWXG|S_IRWXO);
+
     FILE* fp = fopen(filename, "wt");
+    mask(old_umask);
+
     if (fp == NULL) {
         return -1;
     }
+
+    chmod(filename,S_IRUSR|S_IWUSR);
 
     for (int j = 0; j < historyLen; ++j) {
         if (history[j][0] != '\0') {
