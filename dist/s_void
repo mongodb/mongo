@@ -44,7 +44,6 @@ func_ok()
 	    -e '/int __posix_file_close$/d' \
 	    -e '/int __posix_terminate$/d' \
 	    -e '/int __rec_destroy_session$/d' \
-	    -e '/int __session_transaction_pinned_range$/d' \
 	    -e '/int __win_terminate$/d' \
 	    -e '/int __wt_block_compact_end$/d' \
 	    -e '/int __wt_block_compact_start$/d' \
@@ -115,7 +114,7 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	# form of return assignment or call.
 	file_parse $f |
 	sed -e 's/return ([^)]*); }$//' \
-	    -e '/[A-Z]*_API_CALL(/d' \
+	    -e '/[A-Z]*_API_CALL[A-Z_]*(/d' \
 	    -e '/WT_CURSOR_NEEDKEY(/d' \
 	    -e '/WT_CURSOR_NEEDVALUE(/d' \
 	    -e '/WT_ERR[A-Z_]*(/d' \

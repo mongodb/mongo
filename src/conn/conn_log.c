@@ -421,15 +421,27 @@ __log_file_server(void *arg)
 				 * later syncs.
 				 */
 				WT_ERR(__wt_fsync(session, close_fh, true));
+
 				/*
 				 * We want to have the file size reflect actual
 				 * data with minimal pre-allocated zeroed space.
-				 * The underlying file system may not support
-				 * truncate, which is OK, it's just more work
+				 * We can't truncate the file during hot backup,
+				 * or the underlying file system may not support
+				 * truncate: both are OK, it's just more work
 				 * during cursor traversal.
 				 */
-				WT_ERR_ERROR_OK(__wt_ftruncate(session,
-				    close_fh, close_end_lsn.l.offset), ENOTSUP);
+				if (!conn->hot_backup) {
+					__wt_readlock(
+					    session, conn->hot_backup_lock);
+					if (!conn->hot_backup)
+						WT_ERR_ERROR_OK(
+						    __wt_ftruncate(session,
+						    close_fh,
+						    close_end_lsn.l.offset),
+						    ENOTSUP);
+					__wt_readunlock(
+					    session, conn->hot_backup_lock);
+				}
 				WT_SET_LSN(&close_end_lsn,
 				    close_end_lsn.l.file + 1, 0);
 				__wt_spin_lock(session, &log->log_sync_lock);

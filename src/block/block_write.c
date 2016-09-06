@@ -15,7 +15,10 @@
 int
 __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+
+	conn = S2C(session);
 
 	__wt_verbose(session,
 	    WT_VERB_BLOCK, "truncate file to %" PRIuMAX, (uintmax_t)len);
@@ -34,13 +37,17 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 	 * by system utilities. We cannot truncate the file during the backup
 	 * window, we might surprise an application.
 	 *
-	 * Stop block truncation. This affects files that aren't involved in the
-	 * backup (for example, doing incremental backups, which only copies log
-	 * files, or targeted backups, stops all truncation). We may want a more
-	 * targeted solution at some point.
+	 * This affects files that aren't involved in the backup (for example,
+	 * doing incremental backups, which only copies log files, or targeted
+	 * backups, stops all block truncation unnecessarily). We may want a
+	 * more targeted solution at some point.
 	 */
-	if (S2C(session)->hot_backup)
-		return (0);
+	if (!conn->hot_backup) {
+		__wt_readlock(session, conn->hot_backup_lock);
+		if (!conn->hot_backup)
+			ret = __wt_ftruncate(session, block->fh, len);
+		__wt_readunlock(session, conn->hot_backup_lock);
+	}
 
 	/*
 	 * The truncate may fail temporarily or permanently (for example, there
@@ -48,7 +55,6 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 	 * POSIX system, in which case the underlying function returns EBUSY).
 	 * It's OK, we don't have to be able to truncate files.
 	 */
-	ret = __wt_ftruncate(session, block->fh, len);
 	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 

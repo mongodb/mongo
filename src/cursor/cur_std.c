@@ -539,7 +539,6 @@ err:		cursor->saved_err = ret;
 int
 __wt_cursor_close(WT_CURSOR *cursor)
 {
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
@@ -557,7 +556,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
-	return (ret);
+	return (0);
 }
 
 /*

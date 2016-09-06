@@ -799,14 +799,12 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LSN end_lsn;
-	int yield_cnt;
+	u_int yield_cnt;
 	bool create_log;
 
 	conn = S2C(session);
 	log = conn->log;
 
-	create_log = true;
-	yield_cnt = 0;
 	/*
 	 * Set aside the log file handle to be closed later.  Other threads
 	 * may still be using it to write to the log.  If the log file size
@@ -814,7 +812,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 * Wait for that to close.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	while (log->log_close_fh != NULL) {
+	for (yield_cnt = 0; log->log_close_fh != NULL;) {
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
 		__wt_log_wrlsn(session, NULL);
 		if (++yield_cnt > 10000)
@@ -834,30 +832,39 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 * Make sure everything we set above is visible.
 	 */
 	WT_FULL_BARRIER();
-	/*
-	 * If we're pre-allocating log files, look for one.  If there aren't any
-	 * or we're not pre-allocating, or a backup cursor is open, then
-	 * create one.
-	 */
-	if (conn->log_prealloc > 0 && !conn->hot_backup) {
-		ret = __log_alloc_prealloc(session, log->fileid);
-		/*
-		 * If ret is 0 it means we found a pre-allocated file.
-		 * If ret is non-zero but not WT_NOTFOUND, we return the error.
-		 * If ret is WT_NOTFOUND, we leave create_log set and create
-		 * the new log file.
-		 */
-		if (ret == 0)
-			create_log = false;
-		/*
-		 * If we get any error other than WT_NOTFOUND, return it.
-		 */
-		WT_RET_NOTFOUND_OK(ret);
 
-		if (create_log) {
-			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
-			if (conn->log_cond != NULL)
-				__wt_cond_auto_signal(session, conn->log_cond);
+	/*
+	 * If pre-allocating log files look for one; otherwise, or if we don't
+	 * find one create a log file. We can't use pre-allocated log files in
+	 * while a hot backup is in progress: applications can copy the files
+	 * in any way they choose, and a log file rename might confuse things.
+	 */
+	create_log = true;
+	if (conn->log_prealloc > 0 && !conn->hot_backup) {
+		__wt_readlock(session, conn->hot_backup_lock);
+		if (conn->hot_backup)
+			__wt_readunlock(session, conn->hot_backup_lock);
+		else {
+			ret = __log_alloc_prealloc(session, log->fileid);
+			__wt_readunlock(session, conn->hot_backup_lock);
+
+			/*
+			 * If ret is 0 it means we found a pre-allocated file.
+			 * If ret is WT_NOTFOUND, create the new log file and
+			 * signal the server, we missed our pre-allocation.
+			 * If ret is non-zero but not WT_NOTFOUND, return the
+			 * error.
+			 */
+			WT_RET_NOTFOUND_OK(ret);
+			if (ret == 0)
+				create_log = false;
+			else {
+				WT_STAT_FAST_CONN_INCR(
+				    session, log_prealloc_missed);
+				if (conn->log_cond != NULL)
+					__wt_cond_auto_signal(
+					    session, conn->log_cond);
+			}
 		}
 	}
 	/*
@@ -968,11 +975,17 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
 	conn = S2C(session);
 	log = conn->log;
 
-	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP)) {
-		if ((ret = __wt_ftruncate(session, log_fh, offset)) != ENOTSUP)
-			return (ret);
-
-		F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
+	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && !conn->hot_backup) {
+		__wt_readlock(session, conn->hot_backup_lock);
+		if (conn->hot_backup)
+			__wt_readunlock(session, conn->hot_backup_lock);
+		else {
+			ret = __wt_ftruncate(session, log_fh, offset);
+			__wt_readunlock(session, conn->hot_backup_lock);
+			if (ret != ENOTSUP)
+				return (ret);
+			F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
+		}
 	}
 
 	return (__log_zero(session, log_fh, offset, conn->log_file_max));

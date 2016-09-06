@@ -70,8 +70,8 @@ static CONFIG c[] = {
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
 
 	{ "backups",
-	  "if backups are enabled",				/* 5% */
-	  C_BOOL, 5, 0, 0, &g.c_backups, NULL },
+	  "if backups are enabled",				/* 20% */
+	  C_BOOL, 20, 0, 0, &g.c_backups, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
@@ -203,8 +203,8 @@ static CONFIG c[] = {
 	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
 
 	{ "logging",
-	  "if logging configured",				/* 30% */
-	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+	  "if logging configured",				/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging, NULL },
 
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */
