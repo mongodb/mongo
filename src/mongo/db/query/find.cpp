@@ -386,6 +386,19 @@ QueryResult::View getMore(OperationContext* txn,
         PlanExecutor* exec = cc->getExecutor();
         exec->reattachToOperationContext(txn);
         exec->restoreState();
+
+        auto planSummary = Explain::getPlanSummary(exec);
+        {
+            stdx::lock_guard<Client>(*txn->getClient());
+            curop.setPlanSummary_inlock(planSummary);
+        }
+
+        // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
+        // obtain these values we need to take a diff of the pre-execution and post-execution
+        // metrics, as they accumulate over the course of a cursor's lifetime.
+        PlanSummaryStats preExecutionStats;
+        Explain::getSummaryStats(*exec, &preExecutionStats);
+
         PlanExecutor::ExecState state;
 
         generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
@@ -414,6 +427,13 @@ QueryResult::View getMore(OperationContext* txn,
             // way, attempt to generate another batch of results.
             generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
         }
+
+        PlanSummaryStats postExecutionStats;
+        Explain::getSummaryStats(*exec, &postExecutionStats);
+        curop.debug().keysExamined =
+            postExecutionStats.totalKeysExamined - preExecutionStats.totalKeysExamined;
+        curop.debug().docsExamined =
+            postExecutionStats.totalDocsExamined - preExecutionStats.totalDocsExamined;
 
         // We have to do this before re-acquiring locks in the agg case because
         // shouldSaveCursorGetMore() can make a network call for agg cursors.

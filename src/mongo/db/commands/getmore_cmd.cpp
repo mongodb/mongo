@@ -299,6 +299,12 @@ public:
         exec->reattachToOperationContext(txn);
         exec->restoreState();
 
+        auto planSummary = Explain::getPlanSummary(exec);
+        {
+            stdx::lock_guard<Client>(*txn->getClient());
+            CurOp::get(txn)->setPlanSummary_inlock(planSummary);
+        }
+
         uint64_t notifierVersion = 0;
         std::shared_ptr<CappedInsertNotifier> notifier;
         if (isCursorAwaitData(cursor)) {
@@ -319,6 +325,13 @@ public:
         BSONObj obj;
         PlanExecutor::ExecState state;
         long long numResults = 0;
+
+        // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
+        // obtain these values we need to take a diff of the pre-execution and post-execution
+        // metrics, as they accumulate over the course of a cursor's lifetime.
+        PlanSummaryStats preExecutionStats;
+        Explain::getSummaryStats(*exec, &preExecutionStats);
+
         Status batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
         if (!batchStatus.isOK()) {
             return appendCommandStatus(result, batchStatus);
@@ -362,6 +375,13 @@ public:
                 }
             }
         }
+
+        PlanSummaryStats postExecutionStats;
+        Explain::getSummaryStats(*exec, &postExecutionStats);
+        CurOp::get(txn)->debug().keysExamined =
+            postExecutionStats.totalKeysExamined - preExecutionStats.totalKeysExamined;
+        CurOp::get(txn)->debug().docsExamined =
+            postExecutionStats.totalDocsExamined - preExecutionStats.totalDocsExamined;
 
         if (shouldSaveCursorGetMore(state, exec, isCursorTailable(cursor))) {
             respondWithId = request.cursorid;
