@@ -147,6 +147,14 @@ private:
      */
     Status _upsertIntoGraph(OperationContext* txn, const ViewDefinition& viewDef);
 
+    /**
+     * Returns Status::OK if each view namespace in 'refs' has the same default collation as 'view'.
+     * Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
+     */
+    Status _validateCollation_inlock(OperationContext* txn,
+                                     const ViewDefinition& view,
+                                     const std::vector<NamespaceString>& refs);
+
     std::shared_ptr<ViewDefinition> _lookup_inlock(OperationContext* txn, StringData ns);
     Status _reloadIfNeeded_inlock(OperationContext* txn);
 

@@ -221,6 +221,39 @@
             viewsDB.runCommand(
                 {aggregate: "simpleCollection", pipeline: [lookupFilView, graphLookupSimpleView]}),
             ErrorCodes.OptionNotSupportedOnView);
+
+        // You cannot create a view that depends on another view with a different default collation.
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "zhView", viewOn: "filView", collation: {locale: "zh"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(viewsDB.runCommand({
+            create: "zhView",
+            viewOn: "simpleCollection",
+            pipeline: [lookupFilView],
+            collation: {locale: "zh"}
+        }),
+                                     ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(viewsDB.runCommand({
+            create: "zhView",
+            viewOn: "simpleCollection",
+            pipeline: [graphLookupSimpleView],
+            collation: {locale: "zh"}
+        }),
+                                     ErrorCodes.OptionNotSupportedOnView);
+
+        // You cannot modify a view to depend on another view with a different default collation.
+        assert.commandWorked(viewsDB.runCommand(
+            {create: "esView", viewOn: "simpleCollection", collation: {locale: "es"}}));
+        assert.commandFailedWithCode(viewsDB.runCommand({collMod: "esView", viewOn: "filView"}),
+                                     ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {collMod: "esView", viewOn: "simpleCollection", pipeline: [lookupSimpleView]}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {collMod: "esView", viewOn: "simpleCollection", pipeline: [graphLookupFilView]}),
+            ErrorCodes.OptionNotSupportedOnView);
     }
 
     // Run the test on a standalone.

@@ -170,6 +170,11 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* txn, const ViewDefinition
         refs.push_back(viewDef.viewOn());
 
         if (needsValidation) {
+            // Check the collation of all the dependent namespaces before updating the graph.
+            auto collationStatus = _validateCollation_inlock(txn, viewDef, refs);
+            if (!collationStatus.isOK()) {
+                return collationStatus;
+            }
             return _viewGraph.insertAndValidate(viewDef.name(), refs);
         } else {
             _viewGraph.insertWithoutValidating(viewDef.name(), refs);
@@ -195,6 +200,23 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* txn, const ViewDefinition
     _viewGraph.remove(viewDef.name());
 
     return doInsert(viewDef, true);
+}
+
+Status ViewCatalog::_validateCollation_inlock(OperationContext* txn,
+                                              const ViewDefinition& view,
+                                              const std::vector<NamespaceString>& refs) {
+    for (auto&& potentialViewNss : refs) {
+        auto otherView = _lookup_inlock(txn, potentialViewNss.ns());
+        if (otherView &&
+            !CollatorInterface::collatorsMatch(view.defaultCollator(),
+                                               otherView->defaultCollator())) {
+            return {ErrorCodes::OptionNotSupportedOnView,
+                    str::stream() << "View " << view.name().toString()
+                                  << " has conflicting collation with view "
+                                  << otherView->name().toString()};
+        }
+    }
+    return Status::OK();
 }
 
 Status ViewCatalog::createView(OperationContext* txn,
