@@ -3481,6 +3481,7 @@ buildvariants:
     push_name: win32-debug
     push_arch: x86_64-2008plus
     content_type: application/zip
+    multiversion_platform_arch: "Windows/x86_64-2008plus"
     num_jobs_available: 1
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus
     ext: zip
