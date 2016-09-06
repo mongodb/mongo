@@ -1385,6 +1385,42 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_configsvrCommitChunkMerge",
+          command: {_configsvrCommitChunkMerge: "x.y"},
+          skipSharded: true,
+          expectFail: true,
+          testcases: [
+              {runOnDb: adminDbName,
+               roles: {__system: 1},
+               privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+               expectFail: true},
+          ]
+        },
+        {
+          testname: "_configsvrCommitChunkMigration",
+          command: {_configsvrCommitChunkMigration: "x.y"},
+          skipSharded: true,
+          expectFail: true,
+          testcases: [
+              {runOnDb: adminDbName,
+               roles: {__system: 1},
+               privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+               expectFail: true},
+          ]
+        },
+        {
+          testname: "_configsvrCommitChunkSplit",
+          command: {_configsvrCommitChunkSplit: "x.y"},
+          skipSharded: true,
+          expectFail: true,
+          testcases: [
+              {runOnDb: adminDbName,
+               roles: {__system: 1},
+               privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+               expectFail: true},
+          ]
+        },
+        {
           testname: "create",
           command: {create: "x"},
           teardown: function(db) {
