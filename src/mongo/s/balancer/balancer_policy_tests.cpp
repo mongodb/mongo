@@ -132,9 +132,27 @@ TEST(BalancerPolicy, SingleChunkShouldNotMove) {
         {{ShardStatistics(kShardId0, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
          {ShardStatistics(kShardId1, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
 
-    const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
-    ASSERT(migrations.empty());
+    ASSERT(
+        BalancerPolicy::balance(cluster.first, DistributionStatus(kNamespace, cluster.second), true)
+            .empty());
+    ASSERT(BalancerPolicy::balance(
+               cluster.first, DistributionStatus(kNamespace, cluster.second), false)
+               .empty());
+}
+
+TEST(BalancerPolicy, BalanceThresholdObeyed) {
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId2, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1},
+         {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1}});
+
+    ASSERT(
+        BalancerPolicy::balance(cluster.first, DistributionStatus(kNamespace, cluster.second), true)
+            .empty());
+    ASSERT(BalancerPolicy::balance(
+               cluster.first, DistributionStatus(kNamespace, cluster.second), false)
+               .empty());
 }
 
 TEST(BalancerPolicy, ParallelBalancing) {

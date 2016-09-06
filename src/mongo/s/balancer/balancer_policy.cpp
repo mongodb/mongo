@@ -456,11 +456,10 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
     invariant(totalNumberOfShardsWithTag);
     invariant(totalNumberOfChunksWithTag >= max);
 
-    // The ideal should be at least one per shard
+    // Calculate the ceiling of the optimal number of chunks per shard
     const size_t idealNumberOfChunksPerShardWithTag =
-        (totalNumberOfChunksWithTag < totalNumberOfShardsWithTag)
-        ? 1
-        : (totalNumberOfChunksWithTag / totalNumberOfShardsWithTag);
+        (totalNumberOfChunksWithTag / totalNumberOfShardsWithTag) +
+        (totalNumberOfChunksWithTag % totalNumberOfShardsWithTag ? 1 : 0);
 
     const size_t imbalance = max - idealNumberOfChunksPerShardWithTag;
 
