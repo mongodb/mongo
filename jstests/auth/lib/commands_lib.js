@@ -75,6 +75,14 @@ The teardown function, if present, is called immediately after
 testint whether a particular role authorizes a command for a
 particular database.
 
+8) privileges
+
+An array of privileges used when testing user-defined roles. The test case tests that a user with
+the specified privileges is authorized to run the command, and that having only a subset of the
+privileges causes an authorization failure. If an individual privilege specifies
+"removeWhenTestingAuthzFailure: false", then that privilege will not be removed when testing for
+authorization failure.
+
 */
 
 // constants
@@ -269,6 +277,8 @@ var authCommandsLib = {
               db.getSisterDB(firstDbName).x.drop();
           },
           testcases: [
+              // Tests that a user with read privileges on a view can aggregate it, even if they
+              // don't have read privileges on the underlying namespace.
               {
                 runOnDb: adminDbName,
                 privileges: [
@@ -335,6 +345,8 @@ var authCommandsLib = {
               db.getSisterDB(secondDbName).y.drop();
           },
           testcases: [
+              // Tests that a user with read privileges on a view can explain an aggregation on the
+              // view, even if they don't have read privileges on the underlying namespace.
               {
                 runOnDb: adminDbName,
                 roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
