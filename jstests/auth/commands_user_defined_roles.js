@@ -13,7 +13,10 @@ var testRole = "userDefinedRolesTestRole";
 
 load("jstests/auth/lib/commands_lib.js");
 
-function testProperAuthorization(conn, t, testcase) {
+/**
+ * Run the command specified in 't' with the privileges specified in 'privileges'.
+ */
+function testProperAuthorization(conn, t, testcase, privileges) {
     var out = "";
 
     var runOnDb = conn.getDB(testcase.runOnDb);
@@ -23,8 +26,7 @@ function testProperAuthorization(conn, t, testcase) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(
-        adminDb.runCommand({updateRole: testRole, privileges: testcase.privileges}));
+    assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
     adminDb.logout();
 
     assert(adminDb.auth(testUser, "password"));
@@ -35,10 +37,10 @@ function testProperAuthorization(conn, t, testcase) {
         // don't error if the test failed with code commandNotSupported since
         // some storage engines (e.g wiredTiger) don't support some commands (e.g. touch)
         out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
-            " with privileges " + tojson(testcase.privileges);
+            " with privileges " + tojson(privileges);
     } else if (testcase.expectFail && res.code == authErrCode) {
         out = "expected authorization success" + " but received " + tojson(res) + " on db " +
-            testcase.runOnDb + " with privileges " + tojson(testcase.privileges);
+            testcase.runOnDb + " with privileges " + tojson(privileges);
     }
 
     firstDb.logout();
@@ -82,24 +84,28 @@ function runOneTest(conn, t) {
         if (!("privileges" in testcase)) {
             continue;
         }
-        // Make a copy of the priviliges array since it will be modified.
-        var privileges = testcase.privileges.map(function(p) {
-            return Object.extend({}, p, true);
-        });
 
         if (testcase.expectAuthzFailure) {
-            msg = testInsufficientPrivileges(conn, t, testcase, privileges);
+            msg = testInsufficientPrivileges(conn, t, testcase, testcase.privileges);
             if (msg) {
                 failures.push(t.testname + ": " + msg);
             }
             continue;
         }
 
-        if ((privileges.length == 1 && privileges[0].actions.length > 1) || privileges.length > 1) {
-            for (var j = 0; j < privileges.length; j++) {
-                var p = privileges[j];
+        if ((testcase.privileges.length == 1 && testcase.privileges[0].actions.length > 1) ||
+            testcase.privileges.length > 1) {
+            for (var j = 0; j < testcase.privileges.length; j++) {
+                var p = testcase.privileges[j];
                 var resource = p.resource;
                 var actions = p.actions;
+
+                // A particular privilege can explicitly specify that it should not be removed when
+                // testing for authorization failure. This accommodates special-case behavior for
+                // views in conjunction with the create and collMod commands.
+                if (p.removeWhenTestingAuthzFailure === false) {
+                    continue;
+                }
 
                 for (var k = 0; k < actions.length; k++) {
                     var privDoc = {resource: resource, actions: [actions[k]]};
@@ -111,27 +117,37 @@ function runOneTest(conn, t) {
             }
         }
 
-        msg = testProperAuthorization(conn, t, testcase);
+        // Test for proper authorization with the privileges specified in the test case.
+        msg = testProperAuthorization(conn, t, testcase, testcase.privileges);
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
-        // test resource pattern where collection is ""
-        privileges.forEach(function(j) {
-            if (j.resource.collection && !j.resource.collection.startsWith('system.')) {
-                j.resource.collection = "";
+
+        // Test for proper authorization with the test case's privileges where non-system
+        // collections are modified to be the empty string.
+        msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
+            // Make a copy of the privilege so as not to modify the original array.
+            var modifiedPrivilege = Object.extend({}, priv, true);
+            if (modifiedPrivilege.resource.collection &&
+                !modifiedPrivilege.resource.collection.startsWith('system.')) {
+                modifiedPrivilege.resource.collection = "";
             }
-        });
-        msg = testProperAuthorization(conn, t, testcase);
+            return modifiedPrivilege;
+        }));
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }
-        // test resource pattern where database is ""
-        privileges.forEach(function(j) {
-            if (j.resource.db) {
-                j.resource.db = "";
+
+        // Test for proper authorization with the test case's privileges where the database is the
+        // empty string.
+        msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
+            // Make a copy of the privilege so as not to modify the original array.
+            var modifiedPrivilege = Object.extend({}, priv, true);
+            if (modifiedPrivilege.resource.db) {
+                modifiedPrivilege.resource.db = "";
             }
-        });
-        msg = testProperAuthorization(conn, t, testcase);
+            return modifiedPrivilege;
+        }));
         if (msg) {
             failures.push(t.testname + ": " + msg);
         }

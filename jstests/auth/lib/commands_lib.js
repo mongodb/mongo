@@ -75,6 +75,14 @@ The teardown function, if present, is called immediately after
 testint whether a particular role authorizes a command for a
 particular database.
 
+8) privileges
+
+An array of privileges used when testing user-defined roles. The test case tests that a user with
+the specified privileges is authorized to run the command, and that having only a subset of the
+privileges causes an authorization failure. If an individual privilege specifies
+"removeWhenTestingAuthzFailure: false", then that privilege will not be removed when testing for
+authorization failure.
+
 */
 
 // constants
@@ -235,6 +243,8 @@ var authCommandsLib = {
           },
           command: {aggregate: "view", pipeline: []},
           testcases: [
+              // Tests that a user with read privileges on a view can aggregate it, even if they
+              // don't have read privileges on the underlying namespace.
               {
                 runOnDb: firstDbName,
                 roles: roles_read,
@@ -275,6 +285,8 @@ var authCommandsLib = {
           },
           command: {aggregate: "view", explain: true, pipeline: [{$match: {bar: 1}}]},
           testcases: [
+              // Tests that a user with read privileges on a view can explain an aggregation on the
+              // view, even if they don't have read privileges on the underlying namespace.
               {
                 runOnDb: firstDbName,
                 roles: roles_read,
@@ -425,6 +437,42 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_lookup_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+              db.createCollection("foo");
+          },
+          teardown: function(db) {
+              db.view.drop();
+              db.foo.drop();
+          },
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $lookup: {from: "view", localField: "_id", foreignField: "_id", as: "results"}
+              }]
+          },
+          testcases: [
+              // Tests that a user can successfully $lookup into a view when given read access.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "view"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "view"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
           testname: "aggregate_graphLookup",
           command: {
               aggregate: "foo",
@@ -461,6 +509,48 @@ var authCommandsLib = {
                 privileges: [
                     {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
                     {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_graphLookup_views",
+          setup: function(db) {
+              db.createView("view", "collection", [{$match: {}}]);
+              db.createCollection("foo");
+          },
+          teardown: function(db) {
+              db.view.drop();
+              db.foo.drop();
+          },
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $graphLookup: {
+                      from: "view",
+                      startWith: [1],
+                      connectFromField: "_id",
+                      connectToField: "viewId",
+                      as: "results"
+                  }
+              }]
+          },
+          testcases: [
+              // Tests that a user can successfully $graphLookup into a view when given read access.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "view"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "view"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}
                 ]
               }
           ]
@@ -565,6 +655,75 @@ var authCommandsLib = {
                     {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
                     {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
                     {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]}
+                ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_facet_views",
+          command: {
+              aggregate: "foo",
+              pipeline: [{
+                  $facet: {
+                      lookup: [{
+                          $lookup: {
+                              from: "view1",
+                              localField: "_id",
+                              foreignField: "_id",
+                              as: "results"
+                          }
+                      }],
+                      graphLookup: [{
+                          $graphLookup: {
+                              from: "view2",
+                              startWith: "foo",
+                              connectFromField: "_id",
+                              connectToField: "_id",
+                              as: "results"
+                          }
+                      }]
+                  }
+              }]
+          },
+          setup: function(db) {
+              db.createCollection("foo");
+              db.createView("view1", "bar", [
+                  {$lookup: {from: "qux", localField: "_id", foreignField: "_id", as: "results"}}
+              ]);
+              db.createView("view2", "baz", [{
+                                $graphLookup: {
+                                    from: "quz",
+                                    startWith: [1],
+                                    connectFromField: "_id",
+                                    connectToField: "_id",
+                                    as: "results"
+                                }
+                            }]);
+          },
+          teardown: function(db) {
+              db.foo.drop();
+              db.view1.drop();
+              db.view2.drop();
+          },
+          testcases: [
+              // Tests that a user can successfully $lookup and $graphLookup into views when the
+              // lookups are nested within a $facet.
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "view1"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "view2"}, actions: ["find"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "view1"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "view2"}, actions: ["find"]}
                 ]
               }
           ]
@@ -731,13 +890,15 @@ var authCommandsLib = {
         {
           testname: "collMod_views",
           setup: function(db) {
-              db.createView("view", "collection", [{$match: {}}]);
+              db.createView("view", "foo", [{$match: {}}]);
           },
           teardown: function(db) {
               db.view.drop();
           },
-          command: {collMod: "view", viewOn: "collection2", pipeline: [{$limit: 7}]},
+          command: {collMod: "view", viewOn: "bar", pipeline: [{$limit: 7}]},
           testcases: [
+              // Tests that a user who can modify a view (but not read it) may modify it to be a
+              // view on a namespace the user also cannot read.
               {
                 runOnDb: firstDbName,
                 roles: Object.extend({restore: 1}, roles_dbAdmin),
@@ -749,6 +910,241 @@ var authCommandsLib = {
                 roles: Object.extend({restore: 1}, roles_dbAdminAny),
                 privileges:
                     [{resource: {db: secondDbName, collection: "view"}, actions: ["collMod"]}]
+              },
+              // Tests that a user who can both read and modify a view has read privileges on the
+              // view's underlying namespace.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              }
+          ]
+        },
+        {
+          testname: "collMod_views_lookup",
+          setup: function(db) {
+              db.createView("view", "foo", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {
+              collMod: "view",
+              viewOn: "bar",
+              pipeline: [
+                  {$lookup: {from: "baz", localField: "_id", foreignField: "_id", as: "results"}}
+              ]
+          },
+          testcases: [
+              // Tests that a user who can modify a view (but not read it) may modify it to depend
+              // on namespaces the user also cannot read, including namespaces accessed via $lookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "view"}, actions: ["collMod"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["collMod"]}]
+              },
+              // Tests that a user who can both read and modify a view has read privileges on all
+              // the view's dependent namespaces, including namespaces accessed via $lookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "baz"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              }
+          ]
+        },
+        {
+          testname: "collMod_views_graphLookup",
+          setup: function(db) {
+              db.createView("view", "foo", [{$match: {}}]);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {
+              collMod: "view",
+              viewOn: "bar",
+              pipeline: [{
+                  $graphLookup: {
+                      from: "baz",
+                      startWith: [1],
+                      connectFromField: "_id",
+                      connectToField: "bazId",
+                      as: "results"
+                  }
+              }]
+          },
+          testcases: [
+              // Tests that a user who can modify a view (but not read it) may modify it to depend
+              // on namespaces the user also cannot read, including namespaces accessed via
+              // $graphLookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "view"}, actions: ["collMod"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["collMod"]}]
+              },
+              // Tests that a user who can both read and modify a view has read privileges on all
+              // the view's dependent namespaces, including namespaces accessed via $graphLookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "baz"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              }
+          ]
+        },
+        {
+          testname: "collMod_views_facet",
+          setup: function(db) {
+              db.createView("view", "foo", []);
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          command: {
+              collMod: "view",
+              viewOn: "bar",
+              pipeline: [{
+                  $facet: {
+                      lookup: [{
+                          $lookup: {
+                              from: "baz",
+                              localField: "_id",
+                              foreignField: "_id",
+                              as: "results"
+                          }
+                      }],
+                      graphLookup: [{
+                          $graphLookup: {
+                              from: "qux",
+                              startWith: "blah",
+                              connectFromField: "_id",
+                              connectToField: "_id",
+                              as: "results"
+                          }
+                      }]
+                  }
+              }]
+          },
+          testcases: [
+              // Tests that a user who can modify a view (but not read it) may modify it to depend
+              // on namespaces the user also cannot read, including namespaces accessed via $lookup
+              // and $graphLookup that are nested within a $facet.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "view"}, actions: ["collMod"]}],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges:
+                    [{resource: {db: secondDbName, collection: "view"}, actions: ["collMod"]}],
+              },
+              // Tests that a user who can both read and modify a view has read privileges on all
+              // the view's dependent namespaces, including namespaces accessed via $lookup and
+              // $graphLookup that are nested within a $facet.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "baz"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "qux"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "qux"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["collMod", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ],
               }
           ]
         },
@@ -1030,6 +1426,8 @@ var authCommandsLib = {
               db.view.drop();
           },
           testcases: [
+              // Tests that a user who can create a view (but not read it) can create a view on a
+              // namespace the user also cannot read.
               {
                 runOnDb: firstDbName,
                 roles: Object.extend({restore: 1}, roles_writeDbAdmin),
@@ -1046,6 +1444,245 @@ var authCommandsLib = {
                     actions: ["createCollection"]
                 }]
               },
+              // Tests that a user who can both create and read a view has read privileges on the
+              // view's underlying namespace.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "collection"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "collection"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              }
+          ]
+        },
+        {
+          testname: "create_views_lookup",
+          command: {
+              create: "view",
+              viewOn: "foo",
+              pipeline: [
+                  {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "results"}}
+              ]
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          testcases: [
+              // Tests that a user who can create a view (but not read it) may create a view that
+              // depends on namespaces the user also cannot read, including namespaces accessed via
+              // $lookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [{
+                    resource: {db: firstDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [{
+                    resource: {db: secondDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }],
+              },
+              // Tests that a user who can both create and read a view has read privileges on all
+              // the view's dependent namespaces, including namespaces accessed via $lookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ]
+              }
+          ]
+        },
+        {
+          testname: "create_views_graphLookup",
+          command: {
+              create: "view",
+              viewOn: "foo",
+              pipeline: [{
+                  $graphLookup: {
+                      from: "bar",
+                      startWith: [1],
+                      connectFromField: "_id",
+                      connectToField: "barId",
+                      as: "results"
+                  }
+              }]
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          testcases: [
+              // Tests that a user who can create a view (but not read it) may create a view that
+              // depends on namespaces the user also cannot read, including namespaces accessed via
+              // $graphLookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [{
+                    resource: {db: firstDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [{
+                    resource: {db: secondDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }],
+              },
+              // Tests that a user who can both create and read a view has read privileges on all
+              // the view's dependent namespaces, including namespaces accessed via $graphLookup.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ],
+              }
+          ]
+        },
+        {
+          testname: "create_views_facet",
+          command: {
+              create: "view",
+              viewOn: "foo",
+              pipeline: [{
+                  $facet: {
+                      lookup: [{
+                          $lookup: {
+                              from: "bar",
+                              localField: "_id",
+                              foreignField: "_id",
+                              as: "results"
+                          }
+                      }],
+                      graphLookup: [{
+                          $graphLookup: {
+                              from: "baz",
+                              startWith: "foo",
+                              connectFromField: "_id",
+                              connectToField: "_id",
+                              as: "results"
+                          }
+                      }]
+                  }
+              }]
+          },
+          teardown: function(db) {
+              db.view.drop();
+          },
+          testcases: [
+              // Tests that a user who can create a view (but not read it) may create a view that
+              // depends on namespaces the user also cannot read, including namespaces accessed via
+              // $lookup and $graphLookup that are nested within a $facet.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [{
+                    resource: {db: firstDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [{
+                    resource: {db: secondDbName, collection: "view"},
+                    actions: ["createCollection"]
+                }],
+              },
+              // Tests that a user who can both create and read a view has read privileges on all
+              // the view's dependent namespaces, including namespaces accessed via $lookup and
+              // $graphLookup that are nested within a $facet.
+              {
+                runOnDb: firstDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "baz"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "baz"}, actions: ["find"]},
+                    {
+                      resource: {db: secondDbName, collection: "view"},
+                      actions: ["createCollection", "find"],
+                      removeWhenTestingAuthzFailure: false
+                    }
+                ],
+              }
           ]
         },
         {
@@ -1459,6 +2096,8 @@ var authCommandsLib = {
           },
           command: {find: "view"},
           testcases: [
+              // Tests that a user with read access to a view can perform a find on it, even if they
+              // don't have read access to the underlying namespace.
               {
                 runOnDb: firstDbName,
                 roles: roles_read,

@@ -1,8 +1,6 @@
 /**
  * Tests authorization special cases with views. These are special exceptions that prohibit certain
  * operations on views even if the user has an explicit privilege on that view.
- *
- * TODO(SERVER-25526): merge this test into jstests/auth/libs/commands_lib.js.
  */
 (function() {
     "use strict";
