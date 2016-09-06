@@ -85,7 +85,7 @@ typedef struct {
 
 static void *thread_insert(void *);
 static void *thread_join(void *);
-static int test_join(TEST_OPTS *, SHARED_OPTS *, bool, bool);
+static void test_join(TEST_OPTS *, SHARED_OPTS *, bool, bool);
 
 int
 main(int argc, char *argv[])
@@ -117,17 +117,17 @@ main(int argc, char *argv[])
 	testutil_check(wiredtiger_open(opts->home, NULL,
 	    "create,cache_size=1G", &opts->conn));
 
-	testutil_check(test_join(opts, sharedopts, true, true));
-	testutil_check(test_join(opts, sharedopts, true, false));
-	testutil_check(test_join(opts, sharedopts, false, true));
-	testutil_check(test_join(opts, sharedopts, false, false));
+	test_join(opts, sharedopts, true, true);
+	test_join(opts, sharedopts, true, false);
+	test_join(opts, sharedopts, false, true);
+	test_join(opts, sharedopts, false, false);
 
 	testutil_cleanup(opts);
 
 	return (0);
 }
 
-static int
+static void
 test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom,
     bool sometimes_remove)
 {
@@ -223,8 +223,6 @@ test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom,
 	testutil_check(session->drop(session, sharedopts->flaguri, NULL));
 	testutil_check(session->drop(session, opts->uri, NULL));
 	testutil_check(session->close(session, NULL));
-
-	return (0);
 }
 
 static void *thread_insert(void *arg)
