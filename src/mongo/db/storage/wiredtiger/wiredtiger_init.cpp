@@ -29,6 +29,10 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#if defined(__linux__)
+#include <sys/vfs.h>
+#endif
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
@@ -60,6 +64,24 @@ public:
         if (lockFile && lockFile->createdByUncleanShutdown()) {
             warning() << "Recovering data from the last clean checkpoint.";
         }
+
+#if defined(__linux__)
+// This is from <linux/magic.h> but that isn't available on all systems.
+// Note that the magic number for ext4 is the same as ext2 and ext3.
+#define EXT4_SUPER_MAGIC 0xEF53
+        {
+            struct statfs fs_stats;
+            int ret = statfs(params.dbpath.c_str(), &fs_stats);
+
+            if (ret == 0 && fs_stats.f_type == EXT4_SUPER_MAGIC) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: Using the XFS filesystem is strongly recommended with the "
+                         "WiredTiger storage engine";
+                log() << "See "
+                         "http://dochub.mongodb.org/core/prodnotes-filesystem";
+            }
+        }
+#endif
 
         size_t cacheMB = WiredTigerUtil::getCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
         const bool ephemeral = false;
