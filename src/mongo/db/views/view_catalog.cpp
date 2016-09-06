@@ -192,6 +192,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* txn, const ViewDefinition
             }
         }
         // Only if the inserts completed without error will we no longer need a refresh.
+        txn->recoveryUnit()->onRollback([this]() { this->_viewGraphNeedsRefresh = true; });
         _viewGraphNeedsRefresh = false;
     }
 
