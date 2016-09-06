@@ -844,7 +844,4 @@ inline BSONElement::BSONElement() {
     fieldNameSize_ = 0;
     totalSize = 1;
 }
-
-// TODO(SERVER-14596): move to a better place; take a StringData.
-std::string escape(const std::string& s, bool escape_slash = false);
 }

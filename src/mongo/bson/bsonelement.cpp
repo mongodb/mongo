@@ -44,6 +44,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 namespace str = mongoutils::str;
@@ -839,48 +840,6 @@ bool BSONObj::coerceVector(std::vector<T>* out) const {
         out->push_back(t);
     }
     return true;
-}
-
-// used by jsonString()
-std::string escape(const std::string& s, bool escape_slash) {
-    StringBuilder ret;
-    for (std::string::const_iterator i = s.begin(); i != s.end(); ++i) {
-        switch (*i) {
-            case '"':
-                ret << "\\\"";
-                break;
-            case '\\':
-                ret << "\\\\";
-                break;
-            case '/':
-                ret << (escape_slash ? "\\/" : "/");
-                break;
-            case '\b':
-                ret << "\\b";
-                break;
-            case '\f':
-                ret << "\\f";
-                break;
-            case '\n':
-                ret << "\\n";
-                break;
-            case '\r':
-                ret << "\\r";
-                break;
-            case '\t':
-                ret << "\\t";
-                break;
-            default:
-                if (*i >= 0 && *i <= 0x1f) {
-                    // TODO: these should be utf16 code-units not bytes
-                    char c = *i;
-                    ret << "\\u00" << toHexLower(&c, 1);
-                } else {
-                    ret << *i;
-                }
-        }
-    }
-    return ret.str();
 }
 
 /**
