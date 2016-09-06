@@ -95,7 +95,7 @@ public:
     Status dropView(OperationContext* txn, const NamespaceString& viewName);
 
     /**
-     * Modify the view named 'viewName' to have the new 'viewOn', 'pipeline' and 'collation'.
+     * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
      *
      * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
      */
