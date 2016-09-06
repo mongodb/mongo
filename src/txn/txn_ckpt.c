@@ -113,7 +113,7 @@ __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 
 	/* Step through the targets and optionally operate on each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
-	WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
+	__wt_config_subinit(session, &targetconf, &cval);
 	while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
 		if (!target_list) {
 			WT_ERR(__wt_scr_alloc(session, 512, &tmp));
@@ -1054,7 +1054,7 @@ __checkpoint_lock_tree(WT_SESSION_IMPL *session,
 		cval.len = 0;
 		WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
 		if (cval.len != 0) {
-			WT_ERR(__wt_config_subinit(session, &dropconf, &cval));
+			__wt_config_subinit(session, &dropconf, &cval);
 			while ((ret =
 			    __wt_config_next(&dropconf, &k, &v)) == 0) {
 				/* Disallow unsafe checkpoint names. */

@@ -54,8 +54,8 @@ revint_compare(WT_COLLATOR *collator,
 	const REVINT_COLLATOR *revint_collator;
 	WT_EXTENSION_API *wtapi;
 	WT_PACK_STREAM *pstream;
-	int ret;
 	int64_t i1, i2, p1, p2;
+	int ret;
 
 	i1 = i2 = p1 = p2 = 0;
 	revint_collator = (const REVINT_COLLATOR *)collator;
@@ -82,23 +82,23 @@ revint_compare(WT_COLLATOR *collator,
 	if ((ret = wtapi->unpack_start(
 	    wtapi, session, "ii", k1->data, k1->size, &pstream)) != 0 ||
 	    (ret = wtapi->unpack_int(wtapi, pstream, &i1)) != 0)
-		goto err;
+		return (ret);
 	if ((ret = wtapi->unpack_int(wtapi, pstream, &p1)) != 0)
 		/* A missing primary key is OK and sorts first. */
 		p1 = INT64_MIN;
 	if ((ret = wtapi->pack_close(wtapi, pstream, NULL)) != 0)
-		goto err;
+		return (ret);
 
 	/* Unpack the second pair of numbers. */
 	if ((ret = wtapi->unpack_start(
 	    wtapi, session, "ii", k2->data, k2->size, &pstream)) != 0 ||
 	    (ret = wtapi->unpack_int(wtapi, pstream, &i2)) != 0)
-		goto err;
+		return (ret);
 	if ((ret = wtapi->unpack_int(wtapi, pstream, &p2)) != 0)
 		/* A missing primary key is OK and sorts first. */
 		p2 = INT64_MIN;
 	if ((ret = wtapi->pack_close(wtapi, pstream, NULL)) != 0)
-		goto err;
+		return (ret);
 
 	/* sorting is reversed */
 	if (i1 < i2)
@@ -113,7 +113,7 @@ revint_compare(WT_COLLATOR *collator,
 	else
 		*cmp = 0; /* index key and primary key are same */
 
-err:	return (ret);
+	return (0);
 }
 
 /*

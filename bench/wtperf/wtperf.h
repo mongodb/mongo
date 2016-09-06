@@ -263,7 +263,7 @@ struct __config_thread {		/* Per-thread structure */
 void	 cleanup_truncate_config(CONFIG *);
 int	 config_compress(CONFIG *);
 void	 config_free(CONFIG *);
-int	 config_copy(CONFIG *, const CONFIG *);
+void	 config_copy(CONFIG *, const CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);

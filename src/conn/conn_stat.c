@@ -155,13 +155,13 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	WT_ERR(__wt_filename(session, tmp->data, &conn->stat_path));
 
 	WT_ERR(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
-	WT_ERR(__wt_config_subinit(session, &objectconf, &cval));
+	__wt_config_subinit(session, &objectconf, &cval);
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
 		;
 	WT_ERR_NOTFOUND_OK(ret);
 	if (cnt != 0) {
 		WT_ERR(__wt_calloc_def(session, cnt + 1, &sources));
-		WT_ERR(__wt_config_subinit(session, &objectconf, &cval));
+		__wt_config_subinit(session, &objectconf, &cval);
 		for (cnt = 0;
 		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
 			/*

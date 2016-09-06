@@ -310,12 +310,11 @@ done:	/* Apply any tracked operations post-commit. */
  *	Start a group of operations that can be committed independent of the
  *	main transaction.
  */
-int
+void
 __wt_meta_track_sub_on(WT_SESSION_IMPL *session)
 {
 	WT_ASSERT(session, session->meta_track_sub == NULL);
 	session->meta_track_sub = session->meta_track_next;
-	return (0);
 }
 
 /*

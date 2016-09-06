@@ -83,7 +83,7 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 	 * we determine that neither of those conditions can be satisfied.
 	 */
 	WT_ERR(__wt_config_getones(session, tableconf, "columns", &colconf));
-	WT_ERR(__wt_config_subinit(session, &cparser, &colconf));
+	__wt_config_subinit(session, &cparser, &colconf);
 	if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 		goto err;
 

@@ -873,7 +873,7 @@ insert:
 		}
 		else
 			WT_ERR(c->get_key(c, &curvalue));
-		WT_ERR(__wt_bloom_insert(bloom, &curvalue));
+		__wt_bloom_insert(bloom, &curvalue);
 		entry->stats.bloom_insert++;
 advance:
 		if ((ret = c->next(c)) == WT_NOTFOUND)

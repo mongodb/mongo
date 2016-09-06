@@ -2006,8 +2006,7 @@ start_all_runs(CONFIG *cfg)
 	for (i = 0; i < cfg->database_count; i++) {
 		next_cfg = dcalloc(1, sizeof(CONFIG));
 		configs[i] = next_cfg;
-		if ((ret = config_copy(next_cfg, cfg)) != 0)
-			goto err;
+		config_copy(next_cfg, cfg);
 
 		/* Setup a unique home directory for each database. */
 		new_home = dmalloc(home_len + 5);
@@ -2238,8 +2237,7 @@ main(int argc, char *argv[])
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
 	memset(cfg, 0, sizeof(*cfg));
-	if (config_copy(cfg, &default_cfg))
-		goto err;
+	config_copy(cfg, &default_cfg);
 	cfg->home = dstrdup(DEFAULT_HOME);
 	cfg->monitor_dir = dstrdup(DEFAULT_MONITOR_DIR);
 

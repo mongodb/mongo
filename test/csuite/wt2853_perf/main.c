@@ -186,7 +186,8 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-static void *thread_insert(void *arg)
+static void *
+thread_insert(void *arg)
 {
 	TEST_OPTS *opts;
 	THREAD_ARGS *threadargs;
@@ -252,7 +253,8 @@ static void *thread_insert(void *arg)
 	return (NULL);
 }
 
-static void *thread_get(void *arg)
+static void *
+thread_get(void *arg)
 {
 	SHARED_OPTS *sharedopts;
 	TEST_OPTS *opts;

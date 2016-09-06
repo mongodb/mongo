@@ -513,8 +513,8 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
-		WT_ERR(__wt_json_column_init(cursor, table->key_format,
-			&idx->colconf, &table->colconf));
+		__wt_json_column_init(
+		    cursor, table->key_format, &idx->colconf, &table->colconf);
 
 	if (0) {
 err:		WT_TRET(__curindex_close(cursor));

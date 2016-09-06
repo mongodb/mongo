@@ -919,7 +919,7 @@ __conn_load_extensions(
 	    WT_CONFIG_BASE(session, WT_CONNECTION_load_extension), NULL, NULL };
 
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
-	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
+	__wt_config_subinit(session, &subconfig, &cval);
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
 		if (expath == NULL)
 			WT_ERR(__wt_scr_alloc(session, 0, &expath));
@@ -1020,7 +1020,7 @@ err:	/*
 		}
 
 	/* Release all named snapshots. */
-	WT_TRET(__wt_txn_named_snapshot_destroy(session));
+	__wt_txn_named_snapshot_destroy(session);
 
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
@@ -1854,7 +1854,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "readonly=,"
 	    "use_environment_priv=,"
 	    "verbose=,", &base_config));
-	WT_ERR(__wt_config_init(session, &parser, base_config));
+	__wt_config_init(session, &parser, base_config);
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
 		if (v.type == WT_CONFIG_ITEM_STRING) {
@@ -2009,7 +2009,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session->name = "wiredtiger_open";
 
 	/* Do standard I/O and error handling first. */
-	WT_ERR(__wt_os_stdio(session));
+	__wt_os_stdio(session);
 	__wt_event_handler_set(session, event_handler);
 
 	/*

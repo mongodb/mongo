@@ -147,7 +147,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &las_value));
 
 	/* Open a lookaside table cursor. */
-	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
+	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/*
 	 * The lookaside records are in key and update order, that is, there

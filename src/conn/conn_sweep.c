@@ -17,7 +17,7 @@
  *	Mark idle handles with a time of death, and note if we see dead
  *	handles.
  */
-static int
+static void
 __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -50,8 +50,6 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 		dhandle->timeofdeath = now;
 		WT_STAT_FAST_CONN_INCR(session, dh_sweep_tod);
 	}
-
-	return (0);
 }
 
 /*
@@ -303,7 +301,7 @@ __sweep_server(void *arg)
 		 * never become idle.
 		 */
 		if (conn->sweep_idle_time != 0)
-			WT_ERR(__sweep_mark(session, now));
+			__sweep_mark(session, now);
 
 		/*
 		 * Close handles if we have reached the configured limit.

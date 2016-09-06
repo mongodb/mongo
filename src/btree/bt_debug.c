@@ -140,13 +140,14 @@ __dmsg_event(WT_DBG *ds, const char *fmt, ...)
 static int
 __dmsg_file(WT_DBG *ds, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)vfprintf(ds->fp, fmt, ap);
+	ret = vfprintf(ds->fp, fmt, ap) < 0 ? EIO : 0;
 	va_end(ap);
 
-	return (0);
+	return (ret);
 }
 
 /*

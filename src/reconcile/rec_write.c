@@ -3406,7 +3406,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	 */
 	__wt_las_set_written(session);
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
+	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/* Ensure enough room for a column-store key without checking. */
 	WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));

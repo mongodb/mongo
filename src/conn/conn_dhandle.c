@@ -488,9 +488,9 @@ __wt_conn_dhandle_close_all(
 		 * open at this point.  Close the handle, if necessary.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			if ((ret = __wt_meta_track_sub_on(session)) == 0)
-				ret = __wt_conn_btree_sync_and_close(
-				    session, false, force);
+			__wt_meta_track_sub_on(session);
+			ret = __wt_conn_btree_sync_and_close(
+			    session, false, force);
 
 			/*
 			 * If the close succeeded, drop any locks it acquired.

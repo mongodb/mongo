@@ -447,7 +447,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
-		WT_ERR(__wt_bloom_insert(bloom, &key));
+		__wt_bloom_insert(bloom, &key);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 	WT_TRET(src->close(src));

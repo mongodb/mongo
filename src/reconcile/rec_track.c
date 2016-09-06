@@ -108,7 +108,7 @@ __ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __ovfl_discard_wrapup_err --
  *	Resolve the page's overflow discard list after an error occurs.
  */
-static int
+static void
 __ovfl_discard_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TRACK *track;
@@ -117,8 +117,6 @@ __ovfl_discard_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	__wt_free(session, track->discard);
 	track->discard_entries = track->discard_allocated = 0;
-
-	return (0);
 }
 
 /*
@@ -903,7 +901,7 @@ __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	track = page->modify->ovfl_track;
 	if (track->discard != NULL)
-		WT_RET(__ovfl_discard_wrapup_err(session, page));
+		__ovfl_discard_wrapup_err(session, page);
 
 	if (track->ovfl_reuse[0] != NULL)
 		WT_RET(__ovfl_reuse_wrapup_err(session, page));

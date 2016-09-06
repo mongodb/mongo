@@ -89,7 +89,7 @@ __verify_config_offsets(
 	*quitp = false;
 
 	WT_RET(__wt_config_gets(session, cfg, "dump_offsets", &cval));
-	WT_RET(__wt_config_subinit(session, &list, &cval));
+	__wt_config_subinit(session, &list, &cval);
 	while ((ret = __wt_config_next(&list, &k, &v)) == 0) {
 		/*
 		 * Quit after dumping the requested blocks.  (That's hopefully
