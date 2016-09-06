@@ -32,6 +32,8 @@ function clientEvalConstructorTest(constructorList) {
 }
 
 function dbEvalConstructorTest(constructorList) {
+    assert.writeOK(db.evalConstructors.insert({}), "db must exist for eval to succeed");
+    assert(db.evalConstructors.drop());
     constructorList = addConstructorsWithNew(constructorList);
     constructorList.valid.forEach(function(constructor) {
         try {

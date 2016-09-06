@@ -1,4 +1,5 @@
-
+assert.writeOK(db.evalprep.insert({}), "db must exist for eval to succeed");
+assert(db.evalprep.drop());
 assert.eq(17,
           db.eval(function() {
               return 11 + 6;
