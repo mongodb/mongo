@@ -2763,7 +2763,7 @@ int linenoiseHistorySetMaxLen(int len) {
  * otherwise -1 is returned. */
 int linenoiseHistorySave(const char* filename) {
     FILE* fp;
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
     int fd = open(filename, O_CREAT, S_IRUSR | S_IWUSR);
     if (fd == -1) {
         // report errno somehow?
@@ -2772,7 +2772,7 @@ int linenoiseHistorySave(const char* filename) {
     fp = fdopen(fd, "wt");
 #else
     fp = fopen(filename, "wt");
-#endif  // _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+#endif  // _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
     if (fp == NULL) {
         return -1;
     }

@@ -94,7 +94,14 @@
         clearRawMongoProgramOutput();
         var rc = runProgram("ls", "-l", file.name);
         assert.eq(rc, 0);
-        var output = rawMongoProgramOutput();
+        // Before SERVER-22992 is fixed:
+        var output = null;
+        assert.soon(function() {
+            output = rawMongoProgramOutput();
+            return output != "";
+        });
+        // After SERVER-22992 is fixed:
+        // var output = rawMongoProgramOutput();
         var fields = output.split(" ");
         // First field is the prefix, second field is the `ls -l` permissions.
         assert.eq(fields[1], "-rw-------", targetFile + " has bad permissions");
