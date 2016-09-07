@@ -116,7 +116,7 @@ boost::optional<ParsedDeps> DepsTracker::toParsedDeps() const {
 
 namespace {
 // Mutually recursive with arrayHelper
-Document documentHelper(const BSONObj& bson, const Document& neededFields);
+Document documentHelper(const BSONObj& bson, const Document& neededFields, int nFieldsNeeded = -1);
 
 // Handles array-typed values for ParsedDeps::extractFields
 Value arrayHelper(const BSONObj& bson, const Document& neededFields) {
@@ -139,33 +139,37 @@ Value arrayHelper(const BSONObj& bson, const Document& neededFields) {
 }
 
 // Handles object-typed values including the top-level for ParsedDeps::extractFields
-Document documentHelper(const BSONObj& bson, const Document& neededFields) {
-    MutableDocument md(neededFields.size());
+Document documentHelper(const BSONObj& bson, const Document& neededFields, int nFieldsNeeded) {
+    // We cache the number of top level fields, so don't need to re-compute it every time. For
+    // sub-documents, just scan for the number of fields.
+    if (nFieldsNeeded == -1) {
+        nFieldsNeeded = neededFields.size();
+    }
+    MutableDocument md(nFieldsNeeded);
 
     BSONObjIterator it(bson);
-    while (it.more()) {
-        BSONElement bsonElement(it.next());
+    while (it.more() && nFieldsNeeded > 0) {
+        auto bsonElement = it.next();
         StringData fieldName = bsonElement.fieldNameStringData();
         Value isNeeded = neededFields[fieldName];
 
         if (isNeeded.missing())
             continue;
 
+        --nFieldsNeeded;  // Found a needed field.
         if (isNeeded.getType() == Bool) {
             md.addField(fieldName, Value(bsonElement));
-            continue;
-        }
+        } else {
+            dassert(isNeeded.getType() == Object);
 
-        dassert(isNeeded.getType() == Object);
-
-        if (bsonElement.type() == Object) {
-            Document sub = documentHelper(bsonElement.embeddedObject(), isNeeded.getDocument());
-            md.addField(fieldName, Value(sub));
-        }
-
-        if (bsonElement.type() == Array) {
-            md.addField(fieldName,
-                        arrayHelper(bsonElement.embeddedObject(), isNeeded.getDocument()));
+            if (bsonElement.type() == BSONType::Object) {
+                md.addField(
+                    fieldName,
+                    Value(documentHelper(bsonElement.embeddedObject(), isNeeded.getDocument())));
+            } else if (bsonElement.type() == BSONType::Array) {
+                md.addField(fieldName,
+                            arrayHelper(bsonElement.embeddedObject(), isNeeded.getDocument()));
+            }
         }
     }
 
@@ -174,6 +178,6 @@ Document documentHelper(const BSONObj& bson, const Document& neededFields) {
 }  // namespace
 
 Document ParsedDeps::extractFields(const BSONObj& input) const {
-    return documentHelper(input, _fields);
+    return documentHelper(input, _fields, _nFields);
 }
 }
