@@ -50,6 +50,7 @@
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -560,6 +561,13 @@ Status validateServerOptions(const moe::Environment& params) {
         auto authMechParameter = parameters.find("authenticationMechanisms");
         if (authMechParameter != parameters.end() && authMechParameter->second.empty()) {
             haveAuthenticationMechanisms = false;
+        }
+
+        // Only register failpoint server parameters if enableTestCommands=1.
+        auto enableTestCommandsParameter = parameters.find("enableTestCommands");
+        if (enableTestCommandsParameter != parameters.end() &&
+            enableTestCommandsParameter->second.compare("1") == 0) {
+            getGlobalFailPointRegistry()->registerAllFailPointsAsServerParameters();
         }
     }
     if ((params.count("security.authorization") &&

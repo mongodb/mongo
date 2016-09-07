@@ -105,9 +105,10 @@
  *         return Status::OK();
  *     }
  */
-#define MONGO_STARTUP_OPTIONS_VALIDATE(fname) \
-    MONGO_INITIALIZER_GENERAL(                \
-        fname##_Validate, ("BeginStartupOptionValidation"), ("EndStartupOptionValidation"))
+#define MONGO_STARTUP_OPTIONS_VALIDATE(fname)                                              \
+    MONGO_INITIALIZER_GENERAL(fname##_Validate,                                            \
+                              ("BeginStartupOptionValidation", "AllFailPointsRegistered"), \
+                              ("EndStartupOptionValidation"))
 
 /**
  * Macro to define an initializer function named "<fname>_Store" to store the command line and

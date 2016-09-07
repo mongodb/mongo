@@ -45,7 +45,7 @@ class OperationContext;
 
 /**
  * Lets you make server level settings easily configurable.
- * Hooks into (set|get)Paramter, as well as command line processing
+ * Hooks into (set|get)Parameter, as well as command line processing
  *
  * NOTE: ServerParameters set at runtime can be read or written to at anytime, and are not
  * thread-safe without atomic types or other concurrency techniques.

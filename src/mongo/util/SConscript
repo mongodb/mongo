@@ -239,10 +239,13 @@ env.Library(
     source=[
         "fail_point.cpp",
         "fail_point_registry.cpp",
+        "fail_point_server_parameter.cpp",
         "fail_point_service.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/db/server_parameters",
     ],
 )
 

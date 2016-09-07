@@ -1,5 +1,5 @@
-/*
- *    Copyright (C) 2012 10gen Inc.
+/**
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,53 +26,29 @@
  *    then also delete it in the license file.
  */
 
-/**
- * Should NOT be included by other header files.  Include only in source files.
- */
-
 #pragma once
 
+#include "mongo/db/server_parameters.h"
+
 #include "mongo/base/status.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
-/**
- * Class for storing FailPoint instances.
- */
-class FailPointRegistry {
+
+class FailPointServerParameter : public ServerParameter {
 public:
-    FailPointRegistry();
+    // When set via --setParameter on the command line, failpoint names must include this prefix.
+    static const std::string failPointPrefix;
 
-    /**
-     * Adds a new fail point to this registry. Duplicate names are not allowed.
-     *
-     * @return the status code under these circumstances:
-     *     OK - if successful.
-     *     DuplicateKey - if the given name already exists in this registry.
-     *     CannotMutateObject - if this registry is already frozen.
-     */
-    Status addFailPoint(const std::string& name, FailPoint* failPoint);
+    FailPointServerParameter(std::string name, FailPoint* failpoint);
 
-    /**
-     * @return the fail point object registered. Returns NULL if it was not registered.
-     */
-    FailPoint* getFailPoint(const std::string& name) const;
-
-    /**
-     * Freezes this registry from being modified.
-     */
-    void freeze();
-
-    /**
-     * Creates a new FailPointServerParameter for each failpoint in the registry. This allows the
-     * failpoint to be set on the command line via --setParameter, but is only allowed when
-     * running with '--setParameter enableTestCommands=1'.
-     */
-    void registerAllFailPointsAsServerParameters();
+    void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) override;
+    Status set(const BSONElement& newValueElement) override;
+    Status setFromString(const std::string& str) override;
 
 private:
-    bool _frozen;
-    unordered_map<std::string, FailPoint*> _fpMap;
+    FailPoint* _failpoint;  // not owned here
+    std::string _failPointName;
 };
-}
+
+}  // namespace mongo
