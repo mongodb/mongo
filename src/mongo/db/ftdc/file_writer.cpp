@@ -57,9 +57,6 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
 
     _archiveFile = file;
 
-    // Disable file buffering
-    _archiveStream.rdbuf()->pubsetbuf(0, 0);
-
     // Ideally, we create a file from scratch via O_CREAT but there is not portable way via C++
     // iostreams to do this.
     _archiveStream.open(_archiveFile.c_str(),
@@ -86,9 +83,6 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
 Status FTDCFileWriter::writeInterimFileBuffer(ConstDataRange buf) {
     // Fixed size interim stream
     std::ofstream interimStream;
-
-    // Disable file buffering
-    interimStream.rdbuf()->pubsetbuf(0, 0);
 
     // Open up a temporary interim file
     interimStream.open(_interimTempFile.c_str(),
@@ -131,6 +125,18 @@ Status FTDCFileWriter::writeArchiveFileBuffer(ConstDataRange buf) {
             ErrorCodes::FileStreamFailed,
             str::stream()
                 << "Failed to write to archive file buffer for full-time diagnostic data capture: "
+                << _archiveFile.generic_string()};
+    }
+
+    // Flush the stream explictly, this is preferred over "pubsetbuf(0,0)" which has implementation
+    // defined behavior of "before any I/O has occurred".
+    _archiveStream.flush();
+
+    if (_archiveStream.fail()) {
+        return {
+            ErrorCodes::FileStreamFailed,
+            str::stream()
+                << "Failed to flush to archive file buffer for full-time diagnostic data capture: "
                 << _archiveFile.generic_string()};
     }
 

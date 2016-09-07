@@ -45,6 +45,7 @@
 namespace mongo {
 
 const char* kTestFile = "metrics.test";
+const char* kTestFileCopy = "metrics.test.copy";
 
 // File Sanity check
 TEST(FTDCFileTest, TestFileBasicMetadata) {
@@ -172,7 +173,27 @@ public:
     }
 
 private:
-    void validate(bool forceCompress = true) {
+    void validate() {
+        // Verify we are flushing writes correctly by copying the file, and then reading it.
+        auto tempfile(boost::filesystem::path(_tempdir.path()) / kTestFileCopy);
+        boost::filesystem::copy_file(_path, tempfile);
+
+        // Read the file to make sure it is correct.
+        // We do not verify contents because the compressor may not have flushed the final records
+        // which is expected.
+        {
+            FTDCFileReader reader;
+
+            ASSERT_OK(reader.open(tempfile));
+
+            auto sw = reader.hasNext();
+            while (sw.isOK() && sw.getValue()) {
+                sw = reader.hasNext();
+            }
+
+            ASSERT_OK(sw);
+        }
+
         _writer.close();
 
         ValidateDocumentList(_path, _docs);
@@ -293,6 +314,23 @@ TEST(FTDCFileTest, TestFull) {
                          << 34
                          << "key2"
                          << 45));
+    }
+}
+
+// Test a large documents so that we cause multiple 4kb buffers to flush on Windows.
+TEST(FTDCFileTest, TestLargeDocuments) {
+    FileTestTie c;
+
+    for (int j = 0; j < 5; j++) {
+        for (size_t i = 0; i <= FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault; i++) {
+            BSONObjBuilder b;
+            b.append("name", "joe");
+            for (size_t k = 0; k < 200; k++) {
+                b.appendNumber("num", static_cast<long long int>(i * j + 5000 - (sin(k) * 100)));
+            }
+
+            c.addSample(b.obj());
+        }
     }
 }
 
