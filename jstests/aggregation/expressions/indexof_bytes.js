@@ -59,7 +59,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExp
 
     testExpressionBytes(coll, {$indexOfBytes: ["abc", "b", 3]}, -1);
 
-    testExpressionBytes(coll, {$indexOfBytes: ["abc", "b", 3, 1]}, -1);
+    // $substrBytes does not accept negative values.
+    testExpressionBytes(coll, {$indexOfBytes: ["abc", "b", 3, 1]}, -1, false);
 
     testExpressionBytes(coll, {$indexOfBytes: ["abc", "b", 3, 5]}, -1);
 
