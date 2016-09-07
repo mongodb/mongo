@@ -144,10 +144,15 @@ static void cleanupTask() {
         if (serviceContext)
             serviceContext->setKillAllOperations();
 
-        auto cursorManager = grid.getCursorManager();
-        cursorManager->shutdown();
-        grid.getExecutorPool()->shutdownAndJoin();
-        grid.catalogClient(txn)->shutDown(txn);
+        if (auto cursorManager = Grid::get(txn)->getCursorManager()) {
+            cursorManager->shutdown();
+        }
+        if (auto pool = Grid::get(txn)->getExecutorPool()) {
+            pool->shutdownAndJoin();
+        }
+        if (auto catalog = Grid::get(txn)->catalogClient(txn)) {
+            catalog->shutDown(txn);
+        }
     }
 
     audit::logShutdown(Client::getCurrent());
