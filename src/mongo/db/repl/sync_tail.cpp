@@ -460,8 +460,7 @@ void initializeWriterThread() {
 
 // Schedules the writes to the oplog for 'ops' into threadPool. The caller must guarantee that 'ops'
 // stays valid until all scheduled work in the thread pool completes.
-// Returns true if more than one thread will be used to write to the oplog.
-bool scheduleWritesToOplog(OperationContext* txn,
+void scheduleWritesToOplog(OperationContext* txn,
                            OldThreadPool* threadPool,
                            const MultiApplier::Operations& ops) {
 
@@ -505,7 +504,7 @@ bool scheduleWritesToOplog(OperationContext* txn,
         !txn->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
 
         threadPool->schedule(makeOplogWriterForRange(0, ops.size()));
-        return false;
+        return;
     }
 
 
@@ -516,7 +515,6 @@ bool scheduleWritesToOplog(OperationContext* txn,
         size_t end = (thread == numOplogThreads - 1) ? ops.size() : begin + numOpsPerThread;
         threadPool->schedule(makeOplogWriterForRange(begin, end));
     }
-    return true;
 }
 
 /**
@@ -1246,19 +1244,11 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
     {
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on our stack, including writerVectors.
-        std::vector<MultiApplier::OperationPtrs> writerVectors;
+        std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
         storage->setOplogDeleteFromPoint(txn, ops.front().ts.timestamp());
-        const bool multiThreadedOplogWrites = scheduleWritesToOplog(txn, workerPool, ops);
-        if (multiThreadedOplogWrites) {
-            // Use all threads for oplog application.
-            writerVectors.resize(workerPool->getNumThreads());
-        } else {
-            // We claimed 1 thread for oplog writing, so use 1 less for oplog application.
-            writerVectors.resize(std::max(workerPool->getNumThreads() - 1, size_t(1)));
-        }
-
+        scheduleWritesToOplog(txn, workerPool, ops);
         fillWriterVectors(txn, &ops, &writerVectors);
 
         workerPool->join();

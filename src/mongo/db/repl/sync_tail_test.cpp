@@ -544,7 +544,7 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     // the number of threads in the pool.
     NamespaceString nss1("test.t0");
     NamespaceString nss2("test.t1");
-    OldThreadPool writerPool(3);
+    OldThreadPool writerPool(2);
 
     stdx::mutex mutex;
     std::vector<MultiApplier::Operations> operationsApplied;
