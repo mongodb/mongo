@@ -604,7 +604,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     cloner->startup();  // When the cloner is done applier starts.
     _exec->waitForEvent(initialSyncFinishEvent);
 
-    log() << "Initial sync finished applying oplog entries.";
+    log() << "Initial sync attempt finishing up.";
     lk.lock();
     if (!_initialSyncState->status.isOK()) {
         return _initialSyncState->status;
