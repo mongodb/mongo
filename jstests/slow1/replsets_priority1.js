@@ -73,7 +73,7 @@ var checkPrimaryIs = function(node) {
         }, 15);
 
         return ok;
-    }, node.host + '==1', 60000, 1000);
+    }, node.host + '==1', 240000, 1000);
 
     everyoneOkSoon();
 };
