@@ -359,7 +359,7 @@ void ShardRegistryData::_init(OperationContext* txn, ShardFactory* shardFactory)
         auto shard = shardFactory->createShard(std::move(std::get<0>(shardInfo)),
                                                std::move(std::get<1>(shardInfo)));
 
-        _addShard_inlock(std::move(shard));
+        _addShard_inlock(std::move(shard), false);
     }
 }
 
@@ -379,7 +379,7 @@ shared_ptr<Shard> ShardRegistryData::getConfigShard() const {
 void ShardRegistryData::addConfigShard(std::shared_ptr<Shard> shard) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _configShard = shard;
-    _addShard_inlock(shard);
+    _addShard_inlock(shard, true);
 }
 
 shared_ptr<Shard> ShardRegistryData::findByRSName(const string& name) const {
@@ -469,15 +469,17 @@ void ShardRegistryData::_rebuildShard_inlock(const ConnectionString& newConnStri
     auto it = _rsLookup.find(newConnString.getSetName());
     invariant(it->second);
     auto shard = factory->createShard(it->second->getId(), newConnString);
-    _addShard_inlock(shard);
+    _addShard_inlock(shard, true);
     if (shard->isConfig()) {
         _configShard = shard;
     }
 }
 
-void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard) {
+void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard, bool useOriginalCS) {
     const ShardId shardId = shard->getId();
-    const ConnectionString connString = shard->originalConnString();
+
+    const ConnectionString connString =
+        useOriginalCS ? shard->originalConnString() : shard->getConnString();
 
     auto currentShard = _findByShardId_inlock(shardId);
     if (currentShard) {
@@ -497,6 +499,7 @@ void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard) {
 
     _lookup[shard->getId()] = shard;
 
+    LOG(3) << "Adding shard " << shard->getId() << ", with CS " << connString.toString();
     if (connString.type() == ConnectionString::SET) {
         _rsLookup[connString.getSetName()] = shard;
     } else if (connString.type() == ConnectionString::CUSTOM) {

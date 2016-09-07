@@ -111,8 +111,11 @@ private:
 
     /**
      * Creates a shard based on the specified information and puts it into the lookup maps.
+     * if useOriginalCS = true it will use the ConnectionSring used for shard creation to update
+     * lookup maps. Otherwise the current connection string from the Shard's RemoteCommandTargeter
+     * will be used.
      */
-    void _addShard_inlock(const std::shared_ptr<Shard>&);
+    void _addShard_inlock(const std::shared_ptr<Shard>&, bool useOriginalCS);
     std::shared_ptr<Shard> _findByShardId_inlock(const ShardId&) const;
     void _rebuildShard_inlock(const ConnectionString& newConnString, ShardFactory* factory);
 

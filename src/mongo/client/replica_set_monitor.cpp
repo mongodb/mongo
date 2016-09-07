@@ -50,6 +50,7 @@
 #include "mongo/util/concurrency/mutex.h"  // for StaticObserver
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/static_observer.h"
 #include "mongo/util/string_map.h"
@@ -62,6 +63,9 @@ using std::numeric_limits;
 using std::set;
 using std::string;
 using std::vector;
+
+// Failpoint for disabling AsyncConfigChangeHook calls on updated RS nodes.
+MONGO_FP_DECLARE(failAsyncConfigChangeHook);
 
 namespace {
 
@@ -720,7 +724,7 @@ bool Refresher::receivedIsMasterFromMaster(const IsMasterReply& reply) {
             syncConfigChangeHook(_set->name, _set->getConfirmedServerAddress());
         }
 
-        if (asyncConfigChangeHook) {
+        if (asyncConfigChangeHook && !MONGO_FAIL_POINT(failAsyncConfigChangeHook)) {
             // call from a separate thread to avoid blocking and holding lock while potentially
             // going over the network
             stdx::thread bg(asyncConfigChangeHook, _set->name, _set->getConfirmedServerAddress());
