@@ -61,17 +61,8 @@ namespace {
 
 const char kFindAndModifyResponseResultDocField[] = "value";
 const char kLocalTimeField[] = "localTime";
-const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting UNSET here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by this mongod.
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
 
-const WriteConcernOptions kLocalWriteConcern(1,
-                                             WriteConcernOptions::SyncMode::UNSET,
-                                             Milliseconds(0));
+const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
 
 /**
  * Returns the resulting new object from the findAndModify response object.
@@ -196,7 +187,8 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
                                                     StringData who,
                                                     StringData processId,
                                                     Date_t time,
-                                                    StringData why) {
+                                                    StringData why,
+                                                    const WriteConcernOptions& writeConcern) {
     BSONObj newLockDetails(BSON(
         LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
                                          << who
@@ -212,7 +204,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
         BSON("$set" << newLockDetails));
     request.setUpsert(true);
     request.setShouldReturnNew(true);
-    request.setWriteConcern(kMajorityWriteConcern);
+    request.setWriteConcern(writeConcern);
 
     auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
         txn,

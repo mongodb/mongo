@@ -99,7 +99,8 @@ public:
                                            StringData who,
                                            StringData processId,
                                            Date_t time,
-                                           StringData why) override;
+                                           StringData why,
+                                           const WriteConcernOptions& writeConcern) override;
 
     virtual StatusWith<LocksType> overtakeLock(OperationContext* txn,
                                                StringData lockID,

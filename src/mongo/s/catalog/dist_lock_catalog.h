@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -49,6 +50,9 @@ class DistLockCatalog {
     MONGO_DISALLOW_COPYING(DistLockCatalog);
 
 public:
+    static const WriteConcernOptions kLocalWriteConcern;
+    static const WriteConcernOptions kMajorityWriteConcern;
+
     /**
      * Simple data structure for storing server local time and election id.
      */
@@ -93,13 +97,15 @@ public:
      *
      * Common status errors include socket and duplicate key errors.
      */
-    virtual StatusWith<LocksType> grabLock(OperationContext* txn,
-                                           StringData lockID,
-                                           const OID& lockSessionID,
-                                           StringData who,
-                                           StringData processId,
-                                           Date_t time,
-                                           StringData why) = 0;
+    virtual StatusWith<LocksType> grabLock(
+        OperationContext* txn,
+        StringData lockID,
+        const OID& lockSessionID,
+        StringData who,
+        StringData processId,
+        Date_t time,
+        StringData why,
+        const WriteConcernOptions& writeConcern = kMajorityWriteConcern) = 0;
 
     /**
      * Attempts to forcefully transfer the ownership of a lock from currentHolderTS

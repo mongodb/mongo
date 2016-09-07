@@ -154,6 +154,15 @@ public:
         Milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 
     /**
+     * Specialized locking method, which only succeeds if the specified lock name is not held by
+     * anyone. Uses local write concern and does not attempt to overtake the lock or check whether
+     * the lock lease has expired.
+     */
+    virtual StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
+                                                                    StringData name,
+                                                                    StringData whyMessage) = 0;
+
+    /**
      * Unlocks the given lockHandle. Will attempt to retry again later if the config
      * server is not reachable.
      */

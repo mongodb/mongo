@@ -32,6 +32,17 @@
 
 namespace mongo {
 
+const WriteConcernOptions DistLockCatalog::kLocalWriteConcern(1,
+                                                              WriteConcernOptions::SyncMode::UNSET,
+                                                              Milliseconds(0));
+
+const WriteConcernOptions DistLockCatalog::kMajorityWriteConcern(
+    WriteConcernOptions::kMajority,
+    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
+    // supported by this mongod.
+    WriteConcernOptions::SyncMode::UNSET,
+    Seconds(15));
+
 DistLockCatalog::DistLockCatalog() = default;
 
 DistLockCatalog::ServerInfo::ServerInfo(Date_t time, OID _electionId)

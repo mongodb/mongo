@@ -423,6 +423,28 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
     return {ErrorCodes::LockBusy, str::stream() << "timed out waiting for " << name};
 }
 
+StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
+    OperationContext* txn, StringData name, StringData whyMessage) {
+    const DistLockHandle lockSessionID = OID::gen();
+    const string who = str::stream() << _processID << ":" << getThreadName();
+
+    auto lockStatus = _catalog->grabLock(txn,
+                                         name,
+                                         lockSessionID,
+                                         who,
+                                         _processID,
+                                         Date_t::now(),
+                                         whyMessage.toString(),
+                                         DistLockCatalog::kLocalWriteConcern);
+    if (lockStatus == ErrorCodes::LockStateChangeFailed) {
+        return {ErrorCodes::LockBusy, str::stream() << "Unable to acquire " << name};
+    } else if (!lockStatus.isOK()) {
+        return lockStatus.getStatus();
+    }
+
+    return lockSessionID;
+}
+
 void ReplSetDistLockManager::unlock(OperationContext* txn, const DistLockHandle& lockSessionID) {
     auto unlockStatus = _catalog->unlock(txn, lockSessionID);
 

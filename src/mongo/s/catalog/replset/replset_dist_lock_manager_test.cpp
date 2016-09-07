@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
 #include <map>
@@ -2034,6 +2033,45 @@ TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
                       ->lock(operationContext(), "bar", "foo", Milliseconds(0), Milliseconds(0))
                       .getStatus());
     }
+}
+
+TEST_F(ReplSetDistLockManagerFixture, TryLockWithLocalWriteConcernBusy) {
+    string lockName("test");
+    Date_t now(Date_t::now());
+    string whyMsg("because");
+
+    LocksType retLockDoc;
+    retLockDoc.setName(lockName);
+    retLockDoc.setState(LocksType::LOCKED);
+    retLockDoc.setProcess(getProcessID());
+    retLockDoc.setWho("me");
+    retLockDoc.setWhy(whyMsg);
+    // Will be different from the actual lock session id. For testing only.
+    retLockDoc.setLockID(OID::gen());
+
+    OID lockSessionIDPassed;
+
+    getMockCatalog()->expectGrabLock(
+        [this, &lockName, &now, &whyMsg, &lockSessionIDPassed](StringData lockID,
+                                                               const OID& lockSessionID,
+                                                               StringData who,
+                                                               StringData processId,
+                                                               Date_t time,
+                                                               StringData why) {
+            ASSERT_EQUALS(lockName, lockID);
+            ASSERT_TRUE(lockSessionID.isSet());
+            ASSERT_EQUALS(getProcessID(), processId);
+            ASSERT_GREATER_THAN_OR_EQUALS(time, now);
+            ASSERT_EQUALS(whyMsg, why);
+
+            lockSessionIDPassed = lockSessionID;
+            getMockCatalog()->expectNoGrabLock();  // Call only once.
+        },
+        {ErrorCodes::LockStateChangeFailed, "Unable to take lock"});
+
+    auto lockStatus =
+        distLock()->tryLockWithLocalWriteConcern(operationContext(), lockName, whyMsg);
+    ASSERT_EQ(ErrorCodes::LockBusy, lockStatus.getStatus());
 }
 
 }  // unnamed namespace

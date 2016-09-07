@@ -75,6 +75,10 @@ public:
                                                  Milliseconds waitFor,
                                                  Milliseconds lockTryInterval) override;
 
+    StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
+                                                            StringData name,
+                                                            StringData whyMessage) override;
+
     void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 
     void unlock(OperationContext* txn,

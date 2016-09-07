@@ -179,7 +179,8 @@ StatusWith<LocksType> DistLockCatalogMock::grabLock(OperationContext* txn,
                                                     StringData who,
                                                     StringData processId,
                                                     Date_t time,
-                                                    StringData why) {
+                                                    StringData why,
+                                                    const WriteConcernOptions& writeConcern) {
     auto ret = kLocksTypeBadRetValue;
     GrabLockFunc checkerFunc = noGrabLockFuncSet;
 
