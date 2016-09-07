@@ -1015,7 +1015,7 @@ bool Value::integral() const {
             // If we are able to convert the decimal to an int32_t without an rounding errors,
             // then it is integral.
             uint32_t signalingFlags = Decimal128::kNoFlag;
-            (void)_storage.getDecimal().toInt(&signalingFlags);
+            (void)_storage.getDecimal().toIntExact(&signalingFlags);
             return signalingFlags == Decimal128::kNoFlag;
         }
         default:
