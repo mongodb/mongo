@@ -44,12 +44,14 @@
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
         copyDatabaseWithSCRAM, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoLocalInfo, MongoExternalInfo),
@@ -89,8 +91,11 @@ const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
 
 namespace {
 DBClientBase* getConnection(JS::CallArgs& args) {
-    return static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()))
-        ->get();
+    auto ret = static_cast<std::shared_ptr<DBClientBase>*>(
+                   JS_GetPrivate(args.thisv().toObjectOrNull()))->get();
+    uassert(
+        ErrorCodes::BadValue, "Trying to get connection for closed Mongo object", ret != nullptr);
+    return ret;
 }
 
 void setCursor(JS::HandleObject target,
@@ -118,6 +123,17 @@ void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
     if (conn) {
         delete conn;
     }
+}
+
+void MongoBase::Functions::close::call(JSContext* cx, JS::CallArgs args) {
+    getConnection(args);
+
+    auto thisv = args.thisv().toObjectOrNull();
+    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(thisv));
+
+    conn->reset();
+
+    args.rval().setUndefined();
 }
 
 void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {

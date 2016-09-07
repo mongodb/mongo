@@ -10,6 +10,7 @@ Import([
 env.Library(
     target='scripting_common',
     source=[
+        'deadline_monitor.cpp',
         'engine.cpp',
         'utils.cpp',
     ],
@@ -183,5 +184,6 @@ env.CppUnitTest(
         'deadline_monitor_test.cpp',
     ],
     LIBDEPS=[
+        'scripting_common',
     ],
 )

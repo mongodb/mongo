@@ -44,10 +44,8 @@ for (var test = 0; test < 2; test++) {
         jsTest.log("Returning the connections back to the pool.");
 
         for (var i = 0; i < conns.length; i++) {
-            conns[i] = null;
+            conns[i].close();
         }
-        // Make sure we return connections back to the pool
-        gc();
 
         // Don't make test fragile by linking to format of shardConnPoolStats, but this is useful if
         // something goes wrong.

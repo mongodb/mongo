@@ -348,7 +348,7 @@ public:
     }
 
     void handleRecvError(int ret, int len);
-    MONGO_COMPILER_NORETURN void handleSendError(int ret, const char* context);
+    void handleSendError(int ret, const char* context);
 
 private:
     void _init();

@@ -26,8 +26,12 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/json.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

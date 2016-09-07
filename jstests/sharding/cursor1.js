@@ -44,8 +44,6 @@
     assert.eq(numObjs, cursor3.itcount(), "c3");
 
     // Test that a cursor with a 1 second timeout eventually times out.
-    gc();
-    gc();
     var cur = db.foo.find().batchSize(2);
     assert(cur.next(), "T1");
     assert(cur.next(), "T2");
@@ -64,9 +62,6 @@
             return true;
         }
     }, "cursor failed to time out", /*timeout*/ 30000, /*interval*/ 5000);
-
-    gc();
-    gc();
 
     s.stop();
 

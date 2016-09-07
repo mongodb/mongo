@@ -1,11 +1,7 @@
 var maxBsonObjectSize = db.isMaster().maxBsonObjectSize;
 var docOverhead = Object.bsonsize({_id: new ObjectId(), x: ''});
 var maxStrSize = maxBsonObjectSize - docOverhead;
-
-var maxStr = 'a';
-while (maxStr.length < maxStrSize)
-    maxStr += 'a';
-
+var maxStr = 'a'.repeat(maxStrSize);
 var coll = db.max_doc_size;
 
 coll.drop();

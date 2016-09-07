@@ -546,7 +546,10 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
     }
 #else
     int tmp;
-    bool ret = (pid.toNative() == waitpid(pid.toNative(), &tmp, (block ? 0 : WNOHANG)));
+    int ret;
+    do {
+        ret = waitpid(pid.toNative(), &tmp, (block ? 0 : WNOHANG));
+    } while (ret == -1 && errno == EINTR);
     if (ret && exit_code) {
         if (WIFEXITED(tmp)) {
             *exit_code = WEXITSTATUS(tmp);
@@ -556,7 +559,7 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
             MONGO_UNREACHABLE;
         }
     }
-    return ret;
+    return ret == pid.toNative();
 
 #endif
 }
