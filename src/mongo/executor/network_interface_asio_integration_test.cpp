@@ -246,7 +246,6 @@ private:
     bool _cancel;
 };
 
-#ifndef _WIN32
 TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
     constexpr std::size_t numOps = 10000;
     RemoteCommandResponse testResults[numOps];
@@ -298,7 +297,6 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
         ASSERT_EQ(ec, expectedResults[i]);
     }
 }
-#endif
 
 // Hook that intentionally never finishes
 class HangingHook : public executor::NetworkConnectionHook {
