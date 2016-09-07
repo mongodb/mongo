@@ -326,7 +326,9 @@ TEST(FTDCFileTest, TestLargeDocuments) {
             BSONObjBuilder b;
             b.append("name", "joe");
             for (size_t k = 0; k < 200; k++) {
-                b.appendNumber("num", static_cast<long long int>(i * j + 5000 - (sin(k) * 100)));
+                b.appendNumber(
+                    "num",
+                    static_cast<long long int>(i * j + 5000 - (sin(static_cast<double>(k)) * 100)));
             }
 
             c.addSample(b.obj());
