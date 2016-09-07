@@ -860,6 +860,13 @@ var ReplSetTest = function(opts) {
         return res;
     };
 
+    this.dumpOplog = function(conn, limit) {
+        print('Dumping the latest ' + limit + ' documents from the oplog of ' + conn.host);
+        var cursor =
+            conn.getDB('local').getCollection('oplog.rs').find().sort({$natural: -1}).limit(limit);
+        cursor.forEach(printjsononeline);
+    };
+
     this.checkReplicatedDataHashes = function(excludedDBs = [], msgPrefix = undefined) {
         // TODO: Remove nested functions -- SERVER-25644
         'use strict';
@@ -1091,21 +1098,10 @@ var ReplSetTest = function(opts) {
                         }
 
                         if (!success) {
-                            var dumpOplog = function(conn, limit) {
-                                print('Dumping the latest ' + limit +
-                                      ' documents from the oplog of ' + conn.host);
-                                var cursor = conn.getDB('local')
-                                                 .getCollection('oplog.rs')
-                                                 .find()
-                                                 .sort({$natural: -1})
-                                                 .limit(limit);
-                                cursor.forEach(printjsononeline);
-                            };
-
                             if (!hasDumpedOplog) {
-                                dumpOplog(primary, 100);
+                                rst.dumpOplog(primary, 100);
                                 rst.getSecondaries().forEach(secondary =>
-                                                                 dumpOplog(secondary, 100));
+                                                                 rst.dumpOplog(secondary, 100));
                                 hasDumpedOplog = true;
                             }
                         }
