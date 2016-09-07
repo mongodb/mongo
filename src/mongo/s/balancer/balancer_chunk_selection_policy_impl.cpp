@@ -151,7 +151,10 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
         const NamespaceString nss(coll.getNs());
 
         auto candidatesStatus = _getSplitCandidatesForCollection(txn, nss, shardStats);
-        if (!candidatesStatus.isOK()) {
+        if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
+            // Namespace got dropped before we managed to get to it, so just skip it
+            continue;
+        } else if (!candidatesStatus.isOK()) {
             warning() << "Unable to enforce tag range policy for collection " << nss.ns()
                       << causedBy(candidatesStatus.getStatus());
             continue;
@@ -202,7 +205,10 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
         auto candidatesStatus =
             _getMigrateCandidatesForCollection(txn, nss, shardStats, aggressiveBalanceHint);
-        if (!candidatesStatus.isOK()) {
+        if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
+            // Namespace got dropped before we managed to get to it, so just skip it
+            continue;
+        } else if (!candidatesStatus.isOK()) {
             warning() << "Unable to balance collection " << nss.ns()
                       << causedBy(candidatesStatus.getStatus());
             continue;
