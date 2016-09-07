@@ -123,29 +123,39 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
     auto scope = getScope(cx);
 
     if (!JSREPORT_IS_WARNING(report->flags)) {
-        str::stream ss;
-        ss << message;
 
-        // TODO: something far more elaborate that mimics the stack printing from v8
-        JS::RootedValue excn(cx);
-        if (JS_GetPendingException(cx, &excn) && excn.isObject()) {
-            JS::RootedValue stack(cx);
+        std::string exceptionMsg;
 
-            ObjectWrapper(cx, excn).getValue("stack", &stack);
+        try {
+            str::stream ss;
+            ss << message;
 
-            auto str = ValueWriter(cx, stack).toString();
+            // TODO: something far more elaborate that mimics the stack printing from v8
+            JS::RootedValue excn(cx);
+            if (JS_GetPendingException(cx, &excn) && excn.isObject()) {
+                JS::RootedValue stack(cx);
 
-            if (str.empty()) {
-                ss << " @" << report->filename << ":" << report->lineno << ":" << report->column
-                   << "\n";
-            } else {
-                ss << " :\n" << str;
+                ObjectWrapper(cx, excn).getValue("stack", &stack);
+
+                auto str = ValueWriter(cx, stack).toString();
+
+                if (str.empty()) {
+                    ss << " @" << report->filename << ":" << report->lineno << ":" << report->column
+                       << "\n";
+                } else {
+                    ss << " :\n" << str;
+                }
             }
+
+            exceptionMsg = ss;
+        } catch (const DBException& dbe) {
+            exceptionMsg = "Unknown error occured while processing exception";
+            log() << exceptionMsg << ":" << dbe.toString() << ":" << message;
         }
 
         scope->_status = Status(
             JSErrorReportToStatus(cx, report, ErrorCodes::JSInterpreterFailure, message).code(),
-            ss);
+            exceptionMsg);
     }
 }
 
