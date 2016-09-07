@@ -147,11 +147,6 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<DistLockManager::ScopedDistLock> ShardingCatalogClientMock::distLock(
-    OperationContext* txn, StringData name, StringData whyMessage, Milliseconds waitFor) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 bool ShardingCatalogClientMock::runUserManagementWriteCommand(OperationContext* txn,
                                                               const string& commandName,
                                                               const string& dbname,

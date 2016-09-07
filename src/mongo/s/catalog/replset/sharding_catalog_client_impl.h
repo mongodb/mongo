@@ -83,11 +83,6 @@ public:
                      const BSONObj& detail,
                      const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<DistLockManager::ScopedDistLock> distLock(OperationContext* txn,
-                                                         StringData name,
-                                                         StringData whyMessage,
-                                                         Milliseconds waitFor) override;
-
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,

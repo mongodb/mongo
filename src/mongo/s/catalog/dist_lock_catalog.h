@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/util/time_support.h"
@@ -45,13 +46,14 @@ class StatusWith;
  * Interface for the distributed lock operations.
  */
 class DistLockCatalog {
+    MONGO_DISALLOW_COPYING(DistLockCatalog);
+
 public:
     /**
      * Simple data structure for storing server local time and election id.
      */
     struct ServerInfo {
     public:
-        ServerInfo();  // TODO: SERVER-18007
         ServerInfo(Date_t time, OID electionId);
 
         // The local time of the server at the time this was created.
@@ -169,6 +171,9 @@ public:
      * Common status errors include socket errors.
      */
     virtual Status stopPing(OperationContext* txn, StringData processId) = 0;
+
+protected:
+    DistLockCatalog();
 };
 
 }  // namespace mongo

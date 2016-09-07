@@ -63,28 +63,28 @@ public:
 
     virtual ~ReplSetDistLockManager();
 
-    virtual void startUp() override;
-    virtual void shutDown(OperationContext* txn) override;
+    void startUp() override;
+    void shutDown(OperationContext* txn) override;
 
-    virtual std::string getProcessID() override;
+    std::string getProcessID() override;
 
-    virtual StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
-                                                         StringData name,
-                                                         StringData whyMessage,
-                                                         const OID lockSessionID,
-                                                         Milliseconds waitFor,
-                                                         Milliseconds lockTryInterval) override;
+    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
+                                                 StringData name,
+                                                 StringData whyMessage,
+                                                 const OID& lockSessionID,
+                                                 Milliseconds waitFor,
+                                                 Milliseconds lockTryInterval) override;
 
-    virtual void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
+    void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 
-    virtual void unlock(OperationContext* txn,
-                        const DistLockHandle& lockSessionID,
-                        StringData name) override;
+    void unlock(OperationContext* txn,
+                const DistLockHandle& lockSessionID,
+                StringData name) override;
 
-    virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
+    void unlockAll(OperationContext* txn, const std::string& processID) override;
 
 protected:
-    virtual Status checkStatus(OperationContext* txn, const DistLockHandle& lockSessionID) override;
+    Status checkStatus(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 
 private:
     /**
@@ -144,4 +144,5 @@ private:
     // Map of lockName to last ping information.
     std::unordered_map<std::string, DistLockPingInfo> _pingHistory;  // (M)
 };
-}
+
+}  // namespace mongo

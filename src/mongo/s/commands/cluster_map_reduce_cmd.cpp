@@ -518,9 +518,8 @@ public:
             auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogClient(txn)->distLock(
+                auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
                     txn, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
-
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());
                 }

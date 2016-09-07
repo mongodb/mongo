@@ -394,11 +394,6 @@ Status ShardingCatalogClientImpl::_log(OperationContext* txn,
     return result;
 }
 
-StatusWith<DistLockManager::ScopedDistLock> ShardingCatalogClientImpl::distLock(
-    OperationContext* txn, StringData name, StringData whyMessage, Milliseconds waitFor) {
-    return getDistLockManager()->lock(txn, name, whyMessage, waitFor);
-}
-
 Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
                                                   const string& ns,
                                                   const ShardKeyPattern& fieldsAndOrder,

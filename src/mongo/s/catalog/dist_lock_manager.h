@@ -149,7 +149,7 @@ public:
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
-        const OID lockSessionID,
+        const OID& lockSessionID,
         Milliseconds waitFor = kDefaultLockTimeout,
         Milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 

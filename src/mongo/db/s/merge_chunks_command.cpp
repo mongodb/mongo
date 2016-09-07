@@ -86,8 +86,8 @@ Status mergeChunks(OperationContext* txn,
     // TODO(SERVER-25086): Remove distLock acquisition from merge chunk
     const string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey
                                        << " to " << maxKey;
-    auto scopedDistLock = grid.catalogClient(txn)->distLock(
-        txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+    auto scopedDistLock =
+        grid.catalogClient(txn)->getDistLockManager()->lock(txn, nss.ns(), whyMessage);
 
     if (!scopedDistLock.isOK()) {
         std::string errmsg = stream() << "could not acquire collection lock for " << nss.ns()

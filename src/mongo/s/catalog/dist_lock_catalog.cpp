@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+DistLockCatalog::DistLockCatalog() = default;
+
 DistLockCatalog::ServerInfo::ServerInfo(Date_t time, OID _electionId)
     : serverTime(std::move(time)), electionId(std::move(_electionId)) {}
 

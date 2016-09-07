@@ -162,11 +162,6 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    StatusWith<DistLockManager::ScopedDistLock> distLock(OperationContext* txn,
-                                                         StringData name,
-                                                         StringData whyMessage,
-                                                         Milliseconds waitFor) override;
-
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                               BSONArrayBuilder* builder) override;
 

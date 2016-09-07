@@ -442,13 +442,6 @@ public:
     virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                                       BSONArrayBuilder* builder) = 0;
 
-
-    virtual StatusWith<DistLockManager::ScopedDistLock> distLock(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        Milliseconds waitFor = DistLockManager::kSingleLockAttemptTimeout) = 0;
-
     /**
      * Obtains a reference to the distributed lock manager instance to use for synchronizing
      * system-wide changes.
@@ -457,7 +450,6 @@ public:
      * be cached.
      */
     virtual DistLockManager* getDistLockManager() = 0;
-
 
 protected:
     ShardingCatalogClient() = default;

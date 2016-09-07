@@ -75,7 +75,7 @@ std::string DistLockManagerMock::getProcessID() {
 StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationContext* txn,
                                                                   StringData name,
                                                                   StringData whyMessage,
-                                                                  const OID lockSessionID,
+                                                                  const OID& lockSessionID,
                                                                   Milliseconds waitFor,
                                                                   Milliseconds lockTryInterval) {
     _lockChecker(name, whyMessage, waitFor, lockTryInterval);
@@ -101,7 +101,8 @@ StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationConte
 }
 
 void DistLockManagerMock::unlockAll(OperationContext* txn, const std::string& processID) {
-    fassertFailed(34366);  // Not implemented for the mock
+    // Not yet implemented
+    MONGO_UNREACHABLE;
 }
 
 void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lockHandle) {

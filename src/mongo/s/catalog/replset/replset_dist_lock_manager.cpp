@@ -274,7 +274,7 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* txn,
 StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationContext* txn,
                                                                      StringData name,
                                                                      StringData whyMessage,
-                                                                     const OID lockSessionID,
+                                                                     const OID& lockSessionID,
                                                                      Milliseconds waitFor,
                                                                      Milliseconds lockTryInterval) {
     Timer timer(_serviceContext->getTickSource());
@@ -299,6 +299,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
             const BSONObj& data = customTimeout.getData();
             lockExpiration = Milliseconds(data["timeoutMs"].numberInt());
         }
+
         LOG(1) << "trying to acquire new distributed lock for " << name
                << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)
                << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)

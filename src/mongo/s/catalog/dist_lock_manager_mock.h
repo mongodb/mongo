@@ -31,9 +31,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/s/catalog/dist_lock_manager.h"
-
 #include "mongo/s/catalog/dist_lock_catalog.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -44,19 +43,19 @@ public:
 
     virtual ~DistLockManagerMock() = default;
 
-    virtual void startUp() override;
-    virtual void shutDown(OperationContext* txn) override;
+    void startUp() override;
+    void shutDown(OperationContext* txn) override;
 
-    virtual std::string getProcessID() override;
+    std::string getProcessID() override;
 
-    virtual StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
-                                                         StringData name,
-                                                         StringData whyMessage,
-                                                         const OID lockSessionID,
-                                                         Milliseconds waitFor,
-                                                         Milliseconds lockTryInterval) override;
+    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
+                                                 StringData name,
+                                                 StringData whyMessage,
+                                                 const OID& lockSessionID,
+                                                 Milliseconds waitFor,
+                                                 Milliseconds lockTryInterval) override;
 
-    virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
+    void unlockAll(OperationContext* txn, const std::string& processID) override;
 
     using LockFunc = stdx::function<void(StringData name,
                                          StringData whyMessage,
@@ -66,20 +65,17 @@ public:
     void expectLock(LockFunc checkerFunc, Status lockStatus);
 
 protected:
-    virtual void unlock(OperationContext* txn, const DistLockHandle& lockHandle) override;
+    void unlock(OperationContext* txn, const DistLockHandle& lockHandle) override;
 
-    virtual void unlock(OperationContext* txn,
-                        const DistLockHandle& lockHandle,
-                        StringData name) override;
+    void unlock(OperationContext* txn, const DistLockHandle& lockHandle, StringData name) override;
 
-    virtual Status checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) override;
+    Status checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) override;
 
 private:
     struct LockInfo {
         DistLockHandle lockID;
         std::string name;
     };
-
 
     /**
      * Unused, but needed so that test code mirrors the ownership semantics of production code.
@@ -90,4 +86,5 @@ private:
     Status _lockReturnStatus;
     LockFunc _lockChecker;
 };
-}
+
+}  // namespace mongo

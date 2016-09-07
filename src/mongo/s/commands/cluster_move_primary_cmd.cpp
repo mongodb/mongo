@@ -152,8 +152,8 @@ public:
               << " to: " << toShard->toString();
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
-        auto scopedDistLock = grid.catalogClient(txn)->distLock(
-            txn, dbname + "-movePrimary", whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
+            txn, dbname + "-movePrimary", whyMessage);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());
