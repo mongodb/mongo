@@ -683,14 +683,6 @@ Status userCreateNS(OperationContext* txn,
 
     // Validate the collation, if there is one.
     if (!collectionOptions.collation.isEmpty()) {
-        if (serverGlobalParams.featureCompatibilityVersion.load() ==
-            ServerGlobalParams::FeatureCompatibilityVersion_32) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "The featureCompatibilityVersion must be 3.4 to create a collection or "
-                          "view with a default collation. See "
-                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-        }
-
         auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
                             ->makeFromBSON(collectionOptions.collation);
         if (!collator.isOK()) {
