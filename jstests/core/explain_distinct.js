@@ -65,7 +65,7 @@
     assert.eq(false, stage.isUnique);
     assert.eq(false, stage.isSparse);
     assert.eq(false, stage.isPartial);
-    assert.eq(1, stage.indexVersion);
+    assert.lte(1, stage.indexVersion);
     assert("indexBounds" in stage);
 
     assert.commandWorked(coll.createIndex({a: 1, b: 1}));

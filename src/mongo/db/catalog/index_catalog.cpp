@@ -62,10 +62,12 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo {
 
@@ -74,11 +76,10 @@ using std::endl;
 using std::string;
 using std::vector;
 
+using IndexVersion = IndexDescriptor::IndexVersion;
+
 static const int INDEX_CATALOG_INIT = 283711;
 static const int INDEX_CATALOG_UNINIT = 654321;
-
-// What's the default version of our indices?
-const int DefaultIndexVersionNumber = 1;
 
 const BSONObj IndexCatalog::_idObj = BSON("_id" << 1);
 
@@ -472,22 +473,30 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "non-numeric value for \"v\" field: " << vElt);
         }
-        double v = vElt.Number();
+
+        auto vEltAsInt = representAs<int>(vElt.number());
+        if (!vEltAsInt) {
+            return {
+                ErrorCodes::CannotCreateIndex,
+                str::stream() << "Index version must be representable as a 32-bit integer, but got "
+                              << vElt.toString(false, false)};
+        }
+
+        auto indexVersion = static_cast<IndexVersion>(*vEltAsInt);
 
         // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
-        if (v == 0 && !txn->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        if (indexVersion == IndexVersion::kV0 &&
+            !txn->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "use of v0 indexes is only allowed with the "
                                         << "mmapv1 storage engine");
         }
 
-        // note (one day) we may be able to fresh build less versions than we can use
-        // isASupportedIndexVersionNumber() is what we can use
-        if (v != 0 && v != 1) {
+        if (!IndexDescriptor::isIndexVersionSupported(indexVersion)) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "this version of mongod cannot build new indexes "
                                         << "of version number "
-                                        << v);
+                                        << static_cast<int>(indexVersion));
         }
     }
 
@@ -556,6 +565,15 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
             return statusWithCollator.getStatus();
         }
         collator = std::move(statusWithCollator.getValue());
+
+        if (vElt && static_cast<IndexVersion>(vElt.numberInt()) < IndexVersion::kV2) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "Index version " << vElt.fieldNameStringData() << "="
+                                  << vElt.numberInt()
+                                  << " does not support the '"
+                                  << collationElement.fieldNameStringData()
+                                  << "' option"};
+        }
 
         string pluginName = IndexNames::findPluginName(key);
         if (collator && (pluginName != IndexNames::BTREE) &&
@@ -1335,13 +1353,16 @@ StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(OperationContext* txn,
 
     BSONObjBuilder b;
 
-    int v = DefaultIndexVersionNumber;
+    auto indexVersion = IndexDescriptor::getDefaultIndexVersion(
+        serverGlobalParams.featureCompatibilityVersion.load());
     if (!o["v"].eoo()) {
-        v = o["v"].numberInt();
+        // We've already verified in IndexCatalog::_isSpecOk() that the index version is
+        // representable as a 32-bit integer.
+        indexVersion = static_cast<IndexVersion>(o["v"].numberInt());
     }
 
     // idea is to put things we use a lot earlier
-    b.append("v", v);
+    b.append("v", static_cast<int>(indexVersion));
 
     if (o["unique"].trueValue())
         b.appendBool("unique", true);  // normalize to bool true in case was int 1 or something...
@@ -1376,9 +1397,11 @@ StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(OperationContext* txn,
         if (collator.getValue()) {
             b.append("collation", collator.getValue()->getSpec().toBSON());
         }
-    } else if (collection->getDefaultCollator()) {
+    } else if (collection->getDefaultCollator() && indexVersion >= IndexVersion::kV2) {
         // The user did not specify an explicit collation for this index and the collection has a
-        // default collator. In this case, the index inherits the collection default.
+        // default collator. If we're building a v=2 index, then we should inherit the collection
+        // default. However, if we're building a v=1 index, then we're implicitly building an index
+        // that's using the "simple" collation.
         b.append("collation", collection->getDefaultCollator()->getSpec().toBSON());
     }
 

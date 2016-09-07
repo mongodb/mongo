@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -58,6 +59,8 @@ using std::vector;
 using std::map;
 using std::string;
 using std::stringstream;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 
@@ -96,6 +99,8 @@ BSONObj createIndexDoc(const string& ns,
     indexDoc.append("name", indexName.str());
 
     if (!collation.isEmpty()) {
+        // Creating an index with the "collation" option requires a v=2 index.
+        indexDoc.append("v", static_cast<int>(IndexVersion::kV2));
         indexDoc.append("collation", collation);
     }
 

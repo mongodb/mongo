@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -66,8 +67,10 @@ const StringData kIndexesFieldName = "indexes"_sd;
  * specifications that have any missing attributes filled in. If any index specification is
  * malformed, then an error status is returned.
  */
-StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(const NamespaceString& ns,
-                                                            const BSONObj& cmdObj) {
+StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
+    const NamespaceString& ns,
+    const BSONObj& cmdObj,
+    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) {
     bool hasIndexesField = false;
 
     std::vector<BSONObj> indexSpecs;
@@ -90,7 +93,8 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(const NamespaceStrin
                                           << typeName(indexesElem.type())};
                 }
 
-                auto indexSpec = validateIndexSpec(indexesElem.Obj(), ns);
+                auto indexSpec =
+                    validateIndexSpec(indexesElem.Obj(), ns, featureCompatibilityVersion);
                 if (!indexSpec.isOK()) {
                     return indexSpec.getStatus();
                 }
@@ -156,7 +160,9 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        auto specsWithStatus = parseAndValidateIndexSpecs(ns, cmdObj);
+        const auto featureCompatibilityVersion =
+            serverGlobalParams.featureCompatibilityVersion.load();
+        auto specsWithStatus = parseAndValidateIndexSpecs(ns, cmdObj, featureCompatibilityVersion);
         if (!specsWithStatus.isOK()) {
             return appendCommandStatus(result, specsWithStatus.getStatus());
         }

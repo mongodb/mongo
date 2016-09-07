@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/db/server_options.h"
+
 namespace mongo {
 class BSONObj;
 class NamespaceString;
@@ -45,6 +47,8 @@ Status validateKeyPattern(const BSONObj& key);
  * has any missing attributes filled in. If the index specification is malformed, then an error
  * status is returned.
  */
-StatusWith<BSONObj> validateIndexSpec(const BSONObj& indexSpec,
-                                      const NamespaceString& expectedNamespace);
+StatusWith<BSONObj> validateIndexSpec(
+    const BSONObj& indexSpec,
+    const NamespaceString& expectedNamespace,
+    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion);
 }  // namespace mongo

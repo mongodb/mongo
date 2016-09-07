@@ -27,6 +27,12 @@ rst.initiate(replSetConfig);
 var primary = rst.getPrimary();
 var coll = "test.foo";
 
+// We set the featureCompatibilityVersion to 3.2 so that the default index version becomes v=1. We
+// do this prior to writing any data to the replica set so that any indexes created during this test
+// are compatible with 3.2. This effectively allows us to emulate upgrading to the latest version
+// with existing data files and then trying to downgrade back to 3.2.
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
+
 jsTest.log("Inserting documents into collection.");
 for (var i = 0; i < 10; i++) {
     primary.getCollection(coll).insert({_id: i, str: "hello world"});

@@ -113,10 +113,15 @@ function CollectionDataValidator() {
         return collection;
     };
 
-    this.validateCollectionData = function(collection, dbVersionForCollection) {
+    this.validateCollectionData = function(
+        collection, dbVersionForCollection, options = {indexSpecFieldsToSkip: []}) {
 
         if (!_initialized) {
             throw Error("validateCollectionWithAllData called, but data is not initialized");
+        }
+
+        if (!Array.isArray(options.indexSpecFieldsToSkip)) {
+            throw new Error("Option 'indexSpecFieldsToSkip' must be an array");
         }
 
         // Get the metadata for this collection
@@ -134,7 +139,15 @@ function CollectionDataValidator() {
                 return -1;
         });
         for (var i = 0; i < newIndexData.length; i++) {
-            assert.docEq(_indexData[i], newIndexData[i], "indexes not equal");
+            let recordedIndex = Object.extend({}, _indexData[i]);
+            let newIndex = Object.extend({}, newIndexData[i]);
+
+            options.indexSpecFieldsToSkip.forEach(fieldName => {
+                delete recordedIndex[fieldName];
+                delete newIndex[fieldName];
+            });
+
+            assert.docEq(recordedIndex, newIndex, "indexes not equal");
         }
 
         // Save the data for this collection for later comparison

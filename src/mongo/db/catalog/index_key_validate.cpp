@@ -30,27 +30,31 @@
 
 #include "mongo/db/catalog/index_key_validate.h"
 
+#include <boost/optional.hpp>
 #include <cmath>
 #include <limits>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo {
 
 using std::string;
 
-namespace {
-const int kIndexVersionV0 = 0;
+using IndexVersion = IndexDescriptor::IndexVersion;
 
+namespace {
 const StringData kKeyPatternFieldName = "key"_sd;
 const StringData kNamespaceFieldName = "ns"_sd;
 const StringData kVersionFieldName = "v"_sd;
+const StringData kCollationFieldName = "collation"_sd;
 }  // namespace
 
 Status validateKeyPattern(const BSONObj& key) {
@@ -141,10 +145,16 @@ Status validateKeyPattern(const BSONObj& key) {
     return Status::OK();
 }
 
-StatusWith<BSONObj> validateIndexSpec(const BSONObj& indexSpec,
-                                      const NamespaceString& expectedNamespace) {
+StatusWith<BSONObj> validateIndexSpec(
+    const BSONObj& indexSpec,
+    const NamespaceString& expectedNamespace,
+    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) {
     bool hasKeyPatternField = false;
     bool hasNamespaceField = false;
+    bool hasVersionField = false;
+    bool hasCollationField = false;
+
+    boost::optional<IndexVersion> resolvedIndexVersion;
 
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
@@ -202,18 +212,41 @@ StatusWith<BSONObj> validateIndexSpec(const BSONObj& indexSpec,
                                       << typeName(indexSpecElem.type())};
             }
 
-            if (kIndexVersionV0 == indexSpecElem.numberInt()) {
-                return {ErrorCodes::CannotCreateIndex,
-                        str::stream() << "Invalid index specification " << indexSpec
-                                      << "; cannot create an index with "
-                                      << kVersionFieldName
-                                      << "="
-                                      << kIndexVersionV0};
+            auto requestedIndexVersionAsInt = representAs<int>(indexSpecElem.number());
+            if (!requestedIndexVersionAsInt) {
+                return {ErrorCodes::BadValue,
+                        str::stream()
+                            << "Index version must be representable as a 32-bit integer, but got "
+                            << indexSpecElem.toString(false, false)};
             }
+
+            const IndexVersion requestedIndexVersion =
+                static_cast<IndexVersion>(*requestedIndexVersionAsInt);
+            auto creationAllowedStatus = IndexDescriptor::isIndexVersionAllowedForCreation(
+                requestedIndexVersion, featureCompatibilityVersion, indexSpec);
+            if (!creationAllowedStatus.isOK()) {
+                return creationAllowedStatus;
+            }
+
+            hasVersionField = true;
+            resolvedIndexVersion = requestedIndexVersion;
+        } else if (kCollationFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << kNamespaceFieldName
+                                      << "' must be an object, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+
+            hasCollationField = true;
         } else {
             // TODO SERVER-769: Validate index options specified in the "createIndexes" command.
             continue;
         }
+    }
+
+    if (!resolvedIndexVersion) {
+        resolvedIndexVersion = IndexDescriptor::getDefaultIndexVersion(featureCompatibilityVersion);
     }
 
     if (!hasKeyPatternField) {
@@ -222,11 +255,32 @@ StatusWith<BSONObj> validateIndexSpec(const BSONObj& indexSpec,
                               << "' field is a required property of an index specification"};
     }
 
-    if (!hasNamespaceField) {
-        // We create a new index specification with the 'ns' field set as 'expectedNamespace' if the
-        // field was omitted.
+    if (hasCollationField && *resolvedIndexVersion < IndexVersion::kV2) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Invalid index specification " << indexSpec
+                              << "; cannot create an index with the '"
+                              << kCollationFieldName
+                              << "' option and "
+                              << kVersionFieldName
+                              << "="
+                              << static_cast<int>(*resolvedIndexVersion)};
+    }
+
+    if (!hasNamespaceField || !hasVersionField) {
         BSONObjBuilder bob;
-        bob.append(kNamespaceFieldName, expectedNamespace.ns());
+
+        if (!hasNamespaceField) {
+            // We create a new index specification with the 'ns' field set as 'expectedNamespace' if
+            // the field was omitted.
+            bob.append(kNamespaceFieldName, expectedNamespace.ns());
+        }
+
+        if (!hasVersionField) {
+            // We create a new index specification with the 'v' field set as 'defaultIndexVersion'
+            // if the field was omitted.
+            bob.append(kVersionFieldName, static_cast<int>(*resolvedIndexVersion));
+        }
+
         bob.appendElements(indexSpec);
         return bob.obj();
     }

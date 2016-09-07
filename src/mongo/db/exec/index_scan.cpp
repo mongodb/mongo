@@ -85,7 +85,7 @@ IndexScan::IndexScan(OperationContext* txn,
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {

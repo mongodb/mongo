@@ -153,9 +153,14 @@ function multiVersionDumpRestoreTest(configObj) {
 
     let destDbVersion = destDB.version();
 
+    // The mongorestore tool removes the "v" field when creating indexes from a dump. This allows
+    // indexes to be built with the latest supported index version. We therefore remove the "v"
+    // field when comparing whether the indexes we built are equivalent.
+    const options = {indexSpecFieldsToSkip: ["v"]};
+
     // Validate that our collections were properly restored
-    assert(collValid.validateCollectionData(destColl, destDbVersion));
-    assert(cappedCollValid.validateCollectionData(destCollCapped, destDbVersion));
+    assert(collValid.validateCollectionData(destColl, destDbVersion, options));
+    assert(cappedCollValid.validateCollectionData(destCollCapped, destDbVersion, options));
 
     if (configObj.restoreType === "mongos") {
         shardingTest.stop();

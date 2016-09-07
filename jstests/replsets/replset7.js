@@ -48,7 +48,7 @@ assert.eq(1,
           slave.getDB('d')['c']
               .getIndexes()
               .filter(function(doc) {
-                  return (doc.v === 1 && JSON.stringify(doc.key) === JSON.stringify({x: 1}) &&
+                  return (doc.v >= 1 && JSON.stringify(doc.key) === JSON.stringify({x: 1}) &&
                           doc.ns === 'd.c' && doc.name === 'x_1');
               })
               .length);

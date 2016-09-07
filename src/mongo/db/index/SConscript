@@ -20,6 +20,7 @@ env.Library(
         ],
         LIBDEPS=[
             'expression_params',
+            'index_descriptor',
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/bson/dotted_path_support',
             '$BUILD_DIR/mongo/db/fts/base',

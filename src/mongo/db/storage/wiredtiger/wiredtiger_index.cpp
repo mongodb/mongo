@@ -41,7 +41,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/storage_options.h"
@@ -195,13 +194,16 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // Indexes need to store the metadata for collation to work as expected.
     ss << ",key_format=u,value_format=u";
 
+    // We build v=2 indexes when the featureCompatibilityVersion is 3.4. This means that the server
+    // supports new index features and we can therefore use KeyString::Version::V1.
+    const int keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
+        ? kKeyStringV1Version
+        : kKeyStringV0Version;
+
     // Index metadata
     ss << ",app_metadata=("
-       << "formatVersion=" << (serverGlobalParams.featureCompatibilityVersion.load() ==
-                                       ServerGlobalParams::FeatureCompatibilityVersion_34
-                                   ? kKeyStringV1Version
-                                   : kKeyStringV0Version)
-       << ',' << "infoObj=" << desc.infoObj().jsonString() << "),";
+       << "formatVersion=" << keyStringVersion << ',' << "infoObj=" << desc.infoObj().jsonString()
+       << "),";
 
     LOG(3) << "index create string: " << ss.ss.str();
     return StatusWith<std::string>(ss);

@@ -17,8 +17,8 @@
     a = db.getCollection("jssymbol_col").getIndexes()[0];
 
     assert(isNaN(+a));
-    assert(+a.v == 1);
-    assert(`${a.v}` == 1);
+    assert(+a.v >= 1);
+    assert(`${a.v}` >= 1);
     assert(`${a}` == '[object BSON]');
 
     // Exercise the special Symbol methods and make sure BSON.resolve handles them

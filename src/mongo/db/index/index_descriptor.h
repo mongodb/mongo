@@ -35,7 +35,8 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
-
+#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
@@ -53,6 +54,8 @@ class IndexCatalogEntryContainer;
  */
 class IndexDescriptor {
 public:
+    enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
+
     /**
      * OnDiskIndexData is a pointer to the memory mapped per-index data.
      * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
@@ -72,13 +75,33 @@ public:
           _cachedEntry(NULL) {
         _indexNamespace = makeIndexNamespace(_parentNS, _indexName);
 
-        _version = 0;
+        _version = IndexVersion::kV0;
         BSONElement e = _infoObj["v"];
         if (e.isNumber()) {
-            _version = e.numberInt();
+            _version = static_cast<IndexVersion>(e.numberInt());
         }
     }
 
+
+    /**
+     * Returns true if the specified index version is supported, and returns false otherwise.
+     */
+    static bool isIndexVersionSupported(IndexVersion indexVersion);
+
+    /**
+     * Returns Status::OK() if indexes of version 'indexVersion' are allowed to be created, and
+     * returns ErrorCodes::CannotCreateIndex otherwise.
+     */
+    static Status isIndexVersionAllowedForCreation(
+        IndexVersion indexVersion,
+        ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion,
+        const BSONObj& indexSpec);
+
+    /**
+     * Returns the index version to use if it isn't specified in the index specification.
+     */
+    static IndexVersion getDefaultIndexVersion(
+        ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion);
 
     //
     // Information about the key pattern.
@@ -135,7 +158,7 @@ public:
     //
 
     // Return what version of index this is.
-    int version() const {
+    IndexVersion version() const {
         return _version;
     }
 
@@ -237,7 +260,7 @@ private:
     bool _sparse;
     bool _unique;
     bool _partial;
-    int _version;
+    IndexVersion _version;
 
     // only used by IndexCatalogEntryContainer to do caching for perf
     // users not allowed to touch, and not part of API

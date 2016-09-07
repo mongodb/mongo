@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
@@ -55,6 +56,8 @@ using std::endl;
 using std::pair;
 using std::set;
 using std::vector;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 
@@ -82,16 +85,17 @@ int oldCompare(const BSONObj& l, const BSONObj& r, const Ordering& o);
 
 class BtreeExternalSortComparison {
 public:
-    BtreeExternalSortComparison(const BSONObj& ordering, int version)
+    BtreeExternalSortComparison(const BSONObj& ordering, IndexVersion version)
         : _ordering(Ordering::make(ordering)), _version(version) {
-        invariant(version == 1 || version == 0);
+        invariant(IndexDescriptor::isIndexVersionSupported(version));
     }
 
     typedef std::pair<BSONObj, RecordId> Data;
 
     int operator()(const Data& l, const Data& r) const {
-        int x = (_version == 1 ? l.first.woCompare(r.first, _ordering, /*considerfieldname*/ false)
-                               : oldCompare(l.first, r.first, _ordering));
+        int x = (_version == IndexVersion::kV0
+                     ? oldCompare(l.first, r.first, _ordering)
+                     : l.first.woCompare(r.first, _ordering, /*considerfieldname*/ false));
         if (x) {
             return x;
         }
@@ -100,12 +104,12 @@ public:
 
 private:
     const Ordering _ordering;
-    const int _version;
+    const IndexVersion _version;
 };
 
 IndexAccessMethod::IndexAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
     : _btreeState(btreeState), _descriptor(btreeState->descriptor()), _newInterface(btree) {
-    verify(0 == _descriptor->version() || 1 == _descriptor->version());
+    verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
 }
 
 bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* txn) {

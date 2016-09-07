@@ -35,9 +35,13 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -61,6 +65,21 @@ BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
     _nullKey = nullKeyBuilder.obj();
 
     _isIdIndex = fieldNames.size() == 1 && std::string("_id") == fieldNames[0];
+}
+
+std::unique_ptr<BtreeKeyGenerator> BtreeKeyGenerator::make(IndexVersion indexVersion,
+                                                           std::vector<const char*> fieldNames,
+                                                           std::vector<BSONElement> fixed,
+                                                           bool isSparse,
+                                                           const CollatorInterface* collator) {
+    switch (indexVersion) {
+        case IndexVersion::kV0:
+            return stdx::make_unique<BtreeKeyGeneratorV0>(fieldNames, fixed, isSparse);
+        case IndexVersion::kV1:
+        case IndexVersion::kV2:
+            return stdx::make_unique<BtreeKeyGeneratorV1>(fieldNames, fixed, isSparse, collator);
+    }
+    return nullptr;
 }
 
 void BtreeKeyGenerator::getKeys(const BSONObj& obj,

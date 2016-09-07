@@ -26,6 +26,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index_names',
     ],
 )
@@ -69,6 +70,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/repl/serveronly',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
         '$BUILD_DIR/mongo/db/storage/key_string',

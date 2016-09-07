@@ -30,6 +30,9 @@
 
 #include "mongo/db/catalog/index_key_validate.h"
 
+#include <cmath>
+#include <limits>
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
@@ -55,96 +58,77 @@ BSONObj sorted(const BSONObj& obj) {
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsNotAnObject) {
-    ASSERT_EQ(ErrorCodes::TypeMismatch, validateIndexSpec(BSON("key" << 1), kTestNamespace));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << 1),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
               validateIndexSpec(BSON("key"
                                      << "not an object"),
-                                kTestNamespace));
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(BSON("key" << BSONArray()), kTestNamespace));
+              validateIndexSpec(BSON("key" << BSONArray()),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfFieldRepeatedInKeyPattern) {
     ASSERT_EQ(ErrorCodes::BadValue,
-              validateIndexSpec(BSON("key" << BSON("field" << 1 << "field" << 1)), kTestNamespace));
+              validateIndexSpec(BSON("key" << BSON("field" << 1 << "field" << 1)),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIndexSpec(BSON("key" << BSON("field" << 1 << "otherField" << -1 << "field"
                                                            << "2dsphere")),
-                                kTestNamespace));
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsNotPresent) {
-    ASSERT_EQ(ErrorCodes::FailedToParse, validateIndexSpec(BSONObj(), kTestNamespace));
+    ASSERT_EQ(ErrorCodes::FailedToParse,
+              validateIndexSpec(
+                  BSONObj(), kTestNamespace, ServerGlobalParams::FeatureCompatibilityVersion_34));
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfNamespaceIsNotAString) {
     ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << 1), kTestNamespace));
-    ASSERT_EQ(
-        ErrorCodes::TypeMismatch,
-        validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << BSONObj()), kTestNamespace));
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << 1),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << BSONObj()),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfNamespaceIsEmptyString) {
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns"
                                            << ""),
-                                NamespaceString()));
+                                NamespaceString(),
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfNamespaceDoesNotMatch) {
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns"
                                            << "some string"),
-                                kTestNamespace));
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
 
     // Verify that we reject the index specification when the "ns" field only contains the
     // collection name.
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.coll()),
-                                kTestNamespace));
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
 }
 
 TEST(IndexSpecValidateTest, ReturnsIndexSpecWithNamespaceFilledInIfItIsNotPresent) {
-    auto result = validateIndexSpec(BSON("key" << BSON("field" << 1)), kTestNamespace);
-    ASSERT_OK(result.getStatus());
-
-    // We don't care about the order of the fields in the resulting index specification.
-    ASSERT_BSONOBJ_EQ(sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns())),
-                      sorted(result.getValue()));
-
-    // Verify that the index specification we returned is still considered valid.
-    ASSERT_OK(validateIndexSpec(result.getValue(), kTestNamespace));
-}
-
-TEST(IndexSpecValidateTest, ReturnsIndexSpecUnchangedIfNamespaceIsPresent) {
-    auto result = validateIndexSpec(
-        BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns()), kTestNamespace);
-    ASSERT_OK(result.getStatus());
-
-    // We don't care about the order of the fields in the resulting index specification.
-    ASSERT_BSONOBJ_EQ(sorted(BSON("key" << BSON("field" << 1) << "ns"
-                                        << "test.index_spec_validate")),
-                      sorted(result.getValue()));
-}
-
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotANumber) {
-    ASSERT_EQ(ErrorCodes::TypeMismatch,
-              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v"
-                                           << "not a number"),
-                                kTestNamespace));
-    ASSERT_EQ(
-        ErrorCodes::TypeMismatch,
-        validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << BSONObj()), kTestNamespace));
-}
-
-TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsV0) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
-              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 0), kTestNamespace));
-}
-
-TEST(IndexSpecValidateTest, AcceptsAnyNonZeroNumericValueForVersion) {
-    auto result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 1), kTestNamespace);
+    auto result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 1),
+                                    kTestNamespace,
+                                    ServerGlobalParams::FeatureCompatibilityVersion_34);
     ASSERT_OK(result.getStatus());
 
     // We don't care about the order of the fields in the resulting index specification.
@@ -152,20 +136,236 @@ TEST(IndexSpecValidateTest, AcceptsAnyNonZeroNumericValueForVersion) {
         sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 1)),
         sorted(result.getValue()));
 
-    result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2.2), kTestNamespace);
+    // Verify that the index specification we returned is still considered valid.
+    ASSERT_OK(validateIndexSpec(
+        result.getValue(), kTestNamespace, ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, ReturnsIndexSpecUnchangedIfNamespaceAndVersionArePresent) {
+    auto result = validateIndexSpec(
+        BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 1),
+        kTestNamespace,
+        ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(sorted(BSON("key" << BSON("field" << 1) << "ns"
+                                        << "test.index_spec_validate"
+                                        << "v"
+                                        << 1)),
+                      sorted(result.getValue()));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotANumber) {
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v"
+                                           << "not a number"),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << BSONObj()),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsNotRepresentableAsInt) {
+    ASSERT_EQ(ErrorCodes::BadValue,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2.2),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::BadValue,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << std::nan("1")),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::BadValue,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v"
+                                           << std::numeric_limits<double>::infinity()),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::BadValue,
+              validateIndexSpec(
+                  BSON("key" << BSON("field" << 1) << "v" << std::numeric_limits<long long>::max()),
+                  kTestNamespace,
+                  ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsV0) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 0),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfVersionIsUnsupported) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateIndexSpec(
+                  BSON("key" << BSON("field" << 1) << "v" << 3 << "collation" << BSON("locale"
+                                                                                      << "en")),
+                  kTestNamespace,
+                  ServerGlobalParams::FeatureCompatibilityVersion_34));
+
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << -3LL),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfIndexVersionIsV2AndFeatureCompatibilityVersionIs32) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_32));
+}
+
+TEST(IndexSpecValidateTest, AcceptsIndexVersionsThatAreAllowedForCreation) {
+    auto result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 1),
+                                    kTestNamespace,
+                                    ServerGlobalParams::FeatureCompatibilityVersion_34);
     ASSERT_OK(result.getStatus());
 
     // We don't care about the order of the fields in the resulting index specification.
     ASSERT_BSONOBJ_EQ(
-        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2.2)),
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 1)),
         sorted(result.getValue()));
 
-    result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << -3LL), kTestNamespace);
+    result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2LL),
+                               kTestNamespace,
+                               ServerGlobalParams::FeatureCompatibilityVersion_34);
     ASSERT_OK(result.getStatus());
 
     // We don't care about the order of the fields in the resulting index specification.
     ASSERT_BSONOBJ_EQ(
-        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << -3LL)),
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2LL)),
+        sorted(result.getValue()));
+}
+
+TEST(IndexSpecValidateTest, DefaultIndexVersionIsV1IfFeatureCompatibilityVersionIs32) {
+    auto result =
+        validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns()),
+                          kTestNamespace,
+                          ServerGlobalParams::FeatureCompatibilityVersion_32);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 1)),
+        sorted(result.getValue()));
+
+    // Verify that the index specification we returned is still considered valid.
+    ASSERT_OK(validateIndexSpec(
+        result.getValue(), kTestNamespace, ServerGlobalParams::FeatureCompatibilityVersion_32));
+}
+
+TEST(IndexSpecValidateTest, DefaultIndexVersionIsV2IfFeatureCompatibilityVersionIs34) {
+    auto result =
+        validateIndexSpec(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns()),
+                          kTestNamespace,
+                          ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2)),
+        sorted(result.getValue()));
+
+    // Verify that the index specification we returned is still considered valid.
+    ASSERT_OK(validateIndexSpec(
+        result.getValue(), kTestNamespace, ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, AcceptsIndexVersionV1WhenFeatureCompatibilityVersionIs34) {
+    auto result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 1),
+                                    kTestNamespace,
+                                    ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 1)),
+        sorted(result.getValue()));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsNotAnObject) {
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "collation" << 1),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "collation"
+                                           << "not an object"),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              validateIndexSpec(BSON("key" << BSON("field" << 1) << "collation" << BSONArray()),
+                                kTestNamespace,
+                                ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsPresentAndVersionIsLessThanV2) {
+    ASSERT_EQ(
+        ErrorCodes::CannotCreateIndex,
+        validateIndexSpec(BSON("key" << BSON("field" << 1) << "collation" << BSONObj() << "v" << 1),
+                          kTestNamespace,
+                          ServerGlobalParams::FeatureCompatibilityVersion_34));
+}
+
+TEST(IndexSpecValidateTest, AcceptsAnyObjectValueForCollation) {
+    auto result = validateIndexSpec(
+        BSON("key" << BSON("field" << 1) << "v" << 2 << "collation" << BSON("locale"
+                                                                            << "simple")),
+        kTestNamespace,
+        ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2
+                          << "collation"
+                          << BSON("locale"
+                                  << "simple"))),
+        sorted(result.getValue()));
+
+    result =
+        validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2 << "collation" << BSONObj()),
+                          kTestNamespace,
+                          ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2
+                          << "collation"
+                          << BSONObj())),
+        sorted(result.getValue()));
+
+    result = validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2 << "collation"
+                                          << BSON("unknownCollationOption" << true)),
+                               kTestNamespace,
+                               ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2
+                          << "collation"
+                          << BSON("unknownCollationOption" << true))),
+        sorted(result.getValue()));
+}
+
+TEST(IndexSpecValidateTest, AcceptsIndexSpecIfCollationIsPresentAndVersionIsEqualToV2) {
+    auto result = validateIndexSpec(
+        BSON("key" << BSON("field" << 1) << "v" << 2 << "collation" << BSON("locale"
+                                                                            << "en")),
+        kTestNamespace,
+        ServerGlobalParams::FeatureCompatibilityVersion_34);
+    ASSERT_OK(result.getStatus());
+
+    // We don't care about the order of the fields in the resulting index specification.
+    ASSERT_BSONOBJ_EQ(
+        sorted(BSON("key" << BSON("field" << 1) << "ns" << kTestNamespace.ns() << "v" << 2
+                          << "collation"
+                          << BSON("locale"
+                                  << "en"))),
         sorted(result.getValue()));
 }
 

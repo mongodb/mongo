@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
@@ -71,6 +72,8 @@ namespace mongo {
 
 using std::string;
 using str::stream;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 
@@ -562,12 +565,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             for (const BSONObj& spec : indexSpecs) {
                 if (spec["collation"]) {
                     indexSpecsWithCollation.push_back(spec.getOwned());
-                } else {
+                } else if (IndexVersion::kV2 <= static_cast<IndexVersion>(spec["v"].numberInt())) {
                     indexSpecsWithCollation.emplace_back(
                         BSONObjBuilder()
                             .appendElements(spec)
                             .append("collation", CollationSpec::kSimpleSpec)
                             .obj());
+                } else {
+                    indexSpecsWithCollation.push_back(spec.getOwned());
                 }
             }
 

@@ -128,6 +128,10 @@
         version: "57.1",
     });
 
+    // Ensure that a v=1 index doesn't inherit the collection-default collation.
+    assert.commandWorked(coll.ensureIndex({c: 1}, {v: 1}));
+    assertIndexHasCollation({c: 1}, {locale: "simple"});
+
     coll.drop();
 
     //

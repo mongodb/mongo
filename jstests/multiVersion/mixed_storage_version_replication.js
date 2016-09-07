@@ -686,6 +686,14 @@ function doMultiThreadedWork(primary, numThreads) {
     replTest.awaitSecondaryNodes(120000);
     var primary = replTest.getPrimary();
 
+    // We set the featureCompatibilityVersion to 3.2 so that the default index version becomes v=1.
+    // We do this prior to writing any data to the replica set so that any indexes created during
+    // this test are compatible with 3.2. This effectively allows us to emulate upgrading to the
+    // latest version with existing data files and then trying to downgrade back to 3.2.
+    if (MongoRunner.areBinVersionsTheSame(primary.fullOptions.binVersion, newVersion)) {
+        assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
+    }
+
     Random.setRandomSeed();
 
     // Keep track of the indices of different types of primaries.

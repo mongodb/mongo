@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+using IndexVersion = IndexDescriptor::IndexVersion;
+
 namespace {
 void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj& spec) {
     BSONObjIterator it(spec);
@@ -62,6 +64,61 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
         theMap[fieldName] = e;
     }
 }
+}
+
+bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
+    switch (indexVersion) {
+        case IndexVersion::kV0:
+        case IndexVersion::kV1:
+        case IndexVersion::kV2:
+            return true;
+    }
+    return false;
+}
+
+Status IndexDescriptor::isIndexVersionAllowedForCreation(
+    IndexVersion indexVersion,
+    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion,
+    const BSONObj& indexSpec) {
+    switch (indexVersion) {
+        case IndexVersion::kV0:
+            break;
+        case IndexVersion::kV1:
+            return Status::OK();
+        case IndexVersion::kV2: {
+            if (ServerGlobalParams::FeatureCompatibilityVersion_32 == featureCompatibilityVersion) {
+                return {ErrorCodes::CannotCreateIndex,
+                        str::stream() << "Invalid index specification " << indexSpec
+                                      << "; cannot create an index with v="
+                                      << static_cast<int>(IndexVersion::kV2)
+                                      << " when the featureCompatibilityVersion is 3.2. See "
+                                         "http://dochub.mongodb.org/core/"
+                                         "3.4-feature-compatibility."};
+            }
+            return Status::OK();
+        }
+    }
+    return {ErrorCodes::CannotCreateIndex,
+            str::stream() << "Invalid index specification " << indexSpec
+                          << "; cannot create an index with v="
+                          << static_cast<int>(indexVersion)};
+}
+
+IndexVersion IndexDescriptor::getDefaultIndexVersion(
+    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) {
+    // We pass in an empty object for the index specification because it is only used within the
+    // error reason.
+    if (!IndexDescriptor::isIndexVersionAllowedForCreation(
+             IndexVersion::kV2, featureCompatibilityVersion, BSONObj())
+             .isOK()) {
+        // When the featureCompatibilityVersion is 3.2, we use index version v=1 as the default
+        // index version.
+        return IndexVersion::kV1;
+    }
+
+    // When the featureCompatibilityVersion is 3.4, we use index version v=2 as the default index
+    // version.
+    return IndexVersion::kV2;
 }
 
 bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) const {

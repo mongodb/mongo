@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 
@@ -52,14 +53,12 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
         fixed.push_back(BSONElement());
     }
 
-    if (0 == _descriptor->version()) {
-        _keyGenerator.reset(new BtreeKeyGeneratorV0(fieldNames, fixed, _descriptor->isSparse()));
-    } else if (1 == _descriptor->version()) {
-        _keyGenerator.reset(new BtreeKeyGeneratorV1(
-            fieldNames, fixed, _descriptor->isSparse(), btreeState->getCollator()));
-    } else {
-        massert(16745, "Invalid index version for key generation.", false);
-    }
+    _keyGenerator = BtreeKeyGenerator::make(_descriptor->version(),
+                                            fieldNames,
+                                            fixed,
+                                            _descriptor->isSparse(),
+                                            btreeState->getCollator());
+    massert(16745, "Invalid index version for key generation.", _keyGenerator);
 }
 
 void BtreeAccessMethod::getKeys(const BSONObj& obj,

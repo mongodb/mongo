@@ -29,6 +29,7 @@
  */
 
 #include "mongo/db/storage/mmap_v1/btree/btree_interface.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_test_help.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
@@ -42,13 +43,14 @@ public:
     MyHarnessHelper() : _recordStore("a.b"), _order(Ordering::make(BSONObj())) {}
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
-        std::unique_ptr<SortedDataInterface> sorted(getMMAPV1Interface(&_headManager,
-                                                                       &_recordStore,
-                                                                       &_cursorRegistry,
-                                                                       _order,
-                                                                       "a_1",  // indexName
-                                                                       1,      // version
-                                                                       unique));
+        std::unique_ptr<SortedDataInterface> sorted(
+            getMMAPV1Interface(&_headManager,
+                               &_recordStore,
+                               &_cursorRegistry,
+                               _order,
+                               "a_1",  // indexName
+                               IndexDescriptor::IndexVersion::kV1,
+                               unique));
         OperationContextNoop op;
         massertStatusOK(sorted->initAsEmpty(&op));
         return sorted;
