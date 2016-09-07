@@ -433,9 +433,7 @@ int Socket::_send(const char* data, int len, const char* context) {
     }
 #endif
     int ret = ::send(_fd, data, len, portSendFlags);
-    if (ret < 0) {
-        handleSendError(ret, context);
-    }
+
     return ret;
 }
 
@@ -449,9 +447,13 @@ void Socket::send(const char* data, int len, const char* context) {
 #else
             errno = ENETUNREACH;
 #endif
-            handleSendError(ret, context);
         } else {
             ret = _send(data, len, context);
+        }
+
+        if (ret < 0) {
+            handleSendError(ret, context);
+            continue;
         }
 
         _bytesOut += ret;
@@ -594,7 +596,7 @@ void Socket::handleSendError(int ret, const char* context) {
 #endif
         LOG(_logLevel) << "Socket " << context << " send() timed out " << remoteString();
         throw SocketException(SocketException::SEND_TIMEOUT, remoteString());
-    } else {
+    } else if (mongo_errno != EINTR) {
         LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription(mongo_errno)
                        << ' ' << remoteString();
         throw SocketException(SocketException::SEND_ERROR, remoteString());
@@ -614,7 +616,6 @@ void Socket::handleRecvError(int ret, int len) {
     int e = errno;
 #if defined(EINTR)
     if (e == EINTR) {
-        LOG(_logLevel) << "EINTR returned from recv(), retrying";
         return;
     }
 #endif

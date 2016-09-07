@@ -98,8 +98,7 @@
     for (i = 0; i < 100; i++) {
         cursor = coll.find().batchSize(5);
         cursor.next();
-        cursor = null;
-        gc();
+        cursor.close();
     }
 
     print("checkpoint D");
@@ -110,14 +109,12 @@
     for (i = 0; i < 100; i++)
         t.save({_id: i});
     for (i = 0; i < 100; i++) {
-        t.find().batchSize(2).next();
+        var cursor = t.find().batchSize(2);
+        cursor.next();
         assert.lt(0, db.serverStatus().metrics.cursor.open.total, "cursor1");
-        gc();
+        cursor.close();
     }
 
-    for (i = 0; i < 100; i++) {
-        gc();
-    }
     assert.eq(0, db.serverStatus().metrics.cursor.open.total, "cursor2");
 
     // Stop the balancer, otherwise it may grab some connections from the pool for itself
@@ -132,8 +129,7 @@
         temp2 = conn.getDB("test2").foobar;
         assert.eq(conn._fullNameSpace, t._fullNameSpace, "check close 1");
         assert(temp2.findOne(), "check close 2");
-        conn = null;
-        gc();
+        conn.close();
     }
 
     print("checkpoint F");

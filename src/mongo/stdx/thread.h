@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <chrono>
+#include <ctime>
 #include <exception>
 #include <thread>
 #include <type_traits>
@@ -105,7 +107,37 @@ inline void swap(thread& lhs, thread& rhs) noexcept {
     lhs.swap(rhs);
 }
 
-namespace this_thread = ::std::this_thread;  // NOLINT
+namespace this_thread {
+using std::this_thread::get_id;
+using std::this_thread::yield;
+
+#ifdef _WIN32
+using std::this_thread::sleep_for;
+using std::this_thread::sleep_until;
+#else
+template <class Rep, class Period>
+inline void sleep_for(const std::chrono::duration<Rep, Period>& sleep_duration) {
+    if (sleep_duration <= sleep_duration.zero())
+        return;
+
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(sleep_duration);
+    const auto nanoseconds =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration - seconds);
+    struct timespec sleepVal = {static_cast<std::time_t>(seconds.count()),
+                                static_cast<long>(nanoseconds.count())};
+    struct timespec remainVal;
+    while (nanosleep(&sleepVal, &remainVal) == -1 && errno == EINTR) {
+        sleepVal = remainVal;
+    }
+}
+
+template <class Clock, class Duration>
+void sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time) {
+    const auto now = Clock::now();
+    sleep_for(sleep_time - now);
+}
+#endif
+}  // namespace this_thread
 
 }  // namespace stdx
 }  // namespace mongo

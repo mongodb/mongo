@@ -249,8 +249,7 @@
 
     res = mydb.runCommand("listCollections", {cursor: {batchSize: 0}});
     cursor = new DBCommandCursor(mydb.getMongo(), res, 2);
-    cursor = null;
-    gc();  // Shell will send a killCursors message when cleaning up underlying cursor.
+    cursor.close();
     cursor = new DBCommandCursor(mydb.getMongo(), res, 2);
     assert.throws(function() {
         cursor.hasNext();

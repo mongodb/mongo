@@ -30,6 +30,7 @@
 #include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -38,6 +39,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+// Returns the current interrupt interval from the setParameter value
+int getScriptingEngineInterruptInterval();
 
 /**
  * DeadlineMonitor
@@ -133,12 +137,21 @@ private:
         while (!_inShutdown) {
             // get the next interval to wait
             const Date_t now = Date_t::now();
+            const auto interruptInterval = Milliseconds{getScriptingEngineInterruptInterval()};
+
+            if (now - lastInterruptCycle > interruptInterval) {
+                for (const auto& task : _tasks) {
+                    if (task.second > now)
+                        task.first->interrupt();
+                }
+                lastInterruptCycle = now;
+            }
 
             // wait for a task to be added or a deadline to expire
             if (_nearestDeadlineWallclock > now) {
                 if (_nearestDeadlineWallclock == Date_t::max() ||
-                    _nearestDeadlineWallclock - now > Seconds{1}) {
-                    _newDeadlineAvailable.wait_for(lk, Seconds{1}.toSystemDuration());
+                    _nearestDeadlineWallclock - now > interruptInterval) {
+                    _newDeadlineAvailable.wait_for(lk, interruptInterval.toSystemDuration());
                 } else {
                     _newDeadlineAvailable.wait_until(lk,
                                                      _nearestDeadlineWallclock.toSystemTimePoint());
@@ -161,13 +174,6 @@ private:
                     }
                     ++i;
                 }
-            }
-
-            if (now - lastInterruptCycle > Seconds{1}) {
-                for (auto it : _tasks) {
-                    it.first->interrupt();
-                }
-                lastInterruptCycle = now;
             }
         }
     }
