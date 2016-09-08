@@ -186,8 +186,8 @@ int versionCmp(const StringData rhs, const StringData lhs) {
 std::string escape(StringData sd, bool escape_slash) {
     StringBuilder ret;
     ret.reset(sd.size());
-    for (const auto& i : sd) {
-        switch (i) {
+    for (const auto& c : sd) {
+        switch (c) {
             case '"':
                 ret << "\\\"";
                 break;
@@ -213,11 +213,11 @@ std::string escape(StringData sd, bool escape_slash) {
                 ret << "\\t";
                 break;
             default:
-                if (i >= 0 && i <= 0x1f) {
-                    // For i < 0x7f, ASCII value == Unicode code point.
-                    ret << "\\u00" << toHexLower(&i, 1);
+                if (c >= 0 && c <= 0x1f) {
+                    // For c < 0x7f, ASCII value == Unicode code point.
+                    ret << "\\u00" << toHexLower(&c, 1);
                 } else {
-                    ret << i;
+                    ret << c;
                 }
         }
     }
