@@ -58,6 +58,7 @@ env.Library(
         'dist_lock_catalog.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/write_concern_options',
     ],
 )
 
