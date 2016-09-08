@@ -1390,10 +1390,12 @@ var authCommandsLib = {
           skipSharded: true,
           expectFail: true,
           testcases: [
-              {runOnDb: adminDbName,
-               roles: {__system: 1},
-               privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-               expectFail: true},
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
           ]
         },
         {
@@ -1402,10 +1404,12 @@ var authCommandsLib = {
           skipSharded: true,
           expectFail: true,
           testcases: [
-              {runOnDb: adminDbName,
-               roles: {__system: 1},
-               privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-               expectFail: true},
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
           ]
         },
         {
@@ -1414,10 +1418,12 @@ var authCommandsLib = {
           skipSharded: true,
           expectFail: true,
           testcases: [
-              {runOnDb: adminDbName,
-               roles: {__system: 1},
-               privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-               expectFail: true},
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
           ]
         },
         {
