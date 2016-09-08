@@ -664,8 +664,8 @@ Status validateMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
-        for (const auto& disallowedOption : {"replSet",
-                                             "configSvr",
+        for (const auto& disallowedOption : {"replication.replSet",
+                                             "configsvr",
                                              "upgrade",
                                              "repair",
                                              "profile",
@@ -674,14 +674,11 @@ Status validateMongodOptions(const moe::Environment& params) {
                                              "source",
                                              "only",
                                              "slavedelay",
-                                             "journal",
-                                             "storage.journal.enabled",
-                                             "dur",
                                              "autoresync",
                                              "fastsync"}) {
             if (params.count(disallowedOption)) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "Cannot specify both --queryableBackupMode and --"
+                              str::stream() << "Cannot specify both queryable backup mode and "
                                             << disallowedOption);
             }
         }
