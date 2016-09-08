@@ -117,7 +117,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		if (ci->root_offset != WT_BLOCK_INVALID_OFFSET) {
 			endp = root_addr;
 			WT_ERR(__wt_block_addr_to_buffer(block, &endp,
-			    ci->root_offset, ci->root_size, ci->root_cksum));
+			    ci->root_offset, ci->root_size, ci->root_checksum));
 			*root_addr_sizep = WT_PTRDIFF(endp, root_addr);
 		}
 
@@ -216,7 +216,7 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
  */
 int
 __wt_block_checkpoint(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_cksum)
+    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_checksum)
 {
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
@@ -237,11 +237,11 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	 */
 	if (buf == NULL) {
 		ci->root_offset = WT_BLOCK_INVALID_OFFSET;
-		ci->root_size = ci->root_cksum = 0;
+		ci->root_size = ci->root_checksum = 0;
 	} else
 		WT_ERR(__wt_block_write_off(session, block, buf,
-		    &ci->root_offset, &ci->root_size, &ci->root_cksum,
-		    data_cksum, true, false));
+		    &ci->root_offset, &ci->root_size, &ci->root_checksum,
+		    data_checksum, true, false));
 
 	/*
 	 * Checkpoints are potentially reading/writing/merging lots of blocks,
@@ -824,7 +824,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
 		    (uintmax_t)ci->root_offset,
 		    (uintmax_t)(ci->root_offset + ci->root_size),
-		    ci->root_size, ci->root_cksum));
+		    ci->root_size, ci->root_checksum));
 	if (ci->alloc.offset == WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_buf_catfmt(session, buf, ", alloc=[Empty]"));
 	else
@@ -833,7 +833,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
 		    (uintmax_t)ci->alloc.offset,
 		    (uintmax_t)(ci->alloc.offset + ci->alloc.size),
-		    ci->alloc.size, ci->alloc.cksum));
+		    ci->alloc.size, ci->alloc.checksum));
 	if (ci->avail.offset == WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_buf_catfmt(session, buf, ", avail=[Empty]"));
 	else
@@ -842,7 +842,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
 		    (uintmax_t)ci->avail.offset,
 		    (uintmax_t)(ci->avail.offset + ci->avail.size),
-		    ci->avail.size, ci->avail.cksum));
+		    ci->avail.size, ci->avail.checksum));
 	if (ci->discard.offset == WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_buf_catfmt(session, buf, ", discard=[Empty]"));
 	else
@@ -851,7 +851,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
 		    (uintmax_t)ci->discard.offset,
 		    (uintmax_t)(ci->discard.offset + ci->discard.size),
-		    ci->discard.size, ci->discard.cksum));
+		    ci->discard.size, ci->discard.checksum));
 	WT_RET(__wt_buf_catfmt(session, buf,
 	    ", file size=%" PRIuMAX, (uintmax_t)ci->file_size));
 

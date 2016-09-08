@@ -159,7 +159,7 @@ typedef struct {
 
 		WT_ADDR addr;		/* Split's written location */
 		uint32_t size;		/* Split's size */
-		uint32_t cksum;		/* Split's checksum */
+		uint32_t checksum;	/* Split's checksum */
 
 		void    *disk_image;	/* Split's disk image */
 
@@ -1877,7 +1877,7 @@ __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 	__wt_free(session, bnd->addr.addr);
 	WT_CLEAR(bnd->addr);
 	bnd->size = 0;
-	bnd->cksum = 0;
+	bnd->checksum = 0;
 
 	__wt_free(session, bnd->disk_image);
 
@@ -3200,7 +3200,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);
 	}
 	bnd->size = (uint32_t)buf->size;
-	bnd->cksum = 0;
+	bnd->checksum = 0;
 
 	/*
 	 * Check if we've saved updates that belong to this block, and move
@@ -3306,7 +3306,7 @@ supd_check_complete:
 		 */
 		dsk->write_gen = 0;
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
-		bnd->cksum = __wt_cksum(buf->data, buf->size);
+		bnd->checksum = __wt_checksum(buf->data, buf->size);
 
 		/*
 		 * One last check: don't reuse blocks if compacting, the reason
@@ -3319,7 +3319,7 @@ supd_check_complete:
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
-			    multi->cksum == bnd->cksum) {
+			    multi->checksum == bnd->checksum) {
 				multi->addr.reuse = 1;
 				bnd->addr = multi->addr;
 
@@ -5850,7 +5850,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		multi->addr = bnd->addr;
 		multi->addr.reuse = 0;
 		multi->size = bnd->size;
-		multi->cksum = bnd->cksum;
+		multi->checksum = bnd->checksum;
 		bnd->addr.addr = NULL;
 	}
 	mod->mod_multi_entries = r->bnd_next;
@@ -5897,7 +5897,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		multi->addr = bnd->addr;
 		multi->addr.reuse = 0;
 		multi->size = bnd->size;
-		multi->cksum = bnd->cksum;
+		multi->checksum = bnd->checksum;
 		bnd->addr.addr = NULL;
 	}
 	mod->mod_multi_entries = r->bnd_next;

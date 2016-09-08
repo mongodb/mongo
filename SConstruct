@@ -245,6 +245,7 @@ wtheader = env.Substfile(
 # included.
 #
 condition_map = {
+    'ARM64_HOST' : False,
     'POSIX_HOST' : env['PLATFORM'] == 'posix',
     'POWERPC_HOST' : False,
     'WINDOWS_HOST' : env['PLATFORM'] == 'win32',

@@ -640,7 +640,7 @@ __log_file_header(
 	logrec->len = log->allocsize;
 	logrec->checksum = 0;
 	__wt_log_record_byteswap(logrec);
-	logrec->checksum = __wt_cksum(logrec, log->allocsize);
+	logrec->checksum = __wt_checksum(logrec, log->allocsize);
 #ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
@@ -1547,7 +1547,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LSN end_lsn, next_lsn, rd_lsn, start_lsn;
 	wt_off_t log_size;
 	uint32_t allocsize, firstlog, lastlog, lognum, rdup_len, reclen;
-	uint32_t cksum_calculate, cksum_tmp;
+	uint32_t checksum_calculate, checksum_tmp;
 	u_int i, logcount;
 	int firstrecord;
 	bool eol, partial_record;
@@ -1759,12 +1759,12 @@ advance:
 		 */
 		buf->size = reclen;
 		logrec = (WT_LOG_RECORD *)buf->mem;
-		cksum_tmp = logrec->checksum;
+		checksum_tmp = logrec->checksum;
 		logrec->checksum = 0;
-		cksum_calculate = __wt_cksum(logrec, reclen);
-		logrec->checksum = cksum_tmp;
+		checksum_calculate = __wt_checksum(logrec, reclen);
+		logrec->checksum = checksum_tmp;
 		__wt_log_record_byteswap(logrec);
-		if (logrec->checksum != cksum_calculate) {
+		if (logrec->checksum != checksum_calculate) {
 			/*
 			 * A checksum mismatch means we have reached the end of
 			 * the useful part of the log.  This should be found on
@@ -2078,7 +2078,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->len = (uint32_t)record->size;
 	logrec->checksum = 0;
 	__wt_log_record_byteswap(logrec);
-	logrec->checksum = __wt_cksum(logrec, record->size);
+	logrec->checksum = __wt_checksum(logrec, record->size);
 #ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif

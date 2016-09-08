@@ -587,13 +587,14 @@ __wt_block_free(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	wt_off_t offset;
-	uint32_t cksum, size;
+	uint32_t checksum, size;
 
 	WT_UNUSED(addr_size);
 	WT_STAT_FAST_DATA_INCR(session, block_free);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+	WT_RET(
+	    __wt_block_buffer_to_addr(block, addr, &offset, &size, &checksum));
 
 	__wt_verbose(session, WT_VERB_BLOCK,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size);
@@ -1174,7 +1175,7 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, el->size, &tmp));
 	WT_ERR(__wt_block_read_off(
-	    session, block, tmp, el->offset, el->size, el->cksum));
+	    session, block, tmp, el->offset, el->size, el->checksum));
 
 #define	WT_EXTLIST_READ(p, v) do {					\
 	uint64_t _v;							\
@@ -1257,7 +1258,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	entries = el->entries + (additional == NULL ? 0 : additional->entries);
 	if (entries == 0) {
 		el->offset = WT_BLOCK_INVALID_OFFSET;
-		el->cksum = el->size = 0;
+		el->checksum = el->size = 0;
 		return (0);
 	}
 
@@ -1309,8 +1310,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 #endif
 
 	/* Write the extent list to disk. */
-	WT_ERR(__wt_block_write_off(session,
-	    block, tmp, &el->offset, &el->size, &el->cksum, true, true, true));
+	WT_ERR(__wt_block_write_off(session, block,
+	    tmp, &el->offset, &el->size, &el->checksum, true, true, true));
 
 	/*
 	 * Remove the allocated blocks from the system's allocation list, extent
