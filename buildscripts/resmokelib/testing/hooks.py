@@ -261,34 +261,6 @@ class CheckReplDBHash(JsCustomBehavior):
                                   shell_options=shell_options)
 
 
-class TypeSensitiveSON(bson.SON):
-    """
-    Extends bson.SON to perform additional type-checking of document values
-    to differentiate BSON types.
-    """
-
-    def items_with_types(self):
-        """
-        Returns a list of triples. Each triple consists of a field name, a
-        field value, and a field type for each field in the document.
-        """
-
-        return [(key, self[key], type(self[key])) for key in self]
-
-    def __eq__(self, other):
-        """
-        Comparison to another TypeSensitiveSON is order-sensitive and
-        type-sensitive while comparison to a regular dictionary ignores order
-        and type mismatches.
-        """
-
-        if isinstance(other, TypeSensitiveSON):
-            return (len(self) == len(other) and
-                    self.items_with_types() == other.items_with_types())
-
-        raise TypeError("TypeSensitiveSON objects cannot be compared to other types")
-
-
 _CUSTOM_BEHAVIORS = {
     "CleanEveryN": CleanEveryN,
     "CheckReplDBHash": CheckReplDBHash,
