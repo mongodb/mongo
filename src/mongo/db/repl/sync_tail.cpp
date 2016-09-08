@@ -801,6 +801,9 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
                                          << ")."));
         }
 
+        // Don't allow the fsync+lock thread to see intermediate states of batch application.
+        stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
+
         // Do the work.
         multiApply(&txn, ops.releaseBatch());
 
@@ -1225,11 +1228,6 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
     auto storage = StorageInterface::get(txn);
 
     LOG(2) << "replication batch size is " << ops.size();
-    // We must grab this because we're going to grab write locks later.
-    // We hold this mutex the entire time we're writing; it doesn't matter
-    // because all readers are blocked anyway.
-    stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
-
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
     // entries from the oplog until we finish writing.
     Lock::ParallelBatchWriterMode pbwm(txn->lockState());
