@@ -144,7 +144,7 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     if (minWireVersion < 0 || maxWireVersion < 0 ||
         minWireVersion >= std::numeric_limits<int>::max() ||
         maxWireVersion >= std::numeric_limits<int>::max()) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::IncompatibleServerVersion,
                       str::stream() << "Server min and max wire version have invalid values ("
                                     << minWireVersion
                                     << ","
@@ -186,7 +186,7 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
 
     // Server may return bad data.
     if (server.minWireVersion > server.maxWireVersion) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::IncompatibleServerVersion,
                       str::stream() << "Server min and max wire version are incorrect ("
                                     << server.minWireVersion
                                     << ","
@@ -198,7 +198,7 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
     // We assert the invariant that min < max above.
     if (!(client.minWireVersion <= server.maxWireVersion &&
           client.maxWireVersion >= server.minWireVersion)) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::IncompatibleServerVersion,
                       str::stream() << "Server min and max wire version are incompatible ("
                                     << server.minWireVersion
                                     << ","
