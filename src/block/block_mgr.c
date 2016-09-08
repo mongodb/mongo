@@ -607,3 +607,28 @@ __wt_block_manager_open(WT_SESSION_IMPL *session,
 err:	WT_TRET(bm->close(bm, session));
 	return (ret);
 }
+
+/*
+ * __wt_block_panic --
+ * 	Report an error, then panic the handle and the system.
+ */
+int
+__wt_block_panic(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	va_list ap;
+
+	/*
+	 * Ignore error returns from underlying event handlers, we already have
+	 * an error value to return.
+	 */
+	va_start(ap, fmt);
+	WT_IGNORE_RET(__wt_eventv(session, false, error, NULL, 0, fmt, ap));
+	va_end(ap);
+
+	/* Switch the handle into read-only mode. */
+	__bm_method_set(S2BT(session)->bm, true);
+
+	return (__wt_panic(session));
+}
