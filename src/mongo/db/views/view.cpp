@@ -53,6 +53,15 @@ ViewDefinition::ViewDefinition(const ViewDefinition& other)
       _collator(CollatorInterface::cloneCollator(other._collator.get())),
       _pipeline(other._pipeline) {}
 
+ViewDefinition& ViewDefinition::operator=(const ViewDefinition& other) {
+    _viewNss = other._viewNss;
+    _viewOnNss = other._viewOnNss;
+    _collator = CollatorInterface::cloneCollator(other._collator.get());
+    _pipeline = other._pipeline;
+
+    return *this;
+}
+
 void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
     invariant(_viewNss.db() == viewOnNss.db());
     _viewOnNss = viewOnNss;

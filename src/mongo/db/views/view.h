@@ -57,6 +57,7 @@ public:
      * Copying a view 'other' clones its collator and does a simple copy of all other fields.
      */
     ViewDefinition(const ViewDefinition& other);
+    ViewDefinition& operator=(const ViewDefinition& other);
 
     /**
      * @return The fully-qualified namespace of this view.

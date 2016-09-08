@@ -58,9 +58,13 @@ Status collMod(OperationContext* txn,
     Collection* coll = db ? db->getCollection(nss) : nullptr;
 
     // May also modify a view instead of a collection.
-    std::shared_ptr<ViewDefinition> view;
+    boost::optional<ViewDefinition> view;
     if (db && !coll) {
-        view = db->getViewCatalog()->lookup(txn, nss.ns());
+        const auto sharedView = db->getViewCatalog()->lookup(txn, nss.ns());
+        if (sharedView) {
+            // We copy the ViewDefinition as it is modified below to represent the requested state.
+            view = {*sharedView};
+        }
     }
 
     // This can kill all cursors so don't allow running it while a background operation is in
