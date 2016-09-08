@@ -684,9 +684,8 @@ private:
     /**
      * Triggers all callbacks that are blocked waiting for new heartbeat data
      * to decide whether or not to finish a step down.
-     * Should only be called with _topoMutex held.
      */
-    void _signalStepDownWaiters();
+    void _signalStepDownWaiter_inlock();
 
     /**
      * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
@@ -1279,8 +1278,8 @@ private:
     // This member's index position in the current config.
     int _selfIndex;  // (MX)
 
-    // Vector of events that should be signaled whenever new heartbeat data comes in.
-    std::vector<ReplicationExecutor::EventHandle> _stepDownWaiters;  // (X)
+    // Event handle that should be signaled whenever new heartbeat data comes in.
+    ReplicationExecutor::EventHandle _stepDownWaiter;  // (M)
 
     // State for conducting an election of this node.
     // the presence of a non-null _freshnessChecker pointer indicates that an election is

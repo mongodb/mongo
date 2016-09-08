@@ -1452,36 +1452,24 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
 }
 
 void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        // Wake ops waiting for a new committed snapshot.
-        _currentCommittedSnapshotCond.notify_all();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // Wake ops waiting for a new committed snapshot.
+    _currentCommittedSnapshotCond.notify_all();
 
-        auto hasSameOpID = [opId](WaiterInfo* waiter) { return waiter->opID == opId; };
-        _replicationWaiterList.signalAndRemoveIf_inlock(hasSameOpID);
-        _opTimeWaiterList.signalAndRemoveIf_inlock(hasSameOpID);
-    }
-
-    {
-        LockGuard topoLock(_topoMutex);
-        _signalStepDownWaiters();
-    }
+    auto hasSameOpID = [opId](WaiterInfo* waiter) { return waiter->opID == opId; };
+    _replicationWaiterList.signalAndRemoveIf_inlock(hasSameOpID);
+    _opTimeWaiterList.signalAndRemoveIf_inlock(hasSameOpID);
+    _signalStepDownWaiter_inlock();
 }
 
 void ReplicationCoordinatorImpl::interruptAll() {
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        // Wake ops waiting for a new committed snapshot.
-        _currentCommittedSnapshotCond.notify_all();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // Wake ops waiting for a new committed snapshot.
+    _currentCommittedSnapshotCond.notify_all();
 
-        _replicationWaiterList.signalAndRemoveAll_inlock();
-        _opTimeWaiterList.signalAndRemoveAll_inlock();
-    }
-
-    {
-        LockGuard topoLock(_topoMutex);
-        _signalStepDownWaiters();
-    }
+    _replicationWaiterList.signalAndRemoveAll_inlock();
+    _opTimeWaiterList.signalAndRemoveAll_inlock();
+    _signalStepDownWaiter_inlock();
 }
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
@@ -1760,12 +1748,12 @@ ReplicationCoordinatorImpl::stepDown_nonBlocking(OperationContext* txn,
                       true,  // restartHeartbeats
                       result);
 
-    auto signalStepDownWaitersInLock = [this](const CallbackArgs&) {
-        LockGuard topoLock(_topoMutex);
-        _signalStepDownWaiters();
+    auto signalStepDownWaiterInLock = [this](const CallbackArgs&) {
+        LockGuard lk(_mutex);
+        _signalStepDownWaiter_inlock();
     };
 
-    _scheduleWorkAt(waitUntil, signalStepDownWaitersInLock);
+    _scheduleWorkAt(waitUntil, signalStepDownWaiterInLock);
     return std::make_pair(std::move(globalReadLock), finishedEvent.getValue());
 }
 
@@ -1783,12 +1771,11 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
     return result;
 }
 
-void ReplicationCoordinatorImpl::_signalStepDownWaiters() {
-    std::for_each(
-        _stepDownWaiters.begin(),
-        _stepDownWaiters.end(),
-        stdx::bind(&ReplicationExecutor::signalEvent, &_replExecutor, stdx::placeholders::_1));
-    _stepDownWaiters.clear();
+void ReplicationCoordinatorImpl::_signalStepDownWaiter_inlock() {
+    if (_stepDownWaiter) {
+        _replExecutor.signalEvent(_stepDownWaiter);
+        _stepDownWaiter = EventHandle();
+    }
 }
 
 void ReplicationCoordinatorImpl::_stepDownContinue(
@@ -1849,27 +1836,31 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
         return;
     }
 
-    if (_stepDownWaiters.empty()) {
-        StatusWith<ReplicationExecutor::EventHandle> reschedEvent = _replExecutor.makeEvent();
-        if (!reschedEvent.isOK()) {
-            *result = reschedEvent.getStatus();
+    {
+        LockGuard lk(_mutex);
+        if (!_stepDownWaiter) {
+            StatusWith<ReplicationExecutor::EventHandle> reschedEvent = _replExecutor.makeEvent();
+            if (!reschedEvent.isOK()) {
+                *result = reschedEvent.getStatus();
+                return;
+            }
+            _stepDownWaiter = reschedEvent.getValue();
+        }
+        CBHStatus cbh =
+            _replExecutor.onEvent(_stepDownWaiter,
+                                  stdx::bind(&ReplicationCoordinatorImpl::_stepDownContinue,
+                                             this,
+                                             finishedEvent,
+                                             txn,
+                                             waitUntil,
+                                             stepDownUntil,
+                                             force,
+                                             false,  // restartHeartbeats
+                                             result));
+        if (!cbh.isOK()) {
+            *result = cbh.getStatus();
             return;
         }
-        _stepDownWaiters.push_back(reschedEvent.getValue());
-    }
-    CBHStatus cbh = _replExecutor.onEvent(_stepDownWaiters.back(),
-                                          stdx::bind(&ReplicationCoordinatorImpl::_stepDownContinue,
-                                                     this,
-                                                     finishedEvent,
-                                                     txn,
-                                                     waitUntil,
-                                                     stepDownUntil,
-                                                     force,
-                                                     false,  // restartHeartbeats
-                                                     result));
-    if (!cbh.isOK()) {
-        *result = cbh.getStatus();
-        return;
     }
     allFinishedGuard.Dismiss();
 
