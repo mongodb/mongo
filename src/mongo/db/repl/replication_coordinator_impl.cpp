@@ -902,7 +902,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
         return;
     }
 
-    invariant(!_canAcceptNonLocalWrites);
     _canAcceptNonLocalWrites = true;
 
     lk.unlock();
@@ -2638,8 +2637,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _replicationWaiterList.signalAndRemoveAll_inlock();
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
         _opTimeWaiterList.signalAndRemoveAll_inlock();
-        invariant(!_isCatchingUp);
-        invariant(!_isWaitingForDrainToComplete);
         _canAcceptNonLocalWrites = false;
         result = kActionCloseAllConnections;
     } else {
@@ -2739,8 +2736,6 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
                 _electionId = OID::gen();
             }
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
-            invariant(!_isCatchingUp);
-            invariant(!_isWaitingForDrainToComplete);
             _isCatchingUp = true;
             const PostMemberStateUpdateAction nextAction =
                 _updateMemberStateFromTopologyCoordinator_inlock();
@@ -2850,11 +2845,9 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
 }
 
 void ReplicationCoordinatorImpl::_finishCatchUpOplog_inlock(bool startToDrain) {
-    invariant(_isCatchingUp);
     _isCatchingUp = false;
     // If the node steps down during the catch-up, we don't go into drain mode.
     if (startToDrain) {
-        invariant(!_isWaitingForDrainToComplete);
         _isWaitingForDrainToComplete = true;
         // Signal applier in executor to avoid the deadlock with bgsync's mutex that is required to
         // cancel fetcher.
