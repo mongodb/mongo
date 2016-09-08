@@ -221,6 +221,77 @@ functions:
             vmstat -d 5 > mongo-diskstats
         fi
 
+  # Run a monitor process as a background, system task to periodically
+  # display how many threads interesting processes are using.
+  # This process will also periodically signal the Python process, which
+  # should trigger resmoke.py to dump its thread stacks.
+  "monitor process threads": &monitor_process_threads
+    command: shell.exec
+    params:
+      background: true
+      system_log: true
+      script: |
+        proc_list="(bsondump|java|lein|mongo|python|_test$|_test\.exe$)"
+        if [ "Windows_NT" = "$OS" ]; then
+          get_pids() {\
+            proc_pids=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x);\
+            print $2, x}' | grep -i -E $1 | cut -f1 -d ' ');\
+          }
+          get_process_info() {\
+            proc_name="";\
+            proc_info=$(wmic process where "ProcessId=\"$1\"" get "Name,ProcessId,ThreadCount" /format:csv 2> /dev/null | grep $1);\
+            if [ ! -z $proc_info ]; then\
+              proc_name=$(echo $proc_info | cut -f2 -d ',');\
+              proc_threads=$(echo $proc_info | cut -f4 -d ',');
+            fi;\
+            }
+          # Set a large last_time (7 days), since we cannot send signals on Windows.
+          last_time=$((60 * 60 * 24 * 7))
+        else
+          get_pids() { proc_pids=$(pgrep $1); }
+          get_process_info() {\
+            proc_name=$(ps -p $1 -o comm | grep -v COMM);\
+            # prstat is available on Solaris
+            if [ ! -z $(which prstat 2> /dev/null) ]; then\
+              proc_threads=$(prstat -p $1 1 1 | grep $1 | cut -f2 -d "/");\
+            # /proc is available on Linux platforms
+            elif [ -f /proc/$1/status ]; then\
+              proc_threads=$($sudo grep Threads /proc/$1/status | sed "s/\s//g" | cut -f2 -d ":");\
+            else\
+              proc_threads=$(ps -AM $1 | grep -vc PID);\
+            fi;\
+          }
+          last_time=$SECONDS
+        fi
+        ${set_sudo}
+        while [ 1 ]
+        do
+          get_pids $proc_list
+          if [ ! -z "$proc_pids" ]; then
+            printf "Running process/thread counter\n"
+            printf "PROCESS\tPID\tTHREADS\n"
+          fi
+          for pid in $proc_pids
+          do
+            get_process_info $pid
+            if [ ! -z $proc_name ]; then
+              printf "$proc_name\t$pid\t$proc_threads\n"
+              duration=$((SECONDS-last_time))
+              echo $proc_name | grep -q python
+              if [ $? -eq 0 ]; then
+                # Send a signal to the Python process every 5 minutes.
+                # resmoke.py will handle USR1 to dump its thread stacks.
+                if [ $duration -ge 300 ]; then
+                  echo "Sending USR1 signal to python process $pid"
+                  kill -USR1 $pid
+                  last_time=$SECONDS
+                fi
+              fi
+            fi
+          done
+          sleep 60
+        done
+
   "setup credentials" : &setup_credentials
     command: shell.exec
     params:
@@ -303,6 +374,7 @@ functions:
   - *get_buildnumber
   - *setup_credentials
   - *run_diskstats
+  - *monitor_process_threads
 
   "set up virtualenv" :
     command: shell.exec
