@@ -32,6 +32,7 @@
 #include <limits>
 #include <ratio>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
@@ -147,8 +148,8 @@ inline long long durationCount(const stdx::chrono::duration<RepIn, PeriodIn>& d)
 template <typename Period>
 class Duration {
 public:
-    static_assert(Period::num > 0, "Duration::period's numerator must be positive");
-    static_assert(Period::den > 0, "Duration::period's denominator must be positive");
+    MONGO_STATIC_ASSERT_MSG(Period::num > 0, "Duration::period's numerator must be positive");
+    MONGO_STATIC_ASSERT_MSG(Period::den > 0, "Duration::period's denominator must be positive");
 
     using rep = int64_t;
     using period = Period;
@@ -160,9 +161,10 @@ public:
     template <typename OtherDuration>
     struct IsHigherPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
-        static_assert(OtherOverThis::den == 1 || OtherOverThis::num == 1,
-                      "Mongo duration types are only compatible with each other when one's period "
-                      "is an even multiple of the other's.");
+        MONGO_STATIC_ASSERT_MSG(
+            OtherOverThis::den == 1 || OtherOverThis::num == 1,
+            "Mongo duration types are only compatible with each other when one's period "
+            "is an even multiple of the other's.");
         static constexpr bool value = OtherOverThis::den == 1 && OtherOverThis::num != 1;
     };
 
@@ -173,9 +175,10 @@ public:
     template <typename OtherDuration>
     struct IsLowerPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
-        static_assert(OtherOverThis::den == 1 || OtherOverThis::num == 1,
-                      "Mongo duration types are only compatible with each other when one's period "
-                      "is an even multiple of the other's.");
+        MONGO_STATIC_ASSERT_MSG(
+            OtherOverThis::den == 1 || OtherOverThis::num == 1,
+            "Mongo duration types are only compatible with each other when one's period "
+            "is an even multiple of the other's.");
         static constexpr bool value = OtherOverThis::num == 1 && OtherOverThis::den != 1;
     };
 
@@ -220,9 +223,10 @@ public:
         stdx::enable_if_t<std::is_convertible<Rep2, rep>::value && std::is_integral<Rep2>::value,
                           int> = 0>
     constexpr explicit Duration(const Rep2& r) : _count(r) {
-        static_assert(std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep),
-                      "Durations must be constructed from values of integral type that are "
-                      "representable as 64-bit signed integers");
+        MONGO_STATIC_ASSERT_MSG(
+            std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep),
+            "Durations must be constructed from values of integral type that are "
+            "representable as 64-bit signed integers");
     }
 
     /**
@@ -236,9 +240,10 @@ public:
     template <typename FromPeriod>
     /*implicit*/ Duration(const Duration<FromPeriod>& from)
         : Duration(duration_cast<Duration>(from)) {
-        static_assert(!isLowerPrecisionThan<Duration<FromPeriod>>(),
-                      "Use duration_cast to convert from higher precision Duration types to lower "
-                      "precision ones");
+        MONGO_STATIC_ASSERT_MSG(
+            !isLowerPrecisionThan<Duration<FromPeriod>>(),
+            "Use duration_cast to convert from higher precision Duration types to lower "
+            "precision ones");
     }
 
     stdx::chrono::system_clock::duration toSystemDuration() const {
@@ -337,8 +342,9 @@ public:
 
     template <typename Rep2>
     Duration& operator*=(const Rep2& scale) {
-        static_assert(std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
-                      "Durations may only be multiplied by values of signed integral type");
+        MONGO_STATIC_ASSERT_MSG(
+            std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
+            "Durations may only be multiplied by values of signed integral type");
         uassert(ErrorCodes::DurationOverflow,
                 str::stream() << "Overflow while multiplying " << *this << " by " << scale,
                 !mongoSignedMultiplyOverflow64(count(), scale, &_count));
@@ -347,8 +353,8 @@ public:
 
     template <typename Rep2>
     Duration& operator/=(const Rep2& scale) {
-        static_assert(std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
-                      "Durations may only be divided by values of signed integral type");
+        MONGO_STATIC_ASSERT_MSG(std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
+                                "Durations may only be divided by values of signed integral type");
         uassert(ErrorCodes::DurationOverflow,
                 str::stream() << "Overflow while dividing " << *this << " by -1",
                 (count() != min().count() || scale != -1));

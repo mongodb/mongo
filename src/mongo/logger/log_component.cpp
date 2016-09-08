@@ -29,8 +29,8 @@
 
 #include "mongo/logger/log_component.h"
 
-
 #include "mongo/base/init.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -61,11 +61,11 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNames, MONGO_NO_PREREQUISITES)
 // Children always come after parent component.
 // This makes it unnecessary to compute children of each component
 // when setting/clearing log severities in LogComponentSettings.
-#define DECLARE_LOG_COMPONENT_PARENT(CHILD, PARENT)                              \
-    case (CHILD):                                                                \
-        do {                                                                     \
-            static_assert(int(CHILD) > int(PARENT), "int(CHILD) > int(PARENT)"); \
-            return (PARENT);                                                     \
+#define DECLARE_LOG_COMPONENT_PARENT(CHILD, PARENT)        \
+    case (CHILD):                                          \
+        do {                                               \
+            MONGO_STATIC_ASSERT(int(CHILD) > int(PARENT)); \
+            return (PARENT);                               \
         } while (0)
 
 LogComponent LogComponent::parent() const {

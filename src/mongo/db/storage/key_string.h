@@ -32,6 +32,7 @@
 
 #include <limits>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -67,8 +68,9 @@ public:
         static const uint32_t kBytesForTypeAndEmptyKey = 2;
         static const uint32_t kMaxDecimalsPerKey =
             kMaxKeyBytes / (sizeof(Decimal128::Value) + kBytesForTypeAndEmptyKey);
-        static_assert(kMaxTypeBitsPerDecimal * kMaxDecimalsPerKey < kMaxBytesNeeded * 8UL,
-                      "encoding needs change to contain all type bits for worst case key");
+        MONGO_STATIC_ASSERT_MSG(
+            kMaxTypeBitsPerDecimal* kMaxDecimalsPerKey < kMaxBytesNeeded * 8UL,
+            "encoding needs change to contain all type bits for worst case key");
         static const uint8_t kStoredDecimalExponentBits = 6;
         static const uint32_t kStoredDecimalExponentMask = (1U << kStoredDecimalExponentBits) - 1;
 

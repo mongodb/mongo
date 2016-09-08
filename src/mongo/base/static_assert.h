@@ -1,4 +1,4 @@
-/*    Copyright 2013 10gen Inc.
+/*    Copyright 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,56 +25,8 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/platform/process_id.h"
+#define MONGO_STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
-#include <iostream>
-#include <limits>
-#include <sstream>
-
-#include "mongo/base/static_assert.h"
-
-namespace mongo {
-
-MONGO_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
-
-namespace {
-#ifdef _WIN32
-inline NativeProcessId getCurrentNativeProcessId() {
-    return GetCurrentProcessId();
-}
-#else
-inline NativeProcessId getCurrentNativeProcessId() {
-    return getpid();
-}
-#endif
-}  // namespace
-
-ProcessId ProcessId::getCurrent() {
-    return fromNative(getCurrentNativeProcessId());
-}
-
-int64_t ProcessId::asInt64() const {
-    typedef std::numeric_limits<NativeProcessId> limits;
-    if (limits::is_signed)
-        return _npid;
-    else
-        return static_cast<int64_t>(static_cast<uint64_t>(_npid));
-}
-
-long long ProcessId::asLongLong() const {
-    return static_cast<long long>(asInt64());
-}
-
-std::string ProcessId::toString() const {
-    std::ostringstream os;
-    os << *this;
-    return os.str();
-}
-
-std::ostream& operator<<(std::ostream& os, ProcessId pid) {
-    return os << pid.toNative();
-}
-
-}  // namespace mongo
+#define MONGO_STATIC_ASSERT_MSG(...) static_assert(__VA_ARGS__)

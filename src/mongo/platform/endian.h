@@ -32,6 +32,7 @@
 #include <cstring>
 #include <type_traits>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
 
@@ -340,7 +341,7 @@ struct ByteOrderConverter<float> {
     typedef float T;
 
     inline static T nativeToBig(T t) {
-        static_assert(sizeof(T) == sizeof(uint32_t), "sizeof(T) == sizeof(uint32_t)");
+        MONGO_STATIC_ASSERT(sizeof(T) == sizeof(uint32_t));
 
         uint32_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -379,7 +380,7 @@ struct ByteOrderConverter<double> {
     typedef double T;
 
     inline static T nativeToBig(T t) {
-        static_assert(sizeof(T) == sizeof(uint64_t), "sizeof(T) == sizeof(uint64_t)");
+        MONGO_STATIC_ASSERT(sizeof(T) == sizeof(uint64_t));
 
         uint64_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -452,32 +453,31 @@ struct IntegralTypeMap {
 
 template <>
 struct IntegralTypeMap<signed char> {
-    static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
+    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef int8_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned char> {
-    static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
+    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef uint8_t type;
 };
 
 template <>
 struct IntegralTypeMap<char> {
-    static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
+    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef std::conditional<std::is_signed<char>::value, int8_t, uint8_t>::type type;
 };
 
 template <>
 struct IntegralTypeMap<long long> {
-    static_assert(sizeof(long long) == sizeof(int64_t), "sizeof(long long) == sizeof(int64_t)");
+    MONGO_STATIC_ASSERT(sizeof(long long) == sizeof(int64_t));
     typedef int64_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned long long> {
-    static_assert(sizeof(unsigned long long) == sizeof(uint64_t),
-                  "sizeof(unsigned long long) == sizeof(uint64_t)");
+    MONGO_STATIC_ASSERT(sizeof(unsigned long long) == sizeof(uint64_t));
     typedef uint64_t type;
 };
 

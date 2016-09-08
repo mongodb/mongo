@@ -34,6 +34,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
@@ -61,7 +62,8 @@ namespace mongo {
  */
 template <typename T>
 class StatusWith {
-    static_assert(!(std::is_same<T, mongo::Status>::value), "StatusWith<Status> is banned.");
+    MONGO_STATIC_ASSERT_MSG(!(std::is_same<T, mongo::Status>::value),
+                            "StatusWith<Status> is banned.");
 
 public:
     /**

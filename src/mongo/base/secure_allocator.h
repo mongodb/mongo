@@ -36,6 +36,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 
@@ -83,8 +84,8 @@ struct SecureAllocator {
  *
  */
 #ifdef MONGO_CONFIG_HAVE_STD_IS_TRIVIALLY_COPYABLE
-    static_assert(std::is_trivially_copyable<T>::value,
-                  "SecureAllocator can only be used with trivially copyable types");
+    MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
+                            "SecureAllocator can only be used with trivially copyable types");
 #endif
 
     // NOTE: The standard doesn't seem to require these, but libstdc++

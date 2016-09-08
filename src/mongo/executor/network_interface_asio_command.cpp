@@ -34,6 +34,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/async_stream_interface.h"
@@ -76,8 +77,9 @@ using IsNetworkHandler =
 
 template <typename Handler>
 void asyncSendMessage(AsyncStreamInterface& stream, Message* m, Handler&& handler) {
-    static_assert(IsNetworkHandler<Handler>::value,
-                  "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
+    MONGO_STATIC_ASSERT_MSG(
+        IsNetworkHandler<Handler>::value,
+        "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
     m->header().setResponseToMsgId(0);
     m->header().setId(nextMessageId());
     // TODO: Some day we may need to support vector messages.
@@ -89,7 +91,7 @@ template <typename Handler>
 void asyncRecvMessageHeader(AsyncStreamInterface& stream,
                             MSGHEADER::Value* header,
                             Handler&& handler) {
-    static_assert(
+    MONGO_STATIC_ASSERT_MSG(
         IsNetworkHandler<Handler>::value,
         "Handler passed to asyncRecvMessageHeader does not conform to NetworkHandler concept");
     stream.read(asio::buffer(header->view().view2ptr(), sizeof(decltype(*header))),
@@ -101,7 +103,7 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
                           MSGHEADER::Value* header,
                           Message* m,
                           Handler&& handler) {
-    static_assert(
+    MONGO_STATIC_ASSERT_MSG(
         IsNetworkHandler<Handler>::value,
         "Handler passed to asyncRecvMessageBody does not conform to NetworkHandler concept");
     // validate message length

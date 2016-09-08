@@ -33,6 +33,7 @@
 #include <map>
 #include <string>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_proxy.h"
@@ -192,9 +193,9 @@ public:
 template <typename T, ServerParameterType paramType>
 class ExportedServerParameter : public ServerParameter {
 public:
-    static_assert(paramType == ServerParameterType::kStartupOnly ||
-                      is_safe_runtime_parameter_type<T>::value,
-                  "This type is not supported as a runtime server parameter.");
+    MONGO_STATIC_ASSERT_MSG(paramType == ServerParameterType::kStartupOnly ||
+                                is_safe_runtime_parameter_type<T>::value,
+                            "This type is not supported as a runtime server parameter.");
 
     using storage_type = typename server_parameter_storage_type<T, paramType>::value_type;
 

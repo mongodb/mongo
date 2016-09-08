@@ -34,6 +34,7 @@
 
 #include "mongo/db/stats/snapshots.h"
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/service_context.h"
@@ -93,7 +94,7 @@ StatusWith<SnapshotDiff> Snapshots::computeDelta() {
     }
 
     // The following logic depends on there being exactly 2 stored snapshots
-    static_assert(kNumSnapshots == 2, "kNumSnapshots == 2");
+    MONGO_STATIC_ASSERT(kNumSnapshots == 2);
 
     // Current and previous napshot alternates between indexes 0 and 1
     int currIdx = _loc;

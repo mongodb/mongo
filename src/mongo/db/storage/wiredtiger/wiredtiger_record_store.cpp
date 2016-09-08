@@ -38,6 +38,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -74,10 +75,8 @@ namespace {
 static const int kMinimumRecordStoreVersion = 1;
 static const int kCurrentRecordStoreVersion = 1;  // New record stores use this by default.
 static const int kMaximumRecordStoreVersion = 1;
-static_assert(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion,
-              "kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion");
-static_assert(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion,
-              "kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion");
+MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
+MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
 
 bool shouldUseOplogHack(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);

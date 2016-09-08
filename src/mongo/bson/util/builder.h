@@ -40,6 +40,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/inline_decls.h"
@@ -194,7 +195,7 @@ public:
     }
 
     void appendUChar(unsigned char j) {
-        static_assert(CHAR_BIT == 8, "CHAR_BIT == 8");
+        MONGO_STATIC_ASSERT(CHAR_BIT == 8);
         appendNumImpl(j);
     }
     void appendChar(char j) {
@@ -204,11 +205,11 @@ public:
         appendNumImpl(j);
     }
     void appendNum(short j) {
-        static_assert(sizeof(short) == 2, "sizeof(short) == 2");
+        MONGO_STATIC_ASSERT(sizeof(short) == 2);
         appendNumImpl(j);
     }
     void appendNum(int j) {
-        static_assert(sizeof(int) == 4, "sizeof(int) == 4");
+        MONGO_STATIC_ASSERT(sizeof(int) == 4);
         appendNumImpl(j);
     }
     void appendNum(unsigned j) {
@@ -219,11 +220,11 @@ public:
     void appendNum(bool j) = delete;
 
     void appendNum(double j) {
-        static_assert(sizeof(double) == 8, "sizeof(double) == 8");
+        MONGO_STATIC_ASSERT(sizeof(double) == 8);
         appendNumImpl(j);
     }
     void appendNum(long long j) {
-        static_assert(sizeof(long long) == 8, "sizeof(long long) == 8");
+        MONGO_STATIC_ASSERT(sizeof(long long) == 8);
         appendNumImpl(j);
     }
 

@@ -181,8 +181,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         }
 
         case jstOID:
-            static_assert(sizeof(_storage.oid) == OID::kOIDSize,
-                          "sizeof(_storage.oid) == OID::kOIDSize");
+            MONGO_STATIC_ASSERT(sizeof(_storage.oid) == OID::kOIDSize);
             memcpy(_storage.oid, elem.OID().view().view(), OID::kOIDSize);
             break;
 
@@ -836,8 +835,7 @@ void Value::hash_combine(size_t& seed,
 
         case bsonTimestamp:
         case Date:
-            static_assert(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue),
-                          "sizeof(_storage.dateValue) == sizeof(_storage.timestampValue)");
+            MONGO_STATIC_ASSERT(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue));
             boost::hash_combine(seed, _storage.dateValue);
             break;
 

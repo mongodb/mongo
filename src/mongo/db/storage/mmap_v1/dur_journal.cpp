@@ -38,6 +38,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
@@ -96,12 +97,12 @@ MONGO_INITIALIZER(InitializeJournalingParams)(InitializerContext* context) {
     return Status::OK();
 }
 
-static_assert(sizeof(Checksum) == 16, "sizeof(Checksum) == 16");
-static_assert(sizeof(JHeader) == 8192, "sizeof(JHeader) == 8192");
-static_assert(sizeof(JSectHeader) == 20, "sizeof(JSectHeader) == 20");
-static_assert(sizeof(JSectFooter) == 32, "sizeof(JSectFooter) == 32");
-static_assert(sizeof(JEntry) == 12, "sizeof(JEntry) == 12");
-static_assert(sizeof(LSNFile) == 88, "sizeof(LSNFile) == 88");
+MONGO_STATIC_ASSERT(sizeof(Checksum) == 16);
+MONGO_STATIC_ASSERT(sizeof(JHeader) == 8192);
+MONGO_STATIC_ASSERT(sizeof(JSectHeader) == 20);
+MONGO_STATIC_ASSERT(sizeof(JSectFooter) == 32);
+MONGO_STATIC_ASSERT(sizeof(JEntry) == 12);
+MONGO_STATIC_ASSERT(sizeof(LSNFile) == 88);
 
 bool usingPreallocate = false;
 

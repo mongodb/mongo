@@ -34,6 +34,7 @@
 #include <type_traits>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status_with.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -68,7 +69,7 @@ struct MemberState {
 
     template <typename T>
     static StatusWith<MemberState> create(T t) {
-        static_assert(std::is_integral<T>::value, "T must be an integral type");
+        MONGO_STATIC_ASSERT_MSG(std::is_integral<T>::value, "T must be an integral type");
         using UnderlyingType = std::underlying_type<MS>::type;
         if (std::is_signed<T>::value && (t < 0))
             return {ErrorCodes::BadValue, str::stream() << "MemberState cannot be negative"};

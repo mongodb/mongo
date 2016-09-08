@@ -35,6 +35,7 @@
 #include "mongo/db/storage/key_string.h"
 
 #include <cmath>
+#include <type_traits>
 
 #include "mongo/base/data_view.h"
 #include "mongo/platform/bits.h"
@@ -98,12 +99,11 @@ const uint8_t kNumericPositive6ByteInt = kNumeric + 18;
 const uint8_t kNumericPositive7ByteInt = kNumeric + 19;
 const uint8_t kNumericPositive8ByteInt = kNumeric + 20;
 const uint8_t kNumericPositiveLargeMagnitude = kNumeric + 21;  // >= 2**63 including +Inf
-static_assert(kNumericPositiveLargeMagnitude < kStringLike,
-              "kNumericPositiveLargeMagnitude < kStringLike");
+MONGO_STATIC_ASSERT(kNumericPositiveLargeMagnitude < kStringLike);
 
 const uint8_t kBoolFalse = kBool + 0;
 const uint8_t kBoolTrue = kBool + 1;
-static_assert(kBoolTrue < kDate, "kBoolTrue < kDate");
+MONGO_STATIC_ASSERT(kBoolTrue < kDate);
 
 size_t numBytesForInt(uint8_t ctype) {
     if (ctype >= kNumericPositive1ByteInt) {
@@ -240,7 +240,7 @@ void memcpy_flipBits(void* dst, const void* src, size_t bytes) {
 
 template <typename T>
 T readType(BufReader* reader, bool inverted) {
-    // TODO for C++11 to static_assert that T is integral
+    MONGO_STATIC_ASSERT(std::is_integral<T>::value);
     T t = ConstDataView(static_cast<const char*>(reader->skip(sizeof(T)))).read<T>();
     if (inverted)
         return ~t;

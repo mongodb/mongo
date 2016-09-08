@@ -52,8 +52,7 @@
 namespace mongo {
 
 NamespaceDetails::NamespaceDetails(const DiskLoc& loc, bool capped) {
-    static_assert(sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails),
-                  "sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails)");
+    MONGO_STATIC_ASSERT(sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails));
 
     /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
     firstExtent = lastExtent = capExtent = loc;

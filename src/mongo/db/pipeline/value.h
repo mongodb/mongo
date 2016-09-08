@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/value_internal.h"
 #include "mongo/platform/unordered_set.h"
@@ -334,7 +335,7 @@ private:
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
 };
-static_assert(sizeof(Value) == 16, "sizeof(Value) == 16");
+MONGO_STATIC_ASSERT(sizeof(Value) == 16);
 
 inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);

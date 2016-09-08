@@ -32,6 +32,7 @@
 #include <limits>
 #include <string>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/platform/hash_namespace.h"
@@ -175,8 +176,7 @@ const char* resourceTypeName(ResourceType resourceType);
 class ResourceId {
     // We only use 3 bits for the resource type in the ResourceId hash
     enum { resourceTypeBits = 3 };
-    static_assert(ResourceTypesCount <= (1 << resourceTypeBits),
-                  "ResourceTypesCount <= (1 << resourceTypeBits)");
+    MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
 public:
     /**
@@ -240,7 +240,7 @@ private:
 #ifndef MONGO_CONFIG_DEBUG_BUILD
 // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
 // not spend too much time doing comparisons for hashing.
-static_assert(sizeof(ResourceId) == sizeof(uint64_t), "sizeof(ResourceId) == sizeof(uint64_t)");
+MONGO_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 #endif
 
 

@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/server_parameters.h"
@@ -310,8 +311,8 @@ private:
 
         Hash hash() {
             Hash hash;
-            static_assert(sizeof(frames) == sizeof(FrameInfo) * kMaxFramesPerStack,
-                          "frames array is not dense");
+            MONGO_STATIC_ASSERT_MSG(sizeof(frames) == sizeof(FrameInfo) * kMaxFramesPerStack,
+                                    "frames array is not dense");
             MurmurHash3_x86_32(frames.data(), numFrames * sizeof(FrameInfo), 0, &hash);
             return hash;
         }

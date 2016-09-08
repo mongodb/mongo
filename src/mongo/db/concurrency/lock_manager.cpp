@@ -33,6 +33,7 @@
 #include "mongo/db/concurrency/lock_manager.h"
 
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/concurrency/locker.h"
@@ -72,8 +73,7 @@ static const int LockConflictsTable[] = {
 const uint64_t intentModes = (1 << MODE_IS) | (1 << MODE_IX);
 
 // Ensure we do not add new modes without updating the conflicts table
-static_assert((sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount,
-              "(sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount");
+MONGO_STATIC_ASSERT((sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount);
 
 
 /**
@@ -84,10 +84,9 @@ static const char* LockModeNames[] = {"NONE", "IS", "IX", "S", "X"};
 static const char* LegacyLockModeNames[] = {"", "r", "w", "R", "W"};
 
 // Ensure we do not add new modes without updating the names array
-static_assert((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount,
-              "(sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount");
-static_assert((sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) == LockModesCount,
-              "(sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) == LockModesCount");
+MONGO_STATIC_ASSERT((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount);
+MONGO_STATIC_ASSERT((sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) ==
+                    LockModesCount);
 
 // Helper functions for the lock modes
 bool conflicts(LockMode newMode, uint32_t existingModesMask) {
@@ -106,8 +105,8 @@ static const char* ResourceTypeNames[] = {
     "Invalid", "Global", "MMAPV1Journal", "Database", "Collection", "Metadata", "Mutex"};
 
 // Ensure we do not add new types without updating the names array
-static_assert((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount,
-              "(sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount");
+MONGO_STATIC_ASSERT((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) ==
+                    ResourceTypesCount);
 
 
 /**
@@ -118,10 +117,8 @@ static const char* LockRequestStatusNames[] = {
 };
 
 // Ensure we do not add new status types without updating the names array
-static_assert((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0])) ==
-                  LockRequest::StatusCount,
-              "(sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0])) == "
-              "LockRequest::StatusCount");
+MONGO_STATIC_ASSERT((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0])) ==
+                    LockRequest::StatusCount);
 
 }  // namespace
 

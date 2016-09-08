@@ -78,6 +78,7 @@
 #include <iomanip>
 #include <utility>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -149,10 +150,8 @@ unsigned remapFileToStartAt;
 enum { DurStatsResetIntervalMillis = 3 * 1000 };
 
 // Size sanity checks
-static_assert(UncommittedBytesLimit > BSONObjMaxInternalSize * 3,
-              "UncommittedBytesLimit > BSONObjMaxInternalSize * 3");
-static_assert(sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6,
-              "sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6");
+MONGO_STATIC_ASSERT(UncommittedBytesLimit > BSONObjMaxInternalSize * 3);
+MONGO_STATIC_ASSERT(sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6);
 
 
 /**
