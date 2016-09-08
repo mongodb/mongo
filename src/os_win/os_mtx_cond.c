@@ -18,10 +18,6 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 {
 	WT_CONDVAR *cond;
 
-	/*
-	 * !!!
-	 * This function MUST handle a NULL session handle.
-	 */
 	WT_RET(__wt_calloc_one(session, &cond));
 
 	InitializeCriticalSection(&cond->mtx);
@@ -57,14 +53,8 @@ __wt_cond_wait_signal(
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return;
 
-	/*
-	 * !!!
-	 * This function MUST handle a NULL session handle.
-	 */
-	if (session != NULL) {
-		__wt_verbose(session, WT_VERB_MUTEX, "wait %s", cond->name);
-		WT_STAT_FAST_CONN_INCR(session, cond_wait);
-	}
+	__wt_verbose(session, WT_VERB_MUTEX, "wait %s", cond->name);
+	WT_STAT_FAST_CONN_INCR(session, cond_wait);
 
 	EnterCriticalSection(&cond->mtx);
 	locked = true;
@@ -131,12 +121,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 
 	locked = false;
 
-	/*
-	 * !!!
-	 * This function MUST handle a NULL session handle.
-	 */
-	if (session != NULL)
-		__wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
+	__wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
 	/* Fast path if already signalled. */
 	if (cond->waiters == -1)

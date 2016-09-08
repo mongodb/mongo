@@ -97,7 +97,7 @@ config_unescape(char *orig)
  * config_copy --
  *	CONFIG structure initialization, based on a source configuration.
  */
-int
+void
 config_copy(CONFIG *dest, const CONFIG *src)
 {
 	CONFIG_QUEUE_ENTRY *conf_line, *tmp_line;
@@ -156,7 +156,6 @@ config_copy(CONFIG *dest, const CONFIG *src)
 		tmp_line->string = dstrdup(conf_line->string);
 		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
 	}
-	return (0);
 }
 
 /*
@@ -174,7 +173,10 @@ config_free(CONFIG *cfg)
 	free(cfg->monitor_dir);
 	free(cfg->partial_config);
 	free(cfg->reopen_config);
+
+	/* Free the various URIs */
 	free(cfg->base_uri);
+	free(cfg->log_table_uri);
 
 	if (cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)

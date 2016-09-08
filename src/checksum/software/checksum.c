@@ -41,15 +41,7 @@
 #include "wt_internal.h"
 
 /*
- * This file contains two implementations for computing CRC: one that uses
- * hardware CRC instructions, available on newer x86_64/amd64, and one that uses
- * a fast software algorithm.  __wt_cksum() provides a common entry point that
- * indirects to one of these two methods.
- */
-static uint32_t (*__wt_cksum_func)(const void *chunk, size_t len);
-
-/*
- * The CRC slicing tables are used by __wt_cksum_sw.
+ * The CRC slicing tables.
  */
 static const uint32_t g_crc_slicing[8][256] = {
 #ifdef WORDS_BIGENDIAN
@@ -1104,11 +1096,11 @@ static const uint32_t g_crc_slicing[8][256] = {
 };
 
 /*
- * __wt_cksum_sw --
+ * __wt_checksum_sw --
  *	Return a checksum for a chunk of memory, computed in software.
  */
-static uint32_t
-__wt_cksum_sw(const void *chunk, size_t len)
+uint32_t
+__wt_checksum_sw(const void *chunk, size_t len)
 {
 	uint32_t crc, next;
 	size_t nqwords;
@@ -1170,138 +1162,4 @@ __wt_cksum_sw(const void *chunk, size_t len)
 		crc = g_crc_slicing[0][(crc ^ *p) & 0xFF] ^ (crc >> 8);
 #endif
 	return (~crc);
-}
-
-#if (defined(__amd64) || defined(__x86_64))
-/*
- * __wt_cksum_hw --
- *	Return a checksum for a chunk of memory, computed in hardware
- *	using 8 byte steps.
- */
-static uint32_t
-__wt_cksum_hw(const void *chunk, size_t len)
-{
-	uint32_t crc;
-	size_t nqwords;
-	const uint8_t *p;
-	const uint64_t *p64;
-
-	crc = 0xffffffff;
-
-	/* Checksum one byte at a time to the first 4B boundary. */
-	for (p = chunk;
-	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
-		 len > 0; ++p, --len) {
-		__asm__ __volatile__(
-				     ".byte 0xF2, 0x0F, 0x38, 0xF0, 0xF1"
-				     : "=S" (crc)
-				     : "0" (crc), "c" (*p));
-	}
-
-	p64 = (const uint64_t *)p;
-	/* Checksum in 8B chunks. */
-	for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
-		__asm__ __volatile__ (
-				      ".byte 0xF2, 0x48, 0x0F, 0x38, 0xF1, 0xF1"
-				      : "=S"(crc)
-				      : "0"(crc), "c" (*p64));
-		p64++;
-	}
-
-	/* Checksum trailing bytes one byte at a time. */
-	p = (const uint8_t *)p64;
-	for (len &= 0x7; len > 0; ++p, len--) {
-		__asm__ __volatile__(
-				     ".byte 0xF2, 0x0F, 0x38, 0xF0, 0xF1"
-				     : "=S" (crc)
-				     : "0" (crc), "c" (*p));
-	}
-	return (~crc);
-}
-#endif
-
-#if defined(_M_AMD64)
-/*
- * __wt_cksum_hw --
- *	Return a checksum for a chunk of memory, computed in hardware
- *	using 8 byte steps.
- */
-static uint32_t
-__wt_cksum_hw(const void *chunk, size_t len)
-{
-	uint32_t crc;
-	size_t nqwords;
-	const uint8_t *p;
-	const uint64_t *p64;
-
-	crc = 0xffffffff;
-
-	/* Checksum one byte at a time to the first 4B boundary. */
-	for (p = chunk;
-	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
-	    len > 0; ++p, --len) {
-		crc = _mm_crc32_u8(crc, *p);
-	}
-
-	p64 = (const uint64_t *)p;
-	/* Checksum in 8B chunks. */
-	for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
-		crc = (uint32_t)_mm_crc32_u64(crc, *p64);
-		p64++;
-	}
-
-	/* Checksum trailing bytes one byte at a time. */
-	p = (const uint8_t *)p64;
-	for (len &= 0x7; len > 0; ++p, len--) {
-		crc = _mm_crc32_u8(crc, *p);
-	}
-
-	return (~crc);
-}
-#endif
-
-/*
- * __wt_cksum --
- *	WiredTiger: return a checksum for a chunk of memory.
- */
-uint32_t
-__wt_cksum(const void *chunk, size_t len)
-{
-	return (*__wt_cksum_func)(chunk, len);
-}
-
-/*
- * __wt_cksum_init --
- *	WiredTiger: detect CRC hardware and set the checksum function.
- */
-void
-__wt_cksum_init(void)
-{
-#if (defined(__amd64) || defined(__x86_64))
-	unsigned int eax, ebx, ecx, edx;
-
-	__asm__ __volatile__ (
-			      "cpuid"
-			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-			      : "a" (1));
-
-#define	CPUID_ECX_HAS_SSE42	(1 << 20)
-	if (ecx & CPUID_ECX_HAS_SSE42)
-		__wt_cksum_func = __wt_cksum_hw;
-	else
-		__wt_cksum_func = __wt_cksum_sw;
-
-#elif defined(_M_AMD64)
-	int cpuInfo[4];
-
-	__cpuid(cpuInfo, 1);
-
-#define	CPUID_ECX_HAS_SSE42	(1 << 20)
-	if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
-		__wt_cksum_func = __wt_cksum_hw;
-	else
-		__wt_cksum_func = __wt_cksum_sw;
-#else
-	__wt_cksum_func = __wt_cksum_sw;
-#endif
 }

@@ -43,12 +43,11 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  * __lsm_merge_aggressive_clear --
  *	We found a merge to do - clear the aggressive timer.
  */
-static int
+static void
 __lsm_merge_aggressive_clear(WT_LSM_TREE *lsm_tree)
 {
 	F_CLR(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER);
 	lsm_tree->merge_aggressiveness = 0;
-	return (0);
 }
 
 /*
@@ -80,8 +79,10 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * Only get aggressive if a reasonable number of flushes have been
 	 * completed since opening the tree.
 	 */
-	if (lsm_tree->chunks_flushed <= lsm_tree->merge_min)
-		return (__lsm_merge_aggressive_clear(lsm_tree));
+	if (lsm_tree->chunks_flushed <= lsm_tree->merge_min) {
+		__lsm_merge_aggressive_clear(lsm_tree);
+		return (0);
+	}
 
 	/*
 	 * Start the timer if it isn't running. Use a flag to define whether
@@ -329,7 +330,7 @@ retry_find:
 		return (WT_NOTFOUND);
 	}
 
-	WT_RET(__lsm_merge_aggressive_clear(lsm_tree));
+	__lsm_merge_aggressive_clear(lsm_tree);
 	*records = record_count;
 	*start = start_chunk;
 	*end = end_chunk;
@@ -471,7 +472,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		dest->set_value(dest, &value);
 		WT_ERR(dest->insert(dest));
 		if (create_bloom)
-			WT_ERR(__wt_bloom_insert(bloom, &key));
+			__wt_bloom_insert(bloom, &key);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 

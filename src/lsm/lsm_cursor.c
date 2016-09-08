@@ -1074,8 +1074,7 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 		bloom = NULL;
 		if ((bloom = clsm->blooms[i]) != NULL) {
 			if (!have_hash) {
-				WT_ERR(__wt_bloom_hash(
-				    bloom, &cursor->key, &bhash));
+				__wt_bloom_hash(bloom, &cursor->key, &bhash);
 				have_hash = true;
 			}
 

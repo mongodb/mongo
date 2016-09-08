@@ -147,7 +147,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &las_value));
 
 	/* Open a lookaside table cursor. */
-	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
+	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/*
 	 * The lookaside records are in key and update order, that is, there
@@ -331,7 +331,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * If we have already tried and the transaction state has not moved on,
 	 * eviction is highly likely to fail.
 	 */
-	if (page->modify->last_oldest_id == __wt_txn_oldest_id(session))
+	if (page->modify->last_eviction_id == __wt_txn_oldest_id(session))
 		return (false);
 
 	if (page->memory_footprint < btree->maxmempage)
@@ -476,8 +476,15 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 	btree = S2BT(session);
 
-	WT_STAT_FAST_CONN_INCR(session, cache_pages_requested);
-	WT_STAT_FAST_DATA_INCR(session, cache_pages_requested);
+	/*
+	 * Ignore reads of pages already known to be in cache, otherwise the
+	 * eviction server can dominate these statistics.
+	 */
+	if (!LF_ISSET(WT_READ_CACHE)) {
+		WT_STAT_FAST_CONN_INCR(session, cache_pages_requested);
+		WT_STAT_FAST_DATA_INCR(session, cache_pages_requested);
+	}
+
 	for (evict_soon = stalled = false,
 	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {

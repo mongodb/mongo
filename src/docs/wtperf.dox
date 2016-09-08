@@ -185,6 +185,8 @@ execute a read prior to each insert in workload phase
 key size
 @par log_partial (boolean, default=false)
 perform partial logging on first table only.
+@par log_like_table (boolean, default=false)
+Append all modification operations to another shared table.
 @par min_throughput (unsigned int, default=0)
 notify if any throughput measured is less than this amount. Aborts or
 prints warning based on min_throughput_fatal setting. Requires

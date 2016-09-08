@@ -491,9 +491,8 @@ err:		WT_PANIC_MSG(session, ret, "LSM worker manager thread error");
  *	introduces an inefficiency if LSM trees are being opened and closed
  *	regularly.
  */
-int
-__wt_lsm_manager_clear_tree(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+void
+__wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *current, *next;
@@ -541,7 +540,6 @@ __wt_lsm_manager_clear_tree(
 	}
 	__wt_spin_unlock(session, &manager->manager_lock);
 	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
-	return (0);
 }
 
 /*

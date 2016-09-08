@@ -220,8 +220,7 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 	/* We are done if there are no named drops */
 
 	if (names_config.len != 0) {
-		WT_RET(__wt_config_subinit(
-		    session, &objectconf, &names_config));
+		__wt_config_subinit(session, &objectconf, &names_config);
 		while ((ret = __wt_config_next(&objectconf, &k, &v)) == 0) {
 			ret = __nsnap_drop_one(session, &k);
 			if (ret != 0)
@@ -352,7 +351,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
  * __wt_txn_named_snapshot_destroy --
  *	Destroy all named snapshots on connection close
  */
-int
+void
 __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 {
 	WT_NAMED_SNAPSHOT *nsnap;
@@ -365,6 +364,4 @@ __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
 	}
-
-	return (0);
 }

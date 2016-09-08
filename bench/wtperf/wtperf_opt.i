@@ -120,6 +120,8 @@ DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_BOOL(log_partial, 0, "perform partial logging on first table only.")
+DEF_OPT_AS_BOOL(log_like_table, 0,
+    "Append all modification operations to another shared table.")
 DEF_OPT_AS_UINT32(min_throughput, 0,
     "notify if any throughput measured is less than this amount. "
     "Aborts or prints warning based on min_throughput_fatal setting. "

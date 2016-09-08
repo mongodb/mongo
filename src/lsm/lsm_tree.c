@@ -85,10 +85,9 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
  * __lsm_tree_close --
  *	Close an LSM tree structure.
  */
-static int
+static void
 __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 {
-	WT_DECL_RET;
 	int i;
 
 	/*
@@ -97,7 +96,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 	 * the tree queue state.
 	 */
 	lsm_tree->active = false;
-	WT_READ_BARRIER();
+	WT_FULL_BARRIER();
 
 	/*
 	 * Wait for all LSM operations to drain. If WiredTiger is shutting
@@ -120,17 +119,11 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool final)
 		 * other schema level operations will return EBUSY, even though
 		 * we're dropping the schema lock here.
 		 */
-		if (i % WT_THOUSAND == 0) {
-			WT_WITHOUT_LOCKS(session, ret =
+		if (i % WT_THOUSAND == 0)
+			WT_WITHOUT_LOCKS(session,
 			    __wt_lsm_manager_clear_tree(session, lsm_tree));
-			WT_ERR(ret);
-		}
 		__wt_yield();
 	}
-	return (0);
-
-err:	lsm_tree->active = true;
-	return (ret);
 }
 
 /*
@@ -154,7 +147,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		 * is unconditional.
 		 */
 		(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
-		WT_TRET(__lsm_tree_close(session, lsm_tree, true));
+		__lsm_tree_close(session, lsm_tree, true);
 		WT_TRET(__lsm_tree_discard(session, lsm_tree, true));
 	}
 
@@ -390,9 +383,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 * spurious busy returns.
 				 */
 				(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
-				if (__lsm_tree_close(
-				    session, lsm_tree, false) != 0 ||
-				    lsm_tree->refcnt != 1) {
+				__lsm_tree_close(session, lsm_tree, false);
+				if (lsm_tree->refcnt != 1) {
 					__wt_lsm_tree_release(
 					    session, lsm_tree);
 					return (EBUSY);

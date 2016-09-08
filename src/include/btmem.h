@@ -218,6 +218,14 @@ struct __wt_page_modify {
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
 
+	/* The transaction state last time eviction was attempted. */
+	uint64_t last_eviction_id;
+
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that transaction time moves forward. */
+	uint64_t last_oldest_id;
+#endif
+
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
 
@@ -226,9 +234,6 @@ struct __wt_page_modify {
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
-
-	/* Check that transaction time moves forward. */
-	uint64_t last_oldest_id;
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
@@ -306,7 +311,7 @@ struct __wt_page_modify {
 		 */
 		WT_ADDR	 addr;
 		uint32_t size;
-		uint32_t cksum;
+		uint32_t checksum;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	} m;

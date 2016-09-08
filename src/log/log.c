@@ -640,7 +640,7 @@ __log_file_header(
 	logrec->len = log->allocsize;
 	logrec->checksum = 0;
 	__wt_log_record_byteswap(logrec);
-	logrec->checksum = __wt_cksum(logrec, log->allocsize);
+	logrec->checksum = __wt_checksum(logrec, log->allocsize);
 #ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
@@ -799,14 +799,12 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	WT_FH *log_fh;
 	WT_LOG *log;
 	WT_LSN end_lsn;
-	int yield_cnt;
+	u_int yield_cnt;
 	bool create_log;
 
 	conn = S2C(session);
 	log = conn->log;
 
-	create_log = true;
-	yield_cnt = 0;
 	/*
 	 * Set aside the log file handle to be closed later.  Other threads
 	 * may still be using it to write to the log.  If the log file size
@@ -814,7 +812,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 * Wait for that to close.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	while (log->log_close_fh != NULL) {
+	for (yield_cnt = 0; log->log_close_fh != NULL;) {
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
 		__wt_log_wrlsn(session, NULL);
 		if (++yield_cnt > 10000)
@@ -834,30 +832,39 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 * Make sure everything we set above is visible.
 	 */
 	WT_FULL_BARRIER();
-	/*
-	 * If we're pre-allocating log files, look for one.  If there aren't any
-	 * or we're not pre-allocating, or a backup cursor is open, then
-	 * create one.
-	 */
-	if (conn->log_prealloc > 0 && !conn->hot_backup) {
-		ret = __log_alloc_prealloc(session, log->fileid);
-		/*
-		 * If ret is 0 it means we found a pre-allocated file.
-		 * If ret is non-zero but not WT_NOTFOUND, we return the error.
-		 * If ret is WT_NOTFOUND, we leave create_log set and create
-		 * the new log file.
-		 */
-		if (ret == 0)
-			create_log = false;
-		/*
-		 * If we get any error other than WT_NOTFOUND, return it.
-		 */
-		WT_RET_NOTFOUND_OK(ret);
 
-		if (create_log) {
-			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
-			if (conn->log_cond != NULL)
-				__wt_cond_auto_signal(session, conn->log_cond);
+	/*
+	 * If pre-allocating log files look for one; otherwise, or if we don't
+	 * find one create a log file. We can't use pre-allocated log files in
+	 * while a hot backup is in progress: applications can copy the files
+	 * in any way they choose, and a log file rename might confuse things.
+	 */
+	create_log = true;
+	if (conn->log_prealloc > 0 && !conn->hot_backup) {
+		__wt_readlock(session, conn->hot_backup_lock);
+		if (conn->hot_backup)
+			__wt_readunlock(session, conn->hot_backup_lock);
+		else {
+			ret = __log_alloc_prealloc(session, log->fileid);
+			__wt_readunlock(session, conn->hot_backup_lock);
+
+			/*
+			 * If ret is 0 it means we found a pre-allocated file.
+			 * If ret is WT_NOTFOUND, create the new log file and
+			 * signal the server, we missed our pre-allocation.
+			 * If ret is non-zero but not WT_NOTFOUND, return the
+			 * error.
+			 */
+			WT_RET_NOTFOUND_OK(ret);
+			if (ret == 0)
+				create_log = false;
+			else {
+				WT_STAT_FAST_CONN_INCR(
+				    session, log_prealloc_missed);
+				if (conn->log_cond != NULL)
+					__wt_cond_auto_signal(
+					    session, conn->log_cond);
+			}
 		}
 	}
 	/*
@@ -968,11 +975,17 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
 	conn = S2C(session);
 	log = conn->log;
 
-	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP)) {
-		if ((ret = __wt_ftruncate(session, log_fh, offset)) != ENOTSUP)
-			return (ret);
-
-		F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
+	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && !conn->hot_backup) {
+		__wt_readlock(session, conn->hot_backup_lock);
+		if (conn->hot_backup)
+			__wt_readunlock(session, conn->hot_backup_lock);
+		else {
+			ret = __wt_ftruncate(session, log_fh, offset);
+			__wt_readunlock(session, conn->hot_backup_lock);
+			if (ret != ENOTSUP)
+				return (ret);
+			F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
+		}
 	}
 
 	return (__log_zero(session, log_fh, offset, conn->log_file_max));
@@ -1349,8 +1362,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	yield_count = 0;
 	if (freep != NULL)
 		*freep = 1;
-	release_buffered =
-	    WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
+	release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
 	release_bytes = release_buffered + slot->slot_unbuffered;
 
 	/*
@@ -1363,7 +1375,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	 */
 	if (WT_CKPT_LOGSIZE(conn)) {
 		log->log_written += (wt_off_t)release_bytes;
-		WT_RET(__wt_checkpoint_signal(session, log->log_written));
+		__wt_checkpoint_signal(session, log->log_written);
 	}
 
 	/* Write the buffered records */
@@ -1535,7 +1547,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LSN end_lsn, next_lsn, rd_lsn, start_lsn;
 	wt_off_t log_size;
 	uint32_t allocsize, firstlog, lastlog, lognum, rdup_len, reclen;
-	uint32_t cksum_calculate, cksum_tmp;
+	uint32_t checksum_calculate, checksum_tmp;
 	u_int i, logcount;
 	int firstrecord;
 	bool eol, partial_record;
@@ -1747,12 +1759,12 @@ advance:
 		 */
 		buf->size = reclen;
 		logrec = (WT_LOG_RECORD *)buf->mem;
-		cksum_tmp = logrec->checksum;
+		checksum_tmp = logrec->checksum;
 		logrec->checksum = 0;
-		cksum_calculate = __wt_cksum(logrec, reclen);
-		logrec->checksum = cksum_tmp;
+		checksum_calculate = __wt_checksum(logrec, reclen);
+		logrec->checksum = checksum_tmp;
 		__wt_log_record_byteswap(logrec);
-		if (logrec->checksum != cksum_calculate) {
+		if (logrec->checksum != checksum_calculate) {
 			/*
 			 * A checksum mismatch means we have reached the end of
 			 * the useful part of the log.  This should be found on
@@ -2066,7 +2078,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->len = (uint32_t)record->size;
 	logrec->checksum = 0;
 	__wt_log_record_byteswap(logrec);
-	logrec->checksum = __wt_cksum(logrec, record->size);
+	logrec->checksum = __wt_checksum(logrec, record->size);
 #ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif

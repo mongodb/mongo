@@ -140,13 +140,14 @@ __dmsg_event(WT_DBG *ds, const char *fmt, ...)
 static int
 __dmsg_file(WT_DBG *ds, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)vfprintf(ds->fp, fmt, ap);
+	ret = vfprintf(ds->fp, fmt, ap) < 0 ? EIO : 0;
 	va_end(ap);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -290,7 +291,7 @@ err:	__wt_scr_free(session, &buf);
  */
 int
 __wt_debug_offset(WT_SESSION_IMPL *session,
-     wt_off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
+     wt_off_t offset, uint32_t size, uint32_t checksum, const char *ofile)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -309,7 +310,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	 */
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(
-	    S2BT(session)->bm->block, &endp, offset, size, cksum));
+	    S2BT(session)->bm->block, &endp, offset, size, checksum));
 
 	/*
 	 * Read the address through the btree I/O functions (so the block is

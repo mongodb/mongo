@@ -344,12 +344,13 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
 	wt_off_t offset;
-	uint32_t cksum, size;
+	uint32_t checksum, size;
 
 	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+	WT_RET(
+	    __wt_block_buffer_to_addr(block, addr, &offset, &size, &checksum));
 
 	/* Add to the per-file list. */ 
 	WT_RET(

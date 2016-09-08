@@ -52,7 +52,8 @@ struct __wt_extlist {
 	uint32_t entries;			/* Entry count */
 
 	wt_off_t offset;			/* Written extent offset */
-	uint32_t cksum, size;			/* Written extent cksum, size */
+	uint32_t checksum;			/* Written extent checksum */
+	uint32_t size;				/* Written extent size */
 
 	bool	 track_size;			/* Maintain per-size skiplist */
 
@@ -128,7 +129,7 @@ struct __wt_block_ckpt {
 	uint8_t	 version;			/* Version */
 
 	wt_off_t root_offset;			/* The root */
-	uint32_t root_cksum, root_size;
+	uint32_t root_checksum, root_size;
 
 	WT_EXTLIST alloc;			/* Extents allocated */
 	WT_EXTLIST avail;			/* Extents available */
@@ -282,7 +283,7 @@ struct __wt_block_desc {
 #define	WT_BLOCK_MINOR_VERSION	0
 	uint16_t minorv;		/* 06-07: Minor version */
 
-	uint32_t cksum;			/* 08-11: Description block checksum */
+	uint32_t checksum;		/* 08-11: Description block checksum */
 
 	uint32_t unused;		/* 12-15: Padding */
 };
@@ -305,7 +306,7 @@ __wt_block_desc_byteswap(WT_BLOCK_DESC *desc)
 	desc->magic = __wt_bswap32(desc->magic);
 	desc->majorv = __wt_bswap16(desc->majorv);
 	desc->minorv = __wt_bswap16(desc->minorv);
-	desc->cksum = __wt_bswap32(desc->cksum);
+	desc->checksum = __wt_bswap32(desc->checksum);
 #else
 	WT_UNUSED(desc);
 #endif
@@ -335,7 +336,7 @@ struct __wt_block_header {
 	 * stored in the disk header.  This is for salvage, so salvage knows it
 	 * has found a page that may be useful.
 	 */
-	uint32_t cksum;			/* 04-07: checksum */
+	uint32_t checksum;		/* 04-07: checksum */
 
 #define	WT_BLOCK_DATA_CKSUM	0x01	/* Block data is part of the checksum */
 	uint8_t flags;			/* 08: flags */
@@ -364,7 +365,7 @@ __wt_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
 	*to = *from;
 #ifdef WORDS_BIGENDIAN
 	to->disk_size = __wt_bswap32(from->disk_size);
-	to->cksum = __wt_bswap32(from->cksum);
+	to->checksum = __wt_bswap32(from->checksum);
 #endif
 }
 

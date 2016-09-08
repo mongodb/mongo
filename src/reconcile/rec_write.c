@@ -159,7 +159,7 @@ typedef struct {
 
 		WT_ADDR addr;		/* Split's written location */
 		uint32_t size;		/* Split's size */
-		uint32_t cksum;		/* Split's checksum */
+		uint32_t checksum;	/* Split's checksum */
 
 		void    *disk_image;	/* Split's disk image */
 
@@ -374,14 +374,19 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 */
 	__wt_writelock(session, &page->page_lock);
 
+	oldest_id = __wt_txn_oldest_id(session);
+	if (LF_ISSET(WT_EVICTING))
+		mod->last_eviction_id = oldest_id;
+
+#ifdef HAVE_DIAGNOSTIC
 	/*
 	 * Check that transaction time always moves forward for a given page.
 	 * If this check fails, reconciliation can free something that a future
 	 * reconciliation will need.
 	 */
-	oldest_id = __wt_txn_oldest_id(session);
 	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
 	mod->last_oldest_id = oldest_id;
+#endif
 
 	/* Initialize the reconciliation structure for each new run. */
 	if ((ret = __rec_write_init(
@@ -1872,7 +1877,7 @@ __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 	__wt_free(session, bnd->addr.addr);
 	WT_CLEAR(bnd->addr);
 	bnd->size = 0;
-	bnd->cksum = 0;
+	bnd->checksum = 0;
 
 	__wt_free(session, bnd->disk_image);
 
@@ -3195,7 +3200,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);
 	}
 	bnd->size = (uint32_t)buf->size;
-	bnd->cksum = 0;
+	bnd->checksum = 0;
 
 	/*
 	 * Check if we've saved updates that belong to this block, and move
@@ -3301,7 +3306,7 @@ supd_check_complete:
 		 */
 		dsk->write_gen = 0;
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
-		bnd->cksum = __wt_cksum(buf->data, buf->size);
+		bnd->checksum = __wt_checksum(buf->data, buf->size);
 
 		/*
 		 * One last check: don't reuse blocks if compacting, the reason
@@ -3314,7 +3319,7 @@ supd_check_complete:
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
-			    multi->cksum == bnd->cksum) {
+			    multi->checksum == bnd->checksum) {
 				multi->addr.reuse = 1;
 				bnd->addr = multi->addr;
 
@@ -3329,7 +3334,7 @@ supd_check_complete:
 	if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT) && r->entries < 6)
 		__wt_verbose(session, WT_VERB_SPLIT,
 		    "Reconciliation creating a page with %" PRIu32
-		    " entries, memory footprint %" PRIu64
+		    " entries, memory footprint %" WT_SIZET_FMT
 		    ", page count %" PRIu32 ", %s, split state: %d\n",
 		    r->entries, r->page->memory_footprint, r->bnd_next,
 		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",
@@ -3406,7 +3411,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	 */
 	__wt_las_set_written(session);
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
+	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/* Ensure enough room for a column-store key without checking. */
 	WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
@@ -5637,7 +5642,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		__wt_verbose(session, WT_VERB_RECONCILE, "page %p empty", page);
+		__wt_verbose(
+		    session, WT_VERB_RECONCILE, "page %p empty", (void *)page);
 		WT_STAT_FAST_CONN_INCR(session, rec_page_delete);
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
@@ -5699,7 +5705,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	default:					/* Page split */
 		__wt_verbose(session, WT_VERB_RECONCILE,
 		    "page %p reconciled into %" PRIu32 " pages",
-		    page, r->bnd_next);
+		    (void *)page, r->bnd_next);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
@@ -5844,7 +5850,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		multi->addr = bnd->addr;
 		multi->addr.reuse = 0;
 		multi->size = bnd->size;
-		multi->cksum = bnd->cksum;
+		multi->checksum = bnd->checksum;
 		bnd->addr.addr = NULL;
 	}
 	mod->mod_multi_entries = r->bnd_next;
@@ -5891,7 +5897,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		multi->addr = bnd->addr;
 		multi->addr.reuse = 0;
 		multi->size = bnd->size;
-		multi->cksum = bnd->cksum;
+		multi->checksum = bnd->checksum;
 		bnd->addr.addr = NULL;
 	}
 	mod->mod_multi_entries = r->bnd_next;

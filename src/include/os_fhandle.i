@@ -51,7 +51,7 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
 	__wt_verbose(session, WT_VERB_HANDLEOPS,
-	    "%s: handle-extend: %" PRIuMAX " at %" PRIuMAX,
+	    "%s: handle-extend: to %" PRIuMAX,
 	    fh->handle->name, (uintmax_t)offset);
 
 	/*
@@ -134,7 +134,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
 	__wt_verbose(session, WT_VERB_HANDLEOPS,
-	    "%s: handle-truncate: %" PRIuMAX " at %" PRIuMAX,
+	    "%s: handle-truncate: to %" PRIuMAX,
 	    fh->handle->name, (uintmax_t)offset);
 
 	/*

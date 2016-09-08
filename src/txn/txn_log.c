@@ -450,11 +450,10 @@ __wt_txn_truncate_log(
  * __wt_txn_truncate_end --
  *	Finish truncating a range of a file.
  */
-int
+void
 __wt_txn_truncate_end(WT_SESSION_IMPL *session)
 {
 	F_CLR(session, WT_SESSION_LOGGING_INMEM);
-	return (0);
 }
 
 /*

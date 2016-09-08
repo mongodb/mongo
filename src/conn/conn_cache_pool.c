@@ -34,10 +34,10 @@
 #define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	6
 #define	WT_CACHE_POOL_READ_MULTIPLIER	1
 
-static int __cache_pool_adjust(
+static void __cache_pool_adjust(
     WT_SESSION_IMPL *, uint64_t, uint64_t, bool, bool *);
-static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
-static int __cache_pool_balance(WT_SESSION_IMPL *, bool);
+static void __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
+static void __cache_pool_balance(WT_SESSION_IMPL *, bool);
 
 /*
  * __wt_cache_pool_config --
@@ -414,11 +414,10 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
  *	Do a pass over the cache pool members and ensure the pool is being
  *	effectively used.
  */
-static int
+static void
 __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 {
 	WT_CACHE_POOL *cp;
-	WT_DECL_RET;
 	bool adjusted;
 	uint64_t bump_threshold, highest;
 
@@ -429,10 +428,12 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
 
 	/* If the queue is empty there is nothing to do. */
-	if (TAILQ_FIRST(&cp->cache_pool_qh) == NULL)
-		goto err;
+	if (TAILQ_FIRST(&cp->cache_pool_qh) == NULL) {
+		__wt_spin_unlock(NULL, &cp->cache_pool_lock);
+		return;
+	}
 
-	WT_ERR(__cache_pool_assess(session, &highest));
+	__cache_pool_assess(session, &highest);
 	bump_threshold = WT_CACHE_POOL_BUMP_THRESHOLD;
 
 	/*
@@ -442,8 +443,8 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 	 */
 	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
 	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN)) {
-		WT_ERR(__cache_pool_adjust(
-		    session, highest, bump_threshold, forward, &adjusted));
+		__cache_pool_adjust(
+		    session, highest, bump_threshold, forward, &adjusted);
 		/*
 		 * Stop if the amount of cache being used is stable, and we
 		 * aren't over capacity.
@@ -454,15 +455,14 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 			--bump_threshold;
 	}
 
-err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
-	return (ret);
+	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
 }
 
 /*
  * __cache_pool_assess --
  *	Assess the usage of the cache pool.
  */
-static int
+static void
 __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 {
 	WT_CACHE_POOL *cp;
@@ -548,7 +548,6 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	    highest, entries);
 
 	*phighest = highest;
-	return (0);
 }
 
 /*
@@ -557,7 +556,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
  *	ignore cache load information, and reduce the allocation for every
  *	connection allocated more than their reserved size.
  */
-static int
+static void
 __cache_pool_adjust(WT_SESSION_IMPL *session,
     uint64_t highest, uint64_t bump_threshold, bool forward, bool *adjustedp)
 {
@@ -600,7 +599,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * assigned.
 		 */
 		pressure = cache->cp_pass_pressure / highest_percentile;
-		busy = __wt_eviction_needed(entry->default_session, &pct_full);
+		busy = __wt_eviction_needed(
+		    entry->default_session, false, &pct_full);
 
 		__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2u",
@@ -709,7 +709,6 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			 */
 		}
 	}
-	return (0);
 }
 
 /*
@@ -756,7 +755,7 @@ __wt_cache_pool_server(void *arg)
 		 * reported in the balance function.
 		 */
 		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
-			(void)__cache_pool_balance(session, forward);
+			__cache_pool_balance(session, forward);
 			forward = !forward;
 		}
 	}

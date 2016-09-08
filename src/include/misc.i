@@ -48,11 +48,20 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
 /*
  * __wt_verbose --
  * 	Verbose message.
+ *
+ * Inline functions are not parsed for external prototypes, so in cases where we
+ * want GCC attributes attached to the functions, we have to do so explicitly.
  */
 static inline void
 __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
-    WT_GCC_FUNC_ATTRIBUTE((cold))
+WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
+
+/*
+ * __wt_verbose --
+ * 	Verbose message.
+ */
+static inline void
+__wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
 {
 #ifdef HAVE_VERBOSE
 	va_list ap;

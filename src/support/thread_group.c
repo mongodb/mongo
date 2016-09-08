@@ -61,7 +61,7 @@ __thread_group_grow(
 		thread = group->threads[group->current_threads++];
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
 		    "Starting utility thread: %p:%"PRIu32"\n",
-		    group, thread->id);
+		    (void *)group, thread->id);
 		F_SET(thread, WT_THREAD_RUN);
 		WT_ASSERT(session, thread->session != NULL);
 		WT_RET(__wt_thread_create(thread->session,
@@ -101,7 +101,7 @@ __thread_group_shrink(WT_SESSION_IMPL *session,
 		if (thread->tid != 0) {
 			__wt_verbose(session, WT_VERB_THREAD_GROUP,
 			    "Stopping utility thread: %p:%"PRIu32"\n",
-			    group, thread->id);
+			    (void *)group, thread->id);
 			F_CLR(thread, WT_THREAD_RUN);
 			__wt_cond_signal(session, group->wait_cond);
 			WT_TRET(__wt_thread_join(session, thread->tid));
@@ -206,8 +206,7 @@ err:	/*
 	 */
 	if (ret != 0) {
 		WT_TRET(__wt_thread_group_destroy(session, group));
-		WT_PANIC_RET(session, ret,
-		    "Error while resizing thread group");
+		WT_PANIC_RET(session, ret, "Error while resizing thread group");
 	}
 	return (ret);
 }
@@ -226,11 +225,10 @@ __wt_thread_group_resize(
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
 	    "Resize thread group: %p, from min: %" PRIu32 " -> %" PRIu32
 	    " from max: %" PRIu32 " -> %" PRIu32 "\n",
-	    group, group->min, new_min, group->max, new_max);
+	    (void *)group, group->min, new_min, group->max, new_max);
 
 	__wt_writelock(session, group->lock);
-	WT_TRET(__thread_group_resize(
-	    session, group, new_min, new_max, flags));
+	WT_TRET(__thread_group_resize(session, group, new_min, new_max, flags));
 	__wt_writeunlock(session, group->lock);
 	return (ret);
 }
@@ -255,7 +253,7 @@ __wt_thread_group_create(
 	cond_alloced = false;
 
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
-	    "Creating thread group: %p\n", group);
+	    "Creating thread group: %p\n", (void *)group);
 
 	WT_RET(__wt_rwlock_alloc(session, &group->lock, "Thread group"));
 	WT_ERR(__wt_cond_alloc(
@@ -283,16 +281,14 @@ err:	if (ret != 0) {
  *	Shut down a thread group.  Our caller must hold the lock.
  */
 int
-__wt_thread_group_destroy(
-    WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
+__wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 {
 	WT_DECL_RET;
 
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
-	    "Destroying thread group: %p\n", group);
+	    "Destroying thread group: %p\n", (void *)group);
 
-	WT_ASSERT(session,
-	    __wt_rwlock_islocked(session, group->lock));
+	WT_ASSERT(session, __wt_rwlock_islocked(session, group->lock));
 
 	/* Shut down all threads and free associated resources. */
 	WT_TRET(__thread_group_shrink(session, group, 0));
