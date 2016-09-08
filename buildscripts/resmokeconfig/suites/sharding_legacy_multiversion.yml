@@ -30,6 +30,10 @@ selector:
     - jstests/sharding/movePrimary1.js
     # v3.0 responds with $err, v3.2 returns err code for inprog and killop.
     - jstests/sharding/auth.js
+    # Depends on stopping monitoring of a replica set after some period if no response is received.
+    # On the 3.2 branch only, that behavior is governed by a server parameter starting at
+    # 3.2.10. See SERVER-25516.
+    - jstests/sharding/remove2.js
 
     # The following tests fails because of bugs in v3.0 that were already fixed in v3.2:
     - jstests/sharding/addshard2.js # SERVER-17231, fixed in v3.1.1

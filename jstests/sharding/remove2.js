@@ -69,8 +69,16 @@ addShard = function(st, replTest) {
     print("Shard added successfully");
 };
 
-var st = new ShardingTest(
-    {shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}, other: {chunkSize: 1, enableBalancer: true}});
+var st = new ShardingTest({
+    shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
+    other: {
+        rs: {setParameter: "timeOutMonitoringReplicaSets=true"},
+        configOptions: {setParameter: "timeOutMonitoringReplicaSets=true"},
+        mongosOptions: {setParameter: "timeOutMonitoringReplicaSets=true"},
+        chunkSize: 1,
+        enableBalancer: true
+    }
+});
 
 // Pending resolution of SERVER-8598, we need to wait for deletion after chunk migrations to avoid
 // a pending delete re-creating a database after it was dropped.

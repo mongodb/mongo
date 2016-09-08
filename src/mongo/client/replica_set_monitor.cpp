@@ -84,7 +84,7 @@ const Milliseconds kFindHostMaxBackOffTime(500);
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
 ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
 
-MONGO_EXPORT_SERVER_PARAMETER(timeOutMonitoringReplicaSets, bool, true);
+MONGO_EXPORT_SERVER_PARAMETER(timeOutMonitoringReplicaSets, bool, false);
 
 // global background job responsible for checking every X amount of time
 class ReplicaSetMonitorWatcher : public BackgroundJob {
