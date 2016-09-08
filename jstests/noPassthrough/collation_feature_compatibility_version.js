@@ -29,6 +29,25 @@
     assert.commandWorked(res);
     assert.eq("3.2", res.featureCompatibilityVersion);
 
+    // We cannot create a collection with a default collation when the featureCompatibilityVersion
+    // is 3.2.
+    assert.commandFailed(
+        collationDB.createCollection("collection", {collation: {locale: "fr_CA"}}));
+
+    // We cannot explicitly give a collection the simple collation as its default when the
+    // featureCompatibilityVersion is 3.2.
+    assert.commandFailed(
+        collationDB.createCollection("collection", {collation: {locale: "simple"}}));
+
+    // We cannot create a view with a default collation when the featureCompatibilityVersion is 3.2.
+    assert.commandFailed(collationDB.runCommand(
+        {create: "view", viewOn: "caseInsensitive", collation: {locale: "fr_CA"}}));
+
+    // We cannot explicitly give a view the simple collation as its default when the
+    // featureCompatibilityVersion is 3.2.
+    assert.commandFailed(collationDB.runCommand(
+        {create: "view", viewOn: "caseInsensitive", collation: {locale: "simple"}}));
+
     // All operations reject the collation parameter when the featureCompatibilityVersion is 3.2.
     assert.throws(function() {
         caseInsensitive.aggregate([], {collation: {locale: "en_US"}});

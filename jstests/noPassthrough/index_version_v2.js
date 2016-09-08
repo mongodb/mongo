@@ -162,10 +162,7 @@
 
     // Test that creating a collection with a non-simple default collation returns an error when the
     // featureCompatibilityVersion is 3.2.
-    //
-    // TODO SERVER-25741: Disallow creating a collection with a collation option and update this
-    // test case to assert that the "create" command returns an error.
-    assert.commandWorked(testDB.runCommand({create: "collation", collation: {locale: "en"}}));
+    assert.commandFailed(testDB.runCommand({create: "collation", collation: {locale: "en"}}));
 
     // Test that creating an index with a non-simple collation returns an error when the
     // featureCompatibilityVersion is 3.2.
@@ -173,31 +170,20 @@
 
     // Test that creating a collection with a non-simple default collation and without an _id index
     // succeeds when the featureCompatibilityVersion is 3.2.
-    //
-    // TODO SERVER-25741: Disallow creating a collection with a collation option and update this
-    // test case to assert that the "create" command returns an error.
     testDB.collation.drop();
-    assert.commandWorked(
+    assert.commandFailed(
         testDB.runCommand({create: "collation", collation: {locale: "en"}, autoIndexId: false}));
 
     // Test that creating a collection with a simple default collation and without an _id index
     // succeeds when the featureCompatibilityVersion is 3.2.
-    //
-    // TODO SERVER-25741: Disallow creating a collection with a collation option and update this
-    // test case to assert that the "create" command returns an error.
     testDB.collation.drop();
-    assert.commandWorked(testDB.runCommand(
+    assert.commandFailed(testDB.runCommand(
         {create: "collation", collation: {locale: "simple"}, autoIndexId: false}));
 
     // Test that creating a collection with a simple default collation succeeds when the
     // featureCompatibilityVersion is 3.2.
-    //
-    // TODO SERVER-25741: Disallow creating a collection with a collation option and update this
-    // test case to assert that the "create" command returns an error.
     testDB.collation.drop();
-    assert.commandWorked(testDB.runCommand({create: "collation", collation: {locale: "simple"}}));
-    indexSpec = getIndexSpecByName(testDB.collation, "_id_");
-    assert.eq(1, indexSpec.v, tojson(indexSpec));
+    assert.commandFailed(testDB.runCommand({create: "collation", collation: {locale: "simple"}}));
 
     // Test that creating an index with a simple collation returns an error when the
     // featureCompatibilityVersion is 3.2.
