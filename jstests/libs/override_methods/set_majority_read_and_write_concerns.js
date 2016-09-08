@@ -52,37 +52,53 @@
 
         // These commands directly support a writeConcern argument.
         var commandsToForceWriteConcern = [
+            "_mergeAuthzCollections",
+            "appendOplogNote",
             "applyOps",
             "authSchemaUpgrade",
+            "captrunc",
+            "cleanupOrphaned",
             "clone",
             "cloneCollection",
             "cloneCollectionAsCapped",
+            // "collMod", SERVER-25196 - not supported
             "convertToCapped",
             "copydb",
+            "create",
+            "createIndexes",
             "createRole",
             "createUser",
             "delete",
+            "drop",
+            "dropDatabase",
             "dropAllRolesFromDatabase",
             "dropAllUsersFromDatabase",
+            "dropDatabase",
+            "dropIndexes",
             "dropRole",
             "dropUser",
+            "emptycapped",
             "findAndModify",
             "findandmodify",
+            "godinsert",
             "grantPrivilegesToRole",
             "grantRolesToRole",
             "grantRolesToUser",
             "insert",
+            "mapReduceFinish",
+            "mergeAuthzCollections",
+            "moveChunk",
+            "movePrimary",
+            "reIndex",
+            "remove",
+            "renameCollection",
+            "resvChunkStart",
+            "revokePriviligesFromRole",
             "revokeRolesFromRole",
             "revokeRolesFromUser",
             "update",
             "updateRole",
             "updateUser",
-        ];
-
-        // These commands do writes but do not support a writeConcern argument. Emulate it with a
-        // getLastError command.
-        var commandsToEmulateWriteConcern = [
-            "createIndexes",
         ];
 
         // These are reading commands that support majority readConcern.
@@ -96,7 +112,6 @@
         ];
 
         var forceWriteConcern = Array.contains(commandsToForceWriteConcern, cmdName);
-        var emulateWriteConcern = Array.contains(commandsToEmulateWriteConcern, cmdName);
         var forceReadConcern = Array.contains(commandsToForceReadConcern, cmdName);
 
         if (cmdName === "aggregate") {
@@ -109,9 +124,21 @@
             const hasOut =
                 lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
             if (hasOut) {
-                emulateWriteConcern = true;
+                forceWriteConcern = true;
             } else {
                 forceReadConcern = true;
+            }
+        }
+
+        else if (cmdName === "mapReduce") {
+            var stages = obj.pipeline;
+            const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
+                ? stages[stages.length - 1]
+                : undefined;
+            const hasOut =
+                lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
+            if (hasOut) {
+                forceWriteConcern = true;
             }
         }
 
@@ -139,13 +166,6 @@
         }
 
         var res = this.getMongo().runCommand(dbName, obj, options);
-
-        if (res.ok && emulateWriteConcern) {
-            // We only emulate WriteConcern if the command succeeded to match the behavior of
-            // commands that support WriteConcern.
-            var gleCmd = Object.extend({getLastError: 1}, defaultWriteConcern);
-            assert.commandWorked(this.getMongo().runCommand(dbName, gleCmd, options));
-        }
 
         return res;
     };

@@ -8,6 +8,8 @@ selector:
     exclude_files:
     - jstests/aggregation/bugs/server18198.js # Uses a mocked mongo client to test read preference.
     - jstests/aggregation/mongos_slaveok.js # Majority read on secondary requires afterOpTime.
+    - jstests/aggregation/sources/facet/use_cases.js # Cannot specify write concern when
+                                                     # secondaryThrottle is not set.
     - jstests/aggregation/testSlave.js # Majority read on secondary requires afterOpTime.
 
 executor:
