@@ -2249,8 +2249,8 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	 * to avoid repeatedly attempting eviction on the same page.
 	 */
 	if (new->page->modify != NULL)
-		new->page->modify->last_oldest_id =
-		    page->modify->last_oldest_id;
+		new->page->modify->last_eviction_id =
+		    page->modify->last_eviction_id;
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.
