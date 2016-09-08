@@ -158,7 +158,6 @@ public:
     public:
         class EnqueueOnly {};
 
-        explicit GlobalLock(Locker* locker);
         GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs);
 
         /**
