@@ -94,7 +94,7 @@ private:
      * sort, and 'projectionObj' will be set to an empty object if the query system cannot provide a
      * covered projection.
      */
-    static std::shared_ptr<PlanExecutor> prepareExecutor(
+    static StatusWith<std::unique_ptr<PlanExecutor>> prepareExecutor(
         OperationContext* txn,
         Collection* collection,
         const boost::intrusive_ptr<Pipeline>& pipeline,
@@ -112,7 +112,7 @@ private:
     static std::shared_ptr<PlanExecutor> addCursorSource(
         const boost::intrusive_ptr<Pipeline>& pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::shared_ptr<PlanExecutor> exec,
+        std::unique_ptr<PlanExecutor> exec,
         DepsTracker deps,
         const BSONObj& queryObj = BSONObj(),
         const BSONObj& sortObj = BSONObj(),
