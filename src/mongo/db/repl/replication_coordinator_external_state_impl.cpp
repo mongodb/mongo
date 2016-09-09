@@ -530,8 +530,12 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
     // Check if we have any unapplied ops in our oplog. It is important that this is done after
     // deleting the ragged end of the oplog.
     const auto topOfOplog = fassertStatusOK(40290, loadLastOpTime(txn));
-    if (topOfOplog >= appliedThrough) {
+    if (appliedThrough == topOfOplog) {
         return;  // We've applied all the valid oplog we have.
+    } else if (appliedThrough > topOfOplog) {
+        severe() << "Applied op " << appliedThrough << " not found. Top of oplog is " << topOfOplog
+                 << '.';
+        fassertFailedNoTrace(40313);
     }
 
     log() << "Replaying stored operations from " << appliedThrough << " (exclusive) to "

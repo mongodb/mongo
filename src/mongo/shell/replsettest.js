@@ -1287,6 +1287,12 @@ var ReplSetTest = function(opts) {
 
         printjson(this.nodes);
 
+        // Clean up after noReplSet to ensure it doesn't effect future restarts.
+        if (options.noReplSet) {
+            this.nodes[n].fullOptions.replSet = defaults.replSet;
+            delete this.nodes[n].fullOptions.noReplSet;
+        }
+
         wait = wait || false;
         if (!wait.toFixed) {
             if (wait)

@@ -63,6 +63,7 @@ using std::endl;
 
 MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
+MONGO_FP_DECLARE(hangAfterStartingIndexBuildUnlocked);
 
 /**
  * On rollback sets MultiIndexBlock::_needToCleanup to true.
@@ -333,6 +334,19 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
     while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
         log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
         sleepmillis(1000);
+    }
+    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
+        // Unlock before hanging so replication recognizes we've completed.
+        Locker::LockSnapshot lockInfo;
+        _txn->lockState()->saveLockStateAndUnlock(&lockInfo);
+        while (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
+            log() << "Hanging index build with no locks due to "
+                     "'hangAfterStartingIndexBuildUnlocked' failpoint";
+            sleepmillis(1000);
+        }
+        // If we want to support this, we'd need to regrab the lock and be sure that all callers are
+        // ok with us yielding. They should be for BG indexes, but not for foreground.
+        invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off");
     }
 
     progress->finished();
