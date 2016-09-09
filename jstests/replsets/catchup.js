@@ -105,7 +105,8 @@ load("jstests/replsets/rslib.js");
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
     rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
     // Write documents that cannot be replicated to secondaries in time.
-    rst.getSecondaries().forEach(enableFailPoint);
+    var originalSecondaries = rst.getSecondaries();
+    originalSecondaries.forEach(enableFailPoint);
     doWrites(rst.getPrimary());
     var latestOp = getLatestOp(rst.getPrimary());
     // New primary wins immediately, but needs to catch up.
@@ -114,7 +115,7 @@ load("jstests/replsets/rslib.js");
     // Check this node is not writable.
     assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
     // Disable fail point to allow replication.
-    rst.nodes.forEach(disableFailPoint);
+    originalSecondaries.forEach(disableFailPoint);
     // getPrimary() blocks until the primary finishes drain mode.
     assert.eq(newPrimary, rst.getPrimary());
     // Wait for all secondaries to catch up
@@ -125,12 +126,13 @@ load("jstests/replsets/rslib.js");
     jsTest.log("Case 3: The primary needs to catch up, fails due to timeout.");
     rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
     // Write documents that cannot be replicated to secondaries in time.
-    rst.getSecondaries().forEach(enableFailPoint);
+    originalSecondaries = rst.getSecondaries();
+    originalSecondaries.forEach(enableFailPoint);
     doWrites(rst.getPrimary());
     latestOp = getLatestOp(rst.getPrimary());
 
     // New primary wins immediately, but needs to catch up.
-    newPrimary = stepUp(rst.getSecondary());
+    newPrimary = stepUp(originalSecondaries[0]);
     rst.awaitNodesAgreeOnPrimary();
     var latestOpOnNewPrimary = getLatestOp(newPrimary);
     // Wait until the new primary completes the transition to primary and writes a no-op.
@@ -147,7 +149,7 @@ load("jstests/replsets/rslib.js");
     });
     // The extra oplog entries on the old primary are not replicated to the new one.
     checkOpInOplog(newPrimary, latestOp, 0);
-    rst.getSecondaries().forEach(disableFailPoint);
+    disableFailPoint(originalSecondaries[1]);
 
     jsTest.log("Case 4: The primary needs to catch up, but has to change sync source to catch up.");
     rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
@@ -155,15 +157,15 @@ load("jstests/replsets/rslib.js");
     rst.getSecondaries().forEach(enableFailPoint);
     doWrites(rst.getPrimary());
     var oldPrimary = rst.getPrimary();
-    var oldSecondaries = rst.getSecondaries();
+    originalSecondaries = rst.getSecondaries();
     latestOp = getLatestOp(oldPrimary);
-    newPrimary = stepUp(oldSecondaries[0]);
+    newPrimary = stepUp(originalSecondaries[0]);
     rst.awaitNodesAgreeOnPrimary();
     // Disable fail point on one of the other secondaries.
     // Wait until it catches up with the old primary.
-    disableFailPoint(oldSecondaries[1]);
-    assert.commandWorked(oldSecondaries[1].adminCommand({replSetSyncFrom: oldPrimary.host}));
-    awaitOpTime(oldSecondaries[1], latestOp.ts);
+    disableFailPoint(originalSecondaries[1]);
+    assert.commandWorked(originalSecondaries[1].adminCommand({replSetSyncFrom: oldPrimary.host}));
+    awaitOpTime(originalSecondaries[1], latestOp.ts);
     // Disconnect the new primary and the old one.
     oldPrimary.disconnect(newPrimary);
     // Disable the failpoint, the new primary should sync from the other secondary.
