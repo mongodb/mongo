@@ -110,6 +110,10 @@ var ShardingTest = function(params) {
     // cleaning up the data files on shutdown
     var _alldbpaths = [];
 
+    // Timeout to be used for operations scheduled by the sharding test, which must wait for write
+    // concern (5 minutes)
+    var kDefaultWTimeoutMs = 5 * 60 * 1000;
+
     // Publicly exposed variables
 
     /**
@@ -1263,7 +1267,7 @@ var ShardingTest = function(params) {
             assert.writeOK(csrsPrimary.getDB('config').settings.update(
                 {_id: 'chunksize'},
                 {$set: {value: otherParams.chunkSize}},
-                {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
+                {upsert: true, writeConcern: {w: 'majority', wtimeout: kDefaultWTimeoutMs}}));
         }
 
         if (keyFile) {
