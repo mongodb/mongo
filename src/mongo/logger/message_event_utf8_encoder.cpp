@@ -52,7 +52,7 @@ constexpr auto kEOL = "\r\n"_sd;
 #else
 constexpr auto kEOL = "\n"_sd;
 #endif
-} // namespace
+}  // namespace
 
 MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
 std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
