@@ -137,8 +137,18 @@ public:
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config) = 0;
 
     /**
-     * Called as part of the process of transitioning to primary. See the call site in
-     * ReplicationCoordinatorImpl for details about when and how it is called.
+     * Called when a node on way to becoming a primary is ready to leave drain mode. It is called
+     * outside of the global X lock and the replication coordinator mutex.
+     *
+     * Throws on errors.
+     */
+    virtual void onDrainComplete(OperationContext* txn) = 0;
+
+    /**
+     * Called as part of the process of transitioning to primary and run with the global X lock and
+     * the replication coordinator mutex acquired, so no majoirty writes are allowed while in this
+     * state. See the call site in ReplicationCoordinatorImpl for details about when and how it is
+     * called.
      *
      * Among other things, this writes a message about our transition to primary to the oplog if
      * isV1 and and returns the optime of that message. If !isV1, returns the optime of the last op

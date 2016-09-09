@@ -882,10 +882,11 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     if (!_isWaitingForDrainToComplete) {
         return;
     }
-
     lk.unlock();
+
+    _externalState->onDrainComplete(txn);
+
     ScopedTransaction transaction(txn, MODE_X);
-    // Block step downs even after we unlock lk.
     Lock::GlobalWrite globalWriteLock(txn->lockState());
     lk.lock();
 

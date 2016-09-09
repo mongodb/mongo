@@ -286,6 +286,8 @@ void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val
     _isReadCommittedSupported = val;
 }
 
+void ReplicationCoordinatorExternalStateMock::onDrainComplete(OperationContext* txn) {}
+
 OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* txn,
                                                                       bool isV1ElectionProtocol) {
     if (isV1ElectionProtocol) {
@@ -299,5 +301,6 @@ void ReplicationCoordinatorExternalStateMock::startNoopWriter(OpTime opTime) {}
 void ReplicationCoordinatorExternalStateMock::stopNoopWriter() {}
 
 void ReplicationCoordinatorExternalStateMock::setupNoopWriter(Seconds waitTime) {}
+
 }  // namespace repl
 }  // namespace mongo

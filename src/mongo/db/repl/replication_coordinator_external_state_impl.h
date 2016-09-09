@@ -75,7 +75,8 @@ public:
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual OldThreadPool* getDbWorkThreadPool() const override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
-    virtual OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol);
+    void onDrainComplete(OperationContext* txn) override;
+    OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx);
@@ -110,8 +111,6 @@ public:
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* txn) const override;
     virtual bool shouldUseDataReplicatorInitialSync() const override;
-
-    std::string getNextOpContextThreadName();
 
     // Methods from JournalListener.
     virtual JournalListener::Token getToken();

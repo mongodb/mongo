@@ -344,8 +344,20 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
     return Status::OK();
 }
 
+void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* txn) {
+    invariant(!txn->lockState()->isLocked());
+
+    // If this is a config server node becoming a primary, start the balancer
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        // We need to join the balancer here, because it might have been running at a previous time
+        // when this node was a primary.
+        Balancer::get(txn)->joinThread();
+    }
+}
+
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* txn,
                                                                       bool isV1ElectionProtocol) {
+    invariant(txn->lockState()->isW());
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
@@ -635,9 +647,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         return;
     }
 
-    if (!status.isOK()) {
-        fassertFailedWithStatus(40107, status);
-    }
+    fassertStatusOK(40107, status);
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         status = Grid::get(txn)->catalogManager()->initializeConfigDatabaseIfNeeded(txn);
@@ -689,12 +699,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         distLockManager->unlockAll(txn, distLockManager->getProcessID());
 
         // If this is a config server node becoming a primary, start the balancer
-        auto balancer = Balancer::get(txn);
-
-        // We need to join the balancer here, because it might have been running at a previous time
-        // when this node was a primary.
-        balancer->joinThread();
-        balancer->startThread(txn);
+        Balancer::get(txn)->startThread(txn);
     } else if (ShardingState::get(txn)->enabled()) {
         const auto configsvrConnStr =
             Grid::get(txn)->shardRegistry()->getConfigShard()->getConnString();
