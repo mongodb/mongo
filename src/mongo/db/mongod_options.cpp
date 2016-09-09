@@ -1290,6 +1290,16 @@ Status storeMongodOptions(const moe::Environment& params) {
                       "****");
     }
 
+#ifdef _WIN32
+    // If dbPath is a default value, prepend with drive name so log entries are explicit
+    // We must resolve the dbpath before it stored in repairPath in the default case.
+    if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath ||
+        storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
+        boost::filesystem::path currentPath = boost::filesystem::current_path();
+        storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
+    }
+#endif
+
     // needs to be after things like --configsvr parsing, thus here.
     if (params.count("storage.repairPath")) {
         storageGlobalParams.repairpath = params["storage.repairPath"].as<string>();
@@ -1318,15 +1328,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                   << "Please use --journal if you want durability.";
         log() << endl;
     }
-
-#ifdef _WIN32
-    // If dbPath is a default value, prepend with drive name so log entries are explicit
-    if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath ||
-        storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
-        boost::filesystem::path currentPath = boost::filesystem::current_path();
-        storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
-    }
-#endif
 
     setGlobalReplSettings(replSettings);
     return Status::OK();
