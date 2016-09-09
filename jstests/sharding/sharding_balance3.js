@@ -48,7 +48,7 @@
 
     print("* A");
     print("disabling the balancer");
-    s.config.settings.update({_id: "balancer"}, {$set: {stopped: true}}, true);
+    s.stopBalancer();
     s.config.settings.find().forEach(printjson);
     print("* B");
 
