@@ -110,8 +110,9 @@ var Explainable = (function() {
             return this._collection.aggregate(pipeline, extraOpts);
         };
 
-        this.count = function(query) {
-            return this.find(query).count();
+        this.count = function(query, options) {
+            query = this.find(query);
+            return QueryHelpers._applyCountOptions(query, options).count();
         };
 
         /**
