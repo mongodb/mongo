@@ -74,6 +74,7 @@ public:
     virtual void shutdown(OperationContext* txn);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual OldThreadPool* getDbWorkThreadPool() const override;
+    virtual Status runRepairOnLocalDB(OperationContext* txn) override;
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
     void onDrainComplete(OperationContext* txn) override;
     OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;

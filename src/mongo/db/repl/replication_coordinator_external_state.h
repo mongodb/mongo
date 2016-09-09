@@ -132,6 +132,12 @@ public:
     virtual OldThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
+     * Runs the repair database command on the "local" db, if the storage engine is MMapV1.
+     * Note: Used after initial sync to compact the database files.
+     */
+    virtual Status runRepairOnLocalDB(OperationContext* txn) = 0;
+
+    /**
      * Creates the oplog, writes the first entry and stores the replica set config document.
      */
     virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config) = 0;

@@ -47,6 +47,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
@@ -98,12 +99,10 @@ namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 
+const char localDbName[] = "local";
 const char configCollectionName[] = "local.system.replset";
-const char configDatabaseName[] = "local";
 const char lastVoteCollectionName[] = "local.replset.election";
-const char lastVoteDatabaseName[] = "local";
 const char meCollectionName[] = "local.me";
-const char meDatabaseName[] = "local";
 const char tsFieldName[] = "ts";
 
 const char kCollectionOplogBufferName[] = "collection";
@@ -314,6 +313,27 @@ OldThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() co
     return _writerPool.get();
 }
 
+Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationContext* txn) {
+    try {
+        ScopedTransaction scopedXact(txn, MODE_X);
+        Lock::GlobalWrite globalWrite(txn->lockState());
+        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+
+        if (!engine->isMmapV1()) {
+            return Status::OK();
+        }
+
+        txn->setReplicatedWrites(false);
+        Status status = repairDatabase(txn, engine, localDbName, false, false);
+
+        // Open database before returning
+        dbHolder().openDb(txn, localDbName);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+    return Status::OK();
+}
+
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* txn,
                                                                          const BSONObj& config) {
     try {
@@ -395,7 +415,7 @@ OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* txn) {
     OID myRID;
     {
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lock(txn->lockState(), meDatabaseName, MODE_X);
+        Lock::DBLock lock(txn->lockState(), localDbName, MODE_X);
 
         BSONObj me;
         // local.me is an identifier for a server for getLastError w:2+
@@ -443,7 +463,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, MODE_X);
+            Lock::DBLock dbWriteLock(txn->lockState(), localDbName, MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();
         }
@@ -481,7 +501,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbWriteLock(txn->lockState(), lastVoteDatabaseName, MODE_X);
+            Lock::DBLock dbWriteLock(txn->lockState(), localDbName, MODE_X);
             Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
             return Status::OK();
         }

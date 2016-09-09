@@ -629,6 +629,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             if (startCompleted) {
                 startCompleted();
             }
+            // Repair local db (to compact it).
+            uassertStatusOK(_externalState->runRepairOnLocalDB(txn));
             _externalState->startSteadyStateReplication(txn, this);
         });
     } else {
