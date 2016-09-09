@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include <vector>
 
 #include "mongo/base/init.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -160,6 +163,8 @@ public:
         }
 
         failPoint->setMode(mode, val, dataObj);
+        warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
+
         return true;
     }
 };

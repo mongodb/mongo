@@ -19,7 +19,8 @@ function shardCollectionWithChunks(st, coll) {
 
 // Stops replication at a server.
 function stopServerReplication(conn) {
-    conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+    assert.commandWorked(
+        conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
 }
 
 // Stops replication at all replicaset secondaries.
@@ -35,7 +36,8 @@ function stopReplicationOnSecondariesOfAllShards(st) {
 
 // Restarts replication at a server.
 function restartServerReplication(conn) {
-    conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+    assert.commandWorked(
+        conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
 }
 
 // Restarts replication at all nodes in a replicaset.
