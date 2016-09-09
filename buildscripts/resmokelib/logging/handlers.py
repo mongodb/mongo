@@ -136,15 +136,15 @@ class HTTPHandler(object):
         credentials.
         """
 
-        digest_handler = urllib2.HTTPDigestAuthHandler()
-        digest_handler.add_password(
+        auth_handler = urllib2.HTTPBasicAuthHandler()
+        auth_handler.add_password(
             realm=realm,
             uri=url_root,
             user=username,
             passwd=password)
 
         self.url_root = url_root
-        self.url_opener = urllib2.build_opener(digest_handler, urllib2.HTTPErrorProcessor())
+        self.url_opener = urllib2.build_opener(auth_handler, urllib2.HTTPErrorProcessor())
 
     def _make_url(self, endpoint):
         return "%s/%s/" % (self.url_root.rstrip("/"), endpoint.strip("/"))
