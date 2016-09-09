@@ -38,7 +38,7 @@
 #include <memory>
 
 #include "mongo/base/counter.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -587,14 +587,11 @@ void fillWriterVectors(OperationContext* txn,
             //
             // For capped collections, this is illegal, since capped collections must preserve
             // insertion order.
-            //
-            // For collections with a non-simple default collation, this is also illegal, since we
-            // can't currently hash the _id BSONElement with respect to the collation.
-            // TODO SERVER-23990: Lift this restriction once there is a mechanism for
-            // collation-aware hashing of BSONElement.
-            if (supportsDocLocking && !collProperties.isCapped && !collProperties.collator) {
+            if (supportsDocLocking && !collProperties.isCapped) {
                 BSONElement id = op.getIdElement();
-                const size_t idHash = SimpleBSONElementComparator::kInstance.hash(id);
+                BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
+                                                    collProperties.collator);
+                const size_t idHash = elementHasher.hash(id);
                 MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
             }
 
