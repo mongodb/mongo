@@ -597,6 +597,12 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
         log() << "initial sync - initialSyncHangBeforeCopyingDatabases fail point "
                  "enabled. Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
+            lk.lock();
+            if (!_initialSyncState->status.isOK()) {
+                lk.unlock();
+                break;
+            }
+            lk.unlock();
             mongo::sleepsecs(1);
         }
     }
@@ -746,6 +752,12 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
                 log() << "initial sync - initialSyncHangBeforeFinish fail point "
                          "enabled. Blocking until fail point is disabled.";
                 while (MONGO_FAIL_POINT(initialSyncHangBeforeFinish)) {
+                    lk.lock();
+                    if (!_initialSyncState->status.isOK()) {
+                        lk.unlock();
+                        break;
+                    }
+                    lk.unlock();
                     mongo::sleepsecs(1);
                 }
                 lk.lock();
