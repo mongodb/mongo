@@ -294,7 +294,7 @@ void Balancer::_mainThread() {
 
     log() << "CSRS balancer is starting";
 
-    const Seconds kInitBackoffInterval(60);
+    const Seconds kInitBackoffInterval(10);
 
     // Take the balancer distributed lock and hold it permanently
     while (!_stopRequested()) {

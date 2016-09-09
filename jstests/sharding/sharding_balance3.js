@@ -44,7 +44,7 @@
     var initialDiff = diff1();
     assert.soon(function() {
         return diff1() != initialDiff;
-    }, "Balancer did not kick in");
+    }, "Balancer did not kick in", 5 * 60 * 1000, 1000);
 
     print("* A");
     print("disabling the balancer");
