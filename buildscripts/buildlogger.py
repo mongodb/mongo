@@ -94,8 +94,8 @@ URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.mongodb.org/')
 TIMEOUT_SECONDS = 10
 socket.setdefaulttimeout(TIMEOUT_SECONDS)
 
-digest_handler = urllib2.HTTPDigestAuthHandler()
-digest_handler.add_password(
+auth_handler = urllib2.HTTPBasicAuthHandler()
+auth_handler.add_password(
     realm='buildlogs',
     uri=URL_ROOT,
     user=username,
@@ -117,7 +117,7 @@ class HTTPErrorProcessor(urllib2.HTTPErrorProcessor):
 
         return response
 
-url_opener = urllib2.build_opener(digest_handler, HTTPErrorProcessor())
+url_opener = urllib2.build_opener(auth_handler, HTTPErrorProcessor())
 
 def url(endpoint):
     if not endpoint.endswith('/'):
