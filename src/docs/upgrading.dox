@@ -12,8 +12,9 @@ the volume of dirty data in cache under 20%.  For write-heavy workloads, the
 new defaults may result in lower throughput and more threads writing to data
 files concurrently.
 
-These settings also now determine how much work is done at the beginning of a
-checkpoint to make the critical section of checkpoints complete more quickly.
+There is also a new \c eviction_checkpoint_target setting that determines
+how much work is done at the beginning of a checkpoint to make the critical
+section of checkpoints complete more quickly.
 </dd>
 
 <dt>Checkpoint server created checkpoint names</dt>

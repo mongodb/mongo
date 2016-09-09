@@ -457,7 +457,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
 	if (dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100)
 		F_SET(cache, WT_CACHE_EVICT_DIRTY);
-	if ((dirty_trigger = cache->eviction_scrub_target) < 1.0)
+	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
 		dirty_trigger = (double)cache->eviction_dirty_trigger;
 	if (dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100)
 		F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
@@ -1467,45 +1467,6 @@ fast:		/* If the page can't be evicted, give up. */
 }
 
 /*
- * __evict_check_entry_size --
- *	Check if the size of an entry is too large for this thread to evict.
- *	We use this so that the server thread doesn't get stalled evicting
- *	a very large page.
- */
-static bool
-__evict_check_entry_size(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *entry)
-{
-	WT_CACHE *cache;
-	WT_PAGE *page;
-	WT_REF *ref;
-	uint64_t max;
-
-	cache = S2C(session)->cache;
-
-	if (cache->pages_evict == 0 || cache->bytes_evict < WT_MEGABYTE)
-		return (true);
-
-	max = (cache->bytes_evict / cache->pages_evict) * 4;
-	if ((ref = entry->ref) != NULL) {
-		if ((page = ref->page) == NULL)
-			return (true);
-
-		/*
-		 * If this page is dirty and more than four times the average
-		 * evicted page size then return false.  Return true in all
-		 * other cases.
-		 */
-		if (__wt_page_is_modified(page) &&
-		    page->memory_footprint > max) {
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_server_toobig);
-			return (false);
-		}
-	}
-	return (true);
-}
-
-/*
  * __evict_get_ref --
  *	Get a page for eviction.
  */
@@ -1617,26 +1578,17 @@ __evict_get_ref(
 		WT_ASSERT(session, evict->btree != NULL);
 
 		/*
-		 * If the server is helping out and encounters an entry that is
-		 * too large, it stops helping.  Evicting a very large page in
-		 * the server thread could stall eviction from finding new
-		 * work.
+		 * Evicting a dirty page in the server thread could stall
+		 * during a write and prevent eviction from finding new work.
 		 *
 		 * However, we can't skip entries in the urgent queue or they
 		 * may never be found again.
-		 */
-		if (is_server && !urgent_ok &&
-		    !__evict_check_entry_size(session, evict)) {
-			--evict;
-			break;
-		}
-
-		/*
+		 *
 		 * Don't force application threads to evict dirty pages if they
 		 * aren't stalled by the amount of dirty data in cache.
 		 */
-		if (is_app && !urgent_ok &&
-		    !F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD) &&
+		if (!urgent_ok && (is_server || (is_app &&
+		    !F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD))) &&
 		    __wt_page_is_modified(evict->ref->page)) {
 			--evict;
 			break;
@@ -1808,7 +1760,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		 * checkpoints.  Just throttle updates instead.
 		 */
 		if (busy && WT_EVICT_HAS_WORKERS(session) &&
-		    cache->eviction_scrub_target > 0.0 &&
+		    cache->eviction_scrub_limit > 0.0 &&
 		    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD)) {
 			__wt_yield();
 			continue;

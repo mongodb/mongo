@@ -268,7 +268,7 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
 	 * The next transaction in this session will not be able to start until
 	 * the cache is under the limit.
 	 */
-	if ((dirty_trigger = cache->eviction_scrub_target) < 1.0)
+	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
 		dirty_trigger = (double)cache->eviction_dirty_trigger;
 	return (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
 	    (!busy &&
