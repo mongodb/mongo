@@ -538,6 +538,18 @@ public:
             warning() << deprecationWarning;
             result.append("note", deprecationWarning);
         }
+
+        auto featureCompatibilityVersion = serverGlobalParams.featureCompatibilityVersion.load();
+        if (ServerGlobalParams::FeatureCompatibilityVersion_32 == featureCompatibilityVersion &&
+            cmdObj.hasField("collation")) {
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 "The featureCompatibilityVersion must be 3.4 to create a collection or "
+                 "view with a default collation. See "
+                 "http://dochub.mongodb.org/core/3.4-feature-compatibility."});
+        }
+
         return appendCommandStatus(result, createCollection(txn, dbname, cmdObj));
     }
 } cmdCreate;
