@@ -28,8 +28,11 @@
 
 #pragma once
 
+#include <altivec.h>
+#undef vector
+#undef bool
+
 #include <cstdint>
-#include <emmintrin.h>
 
 #include "mongo/platform/bits.h"
 
@@ -42,31 +45,38 @@ namespace unicode {
  * This is specific to the use case in mongo::unicode::String and not intended as a general purpose
  * vector class.
  *
- * This specialization offers acceleration for x86_64
+ * This specialization offers acceleration for ppc64le
  */
 class ByteVector {
 public:
-    using Native = __m128i;
-    using Mask = uint32_t;  // should be uint16_t but better codegen with uint32_t.
+    using Native = __vector signed char;
+
+    // Logically 16 bits, but this is the actual output type of vec_vbpermq
+    using Mask = uint64_t;
+
     using Scalar = int8_t;
     static const int size = sizeof(Native);
 
     /**
      * Sets all bytes to 0.
      */
-    ByteVector() : _data(_mm_setzero_si128()) {}
+    ByteVector() {
+        _data = vec_splat_s8(0);
+    }
 
     /**
      * Sets all bytes to val.
      */
-    explicit ByteVector(Scalar val) : _data(_mm_set1_epi8(val)) {}
+    explicit ByteVector(Scalar val) {
+        _data = vec_splats(val);
+    }
 
     /**
      * Load a vector from a potentially unaligned location.
      */
     static ByteVector load(const void* ptr) {
         // This function is documented as taking an unaligned pointer.
-        return _mm_loadu_si128(reinterpret_cast<const Native*>(ptr));
+        return vec_vsx_ld(0, reinterpret_cast<const Native*>(ptr));
     }
 
     /**
@@ -74,14 +84,21 @@ public:
      */
     void store(void* ptr) const {
         // This function is documented as taking an unaligned pointer.
-        _mm_storeu_si128(reinterpret_cast<Native*>(ptr), _data);
+        vec_vsx_st(_data, 0, reinterpret_cast<Native*>(ptr));
     }
 
     /**
      * Returns a bitmask with the high bit from each byte.
      */
     Mask maskHigh() const {
-        return _mm_movemask_epi8(_data);
+        // The bits array represents the api indexes of the left to right high bits.
+        //
+        // This seems really wrong, but the indexes you hand to vec_vbpermq are actually mirrored on
+        // little endian (the interface seems more designed for big endian).  You'd do 7, 15, etc on
+        // big endian by comparison.
+        const Native bits = {120, 112, 104, 96, 88, 80, 72, 64, 56, 48, 40, 32, 24, 16, 8, 0};
+
+        return vec_extract(vec_vbpermq(_data, bits), 0);
     }
 
     /**
@@ -108,17 +125,17 @@ public:
      * with high bit set.
      */
     ByteVector compareEQ(Scalar val) const {
-        return _mm_cmpeq_epi8(_data, ByteVector(val)._data);
+        return (Native)vec_cmpeq(_data, ByteVector(val)._data);
     }
     ByteVector compareLT(Scalar val) const {
-        return _mm_cmplt_epi8(_data, ByteVector(val)._data);
+        return (Native)vec_cmplt(_data, ByteVector(val)._data);
     }
     ByteVector compareGT(Scalar val) const {
-        return _mm_cmpgt_epi8(_data, ByteVector(val)._data);
+        return (Native)vec_cmpgt(_data, ByteVector(val)._data);
     }
 
     ByteVector operator|(ByteVector other) const {
-        return _mm_or_si128(_data, other._data);
+        return (Native)vec_or(_data, other._data);
     }
 
     ByteVector& operator|=(ByteVector other) {
@@ -126,7 +143,7 @@ public:
     }
 
     ByteVector operator&(ByteVector other) const {
-        return _mm_and_si128(_data, other._data);
+        return (Native)vec_and(_data, other._data);
     }
 
     ByteVector& operator&=(ByteVector other) {
