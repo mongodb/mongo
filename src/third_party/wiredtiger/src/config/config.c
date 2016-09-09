@@ -26,7 +26,7 @@ __config_err(WT_CONFIG *conf, const char *msg, int err)
  *	Initialize a config handle, used to iterate through a config string of
  *	specified length.
  */
-int
+void
 __wt_config_initn(
     WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str, size_t len)
 {
@@ -36,8 +36,6 @@ __wt_config_initn(
 	conf->depth = 0;
 	conf->top = -1;
 	conf->go = NULL;
-
-	return (0);
 }
 
 /*
@@ -45,14 +43,14 @@ __wt_config_initn(
  *	Initialize a config handle, used to iterate through a NUL-terminated
  *	config string.
  */
-int
+void
 __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
 {
 	size_t len;
 
 	len = (str == NULL) ? 0 : strlen(str);
 
-	return (__wt_config_initn(session, conf, str, len));
+	__wt_config_initn(session, conf, str, len);
 }
 
 /*
@@ -61,11 +59,11 @@ __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str)
  *	extracted from another config string (used for parsing nested
  *	structures).
  */
-int
+void
 __wt_config_subinit(
     WT_SESSION_IMPL *session, WT_CONFIG *conf, WT_CONFIG_ITEM *item)
 {
-	return (__wt_config_initn(session, conf, item->str, item->len));
+	__wt_config_initn(session, conf, item->str, item->len);
 }
 
 #define	PUSH(i, t) do {							\
@@ -601,8 +599,8 @@ __config_getraw(
 		    strncmp(key->str, k.str, k.len) == 0) {
 			subk.str = key->str + k.len + 1;
 			subk.len = (key->len - k.len) - 1;
-			WT_RET(__wt_config_initn(
-			    cparser->session, &sparser, v.str, v.len));
+			__wt_config_initn(
+			    cparser->session, &sparser, v.str, v.len);
 			if ((ret = __config_getraw(
 			    &sparser, &subk, value, false)) == 0)
 				found = true;
@@ -641,7 +639,7 @@ __wt_config_get(WT_SESSION_IMPL *session,
 	do {
 		--cfg;
 
-		WT_RET(__wt_config_init(session, &cparser, *cfg));
+		__wt_config_init(session, &cparser, *cfg);
 		if ((ret = __config_getraw(&cparser, key, value, true)) == 0)
 			return (0);
 		WT_RET_NOTFOUND_OK(ret);
@@ -690,7 +688,7 @@ __wt_config_getone(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG cparser;
 
-	WT_RET(__wt_config_init(session, &cparser, config));
+	__wt_config_init(session, &cparser, config);
 	return (__config_getraw(&cparser, key, value, true));
 }
 
@@ -706,7 +704,7 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM key_item =
 	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
-	WT_RET(__wt_config_init(session, &cparser, config));
+	__wt_config_init(session, &cparser, config);
 	return (__config_getraw(&cparser, &key_item, value, true));
 }
 
@@ -771,7 +769,7 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG cparser;
 
-	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
+	__wt_config_initn(session, &cparser, cfg->str, cfg->len);
 	return (__config_getraw(&cparser, key, value, true));
 }
 

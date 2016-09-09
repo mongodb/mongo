@@ -155,6 +155,7 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
 int
 __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	WT_EVENT_HANDLER *handler;
 	WT_DECL_RET;

@@ -65,6 +65,10 @@ AS_CASE([$host_cpu],
 	[s390x*], [wt_cv_zseries="yes"],
 	[wt_cv_zseries="no"])
 AM_CONDITIONAL([ZSERIES_HOST], [test "$wt_cv_zseries" = "yes"])
+AS_CASE([$host_cpu],
+	[aarch64*], [wt_cv_arm64="yes"],
+	[wt_cv_arm64="no"])
+AM_CONDITIONAL([ARM64_HOST], [test "$wt_cv_arm64" = "yes"])
 
 # This is a workaround as part of WT-2459. Currently, clang (v3.7) does not
 # support compiling the ASM code we have to perform the CRC checks on PowerPC.

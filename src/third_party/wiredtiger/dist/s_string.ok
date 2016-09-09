@@ -328,6 +328,7 @@ StoreLoad
 StoreStore
 TAILQ
 TCMalloc
+TESTUTIL
 TODO
 TORTIOUS
 TSO
@@ -472,6 +473,7 @@ call's
 calloc
 cas
 catfmt
+cb
 ccr
 cd
 centric
@@ -550,6 +552,7 @@ curtable
 cust
 customp
 cv
+cx
 cxa
 dT
 data's
@@ -643,6 +646,7 @@ extlist
 fadvise
 fallocate
 fblocks
+fc
 fclose
 fcntl
 fd

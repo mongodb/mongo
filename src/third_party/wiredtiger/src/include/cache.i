@@ -7,6 +7,17 @@
  */
 
 /*
+ * __wt_cache_aggressive --
+ *      Indicate if the cache is operating in aggressive mode.
+ */
+static inline bool
+__wt_cache_aggressive(WT_SESSION_IMPL *session)
+{
+	return (S2C(session)->cache->evict_aggressive_score >=
+	    WT_EVICT_SCORE_CUTOFF);
+}
+
+/*
  * __wt_cache_read_gen --
  *      Get the current read generation number.
  */
@@ -65,6 +76,21 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 	cache = S2C(session)->cache;
 	page->read_gen =
 	    (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
+}
+
+/*
+ * __wt_cache_stuck --
+ *      Indicate if the cache is stuck (i.e., not making progress).
+ */
+static inline bool
+__wt_cache_stuck(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	return (cache->evict_aggressive_score == WT_EVICT_SCORE_MAX &&
+	    F_ISSET(cache,
+		WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD));
 }
 
 /*
@@ -195,11 +221,12 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
  *      percentage as a side-effect.
  */
 static inline bool
-__wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
+__wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CACHE *cache;
-	uint64_t bytes_inuse, bytes_max;
+	double dirty_trigger;
+	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 	u_int pct_dirty, pct_full;
 
 	conn = S2C(session);
@@ -216,24 +243,36 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	 * Avoid division by zero if the cache size has not yet been set in a
 	 * shared cache.
 	 */
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size + 1;
+	bytes_inuse = __wt_cache_bytes_inuse(cache);
+	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
 
 	/*
 	 * Calculate the cache full percentage; anything over the trigger means
 	 * we involve the application thread.
 	 */
-	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
-	pct_dirty =
-	    (u_int)((100 * __wt_cache_dirty_leaf_inuse(cache)) / bytes_max);
+	if (pct_fullp != NULL) {
+		pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
+		pct_dirty = (u_int)((100 * dirty_inuse) / bytes_max);
 
-	if (pct_fullp != NULL)
 		*pct_fullp = (u_int)WT_MAX(0, 100 - WT_MIN(
 		    (int)cache->eviction_trigger - (int)pct_full,
 		    (int)cache->eviction_dirty_trigger - (int)pct_dirty));
+	}
 
-	return (pct_full >= cache->eviction_trigger ||
-	    pct_dirty >= cache->eviction_dirty_trigger);
+	/*
+	 * Only check the dirty trigger when the session is not busy.
+	 *
+	 * In other words, once we are pinning resources, try to finish the
+	 * operation as quickly as possible without exceeding the cache size.
+	 * The next transaction in this session will not be able to start until
+	 * the cache is under the limit.
+	 */
+	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
+		dirty_trigger = (double)cache->eviction_dirty_trigger;
+	return (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
+	    (!busy &&
+	    dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100));
 }
 
 /*
@@ -260,10 +299,26 @@ static inline int
 __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 {
 	WT_BTREE *btree;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
 	u_int pct_full;
 
 	if (didworkp != NULL)
 		*didworkp = false;
+
+	/*
+	 * If the current transaction is keeping the oldest ID pinned, it is in
+	 * the middle of an operation.	This may prevent the oldest ID from
+	 * moving forward, leading to deadlock, so only evict what we can.
+	 * Otherwise, we are at a transaction boundary and we can work harder
+	 * to make sure there is free space in the cache.
+	 */
+	txn_global = &S2C(session)->txn_global;
+	txn_state = WT_SESSION_TXN_STATE(session);
+	busy = busy || txn_state->id != WT_TXN_NONE ||
+	    session->nhazard > 0 ||
+	    (txn_state->snap_min != WT_TXN_NONE &&
+	    txn_global->current != txn_global->oldest_id);
 
 	/*
 	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
@@ -287,7 +342,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 		return (0);
 
 	/* Check if eviction is needed. */
-	if (!__wt_eviction_needed(session, &pct_full))
+	if (!__wt_eviction_needed(session, busy, &pct_full))
 		return (0);
 
 	/*

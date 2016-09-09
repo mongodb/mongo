@@ -17,7 +17,7 @@
  *	Mark idle handles with a time of death, and note if we see dead
  *	handles.
  */
-static int
+static void
 __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -50,8 +50,6 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 		dhandle->timeofdeath = now;
 		WT_STAT_FAST_CONN_INCR(session, dh_sweep_tod);
 	}
-
-	return (0);
 }
 
 /*
@@ -286,10 +284,10 @@ __sweep_server(void *arg)
 		 * If we try to sweep when the cache is full or we aren't
 		 * making progress in eviction, sweeping can wind up constantly
 		 * bringing in and evicting pages from the lookaside table,
-		 * which will stop the WT_CACHE_STUCK flag from being set.
+		 * which will stop the cache from moving into the stuck state.
 		 */
 		if (__wt_las_is_written(session) &&
-		    !F_ISSET(conn->cache, WT_CACHE_STUCK)) {
+		    !__wt_cache_stuck(session)) {
 			oldest_id = __wt_txn_oldest_id(session);
 			if (WT_TXNID_LT(last_las_sweep_id, oldest_id)) {
 				WT_ERR(__wt_las_sweep(session));
@@ -303,7 +301,7 @@ __sweep_server(void *arg)
 		 * never become idle.
 		 */
 		if (conn->sweep_idle_time != 0)
-			WT_ERR(__sweep_mark(session, now));
+			__sweep_mark(session, now);
 
 		/*
 		 * Close handles if we have reached the configured limit.

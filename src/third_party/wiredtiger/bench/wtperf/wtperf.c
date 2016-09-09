@@ -37,6 +37,7 @@ static const CONFIG default_cfg = {
 	NULL,				/* partial logging */
 	NULL,				/* reopen config */
 	NULL,				/* base_uri */
+	NULL,				/* log_table_uri */
 	NULL,				/* uris */
 	NULL,				/* conn */
 	NULL,				/* logf */
@@ -55,6 +56,7 @@ static const CONFIG default_cfg = {
 	0,				/* truncate operations */
 	0,				/* update operations */
 	0,				/* insert key */
+	0,				/* log like table key */
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
@@ -512,11 +514,11 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor, *tmp_cursor;
+	WT_CURSOR **cursors, *cursor, *log_table_cursor, *tmp_cursor;
 	WT_SESSION *session;
 	size_t i;
 	int64_t ops, ops_per_txn;
-	uint64_t next_val, usecs;
+	uint64_t log_id, next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
@@ -526,6 +528,7 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
+	log_table_cursor = NULL;	/* -Wconditional-initialized */
 	ops = 0;
 	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
@@ -560,6 +563,16 @@ worker(void *arg)
 			goto err;
 		}
 	}
+	if (cfg->log_like_table) {
+		if ((ret = session->open_cursor(session,
+		    cfg->log_table_uri, NULL, NULL, &log_table_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "worker: WT_SESSION.open_cursor: %s",
+			    cfg->log_table_uri);
+			goto err;
+		}
+	}
+
 	/* Setup the timer for throttling. */
 	if (thread->workload->throttle != 0)
 		setup_throttle(thread);
@@ -575,7 +588,7 @@ worker(void *arg)
 	op = thread->workload->ops;
 	op_end = op + sizeof(thread->workload->ops);
 
-	if (ops_per_txn != 0 &&
+	if ((ops_per_txn != 0 || cfg->log_like_table) &&
 		(ret = session->begin_transaction(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "First transaction begin failed");
 		goto err;
@@ -768,6 +781,20 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			goto err;		/* can't happen */
 		}
 
+		/* Update the log-like table. */
+		if (cfg->log_like_table &&
+		    (*op != WORKER_READ && *op != WORKER_TRUNCATE)) {
+			log_id = __wt_atomic_add64(&cfg->log_like_table_key, 1);
+			log_table_cursor->set_key(log_table_cursor, log_id);
+			log_table_cursor->set_value(
+			    log_table_cursor, value_buf);
+			if ((ret =
+			    log_table_cursor->insert(log_table_cursor)) != 0) {
+				lprintf(cfg, ret, 0, "Cursor insert failed");
+				goto err;
+			}
+		}
+
 		/* Release the cursor, if we have multiple tables. */
 		if (cfg->table_count > 1 && ret == 0 &&
 		    *op != WORKER_INSERT && *op != WORKER_INSERT_RMW) {
@@ -793,8 +820,12 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			++trk->ops;
 		}
 
-		/* Commit our work if configured for explicit transactions */
-		if (ops_per_txn != 0 && ops++ % ops_per_txn == 0) {
+		/*
+		 * Commit the transaction if grouping operations together
+		 * or tracking changes in our log table.
+		 */
+		if ((cfg->log_like_table && ops_per_txn == 0) ||
+		    (ops_per_txn != 0 && ops++ % ops_per_txn == 0)) {
 			if ((ret = session->commit_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -819,6 +850,7 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 		 */
 		if (--thread->throttle_cfg.ops_count == 0)
 			worker_throttle(thread);
+
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -1879,6 +1911,10 @@ create_uris(CONFIG *cfg)
 		else
 			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
+
+	/* Create the log-like-table URI. */
+	cfg->log_table_uri = dcalloc(base_uri_len + 11, 1);
+	sprintf(cfg->log_table_uri, "%s_log_table", cfg->base_uri);
 }
 
 static int
@@ -1904,6 +1940,11 @@ create_tables(CONFIG *cfg)
 			    "Error creating idle table %s", buf);
 			return (ret);
 		}
+	}
+	if (cfg->log_like_table && (ret = session->create(session,
+	    cfg->log_table_uri, "key_format=Q,value_format=S")) != 0) {
+		lprintf(cfg, ret, 0, "Error creating log table %s", buf);
+		return (ret);
 	}
 
 	for (i = 0; i < cfg->table_count; i++) {
@@ -1965,8 +2006,7 @@ start_all_runs(CONFIG *cfg)
 	for (i = 0; i < cfg->database_count; i++) {
 		next_cfg = dcalloc(1, sizeof(CONFIG));
 		configs[i] = next_cfg;
-		if ((ret = config_copy(next_cfg, cfg)) != 0)
-			goto err;
+		config_copy(next_cfg, cfg);
 
 		/* Setup a unique home directory for each database. */
 		new_home = dmalloc(home_len + 5);
@@ -2197,8 +2237,7 @@ main(int argc, char *argv[])
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
 	memset(cfg, 0, sizeof(*cfg));
-	if (config_copy(cfg, &default_cfg))
-		goto err;
+	config_copy(cfg, &default_cfg);
 	cfg->home = dstrdup(DEFAULT_HOME);
 	cfg->monitor_dir = dstrdup(DEFAULT_MONITOR_DIR);
 
@@ -2329,7 +2368,7 @@ main(int argc, char *argv[])
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
 	    cfg->session_count_idle > 0 || cfg->compress_ext != NULL ||
 	    cfg->async_config != NULL) {
-		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
+		req_len = strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
 		if (cfg->async_config != NULL)
@@ -2349,21 +2388,23 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s%s",
-		    cfg->conn_config,
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s",
 		    cfg->async_config ? cfg->async_config : "",
 		    cfg->compress_ext ? cfg->compress_ext : "",
-		    cfg->verbose > 1 ? ",": "",
-		    cfg->verbose > 1 ? debug_cconfig : "",
+		    cfg->verbose > 1 && strlen(debug_cconfig) ? ",": "",
+		    cfg->verbose > 1 &&
+			strlen(debug_cconfig) ? debug_cconfig : "",
 		    sess_cfg ? sess_cfg : "",
 		    user_cconfig ? ",": "",
 		    user_cconfig ? user_cconfig : "");
-		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
-			goto err;
+		if (strlen(cc_buf))
+			if ((ret = config_opt_str(
+			    cfg, "conn_config", cc_buf)) != 0)
+				goto err;
 	}
 	if (cfg->verbose > 1 || cfg->index ||
 	    user_tconfig != NULL || cfg->compress_table != NULL) {
-		req_len = strlen(cfg->table_config) + strlen(debug_tconfig) + 3;
+		req_len = strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
 		if (cfg->compress_table != NULL)
@@ -2374,16 +2415,18 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
-		    cfg->table_config,
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s",
 		    cfg->index ? INDEX_COL_NAMES : "",
 		    cfg->compress_table ? cfg->compress_table : "",
-		    cfg->verbose > 1 ? ",": "",
-		    cfg->verbose > 1 ? debug_tconfig : "",
+		    cfg->verbose > 1 && strlen(debug_tconfig) ? ",": "",
+		    cfg->verbose > 1 &&
+			strlen(debug_tconfig) ? debug_tconfig : "",
 		    user_tconfig ? ",": "",
 		    user_tconfig ? user_tconfig : "");
-		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
-			goto err;
+		if (strlen(tc_buf))
+			if ((ret = config_opt_str(
+			    cfg, "table_config", tc_buf)) != 0)
+				goto err;
 	}
 	if (cfg->log_partial && cfg->table_count > 1) {
 		req_len = strlen(cfg->table_config) +

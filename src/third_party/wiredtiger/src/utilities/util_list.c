@@ -238,7 +238,7 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			    ci.root_size, ci.root_size);
 			printf("\t\t" "root checksum: %" PRIu32
 			    " (0x%" PRIx32 ")\n",
-			    ci.root_cksum, ci.root_cksum);
+			    ci.root_checksum, ci.root_checksum);
 		}
 	}
 

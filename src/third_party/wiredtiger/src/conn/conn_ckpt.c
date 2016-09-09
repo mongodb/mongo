@@ -93,7 +93,7 @@ __ckpt_server(void *arg)
 		/* Reset. */
 		if (conn->ckpt_logsize) {
 			__wt_log_written_reset(session);
-			conn->ckpt_signalled = 0;
+			conn->ckpt_signalled = false;
 
 			/*
 			 * In case we crossed the log limit during the
@@ -226,9 +226,8 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 /*
  * __wt_checkpoint_signal --
  *	Signal the checkpoint thread if sufficient log has been written.
- *	Return 1 if this signals the checkpoint thread, 0 otherwise.
  */
-int
+void
 __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -237,7 +236,6 @@ __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
 	WT_ASSERT(session, WT_CKPT_LOGSIZE(conn));
 	if (logsize >= conn->ckpt_logsize && !conn->ckpt_signalled) {
 		__wt_cond_signal(session, conn->ckpt_cond);
-		conn->ckpt_signalled = 1;
+		conn->ckpt_signalled = true;
 	}
-	return (0);
 }

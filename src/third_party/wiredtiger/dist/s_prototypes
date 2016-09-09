@@ -46,7 +46,7 @@ proto()
 	    -e p < $1
 }
 
-# proto --
+# externs --
 #	generate the list of prototypes given a file list
 externs()
 {
@@ -76,6 +76,7 @@ externs
 f=../src/include/extern.h
 l=`sed \
     -e '/^[a-z]/!d' \
+    -e '/\/checksum\/arm64/d' \
     -e '/\/checksum\/power8/d' \
     -e '/\/checksum\/zseries/d' \
     -e '/os_posix/d' \

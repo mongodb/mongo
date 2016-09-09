@@ -43,7 +43,7 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define	EXT_PFX	",extensions=("
 #define	EXT_SFX	")"
 #define	EXTPATH "../../ext/compressors/"		/* Extensions path */
-#define	BLKCMP_PFX	",block_compressor="
+#define	BLKCMP_PFX	"block_compressor="
 
 #define	LZ4_BLK BLKCMP_PFX "lz4"
 #define	LZ4_EXT							\
@@ -121,6 +121,7 @@ struct __config {			/* Configuration structure */
 	char *partial_config;		/* Config string for partial logging */
 	char *reopen_config;		/* Config string for conn reopen */
 	char *base_uri;			/* Object URI */
+	char *log_table_uri;		/* URI for log table */
 	char **uris;			/* URIs if multiple tables */
 
 	WT_CONNECTION *conn;		/* Database connection */
@@ -151,6 +152,7 @@ struct __config {			/* Configuration structure */
 	uint64_t update_ops;		/* update operations */
 
 	uint64_t insert_key;		/* insert key */
+	uint64_t log_like_table_key;	/* used to allocate IDs for log table */
 
 	volatile int ckpt;		/* checkpoint in progress */
 	volatile int error;		/* thread error */
@@ -261,7 +263,7 @@ struct __config_thread {		/* Per-thread structure */
 void	 cleanup_truncate_config(CONFIG *);
 int	 config_compress(CONFIG *);
 void	 config_free(CONFIG *);
-int	 config_copy(CONFIG *, const CONFIG *);
+void	 config_copy(CONFIG *, const CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);

@@ -47,6 +47,19 @@ AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
     [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
 AC_MSG_RESULT($with_builtins)
 
+AH_TEMPLATE(
+    HAVE_CRC32_HARDWARE, [Define to 1 to configure CRC32 hardware support.])
+AC_MSG_CHECKING(if --enable-crc32-hardware option specified)
+AC_ARG_ENABLE(crc32-hardware,
+	AC_HELP_STRING([--enable-crc32-hardware],
+	    [Enable CRC32 hardware support.]), r=$enableval, r=yes)
+case "$r" in
+no)	wt_cv_enable_crc32_hardware=no;;
+*)	AC_DEFINE(HAVE_CRC32_HARDWARE)
+	wt_cv_enable_crc32_hardware=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_crc32_hardware)
+
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,

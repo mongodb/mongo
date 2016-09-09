@@ -28,15 +28,15 @@ __lsm_meta_read_v0(
 	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 		F_SET(lsm_tree, WT_LSM_TREE_MERGES);
 
-	WT_ERR(__wt_config_init(session, &cparser, lsmconf));
+	__wt_config_init(session, &cparser, lsmconf);
 	while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
 		if (WT_STRING_MATCH("key_format", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->key_format);
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->key_format));
 		} else if (WT_STRING_MATCH("value_format", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->value_format);
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->value_format));
 		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
 			if (cv.len == 0 ||
@@ -46,25 +46,25 @@ __lsm_meta_read_v0(
 			 * Extract the application-supplied metadata (if any)
 			 * from the file configuration.
 			 */
-			WT_ERR(__wt_config_getones(
+			WT_RET(__wt_config_getones(
 			    session, lsmconf, "file_config", &fileconf));
 			WT_CLEAR(metadata);
-			WT_ERR_NOTFOUND_OK(__wt_config_subgets(
+			WT_RET_NOTFOUND_OK(__wt_config_subgets(
 			    session, &fileconf, "app_metadata", &metadata));
-			WT_ERR(__wt_collator_config(session, lsm_tree->name,
+			WT_RET(__wt_collator_config(session, lsm_tree->name,
 			    &cv, &metadata,
 			    &lsm_tree->collator, &lsm_tree->collator_owned));
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->collator_name));
 		} else if (WT_STRING_MATCH("bloom_config", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->bloom_config);
 			/* Don't include the brackets. */
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    cv.str + 1, cv.len - 2, &lsm_tree->bloom_config));
 		} else if (WT_STRING_MATCH("file_config", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->file_config);
 			/* Don't include the brackets. */
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    cv.str + 1, cv.len - 2, &lsm_tree->file_config));
 		} else if (WT_STRING_MATCH("auto_throttle", ck.str, ck.len)) {
 			if (cv.val)
@@ -92,25 +92,25 @@ __lsm_meta_read_v0(
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
 			lsm_tree->last = (u_int)cv.val;
 		else if (WT_STRING_MATCH("chunks", ck.str, ck.len)) {
-			WT_ERR(__wt_config_subinit(session, &lparser, &cv));
+			__wt_config_subinit(session, &lparser, &cv);
 			for (nchunks = 0; (ret =
 			    __wt_config_next(&lparser, &lk, &lv)) == 0; ) {
 				if (WT_STRING_MATCH("id", lk.str, lk.len)) {
-					WT_ERR(__wt_realloc_def(session,
+					WT_RET(__wt_realloc_def(session,
 					    &lsm_tree->chunk_alloc,
 					    nchunks + 1, &lsm_tree->chunk));
-					WT_ERR(
+					WT_RET(
 					    __wt_calloc_one(session, &chunk));
 					lsm_tree->chunk[nchunks++] = chunk;
 					chunk->id = (uint32_t)lv.val;
-					WT_ERR(__wt_lsm_tree_chunk_name(session,
+					WT_RET(__wt_lsm_tree_chunk_name(session,
 					    lsm_tree, chunk->id, &chunk->uri));
 					F_SET(chunk,
 					    WT_LSM_CHUNK_ONDISK |
 					    WT_LSM_CHUNK_STABLE);
 				} else if (WT_STRING_MATCH(
 				    "bloom", lk.str, lk.len)) {
-					WT_ERR(__wt_lsm_tree_bloom_name(
+					WT_RET(__wt_lsm_tree_bloom_name(
 					    session, lsm_tree,
 					    chunk->id, &chunk->bloom_uri));
 					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
@@ -129,28 +129,28 @@ __lsm_meta_read_v0(
 					continue;
 				}
 			}
-			WT_ERR_NOTFOUND_OK(ret);
+			WT_RET_NOTFOUND_OK(ret);
 			lsm_tree->nchunks = nchunks;
 		} else if (WT_STRING_MATCH("old_chunks", ck.str, ck.len)) {
-			WT_ERR(__wt_config_subinit(session, &lparser, &cv));
+			__wt_config_subinit(session, &lparser, &cv);
 			for (nchunks = 0; (ret =
 			    __wt_config_next(&lparser, &lk, &lv)) == 0; ) {
 				if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
-					WT_ERR(__wt_strndup(session,
+					WT_RET(__wt_strndup(session,
 					    lv.str, lv.len, &chunk->bloom_uri));
 					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				}
-				WT_ERR(__wt_realloc_def(session,
+				WT_RET(__wt_realloc_def(session,
 				    &lsm_tree->old_alloc, nchunks + 1,
 				    &lsm_tree->old_chunks));
-				WT_ERR(__wt_calloc_one(session, &chunk));
+				WT_RET(__wt_calloc_one(session, &chunk));
 				lsm_tree->old_chunks[nchunks++] = chunk;
-				WT_ERR(__wt_strndup(session,
+				WT_RET(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			}
-			WT_ERR_NOTFOUND_OK(ret);
+			WT_RET_NOTFOUND_OK(ret);
 			lsm_tree->nold_chunks = nchunks;
 		}
 		/*
@@ -158,8 +158,8 @@ __lsm_meta_read_v0(
 		 * created by a future release, with unknown options.
 		 */
 	}
-	WT_ERR_NOTFOUND_OK(ret);
-err:	return (ret);
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
 }
 
 /*
@@ -264,7 +264,7 @@ __lsm_meta_read_v1(
 	WT_ERR(__wt_config_getones(session, lsmconf, "last", &cv));
 	lsm_tree->last = (u_int)cv.val;
 	WT_ERR(__wt_config_getones(session, lsmconf, "chunks", &cv));
-	WT_ERR(__wt_config_subinit(session, &lparser, &cv));
+	__wt_config_subinit(session, &lparser, &cv);
 	for (nchunks = 0; (ret =
 	    __wt_config_next(&lparser, &lk, &lv)) == 0; ) {
 		if (WT_STRING_MATCH("id", lk.str, lk.len)) {
@@ -299,7 +299,7 @@ __lsm_meta_read_v1(
 	lsm_tree->nchunks = nchunks;
 
 	WT_ERR(__wt_config_getones(session, lsmconf, "old_chunks", &cv));
-	WT_ERR(__wt_config_subinit(session, &lparser, &cv));
+	__wt_config_subinit(session, &lparser, &cv);
 	for (nchunks = 0; (ret =
 	    __wt_config_next(&lparser, &lk, &lv)) == 0; ) {
 		if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
@@ -404,6 +404,7 @@ __lsm_meta_upgrade_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
+
 /*
  * __wt_lsm_meta_read --
  *	Read the metadata for an LSM tree.

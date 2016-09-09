@@ -9,6 +9,7 @@
 #
 # Data-source statistics are normally aggregated across the set of underlying
 # objects. Additional optional configuration flags are available:
+#       all_only        Only gets reported when statistics=all set
 #       max_aggregate   Take the maximum value when aggregating statistics
 #       no_clear        Value not cleared when statistics cleared
 #       no_scale        Don't scale value per second in the logging tool script
@@ -202,7 +203,6 @@ connection_stats = [
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
     CacheStat('cache_eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
-    CacheStat('cache_eviction_server_toobig', 'eviction server skipped very large page'),
     CacheStat('cache_eviction_slow', 'eviction server unable to reach eviction goal'),
     CacheStat('cache_eviction_split_internal', 'internal pages split during eviction'),
     CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
@@ -421,13 +421,13 @@ dsrc_stats = [
     # Btree statistics
     ##########################################
     BtreeStat('btree_checkpoint_generation', 'btree checkpoint generation', 'no_clear,no_scale'),
-    BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale'),
-    BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale'),
-    BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale'),
-    BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale'),
-    BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale'),
+    BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,all_only'),
+    BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,all_only'),
+    BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,all_only'),
+    BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale,all_only'),
+    BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale,all_only'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
-    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale'),
+    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale,all_only'),
     BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maximum_depth', 'maximum tree depth', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale,size'),
@@ -435,9 +435,9 @@ dsrc_stats = [
     BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale,size'),
-    BtreeStat('btree_overflow', 'overflow pages', 'no_scale'),
-    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale'),
-    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale'),
+    BtreeStat('btree_overflow', 'overflow pages', 'no_scale,all_only'),
+    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,all_only'),
+    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,all_only'),
 
     ##########################################
     # LSM statistics

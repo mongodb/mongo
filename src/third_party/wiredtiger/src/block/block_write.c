@@ -15,7 +15,10 @@
 int
 __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+
+	conn = S2C(session);
 
 	__wt_verbose(session,
 	    WT_VERB_BLOCK, "truncate file to %" PRIuMAX, (uintmax_t)len);
@@ -34,13 +37,17 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 	 * by system utilities. We cannot truncate the file during the backup
 	 * window, we might surprise an application.
 	 *
-	 * Stop block truncation. This affects files that aren't involved in the
-	 * backup (for example, doing incremental backups, which only copies log
-	 * files, or targeted backups, stops all truncation). We may want a more
-	 * targeted solution at some point.
+	 * This affects files that aren't involved in the backup (for example,
+	 * doing incremental backups, which only copies log files, or targeted
+	 * backups, stops all block truncation unnecessarily). We may want a
+	 * more targeted solution at some point.
 	 */
-	if (S2C(session)->hot_backup)
-		return (0);
+	if (!conn->hot_backup) {
+		__wt_readlock(session, conn->hot_backup_lock);
+		if (!conn->hot_backup)
+			ret = __wt_ftruncate(session, block->fh, len);
+		__wt_readunlock(session, conn->hot_backup_lock);
+	}
 
 	/*
 	 * The truncate may fail temporarily or permanently (for example, there
@@ -48,7 +55,6 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 	 * POSIX system, in which case the underlying function returns EBUSY).
 	 * It's OK, we don't have to be able to truncate files.
 	 */
-	ret = __wt_ftruncate(session, block->fh, len);
 	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
@@ -196,17 +202,17 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  */
 int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
-    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
+    uint8_t *addr, size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
 {
 	wt_off_t offset;
-	uint32_t size, cksum;
+	uint32_t checksum, size;
 	uint8_t *endp;
 
-	WT_RET(__wt_block_write_off(session, block,
-	    buf, &offset, &size, &cksum, data_cksum, checkpoint_io, false));
+	WT_RET(__wt_block_write_off(session, block, buf,
+	    &offset, &size, &checksum, data_checksum, checkpoint_io, false));
 
 	endp = addr;
-	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
+	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, checksum));
 	*addr_sizep = WT_PTRDIFF(endp, addr);
 
 	return (0);
@@ -219,15 +225,15 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
  */
 static int
 __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
-    bool data_cksum, bool checkpoint_io, bool caller_locked)
+    WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump,
+    bool data_checksum, bool checkpoint_io, bool caller_locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
 	size_t align_size;
 	wt_off_t offset;
-	uint32_t cksum;
+	uint32_t checksum;
 	bool local_locked;
 
 	fh = block->fh;
@@ -292,14 +298,14 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * big-endian format, swap it into place in a separate step.
 	 */
 	blk->flags = 0;
-	if (data_cksum)
+	if (data_checksum)
 		F_SET(blk, WT_BLOCK_DATA_CKSUM);
-	blk->cksum = 0;
+	blk->checksum = 0;
 	__wt_block_header_byteswap(blk);
-	blk->cksum = cksum = __wt_cksum(
-	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
+	blk->checksum = checksum = __wt_checksum(
+	    buf->mem, data_checksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 #ifdef WORDS_BIGENDIAN
-	blk->cksum = __wt_bswap32(blk->cksum);
+	blk->checksum = __wt_bswap32(blk->checksum);
 #endif
 
 	/* Pre-allocate some number of extension structures. */
@@ -364,12 +370,12 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    session, block_byte_write_checkpoint, align_size);
 
 	__wt_verbose(session, WT_VERB_WRITE,
-	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
-	    (uintmax_t)offset, (uintmax_t)align_size, cksum);
+	    "off %" PRIuMAX ", size %" PRIuMAX ", checksum %" PRIu32,
+	    (uintmax_t)offset, (uintmax_t)align_size, checksum);
 
 	*offsetp = offset;
 	*sizep = WT_STORE_SIZE(align_size);
-	*cksump = cksum;
+	*checksump = checksum;
 
 	return (0);
 }
@@ -381,8 +387,8 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
  */
 int
 __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
-    bool data_cksum, bool checkpoint_io, bool caller_locked)
+    WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *checksump,
+    bool data_checksum, bool checkpoint_io, bool caller_locked)
 {
 	WT_DECL_RET;
 
@@ -393,8 +399,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * than their original content.
 	 */
 	__wt_page_header_byteswap(buf->mem);
-	ret = __block_write_off(session, block, buf,
-	    offsetp, sizep, cksump, data_cksum, checkpoint_io, caller_locked);
+	ret = __block_write_off(session, block, buf, offsetp,
+	    sizep, checksump, data_checksum, checkpoint_io, caller_locked);
 	__wt_page_header_byteswap(buf->mem);
 	return (ret);
 }

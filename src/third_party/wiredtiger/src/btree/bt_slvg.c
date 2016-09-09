@@ -119,7 +119,7 @@ static int  __slvg_col_build_leaf(WT_SESSION_IMPL *, WT_TRACK *, WT_REF *);
 static int  __slvg_col_ovfl(WT_SESSION_IMPL *,
 		WT_TRACK *, WT_PAGE *, uint64_t, uint64_t, uint64_t);
 static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
-static int  __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
+static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static void __slvg_col_trk_update_start(uint32_t, WT_STUFF *);
@@ -281,7 +281,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	switch (ss->page_type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__slvg_col_range_missing(session, ss));
+		__slvg_col_range_missing(session, ss);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		break;
@@ -1107,7 +1107,7 @@ __slvg_col_trk_update_start(uint32_t slot, WT_STUFF *ss)
  * __slvg_col_range_missing --
  *	Detect missing ranges from column-store files.
  */
-static int
+static void
 __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
@@ -1134,7 +1134,6 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 		r = trk->col_stop;
 	}
-	return (0);
 }
 
 /*
@@ -1943,7 +1942,7 @@ __slvg_row_build_leaf(
 			if (cmp >= 0)
 				break;
 			__wt_verbose(session, WT_VERB_SALVAGE,
-			    "%s merge discarding leading key %.*s",
+			    "%s merge discarding leading key %s",
 			    __wt_addr_string(session,
 			    trk->trk_addr, trk->trk_addr_size, ss->tmp1),
 			    __wt_buf_set_printable(
@@ -1963,7 +1962,7 @@ __slvg_row_build_leaf(
 			if (cmp < 0)
 				break;
 			__wt_verbose(session, WT_VERB_SALVAGE,
-			    "%s merge discarding trailing key %.*s",
+			    "%s merge discarding trailing key %s",
 			    __wt_addr_string(session,
 			    trk->trk_addr, trk->trk_addr_size, ss->tmp1),
 			    __wt_buf_set_printable(

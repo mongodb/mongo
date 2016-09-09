@@ -42,7 +42,7 @@ __wt_config_collapse(
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
+	__wt_config_init(session, &cparser, cfg[0]);
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
@@ -127,7 +127,7 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &kb));
 	WT_ERR(__wt_scr_alloc(session, 0, &vb));
 
-	WT_ERR(__wt_config_init(session, &cparser, value));
+	__wt_config_init(session, &cparser, value);
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)

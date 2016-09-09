@@ -387,7 +387,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 	 * otherwise it's not our problem.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
-	WT_RET(__wt_config_subinit(session, &targetconf, &cval));
+	__wt_config_subinit(session, &targetconf, &cval);
 	for (target_list = false;
 	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
 	    target_list = true) {

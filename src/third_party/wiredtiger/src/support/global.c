@@ -55,7 +55,7 @@ __wt_global_once(void)
 		return;
 	}
 
-	__wt_cksum_init();
+	__wt_checksum_init();
 
 	TAILQ_INIT(&__wt_process.connqh);
 

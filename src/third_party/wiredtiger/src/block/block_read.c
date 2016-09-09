@@ -21,7 +21,7 @@ __wt_bm_preload(
 	WT_DECL_RET;
 	WT_FILE_HANDLE *handle;
 	wt_off_t offset;
-	uint32_t cksum, size;
+	uint32_t checksum, size;
 	bool mapped;
 
 	WT_UNUSED(addr_size);
@@ -31,7 +31,8 @@ __wt_bm_preload(
 	WT_STAT_FAST_CONN_INCR(session, block_preload);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+	WT_RET(
+	    __wt_block_buffer_to_addr(block, addr, &offset, &size, &checksum));
 
 	handle = block->fh->handle;
 	mapped = bm->map != NULL && offset + size <= (wt_off_t)bm->maplen;
@@ -64,14 +65,15 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FILE_HANDLE *handle;
 	wt_off_t offset;
-	uint32_t cksum, size;
+	uint32_t checksum, size;
 	bool mapped;
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+	WT_RET(
+	    __wt_block_buffer_to_addr(block, addr, &offset, &size, &checksum));
 
 	/*
 	 * Map the block if it's possible.
@@ -98,7 +100,8 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	    session, block, "read", offset, size, bm->is_live));
 #endif
 	/* Read the block. */
-	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
+	WT_RET(
+	    __wt_block_read_off(session, block, buf, offset, size, checksum));
 
 	/* Optionally discard blocks from the system's buffer cache. */
 	WT_RET(__wt_block_discard(session, block, (size_t)size));
@@ -117,7 +120,7 @@ __wt_block_read_off_blind(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t offset)
 {
 	WT_BLOCK_HEADER *blk;
-	uint32_t cksum, size;
+	uint32_t checksum, size;
 
 	/*
 	 * Make sure the buffer is large enough for the header and read the
@@ -134,13 +137,14 @@ __wt_block_read_off_blind(
 	 * and if the size isn't insane, read the rest of the block.
 	 */
 	size = blk->disk_size;
-	cksum = blk->cksum;
+	checksum = blk->checksum;
 	if (__wt_block_offset_invalid(block, offset, size))
 		WT_RET_MSG(session, EINVAL,
 		    "block at offset %" PRIuMAX " cannot be a valid block, no "
 		    "read attempted",
 		    (uintmax_t)offset);
-	return (__wt_block_read_off(session, block, buf, offset, size, cksum));
+	return (
+	    __wt_block_read_off(session, block, buf, offset, size, checksum));
 }
 #endif
 
@@ -150,15 +154,15 @@ __wt_block_read_off_blind(
  */
 int
 __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t cksum)
+    WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t checksum)
 {
 	WT_BLOCK_HEADER *blk, swap;
 	size_t bufsize;
-	uint32_t page_cksum;
+	uint32_t page_checksum;
 
 	__wt_verbose(session, WT_VERB_READ,
-	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    (uintmax_t)offset, size, cksum);
+	    "off %" PRIuMAX ", size %" PRIu32 ", checksum %" PRIu32,
+	    (uintmax_t)offset, size, checksum);
 
 	WT_STAT_FAST_CONN_INCR(session, block_read);
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_read, size);
@@ -189,12 +193,12 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	__wt_block_header_byteswap_copy(blk, &swap);
-	if (swap.cksum == cksum) {
-		blk->cksum = 0;
-		page_cksum = __wt_cksum(buf->mem,
+	if (swap.checksum == checksum) {
+		blk->checksum = 0;
+		page_checksum = __wt_checksum(buf->mem,
 		    F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ?
 		    size : WT_BLOCK_COMPRESS_SKIP);
-		if (page_cksum == cksum) {
+		if (page_checksum == checksum) {
 			/*
 			 * Swap the page-header as needed; this doesn't belong
 			 * here, but it's the best place to catch all callers.
@@ -209,7 +213,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    "offset %" PRIuMAX ": calculated block checksum "
 			    "of %" PRIu32 " doesn't match expected checksum "
 			    "of %" PRIu32,
-			    size, (uintmax_t)offset, page_cksum, cksum);
+			    size, (uintmax_t)offset, page_checksum, checksum);
 	} else
 		if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 			__wt_errx(session,
@@ -217,7 +221,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    "offset %" PRIuMAX ": block header checksum "
 			    "of %" PRIu32 " doesn't match expected checksum "
 			    "of %" PRIu32,
-			    size, (uintmax_t)offset, swap.cksum, cksum);
+			    size, (uintmax_t)offset, swap.checksum, checksum);
 
 	/* Panic if a checksum fails during an ordinary read. */
 	return (block->verify ||

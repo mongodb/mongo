@@ -31,14 +31,23 @@ __evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline int
 __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+	int loops;
+
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
 	/*
 	 * Check for a hazard pointer indicating another thread is using the
 	 * page, meaning the page cannot be evicted.
 	 */
-	if (__wt_page_hazard_check(session, ref->page) == NULL)
-		return (0);
+	for (loops = 0; loops < 10; loops++) {
+		if (__wt_page_hazard_check(session, ref->page) == NULL)
+			return (0);
+		if (ref->page->read_gen != WT_READGEN_OLDEST &&
+		    ref->page->memory_footprint <
+		    S2BT(session)->split_deepen_min_child)
+			break;
+		__wt_sleep(0, WT_THOUSAND);
+	}
 
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
@@ -117,7 +126,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 
 	__wt_verbose(session, WT_VERB_EVICT,
-	    "page %p (%s)", page, __wt_page_type_string(page->type));
+	    "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
 	/*
 	 * Get exclusive access to the page and review it for conditions that
@@ -524,7 +533,7 @@ __evict_review(
 		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 			LF_SET(WT_EVICT_IN_MEMORY |
 			    WT_EVICT_SCRUB | WT_EVICT_UPDATE_RESTORE);
-		else if (F_ISSET(cache, WT_CACHE_STUCK))
+		else if (__wt_cache_stuck(session))
 			LF_SET(WT_EVICT_LOOKASIDE);
 		else if (!__wt_txn_visible_all(
 		    session, page->modify->update_txn) ||
@@ -537,7 +546,7 @@ __evict_review(
 		 * page and keep it around.
 		 */
 		if (!LF_ISSET(WT_EVICT_LOOKASIDE) &&
-		    FLD_ISSET(cache->state, WT_EVICT_STATE_SCRUB))
+		    F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
 			LF_SET(WT_EVICT_SCRUB);
 	}
 	*flagsp = flags;

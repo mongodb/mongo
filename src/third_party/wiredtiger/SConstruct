@@ -245,6 +245,7 @@ wtheader = env.Substfile(
 # included.
 #
 condition_map = {
+    'ARM64_HOST' : False,
     'POSIX_HOST' : env['PLATFORM'] == 'posix',
     'POWERPC_HOST' : False,
     'WINDOWS_HOST' : env['PLATFORM'] == 'win32',
@@ -443,28 +444,22 @@ t = env.Program("t_fops",
     "test/fops/t.c"],
     LIBS=[wtlib, shim, testutil] + wtlibs)
 env.Append(CPPPATH=["test/utility"])
-env.Alias("check", env.SmokeTest(t))
 Default(t)
 
-if useBdb:
-    benv = env.Clone()
-
-    benv.Append(CPPDEFINES=['BERKELEY_DB_PATH=\\"' + useBdb.replace("\\", "\\\\") + '\\"'])
-
-    t = benv.Program("t_format",
-        ["test/format/backup.c",
-        "test/format/bdb.c",
-        "test/format/bulk.c",
-        "test/format/compact.c",
-        "test/format/config.c",
-        "test/format/ops.c",
-        "test/format/salvage.c",
-        "test/format/t.c",
-        "test/format/util.c",
-        "test/format/wts.c"],
-         LIBS=[wtlib, shim, "libdb61"] + wtlibs)
-    env.Alias("test", env.SmokeTest(t))
-    Default(t)
+t = env.Program("t_format",
+    ["test/format/backup.c",
+    "test/format/bulk.c",
+    "test/format/compact.c",
+    "test/format/config.c",
+    "test/format/lrt.c",
+    "test/format/ops.c",
+    "test/format/rebalance.c",
+    "test/format/salvage.c",
+    "test/format/t.c",
+    "test/format/util.c",
+    "test/format/wts.c"],
+     LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
 
 #env.Program("t_thread",
     #["test/thread/file.c",

@@ -34,8 +34,6 @@
 
 void (*custom_die)(void) = NULL;
 
-uint32_t cksum_sw(const void *, size_t);
-
 static inline void
 check(uint32_t hw, uint32_t sw, size_t len, const char *msg)
 {
@@ -61,48 +59,57 @@ main(void)
 	testutil_check(__wt_random_init_seed(NULL, &rnd));
 
 	/* Initialize the WiredTiger library checksum functions. */
-	__wt_cksum_init();
+	__wt_checksum_init();
 
 	/*
 	 * Some simple known checksums.
 	 */
 	len = 1;
-	hw = __wt_cksum(data, len);
+	hw = __wt_checksum(data, len);
 	check(hw, (uint32_t)0x527d5351, len, "nul x1: hardware");
-	sw = cksum_sw(data, len);
+	sw = __wt_checksum_sw(data, len);
 	check(sw, (uint32_t)0x527d5351, len, "nul x1: software");
 
 	len = 2;
-	hw = __wt_cksum(data, len);
+	hw = __wt_checksum(data, len);
 	check(hw, (uint32_t)0xf16177d2, len, "nul x2: hardware");
-	sw = cksum_sw(data, len);
+	sw = __wt_checksum_sw(data, len);
 	check(sw, (uint32_t)0xf16177d2, len, "nul x2: software");
 
 	len = 3;
-	hw = __wt_cksum(data, len);
+	hw = __wt_checksum(data, len);
 	check(hw, (uint32_t)0x6064a37a, len, "nul x3: hardware");
-	sw = cksum_sw(data, len);
+	sw = __wt_checksum_sw(data, len);
 	check(sw, (uint32_t)0x6064a37a, len, "nul x3: software");
 
 	len = 4;
-	hw = __wt_cksum(data, len);
+	hw = __wt_checksum(data, len);
 	check(hw, (uint32_t)0x48674bc7, len, "nul x4: hardware");
-	sw = cksum_sw(data, len);
+	sw = __wt_checksum_sw(data, len);
 	check(sw, (uint32_t)0x48674bc7, len, "nul x4: software");
 
 	len = strlen("123456789");
 	memcpy(data, "123456789", len);
-	hw = __wt_cksum(data, len);
+	hw = __wt_checksum(data, len);
 	check(hw, (uint32_t)0xe3069283, len, "known string #1: hardware");
-	sw = cksum_sw(data, len);
+	sw = __wt_checksum_sw(data, len);
 	check(sw, (uint32_t)0xe3069283, len, "known string #1: software");
 
 	len = strlen("The quick brown fox jumps over the lazy dog");
 	memcpy(data, "The quick brown fox jumps over the lazy dog", len);
-	hw = __wt_cksum(data, len);
+	hw = __wt_checksum(data, len);
 	check(hw, (uint32_t)0x22620404, len, "known string #2: hardware");
-	sw = cksum_sw(data, len);
+	sw = __wt_checksum_sw(data, len);
 	check(sw, (uint32_t)0x22620404, len, "known string #2: software");
+
+	/*
+	 * Offset the string by 1 to ensure the hardware code handles unaligned
+	 * reads.
+	 */
+	hw = __wt_checksum(data + 1, len - 1);
+	check(hw, (uint32_t)0xae11f7f5, len, "known string #2: hardware");
+	sw = __wt_checksum_sw(data + 1, len - 1);
+	check(sw, (uint32_t)0xae11f7f5, len, "known string #2: software");
 
 	/*
 	 * Checksums of power-of-two data chunks.
@@ -110,8 +117,8 @@ main(void)
 	for (i = 0, len = 512; i < 1000; ++i) {
 		for (j = 0; j < len; ++j)
 			data[j] = __wt_random(&rnd) & 0xff;
-		hw = __wt_cksum(data, len);
-		sw = cksum_sw(data, len);
+		hw = __wt_checksum(data, len);
+		sw = __wt_checksum_sw(data, len);
 		check(hw, sw, len, "random power-of-two");
 
 		len *= 2;
@@ -126,8 +133,8 @@ main(void)
 		len = __wt_random(&rnd) % DATASIZE;
 		for (j = 0; j < len; ++j)
 			data[j] = __wt_random(&rnd) & 0xff;
-		hw = __wt_cksum(data, len);
-		sw = cksum_sw(data, len);
+		hw = __wt_checksum(data, len);
+		sw = __wt_checksum_sw(data, len);
 		check(hw, sw, len, "random");
 	}
 

@@ -182,7 +182,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	size_t dst_len, len, result_len, size, src_len;
 	int compression_failed;		/* Extension API, so not a bool. */
 	uint8_t *dst, *src;
-	bool data_cksum, encrypted;
+	bool data_checksum, encrypted;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -344,24 +344,24 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Checksum the data if the buffer isn't compressed or checksums are
 	 * configured.
 	 */
-	data_cksum = true;		/* -Werror=maybe-uninitialized */
+	data_checksum = true;		/* -Werror=maybe-uninitialized */
 	switch (btree->checksum) {
 	case CKSUM_ON:
-		data_cksum = true;
+		data_checksum = true;
 		break;
 	case CKSUM_OFF:
-		data_cksum = false;
+		data_checksum = false;
 		break;
 	case CKSUM_UNCOMPRESSED:
-		data_cksum = !compressed;
+		data_checksum = !compressed;
 		break;
 	}
 
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
-	    bm->checkpoint(bm, session, ip, btree->ckpt, data_cksum) :
+	    bm->checkpoint(bm, session, ip, btree->ckpt, data_checksum) :
 	    bm->write(
-	    bm, session, ip, addr, addr_sizep, data_cksum, checkpoint_io));
+	    bm, session, ip, addr, addr_sizep, data_checksum, checkpoint_io));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_write);
 	WT_STAT_FAST_DATA_INCR(session, cache_write);

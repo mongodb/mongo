@@ -1212,7 +1212,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 	}
 
 err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
-		WT_TRET(__wt_txn_truncate_end(session));
+		__wt_txn_truncate_end(session);
 	return (ret);
 }
 

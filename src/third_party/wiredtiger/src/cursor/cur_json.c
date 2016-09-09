@@ -186,7 +186,7 @@ __json_struct_size(WT_SESSION_IMPL *session, const void *buffer,
 	result = 0;
 	needcr = false;
 
-	WT_RET(__pack_name_init(session, names, iskey, &packname));
+	__pack_name_init(session, names, iskey, &packname);
 	WT_RET(__pack_init(session, &pack, fmt));
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		if (needcr)
@@ -231,7 +231,7 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 	/* Unpacking a cursor marked as json implies a single arg. */
 	*va_arg(ap, const char **) = (char *)jbuf;
 
-	WT_RET(__pack_name_init(session, names, iskey, &packname));
+	__pack_name_init(session, names, iskey, &packname);
 	WT_RET(__pack_init(session, &pack, fmt));
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		if (needcr) {
@@ -365,10 +365,10 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
 
 /*
  * __wt_json_column_init --
- *	set json_key_names, json_value_names to comma separated lists
+ *	Set json_key_names, json_value_names to comma separated lists
  *	of column names.
  */
-int
+void
 __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
     const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
@@ -408,7 +408,6 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 		json->key_names.str = beginkey;
 		json->key_names.len = WT_PTRDIFF(p, beginkey);
 	}
-	return (0);
 }
 
 #define	MATCH_KEYWORD(session, in, result, keyword, matchval) 	do {	\
@@ -774,7 +773,7 @@ __json_pack_size(
 	bool multi;
 	const char *tokstart;
 
-	WT_RET(__pack_name_init(session, names, iskey, &packname));
+	__pack_name_init(session, names, iskey, &packname);
 	multi = false;
 	WT_RET(__pack_init(session, &pack, fmt));
 	for (total = 0; __pack_next(&pack, &pv) == 0;) {
