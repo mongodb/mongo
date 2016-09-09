@@ -402,6 +402,11 @@ connection_runtime_config = [
                 vary depending on the current eviction load''',
                 min=1, max=20),
             ]),
+    Config('eviction_checkpoint_target', '5', r'''
+        perform eviction at the beginning of checkpoints to bring the dirty
+        content in cache to this level, expressed as a percentage of the total
+        cache size.  Ignored if set to zero or \c in_memory is \c true''',
+        min=0, max=99),
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
         this much dirty content, expressed as a percentage of the total cache

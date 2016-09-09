@@ -329,6 +329,11 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	/* Give up if scrubbing is disabled. */
+	if (cache->eviction_checkpoint_target == 0 ||
+	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
+		return (0);
+
 	WT_RET(__wt_epoch(session, &start));
 	last = start;
 	bytes_written_last = 0;
@@ -352,7 +357,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	 * Start with the scrub target equal to the expected maximum percentage
 	 * of dirty data in cache.
 	 */
-	cache->eviction_scrub_target = cache->eviction_dirty_trigger;
+	cache->eviction_scrub_limit = cache->eviction_dirty_trigger;
 
 	/* Stop if we write as much dirty data as is currently in cache. */
 	max_write = __wt_cache_dirty_leaf_inuse(cache);
@@ -361,7 +366,8 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	for (;;) {
 		current_dirty =
 		    (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
-		if (current_dirty <= (double)cache->eviction_dirty_target)
+		if (current_dirty <=
+		    (double)cache->eviction_checkpoint_target)
 			break;
 
 		__wt_sleep(0, stepdown_us / 10);
@@ -371,7 +377,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		bytes_written_total =
 		    cache->bytes_written - bytes_written_start;
 
-		if (current_dirty > cache->eviction_scrub_target) {
+		if (current_dirty > cache->eviction_scrub_limit) {
 			/*
 			 * We haven't reached the current target.
 			 *
@@ -417,9 +423,9 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		 * level.
 		 */
 		__wt_sleep(0, 10 * stepdown_us);
-		cache->eviction_scrub_target = current_dirty - delta;
+		cache->eviction_scrub_limit = current_dirty - delta;
 		WT_STAT_FAST_CONN_SET(session, txn_checkpoint_scrub_target,
-		    cache->eviction_scrub_target);
+		    cache->eviction_scrub_limit);
 		WT_RET(__wt_epoch(session, &last));
 	}
 
@@ -698,7 +704,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Unblock updates -- we can figure out that any updates to clean pages
 	 * after this point are too new to be written in the checkpoint.
 	 */
-	cache->eviction_scrub_target = 0.0;
+	cache->eviction_scrub_limit = 0.0;
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_scrub_target, 0);
 
 	/*
@@ -822,7 +828,7 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, false, ret != 0));
 
-	cache->eviction_scrub_target = 0.0;
+	cache->eviction_scrub_limit = 0.0;
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_scrub_target, 0);
 
 	if (F_ISSET(txn, WT_TXN_RUNNING)) {
