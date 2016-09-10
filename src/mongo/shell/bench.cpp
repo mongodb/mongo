@@ -680,7 +680,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
         }
     }
 
-    unique_ptr<Scope> scope{globalScriptEngine->newScopeForCurrentThread()};
+    unique_ptr<Scope> scope{getGlobalScriptEngine()->newScopeForCurrentThread()};
     verify(scope.get());
 
     while (!shouldStop()) {

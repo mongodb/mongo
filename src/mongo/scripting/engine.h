@@ -296,5 +296,6 @@ void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-extern ScriptEngine* globalScriptEngine;
+ScriptEngine* getGlobalScriptEngine();
+void setGlobalScriptEngine(ScriptEngine* impl);
 }

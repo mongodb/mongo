@@ -58,6 +58,11 @@ AtomicInt64 Scope::_lastVersion(1);
 namespace {
 // 2 GB is the largest support Javascript file size.
 const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
+
+const ServiceContext::Decoration<std::unique_ptr<ScriptEngine>> forService =
+    ServiceContext::declareDecoration<std::unique_ptr<ScriptEngine>>();
+static std::unique_ptr<ScriptEngine> globalScriptEngine;
+
 }  // namespace
 
 ScriptEngine::ScriptEngine() : _scopeInitCallback() {}
@@ -545,7 +550,20 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* txn,
 }
 
 void (*ScriptEngine::_connectCallback)(DBClientWithCommands&) = 0;
-ScriptEngine* globalScriptEngine = 0;
+
+ScriptEngine* getGlobalScriptEngine() {
+    if (hasGlobalServiceContext())
+        return forService(getGlobalServiceContext()).get();
+    else
+        return globalScriptEngine.get();
+}
+
+void setGlobalScriptEngine(ScriptEngine* impl) {
+    if (hasGlobalServiceContext())
+        forService(getGlobalServiceContext()).reset(impl);
+    else
+        globalScriptEngine.reset(impl);
+}
 
 bool hasJSReturn(const string& code) {
     size_t x = code.find("return");

@@ -824,7 +824,7 @@ void State::init() {
     // setup js
     const string userToken =
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
-    _scope.reset(globalScriptEngine->newScopeForCurrentThread());
+    _scope.reset(getGlobalScriptEngine()->newScopeForCurrentThread());
     _scope->registerOperation(_txn);
     _scope->setLocalDB(_config.dbname);
     _scope->loadStored(_txn, true);
@@ -1375,7 +1375,7 @@ public:
 
         LOG(1) << "mr ns: " << config.ns;
 
-        uassert(16149, "cannot run map reduce without the js engine", globalScriptEngine);
+        uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
 
         // Prevent sharding state from changing during the MR.
         unique_ptr<RangePreserver> rangePreserver;

@@ -55,12 +55,13 @@ MONGO_EXPORT_SERVER_PARAMETER(jsHeapLimitMB, int, 1100);
 }  // namespace
 
 void ScriptEngine::setup() {
-    if (!globalScriptEngine) {
-        globalScriptEngine = new mozjs::MozJSScriptEngine();
+    if (getGlobalScriptEngine())
+        return;
 
-        if (hasGlobalServiceContext()) {
-            getGlobalServiceContext()->registerKillOpListener(globalScriptEngine);
-        }
+    setGlobalScriptEngine(new mozjs::MozJSScriptEngine());
+
+    if (hasGlobalServiceContext()) {
+        getGlobalServiceContext()->registerKillOpListener(getGlobalScriptEngine());
     }
 }
 

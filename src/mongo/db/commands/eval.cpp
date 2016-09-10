@@ -86,12 +86,12 @@ bool dbEval(OperationContext* txn,
 
     verify(code);
 
-    if (!globalScriptEngine) {
+    if (!getGlobalScriptEngine()) {
         errmsg = "db side execution is disabled";
         return false;
     }
 
-    unique_ptr<Scope> s(globalScriptEngine->newScope());
+    unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
     s->registerOperation(txn);
 
     ScriptingFunction f = s->createFunction(code);

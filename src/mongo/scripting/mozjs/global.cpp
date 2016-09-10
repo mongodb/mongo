@@ -99,7 +99,7 @@ void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void GlobalInfo::Functions::getJSHeapLimitMB::call(JSContext* cx, JS::CallArgs args) {
-    ValueReader(cx, args.rval()).fromDouble(mongo::globalScriptEngine->getJSHeapLimitMB());
+    ValueReader(cx, args.rval()).fromDouble(mongo::getGlobalScriptEngine()->getJSHeapLimitMB());
 }
 
 void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {

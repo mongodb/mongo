@@ -97,8 +97,8 @@ Status GroupStage::initGroupScripting() {
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
     const NamespaceString nss(_request.ns);
-    _scope =
-        globalScriptEngine->getPooledScope(getOpCtx(), nss.db().toString(), "group" + userToken);
+    _scope = getGlobalScriptEngine()->getPooledScope(
+        getOpCtx(), nss.db().toString(), "group" + userToken);
     if (!_request.reduceScope.isEmpty()) {
         _scope->init(&_request.reduceScope);
     }

@@ -46,6 +46,7 @@
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/framework.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -122,6 +123,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     getGlobalAuthorizationManager()->setAuthEnabled(false);
+    ScriptEngine::setup();
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }

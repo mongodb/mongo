@@ -210,7 +210,7 @@ BSONObj readMode(const BSONObj&, void*) {
 
 BSONObj interpreterVersion(const BSONObj& a, void* data) {
     uassert(16453, "interpreterVersion accepts no arguments", a.nFields() == 0);
-    return BSON("" << globalScriptEngine->getInterpreterVersionString());
+    return BSON("" << getGlobalScriptEngine()->getInterpreterVersionString());
 }
 
 void installShellUtils(Scope& scope) {

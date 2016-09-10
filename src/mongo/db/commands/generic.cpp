@@ -151,9 +151,9 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        if (globalScriptEngine) {
+        if (getGlobalScriptEngine()) {
             BSONObjBuilder bb(result.subobjStart("js"));
-            result.append("utf8", globalScriptEngine->utf8Ok());
+            result.append("utf8", getGlobalScriptEngine()->utf8Ok());
             bb.done();
         }
         if (cmdObj["oidReset"].trueValue()) {

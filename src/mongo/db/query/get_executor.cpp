@@ -986,7 +986,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
                                                       Collection* collection,
                                                       const GroupRequest& request,
                                                       PlanExecutor::YieldPolicy yieldPolicy) {
-    if (!globalScriptEngine) {
+    if (!getGlobalScriptEngine()) {
         return Status(ErrorCodes::BadValue, "server-side JavaScript execution is disabled");
     }
 
