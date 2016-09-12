@@ -72,7 +72,7 @@ load("jstests/replsets/rslib.js");
         node.getDB("admin").getMongo().setSlaveOk();
         var oplog = node.getDB("local")['oplog.rs'];
         var oplogArray = oplog.find().toArray();
-        assert.eq(oplog.count(op), count, "oplog: " + tojson(oplogArray));
+        assert.eq(oplog.count(op), count, "op: " + tojson(op) + ", oplog: " + tojson(oplogArray));
     }
 
     function isEarlierTimestamp(ts1, ts2) {
