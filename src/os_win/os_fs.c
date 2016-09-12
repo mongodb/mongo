@@ -17,17 +17,20 @@ __win_fs_exist(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, bool *existp)
 {
 	WT_DECL_RET;
+	WT_DECL_ITEM(name_wide);
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	*existp = false;
 
-	if (GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES)
+	WT_RET(__wt_to_utf16_string(session, name, &name_wide));
+
+	if (GetFileAttributesW(name_wide->data) != INVALID_FILE_ATTRIBUTES)
 		*existp = true;
-	else
-		*existp = false;
 
+	__wt_scr_free(session, &name_wide);
 	return (0);
 }
 
@@ -40,6 +43,8 @@ __win_fs_remove(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, uint32_t flags)
 {
 	DWORD windows_error;
+	WT_DECL_RET;
+	WT_DECL_ITEM(name_wide);
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
@@ -47,14 +52,18 @@ __win_fs_remove(WT_FILE_SYSTEM *file_system,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	if (DeleteFileA(name) == FALSE) {
+	WT_RET(__wt_to_utf16_string(session, name, &name_wide));
+
+	if (DeleteFileW(name_wide->data) == FALSE) {
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s: file-remove: DeleteFileA: %s",
+		    "%s: file-remove: DeleteFileW: %s",
 		    name, __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		WT_ERR(__wt_map_windows_error(windows_error));
 	}
-	return (0);
+
+err:	__wt_scr_free(session, &name_wide);
+	return (ret);
 }
 
 /*
@@ -66,35 +75,42 @@ __win_fs_rename(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *from, const char *to, uint32_t flags)
 {
 	DWORD windows_error;
+	WT_DECL_RET;
+	WT_DECL_ITEM(from_wide);
+	WT_DECL_ITEM(to_wide);
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
 	WT_UNUSED(flags);
-
 	session = (WT_SESSION_IMPL *)wt_session;
+
+	WT_ERR(__wt_to_utf16_string(session, from, &from_wide));
+	WT_ERR(__wt_to_utf16_string(session, to, &to_wide));
 
 	/*
 	 * Check if file exists since Windows does not override the file if
 	 * it exists.
 	 */
-	if (GetFileAttributesA(to) != INVALID_FILE_ATTRIBUTES)
-		if (DeleteFileA(to) == FALSE) {
+	if (GetFileAttributesW(to_wide->data) != INVALID_FILE_ATTRIBUTES)
+		if (DeleteFileW(to_wide->data) == FALSE) {
 			windows_error = __wt_getlasterror();
 			__wt_errx(session,
-			    "%s: file-rename: DeleteFileA: %s",
+			    "%s: file-rename: DeleteFileW: %s",
 			    to, __wt_formatmessage(session, windows_error));
-			return (__wt_map_windows_error(windows_error));
+			WT_ERR(__wt_map_windows_error(windows_error));
 		}
 
-	if (MoveFileA(from, to) == FALSE) {
+	if (MoveFileW(from_wide->data, to_wide->data) == FALSE) {
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s to %s: file-rename: MoveFileA: %s",
+		    "%s to %s: file-rename: MoveFileW: %s",
 		    from, to, __wt_formatmessage(session, windows_error));
-		return (__wt_map_windows_error(windows_error));
+		WT_ERR(__wt_map_windows_error(windows_error));
 	}
 
-	return (0);
+err:	__wt_scr_free(session, &from_wide);
+	__wt_scr_free(session, &to_wide);
+	return (ret);
 }
 
 /*
@@ -106,24 +122,29 @@ __wt_win_fs_size(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, wt_off_t *sizep)
 {
 	DWORD windows_error;
+	WT_DECL_RET;
 	WIN32_FILE_ATTRIBUTE_DATA data;
+	WT_DECL_ITEM(name_wide);
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);
-
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	if (GetFileAttributesExA(name, GetFileExInfoStandard, &data) != 0) {
-		*sizep =
-		    ((int64_t)data.nFileSizeHigh << 32) | data.nFileSizeLow;
-		return (0);
+	WT_RET(__wt_to_utf16_string(session, name, &name_wide));
+
+	if (GetFileAttributesExW(
+	    name_wide->data, GetFileExInfoStandard, &data) == 0) {
+		windows_error = __wt_getlasterror();
+		__wt_errx(session,
+		    "%s: file-size: GetFileAttributesEx: %s",
+		    name, __wt_formatmessage(session, windows_error));
+		WT_ERR(__wt_map_windows_error(windows_error));
 	}
 
-	windows_error = __wt_getlasterror();
-	__wt_errx(session,
-	    "%s: file-size: GetFileAttributesEx: %s",
-	    name, __wt_formatmessage(session, windows_error));
-	return (__wt_map_windows_error(windows_error));
+	*sizep = ((int64_t)data.nFileSizeHigh << 32) | data.nFileSizeLow;
+
+err:	__wt_scr_free(session, &name_wide);
+	return (ret);
 }
 
 /*
@@ -330,11 +351,11 @@ __win_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 }
 
 /*
- * __win_file_truncate --
- *	Truncate a file.
+ * __win_file_set_end --
+ *	Truncate or extend a file.
  */
 static int
-__win_file_truncate(
+__win_file_set_end(
     WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t len)
 {
 	DWORD windows_error;
@@ -349,13 +370,14 @@ __win_file_truncate(
 
 	if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE)
 		WT_RET_MSG(session, EINVAL,
-		    "%s: handle-truncate: read-only", file_handle->name);
+		    "%s: handle-set-end: no secondary handle",
+		    file_handle->name);
 
 	if (SetFilePointerEx(win_fh->filehandle_secondary,
 	    largeint, NULL, FILE_BEGIN) == FALSE) {
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s: handle-truncate: SetFilePointerEx: %s",
+		    "%s: handle-set-end: SetFilePointerEx: %s",
 		    file_handle->name,
 		    __wt_formatmessage(session, windows_error));
 		return (__wt_map_windows_error(windows_error));
@@ -366,7 +388,7 @@ __win_file_truncate(
 			return (EBUSY);
 		windows_error = __wt_getlasterror();
 		__wt_errx(session,
-		    "%s: handle-truncate: SetEndOfFile: %s",
+		    "%s: handle-set-end: SetEndOfFile: %s",
 		    file_handle->name,
 		    __wt_formatmessage(session, windows_error));
 		return (__wt_map_windows_error(windows_error));
@@ -434,25 +456,25 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	DWORD dwCreationDisposition, windows_error;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_DECL_ITEM(name_wide);
 	WT_FILE_HANDLE *file_handle;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
 	int desired_access, f;
 
 	WT_UNUSED(file_system);
-
-	*file_handlep = NULL;
-
 	session = (WT_SESSION_IMPL *)wt_session;
 	conn = S2C(session);
+	*file_handlep = NULL;
 
 	WT_RET(__wt_calloc_one(session, &win_fh));
-
 	win_fh->direct_io = false;
 
 	/* Set up error handling. */
 	win_fh->filehandle =
 	    win_fh->filehandle_secondary = INVALID_HANDLE_VALUE;
+
+	WT_ERR(__wt_to_utf16_string(session, name, &name_wide));
 
 	/*
 	 * Opening a file handle on a directory is only to support filesystems
@@ -503,41 +525,41 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	if (file_type == WT_FS_OPEN_FILE_TYPE_DATA)
 		f |= FILE_FLAG_RANDOM_ACCESS;
 
-	win_fh->filehandle = CreateFileA(name, desired_access,
+	win_fh->filehandle = CreateFileW(name_wide->data, desired_access,
 	    FILE_SHARE_READ | FILE_SHARE_WRITE,
 	    NULL, dwCreationDisposition, f, NULL);
 	if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
 		if (LF_ISSET(WT_FS_OPEN_CREATE) &&
 		    GetLastError() == ERROR_FILE_EXISTS)
-			win_fh->filehandle = CreateFileA(name, desired_access,
-			    FILE_SHARE_READ | FILE_SHARE_WRITE,
+			win_fh->filehandle = CreateFileW(name_wide->data,
+			    desired_access, FILE_SHARE_READ | FILE_SHARE_WRITE,
 			    NULL, OPEN_EXISTING, f, NULL);
 		if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
 			windows_error = __wt_getlasterror();
 			__wt_errx(session,
 			    win_fh->direct_io ?
-			    "%s: handle-open: CreateFileA: failed with direct "
+			    "%s: handle-open: CreateFileW: failed with direct "
 			    "I/O configured, some filesystem types do not "
 			    "support direct I/O: %s" :
-			    "%s: handle-open: CreateFileA: %s",
+			    "%s: handle-open: CreateFileW: %s",
 			    name, __wt_formatmessage(session, windows_error));
 			WT_ERR(__wt_map_windows_error(windows_error));
 		}
 	}
 
 	/*
-	 * Open a second handle to file to support allocation/truncation
-	 * concurrently with reads on the file. Writes would also move the file
-	 * pointer.
+	 * Open a second handle to file to support file extension/truncation
+	 * concurrently with reads on the file. Writes would also move the
+	 * file pointer.
 	 */
 	if (!LF_ISSET(WT_FS_OPEN_READONLY)) {
-		win_fh->filehandle_secondary = CreateFileA(name, desired_access,
-		    FILE_SHARE_READ | FILE_SHARE_WRITE,
+		win_fh->filehandle_secondary = CreateFileW(name_wide->data,
+		    desired_access, FILE_SHARE_READ | FILE_SHARE_WRITE,
 		    NULL, OPEN_EXISTING, f, NULL);
 		if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE) {
 			windows_error = __wt_getlasterror();
 			__wt_errx(session,
-			    "%s: handle-open: CreateFileA: secondary: %s",
+			    "%s: handle-open: Creatively: secondary: %s",
 			    name, __wt_formatmessage(session, windows_error));
 			WT_ERR(__wt_map_windows_error(windows_error));
 		}
@@ -562,14 +584,20 @@ directory_open:
 	file_handle->fh_read = __win_file_read;
 	file_handle->fh_size = __win_file_size;
 	file_handle->fh_sync = __win_file_sync;
-	file_handle->fh_truncate = __win_file_truncate;
+
+	/* Extend and truncate share the same implementation. */
+	file_handle->fh_extend = __win_file_set_end;
+	file_handle->fh_truncate = __win_file_set_end;
+
 	file_handle->fh_write = __win_file_write;
 
 	*file_handlep = file_handle;
 
+	__wt_scr_free(session, &name_wide);
 	return (0);
 
-err:	WT_TRET(__win_file_close((WT_FILE_HANDLE *)win_fh, wt_session));
+err:	__wt_scr_free(session, &name_wide);
+	WT_TRET(__win_file_close((WT_FILE_HANDLE *)win_fh, wt_session));
 	return (ret);
 }
 

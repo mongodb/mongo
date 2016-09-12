@@ -45,7 +45,7 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 cgcols:			cval = colgroup->colconf;
 			col = table->nkey_columns;
 		}
-		WT_RET(__wt_config_subinit(session, &conf, &cval));
+		__wt_config_subinit(session, &conf, &cval);
 		for (; (ret = __wt_config_next(&conf, &k, &v)) == 0; col++) {
 			if (k.len == colname->len &&
 			    strncmp(colname->str, k.str, k.len) == 0) {
@@ -105,7 +105,7 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session,
 	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
 	/* Walk through the named columns. */
-	WT_RET(__wt_config_subinit(session, &conf, colconf));
+	__wt_config_subinit(session, &conf, colconf);
 	for (ncols = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; ncols++)
 		;
 	WT_RET_TEST(ret != WT_NOTFOUND, ret);
@@ -140,7 +140,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 		return (0);
 
 	/* Walk through the columns. */
-	WT_RET(__wt_config_subinit(session, &conf, &table->colconf));
+	__wt_config_subinit(session, &conf, &table->colconf);
 
 	/* Skip over the key columns. */
 	for (i = 0; i < table->nkey_columns; i++)
@@ -186,7 +186,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	start_cg = start_col = UINT_MAX;	/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
-	WT_RET(__wt_config_initn(session, &conf, columns, len));
+	__wt_config_initn(session, &conf, columns, len);
 	if (value_only)
 		for (i = 0; i < table->nkey_columns; i++)
 			WT_RET(__wt_config_next(&conf, &k, &v));
@@ -281,7 +281,7 @@ __find_column_format(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_PACK pack;
 	bool inkey;
 
-	WT_RET(__wt_config_subinit(session, &conf, &table->colconf));
+	__wt_config_subinit(session, &conf, &table->colconf);
 	WT_RET(__pack_init(session, &pack, table->key_format));
 	inkey = true;
 
@@ -323,7 +323,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_DECL_RET;
 	bool have_next;
 
-	WT_RET(__wt_config_initn(session, &config, columns, len));
+	__wt_config_initn(session, &config, columns, len);
 	/*
 	 * If an empty column list is specified, this will fail with
 	 * WT_NOTFOUND, that's okay.
@@ -331,7 +331,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_RET_NOTFOUND_OK(ret = __wt_config_next(&config, &next_k, &next_v));
 	if (ret == WT_NOTFOUND) {
 		if (extra_cols != NULL) {
-			WT_RET(__wt_config_init(session, &config, extra_cols));
+			__wt_config_init(session, &config, extra_cols);
 			WT_RET(__wt_config_next(&config, &next_k, &next_v));
 			extra_cols = NULL;
 		} else if (format->size == 0) {
@@ -347,7 +347,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 		have_next = ret == 0;
 
 		if (!have_next && extra_cols != NULL) {
-			WT_RET(__wt_config_init(session, &config, extra_cols));
+			__wt_config_init(session, &config, extra_cols);
 			WT_RET(__wt_config_next(&config, &next_k, &next_v));
 			have_next = true;
 			extra_cols = NULL;

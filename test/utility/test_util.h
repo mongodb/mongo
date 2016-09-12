@@ -29,9 +29,12 @@
 
 #ifdef _WIN32
 	#define DIR_DELIM '\\'
+	#define DIR_DELIM_STR "\\"
+	#define DIR_EXISTS_COMMAND "IF EXIST "
 	#define RM_COMMAND "rd /s /q "
 #else
 	#define	DIR_DELIM '/'
+	#define	DIR_DELIM_STR "/"
 	#define RM_COMMAND "rm -rf "
 #endif
 
@@ -115,8 +118,10 @@ void *dcalloc(size_t, size_t);
 void *dmalloc(size_t);
 void *drealloc(void *, size_t);
 void *dstrdup(const void *);
+void *dstrndup(const char *, size_t);
 void  testutil_clean_work_dir(char *);
 void  testutil_cleanup(TEST_OPTS *);
+bool  testutil_disable_long_tests(void);
 void  testutil_make_work_dir(char *);
 int   testutil_parse_opts(int, char * const *, TEST_OPTS *);
 void  testutil_work_dir_from_path(char *, size_t, const char *);

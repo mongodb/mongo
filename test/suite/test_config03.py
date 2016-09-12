@@ -69,14 +69,11 @@ class test_config03(test_base03.test_base03):
                     'eviction_trigger', 'hazard_max', 'multiprocess',
                     'session_max', 'verbose' ]
 
-    all_scenarios = wtscenario.multiply_scenarios('_',
+    scenarios = wtscenario.make_scenarios(
         cache_size_scenarios, create_scenarios, error_prefix_scenarios,
         eviction_target_scenarios, eviction_trigger_scenarios,
         hazard_max_scenarios, multiprocess_scenarios, session_max_scenarios,
-        transactional_scenarios, verbose_scenarios)
-
-    scenarios = wtscenario.prune_scenarios(all_scenarios, 1000)
-    scenarios = wtscenario.number_scenarios(scenarios)
+        transactional_scenarios, verbose_scenarios, prune=1000)
 
     #wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \
     #                      str(len(scenarios)) + ' of ' + \

@@ -33,7 +33,7 @@
 import os, run, random
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Test basic encryption
 class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
@@ -48,7 +48,7 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
         ('keyid-pass', dict( encrypt='rotn', encrypt_args='name=rotn,keyid=11',
                         secret_arg='ABC')),
     ]
-    scenarios = number_scenarios(encrypt_type)
+    scenarios = make_scenarios(encrypt_type)
 
     nrecords = 5000
     bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010

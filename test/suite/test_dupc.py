@@ -33,7 +33,7 @@
 import os, time
 import wiredtiger, wttest
 from helper import complex_populate, key_populate, simple_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # Test session.open_cursor with cursor duplication.
 class test_duplicate_cursor(wttest.WiredTigerTestCase):
@@ -42,7 +42,7 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
 
     config = 'key_format='
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file-r', dict(uri='file:', fmt='r')),
         ('file-S', dict(uri='file:', fmt='S')),
         ('table-r', dict(uri='table:', fmt='r')),

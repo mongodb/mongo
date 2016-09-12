@@ -205,7 +205,7 @@ __async_get_type(WT_ASYNC_OP *asyncop)
  * __async_op_init --
  *	Initialize all the op handle fields.
  */
-static int
+static void
 __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 {
 	WT_ASYNC_OP *asyncop;
@@ -243,7 +243,6 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 
 	op->internal_id = id;
 	op->state = WT_ASYNCOP_FREE;
-	return (0);
 }
 
 /*
@@ -330,7 +329,7 @@ __wt_async_op_init(WT_SESSION_IMPL *session)
 	/*
 	 * Initialize the flush op structure.
 	 */
-	WT_RET(__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX));
+	__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX);
 
 	/*
 	 * Allocate and initialize the work queue.  This is sized so that
@@ -346,7 +345,7 @@ __wt_async_op_init(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_calloc_def(session, conn->async_size, &async->async_ops));
 	for (i = 0; i < conn->async_size; i++) {
 		op = &async->async_ops[i];
-		WT_ERR(__async_op_init(conn, op, i));
+		__async_op_init(conn, op, i);
 	}
 	return (0);
 

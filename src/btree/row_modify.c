@@ -267,22 +267,27 @@ int
 __wt_update_alloc(
     WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
+	WT_UPDATE *upd;
 	size_t size;
+
+	*updp = NULL;
 
 	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
 	 * the value into place.
 	 */
 	size = value == NULL ? 0 : value->size;
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, updp));
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, &upd));
 	if (value == NULL)
-		WT_UPDATE_DELETED_SET(*updp);
+		WT_UPDATE_DELETED_SET(upd);
 	else {
-		(*updp)->size = WT_STORE_SIZE(size);
-		memcpy(WT_UPDATE_DATA(*updp), value->data, size);
+		upd->size = WT_STORE_SIZE(size);
+		if (size != 0)
+			memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
-	*sizep = WT_UPDATE_MEMSIZE(*updp);
+	*updp = upd;
+	*sizep = WT_UPDATE_MEMSIZE(upd);
 	return (0);
 }
 

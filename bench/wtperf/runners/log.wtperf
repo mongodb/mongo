@@ -1,10 +1,27 @@
+#
 # wtperf options file: Test performance with a log file enabled.
 # Set the log file small to catch log-swtich bottlenecks.
-conn_config="cache_size=1G,log=(enabled=true,file_max=200K),checkpoint=(log_size=500MB)"
+#
+# Perform updates instead of inserts to stress logging not eviction,
+# page splits or reconciliation.  Have it fit in cache.
+#
+# We expect this test can and will be run in other forms from the command
+# line to change log file size, pre-allocation, zero filling, logging off
+# and checkpoint off.
+#
+# Jenkins runs for perf testing:
+# - Config as-is
+# - Config + "-C "log=(enabled,file_max=1M)": small log files and switching
+# - Config + "-C "log=(enabled,zero_fill=true,file_max=1M)": zero-filling
+# - Config + "-C "checkpoint=(wait=0)": no checkpoints
+# - Config + "-C "log=(enabled,prealloc=false,file_max=1M)": no pre-allocation
+#
+conn_config="cache_size=5G,log=(enabled=true),checkpoint=(log_size=500M),eviction=(threads_max=4)"
 table_config="type=file"
-icount=50000
+icount=1000000
 report_interval=5
-run_time=120
+run_time=180
 populate_threads=1
-random_range=50000000
-threads=((count=8,inserts=1))
+threads=((count=8,updates=1))
+# Warm up the cache for a minute.
+warmup=60

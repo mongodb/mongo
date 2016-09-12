@@ -92,7 +92,7 @@ zalloc(void *cookie, uint32_t number, uint32_t size)
 	opaque = cookie;
 	wt_api = ((ZLIB_COMPRESSOR *)opaque->compressor)->wt_api;
 	return (wt_api->scr_alloc(
-	    wt_api, opaque->session, (size_t)(number * size)));
+	    wt_api, opaque->session, (size_t)number * size));
 }
 
 /*

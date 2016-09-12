@@ -391,41 +391,6 @@ __im_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 }
 
 /*
- * __im_file_truncate --
- *	POSIX ftruncate.
- */
-static int
-__im_file_truncate(
-    WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_off_t offset)
-{
-	WT_DECL_RET;
-	WT_FILE_HANDLE_INMEM *im_fh;
-	WT_FILE_SYSTEM_INMEM *im_fs;
-	WT_SESSION_IMPL *session;
-	size_t off;
-
-	im_fh = (WT_FILE_HANDLE_INMEM *)file_handle;
-	im_fs = (WT_FILE_SYSTEM_INMEM *)file_handle->file_system;
-	session = (WT_SESSION_IMPL *)wt_session;
-
-	__wt_spin_lock(session, &im_fs->lock);
-
-	/*
-	 * Grow the buffer as necessary, clear any new space in the file, and
-	 * reset the file's data length.
-	 */
-	off = (size_t)offset;
-	WT_ERR(__wt_buf_grow(session, &im_fh->buf, off));
-	if (im_fh->buf.size < off)
-		memset((uint8_t *)im_fh->buf.data + im_fh->buf.size,
-		    0, off - im_fh->buf.size);
-	im_fh->buf.size = off;
-
-err:	__wt_spin_unlock(session, &im_fs->lock);
-	return (ret);
-}
-
-/*
  * __im_file_write --
  *	POSIX pwrite.
  */
@@ -526,7 +491,6 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	file_handle->fh_read = __im_file_read;
 	file_handle->fh_size = __im_file_size;
 	file_handle->fh_sync = __im_file_sync;
-	file_handle->fh_truncate = __im_file_truncate;
 	file_handle->fh_write = __im_file_write;
 
 	*file_handlep = file_handle;

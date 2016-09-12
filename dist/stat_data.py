@@ -9,6 +9,7 @@
 #
 # Data-source statistics are normally aggregated across the set of underlying
 # objects. Additional optional configuration flags are available:
+#       all_only        Only gets reported when statistics=all set
 #       max_aggregate   Take the maximum value when aggregating statistics
 #       no_clear        Value not cleared when statistics cleared
 #       no_scale        Don't scale value per second in the logging tool script
@@ -81,10 +82,10 @@ class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionStat.prefix, desc, flags)
-class ThreadState(Stat):
+class ThreadStat(Stat):
     prefix = 'thread-state'
     def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, ThreadState.prefix, desc, flags)
+        Stat.__init__(self, name, ThreadStat.prefix, desc, flags)
 class TxnStat(Stat):
     prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
@@ -105,7 +106,7 @@ groups['evict'] = [
     BlockStat.prefix,
     CacheStat.prefix,
     ConnStat.prefix,
-    ThreadState.prefix
+    ThreadStat.prefix
 ]
 groups['lsm'] = [LSMStat.prefix, TxnStat.prefix]
 groups['memory'] = [CacheStat.prefix, ConnStat.prefix, RecStat.prefix]
@@ -113,7 +114,7 @@ groups['system'] = [
     ConnStat.prefix,
     DhandleStat.prefix,
     SessionStat.prefix,
-    ThreadState.prefix
+    ThreadStat.prefix
 ]
 
 ##########################################
@@ -159,6 +160,7 @@ connection_stats = [
     BlockStat('block_byte_map_read', 'mapped bytes read', 'size'),
     BlockStat('block_byte_read', 'bytes read', 'size'),
     BlockStat('block_byte_write', 'bytes written', 'size'),
+    BlockStat('block_byte_write_checkpoint', 'bytes written for checkpoint', 'size'),
     BlockStat('block_map_read', 'mapped blocks read'),
     BlockStat('block_preload', 'blocks pre-loaded'),
     BlockStat('block_read', 'blocks read'),
@@ -168,11 +170,12 @@ connection_stats = [
     # Cache and eviction statistics
     ##########################################
     CacheStat('cache_bytes_dirty', 'tracked dirty bytes in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_image', 'bytes belonging to page images in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_internal', 'tracked bytes belonging to internal pages in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_leaf', 'tracked bytes belonging to leaf pages in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size'),
-    CacheStat('cache_bytes_overflow', 'tracked bytes belonging to overflow pages in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_other', 'bytes not belonging to page images in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
     CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
     CacheStat('cache_eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
@@ -193,17 +196,17 @@ connection_stats = [
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
     CacheStat('cache_eviction_maximum_page_size', 'maximum page size at eviction', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_pages_queued', 'pages queued for eviction'),
-    CacheStat('cache_eviction_pages_queued_oldest', 'pages queued for urgent eviction'),
+    CacheStat('cache_eviction_pages_queued_oldest', 'pages queued for urgent eviction during walk'),
+    CacheStat('cache_eviction_pages_queued_urgent', 'pages queued for urgent eviction'),
     CacheStat('cache_eviction_pages_seen', 'pages seen by eviction walk'),
     CacheStat('cache_eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
-    CacheStat('cache_eviction_server_not_evicting', 'eviction server populating queue, but not evicting pages'),
     CacheStat('cache_eviction_server_slept', 'eviction server slept, because we did not make progress with eviction'),
-    CacheStat('cache_eviction_server_toobig', 'eviction server skipped very large page'),
     CacheStat('cache_eviction_slow', 'eviction server unable to reach eviction goal'),
     CacheStat('cache_eviction_split_internal', 'internal pages split during eviction'),
     CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
+    CacheStat('cache_eviction_state', 'eviction state', 'no_clear,no_scale'),
     CacheStat('cache_eviction_walk', 'pages walked for eviction'),
     CacheStat('cache_eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_walks_started', 'files with new eviction walks started'),
@@ -215,12 +218,14 @@ connection_stats = [
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_lookaside_insert', 'lookaside table insert calls'),
     CacheStat('cache_lookaside_remove', 'lookaside table remove calls'),
+    CacheStat('cache_overflow_value', 'overflow values cached in memory', 'no_scale'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty', 'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_lookaside', 'pages read into cache requiring lookaside entries'),
+    CacheStat('cache_read_overflow', 'overflow pages read into cache'),
     CacheStat('cache_write', 'pages written from cache'),
     CacheStat('cache_write_lookaside', 'page written requiring lookaside records'),
     CacheStat('cache_write_restore', 'pages written requiring in-memory restoration'),
@@ -271,8 +276,8 @@ connection_stats = [
     LogStat('log_slot_unbuffered', 'consolidated slot unbuffered writes'),
     LogStat('log_sync', 'log sync operations'),
     LogStat('log_sync_dir', 'log sync_dir operations'),
-    LogStat('log_sync_dir_duration', 'log sync_dir time duration (usecs)'),
-    LogStat('log_sync_duration', 'log sync time duration (usecs)'),
+    LogStat('log_sync_dir_duration', 'log sync_dir time duration (usecs)', 'no_clear,no_scale'),
+    LogStat('log_sync_duration', 'log sync time duration (usecs)', 'no_clear,no_scale'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
     LogStat('log_write_lsn_skip', 'log server thread write LSN walk skipped'),
     LogStat('log_writes', 'log write operations'),
@@ -294,11 +299,11 @@ connection_stats = [
     TxnStat('txn_begin', 'transaction begins'),
     TxnStat('txn_checkpoint', 'transaction checkpoints'),
     TxnStat('txn_checkpoint_fsync_post', 'transaction fsync calls for checkpoint after allocating the transaction ID'),
-    TxnStat('txn_checkpoint_fsync_post_duration', 'transaction fsync duration for checkpoint after allocating the transaction ID (usecs)'),
-    TxnStat('txn_checkpoint_fsync_pre', 'transaction fsync calls for checkpoint before allocating the transaction ID'),
-    TxnStat('txn_checkpoint_fsync_pre_duration', 'transaction fsync duration for checkpoint before allocating the transaction ID (usecs)'),
+    TxnStat('txn_checkpoint_fsync_post_duration', 'transaction fsync duration for checkpoint after allocating the transaction ID (usecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_generation', 'transaction checkpoint generation', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_running', 'transaction checkpoint currently running', 'no_clear,no_scale'),
+    TxnStat('txn_checkpoint_scrub_target', 'transaction checkpoint scrub dirty target', 'no_clear,no_scale'),
+    TxnStat('txn_checkpoint_scrub_time', 'transaction checkpoint scrub time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_max', 'transaction checkpoint max time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_min', 'transaction checkpoint min time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_recent', 'transaction checkpoint most recent time (msecs)', 'no_clear,no_scale'),
@@ -332,6 +337,22 @@ connection_stats = [
     ##########################################
     SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
     SessionStat('session_open', 'open session count', 'no_clear,no_scale'),
+    SessionStat('session_table_compact_fail', 'table compact failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_compact_success', 'table compact successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_create_fail', 'table create failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_drop_success', 'table drop successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rebalance_fail', 'table rebalance failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rebalance_success', 'table rebalance successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rename_fail', 'table rename failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rename_success', 'table rename successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_salvage_fail', 'table salvage failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_salvage_success', 'table salvage successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
 
     ##########################################
     # Total cursor operations
@@ -349,11 +370,11 @@ connection_stats = [
     CursorStat('cursor_update', 'cursor update calls'),
 
     ##########################################
-    # Thread State statistics
+    # Thread Count statistics
     ##########################################
-    ThreadState('fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
-    ThreadState('read_active', 'active filesystem read calls','no_clear,no_scale'),
-    ThreadState('write_active', 'active filesystem write calls','no_clear,no_scale'),
+    ThreadStat('thread_fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
+    ThreadStat('thread_read_active', 'active filesystem read calls','no_clear,no_scale'),
+    ThreadStat('thread_write_active', 'active filesystem write calls','no_clear,no_scale'),
 
     ##########################################
     # Yield statistics
@@ -400,13 +421,13 @@ dsrc_stats = [
     # Btree statistics
     ##########################################
     BtreeStat('btree_checkpoint_generation', 'btree checkpoint generation', 'no_clear,no_scale'),
-    BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale'),
-    BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale'),
-    BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale'),
-    BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale'),
-    BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale'),
+    BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,all_only'),
+    BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,all_only'),
+    BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,all_only'),
+    BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale,all_only'),
+    BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale,all_only'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
-    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale'),
+    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale,all_only'),
     BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maximum_depth', 'maximum tree depth', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale,size'),
@@ -414,9 +435,9 @@ dsrc_stats = [
     BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale,size'),
-    BtreeStat('btree_overflow', 'overflow pages', 'no_scale'),
-    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale'),
-    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale'),
+    BtreeStat('btree_overflow', 'overflow pages', 'no_scale,all_only'),
+    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,all_only'),
+    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,all_only'),
 
     ##########################################
     # LSM statistics
@@ -451,6 +472,7 @@ dsrc_stats = [
     ##########################################
     # Cache and eviction statistics
     ##########################################
+    CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
     CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
     CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),

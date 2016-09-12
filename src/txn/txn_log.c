@@ -329,7 +329,7 @@ __wt_txn_checkpoint_log(
 	case WT_TXN_LOG_CKPT_START:
 		/* Take a copy of the transaction snapshot. */
 		txn->ckpt_nsnapshot = txn->snapshot_count;
-		recsize = txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
+		recsize = (size_t)txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
 		WT_ERR(__wt_scr_alloc(session, recsize, &txn->ckpt_snapshot));
 		p = txn->ckpt_snapshot->mem;
 		end = p + recsize;
@@ -376,7 +376,7 @@ __wt_txn_checkpoint_log(
 		 * that case.
 		 */
 		if (!S2C(session)->hot_backup && txn->full_ckpt)
-			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
+			__wt_log_ckpt(session, ckpt_lsn);
 
 		/* FALLTHROUGH */
 	case WT_TXN_LOG_CKPT_CLEANUP:
@@ -450,11 +450,10 @@ __wt_txn_truncate_log(
  * __wt_txn_truncate_end --
  *	Finish truncating a range of a file.
  */
-int
+void
 __wt_txn_truncate_end(WT_SESSION_IMPL *session)
 {
 	F_CLR(session, WT_SESSION_LOGGING_INMEM);
-	return (0);
 }
 
 /*

@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
@@ -70,8 +70,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         ('none', dict(compress='')),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s,
-                                                    compress))
+    scenarios = make_scenarios(types, op1s, txn1s, compress)
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
@@ -218,6 +217,13 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
 
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
+        #
+        # Run printlog and make sure it exits with zero status. This should be
+        # run as soon as we can after the crash to try and conflict with the
+        # journal file read.
+        #
+
+        self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         clen = stat_cursor[stat.conn.log_compress_len][2]
@@ -239,11 +245,6 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertEqual(clen < cmem, True)
             self.assertEqual(cwrites > 0, True)
             self.assertEqual((cfails > 0 or csmall > 0), True)
-
-        #
-        # Run printlog and make sure it exits with zero status.
-        #
-        self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
 
 if __name__ == '__main__':
     wttest.run()

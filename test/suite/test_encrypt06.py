@@ -32,7 +32,7 @@
 
 import os, run, random
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Test encryption, when on, does not leak any information
 class test_encrypt06(wttest.WiredTigerTestCase):
@@ -86,7 +86,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
             file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
             file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', encrypt, storagetype))
+    scenarios = make_scenarios(encrypt, storagetype)
     nrecords = 1000
 
     # Override WiredTigerTestCase, we have extensions.

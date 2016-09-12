@@ -22,10 +22,15 @@ runmax=$2
 # have 3 or 4 args.
 wtarg=""
 wtarg2=""
+create=1
 if test "$#" -gt "2"; then
 	wtarg=$3
 	if test "$#" -eq "4"; then
 		wtarg2=$4
+	fi
+	if test "$wtarg" == "NOCREATE"; then
+		create=0
+		wtarg=$wtarg2
 	fi
 fi
 
@@ -86,9 +91,11 @@ getmin=0
 getmax=1
 run=1
 while test "$run" -le "$runmax"; do
-	rm -rf $home
-	mkdir $home
-	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg $wtarg2
+	if test "$create" -eq "1"; then
+		rm -rf $home
+		mkdir $home
+	fi
+	LD_PRELOAD=/usr/local/lib/libtcmalloc.so LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg $wtarg2
 	if test "$?" -ne "0"; then
 		exit 1
 	fi

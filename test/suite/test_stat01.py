@@ -29,7 +29,7 @@
 import helper, wiredtiger, wttest
 from wiredtiger import stat
 from helper import key_populate, simple_populate
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_stat01.py
 #    Statistics operations
@@ -49,7 +49,7 @@ class test_stat01(wttest.WiredTigerTestCase):
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
+    scenarios = make_scenarios(types, keyfmt)
 
     conn_config = 'statistics=(all)'
 

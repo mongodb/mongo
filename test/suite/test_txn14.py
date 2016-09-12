@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
@@ -47,7 +47,7 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         ('sync', dict(sync='on')),
         ('bg', dict(sync='background')),
     ]
-    scenarios = multiply_scenarios('.', sync_list)
+    scenarios = make_scenarios(sync_list)
 
     def simulate_crash_restart(self, olddir, newdir):
         ''' Simulate a crash from olddir and restart in newdir. '''

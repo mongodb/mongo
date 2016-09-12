@@ -1,0 +1,134 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+cd ..
+
+# Turn a C file into a line per function that returns an int.
+file_parse()
+{
+	sed -n \
+	    -e '/^int$/b loop' \
+	    -e '/^static int$/b loop' \
+	    -e 'd' \
+	    -e ': loop' \
+	    -e 'H' \
+	    -e 'n' \
+	    -e '/^}$/!b loop' \
+	    -e 'H' \
+	    -e 'x' \
+	    -e 's/\n/ /g' \
+	    -e 'p' \
+	    -e 's/.*//' \
+	    -e 'x' \
+	    -e 'd' $1
+}
+
+# Strip out a list of functions that will be flagged, but are OK.
+func_ok()
+{
+	sed \
+	    -e '/int __bm_stat$/d' \
+	    -e '/int __checkpoint_presync$/d' \
+	    -e '/int __compact_uri_analyze$/d' \
+	    -e '/int __curlog_reset$/d' \
+	    -e '/int __handle_close_default$/d' \
+	    -e '/int __handle_progress_default$/d' \
+	    -e '/int __im_file_close$/d' \
+	    -e '/int __im_file_lock$/d' \
+	    -e '/int __im_file_size$/d' \
+	    -e '/int __im_file_sync$/d' \
+	    -e '/int __im_fs_directory_list_free$/d' \
+	    -e '/int __im_fs_exist$/d' \
+	    -e '/int __posix_file_close$/d' \
+	    -e '/int __posix_terminate$/d' \
+	    -e '/int __rec_destroy_session$/d' \
+	    -e '/int __win_terminate$/d' \
+	    -e '/int __wt_block_compact_end$/d' \
+	    -e '/int __wt_block_compact_start$/d' \
+	    -e '/int __wt_block_manager_size$/d' \
+	    -e '/int __wt_block_write_size$/d' \
+	    -e '/int __wt_curjoin_joined$/d' \
+	    -e '/int __wt_cursor_close$/d' \
+	    -e '/int __wt_cursor_noop$/d' \
+	    -e '/int __wt_epoch$/d' \
+	    -e '/int __wt_errno$/d' \
+	    -e '/int __wt_get_vm_pagesize$/d' \
+	    -e '/int __wt_lsm_manager_pop_entry$/d' \
+	    -e '/int __wt_once$/d' \
+	    -e '/int __wt_posix_directory_list_free$/d' \
+	    -e '/int __wt_stat_connection_desc$/d' \
+	    -e '/int __wt_stat_dsrc_desc$/d' \
+	    -e '/int __wt_stat_join_desc$/d' \
+	    -e '/int __wt_win_directory_list_free$/d' \
+	    -e '/int bdb_compare_reverse$/d' \
+	    -e '/int csv_terminate$/d' \
+	    -e '/int demo_file_close$/d' \
+	    -e '/int demo_file_lock$/d' \
+	    -e '/int demo_file_size$/d' \
+	    -e '/int demo_file_sync$/d' \
+	    -e '/int demo_fs_directory_list_free$/d' \
+	    -e '/int demo_fs_exist$/d' \
+	    -e '/int handle_message$/d' \
+	    -e '/int handle_progress$/d' \
+	    -e '/int helium_cursor_reset$/d' \
+	    -e '/int helium_session_verify$/d' \
+	    -e '/int log_print_err$/d' \
+	    -e '/int lz4_error$/d' \
+	    -e '/int lz4_pre_size$/d' \
+	    -e '/int lz4_terminate$/d' \
+	    -e '/int main$/d' \
+	    -e '/int nop_decompress$/d' \
+	    -e '/int nop_decrypt$/d' \
+	    -e '/int nop_pre_size$/d' \
+	    -e '/int nop_sizing$/d' \
+	    -e '/int nop_terminate$/d' \
+	    -e '/int nop_terminate$/d' \
+	    -e '/int os_errno$/d' \
+	    -e '/int revint_terminate$/d' \
+	    -e '/int rotn_error$/d' \
+	    -e '/int rotn_sizing$/d' \
+	    -e '/int rotn_terminate$/d' \
+	    -e '/int uri2name$/d' \
+	    -e '/int usage$/d' \
+	    -e '/int util_err$/d' \
+	    -e '/int wiredtiger_extension_init$/d' \
+	    -e '/int wiredtiger_extension_terminate$/d' \
+	    -e '/int wiredtiger_pack_close$/d' \
+	    -e '/int wt_snappy_pre_size$/d' \
+	    -e '/int wt_snappy_terminate$/d' \
+	    -e '/int zlib_error$/d' \
+	    -e '/int zlib_terminate$/d'
+}
+
+# Complain about functions which return an "int" but which don't return except
+# at the end of the function. This script is a kluge and isn't run by default.
+for f in `find bench ext src test -name '*.[ci]'`; do
+	if expr "$f" : '.*/windows_shim.c' > /dev/null; then
+		continue
+	fi
+
+	# Turn each function into a single line, then discard the function's
+	# final "return" call, then discard any function that still has some
+	# form of return assignment or call.
+	file_parse $f |
+	sed -e 's/return ([^)]*); }$//' \
+	    -e '/[A-Z]*_API_CALL[A-Z_]*(/d' \
+	    -e '/WT_CURSOR_NEEDKEY(/d' \
+	    -e '/WT_CURSOR_NEEDVALUE(/d' \
+	    -e '/WT_ERR[A-Z_]*(/d' \
+	    -e '/WT_ILLEGAL_VALUE[A-Z_]*(/d' \
+	    -e '/WT_PANIC[A-Z_]*(/d' \
+	    -e '/WT_RET[A-Z_]*(/d' \
+	    -e '/WT_TRET(/d' \
+	    -e '/[^a-z_]ret = /d' \
+	    -e '/[^a-z_]return (/d' \
+	    -e 's/^\([^(]*\).*/\1/' \
+	    -e 's/^ *//' |
+	func_ok > $t
+	test -s $t && {
+		echo "========== $f"
+		cat $t
+	}
+done

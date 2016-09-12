@@ -92,8 +92,6 @@ class test_reconfig01(wttest.WiredTigerTestCase):
         self.conn.reconfigure("checkpoint=(wait=5)")
         self.conn.reconfigure("checkpoint=(log_size=0)")
         self.conn.reconfigure("checkpoint=(log_size=1M)")
-        self.conn.reconfigure("checkpoint=(wait=0,name=hi)")
-        self.conn.reconfigure("checkpoint=(wait=5,name=hi)")
 
     # Statistics logging: reconfigure the things we can reconfigure.
     def test_reconfig_statistics_log_ok(self):

@@ -179,6 +179,49 @@ def simple_populate_check(self, uri, rows):
     simple_populate_check_cursor(self, cursor, rows)
     cursor.close()
 
+# population of a simple object, with a single index
+#    uri:       object
+#    config:    prefix of the session.create configuration string (defaults
+#               to string value formats)
+#    rows:      entries to insert
+def simple_index_populate(self, uri, config, rows):
+    self.pr('simple_index_populate: ' + uri + ' with ' + str(rows) + ' rows')
+    self.session.create(uri, 'value_format=S,columns=(key0,value0),' + config)
+    indxname = 'index:' + uri.split(":")[1]
+    self.session.create(indxname + ':index1', 'columns=(value0,key0)')
+    cursor = self.session.open_cursor(uri, None)
+    for i in range(1, rows + 1):
+        cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+    cursor.close()
+
+def simple_index_populate_check_cursor(self, cursor, rows):
+    i = 0
+    for key,val in cursor:
+        i += 1
+        self.assertEqual(key, key_populate(cursor, i))
+        if cursor.value_format == '8t' and val == 0:    # deleted
+            continue
+        self.assertEqual(val, value_populate(cursor, i))
+    self.assertEqual(i, rows)
+
+def simple_index_populate_check(self, uri, rows):
+    self.pr('simple_index_populate_check: ' + uri)
+
+    # Check values in the main table.
+    cursor = self.session.open_cursor(uri, None)
+    simple_index_populate_check_cursor(self, cursor, rows)
+
+    # Check values in the index.
+    indxname = 'index:' + uri.split(":")[1]
+    idxcursor = self.session.open_cursor(indxname + ':index1')
+    for i in range(1, rows + 1):
+        k = key_populate(cursor, i)
+        v = value_populate(cursor, i)
+        ik = (v,k)  # The index key is columns=(v,k).
+        self.assertEqual(v, idxcursor[ik])
+    idxcursor.close()
+    cursor.close()
+
 # Return the value stored in a complex object.
 def complex_value_populate(cursor, i):
     return [str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],

@@ -240,7 +240,6 @@ WT_CLASS(type, class, name)
 
 %typemap(freearg, numinputs=0) class ## _CLOSED *name {
 	closeHandler(jenv, savesess2, jcb2);
-	priv = NULL;
 }
 
 %enddef

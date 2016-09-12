@@ -33,13 +33,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * Truncate the file to an allocation-size multiple of blocks (bytes
 	 * trailing the last block must be garbage, by definition).
 	 */
-	if (block->size > allocsize) {
+	len = allocsize;
+	if (block->size > allocsize)
 		len = (block->size / allocsize) * allocsize;
-		if (len != block->size)
-			WT_RET(__wt_block_truncate(session, block, len));
-	} else
-		len = allocsize;
-	block->live.file_size = len;
+	WT_RET(__wt_block_truncate(session, block, len));
 
 	/*
 	 * The file's first allocation-sized block is description information,
@@ -101,7 +98,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FH *fh;
 	wt_off_t max, offset;
-	uint32_t allocsize, cksum, size;
+	uint32_t allocsize, checksum, size;
 	uint8_t *endp;
 
 	*eofp = 0;
@@ -128,7 +125,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		blk = WT_BLOCK_HEADER_REF(tmp->mem);
 		__wt_block_header_byteswap(blk);
 		size = blk->disk_size;
-		cksum = blk->cksum;
+		checksum = blk->checksum;
 
 		/*
 		 * Check the block size: if it's not insane, read the block.
@@ -138,13 +135,13 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		 */
 		if (!__wt_block_offset_invalid(block, offset, size) &&
 		    __wt_block_read_off(
-		    session, block, tmp, offset, size, cksum) == 0)
+		    session, block, tmp, offset, size, checksum) == 0)
 			break;
 
 		/* Free the allocation-size block. */
-		WT_ERR(__wt_verbose(session, WT_VERB_SALVAGE,
+		__wt_verbose(session, WT_VERB_SALVAGE,
 		    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
-		    allocsize, (uintmax_t)offset));
+		    allocsize, (uintmax_t)offset);
 		WT_ERR(__wt_block_off_free(
 		    session, block, offset, (wt_off_t)allocsize));
 		block->slvg_off += allocsize;
@@ -152,7 +149,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 
 	/* Re-create the address cookie that should reference this block. */
 	endp = addr;
-	WT_ERR(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
+	WT_ERR(__wt_block_addr_to_buffer(block, &endp, offset, size, checksum));
 	*addr_sizep = WT_PTRDIFF(endp, addr);
 
 done:
@@ -169,7 +166,7 @@ __wt_block_salvage_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block, uint8_t *addr, size_t addr_size, bool valid)
 {
 	wt_off_t offset;
-	uint32_t size, cksum;
+	uint32_t size, checksum;
 
 	WT_UNUSED(session);
 	WT_UNUSED(addr_size);
@@ -179,7 +176,8 @@ __wt_block_salvage_valid(WT_SESSION_IMPL *session,
 	 * If the upper layer took the block, move past it; if the upper layer
 	 * rejected the block, move past an allocation size chunk and free it.
 	 */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+	WT_RET(
+	    __wt_block_buffer_to_addr(block, addr, &offset, &size, &checksum));
 	if (valid)
 		block->slvg_off = offset + size;
 	else {

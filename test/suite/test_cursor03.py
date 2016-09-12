@@ -28,7 +28,7 @@
 
 import wiredtiger
 from test_cursor_tracker import TestCursorTracker
-from wtscenario import multiply_scenarios
+from wtscenario import make_scenarios
 
 # test_cursor03.py
 #    Cursor operations on tables of various sizes, with key/values of various
@@ -40,7 +40,7 @@ class test_cursor03(TestCursorTracker):
     key/value content and to track/verify content
     after inserts and removes.
     """
-    scenarios = multiply_scenarios('.', [
+    scenarios = make_scenarios([
             ('row', dict(tablekind='row', keysize=None, valsize=None, uri='table')),
             ('lsm-row', dict(tablekind='row', keysize=None, valsize=None, uri='lsm')),
             ('col', dict(tablekind='col', keysize=None, valsize=None, uri='table')),

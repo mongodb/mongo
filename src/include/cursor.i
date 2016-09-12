@@ -117,7 +117,7 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	 */
 	if (cbt->ref != NULL &&
 	    cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD)
-		__wt_page_evict_soon(cbt->ref->page);
+		__wt_page_evict_soon(session, cbt->ref);
 	cbt->page_deleted_count = 0;
 
 	/*

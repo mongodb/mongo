@@ -118,7 +118,13 @@ __handler_failure(WT_SESSION_IMPL *session,
 	    handler->handle_error(handler, wt_session, error, s) == 0)
 		return;
 
+	/*
+	 * In case there is a failure in the default error handler, make sure
+	 * we don't recursively try to report *that* error.
+	 */
+	session->event_handler = &__event_handler_default;
 	(void)__handle_error_default(NULL, wt_session, error, s);
+	session->event_handler = handler;
 }
 
 /*
@@ -149,6 +155,7 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
 int
 __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	WT_EVENT_HANDLER *handler;
 	WT_DECL_RET;
@@ -308,6 +315,7 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
  */
 void
 __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;
@@ -317,7 +325,7 @@ __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	(void)__wt_eventv(session, false, error, NULL, 0, fmt, ap);
+	WT_IGNORE_RET(__wt_eventv(session, false, error, NULL, 0, fmt, ap));
 	va_end(ap);
 }
 
@@ -327,6 +335,7 @@ __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
  */
 void
 __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	va_list ap;
@@ -336,7 +345,7 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	(void)__wt_eventv(session, false, 0, NULL, 0, fmt, ap);
+	WT_IGNORE_RET(__wt_eventv(session, false, 0, NULL, 0, fmt, ap));
 	va_end(ap);
 }
 
@@ -392,6 +401,7 @@ info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
  */
 int
 __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	WT_DECL_RET;
@@ -468,6 +478,7 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 void
 __wt_assert(WT_SESSION_IMPL *session,
     int error, const char *file_name, int line_number, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 5, 6)))
 #ifdef HAVE_DIAGNOSTIC
     WT_GCC_FUNC_ATTRIBUTE((noreturn))
@@ -476,8 +487,8 @@ __wt_assert(WT_SESSION_IMPL *session,
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)__wt_eventv(
-	    session, false, error, file_name, line_number, fmt, ap);
+	WT_IGNORE_RET(__wt_eventv(
+	    session, false, error, file_name, line_number, fmt, ap));
 	va_end(ap);
 
 #ifdef HAVE_DIAGNOSTIC
@@ -492,6 +503,7 @@ __wt_assert(WT_SESSION_IMPL *session,
  */
 int
 __wt_panic(WT_SESSION_IMPL *session)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	F_SET(S2C(session), WT_CONN_PANIC);
 	__wt_err(session, WT_PANIC, "the process must exit and restart");
@@ -515,6 +527,7 @@ __wt_panic(WT_SESSION_IMPL *session)
  */
 int
 __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	__wt_errx(session, "%s%s%s",
 	    name == NULL ? "" : name, name == NULL ? "" : ": ",
@@ -535,6 +548,7 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
  */
 int
 __wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	WT_RET_MSG(session, ENOTSUP, "unsupported object operation: %s", uri);
 }
@@ -546,6 +560,7 @@ __wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri)
  */
 int
 __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	if (WT_PREFIX_MATCH(uri, "backup:") ||
 	    WT_PREFIX_MATCH(uri, "colgroup:") ||

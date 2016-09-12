@@ -183,17 +183,17 @@ __wt_session_lock_dhandle(
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
-			WT_RET(__wt_readlock(session, dhandle->rwlock));
+			__wt_readlock(session, dhandle->rwlock);
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				*is_deadp = 1;
-				return (
-				    __wt_readunlock(session, dhandle->rwlock));
+				__wt_readunlock(session, dhandle->rwlock);
+				return (0);
 			}
 
 			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
 			if (is_open && !want_exclusive)
 				return (0);
-			WT_RET(__wt_readunlock(session, dhandle->rwlock));
+			__wt_readunlock(session, dhandle->rwlock);
 		} else
 			is_open = false;
 
@@ -206,8 +206,8 @@ __wt_session_lock_dhandle(
 		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				*is_deadp = 1;
-				return (
-				    __wt_writeunlock(session, dhandle->rwlock));
+				__wt_writeunlock(session, dhandle->rwlock);
+				return (0);
 			}
 
 			/*
@@ -217,8 +217,7 @@ __wt_session_lock_dhandle(
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !want_exclusive) {
 				lock_busy = false;
-				WT_RET(
-				    __wt_writeunlock(session, dhandle->rwlock));
+				__wt_writeunlock(session, dhandle->rwlock);
 				continue;
 			}
 
@@ -287,12 +286,11 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 			locked = false;
 	}
 	if (locked) {
-		if (write_locked)
+		if (write_locked) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-
-		WT_TRET(write_locked ?
-		    __wt_writeunlock(session, dhandle->rwlock):
-		    __wt_readunlock(session, dhandle->rwlock));
+			__wt_writeunlock(session, dhandle->rwlock);
+		} else
+			__wt_readunlock(session, dhandle->rwlock);
 	}
 
 	session->dhandle = NULL;
@@ -514,7 +512,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			dhandle->excl_session = NULL;
 			dhandle->excl_ref = 0;
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
+			__wt_writeunlock(session, dhandle->rwlock);
 
 			WT_WITH_SCHEMA_LOCK(session, ret,
 			    WT_WITH_HANDLE_LIST_LOCK(session,
@@ -536,7 +534,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		dhandle->excl_session = NULL;
 		dhandle->excl_ref = 0;
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+		__wt_writeunlock(session, dhandle->rwlock);
 		WT_RET(ret);
 	}
 

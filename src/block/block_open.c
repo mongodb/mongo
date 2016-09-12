@@ -150,7 +150,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	uint64_t bucket, hash;
 	uint32_t flags;
 
-	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
+	__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
 	conn = S2C(session);
 	*blockp = block = NULL;
@@ -248,14 +248,14 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	conn = S2C(session);
 
-	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK,
-	    "close: %s", block->name == NULL ? "" : block->name ));
+	__wt_verbose(session, WT_VERB_BLOCK,
+	    "close: %s", block->name == NULL ? "" : block->name );
 
 	__wt_spin_lock(session, &conn->block_lock);
 
 			/* Reference count is initialized to 1. */
 	if (block->ref == 0 || --block->ref == 0)
-		WT_TRET(__block_destroy(session, block));
+		ret = __block_destroy(session, block);
 
 	__wt_spin_unlock(session, &conn->block_lock);
 
@@ -290,11 +290,11 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BLOCK_MAJOR_VERSION;
 	desc->minorv = WT_BLOCK_MINOR_VERSION;
-	desc->cksum = 0;
+	desc->checksum = 0;
 	__wt_block_desc_byteswap(desc);
-	desc->cksum = __wt_cksum(desc, allocsize);
+	desc->checksum = __wt_checksum(desc, allocsize);
 #ifdef WORDS_BIGENDIAN
-	desc->cksum = __wt_bswap32(desc->cksum);
+	desc->checksum = __wt_bswap32(desc->checksum);
 #endif
 	ret = __wt_write(session, fh, (wt_off_t)0, (size_t)allocsize, desc);
 
@@ -312,7 +312,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	uint32_t cksum_calculate, cksum_tmp;
+	uint32_t checksum_calculate, checksum_tmp;
 
 	/* If in-memory, we don't read or write the descriptor structure. */
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
@@ -333,10 +333,10 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * a calculated checksum that should match the checksum in the header.
 	 */
 	desc = buf->mem;
-	cksum_tmp = desc->cksum;
-	desc->cksum = 0;
-	cksum_calculate = __wt_cksum(desc, block->allocsize);
-	desc->cksum = cksum_tmp;
+	checksum_tmp = desc->checksum;
+	desc->checksum = 0;
+	checksum_calculate = __wt_checksum(desc, block->allocsize);
+	desc->checksum = checksum_tmp;
 	__wt_block_desc_byteswap(desc);
 
 	/*
@@ -348,7 +348,8 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * may have entered the wrong file name, and is now frantically pounding
 	 * their interrupt key.
 	 */
-	if (desc->magic != WT_BLOCK_MAGIC || desc->cksum != cksum_calculate)
+	if (desc->magic != WT_BLOCK_MAGIC ||
+	    desc->checksum != checksum_calculate)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "%s does not appear to be a WiredTiger file", block->name);
 
@@ -362,13 +363,13 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
 		    desc->majorv, desc->minorv);
 
-	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
+	__wt_verbose(session, WT_VERB_BLOCK,
 	    "%s: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,
 	    block->name, desc->magic,
 	    desc->majorv, desc->minorv,
-	    desc->cksum));
+	    desc->checksum);
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);

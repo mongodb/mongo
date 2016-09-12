@@ -79,7 +79,6 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	WT_CONFIG_ITEM config_item =
 	    { config, len, 0, WT_CONFIG_ITEM_STRING };
 	WT_CONFIG_PARSER_IMPL *config_parser;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	*config_parserp = NULL;
@@ -94,14 +93,10 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	 * structure for iterations through the configuration string.
 	 */
 	memcpy(&config_parser->config_item, &config_item, sizeof(config_item));
-	WT_ERR(__wt_config_initn(session, &config_parser->config, config, len));
+	__wt_config_initn(session, &config_parser->config, config, len);
 
-	if (ret == 0)
-		*config_parserp = (WT_CONFIG_PARSER *)config_parser;
-	else
-err:		__wt_free(session, config_parser);
-
-	return (ret);
+	*config_parserp = (WT_CONFIG_PARSER *)config_parser;
+	return (0);
 }
 
 /*

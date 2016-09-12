@@ -73,6 +73,9 @@ struct __wt_cursor_backup {
 	WT_CURSOR_BACKUP_ENTRY *list;	/* List of files to be copied. */
 	size_t list_allocated;
 	size_t list_next;
+
+#define	WT_CURBACKUP_LOCKER	0x01	/* Hot-backup started */
+	uint8_t	flags;
 };
 #define	WT_CURSOR_BACKUP_ID(cursor)	(((WT_CURSOR_BACKUP *)cursor)->maxid)
 
@@ -413,18 +416,21 @@ struct __wt_cursor_log {
 	uint32_t	step_count;	/* Intra-record count */
 	uint32_t	rectype;	/* Record type */
 	uint64_t	txnid;		/* Record txnid */
-	uint32_t	flags;
+
+#define	WT_CURLOG_ARCHIVE_LOCK	0x01	/* Archive lock held */
+	uint8_t		flags;
 };
 
 struct __wt_cursor_metadata {
 	WT_CURSOR iface;
 
 	WT_CURSOR *file_cursor;		/* Queries of regular metadata */
+	WT_CURSOR *create_cursor;	/* Extra cursor for create option */
 
 #define	WT_MDC_CREATEONLY	0x01
 #define	WT_MDC_ONMETADATA	0x02
 #define	WT_MDC_POSITIONED	0x04
-	uint32_t flags;
+	uint8_t	flags;
 };
 
 struct __wt_join_stats_group {

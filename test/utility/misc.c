@@ -82,12 +82,22 @@ testutil_clean_work_dir(char *dir)
 	int ret;
 	char *buf;
 
+#ifdef _WIN32
 	/* Additional bytes for the Windows rd command. */
+	len = 2 * strlen(dir) + strlen(RM_COMMAND) +
+		strlen(DIR_EXISTS_COMMAND) + 4;
+	if ((buf = malloc(len)) == NULL)
+		testutil_die(ENOMEM, "Failed to allocate memory");
+
+	snprintf(buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir,
+		 RM_COMMAND, dir);
+#else
 	len = strlen(dir) + strlen(RM_COMMAND) + 1;
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
+#endif
 
 	if ((ret = system(buf)) != 0 && ret != ENOENT)
 		testutil_die(ret, "%s", buf);
@@ -136,6 +146,23 @@ testutil_cleanup(TEST_OPTS *opts)
 	free(opts->table_config);
 	free(opts->uri);
 	free(opts->home);
+}
+
+/*
+ * testutil_disable_long_tests --
+ *	Return if TESTUTIL_DISABLE_LONG_TESTS is set.
+ */
+bool
+testutil_disable_long_tests(void)
+{
+	const char *res;
+
+	if (__wt_getenv(NULL,
+	    "TESTUTIL_DISABLE_LONG_TESTS", &res) == WT_NOTFOUND)
+		return (false);
+
+	free((void *)res);
+	return (true);
 }
 
 /*
@@ -191,4 +218,19 @@ dstrdup(const void *str)
 	if ((p = strdup(str)) != NULL)
 		return (p);
 	testutil_die(errno, "strdup");
+}
+
+/*
+ * dstrndup --
+ *      Call emulating strndup, dying on failure. Don't use actual strndup here
+ *	as it is not supported within MSVC.
+ */
+void *
+dstrndup(const char *str, size_t len)
+{
+	char *p;
+
+	p = dcalloc(len + 1, sizeof(char));
+	memcpy(p, str, len);
+	return (p);
 }

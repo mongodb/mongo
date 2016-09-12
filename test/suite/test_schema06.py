@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_schema06.py
 #    Repeatedly create and drop indices
@@ -36,10 +37,10 @@ class test_schema06(wttest.WiredTigerTestCase):
     """
     nentries = 1000
 
-    scenarios = [
+    scenarios = make_scenarios([
         ('normal', { 'idx_config' : '' }),
         ('lsm', { 'idx_config' : ',type=lsm' }),
-    ]
+    ])
 
     def flip(self, inum, val):
         """

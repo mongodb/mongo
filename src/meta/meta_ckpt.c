@@ -139,7 +139,7 @@ __ckpt_named(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM k, v;
 
 	WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
-	WT_RET(__wt_config_subinit(session, &ckptconf, &v));
+	__wt_config_subinit(session, &ckptconf, &v);
 
 	/*
 	 * Take the first match: there should never be more than a single
@@ -164,7 +164,7 @@ __ckpt_last(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
 	int64_t found;
 
 	WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
-	WT_RET(__wt_config_subinit(session, &ckptconf, &v));
+	__wt_config_subinit(session, &ckptconf, &v);
 	for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
 		/* Ignore checkpoints before the ones we've already seen. */
 		WT_RET(__wt_config_subgets(session, &v, "order", &a));
@@ -196,7 +196,7 @@ __ckpt_last_name(
 	*namep = NULL;
 
 	WT_ERR(__wt_config_getones(session, config, "checkpoint", &v));
-	WT_ERR(__wt_config_subinit(session, &ckptconf, &v));
+	__wt_config_subinit(session, &ckptconf, &v);
 	for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
 		/*
 		 * We only care about unnamed checkpoints; applications may not
@@ -267,8 +267,8 @@ __wt_meta_ckptlist_get(
 
 	/* Load any existing checkpoints into the array. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	if (__wt_config_getones(session, config, "checkpoint", &v) == 0 &&
-	    __wt_config_subinit(session, &ckptconf, &v) == 0)
+	if (__wt_config_getones(session, config, "checkpoint", &v) == 0) {
+		__wt_config_subinit(session, &ckptconf, &v);
 		for (; __wt_config_next(&ckptconf, &k, &v) == 0; ++slot) {
 			WT_ERR(__wt_realloc_def(
 			    session, &allocated, slot + 1, &ckptbase));
@@ -276,6 +276,7 @@ __wt_meta_ckptlist_get(
 
 			WT_ERR(__ckpt_load(session, &k, &v, ckpt));
 		}
+	}
 
 	/*
 	 * Allocate an extra slot for a new value, plus a slot to mark the end.
