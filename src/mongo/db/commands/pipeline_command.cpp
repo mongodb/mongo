@@ -401,8 +401,7 @@ public:
             // recursively calling run, which will re-acquire locks on the underlying collection.
             // (The lock must be released because recursively acquiring locks on the database will
             // prohibit yielding.)
-            auto view = ctx.getView();
-            if (view && !startsWithCollStats()) {
+            if (ctx.getView() && !startsWithCollStats()) {
                 // Check that the default collation of 'view' is compatible with the
                 // operation's collation. The check is skipped if the 'request' has the empty
                 // collation, which means that no collation was specified.
@@ -412,7 +411,7 @@ public:
                     if (!operationCollator.isOK()) {
                         return appendCommandStatus(result, operationCollator.getStatus());
                     }
-                    if (!CollatorInterface::collatorsMatch(view->defaultCollator(),
+                    if (!CollatorInterface::collatorsMatch(ctx.getView()->defaultCollator(),
                                                            operationCollator.getValue().get())) {
                         return appendCommandStatus(result,
                                                    {ErrorCodes::OptionNotSupportedOnView,
@@ -421,7 +420,7 @@ public:
                 }
 
                 auto viewDefinition =
-                    ViewShardingCheck::getResolvedViewIfSharded(txn, ctx.getDb(), view);
+                    ViewShardingCheck::getResolvedViewIfSharded(txn, ctx.getDb(), ctx.getView());
                 if (!viewDefinition.isOK()) {
                     return appendCommandStatus(result, viewDefinition.getStatus());
                 }
@@ -436,7 +435,11 @@ public:
                     return appendCommandStatus(result, resolvedView.getStatus());
                 }
 
-                // With the view resolved, we can relinquish locks.
+                auto collationSpec = ctx.getView()->defaultCollator()
+                    ? ctx.getView()->defaultCollator()->getSpec().toBSON().getOwned()
+                    : CollationSpec::kSimpleSpec;
+
+                // With the view & collation resolved, we can relinquish locks.
                 ctx.releaseLocksForView();
 
                 // Parse the resolved view into a new aggregation request.
@@ -449,9 +452,7 @@ public:
                 if (!newRequest.isOK()) {
                     return appendCommandStatus(result, newRequest.getStatus());
                 }
-                newRequest.getValue().setCollation(view->defaultCollator()
-                                                       ? view->defaultCollator()->getSpec().toBSON()
-                                                       : CollationSpec::kSimpleSpec);
+                newRequest.getValue().setCollation(collationSpec);
 
                 bool status = runParsed(
                     txn, origNss, newRequest.getValue(), newCmd.getValue(), errmsg, result);
