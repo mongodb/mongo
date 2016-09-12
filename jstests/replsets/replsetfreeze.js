@@ -53,6 +53,10 @@ var r = replTest.initiate(config);
 var master = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
+assert.commandFailedWithCode(master.getDB("admin").runCommand({replSetFreeze: 30}),
+                             ErrorCodes.NotSecondary,
+                             'replSetFreeze should return error when run on primary');
+
 replTest.awaitSecondaryNodes();
 
 print("2: step down m1");

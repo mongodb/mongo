@@ -2194,6 +2194,16 @@ void ReplicationCoordinatorImpl::_processReplSetFreeze_finish(
         return;
     }
 
+    if (_topCoord->getRole() != TopologyCoordinator::Role::follower) {
+        *result = Status(ErrorCodes::NotSecondary,
+                         str::stream()
+                             << "cannot freeze node when primary or running for election. state: "
+                             << (_topCoord->getRole() == TopologyCoordinator::Role::leader
+                                     ? "Primary"
+                                     : "Running-Election"));
+        return;
+    }
+
     _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, response);
 
     if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
