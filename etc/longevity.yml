@@ -164,8 +164,6 @@ functions:
           # move additional file here
           cd reports
           cp ../infrastructure_provisioning.out.yml .
-          cp ../ips.sh .
-          cp ../ips.py .
           cp ../perf.json .
           cd ..
           $DSI_PATH/bin/retrieve-diag-data.sh

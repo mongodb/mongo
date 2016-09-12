@@ -132,7 +132,7 @@ functions:
           if [ $? -eq 0 ]; then
             echo "Resource provisioned/updated."
             # copy terraform information needed for teardown
-            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf,variables.tf} $HOME/infrastructure_provisioning/terraform/.
+            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf} $HOME/infrastructure_provisioning/terraform/.
             rsync -vr ../modules $HOME/infrastructure_provisioning/modules
             cd $HOME/infrastructure_provisioning/terraform
             ./terraform get
@@ -204,8 +204,6 @@ functions:
           cd reports
           # move additional file here
           cp ../infrastructure_provisioning.out.yml .
-          cp ../ips.sh .
-          cp ../ips.py .
           if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
           cp ../perf.json .
           cd ..
