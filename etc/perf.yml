@@ -148,14 +148,13 @@ functions:
         silent: true
         script: |
           set -o errexit
-          set -o verbose
           source ./venv/bin/activate
           REFTAGS="3.2.9-Baseline 3.3.10-Baseline 3.0.12-Baseline" # These are project specific
           # Project Opts are  project specific, but don't match expansion from elsewhere.
           # We could change dsi/analysis/master to dsi/analysis/perf in DSI to get dsi/analysis/${project}/perf_override.json
           # Note project_id performance doesn't match string perf used elsewhere for ${project}
           PROJECT_OPTS="--overrideFile ../dsi/analysis/master/perf_override.json --project_id performance"
-          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --task_name ${task_name} --variant {build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"

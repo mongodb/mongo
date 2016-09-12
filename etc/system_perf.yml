@@ -262,7 +262,6 @@ functions:
         silent: true
         script: |
           set -o errexit
-          set -o verbose
           TAGS="3.3.10-Baseline 3.2.9-Baseline 3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline"
           PROJECT="sys-perf"
           OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
