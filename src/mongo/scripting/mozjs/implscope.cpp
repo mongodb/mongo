@@ -687,7 +687,7 @@ bool MozJSImplScope::exec(StringData code,
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
-    co.setFile(name.c_str());
+    co.setFileAndLine(name.c_str(), 1);
     JS::RootedScript script(_context);
 
     bool success = JS::Compile(_context, co, code.rawData(), code.size(), &script);
@@ -847,12 +847,18 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
         if (JS_GetPendingException(_context, &excn) && excn.isObject()) {
             str::stream ss;
 
-            JS::RootedValue stack(_context);
+            auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
+            auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
+            auto lineNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
+            auto colNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
 
-            ObjectWrapper(_context, excn).getValue("stack", &stack);
-
-            ss << ValueWriter(_context, excn).toString() << " :\n"
-               << ValueWriter(_context, stack).toString();
+            if (fnameStr != "") {
+                ss << "[" << fnameStr << ":" << lineNum << ":" << colNum << "] ";
+            }
+            ss << ValueWriter(_context, excn).toString();
+            if (stackStr != "") {
+                ss << "\nStack trace:\n" << stackStr << "----------\n";
+            }
             _status = Status(ErrorCodes::JSInterpreterFailure, ss);
         } else {
             _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
