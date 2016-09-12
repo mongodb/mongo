@@ -920,7 +920,7 @@ var ReplSetTest = function(opts) {
                         missingOnSecondary.push(tojsononeline(primaryDoc));
                         primaryIndex--;
                     } else {
-                        if (bsonWoCompare(primaryDoc, secondaryDoc) !== 0) {
+                        if (!bsonBinaryEqual(primaryDoc, secondaryDoc)) {
                             print('Mismatching documents:');
                             print('    primary: ' + tojsononeline(primaryDoc));
                             print('    secondary: ' + tojsononeline(secondaryDoc));
@@ -1043,7 +1043,7 @@ var ReplSetTest = function(opts) {
                         secondaryCollInfo.forEach(secondaryInfo => {
                             primaryCollInfo.forEach(primaryInfo => {
                                 if (secondaryInfo.name === primaryInfo.name) {
-                                    if (bsonWoCompare(secondaryInfo, primaryInfo) !== 0) {
+                                    if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                         print(msgPrefix +
                                               ', the primary and secondary have different ' +
                                               'attributes for the collection ' + dbName + '.' +
