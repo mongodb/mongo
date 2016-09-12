@@ -247,7 +247,7 @@ private:
 };
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
-    constexpr std::size_t numOps = 10000;
+    constexpr std::size_t numOps = 1000;
     RemoteCommandResponse testResults[numOps];
     ErrorCodes::Error expectedResults[numOps];
     CountdownLatch cl(numOps);
@@ -264,7 +264,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
 
     for (std::size_t i = 0; i < numOps; ++i) {
         // stagger operations slightly to mitigate connection pool contention
-        sleepmillis(rng.nextInt32(10));
+        sleepmillis(rng.nextInt32(16));
 
         auto r = rng.nextCanonicalDouble();
 
