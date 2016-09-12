@@ -51,7 +51,7 @@ function checkDBHashes(rst, dbBlacklist = [], phase = 'after test hook') {
                 missingOnSecondary.push(tojsononeline(primaryDoc));
                 primaryIndex--;
             } else {
-                if (bsonWoCompare(primaryDoc, secondaryDoc) !== 0) {
+                if (!bsonBinaryEqual(primaryDoc, secondaryDoc)) {
                     print('Mismatching documents:');
                     print('    primary: ' + tojsononeline(primaryDoc));
                     print('    secondary: ' + tojsononeline(secondaryDoc));
@@ -156,7 +156,7 @@ function checkDBHashes(rst, dbBlacklist = [], phase = 'after test hook') {
                 secondaryCollInfo.forEach(secondaryInfo => {
                     primaryCollInfo.forEach(primaryInfo => {
                         if (secondaryInfo.name === primaryInfo.name) {
-                            if (bsonWoCompare(secondaryInfo, primaryInfo) !== 0) {
+                            if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                 print(phase +
                                       ', the primary and secondary have different attributes for ' +
                                       'the collection ' + dbName + '.' + secondaryInfo.name);
