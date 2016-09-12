@@ -2276,6 +2276,15 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* txn,
 
 Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
     LockGuard topoLock(_topoMutex);
+    if (_topCoord->getRole() != TopologyCoordinator::Role::follower) {
+        return Status(ErrorCodes::NotSecondary,
+                      str::stream()
+                          << "cannot freeze node when primary or running for election. state: "
+                          << (_topCoord->getRole() == TopologyCoordinator::Role::leader
+                                  ? "Primary"
+                                  : "Running-Election"));
+    }
+
     _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, resultObj);
 
     if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
