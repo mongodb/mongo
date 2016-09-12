@@ -61,14 +61,10 @@ StatusWith<MigrationSessionId> MigrationSessionId::extractFromBSON(const BSONObj
     Status status = bsonExtractStringField(obj, kFieldName, &sessionId);
     if (status.isOK()) {
         return MigrationSessionId(sessionId);
-    } else if (status == ErrorCodes::NoSuchKey) {
-        return MigrationSessionId();
     }
 
     return status;
 }
-
-MigrationSessionId::MigrationSessionId() = default;
 
 MigrationSessionId::MigrationSessionId(std::string sessionId) {
     invariant(!sessionId.empty());
@@ -76,24 +72,15 @@ MigrationSessionId::MigrationSessionId(std::string sessionId) {
 }
 
 bool MigrationSessionId::matches(const MigrationSessionId& other) const {
-    if (_sessionId && other._sessionId)
-        return *_sessionId == *other._sessionId;
-
-    return !_sessionId && !other._sessionId;
+    return _sessionId == other._sessionId;
 }
 
 void MigrationSessionId::append(BSONObjBuilder* builder) const {
-    if (_sessionId) {
-        builder->append(kFieldName, *_sessionId);
-    }
+    builder->append(kFieldName, _sessionId);
 }
 
 std::string MigrationSessionId::toString() const {
-    return (_sessionId ? *_sessionId : "");
-}
-
-bool MigrationSessionId::isEmpty() const {
-    return !_sessionId;
+    return _sessionId;
 }
 
 }  // namespace mongo

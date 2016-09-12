@@ -56,10 +56,11 @@ StatusWith<ScopedRegisterMigration> ActiveMigrationsRegistry::registerMigration(
         return {ScopedRegisterMigration(nullptr, false, _activeMoveChunkState->notification)};
     }
 
-    return {ErrorCodes::ConflictingOperationInProgress,
-            str::stream()
-                << "Unable start new migration because this shard is currently donating chunk for "
-                << _activeMoveChunkState->args.getNss().ns()};
+    return {
+        ErrorCodes::ConflictingOperationInProgress,
+        str::stream()
+            << "Unable to start new migration because this shard is currently donating chunk for "
+            << _activeMoveChunkState->args.getNss().ns()};
 }
 
 boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveMigrationNss() {

@@ -73,10 +73,11 @@ bool isInRange(const BSONObj& obj,
     return k.woCompare(min) >= 0 && k.woCompare(max) < 0;
 }
 
-BSONObj createRecvChunkCommitRequest(const NamespaceString& nss,
-                                     const MigrationSessionId& sessionId) {
+BSONObj createRequestWithSessionId(StringData commandName,
+                                   const NamespaceString& nss,
+                                   const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append(kRecvChunkCommit, nss.ns());
+    builder.append(commandName, nss.ns());
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -179,7 +180,13 @@ MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
 
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
     invariant(!txn->lockState()->isLocked());
-    auto scopedGuard = MakeGuard([&] { cancelClone(txn); });
+
+    // TODO (Kal): This can be changed to cancelClone after 3.4 is released. The reason to only do
+    // internal cleanup in 3.4 is for backwards compatibility with 3.2 nodes, which cannot
+    // differentiate between cancellations for different migration sessions. It is thus possible
+    // that a second migration from different donor, but the same recipient would certainly abort an
+    // already running migration.
+    auto scopedGuard = MakeGuard([&] { _cleanup(txn); });
 
     // Resolve the donor and recipient shards and their connection string
 
@@ -282,9 +289,17 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
             return {ErrorCodes::OperationFailed, "Data transfer error"};
         }
 
+        auto migrationSessionIdStatus = MigrationSessionId::extractFromBSON(res);
+        if (!migrationSessionIdStatus.isOK()) {
+            return {ErrorCodes::OperationIncomplete,
+                    str::stream() << "Unable to retrieve the id of the migration session due to "
+                                  << migrationSessionIdStatus.getStatus().toString()};
+        }
+
         if (res["ns"].str() != _args.getNss().ns() || res["from"].str() != _donorCS.toString() ||
             !res["min"].isABSONObj() || res["min"].Obj().woCompare(_args.getMinKey()) != 0 ||
-            !res["max"].isABSONObj() || res["max"].Obj().woCompare(_args.getMaxKey()) != 0) {
+            !res["max"].isABSONObj() || res["max"].Obj().woCompare(_args.getMaxKey()) != 0 ||
+            !_sessionId.matches(migrationSessionIdStatus.getValue())) {
             // This can happen when the destination aborted the migration and received another
             // recvChunk before this thread sees the transition to the abort state. This is
             // currently possible only if multiple migrations are happening at once. This is an
@@ -318,7 +333,8 @@ Status MigrationChunkClonerSourceLegacy::commitClone(OperationContext* txn) {
         invariant(!_cloneCompleted);
     }
 
-    auto responseStatus = _callRecipient(createRecvChunkCommitRequest(_args.getNss(), _sessionId));
+    auto responseStatus =
+        _callRecipient(createRequestWithSessionId(kRecvChunkCommit, _args.getNss(), _sessionId));
     if (responseStatus.isOK()) {
         _cleanup(txn);
         return Status::OK();
@@ -337,7 +353,7 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* txn) {
             return;
     }
 
-    _callRecipient(BSON(kRecvChunkAbort << _args.getNss().ns()));
+    _callRecipient(createRequestWithSessionId(kRecvChunkAbort, _args.getNss(), _sessionId));
     _cleanup(txn);
 }
 

@@ -98,7 +98,18 @@ public:
                  const OID& epoch,
                  const WriteConcernOptions& writeConcern);
 
-    void abort();
+    /**
+     * Idempotent method, which causes the current ongoing migration to abort only if it has the
+     * specified session id, otherwise returns false. If the migration is already aborted, does
+     * nothing.
+     */
+    bool abort(const MigrationSessionId& sessionId);
+
+    /**
+     * Same as 'abort' above, but unconditionally aborts the current migration without checking the
+     * session id. Only used for backwards compatibility.
+     */
+    void abortWithoutSessionIdCheck();
 
     bool startCommit(const MigrationSessionId& sessionId);
 
@@ -107,7 +118,6 @@ private:
      * Thread which drives the migration apply process on the recipient side.
      */
     void _migrateThread(std::string ns,
-                        MigrationSessionId sessionId,
                         BSONObj min,
                         BSONObj max,
                         BSONObj shardKeyPattern,
@@ -117,7 +127,6 @@ private:
 
     void _migrateDriver(OperationContext* txn,
                         const std::string& ns,
-                        const MigrationSessionId& sessionId,
                         const BSONObj& min,
                         const BSONObj& max,
                         const BSONObj& shardKeyPattern,

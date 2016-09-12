@@ -1,5 +1,7 @@
-// Test bulk inserts with sharding
+// Test bulk inserts running alonside the auto-balancer. Ensures that they do not conflict with each
+// other.
 (function() {
+    'use strict';
 
     // Setup randomized test
     var seed = new Date().getTime();
@@ -8,7 +10,7 @@
     Random.srand(seed);
     print("Seeded with " + seed);
 
-    var st = new ShardingTest({name: jsTestName(), shards: 4, chunkSize: 1});
+    var st = new ShardingTest({shards: 4, chunkSize: 1});
 
     // Setup sharded collection
     var mongos = st.s0;
@@ -19,8 +21,7 @@
     // Insert lots of bulk documents
     var numDocs = 1000000;
 
-    var bulkSize = Math.floor(Random.rand() * 1000) + 2;
-    bulkSize = 4000;
+    var bulkSize = 4000;
     var docSize = 128; /* bytes */
     print("\n\n\nBulk size is " + bulkSize);
 
@@ -63,19 +64,9 @@
     st.printShardingStatus();
 
     var count = coll.find().count();
-    var itcount = count;  // coll.find().itcount()
-
-    print("Inserted " + docsInserted + " count : " + count + " itcount : " + itcount);
-
-    st.startBalancer();
-
-    var count = coll.find().count();
     var itcount = coll.find().itcount();
-
     print("Inserted " + docsInserted + " count : " + count + " itcount : " + itcount);
-
-    // SERVER-3645
-    // assert.eq( docsInserted, count )
     assert.eq(docsInserted, itcount);
 
+    st.stop();
 })();
