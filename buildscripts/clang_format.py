@@ -648,7 +648,7 @@ def get_files_to_check_from_patch(patches):
     candidates = []
 
     # Get a list of candidate_files
-    check = re.compile(r"^diff --git a\/([a-z\/\.\-_0-9]+) b\/[a-z\/\.\-_0-9]+")
+    check = re.compile(r"^diff --git a\/([\w\/\.\-]+) b\/[\w\/\.\-]+")
 
     lines = []
     for patch in patches:
