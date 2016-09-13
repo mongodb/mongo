@@ -20,7 +20,6 @@ selector:
     - jstests/sharding/balance_tags2.js
     - jstests/sharding/basic_drop_coll.js
     - jstests/sharding/basic_merge.js
-    - jstests/sharding/bulk_shard_insert.js
     - jstests/sharding/count1.js
     - jstests/sharding/count2.js
     - jstests/sharding/cursor1.js

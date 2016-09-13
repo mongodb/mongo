@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -43,9 +45,9 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 MONGO_FP_DECLARE(migrationCommitError);
@@ -151,7 +153,7 @@ public:
                     << nss.ns()
                     << "'. The collection has been dropped since the migration began. Aborting "
                     << "migration commit for chunk ("
-                    << chunkRange.toString()
+                    << redact(chunkRange.toString())
                     << ").",
                 !findResponse.docs.empty());
 
