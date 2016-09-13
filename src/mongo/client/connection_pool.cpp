@@ -31,6 +31,7 @@
 #include "mongo/client/connection_pool.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -172,6 +173,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
         conn.reset(new DBClientConnection(
             false,  // auto reconnect
             0,      // socket timeout
+            {},     // MongoURI
             [this, target](const executor::RemoteCommandResponse& isMasterReply) {
                 return _hook->validateHost(target, isMasterReply);
             }));

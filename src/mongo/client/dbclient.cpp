@@ -897,8 +897,24 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     }
 
 #ifdef MONGO_CONFIG_SSL
-    int sslModeVal = sslGlobalParams.sslMode.load();
-    if (sslModeVal == SSLParams::SSLMode_preferSSL || sslModeVal == SSLParams::SSLMode_requireSSL) {
+    // Prefer to get SSL mode directly from our URI, but if it is not set, fall back to
+    // checking global SSL params. DBClientConnections create through the shell will have a
+    // meaningful URI set, but DBClientConnections created from within the server may not.
+    int sslMode;
+    auto options = _uri.getOptions();
+    auto iter = options.find("ssl");
+    if (iter != options.end()) {
+        if (iter->second == "true") {
+            sslMode = SSLParams::SSLMode_requireSSL;
+        } else {
+            sslMode = SSLParams::SSLMode_disabled;
+        }
+    } else {
+        sslMode = sslGlobalParams.sslMode.load();
+    }
+
+    if (sslMode == SSLParams::SSLMode_preferSSL || sslMode == SSLParams::SSLMode_requireSSL) {
+        uassert(40312, "SSL is not enabled; cannot create an SSL connection", sslManager());
         if (!_port->secure(sslManager(), serverAddress.host())) {
             return Status(ErrorCodes::SSLHandshakeFailed, "Failed to initialize SSL on connection");
         }
@@ -1296,12 +1312,14 @@ void DBClientWithCommands::createIndex(StringData ns, const IndexSpec& descripto
 
 DBClientConnection::DBClientConnection(bool _autoReconnect,
                                        double so_timeout,
+                                       MongoURI uri,
                                        const HandshakeValidationHook& hook)
     : _failed(false),
       autoReconnect(_autoReconnect),
       autoReconnectBackoff(1000, 2000),
       _so_timeout(so_timeout),
-      _hook(hook) {
+      _hook(hook),
+      _uri(std::move(uri)) {
     _numConnections.fetchAndAdd(1);
 }
 
