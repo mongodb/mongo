@@ -69,6 +69,9 @@ public:
     void enableJavaScriptProtection(bool value) override;
     bool isJavaScriptProtectionEnabled() const override;
 
+    int getJSHeapMBLimit() const override;
+    void setJSHeapMBLimit(int limit) override;
+
     void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
     void unregisterOperation(unsigned int opId);
 
