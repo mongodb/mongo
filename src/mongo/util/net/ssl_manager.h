@@ -188,8 +188,6 @@ public:
         SSL* ssl, const std::string& remoteHost) = 0;
 };
 
-bool SSLEnabled();
-
 // Access SSL functions through this instance.
 SSLManagerInterface* getSSLManager();
 

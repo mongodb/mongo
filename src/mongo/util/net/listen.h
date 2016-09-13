@@ -104,8 +104,7 @@ private:
     virtual void _accepted(const std::shared_ptr<Socket>& psocket, long long connectionId);
 
 #ifdef MONGO_CONFIG_SSL
-    bool _sslEnabled;
-    SSLManagerInterface* _sslManager;
+    SSLManagerInterface* _ssl;
 #endif
 
     void _logListen(int port, bool ssl);

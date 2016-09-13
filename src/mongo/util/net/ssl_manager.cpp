@@ -356,10 +356,6 @@ void setupFIPS() {
 }
 }  // namespace
 
-bool SSLEnabled() {
-    return getSSLGlobalParams().sslMode.load() != SSLParams::SSLModes::SSLMode_disabled;
-}
-
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
@@ -388,7 +384,10 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL"))(InitializerContext*) {
-    theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
+    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
+    if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
+        theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
+    }
     return Status::OK();
 }
 
@@ -398,7 +397,10 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
 }
 
 SSLManagerInterface* getSSLManager() {
-    return theSSLManager;
+    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
+    if (theSSLManager)
+        return theSSLManager;
+    return NULL;
 }
 
 std::string getCertificateSubjectName(X509* cert) {
@@ -429,7 +431,7 @@ SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock, const char* initial
     ssl = SSL_new(context);
 
     std::string sslErr =
-        SSLEnabled() ? getSSLManager()->getSSLErrorMessage(ERR_get_error()) : "SSL is not enabled";
+        NULL != getSSLManager() ? getSSLManager()->getSSLErrorMessage(ERR_get_error()) : "";
     massert(15861, "Error creating new SSL object " + sslErr, ssl);
 
     BIO_new_bio_pair(&internalBIO, BUFFER_SIZE, &networkBIO, BUFFER_SIZE);
@@ -505,11 +507,6 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
-    // If we are running with SSL disabled (sslMode != disabled) then do nothing.
-    if (params.sslMode.load() == SSLParams::SSLModes::SSLMode_disabled) {
-        return;
-    }
-
     if (!_initSynchronousSSLContext(&_clientContext, params, ConnectionDirection::kOutgoing)) {
         uasserted(16768, "ssl initialization problem");
     }
@@ -536,7 +533,6 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
             uasserted(16562, "ssl initialization problem");
         }
 
-        log() << "about to read keyfile from " << params.sslPEMKeyFile;
         if (!_parseAndValidateCertificate(params.sslPEMKeyFile,
                                           &_sslConfiguration.serverSubjectName,
                                           &_sslConfiguration.serverCertificateExpirationDate)) {

@@ -145,8 +145,7 @@ Listener::Listener(const string& name,
       _ctx(ctx),
       _setAsServiceCtxDecoration(setAsServiceCtxDecoration) {
 #ifdef MONGO_CONFIG_SSL
-    _sslEnabled = SSLEnabled();
-    _sslManager = getSSLManager();
+    _ssl = getSSLManager();
 #endif
     if (setAsServiceCtxDecoration) {
         auto& listener = getListener(ctx);
@@ -267,7 +266,7 @@ void Listener::initAndListen() {
     }
 
 #ifdef MONGO_CONFIG_SSL
-    _logListen(_port, _sslEnabled);
+    _logListen(_port, _ssl);
 #else
     _logListen(_port, false);
 #endif
@@ -359,8 +358,8 @@ void Listener::initAndListen() {
 
             std::shared_ptr<Socket> pnewSock(new Socket(s, from));
 #ifdef MONGO_CONFIG_SSL
-            if (_sslEnabled) {
-                pnewSock->secureAccepted(_sslManager);
+            if (_ssl) {
+                pnewSock->secureAccepted(_ssl);
             }
 #endif
             _accepted(pnewSock, myConnectionNumber);
@@ -433,7 +432,7 @@ void Listener::initAndListen() {
     }
 
 #ifdef MONGO_CONFIG_SSL
-    _logListen(_port, _sslEnabled);
+    _logListen(_port, _ssl);
 #else
     _logListen(_port, false);
 #endif
@@ -569,8 +568,8 @@ void Listener::initAndListen() {
 
         std::shared_ptr<Socket> pnewSock(new Socket(s, from));
 #ifdef MONGO_CONFIG_SSL
-        if (_sslEnabled) {
-            pnewSock->secureAccepted(_sslManager);
+        if (_ssl) {
+            pnewSock->secureAccepted(_ssl);
         }
 #endif
         _accepted(pnewSock, myConnectionNumber);
@@ -578,9 +577,9 @@ void Listener::initAndListen() {
 }
 #endif
 
-void Listener::_logListen(int port, bool sslEnabled) {
+void Listener::_logListen(int port, bool ssl) {
     log() << _name << (_name.size() ? " " : "") << "waiting for connections on port " << port
-          << (sslEnabled ? " ssl" : "");
+          << (ssl ? " ssl" : "");
 }
 
 void Listener::waitUntilListening() const {

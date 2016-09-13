@@ -33,7 +33,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/index_spec.h"
-#include "mongo/client/mongo_uri.h"
 #include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
@@ -980,7 +979,6 @@ public:
      */
     DBClientConnection(bool _autoReconnect = false,
                        double so_timeout = 0,
-                       MongoURI uri = {},
                        const HandshakeValidationHook& hook = HandshakeValidationHook());
 
     virtual ~DBClientConnection() {
@@ -1190,8 +1188,6 @@ private:
     HandshakeValidationHook _hook;
 
     MessageCompressorManager _compressorManager;
-
-    MongoURI _uri;
 };
 
 BSONElement getErrField(const BSONObj& result);

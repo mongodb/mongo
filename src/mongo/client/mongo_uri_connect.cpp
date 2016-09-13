@@ -177,7 +177,7 @@ DBClientBase* MongoURI::connect(StringData applicationName, std::string& errmsg)
         }
     }
 
-    auto ret = _connectString.connect(applicationName, errmsg, socketTimeout, this);
+    auto ret = _connectString.connect(applicationName, errmsg, socketTimeout);
     if (!ret) {
         return ret;
     }

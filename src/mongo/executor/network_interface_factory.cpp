@@ -60,8 +60,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
 
 #ifdef MONGO_CONFIG_SSL
-    if (SSLEnabled()) {
-        options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(getSSLManager());
+    if (SSLManagerInterface* manager = getSSLManager()) {
+        options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
     }
 #endif
 

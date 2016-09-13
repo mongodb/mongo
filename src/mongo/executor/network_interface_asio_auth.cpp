@@ -179,7 +179,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    if (SSLEnabled()) {
+    if (getSSLManager()) {
         clientName = getSSLManager()->getSSLConfiguration().clientSubjectName;
     }
 #endif

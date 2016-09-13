@@ -120,10 +120,6 @@ int HttpClient::_go(const char* command, string url, const char* body, Result* r
 
     if (ssl) {
 #ifdef MONGO_CONFIG_SSL
-        if (!SSLEnabled()) {
-            uasserted(40308, "no ssl support");
-        }
-
         // pointer to global singleton instance
         SSLManagerInterface* mgr = getSSLManager();
 

@@ -297,7 +297,7 @@ public:
 
     BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
         BSONObj result;
-        if (SSLEnabled()) {
+        if (getSSLManager()) {
             result = getSSLManager()->getSSLConfiguration().getServerStatusBSON();
         }
 

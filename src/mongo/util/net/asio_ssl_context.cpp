@@ -42,14 +42,15 @@
 namespace mongo {
 
 ASIOSSLContext::ASIOSSLContext()
-    : _context(stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23)) {}
+    : _context(stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23)),
+      _mode(static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load())) {}
 
 ASIOSSLContext::ASIOSSLContext(ASIOSSLContext&& other) = default;
 
 ASIOSSLContext& ASIOSSLContext::operator=(ASIOSSLContext&& other) = default;
 
 void ASIOSSLContext::init(SSLManagerInterface::ConnectionDirection direction) {
-    if (SSLEnabled()) {
+    if (_mode != SSLParams::SSLMode_disabled) {
         uassertStatusOK(getSSLManager()->initSSLContext(
             _context->native_handle(), getSSLGlobalParams(), direction));
     }
@@ -57,6 +58,10 @@ void ASIOSSLContext::init(SSLManagerInterface::ConnectionDirection direction) {
 
 asio::ssl::context& ASIOSSLContext::getContext() {
     return *_context;
+}
+
+SSLParams::SSLModes ASIOSSLContext::sslMode() const {
+    return _mode;
 }
 
 }  // namespace mongo

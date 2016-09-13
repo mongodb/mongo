@@ -66,8 +66,14 @@ public:
      */
     asio::ssl::context& getContext();
 
+    /**
+     * The SSL operation mode. See enum SSLModes in ssl_options.h
+     */
+    SSLParams::SSLModes sslMode() const;
+
 private:
     std::unique_ptr<asio::ssl::context> _context;
+    SSLParams::SSLModes _mode;
 };
 }  // namespace mongo
 #else

@@ -654,7 +654,7 @@ public:
         }
 
 #ifdef MONGO_CONFIG_SSL
-        if (args.userName.getDB() == "$external" && SSLEnabled() &&
+        if (args.userName.getDB() == "$external" && getSSLManager() &&
             getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::BadValue,
