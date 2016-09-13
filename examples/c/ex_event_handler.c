@@ -131,7 +131,7 @@ main(void)
 	 */
 	if (getenv("WIREDTIGER_HOME") == NULL) {
 		home = "WT_HOME";
-		(void)system("rm -rf WT_HOME && mkdir WT_HOME");
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
 	} else
 		home = NULL;
 
