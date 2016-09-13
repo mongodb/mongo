@@ -261,8 +261,14 @@ public:
     // replset.
     virtual void fillIsMasterForReplSet(IsMasterResponse* response) = 0;
 
-    // produce a reply to a freeze request
-    virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response) = 0;
+    enum class PrepareFreezeResponseResult { kNoAction, kElectSelf };
+
+    /**
+     * Produce a reply to a freeze request. Returns a PostMemberStateUpdateAction on success that
+     * may trigger state changes in the caller.
+     */
+    virtual StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(
+        Date_t now, int secs, BSONObjBuilder* response) = 0;
 
     ////////////////////////////////////////////////////////////
     //
@@ -512,6 +518,7 @@ private:
 //
 
 std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role);
+std::ostream& operator<<(std::ostream& os, TopologyCoordinator::PrepareFreezeResponseResult result);
 
 }  // namespace repl
 }  // namespace mongo

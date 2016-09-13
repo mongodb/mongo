@@ -2276,25 +2276,20 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* txn,
 
 Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
     LockGuard topoLock(_topoMutex);
-    if (_topCoord->getRole() != TopologyCoordinator::Role::follower) {
-        return Status(ErrorCodes::NotSecondary,
-                      str::stream()
-                          << "cannot freeze node when primary or running for election. state: "
-                          << (_topCoord->getRole() == TopologyCoordinator::Role::leader
-                                  ? "Primary"
-                                  : "Running-Election"));
+
+    auto result = _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, resultObj);
+    if (!result.isOK()) {
+        return result.getStatus();
     }
 
-    _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, resultObj);
-
-    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+    if (TopologyCoordinator::PrepareFreezeResponseResult::kElectSelf == result.getValue()) {
         // If we just unfroze and ended our stepdown period and we are a one node replica set,
         // the topology coordinator will have gone into the candidate role to signal that we
         // need to elect ourself.
         _performPostMemberStateUpdateAction(kActionWinElection);
     }
+
     return Status::OK();
-    ;
 }
 
 Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,

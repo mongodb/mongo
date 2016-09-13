@@ -1769,9 +1769,16 @@ void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response)
     }
 }
 
-void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
-                                                    int secs,
-                                                    BSONObjBuilder* response) {
+StatusWith<TopologyCoordinatorImpl::PrepareFreezeResponseResult>
+TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response) {
+    if (_role != TopologyCoordinator::Role::follower) {
+        std::string msg = str::stream()
+            << "cannot freeze node when primary or running for election. state: "
+            << (_role == TopologyCoordinator::Role::leader ? "Primary" : "Running-Election");
+        log() << msg;
+        return Status(ErrorCodes::NotSecondary, msg);
+    }
+
     if (secs == 0) {
         _stepDownUntil = now;
         log() << "'unfreezing'";
@@ -1784,18 +1791,17 @@ void TopologyCoordinatorImpl::prepareFreezeResponse(Date_t now,
             // we must transition to candidate now that our stepdown period
             // is no longer active, in leiu of heartbeats.
             _role = Role::candidate;
+            return PrepareFreezeResponseResult::kElectSelf;
         }
     } else {
         if (secs == 1)
             response->append("warning", "you really want to freeze for only 1 second?");
 
-        if (!_iAmPrimary()) {
-            _stepDownUntil = std::max(_stepDownUntil, now + Seconds(secs));
-            log() << "'freezing' for " << secs << " seconds";
-        } else {
-            log() << "received freeze command but we are primary";
-        }
+        _stepDownUntil = std::max(_stepDownUntil, now + Seconds(secs));
+        log() << "'freezing' for " << secs << " seconds";
     }
+
+    return PrepareFreezeResponseResult::kNoAction;
 }
 
 bool TopologyCoordinatorImpl::becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now) {

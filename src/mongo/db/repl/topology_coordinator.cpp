@@ -68,5 +68,16 @@ std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role) {
     return os << role.toString();
 }
 
+std::ostream& operator<<(std::ostream& os,
+                         TopologyCoordinator::PrepareFreezeResponseResult result) {
+    switch (result) {
+        case TopologyCoordinator::PrepareFreezeResponseResult::kNoAction:
+            return os << "no action";
+        case TopologyCoordinator::PrepareFreezeResponseResult::kElectSelf:
+            return os << "elect self";
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo
