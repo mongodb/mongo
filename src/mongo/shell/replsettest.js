@@ -85,6 +85,8 @@ var ReplSetTest = function(opts) {
     var _unbridgedPorts;
     var _unbridgedNodes;
 
+    this.kDefaultTimeoutMs = 5 * 60 * 1000;
+
     // Publicly exposed variables
 
     /**
@@ -154,7 +156,7 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        timeout = timeout || 30000;
+        timeout = timeout || self.kDefaultTimeoutMS;
 
         if (!node.getDB) {
             node = self.nodes[node];
@@ -471,7 +473,7 @@ var ReplSetTest = function(opts) {
      * Blocks until the secondary nodes have completed recovery and their roles are known.
      */
     this.awaitSecondaryNodes = function(timeout) {
-        timeout = timeout || 60000;
+        timeout = timeout || self.kDefaultTimeoutMS;
 
         assert.soonNoExcept(function() {
             // Reload who the current slaves are
@@ -495,7 +497,7 @@ var ReplSetTest = function(opts) {
      * Blocks until all nodes agree on who the primary is.
      */
     this.awaitNodesAgreeOnPrimary = function(timeout) {
-        timeout = timeout || 60000;
+        timeout = timeout || self.kDefaultTimeoutMS;
 
         assert.soonNoExcept(function() {
             var primary = -1;
@@ -535,7 +537,7 @@ var ReplSetTest = function(opts) {
      * if primary is available will return a connection to it. Otherwise throws an exception.
      */
     this.getPrimary = function(timeout) {
-        timeout = timeout || 60000;
+        timeout = timeout || self.kDefaultTimeoutMS;
         var primary = null;
 
         assert.soonNoExcept(function() {
@@ -548,7 +550,7 @@ var ReplSetTest = function(opts) {
 
     this.awaitNoPrimary = function(msg, timeout) {
         msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
-        timeout = timeout || 30000;
+        timeout = timeout || self.kDefaultTimeoutMS;
 
         assert.soonNoExcept(function() {
             return _callIsMaster() == false;
@@ -624,7 +626,7 @@ var ReplSetTest = function(opts) {
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
         var cmdKey = initCmd || 'replSetInitiate';
-        timeout = timeout || 120000;
+        timeout = timeout || self.kDefaultTimeoutMS;
 
         this._setDefaultConfigOptions(config);
 
@@ -713,7 +715,7 @@ var ReplSetTest = function(opts) {
 
     // Wait until the optime of the specified type reaches the primary's last applied optime.
     this.awaitReplication = function(timeout, secondaryOpTimeType) {
-        timeout = timeout || 30000;
+        timeout = timeout || self.kDefaultTimeoutMS;
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
         var masterLatestOpTime;
@@ -730,7 +732,7 @@ var ReplSetTest = function(opts) {
                 }
 
                 return true;
-            }, "awaiting oplog query", 30000);
+            }, "awaiting oplog query", timeout);
         };
 
         awaitLastOpTimeWrittenFn();
@@ -1128,7 +1130,8 @@ var ReplSetTest = function(opts) {
             dummyColl.drop();
             assert.commandWorked(dummyColl.createIndex({x: 1}));
             assert.writeOK(dummyColl.insert(
-                {x: 1}, {writeConcern: {w: rst.nodeList().length, wtimeout: 5 * 60 * 1000}}));
+                {x: 1},
+                {writeConcern: {w: rst.nodeList().length, wtimeout: self.kDefaultTimeoutMS}}));
             assert.commandWorked(dummyDB.dropDatabase());
 
             var activeException = false;
@@ -1627,7 +1630,7 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
         return;
     }
 
-    timeout = timeout || 60000;
+    timeout = timeout || 5 * 60 * 1000;
 
     if (hostOk == undefined)
         hostOk = {ok: true};
