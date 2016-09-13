@@ -1,6 +1,10 @@
 // These tests validate that a migration with session IDs between two shards is protected against
 // disruptive migration commands from a third shard. It tests several scenarios. For more
 // information on migration session IDs see SERVER-20290.
+//
+// These tests are all in a single JS file so we don't have to start up a cluster several times.
+// Be careful to maintain each sub-test's operational independence from the others. E.g., 3rd test
+// doesn't unlock a collection distlock promptly, so don't use that collection after the 3rd test.
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
@@ -14,6 +18,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Shard0:
     //      coll1:     [-inf, 10) [10, +inf)
     //      coll2:     [-inf, 10) [10, +inf)
+    //      coll3:     [-inf, 10) [10, +inf)
     // Shard1:
     // Shard2:
 
@@ -23,10 +28,12 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
         coll1 = mongos.getCollection(ns1), ns2 = dbName + ".baz", coll2 = mongos.getCollection(ns2),
-        shard0 = st.shard0, shard1 = st.shard1, shard2 = st.shard2,
-        shard0Coll1 = shard0.getCollection(ns1), shard0Coll2 = shard0.getCollection(ns2),
+        ns3 = dbName + ".bar", coll3 = mongos.getCollection(ns3), shard0 = st.shard0,
+        shard1 = st.shard1, shard2 = st.shard2, shard0Coll1 = shard0.getCollection(ns1),
+        shard0Coll2 = shard0.getCollection(ns2), shard0Coll3 = shard0.getCollection(ns3),
         shard1Coll1 = shard1.getCollection(ns1), shard1Coll2 = shard1.getCollection(ns2),
-        shard2Coll1 = shard2.getCollection(ns1), shard2Coll2 = shard2.getCollection(ns2);
+        shard1Coll3 = shard1.getCollection(ns3), shard2Coll1 = shard2.getCollection(ns1),
+        shard2Coll2 = shard2.getCollection(ns2), shard2Coll3 = shard2.getCollection(ns3);
 
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
@@ -44,6 +51,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.writeOK(coll2.insert({a: 10}));
     assert.eq(2, shard0Coll2.count());
     assert.eq(2, coll2.count());
+
+    assert.commandWorked(admin.runCommand({shardCollection: ns3, key: {a: 1}}));
+    assert.commandWorked(admin.runCommand({split: ns3, middle: {a: 10}}));
+    assert.writeOK(coll3.insert({a: 0}));
+    assert.writeOK(coll3.insert({a: 10}));
+    assert.eq(2, shard0Coll3.count());
+    assert.eq(2, coll3.count());
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //      1. When a migration is in process from shard0 to shard1 on coll1, shard2 is unable to
@@ -161,6 +175,9 @@ load('./jstests/libs/chunk_manipulation_util.js');
     //      3. If a donor aborts a migration to a recipient, the recipient does not realize the
     //         migration has been aborted, and the donor moves on to a new migration, the original
     //         recipient will then fail to clone documents from the donor.
+    //
+    //      Note: don't use coll1 after this test -- the distlock isn't released promptly when
+    //      interrupted.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Shard0:
@@ -229,19 +246,25 @@ load('./jstests/libs/chunk_manipulation_util.js');
     //      4. If a donor aborts a migration to a recipient, the recipient does not realize the
     //         migration has been aborted, and the donor moves on to a new migration, the original
     //         recipient will then fail to retrieve transferMods from the donor's xfermods log.
+    //
+    //      Note: don't use coll3 after this test -- the distlock isn't released promptly when
+    //      interrupted.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+    // Distributed Lock for coll1 is most likely still locked because of the previous test's
+    // interrupt (killOp) of the source shard's migration thread. Don't use coll1!
+    //
     // Shard0:
-    //      coll1:     [-inf, 10) [10, +inf)
     //      coll2:     [-inf, 10) [10, +inf)
+    //      coll3:     [-inf, 10) [10, +inf)
     // Shard1:
     // Shard2:
 
-    // Start coll1 migration to shard1: pause recipient after cloning, donor before interrupt check
+    // Start coll3 migration to shard1: pause recipient after cloning, donor before interrupt check
     pauseMigrateAtStep(shard1, migrateStepNames.cloned);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+        staticMongod, st.s0.host, {a: 0}, null, coll3.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.cloned);
 
     // Abort migration on donor side, recipient is unaware
@@ -273,11 +296,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(4, coll2.count(), "Failed to insert documents into coll2");
     assert.eq(4, shard0Coll2.count());
 
-    jsTest.log('Releasing coll1 migration recipient, whose transferMods command should fail....');
+    jsTest.log('Releasing coll3 migration recipient, whose transferMods command should fail....');
     unpauseMigrateAtStep(shard1, migrateStepNames.cloned);
-    assert.eq(2, shard0Coll1.count(), "donor shard0 completed a migration that it aborted");
+    assert.eq(2, shard0Coll3.count(), "donor shard0 completed a migration that it aborted");
     assert.eq(1,
-              shard1Coll1.count(),
+              shard1Coll3.count(),
               "shard1 accessed the xfermods log despite " + "donor migration abortion");
 
     jsTest.log('Finishing coll2 migration, which should succeed....');
