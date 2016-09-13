@@ -129,8 +129,8 @@
 
     tests.forEach(function(test) {
         // setup
-        testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
-        testDB.adminCommand({split: 'test.user', middle: {x: 0}});
+        assert.commandWorked(testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
+        assert.commandWorked(testDB.adminCommand({split: 'test.user', middle: {x: 0}}));
 
         for (var x = -3; x < 3; x++) {
             testDB.user.insert({x: x});
