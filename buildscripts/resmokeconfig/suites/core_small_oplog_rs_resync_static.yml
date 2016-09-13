@@ -20,7 +20,7 @@ executor:
         readMode: commands
     hooks:
     - class: IntermediateInitialSync
-      useResync: True
+      use_resync: True
       n: *run_hook_interval
     - class: CleanEveryN
       n: *run_hook_interval
