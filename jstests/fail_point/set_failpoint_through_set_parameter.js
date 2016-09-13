@@ -21,7 +21,7 @@
     // In order to be able connect to a mongos that starts up successfully, start a config replica
     // set so that we can provide a valid config connection string to the mongos.
     var configRS = new ReplSetTest({nodes: 3});
-    configRS.startSet({'configsvr': ''});
+    configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
     configRS.initiate();
 
     // Setting a failpoint via --setParameter fails if enableTestCommands is not on.
