@@ -686,7 +686,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceGroup> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
-        std::vector<AccumulationStatement> accumulationStatement,
+        std::vector<AccumulationStatement> accumulationStatements,
         Variables::Id numVariables,
         size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
@@ -2154,20 +2154,37 @@ public:
         return this;
     }
 
-    static const uint64_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
+    static const uint64_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
 
+    /**
+     * Convenience method to create a $bucketAuto stage.
+     *
+     * If 'accumulationStatements' is the empty vector, it will be filled in with the statement
+     * 'count: {$sum: 1}'.
+     */
     static boost::intrusive_ptr<DocumentSourceBucketAuto> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        int numBuckets = 0,
-        uint64_t maxMemoryUsageBytes = kMaxMemoryUsageBytes);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<Expression>& groupByExpression,
+        Variables::Id numVariables,
+        int numBuckets,
+        std::vector<AccumulationStatement> accumulationStatements = {},
+        const boost::intrusive_ptr<GranularityRounder>& granularityRounder = nullptr,
+        uint64_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
+    /**
+     * Parses a $bucketAuto stage from the user-supplied BSON.
+     */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    explicit DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                      int numBuckets,
-                                      uint64_t maxMemoryUsageBytes);
+    DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                             const boost::intrusive_ptr<Expression>& groupByExpression,
+                             Variables::Id numVariables,
+                             int numBuckets,
+                             std::vector<AccumulationStatement> accumulationStatements,
+                             const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
+                             uint64_t maxMemoryUsageBytes);
 
     // struct for holding information about a bucket.
     struct Bucket {
@@ -2196,11 +2213,6 @@ private:
     void populateBuckets();
 
     /**
-     * Add an accumulator, which will become a field in each output bucket.
-     */
-    void addAccumulator(AccumulationStatement accumulationStatement);
-
-    /**
      * Adds the document in 'entry' to 'bucket' by updating the accumulators in 'bucket'.
      */
     void addDocumentToBucket(const std::pair<Value, Document>& entry, Bucket& bucket);
@@ -2215,10 +2227,6 @@ private:
      * is called.
      */
     Document makeDocument(const Bucket& bucket);
-
-    void parseGroupByExpression(const BSONElement& groupByField, const VariablesParseState& vps);
-
-    void setGranularity(std::string granularity);
 
     std::unique_ptr<Sorter<Value, Document>> _sorter;
     std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
