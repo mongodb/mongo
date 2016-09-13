@@ -33,6 +33,7 @@ __ovfl_read(WT_SESSION_IMPL *session,
 	store->data = WT_PAGE_HEADER_BYTE(btree, dsk);
 	store->size = dsk->u.datalen;
 
+	WT_STAT_FAST_CONN_INCR(session, cache_read_overflow);
 	WT_STAT_FAST_DATA_INCR(session, cache_read_overflow);
 
 	return (0);
@@ -66,11 +67,11 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 	 * Acquire the overflow lock, and retest the on-page cell's value inside
 	 * the lock.
 	 */
-	WT_RET(__wt_readlock(session, S2BT(session)->ovfl_lock));
+	__wt_readlock(session, S2BT(session)->ovfl_lock);
 	ret = __wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM ?
 	    __wt_ovfl_txnc_search(page, unpack->data, unpack->size, store) :
 	    __ovfl_read(session, unpack->data, unpack->size, store);
-	WT_TRET(__wt_readunlock(session, S2BT(session)->ovfl_lock));
+	__wt_readunlock(session, S2BT(session)->ovfl_lock);
 
 	return (ret);
 }
@@ -208,6 +209,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	 */
 	if (!visible) {
 		WT_RET(__ovfl_cache(session, page, vpack));
+		WT_STAT_FAST_CONN_INCR(session, cache_overflow_value);
 		WT_STAT_FAST_DATA_INCR(session, cache_overflow_value);
 	}
 
@@ -229,7 +231,6 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_DECL_RET;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -248,7 +249,7 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	 * Acquire the overflow lock to avoid racing with a thread reading the
 	 * backing overflow blocks.
 	 */
-	WT_RET(__wt_writelock(session, btree->ovfl_lock));
+	__wt_writelock(session, btree->ovfl_lock);
 
 	switch (unpack->raw) {
 	case WT_CELL_KEY_OVFL:
@@ -262,10 +263,8 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_TRET(__wt_writeunlock(session, btree->ovfl_lock));
+	__wt_writeunlock(session, btree->ovfl_lock);
 
 	/* Free the backing disk blocks. */
-	WT_TRET(bm->free(bm, session, unpack->data, unpack->size));
-
-	return (ret);
+	return (bm->free(bm, session, unpack->data, unpack->size));
 }

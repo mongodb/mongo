@@ -15,6 +15,8 @@ echo 'dist/s_all run started...'
 
 force=
 reconf=0
+errmode=0
+errfound=0
 while :
 	do case "$1" in
 	-A)	# Reconfigure the library build.
@@ -22,6 +24,9 @@ while :
 		shift;;
 	-f)	# Force versions to be updated
 		force="-f"
+		shift;;
+	-E)	# Return an error code on failure
+		errmode=1
 		shift;;
 	*)
 		break;;
@@ -48,6 +53,14 @@ errchk()
 	echo "#######################"
 
 	rm -f $2
+
+	# Some tests shouldn't return an error, we exclude them here.
+	case "$1" in
+	*s_export*)
+		break;;
+	*)
+		errfound=1;;
+	esac
 }
 
 run()
@@ -108,3 +121,6 @@ for f in `find . -name ${t_pfx}\*`; do
 done
 
 echo 'dist/s_all run finished'
+if test $errmode -ne 0; then
+	exit $errfound;
+fi

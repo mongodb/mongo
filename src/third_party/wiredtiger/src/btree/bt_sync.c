@@ -84,7 +84,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 					WT_ERR(__wt_txn_get_snapshot(session));
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
-				WT_ERR(__wt_reconcile(session, walk, NULL, 0));
+				WT_ERR(__wt_reconcile(
+				    session, walk, NULL, WT_CHECKPOINTING));
 			}
 		}
 		break;
@@ -92,7 +93,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		/*
 		 * If we are flushing a file at read-committed isolation, which
 		 * is of particular interest for flushing the metadata to make
-		 * schema-changing operation durable, get a transactional
+		 * a schema-changing operation durable, get a transactional
 		 * snapshot now.
 		 *
 		 * All changes committed up to this point should be included.
@@ -126,7 +127,17 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 */
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
 
-		WT_ERR(__wt_evict_file_exclusive_on(session));
+		/*
+		 * Sync for checkpoint allows splits to happen while the queue
+		 * is being drained, but not reconciliation. We need to do this,
+		 * since draining the queue can take long enough for hot pages
+		 * to grow significantly larger than the configured maximum
+		 * size.
+		 */
+		F_SET(btree, WT_BTREE_NO_RECONCILE);
+		ret = __wt_evict_file_exclusive_on(session);
+		F_CLR(btree, WT_BTREE_NO_RECONCILE);
+		WT_ERR(ret);
 		__wt_evict_file_exclusive_off(session);
 
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_RUNNING);
@@ -183,7 +194,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 			}
-			WT_ERR(__wt_reconcile(session, walk, NULL, 0));
+			WT_ERR(__wt_reconcile(
+			    session, walk, NULL, WT_CHECKPOINTING));
 		}
 		break;
 	case WT_SYNC_CLOSE:
@@ -194,7 +206,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 		WT_ERR(__wt_epoch(session, &end));
-		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of internal\n\t"
@@ -202,7 +214,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
-		    WT_TIMEDIFF_MS(end, start)));
+		    WT_TIMEDIFF_MS(end, start));
 	}
 
 err:	/* On error, clear any left-over tree walk. */
@@ -217,41 +229,9 @@ err:	/* On error, clear any left-over tree walk. */
 	    saved_snap_min == WT_TXN_NONE)
 		__wt_txn_release_snapshot(session);
 
-	if (btree->checkpointing != WT_CKPT_OFF) {
-		/*
-		 * Update the checkpoint generation for this handle so visible
-		 * updates newer than the checkpoint can be evicted.
-		 *
-		 * This has to be published before eviction is enabled again,
-		 * so that eviction knows that the checkpoint has completed.
-		 */
-		WT_PUBLISH(btree->checkpoint_gen,
-		    conn->txn_global.checkpoint_gen);
-		WT_STAT_FAST_DATA_SET(session,
-		    btree_checkpoint_generation, btree->checkpoint_gen);
-
-		/*
-		 * Clear the checkpoint flag and push the change; not required,
-		 * but publishing the change means stalled eviction gets moving
-		 * as soon as possible.
-		 */
-		btree->checkpointing = WT_CKPT_OFF;
-		WT_FULL_BARRIER();
-
-		/*
-		 * If this tree was being skipped by the eviction server during
-		 * the checkpoint, clear the wait.
-		 */
-		btree->evict_walk_period = 0;
-
-		/*
-		 * Wake the eviction server, in case application threads have
-		 * stalled while the eviction server decided it couldn't make
-		 * progress.  Without this, application threads will be stalled
-		 * until the eviction server next wakes.
-		 */
-		WT_TRET(__wt_evict_server_wake(session));
-	}
+	/* Clear the checkpoint flag and push the change. */
+	if (btree->checkpointing != WT_CKPT_OFF)
+		WT_PUBLISH(btree->checkpointing, WT_CKPT_OFF);
 
 	__wt_spin_unlock(session, &btree->flush_lock);
 

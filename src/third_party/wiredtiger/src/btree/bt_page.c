@@ -219,6 +219,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Update the page's in-memory size and the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
+	__wt_cache_page_image_incr(session, dsk->mem_size);
 
 	/* Link the new internal page to the parent. */
 	if (ref != NULL) {
@@ -295,7 +296,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __inmem_col_var_repeats --
  *	Count the number of repeat entries on the page.
  */
-static int
+static void
 __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
 {
 	WT_BTREE *btree;
@@ -315,7 +316,6 @@ __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
 		if (__wt_cell_rle(unpack) > 1)
 			++*np;
 	}
-	return (0);
 }
 
 /*
@@ -366,8 +366,7 @@ __inmem_col_var(
 		rle = __wt_cell_rle(unpack);
 		if (rle > 1) {
 			if (repeats == NULL) {
-				WT_RET(
-				    __inmem_col_var_repeats(session, page, &n));
+				__inmem_col_var_repeats(session, page, &n);
 				WT_RET(__wt_realloc_def(session,
 				    &bytes_allocated, n + 1, &repeats));
 

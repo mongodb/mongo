@@ -77,7 +77,6 @@
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\
 } while (0)
-#define	WT_TRET_BUSY_OK(a)	WT_TRET_ERROR_OK(a, EBUSY)
 #define	WT_TRET_NOTFOUND_OK(a)	WT_TRET_ERROR_OK(a, WT_NOTFOUND)
 
 /* Return and branch-to-err-label cases for switch statements. */
@@ -95,10 +94,11 @@
 
 #define	WT_PANIC_MSG(session, v, ...) do {				\
 	__wt_err(session, v, __VA_ARGS__);				\
-	(void)__wt_panic(session);					\
+	WT_IGNORE_RET(__wt_panic(session));				\
 } while (0)
 #define	WT_PANIC_ERR(session, v, ...) do {				\
 	WT_PANIC_MSG(session, v, __VA_ARGS__);				\
+	/* Return WT_PANIC regardless of earlier return codes. */	\
 	WT_ERR(WT_PANIC);						\
 } while (0)
 #define	WT_PANIC_RET(session, v, ...) do {				\

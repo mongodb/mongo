@@ -47,7 +47,7 @@ testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 	opts->running = true;
 	opts->verbose = false;
 
-	if ((opts->progname = strrchr(argv[0], '/')) == NULL)
+	if ((opts->progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		opts->progname = argv[0];
 	else
 		++opts->progname;

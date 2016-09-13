@@ -25,6 +25,10 @@ struct __wt_process {
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
 	WT_CACHE_POOL *cache_pool;
+
+					/* Checksum function */
+#define	__wt_checksum(chunk, len)	__wt_process.checksum(chunk, len)
+	uint32_t (*checksum)(const void *, size_t);
 };
 extern WT_PROCESS __wt_process;
 
@@ -271,10 +275,9 @@ struct __wt_connection_impl {
 	wt_thread_t	 ckpt_tid;	/* Checkpoint thread */
 	bool		 ckpt_tid_set;	/* Checkpoint thread set */
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
-	const char	*ckpt_config;	/* Checkpoint configuration */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
-	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
+	bool		 ckpt_signalled;/* Checkpoint signalled */
 
 	uint64_t  ckpt_usecs;		/* Checkpoint timer */
 	uint64_t  ckpt_time_max;	/* Checkpoint time min/max */
@@ -304,15 +307,11 @@ struct __wt_connection_impl {
 
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Encryptor for metadata and log */
 
-	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
-	wt_thread_t	 evict_tid;	/* Eviction server thread ID */
-	bool		 evict_tid_set;	/* Eviction server thread ID set */
+	bool		 evict_server_running;/* Eviction server operating */
 
-	uint32_t	 evict_workers_alloc;/* Allocated eviction workers */
-	uint32_t	 evict_workers_max;/* Max eviction workers */
-	uint32_t	 evict_workers_min;/* Min eviction workers */
-	uint32_t	 evict_workers;	/* Number of eviction workers */
-	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
+	WT_THREAD_GROUP  evict_threads;
+	uint32_t	 evict_threads_max;/* Max eviction threads */
+	uint32_t	 evict_threads_min;/* Min eviction threads */
 
 #define	WT_STATLOG_FILENAME	"WiredTigerStat.%d.%H"
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */

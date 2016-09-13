@@ -28,7 +28,7 @@
 
 import wiredtiger, wttest
 from helper import simple_populate, key_populate, value_populate
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_cursor_pin.py
 #       Smoke-test fast-path searching for pinned pages before re-descending
@@ -37,7 +37,7 @@ class test_cursor_pin(wttest.WiredTigerTestCase):
     uri = 'file:cursor_pin'
     nentries = 10000
     config = 'allocation_size=512,leaf_page_max=512,value_format=S,key_format='
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S')),
     ])

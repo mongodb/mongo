@@ -9,13 +9,12 @@
 #include "wt_internal.h"
 
 static int __backup_all(WT_SESSION_IMPL *);
-static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_list_uri_append(WT_SESSION_IMPL *, const char *, bool *);
 static int __backup_start(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
-static int __backup_stop(WT_SESSION_IMPL *);
+static int __backup_stop(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_uri(WT_SESSION_IMPL *, const char *[], bool *, bool *);
 
 /*
@@ -76,19 +75,25 @@ __curbackup_close(WT_CURSOR *cursor)
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	WT_TRET(__backup_cleanup_handles(session, cb));
+	/*
+	 * When starting a hot backup, we serialize hot backup cursors and set
+	 * the connection's hot-backup flag. Once that's done, we set the
+	 * cursor's backup-locker flag, implying the cursor owns all necessary
+	 * cleanup (including removing temporary files), regardless of error or
+	 * success. The cursor's backup-locker flag is never cleared (it's just
+	 * discarded when the cursor is closed), because that cursor will never
+	 * not be responsible for cleanup.
+	 */
+	if (F_ISSET(cb, WT_CURBACKUP_LOCKER))
+		WT_TRET(__backup_stop(session, cb));
+
 	WT_TRET(__wt_cursor_close(cursor));
 	session->bkp_cursor = NULL;
-
-	WT_WITH_SCHEMA_LOCK(session, tret,
-	    tret = __backup_stop(session));		/* Stop the backup. */
-	WT_TRET(tret);
 
 err:	API_END_RET(session, ret);
 }
@@ -144,11 +149,11 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 		ret = __backup_start(session, cb, cfg)));
 	WT_ERR(ret);
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		__wt_free(session, cb);
+err:		WT_TRET(__curbackup_close(cursor));
+		*cursorp = NULL;
 	}
 
 	return (ret);
@@ -222,9 +227,12 @@ __backup_start(
 	 * could start a hot backup that would race with an already-started
 	 * checkpoint.
 	 */
-	WT_RET(__wt_writelock(session, conn->hot_backup_lock));
+	__wt_writelock(session, conn->hot_backup_lock);
 	conn->hot_backup = true;
-	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
+	__wt_writeunlock(session, conn->hot_backup_lock);
+
+	/* We're the lock holder, we own cleanup. */
+	F_SET(cb, WT_CURBACKUP_LOCKER);
 
 	/*
 	 * Create a temporary backup file.  This must be opened before
@@ -282,10 +290,7 @@ err:	/* Close the hot backup file. */
 	WT_TRET(__wt_fclose(session, &cb->bfs));
 	if (srcfs != NULL)
 		WT_TRET(__wt_fclose(session, &srcfs));
-	if (ret != 0) {
-		WT_TRET(__backup_cleanup_handles(session, cb));
-		WT_TRET(__backup_stop(session));
-	} else {
+	if (ret == 0) {
 		WT_ASSERT(session, dest != NULL);
 		WT_TRET(__wt_fs_rename(session, WT_BACKUP_TMP, dest, false));
 	}
@@ -295,9 +300,7 @@ err:	/* Close the hot backup file. */
 
 /*
  * __backup_cleanup_handles --
- *	Release and free all btree handles held by the backup. This is kept
- *	separate from __backup_stop because it can be called without the
- *	schema lock held.
+ *	Release and free all btree handles held by the backup.
  */
 static int
 __backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
@@ -325,20 +328,23 @@ __backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
  *	Stop a backup.
  */
 static int
-__backup_stop(WT_SESSION_IMPL *session)
+__backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	conn = S2C(session);
 
+	/* Release all btree handles held by the backup. */
+	WT_TRET(__backup_cleanup_handles(session, cb));
+
 	/* Remove any backup specific file. */
-	ret = __wt_backup_file_remove(session);
+	WT_TRET(__wt_backup_file_remove(session));
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
-	WT_TRET(__wt_writelock(session, conn->hot_backup_lock));
+	__wt_writelock(session, conn->hot_backup_lock);
 	conn->hot_backup = false;
-	WT_TRET(__wt_writeunlock(session, conn->hot_backup_lock));
+	__wt_writeunlock(session, conn->hot_backup_lock);
 
 	return (ret);
 }
@@ -381,7 +387,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 	 * otherwise it's not our problem.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
-	WT_RET(__wt_config_subinit(session, &targetconf, &cval));
+	__wt_config_subinit(session, &targetconf, &cval);
 	for (target_list = false;
 	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
 	    target_list = true) {

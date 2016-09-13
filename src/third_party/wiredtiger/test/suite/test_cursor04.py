@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios
+from wtscenario import make_scenarios
 
 # test_base04.py
 #     Cursor operations
@@ -38,7 +38,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
     table_name1 = 'test_cursor04'
     nentries = 20
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('row', dict(tablekind='row', uri='table')),
         ('lsm-row', dict(tablekind='row', uri='lsm')),
         ('col', dict(tablekind='col', uri='table')),

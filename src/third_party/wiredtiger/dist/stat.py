@@ -41,7 +41,16 @@ compare_srcfile(tmp_file, '../src/include/stat.h')
 
 def print_defines_one(capname, base, stats):
     for v, l in enumerate(stats, base):
-        f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
+        desc = l.desc
+        if 'all_only' in l.flags:
+            desc += ', only reported if statistics=all is set'
+        if len(textwrap.wrap(desc, 70)) > 1:
+            f.write('/*!\n')
+            f.write(' * %s\n' % '\n * '.join(textwrap.wrap(desc, 70)))
+            f.write(' */\n')
+        else:
+            f.write('/*! %s */\n' % desc)
+        #f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(desc, 70)))
         f.write('#define\tWT_STAT_' + capname + '_' + l.name.upper() + "\t" *
             max(1, 6 - int((len('WT_STAT_' + capname + '_' + l.name)) / 8)) +
             str(v) + '\n')

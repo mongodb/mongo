@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
@@ -54,7 +54,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = types
+    scenarios = make_scenarios(types)
 
     def test_disable_idle_timeout1(self):
         #

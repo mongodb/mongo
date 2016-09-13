@@ -33,8 +33,8 @@
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
+from wtscenario import make_scenarios
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
 class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
@@ -55,7 +55,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = types
+    scenarios = make_scenarios(types)
 
     def test_ops(self):
         #

@@ -319,17 +319,23 @@ path_setup(const char *home)
 	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"test -e %s || mkdir %s; "				\
-		"cd %s && del /s /q * >:nul && rd /s /q KVS; "		\
-		"mkdir KVS"
+#define	CMD  "del /q rand.copy & " \
+	     "(IF EXIST %s\\rand copy /y %s\\rand rand.copy) & "	\
+	     "(IF EXIST %s rd /s /q %s) & mkdir %s & "			\
+	     "(IF EXIST rand.copy copy rand.copy %s\\rand) & " \
+	     "cd %s & mkdir KVS"
+	len = strlen(g.home) * 7 + strlen(CMD) + 1;
+	g.home_init = dmalloc(len);
+	snprintf(g.home_init, len, CMD,
+	    g.home, g.home, g.home, g.home, g.home, g.home, g.home);
 #else
 #define	CMD	"test -e %s || mkdir %s; "				\
 		"cd %s > /dev/null && rm -rf `ls | sed /rand/d`; "	\
 		"mkdir KVS"
-#endif
 	len = strlen(g.home) * 3 + strlen(CMD) + 1;
 	g.home_init = dmalloc(len);
 	snprintf(g.home_init, len, CMD, g.home, g.home, g.home);
+#endif
 
 	/* Primary backup directory. */
 	len = strlen(g.home) + strlen("BACKUP") + 2;
@@ -342,7 +348,7 @@ path_setup(const char *home)
 	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del %s/%s %s/%s /s /q >:nul && mkdir %s/%s %s/%s"
+#define	CMD	"rd /s /q %s\\%s %s\\%s & mkdir %s\\%s %s\\%s"
 #else
 #define	CMD	"rm -rf %s/%s %s/%s && mkdir %s/%s %s/%s"
 #endif

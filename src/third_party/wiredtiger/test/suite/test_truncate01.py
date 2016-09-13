@@ -34,13 +34,13 @@ import wiredtiger, wttest
 from helper import confirm_empty,\
     key_populate, value_populate, simple_populate,\
     complex_populate, complex_value_populate
-from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Test truncation arguments.
 class test_truncate_arguments(wttest.WiredTigerTestCase):
     name = 'test_truncate'
 
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
     ])
@@ -80,7 +80,7 @@ class test_truncate_arguments(wttest.WiredTigerTestCase):
 # Test truncation of an object using its URI.
 class test_truncate_uri(wttest.WiredTigerTestCase):
     name = 'test_truncate'
-    scenarios = check_scenarios([
+    scenarios = make_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
     ])
@@ -115,7 +115,7 @@ class test_truncate_cursor_order(wttest.WiredTigerTestCase):
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
+    scenarios = make_scenarios(types, keyfmt)
 
     # Test an illegal order, then confirm that equal cursors works.
     def test_truncate_cursor_order(self):
@@ -146,7 +146,7 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
+    scenarios = make_scenarios(types, keyfmt)
 
     # Test truncation of cursors past the end of the object.
     def test_truncate_cursor_order(self):
@@ -205,8 +205,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
         ('big', dict(nentries=1000,skip=37)),
     ]
 
-    scenarios = number_scenarios(
-        multiply_scenarios('.', types, keyfmt, size, reopen))
+    scenarios = make_scenarios(types, keyfmt, size, reopen)
 
     # Set a cursor key.
     def cursorKey(self, uri, key):

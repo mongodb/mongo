@@ -31,7 +31,7 @@
 #
 
 import wiredtiger, wttest
-from wtscenario import check_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 class PackTester:
     def __init__(self, formatcode, validlow, validhigh, equals):
@@ -126,22 +126,27 @@ class PackTester:
 class test_intpack(wttest.WiredTigerTestCase):
     name = 'test_intpack'
 
-    scenarios = check_scenarios([
-        ('b', dict(formatcode='b', low=-128, high=127, nbits=8)),
-        ('B', dict(formatcode='B', low=0, high=255, nbits=8)),
-        ('8t', dict(formatcode='8t', low=0, high=255, nbits=8)),
-        ('5t', dict(formatcode='5t', low=0, high=31, nbits=5)),
-        ('h', dict(formatcode='h', low=-32768, high=32767, nbits=16)),
-        ('H', dict(formatcode='H', low=0, high=65535, nbits=16)),
-        ('i', dict(formatcode='i', low=-2147483648, high=2147483647, nbits=32)),
-        ('I', dict(formatcode='I', low=0, high=4294967295, nbits=32)),
-        ('l', dict(formatcode='l', low=-2147483648, high=2147483647, nbits=32)),
-        ('L', dict(formatcode='L', low=0, high=4294967295, nbits=32)),
-        ('q', dict(formatcode='q', low=-9223372036854775808,
+    # We have to be a bit verbose here with naming, as there can be problems with
+    # case insensitive test names:w
+
+    scenarios = make_scenarios([
+        ('int8_t_b', dict(formatcode='b', low=-128, high=127, nbits=8)),
+        ('uint8_t_B', dict(formatcode='B', low=0, high=255, nbits=8)),
+        ('fix_len_8t', dict(formatcode='8t', low=0, high=255, nbits=8)),
+        ('fix_len_5t', dict(formatcode='5t', low=0, high=31, nbits=5)),
+        ('int16_t_h', dict(formatcode='h', low=-32768, high=32767, nbits=16)),
+        ('uint16_t_H', dict(formatcode='H', low=0, high=65535, nbits=16)),
+        ('int32_t_i', dict(formatcode='i', low=-2147483648, high=2147483647,
+                   nbits=32)),
+        ('uint32_t_I', dict(formatcode='I', low=0, high=4294967295, nbits=32)),
+        ('int32_t_l', dict(formatcode='l', low=-2147483648, high=2147483647,
+                   nbits=32)),
+        ('uint32_t_L', dict(formatcode='L', low=0, high=4294967295, nbits=32)),
+        ('int64_t_q', dict(formatcode='q', low=-9223372036854775808,
                    high=9223372036854775807, nbits=64)),
-        ('Q', dict(formatcode='Q', low=0, high=18446744073709551615, nbits=64)),
+        ('uint64_t_Q', dict(formatcode='Q', low=0, high=18446744073709551615,
+                   nbits=64)),
     ])
-    scenarios = check_scenarios(number_scenarios(scenarios))
 
     def test_packing(self):
         pt = PackTester(self.formatcode, self.low, self.high, self.assertEquals)

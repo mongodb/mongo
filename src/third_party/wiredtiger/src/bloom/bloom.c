@@ -105,7 +105,7 @@ __wt_bloom_create(
 	*bloomp = bloom;
 	return (0);
 
-err:	(void)__wt_bloom_close(bloom);
+err:	WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 
@@ -166,7 +166,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	*bloomp = bloom;
 	return (0);
 
-err:	(void)__wt_bloom_close(bloom);
+err:	WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
 }
 
@@ -174,7 +174,7 @@ err:	(void)__wt_bloom_close(bloom);
  * __wt_bloom_insert --
  *	Adds the given key to the Bloom filter.
  */
-int
+void
 __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 {
 	uint64_t h1, h2;
@@ -182,10 +182,8 @@ __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 
 	h1 = __wt_hash_fnv64(key->data, key->size);
 	h2 = __wt_hash_city64(key->data, key->size);
-	for (i = 0; i < bloom->k; i++, h1 += h2) {
+	for (i = 0; i < bloom->k; i++, h1 += h2)
 		__bit_set(bloom->bitstring, h1 % bloom->m);
-	}
-	return (0);
 }
 
 /*
@@ -238,15 +236,13 @@ err:	WT_TRET(c->close(c));
  * __wt_bloom_hash --
  *	Calculate the hash values for a given key.
  */
-int
+void
 __wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash)
 {
 	WT_UNUSED(bloom);
 
 	bhash->h1 = __wt_hash_fnv64(key->data, key->size);
 	bhash->h2 = __wt_hash_city64(key->data, key->size);
-
-	return (0);
 }
 
 /*
@@ -309,7 +305,7 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
 {
 	WT_BLOOM_HASH bhash;
 
-	WT_RET(__wt_bloom_hash(bloom, key, &bhash));
+	__wt_bloom_hash(bloom, key, &bhash);
 	return (__wt_bloom_hash_get(bloom, &bhash));
 }
 

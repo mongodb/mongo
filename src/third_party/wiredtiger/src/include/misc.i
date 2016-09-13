@@ -10,12 +10,12 @@
  * __wt_cond_wait --
  *	Wait on a mutex, optionally timing out.
  */
-static inline int
+static inline void
 __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
 	bool notused;
 
-	return (__wt_cond_wait_signal(session, cond, usecs, &notused));
+	__wt_cond_wait_signal(session, cond, usecs, &notused);
 }
 
 /*
@@ -48,25 +48,32 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
 /*
  * __wt_verbose --
  * 	Verbose message.
+ *
+ * Inline functions are not parsed for external prototypes, so in cases where we
+ * want GCC attributes attached to the functions, we have to do so explicitly.
  */
-static inline int
+static inline void
 __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
+
+/*
+ * __wt_verbose --
+ * 	Verbose message.
+ */
+static inline void
+__wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
 {
 #ifdef HAVE_VERBOSE
-	WT_DECL_RET;
 	va_list ap;
 
 	if (WT_VERBOSE_ISSET(session, flag)) {
 		va_start(ap, fmt);
-		ret = __wt_eventv(session, true, 0, NULL, 0, fmt, ap);
+		WT_IGNORE_RET(__wt_eventv(session, true, 0, NULL, 0, fmt, ap));
 		va_end(ap);
 	}
-	return (ret);
 #else
 	WT_UNUSED(session);
 	WT_UNUSED(flag);
 	WT_UNUSED(fmt);
-	return (0);
 #endif
 }

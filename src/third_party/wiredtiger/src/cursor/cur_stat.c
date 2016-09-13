@@ -37,22 +37,6 @@ __curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_ITEM *buf)
 }
 
 /*
- * __curstat_free_config --
- *	Free the saved configuration string stack
- */
-static void
-__curstat_free_config(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
-{
-	size_t i;
-
-	if (cst->cfg != NULL) {
-		for (i = 0; cst->cfg[i] != NULL; ++i)
-			__wt_free(session, cst->cfg[i]);
-		__wt_free(session, cst->cfg);
-	}
-}
-
-/*
  * __curstat_get_key --
  *	WT_CURSOR->get_key for statistics cursors.
  */
@@ -334,11 +318,16 @@ __curstat_close(WT_CURSOR *cursor)
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	size_t i;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	__curstat_free_config(session, cst);
+	if (cst->cfg != NULL) {
+		for (i = 0; cst->cfg[i] != NULL; ++i)
+			__wt_free(session, cst->cfg[i]);
+		__wt_free(session, cst->cfg);
+	}
 
 	__wt_buf_free(session, &cst->pv);
 	__wt_free(session, cst->desc_buf);
@@ -691,7 +680,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	/* The cursor isn't yet positioned. */
 	cst->notpositioned = true;
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
@@ -701,8 +689,8 @@ config_err:	WT_ERR_MSG(session, EINVAL,
 	}
 
 	if (0) {
-err:		__curstat_free_config(session, cst);
-		__wt_free(session, cst);
+err:		WT_TRET(__curstat_close(cursor));
+		*cursorp = NULL;
 	}
 
 	return (ret);

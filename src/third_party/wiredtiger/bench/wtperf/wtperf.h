@@ -29,13 +29,10 @@
 #ifndef	HAVE_WTPERF_H
 #define	HAVE_WTPERF_H
 
-#include <wt_internal.h>
+#include "test_util.h"
+
 #include <assert.h>
 #include <math.h>
-
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
 
 #include "config_opt.h"
 
@@ -46,7 +43,7 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define	EXT_PFX	",extensions=("
 #define	EXT_SFX	")"
 #define	EXTPATH "../../ext/compressors/"		/* Extensions path */
-#define	BLKCMP_PFX	",block_compressor="
+#define	BLKCMP_PFX	"block_compressor="
 
 #define	LZ4_BLK BLKCMP_PFX "lz4"
 #define	LZ4_EXT							\
@@ -83,7 +80,6 @@ typedef struct {
 typedef struct {
 	uint64_t stone_gap;
 	uint64_t needed_stones;
-	uint64_t final_stone_gap;
 	uint64_t expected_total;
 	uint64_t total_inserts;
 	uint64_t last_total_inserts;
@@ -120,13 +116,13 @@ typedef struct {
  * an initialization in wtperf.c in the default_cfg.
  */
 struct __config {			/* Configuration structure */
-	const char *home;		/* WiredTiger home */
-	const char *monitor_dir;	/* Monitor output dir */
+	char *home;			/* WiredTiger home */
+	char *monitor_dir;		/* Monitor output dir */
 	char *partial_config;		/* Config string for partial logging */
 	char *reopen_config;		/* Config string for conn reopen */
 	char *base_uri;			/* Object URI */
+	char *log_table_uri;		/* URI for log table */
 	char **uris;			/* URIs if multiple tables */
-	const char *helium_mount;	/* Optional Helium mount point */
 
 	WT_CONNECTION *conn;		/* Database connection */
 
@@ -156,6 +152,7 @@ struct __config {			/* Configuration structure */
 	uint64_t update_ops;		/* update operations */
 
 	uint64_t insert_key;		/* insert key */
+	uint64_t log_like_table_key;	/* used to allocate IDs for log table */
 
 	volatile int ckpt;		/* checkpoint in progress */
 	volatile int error;		/* thread error */
@@ -264,9 +261,9 @@ struct __config_thread {		/* Per-thread structure */
 };
 
 void	 cleanup_truncate_config(CONFIG *);
-int	 config_assign(CONFIG *, const CONFIG *);
 int	 config_compress(CONFIG *);
 void	 config_free(CONFIG *);
+void	 config_copy(CONFIG *, const CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);
@@ -281,7 +278,7 @@ void	 latency_print(CONFIG *);
 int	 run_truncate(
     CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
-int	 setup_throttle(CONFIG_THREAD*);
+void	 setup_throttle(CONFIG_THREAD*);
 int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 int	 start_idle_table_cycle(CONFIG *, pthread_t *);
 int	 stop_idle_table_cycle(CONFIG *, pthread_t);
@@ -292,7 +289,7 @@ uint64_t sum_read_ops(CONFIG *);
 uint64_t sum_truncate_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
-int	 worker_throttle(CONFIG_THREAD*);
+void	 worker_throttle(CONFIG_THREAD*);
 
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 #if defined(__GNUC__)
@@ -327,76 +324,5 @@ die(int e, const char *str)
 {
 	fprintf(stderr, "Call to %s failed: %s", str, wiredtiger_strerror(e));
 	exit(EXIT_FAILURE);
-}
-
-/*
- * dmalloc --
- *      Call malloc, dying on failure.
- */
-static inline void *
-dmalloc(size_t len)
-{
-	void *p;
-
-	if ((p = malloc(len)) == NULL)
-		die(errno, "malloc");
-	return (p);
-}
-
-/*
- * dcalloc --
- *      Call calloc, dying on failure.
- */
-static inline void *
-dcalloc(size_t num, size_t size)
-{
-	void *p;
-
-	if ((p = calloc(num, size)) == NULL)
-		die(errno, "calloc");
-	return (p);
-}
-
-/*
- * drealloc --
- *      Call realloc, dying on failure.
- */
-static inline void *
-drealloc(void *p, size_t len)
-{
-	void *repl;
-
-	if ((repl = realloc(p, len)) == NULL)
-		die(errno, "realloc");
-	return (repl);
-}
-
-/*
- * dstrdup --
- *      Call strdup, dying on failure.
- */
-static inline char *
-dstrdup(const char *str)
-{
-	char *p;
-
-	if ((p = strdup(str)) == NULL)
-		die(errno, "strdup");
-	return (p);
-}
-
-/*
- * dstrndup --
- *      Call emulating strndup, dying on failure. Don't use actual strndup here
- *	as it is not supported within MSVC.
- */
-static inline char *
-dstrndup(const char *str, const size_t len)
-{
-	char *p;
-
-	p = dcalloc(len + 1, sizeof(char));
-	memcpy(p, str, len);
-	return (p);
 }
 #endif

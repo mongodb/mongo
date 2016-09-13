@@ -32,7 +32,7 @@
 
 import wiredtiger, wttest
 from helper import key_populate, value_populate, simple_populate
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_truncate_fast_delete
 #       When deleting leaf pages that aren't in memory, we set transactional
@@ -86,8 +86,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         ('txn2', dict(commit=False)),
         ]
 
-    scenarios = number_scenarios(
-        multiply_scenarios('.', types, keyfmt, overflow, reads, writes, txn))
+    scenarios = make_scenarios(types, keyfmt, overflow, reads, writes, txn)
 
     # Return the number of records visible to the cursor; test both forward
     # and backward iteration, they are different code paths in this case.

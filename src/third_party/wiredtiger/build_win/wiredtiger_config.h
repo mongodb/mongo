@@ -22,6 +22,9 @@
 /* Define to 1 if you have the `clock_gettime' function. */
 /* #undef HAVE_CLOCK_GETTIME */
 
+/* Define to 1 to enable CRC32 hardware support. */
+/* #undef HAVE_CRC32_HARDWARE */
+
 /* Define to 1 for diagnostic tests. */
 /* #undef HAVE_DIAGNOSTIC */
 
@@ -31,14 +34,8 @@
 /* Define to 1 if you have the `fallocate' function. */
 /* #undef HAVE_FALLOCATE */
 
-/* Define to 1 if you have the `fcntl' function. */
-/* #undef HAVE_FCNTL 1  */
-
 /* Define to 1 if you have the `fdatasync' function. */
 /* #undef HAVE_FDATASYNC */
-
-/* Define to 1 if you have the `fread_unlocked' function. */
-/* #undef HAVE_FREAD_UNLOCKED */
 
 /* Define to 1 if you have the `ftruncate' function. */
 /* #undef HAVE_FTRUNCATE */

@@ -130,9 +130,13 @@ env.Alias('generated-sources', "wiredtiger.h")
 # included.
 #
 condition_map = {
-    'POSIX_HOST' : not env.TargetOSIs('windows'),
-    'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
+    'POSIX_HOST'   : not env.TargetOSIs('windows'),
     'WINDOWS_HOST' : env.TargetOSIs('windows'),
+
+    'ARM64_HOST'   : env['TARGET_ARCH'] == 'aarch64',
+    'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
+    'X86_HOST'     : env['TARGET_ARCH'] == 'x86_64',
+    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
 }
 
 def filtered_filelist(f):
@@ -154,6 +158,15 @@ if useZlib:
 if useSnappy:
     env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_SNAPPY'])
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
+
+# Use hardware by default on all platforms if available.
+# If not available at runtime, we fall back to software in some cases.
+#
+# On zSeries we may disable because SLES 11 kernel doe not support the instructions.
+if not (env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "off"):
+    # Disable ARM hardware CRC for now - the extensions aren't always available
+    if env['TARGET_ARCH'] != 'aarch64':
+        env.Append(CPPDEFINES=["HAVE_CRC32_HARDWARE"])
 
 wtlib = env.Library(
     target="wiredtiger",

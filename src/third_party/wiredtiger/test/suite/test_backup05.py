@@ -35,7 +35,6 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 

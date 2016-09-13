@@ -33,7 +33,7 @@ import itertools, wiredtiger, wttest
 from helper import complex_populate_cgconfig, complex_populate_cgconfig_lsm
 from helper import simple_populate
 from helper import complex_populate_check, simple_populate_check
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # test_util13.py
 #    Utilities: wt dump, as well as the dump cursor
@@ -73,7 +73,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             cfg='merge_max=5')),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types))
+    scenarios = make_scenarios(types)
 
     def compare_config(self, expected_cfg, actual_cfg):
         # Replace '(' characters so configuration groups don't break parsing.

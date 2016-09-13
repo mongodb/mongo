@@ -612,19 +612,17 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 
 	if (entry->bloom != NULL) {
 		/*
+		 * If the item is not in the Bloom filter, we return
+		 * immediately, otherwise, we still need to check the long
+		 * way, since it may be a false positive.
+		 *
 		 * If we don't own the Bloom filter, we must be sharing one
 		 * in a previous entry. So the shared filter has already
-		 * been checked and passed.
+		 * been checked and passed, we don't need to check it again.
+		 * We'll still need to check the long way.
 		 */
-		if (!F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
-			return (0);
-
-		/*
-		 * If the item is not in the Bloom filter, we return
-		 * immediately, otherwise, we still need to check the
-		 * long way.
-		 */
-		WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
+			WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
 		bloom_found = true;
 	}
 	if (entry->subjoin != NULL) {
@@ -875,7 +873,7 @@ insert:
 		}
 		else
 			WT_ERR(c->get_key(c, &curvalue));
-		WT_ERR(__wt_bloom_insert(bloom, &curvalue));
+		__wt_bloom_insert(bloom, &curvalue);
 		entry->stats.bloom_insert++;
 advance:
 		if ((ret = c->next(c)) == WT_NOTFOUND)
@@ -917,6 +915,9 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		WT_RET_MSG(session, EINVAL,
 		    "join cursor has not yet been joined with any other "
 		    "cursors");
+
+	/* Get a consistent view of our subordinate cursors if appropriate. */
+	WT_RET(__wt_txn_cursor_op(session));
 
 	if (F_ISSET((WT_CURSOR *)cjoin, WT_CURSTD_RAW))
 		config = &raw_cfg[0];

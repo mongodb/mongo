@@ -220,8 +220,7 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 	/* We are done if there are no named drops */
 
 	if (names_config.len != 0) {
-		WT_RET(__wt_config_subinit(
-		    session, &objectconf, &names_config));
+		__wt_config_subinit(session, &objectconf, &names_config);
 		while ((ret = __wt_config_next(&objectconf, &k, &v)) == 0) {
 			ret = __nsnap_drop_one(session, &k);
 			if (ret != 0)
@@ -256,7 +255,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
 
-	WT_RET(__wt_readlock(session, txn_global->nsnap_rwlock));
+	__wt_readlock(session, txn_global->nsnap_rwlock);
 	TAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
 		if (WT_STRING_MATCH(nsnap->name, nameval->str, nameval->len)) {
 			txn->snap_min = txn_state->snap_min = nsnap->snap_min;
@@ -268,7 +267,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 			F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 			break;
 		}
-	WT_RET(__wt_readunlock(session, txn_global->nsnap_rwlock));
+	__wt_readunlock(session, txn_global->nsnap_rwlock);
 
 	if (nsnap == NULL)
 		WT_RET_MSG(session, EINVAL,
@@ -352,7 +351,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
  * __wt_txn_named_snapshot_destroy --
  *	Destroy all named snapshots on connection close
  */
-int
+void
 __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 {
 	WT_NAMED_SNAPSHOT *nsnap;
@@ -365,6 +364,4 @@ __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
 	}
-
-	return (0);
 }

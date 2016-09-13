@@ -42,7 +42,7 @@ class test_bug011(wttest.WiredTigerTestCase):
     nops = 10000
     # Add connection configuration for this test.
     def conn_config(self, dir):
-        return 'cache_size=10MB,hazard_max=' + str(self.ntables / 2)
+        return 'cache_size=10MB,eviction_dirty_target=99,eviction_dirty_trigger=99,hazard_max=' + str(self.ntables / 2)
 
     def test_eviction(self):
         cursors = []

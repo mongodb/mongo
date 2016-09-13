@@ -31,55 +31,86 @@
 } while (0)
 
 /*
- * __wt_schema_create_final --
- *	Create a single configuration line from a set of configuration strings,
- * including all of the defaults declared for a session.create, and stripping
- * any configuration strings that don't belong in a session.create. Here for
- * the wt dump command utility, which reads a set of configuration strings and
- * needs to add in the defaults and then collapse them into single string for
- * a subsequent load.
+ * __schema_source_config --
+ *	Extract the "source" configuration key, lookup its metadata.
  */
-int
-__wt_schema_create_final(
-    WT_SESSION_IMPL *session, char *cfg_arg[], char **value_ret)
+static int
+__schema_source_config(WT_SESSION_IMPL *session,
+    WT_CURSOR *srch, const char *config, const char **result)
 {
+	WT_CONFIG_ITEM cval;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	u_int i;
-	const char **cfg;
+	char *v;
 
-	/*
-	 * Count the entries in the original,
-	 * Allocate a copy with the defaults as the first entry,
-	 * Collapse the whole thing into a single configuration string (which
-	 * also strips any entries that don't appear in the first entry).
-	 */
-	for (i = 0; cfg_arg[i] != NULL; ++i)
-		;
-	WT_RET(__wt_calloc_def(session, i + 2, &cfg));
-	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_create);
-	for (i = 0; cfg_arg[i] != NULL; ++i)
-		cfg[i + 1] = cfg_arg[i];
-	cfg[i + 1] = NULL;
+	WT_ERR(__wt_config_getones(session, config, "source", &cval));
+	WT_ERR(__wt_scr_alloc(session, cval.len + 10, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
+	srch->set_key(srch, buf->data);
+	if ((ret = srch->search(srch)) == WT_NOTFOUND)
+		WT_ERR(EINVAL);
+	WT_ERR(ret);
+	WT_ERR(srch->get_value(srch, &v));
+	WT_ERR(__wt_strdup(session, v, result));
 
-	ret = __wt_config_collapse(session, cfg, value_ret);
-
-	__wt_free(session, cfg);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
 /*
- * __schema_create_strip --
- *	Discard any configuration information from a schema entry that is not
- * applicable to an session.create call. Here for the metadata:create URI.
+ * __schema_create_collapse --
+ *	Discard any configuration information from a schema entry that is
+ *	not applicable to an session.create call.
+ *
+ *	For a table URI that contains no named column groups, fold in the
+ *	configuration from the implicit column group and its source. For a
+ *	named column group URI, fold in its source.
  */
 static int
-__schema_create_strip(
-    WT_SESSION_IMPL *session, const char *value, char **value_ret)
+__schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc,
+    const char *key, const char *value, char **value_ret)
 {
-	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, WT_SESSION_create), value, NULL };
+	WT_CURSOR *c;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+	const char *_cfg[5] = {NULL, NULL, NULL, value, NULL};
+	const char **cfg, **firstcfg, **lastcfg, *v;
 
-	return (__wt_config_collapse(session, cfg, value_ret));
+	lastcfg = cfg = &_cfg[3];		/* position on value */
+	c = NULL;
+	if (key != NULL && WT_PREFIX_SKIP(key, "table:")) {
+		c = mdc->create_cursor;
+		WT_ERR(__wt_scr_alloc(session, 0, &buf));
+		/*
+		 * When a table is created without column groups,
+		 * we create one without a name.
+		 */
+		WT_ERR(__wt_buf_fmt(session, buf, "colgroup:%s", key));
+		c->set_key(c, buf->data);
+		if ((ret = c->search(c)) == 0) {
+			WT_ERR(c->get_value(c, &v));
+			WT_ERR(__wt_strdup(session, v, --cfg));
+			WT_ERR(__schema_source_config(session, c, v, --cfg));
+		} else
+			WT_ERR_NOTFOUND_OK(ret);
+	} else if (key != NULL && WT_PREFIX_SKIP(key, "colgroup:")) {
+		if (strchr(key, ':') != NULL) {
+			c = mdc->create_cursor;
+			WT_ERR(__wt_strdup(session, value, --cfg));
+			WT_ERR(
+			    __schema_source_config(session, c, value, --cfg));
+		}
+	}
+	firstcfg = cfg;
+	*--firstcfg = WT_CONFIG_BASE(session, WT_SESSION_create);
+	WT_ERR(__wt_config_collapse(session, firstcfg, value_ret));
+
+err:	for (; cfg < lastcfg; cfg++)
+		__wt_free(session, *cfg);
+	if (c != NULL)
+		WT_TRET(c->reset(c));
+	__wt_scr_free(session, &buf);
+	return (ret);
 }
 
 /*
@@ -95,17 +126,17 @@ __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
 	WT_SESSION_IMPL *session;
 	char *value;
 
+	value = NULL;
 	c = &mdc->iface;
 	session = (WT_SESSION_IMPL *)c->session;
 
 	c->key.data = fc->key.data;
 	c->key.size = fc->key.size;
 	if (F_ISSET(mdc, WT_MDC_CREATEONLY)) {
-		WT_RET(__schema_create_strip(session, fc->value.data, &value));
-		ret = __wt_buf_set(
-		    session, &c->value, value, strlen(value) + 1);
-		__wt_free(session, value);
-		WT_RET(ret);
+		WT_ERR(__schema_create_collapse(
+		    session, mdc, fc->key.data, fc->value.data, &value));
+		WT_ERR(__wt_buf_set(
+		    session, &c->value, value, strlen(value) + 1));
 	} else {
 		c->value.data = fc->value.data;
 		c->value.size = fc->value.size;
@@ -115,7 +146,8 @@ __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
 	F_CLR(mdc, WT_MDC_ONMETADATA);
 	F_SET(mdc, WT_MDC_POSITIONED);
 
-	return (0);
+err:	__wt_free(session, value);
+	return (ret);
 }
 
 /*
@@ -123,8 +155,9 @@ __curmetadata_setkv(WT_CURSOR_METADATA *mdc, WT_CURSOR *fc)
  * but also check for the internal version of the URI.
  */
 #define	WT_KEY_IS_METADATA(key)						\
+	((key)->size > 0 &&						\
 	(WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) ||\
-	 WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1))
+	 WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
 
 /*
  * __curmetadata_metadata_search --
@@ -143,7 +176,8 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
 
 	if (F_ISSET(mdc, WT_MDC_CREATEONLY)) {
-		ret = __schema_create_strip(session, value, &stripped);
+		ret = __schema_create_collapse(session, mdc, NULL, value,
+		    &stripped);
 		__wt_free(session, value);
 		WT_RET(ret);
 		value = stripped;
@@ -467,17 +501,20 @@ err:	API_END_RET(session, ret);
 static int
 __curmetadata_close(WT_CURSOR *cursor)
 {
-	WT_CURSOR *file_cursor;
+	WT_CURSOR *c;
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
-	file_cursor = mdc->file_cursor;
-	CURSOR_API_CALL(cursor, session,
-	    close, ((WT_CURSOR_BTREE *)file_cursor)->btree);
+	c = mdc->file_cursor;
+	CURSOR_API_CALL(cursor, session, close, c == NULL ?
+	    NULL : ((WT_CURSOR_BTREE *)c)->btree);
 
-	ret = file_cursor->close(file_cursor);
+	if (c != NULL)
+		ret = c->close(c);
+	if ((c = mdc->create_cursor) != NULL)
+		WT_TRET(c->close(c));
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -534,11 +571,18 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_metadata_cursor_open(session, cfg[1], &mdc->file_cursor));
 
-	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
-
-	/* If we are only returning create config, strip internal metadata. */
-	if (WT_STREQ(uri, "metadata:create"))
+	/*
+	 * If we are only returning create config, strip internal metadata.
+	 * We'll need some extra cursors to pull out column group information
+	 * and chase "source" entries.
+	 */
+	if (WT_STREQ(uri, "metadata:create")) {
 		F_SET(mdc, WT_MDC_CREATEONLY);
+		WT_ERR(__wt_metadata_cursor_open(session, cfg[1],
+		    &mdc->create_cursor));
+	}
+
+	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
 	/*
 	 * Metadata cursors default to readonly; if not set to not-readonly,
@@ -552,9 +596,8 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		if (mdc->file_cursor != NULL)
-			WT_TRET(mdc->file_cursor->close(mdc->file_cursor));
-		__wt_free(session, mdc);
+err:		WT_TRET(__curmetadata_close(cursor));
+		*cursorp = NULL;
 	}
 	return (ret);
 }

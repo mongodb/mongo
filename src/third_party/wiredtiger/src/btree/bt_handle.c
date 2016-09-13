@@ -163,7 +163,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 
 	/* Destroy locks. */
-	WT_TRET(__wt_rwlock_destroy(session, &btree->ovfl_lock));
+	__wt_rwlock_destroy(session, &btree->ovfl_lock);
 	__wt_spin_destroy(session, &btree->flush_lock);
 
 	/* Free allocated memory. */
@@ -212,8 +212,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		maj_version = cval.val;
 		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
 		min_version = cval.val;
-		WT_RET(__wt_verbose(session, WT_VERB_VERSION,
-		    "%" PRIu64 ".%" PRIu64, maj_version, min_version));
+		__wt_verbose(session, WT_VERB_VERSION,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
 	}
 
 	/* Get the file ID. */
@@ -688,16 +688,21 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 
 	/*
 	 * Don't let pages grow large compared to the cache size or we can end
-	 * up in a situation where nothing can be evicted.  Take care getting
-	 * the cache size: with a shared cache, it may not have been set.
+	 * up in a situation where nothing can be evicted.  Make sure at least
+	 * 10 pages fit in cache when it is at the dirty trigger where threads
+	 * stall.
+	 *
+	 * Take care getting the cache size: with a shared cache, it may not
+	 * have been set.  Don't forget to update the API documentation if you
+	 * alter the bounds for any of the parameters here.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
 	btree->maxmempage = (uint64_t)cval.val;
-	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
-		if ((cache_size = conn->cache_size) > 0)
-			btree->maxmempage =
-			    WT_MIN(btree->maxmempage, cache_size / 10);
-	}
+	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
+	    (cache_size = conn->cache_size) > 0)
+		btree->maxmempage = WT_MIN(btree->maxmempage,
+		    (conn->cache->eviction_dirty_trigger * cache_size) / 1000);
+
 	/* Enforce a lower bound of a single disk leaf page */
 	btree->maxmempage = WT_MAX(btree->maxmempage, btree->maxleafpage);
 

@@ -15,6 +15,7 @@ Coverity
 Coverity's
 DB's
 DBTs
+DONTNEED
 Datastore
 DbCursor
 DbEnv
@@ -216,6 +217,8 @@ failchk
 fallocate
 fd's
 fdatasync
+fextend
+fh
 fieldname
 fileID
 fileformats
@@ -230,6 +233,7 @@ forw
 fput
 freelist
 fsync
+ftruncate
 gcc
 gdbm
 ge
@@ -502,3 +506,4 @@ wtstats
 xa
 yieldcpu
 zlib
+zseries

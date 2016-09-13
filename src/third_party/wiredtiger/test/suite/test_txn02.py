@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
@@ -81,22 +81,18 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     txn3s = [('t3c', dict(txn3='commit')), ('t3r', dict(txn3='rollback'))]
     txn4s = [('t4c', dict(txn4='commit')), ('t4r', dict(txn4='rollback'))]
 
-    all_scenarios = multiply_scenarios('.', types,
-        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)
-
     # This test generates thousands of potential scenarios.
     # For default runs, we'll use a small subset of them, for
     # long runs (when --long is set) we'll set a much larger limit.
-    scenarios = number_scenarios(prune_scenarios(all_scenarios, 20, 5000))
+    scenarios = make_scenarios(types,
+        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s,
+        prune=20, prunelong=5000)
 
     # Each check_log() call takes a second, so we don't call it for
     # every scenario, we'll limit it to the value of checklog_calls.
     checklog_calls = 100 if wttest.islongtest() else 2
     checklog_mod = (len(scenarios) / checklog_calls + 1)
 
-    # scenarios = number_scenarios(multiply_scenarios('.', types,
-    # op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)) [:3]
-    # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
         # Cycle through the different transaction_sync values in a

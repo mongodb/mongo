@@ -32,7 +32,7 @@
 
 import os, run, random
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import make_scenarios
 
 # Test basic encryption
 class test_encrypt03(wttest.WiredTigerTestCase):
@@ -48,7 +48,7 @@ class test_encrypt03(wttest.WiredTigerTestCase):
         #('noname', dict( sys_encrypt='rotn', sys_encrypt_args=',keyid=11',
         #    file_encrypt='none', file_encrypt_args=',keyid=13')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, encrypt))
+    scenarios = make_scenarios(types, encrypt)
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):

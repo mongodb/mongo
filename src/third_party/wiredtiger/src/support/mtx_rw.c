@@ -45,19 +45,19 @@
  *	struct {
  *		uint16_t writers;	Now serving for writers
  *		uint16_t readers;	Now serving for readers
- *		uint16_t users;		Next available ticket number
+ *		uint16_t next;		Next available ticket number
  *		uint16_t __notused;	Padding
  *	}
  *
  * First, imagine a store's 'take a number' ticket algorithm. A customer takes
  * a unique ticket number and customers are served in ticket order. In the data
  * structure, 'writers' is the next writer to be served, 'readers' is the next
- * reader to be served, and 'users' is the next available ticket number.
+ * reader to be served, and 'next' is the next available ticket number.
  *
  * Next, consider exclusive (write) locks. The 'now serving' number for writers
  * is 'writers'. To lock, 'take a number' and wait until that number is being
  * served; more specifically, atomically copy and increment the current value of
- * 'users', and then wait until 'writers' equals that copied number.
+ * 'next', and then wait until 'writers' equals that copied number.
  *
  * Shared (read) locks are similar. Like writers, readers atomically get the
  * next number available. However, instead of waiting for 'writers' to equal
@@ -74,7 +74,7 @@
  *
  * For example, consider the following read (R) and write (W) lock requests:
  *
- *						writers	readers	users
+ *						writers	readers	next
  *						0	0	0
  *	R: ticket 0, readers match	OK	0	1	1
  *	R: ticket 1, readers match	OK	0	2	2
@@ -92,7 +92,7 @@
  * and the next ticket holder (reader or writer) will unblock when the writer
  * unlocks. An example, continuing from the last line of the above example:
  *
- *						writers	readers	users
+ *						writers	readers	next
  *	W: ticket 3, writers match	OK	3	3	4
  *	R: ticket 4, readers no match	block	3	3	5
  *	R: ticket 5, readers no match	block	3	3	6
@@ -101,8 +101,8 @@
  *	R: ticket 4, readers match	OK	4	5	7
  *	R: ticket 5, readers match	OK	4	6	7
  *
- * The 'users' field is a 2-byte value so the available ticket number wraps at
- * 64K requests. If a thread's lock request is not granted until the 'users'
+ * The 'next' field is a 2-byte value so the available ticket number wraps at
+ * 64K requests. If a thread's lock request is not granted until the 'next'
  * field cycles and the same ticket is taken by another thread, we could grant
  * a lock to two separate threads at the same time, and bad things happen: two
  * writer threads or a reader thread and a writer thread would run in parallel,
@@ -124,7 +124,7 @@ __wt_rwlock_alloc(
 {
 	WT_RWLOCK *rwlock;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name));
+	__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name);
 
 	WT_RET(__wt_calloc_one(session, &rwlock));
 
@@ -143,8 +143,6 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new, old;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
@@ -157,14 +155,14 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * Do the cheap test to see if this can possibly succeed (and confirm
 	 * the lock is in the correct state to grant this read lock).
 	 */
-	if (old.s.readers != old.s.users)
+	if (old.s.readers != old.s.next)
 		return (EBUSY);
 
 	/*
 	 * The replacement lock value is a result of allocating a new ticket and
 	 * incrementing the reader value to match it.
 	 */
-	new.s.readers = new.s.users = old.s.users + 1;
+	new.s.readers = new.s.next = old.s.next + 1;
 	return (__wt_atomic_cas64(&l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
@@ -172,15 +170,13 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  * __wt_readlock --
  *	Get a shared lock.
  */
-int
+void
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	WT_DIAGNOSTIC_YIELD;
@@ -192,7 +188,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	ticket = __wt_atomic_fetch_add16(&l->s.users, 1);
+	ticket = __wt_atomic_fetch_add16(&l->s.next, 1);
 	for (pause_cnt = 0; ticket != l->s.readers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
@@ -220,21 +216,18 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock see consistent data.
 	 */
 	WT_READ_BARRIER();
-
-	return (0);
 }
 
 /*
  * __wt_readunlock --
  *	Release a shared lock.
  */
-int
+void
 __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
+	WT_UNUSED(session);
 
 	l = &rwlock->rwlock;
 
@@ -243,8 +236,6 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * sure we don't race).
 	 */
 	(void)__wt_atomic_add16(&l->s.writers, 1);
-
-	return (0);
 }
 
 /*
@@ -256,8 +247,6 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new, old;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
@@ -270,11 +259,11 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * Do the cheap test to see if this can possibly succeed (and confirm
 	 * the lock is in the correct state to grant this write lock).
 	 */
-	if (old.s.writers != old.s.users)
+	if (old.s.writers != old.s.next)
 		return (EBUSY);
 
 	/* The replacement lock value is a result of allocating a new ticket. */
-	++new.s.users;
+	++new.s.next;
 	return (__wt_atomic_cas64(&l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
@@ -282,15 +271,13 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  * __wt_writelock --
  *	Wait to get an exclusive lock.
  */
-int
+void
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
@@ -300,7 +287,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	ticket = __wt_atomic_fetch_add16(&l->s.users, 1);
+	ticket = __wt_atomic_fetch_add16(&l->s.next, 1);
 	for (pause_cnt = 0; ticket != l->s.writers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
@@ -319,21 +306,18 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock see consistent data.
 	 */
 	WT_READ_BARRIER();
-
-	return (0);
 }
 
 /*
  * __wt_writeunlock --
  *	Release an exclusive lock.
  */
-int
+void
 __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: writeunlock %s", rwlock->name));
+	WT_UNUSED(session);
 
 	/*
 	 * Ensure that all updates made while the lock was held are visible to
@@ -356,27 +340,42 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	l->i.wr = new.i.wr;
 
 	WT_DIAGNOSTIC_YIELD;
-
-	return (0);
 }
 
 /*
  * __wt_rwlock_destroy --
  *	Destroy a read/write lock.
  */
-int
+void
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
 	WT_RWLOCK *rwlock;
 
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
 	if (rwlock == NULL)
-		return (0);
+		return;
 	*rwlockp = NULL;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: destroy %s", rwlock->name));
+	__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: destroy %s", rwlock->name);
 
 	__wt_free(session, rwlock);
-	return (0);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_rwlock_islocked --
+ *	Return if a read/write lock is currently locked for reading or writing.
+ */
+bool
+__wt_rwlock_islocked(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	wt_rwlock_t *l;
+
+	WT_UNUSED(session);
+
+	l = &rwlock->rwlock;
+
+	return (l->s.writers != l->s.next || l->s.readers != l->s.next);
+}
+#endif

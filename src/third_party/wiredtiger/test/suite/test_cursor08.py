@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat, WiredTigerError
-from wtscenario import multiply_scenarios, number_scenarios, check_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
@@ -42,17 +42,17 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     nkeys = 500
 
-    reopens = check_scenarios([
+    reopens = [
         ('regular', dict(reopen=False)),
         ('reopen', dict(reopen=True))
-    ])
-    compress = check_scenarios([
+    ]
+    compress = [
         ('nop', dict(compress='nop')),
         ('snappy', dict(compress='snappy')),
         ('zlib', dict(compress='zlib')),
         ('none', dict(compress='none')),
-    ])
-    scenarios = number_scenarios(multiply_scenarios('.', reopens, compress))
+    ]
+    scenarios = make_scenarios(reopens, compress)
     # Load the compression extension, and enable it for logging.
     def conn_config(self, dir):
         return 'log=(archive=false,enabled,file_max=%s,' % self.logmax + \

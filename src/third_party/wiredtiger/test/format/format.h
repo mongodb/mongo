@@ -29,6 +29,13 @@
 #include "test_util.h"
 
 #ifdef BDB
+/*
+ * Berkeley DB has an #ifdef we need to provide a value for, we'll see an
+ * undefined error if it's unset during a strict compile.
+ */
+#ifndef	DB_DBM_HSEARCH
+#define	DB_DBM_HSEARCH	0
+#endif
 #include <assert.h>
 #include <db.h>
 #endif
@@ -68,12 +75,6 @@
 #define	SINGLETHREADED	(g.c_threads == 1)
 
 #define	FORMAT_OPERATION_REPS	3		/* 3 thread operations sets */
-
-#ifndef _WIN32
-#define	SIZET_FMT	"%zu"			/* size_t format string */
-#else
-#define	SIZET_FMT	"%Iu"			/* size_t format string */
-#endif
 
 typedef struct {
 	char *progname;				/* Program name */
@@ -238,7 +239,7 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
-typedef struct {
+typedef struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) {
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
 	uint64_t search;			/* operations */
@@ -260,7 +261,7 @@ typedef struct {
 #define	TINFO_COMPLETE	2			/* Finished */
 #define	TINFO_JOINED	3			/* Resolved */
 	volatile int state;			/* state */
-} TINFO WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT);
+} TINFO;
 
 #ifdef HAVE_BERKELEY_DB
 void	 bdb_close(void);

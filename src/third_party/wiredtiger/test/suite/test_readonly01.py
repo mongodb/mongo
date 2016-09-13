@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
+from wtscenario import make_scenarios
 import wttest
 
 class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
@@ -73,8 +73,7 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = multiply_scenarios('.',
-        basecfg_list, dir_list, log_list, types)
+    scenarios = make_scenarios(basecfg_list, dir_list, log_list, types)
 
     def conn_config(self, dir):
         self.home = dir

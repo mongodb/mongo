@@ -170,7 +170,7 @@ file_config = format_meta + [
             It is stored in clear text, and thus is available when
             the wiredtiger database is reopened.  On the first use
             of a (name, keyid) combination, the WT_ENCRYPTOR::customize
-            function is called with the keyid as an argument.'''),
+            function is called with the keyid as an argument'''),
         ]),
     Config('format', 'btree', r'''
         the file format''',
@@ -238,17 +238,17 @@ file_config = format_meta + [
         min=0, undoc=True),
     Config('log', '', r'''
         the transaction log configuration for this object.  Only valid if
-        log is enabled in ::wiredtiger_open.''',
+        log is enabled in ::wiredtiger_open''',
         type='category', subconfig=[
         Config('enabled', 'true', r'''
-            if false, this object has checkpoint-level durability.''',
+            if false, this object has checkpoint-level durability''',
             type='boolean'),
         ]),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower
-        bound of <code>50 * leaf_page_max</code>, and an upper bound of
-        <code>cache_size / 2</code>.  This limit is soft - it is possible
+        bound of <code>leaf_page_max</code>, and an upper bound of
+        <code>cache_size / 10</code>.  This limit is soft - it is possible
         for pages to be temporarily larger than this value.  This setting
         is ignored for LSM trees, see \c chunk_size''',
         min='512B', max='10TB'),
@@ -352,7 +352,7 @@ connection_runtime_config = [
         Config('threads', '2', r'''
             the number of worker threads to service asynchronous requests.
             Each worker thread uses a session from the configured
-            session_max.''',
+            session_max''',
                 min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
             ]),
     Config('cache_size', '100MB', r'''
@@ -373,11 +373,10 @@ connection_runtime_config = [
         periodically checkpoint the database. Enabling the checkpoint server
         uses a session from the configured session_max''',
         type='category', subconfig=[
-        Config('name', '"WiredTigerCheckpoint"', r'''
-            the checkpoint name'''),
         Config('log_size', '0', r'''
             wait for this amount of log record bytes to be written to
-                the log between each checkpoint.  A database can configure
+                the log between each checkpoint.  If non-zero, this value will
+                use a minimum of the log file size.  A database can configure
                 both log_size and wait to set an upper bound for checkpoints;
                 setting this value above 0 configures periodic checkpoints''',
             min='0', max='2GB'),
@@ -388,24 +387,46 @@ connection_runtime_config = [
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
-    Config('eviction_dirty_target', '80', r'''
-        continue evicting until the cache has less dirty memory than the
-        value, as a percentage of the total cache size. Dirty pages will
-        only be evicted if the cache is full enough to trigger eviction''',
-        min=5, max=99),
-    Config('eviction_dirty_trigger', '95', r'''
-        trigger eviction when the cache is using this much memory for dirty
-        content, as a percentage of the total cache size. This setting only
-        alters behavior if it is lower than eviction_trigger''',
-        min=5, max=99),
+    Config('eviction', '', r'''
+        eviction configuration options''',
+        type='category', subconfig=[
+            Config('threads_max', '1', r'''
+                maximum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads started will vary
+                depending on the current eviction load. Each eviction worker
+                thread uses a session from the configured session_max''',
+                min=1, max=20),
+            Config('threads_min', '1', r'''
+                minimum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads currently running will
+                vary depending on the current eviction load''',
+                min=1, max=20),
+            ]),
+    Config('eviction_checkpoint_target', '15', r'''
+        perform eviction at the beginning of checkpoints to bring the dirty
+        content in cache to this level, expressed as a percentage of the total
+        cache size.  Ignored if set to zero or \c in_memory is \c true''',
+        min=0, max=99),
+    Config('eviction_dirty_target', '5', r'''
+        perform eviction in worker threads when the cache contains at least
+        this much dirty content, expressed as a percentage of the total cache
+        size.  Ignored if \c in_memory is \c true''',
+        min=1, max=99),
+    Config('eviction_dirty_trigger', '20', r'''
+        trigger application threads to perform eviction when the cache contains
+        at least this much dirty content, expressed as a percentage of the
+        total cache size. This setting only alters behavior if it is lower than
+        eviction_trigger. Ignored if \c in_memory is \c true''',
+        min=1, max=99),
     Config('eviction_target', '80', r'''
-        continue evicting until the cache has less total memory than the
-        value, as a percentage of the total cache size. Must be less than
-        \c eviction_trigger''',
+        perform eviction in worker threads when the cache contains at least
+        this much content, expressed as a percentage of the total cache size.
+        Must be less than \c eviction_trigger''',
         min=10, max=99),
     Config('eviction_trigger', '95', r'''
-        trigger eviction when the cache is using this much memory, as a
-        percentage of the total cache size''', min=10, max=99),
+        trigger application threads to perform eviction when the cache contains
+        at least this much content, expressed as a percentage of the
+        total cache size''', min=10, max=99),
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
@@ -423,7 +444,7 @@ connection_runtime_config = [
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.
-        The LSM manager uses a session from the configured session_max.''',
+        The LSM manager uses a session from the configured session_max''',
         type='category', subconfig=[
         Config('worker_thread_max', '4', r'''
             Configure a set of threads to manage merging LSM trees in
@@ -438,21 +459,6 @@ connection_runtime_config = [
     Config('lsm_merge', 'true', r'''
         merge LSM chunks where possible (deprecated)''',
         type='boolean', undoc=True),
-    Config('eviction', '', r'''
-        eviction configuration options.''',
-        type='category', subconfig=[
-            Config('threads_max', '1', r'''
-                maximum number of threads WiredTiger will start to help evict
-                pages from cache. The number of threads started will vary
-                depending on the current eviction load. Each eviction worker
-                thread uses a session from the configured session_max''',
-                min=1, max=20),
-            Config('threads_min', '1', r'''
-                minimum number of threads WiredTiger will start to help evict
-                pages from cache. The number of threads currently running will
-                vary depending on the current eviction load''',
-                min=1, max=20),
-            ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
         either a cache_size or a shared_cache not both. Enabling a
@@ -518,6 +524,7 @@ connection_runtime_config = [
             'shared_cache',
             'split',
             'temporary',
+            'thread_group',
             'transaction',
             'verify',
             'version',
@@ -530,7 +537,7 @@ log_configuration_common = [
         automatically archive unneeded log files''',
         type='boolean'),
     Config('prealloc', 'true', r'''
-        pre-allocate log files.''',
+        pre-allocate log files''',
         type='boolean'),
     Config('zero_fill', 'false', r'''
         manually write zeroes into log files''',
@@ -651,7 +658,7 @@ wiredtiger_open_common =\
         direct I/O, and including \c "checkpoint" will cause WiredTiger data
         files opened at a checkpoint (i.e: read only) to use direct I/O.
         \c direct_io should be combined with \c write_through to get the
-        equivalent of \c O_DIRECT on Windows.''',
+        equivalent of \c O_DIRECT on Windows''',
         type='list', choices=['checkpoint', 'data', 'log']),
     Config('encryption', '', r'''
         configure an encryptor for system wide metadata and logs.
@@ -670,13 +677,13 @@ wiredtiger_open_common =\
             It is stored in clear text, and thus is available when
             the wiredtiger database is reopened.  On the first use
             of a (name, keyid) combination, the WT_ENCRYPTOR::customize
-            function is called with the keyid as an argument.'''),
+            function is called with the keyid as an argument'''),
         Config('secretkey', '', r'''
             A string that is passed to the WT_ENCRYPTOR::customize function.
             It is never stored in clear text, so must be given to any
             subsequent ::wiredtiger_open calls to reopen the database.
             It must also be provided to any "wt" commands used with
-            this database.'''),
+            this database'''),
         ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).
@@ -737,7 +744,7 @@ wiredtiger_open_common =\
         files to write through cache, including \c "log" will cause WiredTiger
         log files to write through cache. \c write_through should be combined
         with \c direct_io to get the equivalent of POSIX \c O_DIRECT on
-        Windows.''',
+        Windows''',
         type='list', choices=['data', 'log']),
 ]
 
@@ -822,8 +829,9 @@ methods = {
 
 'WT_SESSION.drop' : Method([
     Config('checkpoint_wait', 'true', r'''
-        wait for the checkpoint lock, if \c checkpoint_wait=false, fail if
-        this lock is not available immediately''',
+        wait for the checkpoint lock, if \c checkpoint_wait=false, perform
+        the drop operation without taking a lock, returning EBUSY if the
+        operation conflicts with a running checkpoint''',
         type='boolean', undoc=True),
     Config('force', 'false', r'''
         return success if the object does not exist''',
@@ -904,6 +912,11 @@ methods = {
         "WiredTigerCheckpoint" opens the most recent internal
         checkpoint taken for the object).  The cursor does not
         support data modification'''),
+    Config('checkpoint_wait', 'true', r'''
+        wait for the checkpoint lock, if \c checkpoint_wait=false, open the
+        cursor without taking a lock, returning EBUSY if the operation
+        conflicts with a running checkpoint''',
+        type='boolean', undoc=True),
     Config('dump', '', r'''
         configure the cursor for dump format inputs and outputs: "hex"
         selects a simple hexadecimal format, "json" selects a JSON format
@@ -978,7 +991,7 @@ methods = {
     Config('timeout_ms', '1200000', r'''
         maximum amount of time to wait for background sync to complete in
         milliseconds.  A value of zero disables the timeout and returns
-        immediately.''',
+        immediately''',
         type='int'),
 ]),
 
@@ -1081,7 +1094,7 @@ methods = {
         Config('names', '', r'''
             drop specific named snapshots''', type='list'),
         Config('to', '', r'''
-            drop all snapshots up to and including the specified name.'''),
+            drop all snapshots up to and including the specified name'''),
     ]),
     Config('name', '', r'''specify a name for the snapshot'''),
 ]),

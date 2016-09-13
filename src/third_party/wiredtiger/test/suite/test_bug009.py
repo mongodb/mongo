@@ -33,7 +33,6 @@
 
 import wiredtiger, wttest
 from wiredtiger import stat
-from wtscenario import multiply_scenarios, number_scenarios
 
 class test_bug009(wttest.WiredTigerTestCase):
     name = 'test_bug009'

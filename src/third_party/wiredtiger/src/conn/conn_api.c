@@ -919,7 +919,7 @@ __conn_load_extensions(
 	    WT_CONFIG_BASE(session, WT_CONNECTION_load_extension), NULL, NULL };
 
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
-	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
+	__wt_config_subinit(session, &subconfig, &cval);
 	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
 		if (expath == NULL)
 			WT_ERR(__wt_scr_alloc(session, 0, &expath));
@@ -1020,7 +1020,7 @@ err:	/*
 		}
 
 	/* Release all named snapshots. */
-	WT_TRET(__wt_txn_named_snapshot_destroy(session));
+	__wt_txn_named_snapshot_destroy(session);
 
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
@@ -1555,7 +1555,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 #define	WT_SINGLETHREAD_STRING	"WiredTiger lock file\n"
 		WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
-		if (size != strlen(WT_SINGLETHREAD_STRING))
+		if ((size_t)size != strlen(WT_SINGLETHREAD_STRING))
 			WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0,
 			    strlen(WT_SINGLETHREAD_STRING),
 			    WT_SINGLETHREAD_STRING));
@@ -1727,6 +1727,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "shared_cache",	WT_VERB_SHARED_CACHE },
 		{ "split",		WT_VERB_SPLIT },
 		{ "temporary",		WT_VERB_TEMPORARY },
+		{ "thread_group",	WT_VERB_THREAD_GROUP },
 		{ "transaction",	WT_VERB_TRANSACTION },
 		{ "verify",		WT_VERB_VERIFY },
 		{ "version",		WT_VERB_VERSION },
@@ -1853,7 +1854,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "readonly=,"
 	    "use_environment_priv=,"
 	    "verbose=,", &base_config));
-	WT_ERR(__wt_config_init(session, &parser, base_config));
+	__wt_config_init(session, &parser, base_config);
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
 		if (v.type == WT_CONFIG_ITEM_STRING) {
@@ -2008,7 +2009,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session->name = "wiredtiger_open";
 
 	/* Do standard I/O and error handling first. */
-	WT_ERR(__wt_os_stdio(session));
+	__wt_os_stdio(session);
 	__wt_event_handler_set(session, event_handler);
 
 	/*
@@ -2270,8 +2271,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->page_size = __wt_get_vm_pagesize();
 
 	/* Now that we know if verbose is configured, output the version. */
-	WT_ERR(__wt_verbose(
-	    session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING));
+	__wt_verbose(session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING);
 
 	/*
 	 * Open the connection, then reset the local session as the real one

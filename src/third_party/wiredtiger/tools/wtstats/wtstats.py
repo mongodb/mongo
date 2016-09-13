@@ -137,6 +137,8 @@ def parse_wtperf_file(file, result):
         for i, v in enumerate(values):
             if v == 'N': 
                 v = 0
+            if v == 'Y': 
+                v = 1
             # convert us to ms
             if '(ms)' in headings[i]:
                 v = float(v) / 1000.0
