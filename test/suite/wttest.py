@@ -220,7 +220,7 @@ class WiredTigerTestCase(unittest.TestCase):
         ret_str = ''
         if hasattr(self, 'scenario_number'):
             ret_str = ' -s ' + str(self.scenario_number)
-        return self.className() + ret_str
+        return self.simpleName() + ret_str
 
     def simpleName(self):
         return "%s.%s.%s" %  (self.__module__,
