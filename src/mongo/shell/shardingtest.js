@@ -574,10 +574,15 @@ var ShardingTest = function(params) {
 
         var initialStatus = getBalancerStatus();
         var currentStatus;
-        assert.soon(function() {
-            currentStatus = getBalancerStatus();
-            return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
-        }, 'Latest balancer status' + currentStatus, timeoutMs);
+        assert.soon(
+            function() {
+                currentStatus = getBalancerStatus();
+                return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
+            },
+            function() {
+                return 'Latest balancer status: ' + tojson(currentStatus);
+            },
+            timeoutMs);
     };
 
     /**
