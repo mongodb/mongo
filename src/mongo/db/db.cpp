@@ -736,8 +736,12 @@ ExitCode _initAndListen(int listenPort) {
               << startupWarningsLog;
     }
 
-    uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                        ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
+    auto shardingInitialized =
+        uassertStatusOK(ShardingState::get(startupOpCtx.get())
+                            ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
+    if (shardingInitialized) {
+        reloadShardRegistryUntilSuccess(startupOpCtx.get());
+    }
 
     if (!storageGlobalParams.readOnly) {
         logStartup(startupOpCtx.get());

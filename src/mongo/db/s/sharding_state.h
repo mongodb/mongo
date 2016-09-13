@@ -259,8 +259,13 @@ public:
      * on disk, if there is one.
      * If started with --shardsvr in queryableBackupMode, initializes sharding awareness from the
      * shardIdentity document passed through the --overrideShardIdentity startup parameter.
+     *
+     * If returns true, the ShardingState::_globalInit method was called, meaning all the core
+     * classes for sharding were initialized, but no networking calls were made yet (with the
+     * exception of the duplicate ShardRegistry reload in ShardRegistry::startup() (see
+     * SERVER-26123). Outgoing networking calls to cluster members can now be made.
      */
-    Status initializeShardingAwarenessIfNeeded(OperationContext* txn);
+    StatusWith<bool> initializeShardingAwarenessIfNeeded(OperationContext* txn);
 
     /**
      * Check if a command is one of the whitelisted commands that can be accepted with shardVersion

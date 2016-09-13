@@ -570,7 +570,7 @@ void ShardingState::_signalInitializationComplete(Status status) {
     _initializationFinishedCondition.notify_all();
 }
 
-Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn) {
+StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn) {
     // In sharded readOnly mode, we ignore the shardIdentity document on disk and instead *require*
     // a shardIdentity document to be passed through --overrideShardIdentity.
     if (storageGlobalParams.readOnly) {
@@ -589,7 +589,7 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
             if (!status.isOK()) {
                 return status;
             }
-            return reloadShardRegistryUntilSuccess(txn);
+            return true;
         } else {
             // Error if --overrideShardIdentity is used but *not* started with --shardsvr.
             if (!serverGlobalParams.overrideShardIdentity.isEmpty()) {
@@ -600,7 +600,7 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
                            "through --overrideShardIdentity: "
                         << serverGlobalParams.overrideShardIdentity};
             }
-            return Status::OK();
+            return false;
         }
     }
     // In sharded *non*-readOnly mode, error if --overrideShardIdentity is provided. Use the
@@ -639,7 +639,7 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
                           << NamespaceString::kConfigCollectionNamespace
                           << ". This most likely means this server has not yet been added to a "
                              "sharded cluster.";
-                return Status::OK();
+                return false;
             }
             auto swShardIdentity = ShardIdentityType::fromBSON(shardIdentityBSON);
             if (!swShardIdentity.isOK()) {
@@ -649,7 +649,7 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
             if (!status.isOK()) {
                 return status;
             }
-            return reloadShardRegistryUntilSuccess(txn);
+            return true;
         } else {
             // Warn if a shardIdentity document is found on disk but *not* started with --shardsvr.
             if (!shardIdentityBSON.isEmpty()) {
@@ -658,7 +658,7 @@ Status ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* txn)
                           << NamespaceString::kConfigCollectionNamespace << ": "
                           << shardIdentityBSON;
             }
-            return Status::OK();
+            return false;
         }
     }
 }
