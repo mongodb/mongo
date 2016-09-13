@@ -117,13 +117,12 @@ public:
             version == FeatureCompatibilityVersion::kVersion34 ||
                 version == FeatureCompatibilityVersion::kVersion32);
 
-        // Set featureCompatibilityVersion on self.
-        FeatureCompatibilityVersion::set(txn, version);
-
         // Forward to all shards.
         uassertStatusOK(
             Grid::get(txn)->catalogManager()->setFeatureCompatibilityVersionOnShards(txn, version));
 
+        // On success, set featureCompatibilityVersion on self.
+        FeatureCompatibilityVersion::set(txn, version);
         return true;
     }
 } configsvrSetFeatureCompatibilityVersionCmd;

@@ -177,7 +177,10 @@
     var shardPrimaryAdminDB;
 
     // New 3.4 cluster.
-    st = new ShardingTest({shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}]}}});
+    st = new ShardingTest({
+        shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}]}},
+        other: {useBridge: true}
+    });
     mongosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
@@ -211,6 +214,17 @@
     // featureCompatibilityVersion cannot be set via setParameter on mongos.
     assert.commandFailed(
         mongosAdminDB.runCommand({setParameter: 1, featureCompatibilityVersion: "3.2"}));
+
+    // Prevent the shard primary from receiving messages from the config server primary. When we try
+    // to set the featureCompatibilityVersion to "3.2", it should fail because the shard cannot be
+    // contacted. The config server primary should still report "3.4", since setting the version to
+    // "3.2" did not succeed.
+    st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 1.0);
+    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
+    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.commandWorked(res);
+    assert.eq(res.featureCompatibilityVersion, "3.4");
+    st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 0.0);
 
     // featureCompatibilityVersion can be set to 3.2 on mongos.
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
