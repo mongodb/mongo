@@ -274,7 +274,13 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
     }
 
     auto legacyTicket = checked_cast<LegacyTicket*>(getTicketImpl(ticket));
-    auto res = legacyTicket->_fill(amp);
+    Status res = Status::OK();
+
+    try {
+        res = legacyTicket->_fill(amp);
+    } catch (...) {
+        res = exceptionToStatus();
+    }
 
     {
         stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
