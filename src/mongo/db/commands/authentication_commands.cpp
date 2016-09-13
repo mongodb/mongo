@@ -311,7 +311,7 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
 Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
                                           const UserName& user,
                                           const BSONObj& cmdObj) {
-    if (!getSSLManager()) {
+    if (!SSLEnabled()) {
         return Status(ErrorCodes::ProtocolError,
                       "SSL support is required for the MONGODB-X509 mechanism.");
     }

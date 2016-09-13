@@ -238,6 +238,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("quiet")) {
         mongo::serverGlobalParams.quiet = true;
     }
+
 #ifdef MONGO_CONFIG_SSL
     ret = storeSSLClientOptions(params);
     if (!ret.isOK()) {
@@ -247,6 +248,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("ipv6")) {
         mongo::enableIPv6();
     }
+
     if (params.count("verbose")) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
     }

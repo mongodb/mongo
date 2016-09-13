@@ -40,6 +40,7 @@
 namespace mongo {
 
 class DBClientBase;
+class MongoURI;
 
 /**
  * ConnectionString handles parsing different ways to connect to mongo and determining method
@@ -118,7 +119,8 @@ public:
 
     DBClientBase* connect(StringData applicationName,
                           std::string& errmsg,
-                          double socketTimeout = 0) const;
+                          double socketTimeout = 0,
+                          const MongoURI* uri = nullptr) const;
 
     static StatusWith<ConnectionString> parse(const std::string& url);
 

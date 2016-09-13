@@ -136,8 +136,12 @@ bool DBClientReplicaSet::_authPooledSecondaryConn = true;
 DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const vector<HostAndPort>& servers,
                                        StringData applicationName,
-                                       double so_timeout)
-    : _setName(name), _applicationName(applicationName.toString()), _so_timeout(so_timeout) {
+                                       double so_timeout,
+                                       MongoURI uri)
+    : _setName(name),
+      _applicationName(applicationName.toString()),
+      _so_timeout(so_timeout),
+      _uri(std::move(uri)) {
     _rsm =
         ReplicaSetMonitor::createIfNeeded(name, set<HostAndPort>(servers.begin(), servers.end()));
 }
