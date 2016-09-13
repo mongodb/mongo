@@ -200,9 +200,6 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     if (!ret.isOK())
         return ret;
 
-    options->addOptionChaining(
-        "jsHeapMBLimit", "jsHeapMBLimit", moe::Int, "set the js scope's heap size limit");
-
     return Status::OK();
 }
 
@@ -371,16 +368,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
                 shellGlobalParams.files.insert(shellGlobalParams.files.begin(), dbaddress);
             }
         }
-    }
-
-    if (params.count("jsHeapMBLimit")) {
-        int jsHeapMBLimit = params["jsHeapMBLimit"].as<int>();
-        if (jsHeapMBLimit <= 0) {
-            StringBuilder sb;
-            sb << "ERROR: \"jsHeapMBLimit\" needs to be greater than 0";
-            return Status(ErrorCodes::BadValue, sb.str());
-        }
-        shellGlobalParams.jsHeapMBLimit = jsHeapMBLimit;
     }
 
     if (shellGlobalParams.url == "*") {

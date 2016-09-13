@@ -249,9 +249,6 @@ public:
     virtual void enableJavaScriptProtection(bool value) = 0;
     virtual bool isJavaScriptProtectionEnabled() const = 0;
 
-    virtual int getJSHeapMBLimit() const = 0;
-    virtual void setJSHeapMBLimit(int limit) = 0;
-
     static void setup();
     static void dropScopeCache();
 
