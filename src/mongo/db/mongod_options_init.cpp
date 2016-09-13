@@ -40,7 +40,10 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* contex
     return addMongodOptions(&moe::startupOptions);
 }
 
-MONGO_STARTUP_OPTIONS_VALIDATE(MongodOptions)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(MongodOptions,
+                          ("BeginStartupOptionValidation", "AllFailPointsRegistered"),
+                          ("EndStartupOptionValidation"))
+(InitializerContext* context) {
     if (!handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }

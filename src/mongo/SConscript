@@ -263,6 +263,7 @@ mongodLibDeps = [
     "transport/transport_layer_legacy",
     "transport/service_entry_point_utils",
     "util/clock_sources",
+    "util/fail_point",
     "util/ntservice",
     "util/version_impl",
 ]
@@ -323,6 +324,7 @@ env.Install(
             'transport/service_entry_point_utils',
             'transport/transport_layer_legacy',
             'util/clock_sources',
+            'util/fail_point',
             'util/ntservice',
             'util/options_parser/options_parser_init',
             'util/version_impl',
