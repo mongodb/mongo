@@ -216,6 +216,12 @@ class WiredTigerTestCase(unittest.TestCase):
                    ' (' + self.scenario_name + ')'
         return self.simpleName() + scen
 
+    def shortDesc(self):
+        ret_str = ''
+        if hasattr(self, 'scenario_number'):
+            ret_str = ' -s ' + str(self.scenario_number)
+        return self.className() + ret_str
+
     def simpleName(self):
         return "%s.%s.%s" %  (self.__module__,
                               self.className(), self._testMethodName)
