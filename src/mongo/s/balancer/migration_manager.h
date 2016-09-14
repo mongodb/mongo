@@ -134,10 +134,10 @@ public:
 private:
     // The current state of the migration manager
     enum class State {  // Allowed transitions:
-        kRecovering,    // kEnabled
+        kStopped,       // kRecovering
+        kRecovering,    // kEnabled, kStopping
         kEnabled,       // kStopping
         kStopping,      // kStopped
-        kStopped,       // kRecovering
     };
 
     /**

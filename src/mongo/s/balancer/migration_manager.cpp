@@ -265,7 +265,6 @@ Status MigrationManager::executeManualMigration(
 
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
-    cm->reload(txn);
 
     // Regardless of the failure mode, if the chunk's current shard matches the destination, deem
     // the move as success.
@@ -296,6 +295,8 @@ void MigrationManager::finishRecovery(OperationContext* txn,
                                       bool waitForDelete) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_state == State::kStopping)
+            return;
         invariant(_state == State::kRecovering);
         if (!_clusterIdentity.isSet()) {
             _clusterIdentity = clusterIdentity;
@@ -371,7 +372,6 @@ void MigrationManager::finishRecovery(OperationContext* txn,
 
         auto scopedCM = std::move(scopedCMStatus.getValue());
         ChunkManager* const cm = scopedCM.cm();
-        cm->reload(txn);
 
         auto itMigrateInfo = nssAndMigrateInfos.second.begin();
         invariant(itMigrateInfo != nssAndMigrateInfos.second.end());
@@ -406,14 +406,14 @@ void MigrationManager::finishRecovery(OperationContext* txn,
         }
     }
 
-    // The MigrationManager has now reacquired the state that it was in prior to any stepdown.
+    _migrationRecoveryMap.clear();
+
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        invariant(_state == State::kRecovering);
-
-        _migrationRecoveryMap.clear();
-        _state = State::kEnabled;
-        _condVar.notify_all();
+        if (_state == State::kRecovering) {
+            _state = State::kEnabled;
+            _condVar.notify_all();
+        }
     }
 
     // Wait for each migration to finish, as usual.
@@ -427,10 +427,7 @@ void MigrationManager::interruptAndDisableMigrations() {
         Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (_state != State::kEnabled && _state != State::kRecovering) {
-        return;
-    }
-
+    invariant(_state == State::kEnabled || _state == State::kRecovering);
     _state = State::kStopping;
 
     // Interrupt any active migrations with dist lock

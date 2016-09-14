@@ -74,27 +74,37 @@ public:
     static Balancer* get(OperationContext* operationContext);
 
     /**
-     * Starts the main balancer thread and returns immediately. If the thread was successfully
-     * started (or if it was already running), returns an OK status. Otherwise, an error is
-     * returned.
+     * Invoked when the config server primary enters the 'PRIMARY' state and is invoked while the
+     * caller is holding the global X lock. Kicks off the main balancer thread and returns
+     * immediately.
      *
-     * Known errors include:
-     *  ConflictingOperationInProgress - if the balancer is being shut down
+     * Must only be called if the balancer is in the stopped state (i.e., just constructed or
+     * onDrainComplete has been called before). Any code in this call must not try to acquire any
+     * locks or to wait on operations, which acquire locks.
      */
-    Status startThread(OperationContext* txn);
+    void onTransitionToPrimary(OperationContext* txn);
 
     /**
-     * If the main balancer thread is running, requests it to stop and returns immediately without
-     * waiting for it to terminate. The join method must be called afterwards in order to wait for
-     * the thread to complete.
+     * Invoked when this node which is currently serving as a 'PRIMARY' steps down and is invoked
+     * while the global X lock is held. Requests the main balancer thread to stop and returns
+     * immediately without waiting for it to terminate.
+     *
+     * This method might be called multiple times in succession, which is what happens as a result
+     * of incomplete transition to primary so it is resilient to that.
+     *
+     * The onDrainComplete method must be called afterwards in order to wait for the main balancer
+     * thread to terminate and to allow onTransitionToPrimary to be called again.
      */
-    void stopThread();
+    void onStepDownFromPrimary();
 
     /**
-     * Must always be called after stop has been called and only then. Ensures that the balancer
-     * thread has terminated.
+     * Invoked when a node on its way to becoming a primary finishes draining and is about to
+     * acquire the global X lock in order to allow writes. Waits for the balancer thread to
+     * terminate and primes the balancer so that onTransitionToPrimary can be called.
+     *
+     * This method is called without any locks held.
      */
-    void joinThread();
+    void onDrainComplete(OperationContext* txn);
 
     /**
      * Potentially blocking method, which will return immediately if the balancer is not running a
@@ -189,14 +199,24 @@ private:
                            const NamespaceString& nss,
                            const BSONObj& minKey);
 
-    // The main balancer thread
-    stdx::thread _thread;
-
     // Protects the state below
     stdx::mutex _mutex;
 
     // Indicates the current state of the balancer
     State _state{kStopped};
+
+    // The main balancer thread
+    stdx::thread _thread;
+
+    // This thread is only available in the kStopping state and is necessary for the migration
+    // manager shutdown to not deadlock with replica set step down. In particular, the migration
+    // manager's order of lock acquisition is mutex, then collection lock, whereas stepdown first
+    // acquires the global S lock and then acquires the migration manager's mutex.
+    //
+    // The interrupt thread is scheduled when the balancer enters the kStopping state (which is at
+    // step down) and is joined outside of lock, when the replica set leaves draining mode, outside
+    // of the global X lock.
+    stdx::thread _migrationManagerInterruptThread;
 
     // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};

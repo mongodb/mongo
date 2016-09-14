@@ -172,52 +172,52 @@ Balancer* Balancer::get(OperationContext* operationContext) {
     return get(operationContext->getServiceContext());
 }
 
-Status Balancer::startThread(OperationContext* txn) {
+void Balancer::onTransitionToPrimary(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-    switch (_state) {
-        case kStopping:
-            return {ErrorCodes::ConflictingOperationInProgress,
-                    "Sharding balancer is in currently being shut down"};
-        case kStopped:
-            invariant(!_thread.joinable());
-            _state = kRunning;
+    invariant(_state == kStopped);
+    _state = kRunning;
 
-            _migrationManager.startRecovery();
-            _thread = stdx::thread([this] { _mainThread(); });
-        // Intentional fall through
-        case kRunning:
-            return Status::OK();
-        default:
-            MONGO_UNREACHABLE;
-    }
+    _migrationManager.startRecovery();
+
+    invariant(!_thread.joinable());
+    _thread = stdx::thread([this] { _mainThread(); });
 }
 
-void Balancer::stopThread() {
+void Balancer::onStepDownFromPrimary() {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-    if (_state == kRunning) {
-        // Request the balancer thread to stop
-        _state = kStopping;
-        _condVar.notify_all();
-    }
+    if (_state != kRunning)
+        return;
+
+    _state = kStopping;
+
+    // Schedule a separate thread to shutdown the migration manager in order to avoid deadlock with
+    // replication step down
+    invariant(!_migrationManagerInterruptThread.joinable());
+    _migrationManagerInterruptThread =
+        stdx::thread([this] { _migrationManager.interruptAndDisableMigrations(); });
+
+    _condVar.notify_all();
 }
 
-void Balancer::joinThread() {
+void Balancer::onDrainComplete(OperationContext* txn) {
+    invariant(!txn->lockState()->isLocked());
+
     {
         stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-        if (_state == kStopped) {
+        if (_state == kStopped)
             return;
-        }
 
         invariant(_state == kStopping);
+        invariant(_thread.joinable());
     }
 
-    if (_thread.joinable()) {
-        _thread.join();
+    _thread.join();
 
-        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-        _state = kStopped;
-        _thread = {};
-    }
+    stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+    _state = kStopped;
+    _thread = {};
+
+    LOG(1) << "Balancer thread terminated";
 }
 
 void Balancer::joinCurrentRound(OperationContext* txn) {
@@ -409,9 +409,19 @@ void Balancer::_mainThread() {
         }
     }
 
-    // Stop any active migrations and prevent any new migrations from getting scheduled
-    _migrationManager.interruptAndDisableMigrations();
+    {
+        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        invariant(_state == kStopping);
+        invariant(_migrationManagerInterruptThread.joinable());
+    }
+
+    _migrationManagerInterruptThread.join();
     _migrationManager.drainActiveMigrations();
+
+    {
+        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        _migrationManagerInterruptThread = {};
+    }
 
     log() << "CSRS balancer is now stopped";
 }

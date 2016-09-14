@@ -812,6 +812,11 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
                                                      MigrationType::ConfigNS,
                                                      BSON(MigrationType::name(chunk.getName())),
                                                      kMajorityWriteConcern));
+
+    // Restore the migration manager back to the started state, which is expected by tearDown
+    _migrationManager->startRecovery();
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
 }
 
 TEST_F(MigrationManagerTest, RestartMigrationManager) {
