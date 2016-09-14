@@ -153,6 +153,14 @@ TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollect
     testStartupCreatesCollection(_txn.get(), _storageInterface, makeNamespace(_agent));
 }
 
+TEST_F(OplogBufferCollectionTest, StartupDropsExistingCollectionBeforeCreatingNewCollection) {
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(_storageInterface->createCollection(_txn.get(), nss, CollectionOptions()));
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+    oplogBuffer.startup(_txn.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+}
+
 DEATH_TEST_F(OplogBufferCollectionTest,
              StartupWithOplogNamespaceTriggersFatalAssertion,
              "Fatal assertion 40154 Location28838: cannot create a non-capped oplog collection") {

@@ -82,7 +82,7 @@ NamespaceString OplogBufferCollection::getNamespace() const {
 }
 
 void OplogBufferCollection::startup(OperationContext* txn) {
-    _createCollection(txn);
+    clear(txn);
 }
 
 void OplogBufferCollection::shutdown(OperationContext* txn) {
