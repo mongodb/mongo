@@ -236,6 +236,10 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	uint32_t checksum;
 	bool local_locked;
 
+	*offsetp = 0;			/* -Werror=maybe-uninitialized */
+	*sizep = 0;			/* -Werror=maybe-uninitialized */
+	*checksump = 0;			/* -Werror=maybe-uninitialized */
+
 	fh = block->fh;
 
 	/*
