@@ -69,10 +69,6 @@ public:
     // should be made to wait for it to become free.
     static const Milliseconds kSingleLockAttemptTimeout;
 
-    // If timeout is passed to the lock call, what is the default frequency with which the lock will
-    // be checked for availability.
-    static const Milliseconds kDefaultLockRetryInterval;
-
     /**
      * RAII type for distributed lock. Not meant to be shared across multiple threads.
      */
@@ -134,8 +130,7 @@ public:
     StatusWith<ScopedDistLock> lock(OperationContext* txn,
                                     StringData name,
                                     StringData whyMessage,
-                                    Milliseconds waitFor = kDefaultLockTimeout,
-                                    Milliseconds lockTryInterval = kDefaultLockRetryInterval);
+                                    Milliseconds waitFor = kDefaultLockTimeout);
 
     /**
      * Same behavior as lock(...) above, except takes a specific lock session ID "lockSessionID"
@@ -150,8 +145,7 @@ public:
         StringData name,
         StringData whyMessage,
         const OID& lockSessionID,
-        Milliseconds waitFor = kDefaultLockTimeout,
-        Milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
+        Milliseconds waitFor = kDefaultLockTimeout) = 0;
 
     /**
      * Specialized locking method, which only succeeds if the specified lock name is not held by

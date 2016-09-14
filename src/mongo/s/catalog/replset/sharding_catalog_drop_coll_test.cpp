@@ -64,7 +64,7 @@ public:
         configTargeter()->setConnectionStringReturnValue(_configCS);
 
         distLock()->expectLock(
-            [this](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
+            [this](StringData name, StringData whyMessage, Milliseconds) {
                 ASSERT_EQUALS(_dropNS.ns(), name);
                 ASSERT_EQUALS("drop", whyMessage);
             },
@@ -266,7 +266,7 @@ TEST_F(DropColl2ShardTest, ConfigTargeterError) {
 }
 
 TEST_F(DropColl2ShardTest, DistLockBusy) {
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {},
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {},
                            {ErrorCodes::LockBusy, "test lock taken"});
 
     auto future = launchAsync([this] {

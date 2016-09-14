@@ -62,6 +62,9 @@ namespace {
 // How many times to retry acquiring the lock after the first attempt fails
 const int kMaxNumLockAcquireRetries = 2;
 
+// How frequently to poll the distributed lock when it is found to be locked
+const Milliseconds kLockRetryInterval(500);
+
 }  // namespace
 
 const Seconds ReplSetDistLockManager::kDistLockPingInterval{30};
@@ -275,8 +278,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
                                                                      StringData name,
                                                                      StringData whyMessage,
                                                                      const OID& lockSessionID,
-                                                                     Milliseconds waitFor,
-                                                                     Milliseconds lockTryInterval) {
+                                                                     Milliseconds waitFor) {
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
@@ -417,7 +419,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
 
         const Milliseconds timeRemaining =
             std::max(Milliseconds::zero(), waitFor - Milliseconds(timer.millis()));
-        sleepFor(std::min(lockTryInterval, timeRemaining));
+        sleepFor(std::min(kLockRetryInterval, timeRemaining));
     }
 
     return {ErrorCodes::LockBusy, str::stream() << "timed out waiting for " << name};

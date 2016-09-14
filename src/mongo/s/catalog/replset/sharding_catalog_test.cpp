@@ -717,10 +717,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           Milliseconds waitFor,
-           Milliseconds lockTryInterval) {
+        [](StringData name, StringData whyMessage, Milliseconds waitFor) {
             ASSERT_EQUALS("authorizationData", name);
             ASSERT_EQUALS("dropUser", whyMessage);
         },
@@ -1575,11 +1572,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
 
     // Now actually start the createDatabase work.
 
-    distLock()->expectLock([dbname](StringData name,
-                                    StringData whyMessage,
-                                    Milliseconds waitFor,
-                                    Milliseconds lockTryInterval) {},
-                           Status::OK());
+    distLock()->expectLock(
+        [dbname](StringData name, StringData whyMessage, Milliseconds waitFor) {}, Status::OK());
 
 
     future = launchAsync([this, dbname] {
@@ -1678,10 +1672,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDistLockHeld) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     distLock()->expectLock(
-        [dbname](StringData name,
-                 StringData whyMessage,
-                 Milliseconds waitFor,
-                 Milliseconds lockTryInterval) {
+        [dbname](StringData name, StringData whyMessage, Milliseconds waitFor) {
             ASSERT_EQUALS(dbname, name);
             ASSERT_EQUALS("createDatabase", whyMessage);
         },
@@ -1697,11 +1688,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDBExists) {
 
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    distLock()->expectLock([dbname](StringData name,
-                                    StringData whyMessage,
-                                    Milliseconds waitFor,
-                                    Milliseconds lockTryInterval) {},
-                           Status::OK());
+    distLock()->expectLock(
+        [dbname](StringData name, StringData whyMessage, Milliseconds waitFor) {}, Status::OK());
 
 
     auto future = launchAsync([this, dbname] {
@@ -1736,11 +1724,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDBExistsDifferentCase) {
 
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    distLock()->expectLock([dbname](StringData name,
-                                    StringData whyMessage,
-                                    Milliseconds waitFor,
-                                    Milliseconds lockTryInterval) {},
-                           Status::OK());
+    distLock()->expectLock(
+        [dbname](StringData name, StringData whyMessage, Milliseconds waitFor) {}, Status::OK());
 
 
     auto future = launchAsync([this, dbname] {
@@ -1774,11 +1759,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseNoShards) {
 
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    distLock()->expectLock([dbname](StringData name,
-                                    StringData whyMessage,
-                                    Milliseconds waitFor,
-                                    Milliseconds lockTryInterval) {},
-                           Status::OK());
+    distLock()->expectLock(
+        [dbname](StringData name, StringData whyMessage, Milliseconds waitFor) {}, Status::OK());
 
 
     auto future = launchAsync([this, dbname] {
@@ -1865,11 +1847,8 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
 
     // Now actually start the createDatabase work.
 
-    distLock()->expectLock([dbname](StringData name,
-                                    StringData whyMessage,
-                                    Milliseconds waitFor,
-                                    Milliseconds lockTryInterval) {},
-                           Status::OK());
+    distLock()->expectLock(
+        [dbname](StringData name, StringData whyMessage, Milliseconds waitFor) {}, Status::OK());
 
 
     future = launchAsync([this, dbname] {
@@ -1980,7 +1959,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
     distLock()->expectLock(
-        [](StringData name, StringData whyMessage, Milliseconds, Milliseconds) {
+        [](StringData name, StringData whyMessage, Milliseconds) {
             ASSERT_EQ("test", name);
             ASSERT_FALSE(whyMessage.empty());
         },
@@ -2065,7 +2044,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
 TEST_F(ShardingCatalogClientTest, EnableShardingLockBusy) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {},
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {},
                            {ErrorCodes::LockBusy, "lock taken"});
 
     auto status = catalogClient()->enableSharding(operationContext(), "test");
@@ -2082,7 +2061,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingDBExistsWithDifferentCase) {
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogClient()->enableSharding(operationContext(), "test");
@@ -2109,7 +2088,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingDBExists) {
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogClient()->enableSharding(operationContext(), "test");
@@ -2165,7 +2144,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingFailsWhenTheDatabaseIsAlreadySha
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogClient()->enableSharding(operationContext(), "test");
@@ -2191,7 +2170,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingDBExistsInvalidFormat) {
 
     setupShards(vector<ShardType>{shard});
 
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogClient()->enableSharding(operationContext(), "test");
@@ -2211,7 +2190,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingDBExistsInvalidFormat) {
 TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExistsNoShards) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    distLock()->expectLock([](StringData, StringData, Milliseconds, Milliseconds) {}, Status::OK());
+    distLock()->expectLock([](StringData, StringData, Milliseconds) {}, Status::OK());
 
     auto future = launchAsync([this] {
         auto status = catalogClient()->enableSharding(operationContext(), "test");

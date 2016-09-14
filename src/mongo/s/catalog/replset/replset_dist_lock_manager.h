@@ -72,8 +72,7 @@ public:
                                                  StringData name,
                                                  StringData whyMessage,
                                                  const OID& lockSessionID,
-                                                 Milliseconds waitFor,
-                                                 Milliseconds lockTryInterval) override;
+                                                 Milliseconds waitFor) override;
 
     StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
                                                             StringData name,

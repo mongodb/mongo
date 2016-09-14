@@ -52,8 +52,7 @@ public:
                                                  StringData name,
                                                  StringData whyMessage,
                                                  const OID& lockSessionID,
-                                                 Milliseconds waitFor,
-                                                 Milliseconds lockTryInterval) override;
+                                                 Milliseconds waitFor) override;
 
     StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
                                                             StringData name,
@@ -61,10 +60,8 @@ public:
 
     void unlockAll(OperationContext* txn, const std::string& processID) override;
 
-    using LockFunc = stdx::function<void(StringData name,
-                                         StringData whyMessage,
-                                         Milliseconds waitFor,
-                                         Milliseconds lockTryInterval)>;
+    using LockFunc =
+        stdx::function<void(StringData name, StringData whyMessage, Milliseconds waitFor)>;
 
     void expectLock(LockFunc checkerFunc, Status lockStatus);
 
