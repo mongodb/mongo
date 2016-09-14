@@ -587,8 +587,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_next);
-	WT_STAT_FAST_DATA_INCR(session, cursor_next);
+	WT_STAT_CONN_INCR(session, cursor_next);
+	WT_STAT_DATA_INCR(session, cursor_next);
 
 	flags = WT_READ_SKIP_INTL;			/* Tree walk flags. */
 	if (truncating)

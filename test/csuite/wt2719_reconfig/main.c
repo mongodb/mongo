@@ -130,7 +130,8 @@ static const char *list[] = {
 	",statistics=(\"all\")",
 	",statistics=(\"fast\")",
 	",statistics=(\"none\")",
-	",statistics=(\"clear\")",
+	",statistics=(\"all\",\"clear\")",
+	",statistics=(\"fast\",\"clear\")",
 
 	",statistics_log=(json=0)",
 	",statistics_log=(json=1)",

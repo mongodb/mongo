@@ -139,12 +139,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_dsk(session, tmp->data, buf));
 	}
 
-	WT_STAT_FAST_CONN_INCR(session, cache_read);
-	WT_STAT_FAST_DATA_INCR(session, cache_read);
+	WT_STAT_CONN_INCR(session, cache_read);
+	WT_STAT_DATA_INCR(session, cache_read);
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
-		WT_STAT_FAST_DATA_INCR(session, compress_read);
-	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
-	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
+		WT_STAT_DATA_INCR(session, compress_read);
+	WT_STAT_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
+	WT_STAT_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
 
 	if (0) {
 corrupt:	if (ret == 0)
@@ -234,7 +234,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		ip = buf;
 	else if (buf->size <= btree->allocsize) {
 		ip = buf;
-		WT_STAT_FAST_DATA_INCR(session, compress_write_too_small);
+		WT_STAT_DATA_INCR(session, compress_write_too_small);
 	} else {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
@@ -283,10 +283,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		    buf->size / btree->allocsize <=
 		    result_len / btree->allocsize) {
 			ip = buf;
-			WT_STAT_FAST_DATA_INCR(session, compress_write_fail);
+			WT_STAT_DATA_INCR(session, compress_write_fail);
 		} else {
 			compressed = true;
-			WT_STAT_FAST_DATA_INCR(session, compress_write);
+			WT_STAT_DATA_INCR(session, compress_write);
 
 			/*
 			 * Copy in the skipped header bytes, set the final data
@@ -363,11 +363,11 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    bm->write(
 	    bm, session, ip, addr, addr_sizep, data_checksum, checkpoint_io));
 
-	WT_STAT_FAST_CONN_INCR(session, cache_write);
-	WT_STAT_FAST_DATA_INCR(session, cache_write);
+	WT_STAT_CONN_INCR(session, cache_write);
+	WT_STAT_DATA_INCR(session, cache_write);
 	S2C(session)->cache->bytes_written += dsk->mem_size;
-	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
-	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
+	WT_STAT_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
+	WT_STAT_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
 
 err:	__wt_scr_free(session, &ctmp);
 	__wt_scr_free(session, &etmp);

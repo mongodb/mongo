@@ -382,21 +382,19 @@ err:	__wt_scr_free(session, &buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 {
-	WT_UNUSED(session);
-
 	/*
 	 * Reading from the live system's structure normally requires locking,
 	 * but it's an 8B statistics read, there's no need.
 	 */
-	WT_STAT_WRITE(stats, allocation_size, block->allocsize);
-	WT_STAT_WRITE(
+	WT_STAT_WRITE(session, stats, allocation_size, block->allocsize);
+	WT_STAT_WRITE(session,
 	    stats, block_checkpoint_size, (int64_t)block->live.ckpt_size);
-	WT_STAT_WRITE(stats, block_magic, WT_BLOCK_MAGIC);
-	WT_STAT_WRITE(stats, block_major, WT_BLOCK_MAJOR_VERSION);
-	WT_STAT_WRITE(stats, block_minor, WT_BLOCK_MINOR_VERSION);
-	WT_STAT_WRITE(
+	WT_STAT_WRITE(session, stats, block_magic, WT_BLOCK_MAGIC);
+	WT_STAT_WRITE(session, stats, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_STAT_WRITE(session, stats, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_STAT_WRITE(session,
 	    stats, block_reuse_bytes, (int64_t)block->live.avail.bytes);
-	WT_STAT_WRITE(stats, block_size, block->size);
+	WT_STAT_WRITE(session, stats, block_size, block->size);
 }
 
 /*

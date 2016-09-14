@@ -113,7 +113,7 @@ __async_new_op_alloc(WT_SESSION_IMPL *session, const char *uri,
 
 	conn = S2C(session);
 	async = conn->async;
-	WT_STAT_FAST_CONN_INCR(session, async_op_alloc);
+	WT_STAT_CONN_INCR(session, async_op_alloc);
 	*opp = NULL;
 
 retry:
@@ -143,7 +143,7 @@ retry:
 	 * We still haven't found one.  Return an error.
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
-		WT_STAT_FAST_CONN_INCR(session, async_full);
+		WT_STAT_CONN_INCR(session, async_full);
 		WT_RET(EBUSY);
 	}
 	/*
@@ -152,10 +152,10 @@ retry:
 	 * Start the next search at the next entry after this one.
 	 */
 	if (!__wt_atomic_cas32(&op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
-		WT_STAT_FAST_CONN_INCR(session, async_alloc_race);
+		WT_STAT_CONN_INCR(session, async_alloc_race);
 		goto retry;
 	}
-	WT_STAT_FAST_CONN_INCRV(session, async_alloc_view, view);
+	WT_STAT_CONN_INCRV(session, async_alloc_view, view);
 	WT_RET(__async_get_format(conn, uri, config, op));
 	op->unique_id = __wt_atomic_add64(&async->op_id, 1);
 	op->optype = WT_AOP_NONE;
@@ -507,7 +507,7 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 	if (workers == 0)
 		return (0);
 
-	WT_STAT_FAST_CONN_INCR(session, async_flush);
+	WT_STAT_CONN_INCR(session, async_flush);
 	/*
 	 * We have to do several things.  First we have to prevent
 	 * other callers from racing with us so that only one

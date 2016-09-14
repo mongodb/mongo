@@ -599,7 +599,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 * Statistics cursor configuration: must match (and defaults to), the
 	 * database configuration.
 	 */
-	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
+	if (!WT_STAT_ENABLED(session))
 		goto config_err;
 	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
 		if ((ret = __wt_config_subgets(
