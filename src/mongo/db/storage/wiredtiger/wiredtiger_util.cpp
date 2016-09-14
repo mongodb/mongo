@@ -257,6 +257,11 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     ErrorAccumulator eventHandler(&errors);
 
     StringData config = configElem.valueStringData();
+    // Do NOT allow embedded null characters
+    if (config.size() != strlen(config.rawData())) {
+        return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
+    }
+
     Status status = wtRCToStatus(
         wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()));
     if (!status.isOK()) {
