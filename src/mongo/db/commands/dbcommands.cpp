@@ -1038,6 +1038,7 @@ public:
             // is not needed for the missing DB case, we can just do the same that's done in
             // CollectionStats.
             result.appendNumber("collections", 0);
+            result.appendNumber("views", 0);
             result.appendNumber("objects", 0);
             result.append("avgObjSize", 0);
             result.appendNumber("dataSize", 0);

@@ -322,7 +322,8 @@ void Database::getStats(OperationContext* opCtx, BSONObjBuilder* output, double 
     list<string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
 
-    long long ncollections = 0;
+    long long nCollections = 0;
+    long long nViews = 0;
     long long objects = 0;
     long long size = 0;
     long long storageSize = 0;
@@ -337,7 +338,7 @@ void Database::getStats(OperationContext* opCtx, BSONObjBuilder* output, double 
         if (!collection)
             continue;
 
-        ncollections += 1;
+        nCollections += 1;
         objects += collection->numRecords(opCtx);
         size += collection->dataSize(opCtx);
 
@@ -349,7 +350,10 @@ void Database::getStats(OperationContext* opCtx, BSONObjBuilder* output, double 
         indexSize += collection->getIndexSize(opCtx);
     }
 
-    output->appendNumber("collections", ncollections);
+    getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) { nViews += 1; });
+
+    output->appendNumber("collections", nCollections);
+    output->appendNumber("views", nViews);
     output->appendNumber("objects", objects);
     output->append("avgObjSize", objects == 0 ? 0 : double(size) / double(objects));
     output->appendNumber("dataSize", size / scale);
