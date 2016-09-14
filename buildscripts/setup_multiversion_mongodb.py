@@ -36,12 +36,14 @@ def dump_stacks(signal, frame):
     print "======================================"
 
 
-def version_tuple(version):
-    """Returns a version tuple that can be used for numeric sorting
-    of version strings such as '2.6.0-rc1' and '2.4.0'"""
+def get_version_parts(version, for_sorting=False):
+    """Returns a list containing the components of the version string
+    as numeric values. This function can be used for numeric sorting
+    of version strings such as '2.6.0-rc1' and '2.4.0' when the
+    'for_sorting' parameter is specified as true."""
 
     RC_OFFSET = -100
-    version_parts = re.split(r'\.|-', version[0])
+    version_parts = re.split(r'\.|-', version)
 
     if version_parts[-1] == "pre":
         # Prior to improvements for how the version string is managed within the server
@@ -49,24 +51,23 @@ def version_tuple(version):
         version_parts.pop()
 
     if version_parts[-1].startswith("rc"):
-        rc_part = version_parts.pop()
-        rc_part = rc_part.split('rc')[1]
-
         # RC versions are weighted down to allow future RCs and general
         # releases to be sorted in ascending order (e.g., 2.6.0-rc1,
         # 2.6.0-rc2, 2.6.0).
-        version_parts.append(int(rc_part) + RC_OFFSET)
+        version_parts[-1] = int(version_parts[-1][2:]) + RC_OFFSET
     elif version_parts[0].startswith("v") and version_parts[-1] == "latest":
         version_parts[0] = version_parts[0][1:]
         # The "<branchname>-latest" versions are weighted the highest when a particular major
         # release is requested.
         version_parts[-1] = float("inf")
-    else:
-        # Non-RC releases have an extra 0 appended so version tuples like
-        # (2, 6, 0, -100) and (2, 6, 0, 0) sort in ascending order.
+    elif for_sorting:
+        # We want to have the number of components in the resulting version parts match the number
+        # of components in the 'version' string if we aren't going to be using them for sorting.
+        # Otherwise, we append an additional 0 to non-RC releases so that version lists like
+        # [2, 6, 0, -100] and [2, 6, 0, 0] sort in ascending order.
         version_parts.append(0)
 
-    return tuple(map(float, version_parts))
+    return [float(part) for part in version_parts]
 
 
 def download_file(url, file_name):
@@ -138,12 +139,16 @@ class MultiVersionDownloader :
             else: raise
 
         urls = []
+        requested_version_parts = get_version_parts(version)
         for link_version, link_url in self.links.iteritems():
-            if link_version.startswith(version) or link_version == "v%s-latest" % (version):
+            link_version_parts = get_version_parts(link_version)
+            if link_version_parts[:len(requested_version_parts)] == requested_version_parts:
                 # The 'link_version' is a candidate for the requested 'version' if
                 #   (a) it is a prefix of the requested version, or if
                 #   (b) it is the "<branchname>-latest" version and the requested version is for a
                 #       particular major release.
+                # This is equivalent to the 'link_version' having components equal to all of the
+                # version parts that make up 'version'.
                 if "-" in version:
                     # The requested 'version' contains a hyphen, so we only consider exact matches
                     # to that version.
@@ -155,7 +160,7 @@ class MultiVersionDownloader :
             raise Exception("Cannot find a link for version %s, versions %s found." \
                 % (version, self.links))
 
-        urls.sort(key=version_tuple)
+        urls.sort(key=lambda (version, _): get_version_parts(version, for_sorting=True))
         full_version = urls[-1][0]
         url = urls[-1][1]
         extract_dir = url.split("/")[-1][:-4]
