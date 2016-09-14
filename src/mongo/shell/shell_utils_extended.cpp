@@ -196,8 +196,23 @@ BSONObj mkdir(const BSONObj& args, void* data) {
     uassert(16834,
             "mkdir requires a string argument -- mkdir(directory)",
             args.firstElement().type() == String);
-    boost::filesystem::create_directories(args.firstElement().String());
-    return BSON("" << true);
+
+    // Boost bug 12495 (https://svn.boost.org/trac/boost/ticket/12495):
+    // create_directories crashes on empty string. We expect mkdir("") to
+    // fail on the OS level anyway, so catch it here instead.
+    uassert(40315, "mkdir requires a non-empty string", args.firstElement().String() != "");
+
+    boost::system::error_code ec;
+    auto created = boost::filesystem::create_directories(args.firstElement().String(), ec);
+
+    uassert(40316, "mkdir() failed: " + ec.message(), !ec);
+
+    BSONObjBuilder wrapper;
+    BSONObjBuilder res(wrapper.subobjStart(""));
+    res.append("exists", true);
+    res.append("created", created);
+    res.done();
+    return wrapper.obj();
 }
 
 BSONObj removeFile(const BSONObj& args, void* data) {
