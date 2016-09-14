@@ -87,13 +87,6 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
                     "node needs to be a replica set member to use read concern"};
         }
 
-        if (!replCoord->getSettings().isMajorityReadConcernEnabled()) {
-            // This is an opt-in feature. Fail if the user didn't opt-in.
-            return {ErrorCodes::ReadConcernMajorityNotEnabled,
-                    "Linearizable read concern requested, but server was not started with "
-                    "--enableMajorityReadConcern."};
-        }
-
         if (!readConcernArgs.getOpTime().isNull()) {
             return {ErrorCodes::FailedToParse,
                     "afterOpTime not compatible with linearizable read concern"};
@@ -115,8 +108,7 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
 
     if ((replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet ||
          testingSnapshotBehaviorInIsolation) &&
-        (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-         readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern)) {
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
         // ReadConcern Majority is not supported in ProtocolVersion 0.
         if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
             return {ErrorCodes::ReadConcernMajorityNotEnabled,
