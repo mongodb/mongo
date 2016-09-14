@@ -68,7 +68,7 @@ namespace {
 const char kHashFieldName[] = "h";
 const int kSleepToAllowBatchingMillis = 2;
 const int kSmallBatchLimitBytes = 40000;
-const Milliseconds kOplogSocketTimeout(30000);
+const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
 
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.
@@ -423,7 +423,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
         auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
             if (!connection.get()) {
                 connection.reset(new ConnectionPool::ConnectionPtr(
-                    &connectionPool, source, Date_t::now(), kOplogSocketTimeout));
+                    &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
             };
             return connection->get();
         };
