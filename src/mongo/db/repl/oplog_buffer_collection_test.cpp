@@ -209,6 +209,18 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocum
     }
 }
 
+TEST_F(OplogBufferCollectionTest,
+       PushAllNonBlockingIgnoresOperationContextIfNoDocumentsAreProvided) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+
+    oplogBuffer.startup(_txn.get());
+    const std::vector<BSONObj> emptyOplogEntries;
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.pushAllNonBlocking(nullptr, emptyOplogEntries.begin(), emptyOplogEntries.end());
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+}
+
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAddsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);

@@ -112,6 +112,9 @@ void OplogBufferCollection::push(OperationContext* txn, const Value& value) {
 void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
                                                Batch::const_iterator begin,
                                                Batch::const_iterator end) {
+    if (begin == end) {
+        return;
+    }
     size_t numDocs = std::distance(begin, end);
     Batch docsToInsert(numDocs);
     Timestamp ts;
