@@ -197,6 +197,12 @@ TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
     ASSERT_EQUALS(Timestamp(1, 1), testOpPair.second);
 }
 
+DEATH_TEST_F(OplogBufferCollectionTest,
+             addIdToDocumentWithMissingTimestampFieldTriggersInvariantFailure,
+             "Invariant failure !ts.isNull()") {
+    OplogBufferCollection::addIdToDocument(BSON("x" << 1));
+}
+
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
@@ -363,7 +369,7 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
 
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {
-        makeOplogEntry(2), makeOplogEntry(1), makeOplogEntry(3),
+        makeOplogEntry(1), makeOplogEntry(2), makeOplogEntry(3),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
@@ -386,19 +392,19 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
 
     BSONObj doc;
     ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
-    ASSERT_BSONOBJ_EQ(doc, oplog[1]);
+    ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
-    ASSERT_BSONOBJ_EQ(doc, oplog[1]);
+    ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
     ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
-    ASSERT_BSONOBJ_EQ(doc, oplog[0]);
+    ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
-    ASSERT_BSONOBJ_EQ(doc, oplog[0]);
+    ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
     ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
@@ -416,14 +422,14 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
 
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {
-        makeOplogEntry(1), makeOplogEntry(3), makeOplogEntry(2),
+        makeOplogEntry(1), makeOplogEntry(2), makeOplogEntry(3),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
     auto doc = oplogBuffer.lastObjectPushed(_txn.get());
-    ASSERT_BSONOBJ_EQ(*doc, oplog[1]);
+    ASSERT_BSONOBJ_EQ(*doc, oplog[2]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 }
 
@@ -647,6 +653,20 @@ TEST_F(OplogBufferCollectionTest, PushEvenIfFullPushesOnSentinelsProperly) {
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
+}
+
+DEATH_TEST_F(OplogBufferCollectionTest,
+             PushAllNonBlockingWithOutOfOrderDocumentsTriggersInvariantFailure,
+             "Invariant failure ts.isNull() || pair.second > ts") {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+
+    oplogBuffer.startup(_txn.get());
+    const std::vector<BSONObj> oplog = {
+        makeOplogEntry(2), makeOplogEntry(1),
+    };
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
 }
 
 DEATH_TEST_F(OplogBufferCollectionTest,

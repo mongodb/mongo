@@ -60,6 +60,7 @@ std::pair<BSONObj, Timestamp> OplogBufferCollection::addIdToDocument(const BSONO
     invariant(!orig.isEmpty());
     BSONObjBuilder bob;
     Timestamp ts = orig["ts"].timestamp();
+    invariant(!ts.isNull());
     bob.append("_id", ts);
     bob.append(kOplogEntryFieldName, orig);
     return std::pair<BSONObj, Timestamp>{bob.obj(), ts};
@@ -120,6 +121,7 @@ void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
     Timestamp ts;
     std::transform(begin, end, docsToInsert.begin(), [&ts](const Value& value) {
         auto pair = addIdToDocument(value);
+        invariant(ts.isNull() || pair.second > ts);
         ts = pair.second;
         return pair.first;
     });
