@@ -159,14 +159,6 @@ public:
     virtual bool hasLockPending() const {
         invariant(false);
     }
-
-    virtual void setIsBatchWriter(bool newValue) {
-        invariant(false);
-    }
-
-    virtual bool isBatchWriter() const {
-        invariant(false);
-    }
 };
 
 }  // namespace mongo

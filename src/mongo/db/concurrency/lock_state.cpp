@@ -270,8 +270,7 @@ void Locker::setGlobalThrottling(class TicketHolder* reading, class TicketHolder
 }
 
 template <bool IsForMMAPV1>
-LockerImpl<IsForMMAPV1>::LockerImpl()
-    : _id(idCounter.addAndFetch(1)), _wuowNestingLevel(0), _batchWriter(false) {}
+LockerImpl<IsForMMAPV1>::LockerImpl() : _id(idCounter.addAndFetch(1)), _wuowNestingLevel(0) {}
 
 template <bool IsForMMAPV1>
 LockerImpl<IsForMMAPV1>::~LockerImpl() {

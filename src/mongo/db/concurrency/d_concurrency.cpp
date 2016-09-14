@@ -73,7 +73,7 @@ Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqu
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode) {
-    if (!_locker->isBatchWriter()) {
+    if (_locker->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
@@ -85,7 +85,7 @@ void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
         _result = _locker->lockGlobalComplete(timeoutMs);
     }
 
-    if (_result != LOCK_OK && !_locker->isBatchWriter()) {
+    if (_result != LOCK_OK && _locker->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.unlock();
     }
 }
@@ -185,13 +185,14 @@ void Lock::OplogIntentWriteLock::serializeIfNeeded() {
 }
 
 Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
-    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X), _lockState(lockState) {
-    invariant(!_lockState->isBatchWriter());  // Otherwise we couldn't clear in destructor.
-    _lockState->setIsBatchWriter(true);
+    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X),
+      _lockState(lockState),
+      _orginalShouldConflict(_lockState->shouldConflictWithSecondaryBatchApplication()) {
+    _lockState->setShouldConflictWithSecondaryBatchApplication(false);
 }
 
 Lock::ParallelBatchWriterMode::~ParallelBatchWriterMode() {
-    _lockState->setIsBatchWriter(false);
+    _lockState->setShouldConflictWithSecondaryBatchApplication(_orginalShouldConflict);
 }
 
 void Lock::ResourceLock::lock(LockMode mode) {

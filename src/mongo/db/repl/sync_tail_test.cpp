@@ -118,7 +118,6 @@ void SyncTailTest::setUp() {
     StorageInterface::set(serviceContext, std::move(storageInterface));
 
     _txn = cc().makeOperationContext();
-    _txn->lockState()->setIsBatchWriter(false);
     _opsApplied = 0;
     _applyOp = [](OperationContext* txn,
                   Database* db,
@@ -149,7 +148,7 @@ SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
 
 bool SyncTailWithOperationContextChecker::shouldRetry(OperationContext* txn, const BSONObj&) {
     ASSERT_FALSE(txn->writesAreReplicated());
-    ASSERT_TRUE(txn->lockState()->isBatchWriter());
+    ASSERT_FALSE(txn->lockState()->shouldConflictWithSecondaryBatchApplication());
     ASSERT_TRUE(documentValidationDisabled(txn));
     return false;
 }
@@ -599,9 +598,6 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    ASSERT_TRUE(_txn->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_txn.get()));
-    ASSERT_FALSE(_txn->lockState()->isBatchWriter());
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
     _txn.reset();
 
@@ -614,12 +610,9 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    ASSERT_TRUE(_txn->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_txn.get()));
-    ASSERT_FALSE(_txn->lockState()->isBatchWriter());
     auto syncApply = [](OperationContext* txn, const BSONObj&, bool convertUpdatesToUpserts) {
         ASSERT_FALSE(txn->writesAreReplicated());
-        ASSERT_TRUE(txn->lockState()->isBatchWriter());
+        ASSERT_FALSE(txn->lockState()->shouldConflictWithSecondaryBatchApplication());
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(convertUpdatesToUpserts);
         return Status::OK();
@@ -841,9 +834,6 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
 TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
     SyncTailWithOperationContextChecker syncTail;
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    ASSERT_TRUE(_txn->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_txn.get()));
-    ASSERT_FALSE(_txn->lockState()->isBatchWriter());
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};

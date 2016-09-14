@@ -83,7 +83,7 @@ void IndexBuilder::run() {
 
     const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
     OperationContext& txn = *txnPtr;
-    txn.lockState()->setIsBatchWriter(true);
+    txn.lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
     AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 

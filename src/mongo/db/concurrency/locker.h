@@ -302,13 +302,24 @@ public:
      */
     virtual bool hasLockPending() const = 0;
 
-    // Used for the replication parallel oplog application threads to prevent any other threads from
-    // using the system while it is in an inconsistent state.
-    virtual void setIsBatchWriter(bool newValue) = 0;
-    virtual bool isBatchWriter() const = 0;
+    /**
+     * If set to false, this opts out of conflicting with replication's use of the
+     * ParallelBatchWriterMode lock. Code that opts-out must be ok with seeing an inconsistent view
+     * of data because within a batch, secondaries apply operations in a different order than on the
+     * primary. User operations should *never* opt out.
+     */
+    void setShouldConflictWithSecondaryBatchApplication(bool newValue) {
+        _shouldConflictWithSecondaryBatchApplication = newValue;
+    }
+    bool shouldConflictWithSecondaryBatchApplication() const {
+        return _shouldConflictWithSecondaryBatchApplication;
+    }
 
 protected:
     Locker() {}
+
+private:
+    bool _shouldConflictWithSecondaryBatchApplication = true;
 };
 
 }  // namespace mongo

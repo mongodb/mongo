@@ -473,7 +473,7 @@ void scheduleWritesToOplog(OperationContext* txn,
             initializeWriterThread();
             const auto txnHolder = cc().makeOperationContext();
             const auto txn = txnHolder.get();
-            txn->lockState()->setIsBatchWriter(true);
+            txn->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
             txn->setReplicatedWrites(false);
 
             std::vector<BSONObj> docs;
@@ -1049,7 +1049,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
     DisableDocumentValidation validationDisabler(txn);
 
     // allow us to get through the magic barrier
-    txn->lockState()->setIsBatchWriter(true);
+    txn->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
     if (oplogEntryPointers->size() > 1) {
         std::stable_sort(oplogEntryPointers->begin(),
@@ -1157,7 +1157,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
     DisableDocumentValidation validationDisabler(txn);
 
     // allow us to get through the magic barrier
-    txn->lockState()->setIsBatchWriter(true);
+    txn->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
     bool convertUpdatesToUpserts = false;
 

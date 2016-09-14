@@ -244,16 +244,6 @@ public:
     virtual bool hasLockPending() const {
         return getWaitingResource().isValid();
     }
-
-    virtual void setIsBatchWriter(bool newValue) {
-        _batchWriter = newValue;
-    }
-    virtual bool isBatchWriter() const {
-        return _batchWriter;
-    }
-
-private:
-    bool _batchWriter;
 };
 
 typedef LockerImpl<false> DefaultLockerImpl;
