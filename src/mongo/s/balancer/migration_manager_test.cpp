@@ -626,9 +626,11 @@ TEST_F(MigrationManagerTest, FailToAcquireDistributedLock) {
 
     // Take the distributed lock for the collection before scheduling via the MigrationManager.
     const std::string whyMessage("FailToAcquireDistributedLock unit-test taking distributed lock");
-    DistLockManager::ScopedDistLock distLockStatus =
-        assertGet(catalogClient()->getDistLockManager()->lock(
-            operationContext(), chunk1.getNS(), whyMessage));
+    DistLockManager::ScopedDistLock distLockStatus = assertGet(
+        catalogClient()->getDistLockManager()->lock(operationContext(),
+                                                    chunk1.getNS(),
+                                                    whyMessage,
+                                                    DistLockManager::kSingleLockAttemptTimeout));
 
     MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
         operationContext(), migrationRequests, 0, kDefaultSecondaryThrottle, false);

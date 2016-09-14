@@ -67,7 +67,7 @@ DistLockManager::ScopedDistLock acquireCollectionDistLock(OperationContext* txn,
                             << " in "
                             << args.getNss().ns());
     auto distLockStatus = Grid::get(txn)->catalogClient(txn)->getDistLockManager()->lock(
-        txn, args.getNss().ns(), whyMessage);
+        txn, args.getNss().ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
     if (!distLockStatus.isOK()) {
         const string msg = str::stream()
             << "Could not acquire collection lock for " << args.getNss().ns()

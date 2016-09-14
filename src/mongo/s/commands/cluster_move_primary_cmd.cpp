@@ -153,7 +153,7 @@ public:
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
         auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
-            txn, dbname + "-movePrimary", whyMessage);
+            txn, dbname + "-movePrimary", whyMessage, DistLockManager::kDefaultLockTimeout);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());

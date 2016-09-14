@@ -293,11 +293,16 @@ void Balancer::_mainThread() {
 
     OID clusterIdentity = ClusterIdentityLoader::get(txn.get())->getClusterId();
 
-    // Take the balancer distributed lock and hold it permanently
+    // Take the balancer distributed lock and hold it permanently. Do the attempts with single
+    // attempts in order to not block the thread and be able to check for interrupt more frequently.
     while (!_stopRequested()) {
         auto distLockHandleStatus =
             shardingContext->catalogClient(txn.get())->getDistLockManager()->lockWithSessionID(
-                txn.get(), "balancer", "CSRS Balancer", clusterIdentity);
+                txn.get(),
+                "balancer",
+                "CSRS Balancer",
+                clusterIdentity,
+                DistLockManager::kSingleLockAttemptTimeout);
         if (!distLockHandleStatus.isOK()) {
             warning() << "Balancer distributed lock could not be acquired and will be retried in "
                       << durationCount<Seconds>(kInitBackoffInterval) << " seconds"

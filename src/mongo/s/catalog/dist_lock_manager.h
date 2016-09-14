@@ -130,7 +130,7 @@ public:
     StatusWith<ScopedDistLock> lock(OperationContext* txn,
                                     StringData name,
                                     StringData whyMessage,
-                                    Milliseconds waitFor = kDefaultLockTimeout);
+                                    Milliseconds waitFor);
 
     /**
      * Same behavior as lock(...) above, except takes a specific lock session ID "lockSessionID"
@@ -140,12 +140,11 @@ public:
      * immediately reacquired if "lockSessionID" matches that of the lock, rather than waiting for
      * the inactive lock to expire.
      */
-    virtual StatusWith<DistLockHandle> lockWithSessionID(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        const OID& lockSessionID,
-        Milliseconds waitFor = kDefaultLockTimeout) = 0;
+    virtual StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
+                                                         StringData name,
+                                                         StringData whyMessage,
+                                                         const OID& lockSessionID,
+                                                         Milliseconds waitFor) = 0;
 
     /**
      * Specialized locking method, which only succeeds if the specified lock name is not held by

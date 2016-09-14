@@ -196,7 +196,8 @@ Status ShardingCatalogClientImpl::createDatabase(OperationContext* txn, const st
     invariant(dbName != "config");
 
     // Lock the database globally to prevent conflicts with simultaneous database creation.
-    auto scopedDistLock = getDistLockManager()->lock(txn, dbName, "createDatabase");
+    auto scopedDistLock = getDistLockManager()->lock(
+        txn, dbName, "createDatabase", DistLockManager::kDefaultLockTimeout);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -323,7 +324,8 @@ Status ShardingCatalogClientImpl::enableSharding(OperationContext* txn, const st
 
     // Lock the database globally to prevent conflicts with simultaneous database
     // creation/modification.
-    auto scopedDistLock = getDistLockManager()->lock(txn, dbName, "enableSharding");
+    auto scopedDistLock = getDistLockManager()->lock(
+        txn, dbName, "enableSharding", DistLockManager::kDefaultLockTimeout);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -403,7 +405,8 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
                                                   const set<ShardId>& initShardIds) {
     // Lock the collection globally so that no other mongos can try to shard or drop the collection
     // at the same time.
-    auto scopedDistLock = getDistLockManager()->lock(txn, ns, "shardCollection");
+    auto scopedDistLock = getDistLockManager()->lock(
+        txn, ns, "shardCollection", DistLockManager::kDefaultLockTimeout);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
