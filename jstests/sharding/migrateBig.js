@@ -64,9 +64,5 @@
         return x < 2;
     }, "no balance happened", 8 * 60 * 1000, 2000);
 
-    // Use a predicate for the count command so it actually filters out documents, which are being
-    // cleaned up
-    assert.eq(coll.count({x: {$gte: 0}}), coll.find().itcount());
-
     s.stop();
 })();
