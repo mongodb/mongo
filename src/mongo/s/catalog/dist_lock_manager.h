@@ -153,7 +153,8 @@ public:
      */
     virtual StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
                                                                     StringData name,
-                                                                    StringData whyMessage) = 0;
+                                                                    StringData whyMessage,
+                                                                    const OID& lockSessionID) = 0;
 
     /**
      * Unlocks the given lockHandle. Will attempt to retry again later if the config
