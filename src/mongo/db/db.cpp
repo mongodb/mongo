@@ -440,7 +440,7 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
                         severe() << version.getStatus();
                         fassertFailedNoTrace(40283);
                     }
-                    serverGlobalParams.featureCompatibilityVersion.store(version.getValue());
+                    serverGlobalParams.featureCompatibility.version.store(version.getValue());
                 }
             }
         }
@@ -799,6 +799,10 @@ ExitCode _initAndListen(int listenPort) {
             Lock::GlobalWrite lk(startupOpCtx.get()->lockState());
             FeatureCompatibilityVersion::setIfCleanStartup(
                 startupOpCtx.get(), repl::StorageInterface::get(getGlobalServiceContext()));
+        }
+
+        if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave())) {
+            serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         }
     }
 

@@ -50,5 +50,5 @@ Status validateKeyPattern(const BSONObj& key);
 StatusWith<BSONObj> validateIndexSpec(
     const BSONObj& indexSpec,
     const NamespaceString& expectedNamespace,
-    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion);
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion);
 }  // namespace mongo

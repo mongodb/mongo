@@ -644,8 +644,8 @@ public:
         // collection metadata. So the merger needs to accept a collation, and we rely on the shards
         // to reject collations from the user.
         if (!request.getValue().getCollation().isEmpty() &&
-            serverGlobalParams.featureCompatibilityVersion.load() ==
-                ServerGlobalParams::FeatureCompatibilityVersion_32 &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32 &&
             !isMergePipeline(request.getValue().getPipeline())) {
             return appendCommandStatus(
                 result,

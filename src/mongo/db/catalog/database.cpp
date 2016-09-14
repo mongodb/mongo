@@ -393,8 +393,8 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
                     return Status(ErrorCodes::IllegalOperation,
                                   "turn off profiling before dropping system.profile collection");
             } else if (nss.isSystemDotViews()) {
-                if (serverGlobalParams.featureCompatibilityVersion.load() !=
-                    ServerGlobalParams::FeatureCompatibilityVersion_32) {
+                if (serverGlobalParams.featureCompatibility.version.load() !=
+                    ServerGlobalParams::FeatureCompatibility::Version::k32) {
                     return Status(ErrorCodes::IllegalOperation,
                                   "The featureCompatibilityVersion must be 3.2 to drop the "
                                   "system.views collection. See "
@@ -590,7 +590,7 @@ Collection* Database::createCollection(OperationContext* txn,
                 // "setFeatureCompatibilityVersion" command either happens entirely before the
                 // collection creation or it happens entirely after.
                 const auto featureCompatibilityVersion =
-                    serverGlobalParams.featureCompatibilityVersion.load();
+                    serverGlobalParams.featureCompatibility.version.load();
                 IndexCatalog* ic = collection->getIndexCatalog();
                 uassertStatusOK(ic->createIndexOnEmptyCollection(
                     txn, ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));

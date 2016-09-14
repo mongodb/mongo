@@ -67,6 +67,7 @@
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -403,6 +404,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     _shardingOnTransitionToPrimaryHook(txn);
     _dropAllTempCollections(txn);
+
+    serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(true);
 
     return opTimeToReturn;
 }

@@ -48,10 +48,10 @@ constexpr StringData FeatureCompatibilityVersion::kVersionField;
 constexpr StringData FeatureCompatibilityVersion::kVersion34;
 constexpr StringData FeatureCompatibilityVersion::kVersion32;
 
-StatusWith<ServerGlobalParams::FeatureCompatibilityVersions> FeatureCompatibilityVersion::parse(
+StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibilityVersion::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
     bool foundVersionField = false;
-    ServerGlobalParams::FeatureCompatibilityVersions version;
+    ServerGlobalParams::FeatureCompatibility::Version version;
 
     for (auto&& elem : featureCompatibilityVersionDoc) {
         auto fieldName = elem.fieldNameStringData();
@@ -72,9 +72,9 @@ StatusWith<ServerGlobalParams::FeatureCompatibilityVersions> FeatureCompatibilit
                                             << featureCompatibilityVersionDoc);
             }
             if (elem.String() == FeatureCompatibilityVersion::kVersion34) {
-                version = ServerGlobalParams::FeatureCompatibilityVersion_34;
+                version = ServerGlobalParams::FeatureCompatibility::Version::k34;
             } else if (elem.String() == FeatureCompatibilityVersion::kVersion32) {
-                version = ServerGlobalParams::FeatureCompatibilityVersion_32;
+                version = ServerGlobalParams::FeatureCompatibility::Version::k32;
             } else {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Invalid value for "
@@ -146,11 +146,11 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
 
     // Update server parameter.
     if (version == FeatureCompatibilityVersion::kVersion34) {
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_34);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
     } else if (version == FeatureCompatibilityVersion::kVersion32) {
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_32);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k32);
     }
 }
 
@@ -180,8 +180,8 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
                        << FeatureCompatibilityVersion::kVersion34)));
 
         // Update server parameter.
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_34);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
     }
 }
 
@@ -191,7 +191,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(const BSONObj& doc) {
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
         return;
     }
-    serverGlobalParams.featureCompatibilityVersion.store(
+    serverGlobalParams.featureCompatibility.version.store(
         uassertStatusOK(FeatureCompatibilityVersion::parse(doc)));
 }
 
@@ -201,8 +201,8 @@ void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
         return;
     }
-    serverGlobalParams.featureCompatibilityVersion.store(
-        ServerGlobalParams::FeatureCompatibilityVersion_32);
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k32);
 }
 
 /**
@@ -218,10 +218,10 @@ public:
                           ) {}
 
     StringData featureCompatibilityVersionStr() {
-        switch (serverGlobalParams.featureCompatibilityVersion.load()) {
-            case ServerGlobalParams::FeatureCompatibilityVersion_34:
+        switch (serverGlobalParams.featureCompatibility.version.load()) {
+            case ServerGlobalParams::FeatureCompatibility::Version::k34:
                 return FeatureCompatibilityVersion::kVersion34;
-            case ServerGlobalParams::FeatureCompatibilityVersion_32:
+            case ServerGlobalParams::FeatureCompatibility::Version::k32:
                 return FeatureCompatibilityVersion::kVersion32;
             default:
                 MONGO_UNREACHABLE;

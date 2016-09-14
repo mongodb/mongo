@@ -810,8 +810,8 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
 
     // If the minimum allowed version for the cluster is 3.4, set the featureCompatibilityVersion to
     // 3.4 on the shard.
-    if (serverGlobalParams.featureCompatibilityVersion.load() ==
-        ServerGlobalParams::FeatureCompatibilityVersion_34) {
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k34) {
         auto versionResponse =
             _runCommandForAddShard(txn,
                                    targeter.get(),

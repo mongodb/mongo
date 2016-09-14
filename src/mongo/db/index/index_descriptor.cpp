@@ -95,7 +95,7 @@ bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
 
 Status IndexDescriptor::isIndexVersionAllowedForCreation(
     IndexVersion indexVersion,
-    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion,
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion,
     const BSONObj& indexSpec) {
     switch (indexVersion) {
         case IndexVersion::kV0:
@@ -103,7 +103,8 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
         case IndexVersion::kV1:
             return Status::OK();
         case IndexVersion::kV2: {
-            if (ServerGlobalParams::FeatureCompatibilityVersion_32 == featureCompatibilityVersion) {
+            if (ServerGlobalParams::FeatureCompatibility::Version::k32 ==
+                featureCompatibilityVersion) {
                 return {ErrorCodes::CannotCreateIndex,
                         str::stream() << "Invalid index specification " << indexSpec
                                       << "; cannot create an index with v="
@@ -122,7 +123,7 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
 }
 
 IndexVersion IndexDescriptor::getDefaultIndexVersion(
-    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) {
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) {
     // We pass in an empty object for the index specification because it is only used within the
     // error reason.
     if (!IndexDescriptor::isIndexVersionAllowedForCreation(

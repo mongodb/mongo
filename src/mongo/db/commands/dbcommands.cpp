@@ -539,8 +539,8 @@ public:
             result.append("note", deprecationWarning);
         }
 
-        auto featureCompatibilityVersion = serverGlobalParams.featureCompatibilityVersion.load();
-        if (ServerGlobalParams::FeatureCompatibilityVersion_32 == featureCompatibilityVersion &&
+        auto featureCompatibilityVersion = serverGlobalParams.featureCompatibility.version.load();
+        if (ServerGlobalParams::FeatureCompatibility::Version::k32 == featureCompatibilityVersion &&
             cmdObj.hasField("collation")) {
             return appendCommandStatus(
                 result,

@@ -52,8 +52,8 @@ Status ParsedUpdate::parseRequest() {
     invariant(_request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
 
     if (!_request->getCollation().isEmpty()) {
-        if (serverGlobalParams.featureCompatibilityVersion.load() ==
-            ServerGlobalParams::FeatureCompatibilityVersion_32) {
+        if (serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k32) {
             return Status(ErrorCodes::InvalidOptions,
                           "The featureCompatibilityVersion must be 3.4 to use collation. See "
                           "http://dochub.mongodb.org/core/3.4-feature-compatibility.");

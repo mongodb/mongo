@@ -339,8 +339,8 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 // BSONVersion::kLatest.
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion34, ("EndStartupOptionStorage"))
 (InitializerContext* context) {
-    mongo::serverGlobalParams.featureCompatibilityVersion.store(
-        ServerGlobalParams::FeatureCompatibilityVersion_34);
+    mongo::serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
     return Status::OK();
 }
 

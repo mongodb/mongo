@@ -107,14 +107,14 @@ public:
      */
     static Status isIndexVersionAllowedForCreation(
         IndexVersion indexVersion,
-        ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion,
+        ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion,
         const BSONObj& indexSpec);
 
     /**
      * Returns the index version to use if it isn't specified in the index specification.
      */
     static IndexVersion getDefaultIndexVersion(
-        ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion);
+        ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion);
 
     //
     // Information about the key pattern.

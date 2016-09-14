@@ -62,8 +62,8 @@ Status ParsedDelete::parseRequest() {
     invariant(_request->getProj().isEmpty() || _request->shouldReturnDeleted());
 
     if (!_request->getCollation().isEmpty() &&
-        serverGlobalParams.featureCompatibilityVersion.load() ==
-            ServerGlobalParams::FeatureCompatibilityVersion_32) {
+        serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k32) {
         return Status(ErrorCodes::InvalidOptions,
                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
                       "http://dochub.mongodb.org/core/3.4-feature-compatibility.");

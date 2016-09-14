@@ -52,7 +52,7 @@ public:
      * Parses the featureCompatibilityVersion document from admin.system.version, and returns the
      * version.
      */
-    static StatusWith<ServerGlobalParams::FeatureCompatibilityVersions> parse(
+    static StatusWith<ServerGlobalParams::FeatureCompatibility::Version> parse(
         const BSONObj& featureCompatibilityVersionDoc);
 
     /**

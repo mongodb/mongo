@@ -1364,8 +1364,8 @@ public:
         Config config(dbname, cmd);
 
         if (!config.collation.isEmpty() &&
-            serverGlobalParams.featureCompatibilityVersion.load() ==
-                ServerGlobalParams::FeatureCompatibilityVersion_32) {
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::InvalidOptions,

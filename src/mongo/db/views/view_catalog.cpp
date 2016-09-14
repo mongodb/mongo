@@ -227,8 +227,8 @@ Status ViewCatalog::createView(OperationContext* txn,
                                const BSONObj& collation) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (serverGlobalParams.featureCompatibilityVersion.load() ==
-        ServerGlobalParams::FeatureCompatibilityVersion_32) {
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k32) {
         return Status(ErrorCodes::CommandNotSupported,
                       "Cannot create view when the featureCompatibilityVersion is 3.2. See "
                       "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
@@ -259,8 +259,8 @@ Status ViewCatalog::modifyView(OperationContext* txn,
                                const BSONArray& pipeline) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (serverGlobalParams.featureCompatibilityVersion.load() ==
-        ServerGlobalParams::FeatureCompatibilityVersion_32) {
+    if (serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k32) {
         return Status(ErrorCodes::CommandNotSupported,
                       "Cannot modify view when the featureCompatibilityVersion is 3.2. See "
                       "http://dochub.mongodb.org/core/3.4-feature-compatibility.");

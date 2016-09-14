@@ -791,8 +791,8 @@ public:
     void run() {
         // Set the featureCompatibilityVersion to 3.4 so that BSON validation always uses
         // BSONVersion::kLatest.
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_34);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
 
         unique_ptr<Scope> s(globalScriptEngine->newScope());
         BSONObjBuilder b;
@@ -825,8 +825,8 @@ public:
     void run() {
         // Set the featureCompatibilityVersion to 3.4 so that BSON validation always uses
         // BSONVersion::kLatest.
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_34);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
 
         unique_ptr<Scope> s(globalScriptEngine->newScope());
         ASSERT(s->exec("a = 5;", "a", false, true, false));
@@ -839,8 +839,8 @@ public:
     void run() {
         // Set the featureCompatibilityVersion to 3.4 so that BSON validation always uses
         // BSONVersion::kLatest.
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_34);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
 
         unique_ptr<Scope> s(globalScriptEngine->newScope());
 
@@ -1138,8 +1138,8 @@ public:
 
         // Set the featureCompatibilityVersion to 3.4 so that BSON validation always uses
         // BSONVersion::kLatest.
-        serverGlobalParams.featureCompatibilityVersion.store(
-            ServerGlobalParams::FeatureCompatibilityVersion_34);
+        serverGlobalParams.featureCompatibility.version.store(
+            ServerGlobalParams::FeatureCompatibility::Version::k34);
 
         // Drop the collection
         const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();

@@ -74,7 +74,7 @@ const StringData kIndexesFieldName = "indexes"_sd;
 StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
     const NamespaceString& ns,
     const BSONObj& cmdObj,
-    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) {
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) {
     bool hasIndexesField = false;
 
     std::vector<BSONObj> indexSpecs;
@@ -238,7 +238,7 @@ public:
             return appendCommandStatus(result, status);
 
         const auto featureCompatibilityVersion =
-            serverGlobalParams.featureCompatibilityVersion.load();
+            serverGlobalParams.featureCompatibility.version.load();
         auto specsWithStatus = parseAndValidateIndexSpecs(ns, cmdObj, featureCompatibilityVersion);
         if (!specsWithStatus.isOK()) {
             return appendCommandStatus(result, specsWithStatus.getStatus());

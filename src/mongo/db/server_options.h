@@ -138,21 +138,32 @@ struct ServerGlobalParams {
     // queryableBackupMode.
     BSONObj overrideShardIdentity;
 
-    enum FeatureCompatibilityVersions {
-        /**
-         * There may be 3.2 nodes in the cluster, so some 3.4 features are not allowed. Default
-         * value.
-         */
-        FeatureCompatibilityVersion_32,
+    struct FeatureCompatibility {
+        enum class Version {
+            /**
+             * In this mode, the cluster will expose a 3.2-like API. Attempts by a client to use new
+             * features in 3.4, such as read-only views, collation, or the decimal128 BSON type,
+             * will be rejected.
+             */
+            k32,
 
-        /**
-         * All nodes in the cluster should be 3.4, so all 3.4 features are allowed.
-         */
-        FeatureCompatibilityVersion_34
-    };
+            /**
+             * In this mode, new features in 3.4 are allowed. The system should guarantee that no
+             * 3.2 node can participate in a cluster whose feature compatibility version is 3.4.
+             */
+            k34,
+        };
 
-    // Read-only parameter featureCompatibilityVersion.
-    AtomicWord<FeatureCompatibilityVersions> featureCompatibilityVersion;
+        // Read-only parameter featureCompatibilityVersion.
+        AtomicWord<Version> version{Version::k32};
+
+        // Feature validation differs depending on the role of a mongod in a replica set or
+        // master/slave configuration. Masters/primaries can accept user-initiated writes and
+        // validate based on the feature compatibility version. A secondary/slave (which is not also
+        // a master) always validates in "3.4" mode so that it can sync 3.4 features, even when in
+        // "3.2" feature compatibility mode.
+        AtomicWord<bool> validateFeaturesAsMaster{true};
+    } featureCompatibility;
 };
 
 extern ServerGlobalParams serverGlobalParams;

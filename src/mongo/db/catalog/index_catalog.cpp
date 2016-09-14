@@ -784,7 +784,7 @@ Status IndexCatalog::_doesSpecConflictWithExisting(OperationContext* txn,
 }
 
 BSONObj IndexCatalog::getDefaultIdIndexSpec(
-    ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) const {
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) const {
     dassert(_idObj["_id"].type() == NumberInt);
 
     const auto indexVersion = IndexDescriptor::getDefaultIndexVersion(featureCompatibilityVersion);

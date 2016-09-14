@@ -675,7 +675,7 @@ Status Cloner::copyDb(OperationContext* txn,
                 indexer.allowInterruption();
 
                 const auto featureCompatibilityVersion =
-                    serverGlobalParams.featureCompatibilityVersion.load();
+                    serverGlobalParams.featureCompatibility.version.load();
                 auto indexInfoObjs = uassertStatusOK(indexer.init(
                     c->getIndexCatalog()->getDefaultIdIndexSpec(featureCompatibilityVersion)));
                 invariant(indexInfoObjs.size() == 1);

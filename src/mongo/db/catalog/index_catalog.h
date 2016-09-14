@@ -83,7 +83,7 @@ public:
      * Returns the spec for the id index to create by default for this collection.
      */
     BSONObj getDefaultIdIndexSpec(
-        ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) const;
+        ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) const;
 
     IndexDescriptor* findIdIndex(OperationContext* txn) const;
 
