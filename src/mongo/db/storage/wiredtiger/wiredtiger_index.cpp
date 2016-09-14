@@ -494,9 +494,13 @@ protected:
 
         // Not using cursor cache since we need to set "bulk".
         WT_CURSOR* cursor;
-        // We use our own session to ensure we aren't in a transaction.
+        // Use a different session to ensure we don't hijack an existing transaction.
+        // Configure the bulk cursor open to fail quickly if it would wait on a checkpoint
+        // completing - since checkpoints can take a long time, and waiting can result in
+        // an unexpected pause in building an index.
         WT_SESSION* session = _session->getSession();
-        int err = session->open_cursor(session, idx->uri().c_str(), NULL, "bulk", &cursor);
+        int err = session->open_cursor(
+            session, idx->uri().c_str(), NULL, "bulk,checkpoint_wait=false", &cursor);
         if (!err)
             return cursor;
 
