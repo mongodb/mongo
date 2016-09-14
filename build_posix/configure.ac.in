@@ -38,9 +38,9 @@ if test "$wt_cv_enable_strict" = "yes"; then
 	wt_cv_cc_version="`$CC --version | sed -eq`"
 	case "$wt_cv_cc_version" in
 	*clang*)
-		AM_CLANG_WARNINGS;;
+		AM_CLANG_WARNINGS($wt_cv_cc_version);;
 	*cc*|*CC*)					# cc, CC, gcc, GCC
-		AM_GCC_WARNINGS;;
+		AM_GCC_WARNINGS($wt_cv_cc_version);;
 	*)
 		AC_MSG_ERROR(
 		    [--enable-strict does not support "$wt_cv_cc_version".]);;
