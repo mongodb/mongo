@@ -6,11 +6,10 @@
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
 
-    var conn = new Mongo(db.getMongo().host);
-    var testDB = conn.getDB("profile_find");
+    var testDB = db.getSiblingDB("profile_find");
     assert.commandWorked(testDB.dropDatabase());
     var coll = testDB.getCollection("test");
-    var isLegacyReadMode = (db.getMongo().readMode() === "legacy");
+    var isLegacyReadMode = (testDB.getMongo().readMode() === "legacy");
 
     testDB.setProfilingLevel(2);
 
@@ -43,8 +42,9 @@
         assert.eq(profileObj.query.ntoreturn, -1, tojson(profileObj));
     } else {
         assert.eq(profileObj.query.limit, 1, tojson(profileObj));
-        assert.eq(
-            profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+        assert.eq(profileObj.protocol,
+                  getProfilerProtocolStringForCommand(testDB.getMongo()),
+                  tojson(profileObj));
     }
 
     if (!isLegacyReadMode) {

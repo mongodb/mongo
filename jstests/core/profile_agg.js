@@ -6,8 +6,7 @@
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
 
-    var conn = new Mongo(db.getMongo().host);
-    var testDB = conn.getDB("profile_agg");
+    var testDB = db.getSiblingDB("profile_agg");
     assert.commandWorked(testDB.dropDatabase());
     var coll = testDB.getCollection("test");
 
@@ -31,7 +30,9 @@
     assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
-    assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+    assert.eq(profileObj.protocol,
+              getProfilerProtocolStringForCommand(testDB.getMongo()),
+              tojson(profileObj));
     assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
     assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
