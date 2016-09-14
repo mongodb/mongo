@@ -196,7 +196,7 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocum
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    ASSERT_TRUE(oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end()));
+    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
     {
@@ -346,7 +346,7 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
         makeOplogEntry(2), makeOplogEntry(1), makeOplogEntry(3),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    ASSERT_TRUE(oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end()));
+    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
     {
@@ -399,7 +399,7 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
         makeOplogEntry(1), makeOplogEntry(3), makeOplogEntry(2),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    ASSERT_TRUE(oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end()));
+    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
     auto doc = oplogBuffer.lastObjectPushed(_txn.get());

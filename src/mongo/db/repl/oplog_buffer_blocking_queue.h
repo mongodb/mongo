@@ -45,7 +45,7 @@ public:
     void shutdown(OperationContext* txn) override;
     void pushEvenIfFull(OperationContext* txn, const Value& value) override;
     void push(OperationContext* txn, const Value& value) override;
-    bool pushAllNonBlocking(OperationContext* txn,
+    void pushAllNonBlocking(OperationContext* txn,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
     void waitForSpace(OperationContext* txn, std::size_t size) override;

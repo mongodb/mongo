@@ -61,11 +61,10 @@ void OplogBufferBlockingQueue::push(OperationContext*, const Value& value) {
     _queue.push(value);
 }
 
-bool OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
+void OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
                                                   Batch::const_iterator begin,
                                                   Batch::const_iterator end) {
     _queue.pushAllNonBlocking(begin, end);
-    return true;
 }
 
 void OplogBufferBlockingQueue::waitForSpace(OperationContext*, std::size_t size) {

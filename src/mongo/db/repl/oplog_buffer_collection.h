@@ -77,7 +77,7 @@ public:
      * Pushing documents with 'pushAllNonBlocking' will not handle sentinel documents properly. If
      * pushing sentinel documents is required, use 'push' or 'pushEvenIfFull'.
      */
-    bool pushAllNonBlocking(OperationContext* txn,
+    void pushAllNonBlocking(OperationContext* txn,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
     void waitForSpace(OperationContext* txn, std::size_t size) override;

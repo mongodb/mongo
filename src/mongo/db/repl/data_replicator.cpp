@@ -1398,7 +1398,7 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
     }
 
     // Buffer docs for later application.
-    fassert(40143, _oplogBuffer->pushAllNonBlocking(makeOpCtx().get(), begin, end));
+    _oplogBuffer->pushAllNonBlocking(makeOpCtx().get(), begin, end);
 
     _lastFetched = info.lastDocument;
 

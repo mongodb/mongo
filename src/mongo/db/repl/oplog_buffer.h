@@ -98,10 +98,8 @@ public:
 
     /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
-     *
-     * Returns false if there is insufficient space to complete this operation successfully.
      */
-    virtual bool pushAllNonBlocking(OperationContext* txn,
+    virtual void pushAllNonBlocking(OperationContext* txn,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end) = 0;
 

@@ -108,7 +108,7 @@ void OplogBufferCollection::push(OperationContext* txn, const Value& value) {
     pushEvenIfFull(txn, value);
 }
 
-bool OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
+void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
                                                Batch::const_iterator begin,
                                                Batch::const_iterator end) {
     size_t numDocs = std::distance(begin, end);
@@ -130,7 +130,6 @@ bool OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
         return docSize + size_t(value.objsize());
     });
     _cvNoLongerEmpty.notify_all();
-    return true;
 }
 
 void OplogBufferCollection::waitForSpace(OperationContext* txn, std::size_t size) {}
