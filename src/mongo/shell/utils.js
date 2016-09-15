@@ -158,7 +158,7 @@ if (typeof TestData == "undefined") {
 
 function __sanitizeMatch(flag) {
     var sanitizeMatch = /-fsanitize=([^\s]+) /.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
-    if (flag && RegExp(flag).exec(sanitizeMatch[1])) {
+    if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
         return true;
     } else {
         return false;
