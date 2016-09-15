@@ -73,6 +73,8 @@ struct ShellGlobalParams {
     std::string readMode = "compatibility";
 
     boost::optional<rpc::ProtocolSet> rpcProtocols = boost::none;
+
+    int jsHeapLimitMB = 0;
 };
 
 extern ShellGlobalParams shellGlobalParams;

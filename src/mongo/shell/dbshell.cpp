@@ -708,6 +708,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
     mongo::ScriptEngine::setup();
+    mongo::globalScriptEngine->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
     mongo::globalScriptEngine->setScopeInitCallback(mongo::shell_utils::initScope);
     mongo::globalScriptEngine->enableJIT(!shellGlobalParams.nojit);
     mongo::globalScriptEngine->enableJavaScriptProtection(shellGlobalParams.javascriptProtection);

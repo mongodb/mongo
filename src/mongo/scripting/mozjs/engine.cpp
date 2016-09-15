@@ -50,6 +50,7 @@ namespace {
 
 MONGO_EXPORT_SERVER_PARAMETER(disableJavaScriptJIT, bool, false);
 MONGO_EXPORT_SERVER_PARAMETER(javascriptProtection, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(jsHeapLimitMB, int, 1100);
 
 }  // namespace
 
@@ -135,6 +136,14 @@ void MozJSScriptEngine::enableJavaScriptProtection(bool value) {
 
 bool MozJSScriptEngine::isJavaScriptProtectionEnabled() const {
     return javascriptProtection.load();
+}
+
+int MozJSScriptEngine::getJSHeapLimitMB() const {
+    return jsHeapLimitMB.load();
+}
+
+void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
+    jsHeapLimitMB.store(limit);
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* txn, MozJSImplScope* scope) {

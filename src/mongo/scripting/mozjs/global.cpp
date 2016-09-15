@@ -35,6 +35,7 @@
 #include "mongo/base/init.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -44,11 +45,12 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec GlobalInfo::freeFunctions[5] = {
+const JSFunctionSpec GlobalInfo::freeFunctions[6] = {
     MONGO_ATTACH_JS_FUNCTION(gc),
     MONGO_ATTACH_JS_FUNCTION(print),
     MONGO_ATTACH_JS_FUNCTION(version),
     MONGO_ATTACH_JS_FUNCTION(buildInfo),
+    MONGO_ATTACH_JS_FUNCTION(getJSHeapLimitMB),
     JS_FS_END,
 };
 
@@ -94,6 +96,10 @@ void GlobalInfo::Functions::buildInfo::call(JSContext* cx, JS::CallArgs args) {
     BSONObjBuilder b;
     VersionInfoInterface::instance().appendBuildInfo(&b);
     ValueReader(cx, args.rval()).fromBSON(b.obj(), nullptr, false);
+}
+
+void GlobalInfo::Functions::getJSHeapLimitMB::call(JSContext* cx, JS::CallArgs args) {
+    ValueReader(cx, args.rval()).fromDouble(mongo::globalScriptEngine->getJSHeapLimitMB());
 }
 
 void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {
