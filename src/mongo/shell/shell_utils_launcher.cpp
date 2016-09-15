@@ -885,7 +885,6 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
 
 int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
     ProcessId pid;
-    int exitCode = 0;
     if (port > 0) {
         if (!registry.isPortRegistered(port)) {
             log() << "No db started on port: " << port;
@@ -898,32 +897,18 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
 
     kill_wrapper(pid, signal, port, opt);
 
-    bool processTerminated = false;
-    bool killSignalSent = (signal == SIGKILL);
-    for (int i = 0; i < 6000; ++i) {
-        if (i == 600) {
-            log() << "process on port " << port << ", with pid " << pid
-                  << " not terminated, sending sigkill";
-            kill_wrapper(pid, SIGKILL, port, opt);
-            killSignalSent = true;
-        }
-        processTerminated = wait_for_pid(pid, false, &exitCode);
-        if (processTerminated) {
-            break;
-        }
-        sleepmillis(100);
-    }
-    if (!processTerminated) {
-        severe() << "failed to terminate process on port " << port << ", with pid " << pid;
-        invariant(false);
-    }
-
+    int exitCode = EXIT_FAILURE;
+    bool processTerminated = wait_for_pid(pid, true, &exitCode);
     registry.deleteProgram(pid);
 
-    if (killSignalSent) {
+    if (signal == SIGKILL) {
         sleepmillis(4000);  // allow operating system to reclaim resources
     }
 
+    if (!processTerminated) {
+        warning() << "process " << pid << " failed to terminate.";
+        return EXIT_FAILURE;
+    }
     return exitCode;
 }
 
@@ -979,12 +964,18 @@ BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
     return BSON("" << (double)code);
 }
 
-void KillMongoProgramInstances() {
+int KillMongoProgramInstances() {
     vector<ProcessId> pids;
     registry.getRegisteredPids(pids);
+    int returnCode = EXIT_SUCCESS;
     for (auto&& pid : pids) {
-        killDb(0, pid, SIGTERM);
+        int port = registry.portForPid(pid);
+        int code = killDb(port != -1 ? port : 0, pid, SIGTERM);
+        if (code != EXIT_SUCCESS) {
+            returnCode = code;
+        }
     }
+    return returnCode;
 }
 
 MongoProgramScope::~MongoProgramScope() {

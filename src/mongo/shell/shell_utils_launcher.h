@@ -53,7 +53,7 @@ struct MongoProgramScope {
     MongoProgramScope() {}  // Avoid 'unused variable' warning.
     ~MongoProgramScope();
 };
-void KillMongoProgramInstances();
+int KillMongoProgramInstances();
 
 void installShellUtilsLauncher(Scope& scope);
 

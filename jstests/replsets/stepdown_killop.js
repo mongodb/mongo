@@ -100,4 +100,5 @@
     assert.writeOK(primary.getDB(name).foo.remove({}));
     exitCode = writer();
     assert.eq(0, exitCode);
+    secondary.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
 })();
