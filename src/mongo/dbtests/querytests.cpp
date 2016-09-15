@@ -40,6 +40,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find.h"
@@ -55,6 +56,10 @@ using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
+
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 class Base {
 public:
@@ -89,7 +94,8 @@ protected:
     }
 
     void addIndex(const BSONObj& key) {
-        Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
+        Helpers::ensureIndex(
+            &_txn, _collection, key, kIndexVersion, false, key.firstElementFieldName());
     }
 
     void insert(const char* s) {

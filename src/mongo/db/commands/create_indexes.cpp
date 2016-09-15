@@ -42,8 +42,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -57,6 +59,8 @@
 namespace mongo {
 
 using std::string;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 
@@ -119,6 +123,79 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
     }
 
     return indexSpecs;
+}
+
+/**
+ * Returns index specifications with attributes (such as "collation") that are inherited from the
+ * collection filled in.
+ *
+ * The returned index specifications will not be equivalent to the ones specified as 'indexSpecs' if
+ * any missing attributes were filled in; however, the returned index specifications will match the
+ * form stored in the IndexCatalog should any of these indexes already exist.
+ */
+StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
+    OperationContext* txn, const Collection* collection, std::vector<BSONObj> indexSpecs) {
+    std::vector<BSONObj> indexSpecsWithDefaults = std::move(indexSpecs);
+
+    for (size_t i = 0, numIndexSpecs = indexSpecsWithDefaults.size(); i < numIndexSpecs; ++i) {
+        const BSONObj& indexSpec = indexSpecsWithDefaults[i];
+        if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
+            // validateIndexSpec() should have already verified that 'collationElem' is an object.
+            invariant(collationElem.type() == BSONType::Object);
+
+            auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
+                                ->makeFromBSON(collationElem.Obj());
+            if (!collator.isOK()) {
+                return collator.getStatus();
+            }
+
+            if (collator.getValue()) {
+                // If the collator factory returned a non-null collator, then inject the entire
+                // collation specification into the index specification. This is necessary to fill
+                // in any options that the user omitted.
+                BSONObjBuilder bob;
+
+                for (auto&& indexSpecElem : indexSpec) {
+                    if (IndexDescriptor::kCollationFieldName !=
+                        indexSpecElem.fieldNameStringData()) {
+                        bob.append(indexSpecElem);
+                    }
+                }
+                bob.append(IndexDescriptor::kCollationFieldName,
+                           collator.getValue()->getSpec().toBSON());
+
+                indexSpecsWithDefaults[i] = bob.obj();
+            } else {
+                // If the collator factory returned a null collator (representing the "simple"
+                // collation), then we simply omit the "collation" from the index specification.
+                // This is desirable to make the representation for the "simple" collation
+                // consistent between v=1 and v=2 indexes.
+                indexSpecsWithDefaults[i] =
+                    indexSpec.removeField(IndexDescriptor::kCollationFieldName);
+            }
+        } else if (collection->getDefaultCollator()) {
+            // validateIndexSpec() should have added the "v" field if it was not present and
+            // verified that 'versionElem' is a number.
+            auto versionElem = indexSpec[IndexDescriptor::kIndexVersionFieldName];
+            invariant(versionElem.isNumber());
+
+            if (IndexVersion::kV2 <= static_cast<IndexVersion>(versionElem.numberInt())) {
+                // The user did not specify an explicit collation for this index and the collection
+                // has a default collator. If we're building a v=2 index, then we should inherit the
+                // collection default. However, if we're building a v=1 index, then we're implicitly
+                // building an index that's using the "simple" collation.
+                BSONObjBuilder bob;
+
+                bob.appendElements(indexSpec);
+                bob.append(IndexDescriptor::kCollationFieldName,
+                           collection->getDefaultCollator()->getSpec().toBSON());
+
+                indexSpecsWithDefaults[i] = bob.obj();
+            }
+        }
+    }
+
+    return indexSpecsWithDefaults;
 }
 
 }  // namespace
@@ -203,6 +280,13 @@ public:
             result.appendBool("createdCollectionAutomatically", true);
         }
 
+        auto indexSpecsWithDefaults =
+            resolveCollectionDefaultProperties(txn, collection, std::move(specs));
+        if (!indexSpecsWithDefaults.isOK()) {
+            return appendCommandStatus(result, indexSpecsWithDefaults.getStatus());
+        }
+        specs = std::move(indexSpecsWithDefaults.getValue());
+
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
         result.append("numIndexesBefore", numIndexesBefore);
 
@@ -240,8 +324,9 @@ public:
             }
         }
 
+        std::vector<BSONObj> indexInfoObjs;
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            uassertStatusOK(indexer.init(specs));
+            indexInfoObjs = uassertStatusOK(indexer.init(specs));
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
 
@@ -306,11 +391,12 @@ public:
 
             indexer.commit();
 
-            for (size_t i = 0; i < specs.size(); i++) {
+            for (auto&& infoObj : indexInfoObjs) {
                 std::string systemIndexes = ns.getSystemIndexesCollection();
                 auto opObserver = getGlobalServiceContext()->getOpObserver();
-                if (opObserver)
-                    opObserver->onCreateIndex(txn, systemIndexes, specs[i]);
+                if (opObserver) {
+                    opObserver->onCreateIndex(txn, systemIndexes, infoObj);
+                }
             }
 
             wunit.commit();

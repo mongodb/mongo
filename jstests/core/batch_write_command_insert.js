@@ -2,6 +2,8 @@
 // Ensures that mongod respects the batch write protocol for inserts
 //
 
+load("jstests/libs/get_index_helpers.js");
+
 var coll = db.getCollection("batch_write_insert");
 coll.drop();
 
@@ -261,7 +263,24 @@ request = {
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
 assert.eq(1, result.n);
-assert.eq(coll.getIndexes().length, 2);
+var allIndexes = coll.getIndexes();
+var spec = GetIndexHelpers.findByName(allIndexes, "x_1");
+assert.neq(null, spec, "Index with name 'x_1' not found: " + tojson(allIndexes));
+assert.lte(2, spec.v, tojson(spec));
+
+// Test that a v=1 index can be created by inserting into the system.indexes collection.
+coll.drop();
+request = {
+    insert: "system.indexes",
+    documents: [{ns: coll.toString(), key: {x: 1}, name: "x_1", v: 1}]
+};
+result = coll.runCommand(request);
+assert(result.ok, tojson(result));
+assert.eq(1, result.n);
+allIndexes = coll.getIndexes();
+spec = GetIndexHelpers.findByName(allIndexes, "x_1");
+assert.neq(null, spec, "Index with name 'x_1' not found: " + tojson(allIndexes));
+assert.eq(1, spec.v, tojson(spec));
 
 //
 // Duplicate index insertion gives n = 0
@@ -382,4 +401,7 @@ request = {
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
 assert.eq(1, result.n);
-assert.eq(coll.getIndexes().length, 2);
+allIndexes = coll.getIndexes();
+spec = GetIndexHelpers.findByName(allIndexes, "x_1");
+assert.neq(null, spec, "Index with name 'x_1' not found: " + tojson(allIndexes));
+assert.lte(2, spec.v, tojson(spec));

@@ -32,11 +32,15 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageIxscan {
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 class IndexScanTest {
 public:
@@ -57,7 +61,9 @@ public:
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_txn,
             BSON("ns" << ns() << "key" << BSON("x" << 1) << "name"
-                      << DBClientBase::genIndexName(BSON("x" << 1)))));
+                      << DBClientBase::genIndexName(BSON("x" << 1))
+                      << "v"
+                      << static_cast<int>(kIndexVersion))));
 
         wunit.commit();
     }

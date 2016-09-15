@@ -64,6 +64,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -101,6 +102,8 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace repl {
 std::string rsOplogName = "local.oplog.rs";
@@ -708,9 +711,10 @@ Status applyOperation_inlock(OperationContext* txn,
             uassert(ErrorCodes::TypeMismatch,
                     str::stream() << "Expected object for index spec in field 'o': " << op,
                     fieldO.isABSONObj());
+            BSONObj indexSpec = fieldO.embeddedObject();
 
             std::string indexNs;
-            uassertStatusOK(bsonExtractStringField(o, "ns", &indexNs));
+            uassertStatusOK(bsonExtractStringField(indexSpec, "ns", &indexNs));
             const NamespaceString indexNss(indexNs);
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace in index spec: " << op,
@@ -723,24 +727,39 @@ Status applyOperation_inlock(OperationContext* txn,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
             opCounters->gotInsert();
-            if (o["background"].trueValue()) {
+
+            if (!indexSpec["v"]) {
+                // If the "v" field isn't present in the index specification, then we assume it is a
+                // v=1 index from an older version of MongoDB. This is because
+                //   (1) we haven't built v=0 indexes as the default for a long time, and
+                //   (2) the index version has been included in the corresponding oplog entry since
+                //       v=2 indexes were introduced.
+                BSONObjBuilder bob;
+
+                bob.append("v", static_cast<int>(IndexVersion::kV1));
+                bob.appendElements(indexSpec);
+
+                indexSpec = bob.obj();
+            }
+
+            if (indexSpec["background"].trueValue()) {
                 Lock::TempRelease release(txn->lockState());
                 if (txn->lockState()->isLocked()) {
                     // If TempRelease fails, background index build will deadlock.
-                    LOG(3) << "apply op: building background index " << o
+                    LOG(3) << "apply op: building background index " << indexSpec
                            << " in the foreground because temp release failed";
-                    IndexBuilder builder(o);
+                    IndexBuilder builder(indexSpec);
                     Status status = builder.buildInForeground(txn, db);
                     uassertStatusOK(status);
                 } else {
-                    IndexBuilder* builder = new IndexBuilder(o);
+                    IndexBuilder* builder = new IndexBuilder(indexSpec);
                     // This spawns a new thread and returns immediately.
                     builder->go();
                     // Wait for thread to start and register itself
                     IndexBuilder::waitForBgIndexStarting();
                 }
             } else {
-                IndexBuilder builder(o);
+                IndexBuilder builder(indexSpec);
                 Status status = builder.buildInForeground(txn, db);
                 uassertStatusOK(status);
             }

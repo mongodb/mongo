@@ -161,7 +161,7 @@ Status IndexBuilder::_build(OperationContext* txn,
 
 
             try {
-                status = indexer.init(_index);
+                status = indexer.init(_index).getStatus();
                 if (status.code() == ErrorCodes::IndexAlreadyExists) {
                     if (allowBackgroundBuilding) {
                         // Must set this in case anyone is waiting for this build.

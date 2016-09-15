@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -47,6 +48,8 @@ using std::string;
 namespace RollbackTests {
 
 namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+
 void dropDatabase(OperationContext* txn, const NamespaceString& nss) {
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite globalWriteLock(txn->lockState());
@@ -477,7 +480,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -518,7 +522,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         {
             WriteUnitOfWork uow(&txn);
@@ -571,7 +576,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -615,7 +621,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         {
             WriteUnitOfWork uow(&txn);
@@ -677,9 +684,12 @@ public:
         string idxNameA = "indexA";
         string idxNameB = "indexB";
         string idxNameC = "indexC";
-        BSONObj specA = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxNameA);
-        BSONObj specB = BSON("ns" << ns << "key" << BSON("b" << 1) << "name" << idxNameB);
-        BSONObj specC = BSON("ns" << ns << "key" << BSON("c" << 1) << "name" << idxNameC);
+        BSONObj specA = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxNameA << "v"
+                                  << static_cast<int>(kIndexVersion));
+        BSONObj specB = BSON("ns" << ns << "key" << BSON("b" << 1) << "name" << idxNameB << "v"
+                                  << static_cast<int>(kIndexVersion));
+        BSONObj specC = BSON("ns" << ns << "key" << BSON("c" << 1) << "name" << idxNameC << "v"
+                                  << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 

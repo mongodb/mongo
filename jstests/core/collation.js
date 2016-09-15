@@ -3,6 +3,7 @@
     'use strict';
 
     load("jstests/libs/analyze_plan.js");
+    load("jstests/libs/get_index_helpers.js");
 
     var coll = db.collation;
     coll.drop();
@@ -16,27 +17,12 @@
     var isMongos = (isMaster.msg === "isdbgrid");
 
     var assertIndexHasCollation = function(keyPattern, collation) {
-        var foundIndex = false;
         var indexSpecs = coll.getIndexes();
-        for (var i = 0; i < indexSpecs.length; ++i) {
-            if (bsonWoCompare(indexSpecs[i].key, keyPattern) === 0) {
-                foundIndex = true;
-                // We assume that the key pattern is unique, even though indices with different
-                // collations but the same key pattern are allowed.
-                if (collation.locale === "simple") {
-                    // The simple collation is not explicitly stored in the catalog, so we expect
-                    // the "collation" field to be absent.
-                    assert(!indexSpecs[i].hasOwnProperty("collation"),
-                           "Expected the simple collation in: " + tojson(indexSpecs[i]));
-                } else {
-                    assert.eq(indexSpecs[i].collation,
-                              collation,
-                              "Expected collation " + tojson(collation) + " in: " +
-                                  tojson(indexSpecs[i]));
-                }
-            }
-        }
-        assert(foundIndex, "index with key pattern " + tojson(keyPattern) + " not found");
+        var found = GetIndexHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
+        assert.neq(null,
+                   found,
+                   "Index with key pattern " + tojson(keyPattern) + " and collation " +
+                       tojson(collation) + " not found: " + tojson(indexSpecs));
     };
 
     var getQueryCollation = function(explainRes) {
@@ -128,8 +114,42 @@
         version: "57.1",
     });
 
+    // Ensure that an index which specifies the "simple" collation as an overriding collation still
+    // does not use the collection default.
+    assert.commandWorked(coll.ensureIndex({d: 1}, {collation: {locale: "simple"}}));
+    assertIndexHasCollation({d: 1}, {locale: "simple"});
+
     // Ensure that a v=1 index doesn't inherit the collection-default collation.
     assert.commandWorked(coll.ensureIndex({c: 1}, {v: 1}));
+    assertIndexHasCollation({c: 1}, {locale: "simple"});
+
+    // Test that all indexes retain their current collation when the collection is re-indexed.
+    assert.commandWorked(coll.reIndex());
+    assertIndexHasCollation({a: 1}, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+    assertIndexHasCollation({b: 1}, {
+        locale: "en_US",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: false,
+        version: "57.1",
+    });
+    assertIndexHasCollation({d: 1}, {locale: "simple"});
     assertIndexHasCollation({c: 1}, {locale: "simple"});
 
     coll.drop();

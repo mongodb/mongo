@@ -37,6 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/unordered_map.h"
 
@@ -81,7 +82,8 @@ public:
     /**
      * Returns the spec for the id index to create by default for this collection.
      */
-    BSONObj getDefaultIdIndexSpec() const;
+    BSONObj getDefaultIdIndexSpec(
+        ServerGlobalParams::FeatureCompatibilityVersions featureCompatibilityVersion) const;
 
     IndexDescriptor* findIdIndex(OperationContext* txn) const;
 

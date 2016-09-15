@@ -144,14 +144,38 @@ public:
 
         BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNs.ns());
 
+        const auto featureCompatibilityVersion =
+            serverGlobalParams.featureCompatibilityVersion.load();
+        const auto defaultIndexVersion =
+            IndexDescriptor::getDefaultIndexVersion(featureCompatibilityVersion);
+
         vector<BSONObj> all;
         {
             vector<string> indexNames;
             collection->getCatalogEntry()->getAllIndexes(txn, &indexNames);
+            all.reserve(indexNames.size());
+
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const string& name = indexNames[i];
                 BSONObj spec = collection->getCatalogEntry()->getIndexSpec(txn, name);
-                all.push_back(spec.removeField("v").getOwned());
+
+                {
+                    BSONObjBuilder bob;
+
+                    for (auto&& indexSpecElem : spec) {
+                        auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+                        if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
+                            // We create a new index specification with the 'v' field set as
+                            // 'defaultIndexVersion'.
+                            bob.append(IndexDescriptor::kIndexVersionFieldName,
+                                       static_cast<int>(defaultIndexVersion));
+                        } else {
+                            bob.append(indexSpecElem);
+                        }
+                    }
+
+                    all.push_back(bob.obj());
+                }
 
                 const BSONObj key = spec.getObjectField("key");
                 const Status keyStatus = validateKeyPattern(key);
@@ -179,13 +203,15 @@ public:
         MultiIndexBlock indexer(txn, collection);
         // do not want interruption as that will leave us without indexes.
 
-        Status status = indexer.init(all);
-        if (!status.isOK())
-            return appendCommandStatus(result, status);
+        auto indexInfoObjs = indexer.init(all);
+        if (!indexInfoObjs.isOK()) {
+            return appendCommandStatus(result, indexInfoObjs.getStatus());
+        }
 
-        status = indexer.insertAllDocumentsInCollection();
-        if (!status.isOK())
+        auto status = indexer.insertAllDocumentsInCollection();
+        if (!status.isOK()) {
             return appendCommandStatus(result, status);
+        }
 
         {
             WriteUnitOfWork wunit(txn);
@@ -202,8 +228,8 @@ public:
         replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
         collection->setMinimumVisibleSnapshot(snapshotName);
 
-        result.append("nIndexes", (int)all.size());
-        result.append("indexes", all);
+        result.append("nIndexes", static_cast<int>(indexInfoObjs.getValue().size()));
+        result.append("indexes", indexInfoObjs.getValue());
 
         return true;
     }

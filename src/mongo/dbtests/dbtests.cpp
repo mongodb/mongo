@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -54,6 +55,9 @@
 
 namespace mongo {
 namespace dbtests {
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 void initWireSpec() {
     WireSpec& spec = WireSpec::instance();
@@ -67,9 +71,12 @@ void initWireSpec() {
 
 Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
-    specBuilder << "name" << DBClientBase::genIndexName(keys) << "ns" << ns << "key" << keys;
+    specBuilder.append("name", DBClientBase::genIndexName(keys));
+    specBuilder.append("ns", ns);
+    specBuilder.append("key", keys);
+    specBuilder.append("v", static_cast<int>(kIndexVersion));
     if (unique) {
-        specBuilder << "unique" << true;
+        specBuilder.appendBool("unique", true);
     }
     return createIndexFromSpec(txn, ns, specBuilder.done());
 }
@@ -84,7 +91,7 @@ Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& 
         wunit.commit();
     }
     MultiIndexBlock indexer(txn, coll);
-    Status status = indexer.init(spec);
+    Status status = indexer.init(spec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }

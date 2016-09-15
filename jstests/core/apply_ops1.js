@@ -1,5 +1,8 @@
 (function() {
     "use strict";
+
+    load("jstests/libs/get_index_helpers.js");
+
     var t = db.apply_ops1;
     t.drop();
 
@@ -244,13 +247,10 @@
     }));
     assert.eq(1, res.applied, "Incorrect number of operations applied");
     assert.eq(true, res.results[0], "Foreground index creation failed");
-    res = t.getIndexes();
-    assert.eq(1,
-              res.filter(function(element, index, array) {
-                     return element.name == 'a_1';
-                 })
-                  .length,
-              'Foreground index not found in listIndexes result: ' + tojson(res));
+    var allIndexes = t.getIndexes();
+    var spec = GetIndexHelpers.findByName(allIndexes, "a_1");
+    assert.neq(null, spec, "Foreground index 'a_1' not found: " + tojson(allIndexes));
+    assert.eq(1, spec.v, "Expected v=1 index to be built since 'v' field was omitted");
 
     // Background indexes are created in the foreground when processed by applyOps.
     res = assert.commandWorked(db.adminCommand({
@@ -267,11 +267,28 @@
     }));
     assert.eq(1, res.applied, "Incorrect number of operations applied");
     assert.eq(true, res.results[0], "Background index creation failed");
-    res = t.getIndexes();
-    assert.eq(1,
-              res.filter(function(element, index, array) {
-                     return element.name == 'b_1';
-                 })
-                  .length,
-              'Background index not found in listIndexes result: ' + tojson(res));
+    allIndexes = t.getIndexes();
+    spec = GetIndexHelpers.findByName(allIndexes, "b_1");
+    assert.neq(null, spec, "Background index 'b_1' not found: " + tojson(allIndexes));
+    assert.eq(1, spec.v, "Expected v=1 index to be built since 'v' field was omitted");
+
+    // Foreground v=2 index build.
+    res = assert.commandWorked(db.adminCommand({
+        applyOps: [{
+            "op": "i",
+            "ns": db.getName() + ".system.indexes",
+            "o": {
+                ns: t.getFullName(),
+                key: {c: 1},
+                name: "c_1",
+                v: 2,
+            }
+        }]
+    }));
+    assert.eq(1, res.applied, "Incorrect number of operations applied");
+    assert.eq(true, res.results[0], "Foreground v=2 index creation failed");
+    allIndexes = t.getIndexes();
+    spec = GetIndexHelpers.findByName(allIndexes, "c_1");
+    assert.neq(null, spec, "Foreground index 'c_1' not found: " + tojson(allIndexes));
+    assert.eq(2, spec.v, "Expected v=2 index to be built");
 })();

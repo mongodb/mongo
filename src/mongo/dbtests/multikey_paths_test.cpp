@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
@@ -43,6 +44,8 @@
 
 namespace mongo {
 namespace {
+
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 /**
  * Fixture for testing correctness of multikey paths.
@@ -157,7 +160,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPattern));
+                     << keyPattern
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
 
     assertMultikeyPaths(collection, keyPattern, {std::set<size_t>{}, {0U}});
 }
@@ -191,7 +196,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPattern));
+                     << keyPattern
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
 
     assertMultikeyPaths(collection, keyPattern, {{0U}, {0U}});
 }
@@ -208,7 +215,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPattern));
+                     << keyPattern
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -251,7 +260,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPattern));
+                     << keyPattern
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -304,7 +315,9 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPattern));
+                     << keyPattern
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -348,7 +361,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPatternAB));
+                     << keyPatternAB
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
 
     BSONObj keyPatternAC = BSON("a" << 1 << "c" << 1);
     createIndex(collection,
@@ -357,7 +372,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
                      << "ns"
                      << _nss.ns()
                      << "key"
-                     << keyPatternAC));
+                     << keyPatternAC
+                     << "v"
+                     << static_cast<int>(kIndexVersion)));
     {
         WriteUnitOfWork wuow(_opCtx.get());
         OpDebug* const nullOpDebug = nullptr;

@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/db/db.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/data_protector.h"
 
@@ -66,6 +67,7 @@ struct Helpers {
     static void ensureIndex(OperationContext* txn,
                             Collection* collection,
                             BSONObj keyPattern,
+                            IndexDescriptor::IndexVersion indexVersion,
                             bool unique,
                             const char* name);
 

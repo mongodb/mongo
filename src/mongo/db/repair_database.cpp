@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -54,6 +55,8 @@ namespace mongo {
 
 using std::endl;
 using std::string;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 Status rebuildIndexesOnCollection(OperationContext* txn,
@@ -66,10 +69,35 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
     {
         // Fetch all indexes
         cce->getAllIndexes(txn, &indexNames);
+        indexSpecs.reserve(indexNames.size());
+
         for (size_t i = 0; i < indexNames.size(); i++) {
             const string& name = indexNames[i];
             BSONObj spec = cce->getIndexSpec(txn, name);
-            indexSpecs.push_back(spec.removeField("v").getOwned());
+
+            {
+                BSONObjBuilder bob;
+
+                for (auto&& indexSpecElem : spec) {
+                    auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+                    if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
+                        IndexVersion indexVersion =
+                            static_cast<IndexVersion>(indexSpecElem.numberInt());
+                        if (IndexVersion::kV0 == indexVersion) {
+                            // We automatically upgrade v=0 indexes to v=1 indexes.
+                            bob.append(IndexDescriptor::kIndexVersionFieldName,
+                                       static_cast<int>(IndexVersion::kV1));
+                        } else {
+                            bob.append(IndexDescriptor::kIndexVersionFieldName,
+                                       static_cast<int>(indexVersion));
+                        }
+                    } else {
+                        bob.append(indexSpecElem);
+                    }
+                }
+
+                indexSpecs.push_back(bob.obj());
+            }
 
             const BSONObj key = spec.getObjectField("key");
             const Status keyStatus = validateKeyPattern(key);
@@ -116,7 +144,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
         collection.reset(new Collection(txn, ns, cce, dbce->getRecordStore(ns), dbce));
 
         indexer.reset(new MultiIndexBlock(txn, collection.get()));
-        Status status = indexer->init(indexSpecs);
+        Status status = indexer->init(indexSpecs).getStatus();
         if (!status.isOK()) {
             // The WUOW will handle cleanup, so the indexer shouldn't do its own.
             indexer->abortWithoutCleanup();

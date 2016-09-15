@@ -41,6 +41,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -60,13 +61,17 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+
 BSONObj makeIdIndexSpec(const NamespaceString& nss) {
     return BSON("ns" << nss.toString() << "name"
                      << "_id_"
                      << "key"
                      << BSON("_id" << 1)
                      << "unique"
-                     << true);
+                     << true
+                     << "v"
+                     << static_cast<int>(kIndexVersion));
 }
 
 /**

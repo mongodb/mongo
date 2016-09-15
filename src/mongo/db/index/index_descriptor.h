@@ -56,6 +56,19 @@ class IndexDescriptor {
 public:
     enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
 
+    static const StringData k2dsphereVersionFieldName;
+    static const StringData kBackgroundFieldName;
+    static const StringData kCollationFieldName;
+    static const StringData kDropDuplicatesFieldName;
+    static const StringData kIndexNameFieldName;
+    static const StringData kIndexVersionFieldName;
+    static const StringData kKeyPatternFieldName;
+    static const StringData kNamespaceFieldName;
+    static const StringData kPartialFilterExprFieldName;
+    static const StringData kSparseFieldName;
+    static const StringData kTextVersionFieldName;
+    static const StringData kUniqueFieldName;
+
     /**
      * OnDiskIndexData is a pointer to the memory mapped per-index data.
      * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
@@ -64,19 +77,19 @@ public:
         : _collection(collection),
           _accessMethodName(accessMethodName),
           _infoObj(infoObj.getOwned()),
-          _numFields(infoObj.getObjectField("key").nFields()),
-          _keyPattern(infoObj.getObjectField("key").getOwned()),
-          _indexName(infoObj.getStringField("name")),
-          _parentNS(infoObj.getStringField("ns")),
+          _numFields(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).nFields()),
+          _keyPattern(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).getOwned()),
+          _indexName(infoObj.getStringField(IndexDescriptor::kIndexNameFieldName)),
+          _parentNS(infoObj.getStringField(IndexDescriptor::kNamespaceFieldName)),
           _isIdIndex(isIdIndexPattern(_keyPattern)),
-          _sparse(infoObj["sparse"].trueValue()),
-          _unique(_isIdIndex || infoObj["unique"].trueValue()),
-          _partial(!infoObj["partialFilterExpression"].eoo()),
+          _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
+          _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
+          _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
           _cachedEntry(NULL) {
         _indexNamespace = makeIndexNamespace(_parentNS, _indexName);
 
         _version = IndexVersion::kV0;
-        BSONElement e = _infoObj["v"];
+        BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
         if (e.isNumber()) {
             _version = static_cast<IndexVersion>(e.numberInt());
         }

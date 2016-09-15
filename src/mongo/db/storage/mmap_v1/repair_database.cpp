@@ -397,7 +397,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
                     indexes.push_back(desc->infoObj());
                 }
 
-                Status status = indexer.init(indexes);
+                Status status = indexer.init(indexes).getStatus();
                 if (!status.isOK()) {
                     return status;
                 }

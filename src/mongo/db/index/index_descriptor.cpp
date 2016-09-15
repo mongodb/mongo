@@ -50,21 +50,38 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
         const BSONElement e = it.next();
 
         StringData fieldName = e.fieldNameStringData();
-        if (fieldName == "key" || fieldName == "ns" || fieldName == "name" ||
-            fieldName == "v" ||                     // not considered for equivalence
-            fieldName == "textIndexVersion" ||      // same as "v"
-            fieldName == "2dsphereIndexVersion" ||  // same as "v"
-            fieldName == "background" ||            // this is a creation time option only
-            fieldName == "dropDups" ||              // this is now ignored
-            fieldName == "sparse" ||                // checked specially
-            fieldName == "unique"                   // check specially
+        if (fieldName == IndexDescriptor::kKeyPatternFieldName ||
+            fieldName == IndexDescriptor::kNamespaceFieldName ||
+            fieldName == IndexDescriptor::kIndexNameFieldName ||
+            fieldName ==
+                IndexDescriptor::kIndexVersionFieldName ||  // not considered for equivalence
+            fieldName == IndexDescriptor::kTextVersionFieldName ||      // same as index version
+            fieldName == IndexDescriptor::k2dsphereVersionFieldName ||  // same as index version
+            fieldName ==
+                IndexDescriptor::kBackgroundFieldName ||  // this is a creation time option only
+            fieldName == IndexDescriptor::kDropDuplicatesFieldName ||  // this is now ignored
+            fieldName == IndexDescriptor::kSparseFieldName ||          // checked specially
+            fieldName == IndexDescriptor::kUniqueFieldName             // check specially
             ) {
             continue;
         }
         theMap[fieldName] = e;
     }
 }
-}
+}  // namespace
+
+const StringData IndexDescriptor::k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
+const StringData IndexDescriptor::kBackgroundFieldName = "background"_sd;
+const StringData IndexDescriptor::kCollationFieldName = "collation"_sd;
+const StringData IndexDescriptor::kDropDuplicatesFieldName = "dropDups"_sd;
+const StringData IndexDescriptor::kIndexNameFieldName = "name"_sd;
+const StringData IndexDescriptor::kIndexVersionFieldName = "v"_sd;
+const StringData IndexDescriptor::kKeyPatternFieldName = "key"_sd;
+const StringData IndexDescriptor::kNamespaceFieldName = "ns"_sd;
+const StringData IndexDescriptor::kPartialFilterExprFieldName = "partialFilterExpression"_sd;
+const StringData IndexDescriptor::kSparseFieldName = "sparse"_sd;
+const StringData IndexDescriptor::kTextVersionFieldName = "textIndexVersion"_sd;
+const StringData IndexDescriptor::kUniqueFieldName = "unique"_sd;
 
 bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     switch (indexVersion) {

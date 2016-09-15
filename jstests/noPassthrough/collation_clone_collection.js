@@ -24,6 +24,18 @@
               sourceColl.find({_id: "foo"}).toArray(),
               "query should have performed a case-insensitive match");
 
+    assert.commandWorked(
+        sourceColl.createIndex({withSimpleCollation: 1}, {collation: {locale: "simple"}}));
+    assert.commandWorked(sourceColl.createIndex({withDefaultCollation: 1}));
+    assert.commandWorked(
+        sourceColl.createIndex({withNonDefaultCollation: 1}, {collation: {locale: "fr"}}));
+    var sourceIndexInfos = sourceColl.getIndexes().map(function(indexInfo) {
+        // We remove the "ns" field from the index specification when comparing whether the indexes
+        // that were cloned are equivalent because they were built on a different namespace.
+        delete indexInfo.ns;
+        return indexInfo;
+    });
+
     // Test that the "cloneCollection" command respects the collection-default collation.
     destColl.drop();
     assert.commandWorked(destColl.getDB().runCommand({
@@ -35,4 +47,19 @@
     var destCollectionInfos = destColl.getDB().getCollectionInfos({name: destColl.getName()});
     assert.eq(sourceCollectionInfos, destCollectionInfos);
     assert.eq([{_id: "FOO"}], destColl.find({}).toArray());
+
+    var destIndexInfos = destColl.getIndexes().map(function(indexInfo) {
+        // We remove the "ns" field from the index specification when comparing whether the indexes
+        // that were cloned are equivalent because they were built on a different namespace.
+        delete indexInfo.ns;
+        return indexInfo;
+    });
+
+    assert.eq(sourceIndexInfos.length,
+              destIndexInfos.length,
+              "Number of indexes don't match; source: " + tojson(sourceIndexInfos) + ", dest: " +
+                  tojson(destIndexInfos));
+    for (var i = 0; i < sourceIndexInfos.length; ++i) {
+        assert.contains(sourceIndexInfos[i], destIndexInfos);
+    }
 })();

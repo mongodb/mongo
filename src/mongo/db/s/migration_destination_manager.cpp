@@ -44,11 +44,9 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -72,8 +70,6 @@ namespace mongo {
 
 using std::string;
 using str::stream;
-
-using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 
@@ -563,33 +559,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                 return;
             }
 
-            // Attach simple collation if the index does not specify a collation. Otherwise, this
-            // will be back-filled with the collection default collation.
-            std::vector<BSONObj> indexSpecsWithCollation;
-            for (const BSONObj& spec : indexSpecs) {
-                if (spec["collation"]) {
-                    indexSpecsWithCollation.push_back(spec.getOwned());
-                } else if (IndexVersion::kV2 <= static_cast<IndexVersion>(spec["v"].numberInt())) {
-                    indexSpecsWithCollation.emplace_back(
-                        BSONObjBuilder()
-                            .appendElements(spec)
-                            .append("collation", CollationSpec::kSimpleSpec)
-                            .obj());
-                } else {
-                    indexSpecsWithCollation.push_back(spec.getOwned());
-                }
-            }
-
-            Status status = indexer.init(indexSpecsWithCollation);
-            if (!status.isOK()) {
+            auto indexInfoObjs = indexer.init(indexSpecs);
+            if (!indexInfoObjs.isOK()) {
                 errmsg = str::stream() << "failed to create index before migrating data. "
-                                       << " error: " << redact(status);
+                                       << " error: " << redact(indexInfoObjs.getStatus());
                 warning() << errmsg;
                 setState(FAIL);
                 return;
             }
 
-            status = indexer.insertAllDocumentsInCollection();
+            auto status = indexer.insertAllDocumentsInCollection();
             if (!status.isOK()) {
                 errmsg = str::stream() << "failed to create index before migrating data. "
                                        << " error: " << redact(status);
@@ -601,13 +580,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             WriteUnitOfWork wunit(txn);
             indexer.commit();
 
-            for (size_t i = 0; i < indexSpecsWithCollation.size(); i++) {
+            for (auto&& infoObj : indexInfoObjs.getValue()) {
                 // make sure to create index on secondaries as well
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    txn,
-                    db->getSystemIndexesName(),
-                    indexSpecsWithCollation[i],
-                    true /* fromMigrate */);
+                    txn, db->getSystemIndexesName(), infoObj, true /* fromMigrate */);
             }
 
             wunit.commit();

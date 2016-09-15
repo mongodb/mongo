@@ -48,6 +48,10 @@ namespace IndexUpdateTests {
 
 using std::unique_ptr;
 
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
+
 static const char* const _ns = "unittests.indexupdate";
 
 /**
@@ -376,12 +380,14 @@ public:
                                   << coll->ns().ns()
                                   << "key"
                                   << BSON("a" << 1)
+                                  << "v"
+                                  << static_cast<int>(kIndexVersion)
                                   << "unique"
                                   << true
                                   << "background"
                                   << background);
 
-        ASSERT_OK(indexer.init(spec));
+        ASSERT_OK(indexer.init(spec).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection());
 
         WriteUnitOfWork wunit(&_txn);
@@ -428,12 +434,14 @@ public:
                                   << coll->ns().ns()
                                   << "key"
                                   << BSON("a" << 1)
+                                  << "v"
+                                  << static_cast<int>(kIndexVersion)
                                   << "unique"
                                   << true
                                   << "background"
                                   << background);
 
-        ASSERT_OK(indexer.init(spec));
+        ASSERT_OK(indexer.init(spec).getStatus());
         const Status status = indexer.insertAllDocumentsInCollection();
         ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
     }
@@ -479,12 +487,14 @@ public:
                                   << coll->ns().ns()
                                   << "key"
                                   << BSON("a" << 1)
+                                  << "v"
+                                  << static_cast<int>(kIndexVersion)
                                   << "unique"
                                   << true
                                   << "background"
                                   << background);
 
-        ASSERT_OK(indexer.init(spec));
+        ASSERT_OK(indexer.init(spec).getStatus());
 
         std::set<RecordId> dups;
         ASSERT_OK(indexer.insertAllDocumentsInCollection(&dups));
@@ -524,7 +534,9 @@ public:
         // Request an interrupt.
         getGlobalServiceContext()->setKillAllOperations();
         BSONObj indexInfo = BSON("key" << BSON("a" << 1) << "ns" << _ns << "name"
-                                       << "a_1");
+                                       << "a_1"
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion));
         // The call is interrupted because mayInterrupt == true.
         ASSERT_TRUE(buildIndexInterrupted(indexInfo, true));
         // only want to interrupt the index build
@@ -557,7 +569,9 @@ public:
         // Request an interrupt.
         getGlobalServiceContext()->setKillAllOperations();
         BSONObj indexInfo = BSON("key" << BSON("a" << 1) << "ns" << _ns << "name"
-                                       << "a_1");
+                                       << "a_1"
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion));
         // The call is not interrupted because mayInterrupt == false.
         ASSERT_FALSE(buildIndexInterrupted(indexInfo, false));
         // only want to interrupt the index build
@@ -593,7 +607,9 @@ public:
         // Request an interrupt.
         getGlobalServiceContext()->setKillAllOperations();
         BSONObj indexInfo = BSON("key" << BSON("_id" << 1) << "ns" << _ns << "name"
-                                       << "_id_");
+                                       << "_id_"
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion));
         // The call is interrupted because mayInterrupt == true.
         ASSERT_TRUE(buildIndexInterrupted(indexInfo, true));
         // only want to interrupt the index build
@@ -629,7 +645,9 @@ public:
         // Request an interrupt.
         getGlobalServiceContext()->setKillAllOperations();
         BSONObj indexInfo = BSON("key" << BSON("_id" << 1) << "ns" << _ns << "name"
-                                       << "_id_");
+                                       << "_id_"
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion));
         // The call is not interrupted because mayInterrupt == false.
         ASSERT_FALSE(buildIndexInterrupted(indexInfo, false));
         // only want to interrupt the index build
@@ -653,7 +671,7 @@ public:
         // Request an interrupt.
         getGlobalServiceContext()->setKillAllOperations();
         // The call is not interrupted.
-        Helpers::ensureIndex(&_txn, collection(), BSON("a" << 1), false, "a_1");
+        Helpers::ensureIndex(&_txn, collection(), BSON("a" << 1), kIndexVersion, false, "a_1");
         // only want to interrupt the index build
         getGlobalServiceContext()->unsetKillAllOperations();
         // The new index is listed in getIndexSpecs because the index build completed.
@@ -721,7 +739,7 @@ public:
 
 Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& indexSpec) {
     MultiIndexBlock indexer(&_txn, collection());
-    Status status = indexer.init(indexSpec);
+    Status status = indexer.init(indexSpec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
@@ -750,7 +768,9 @@ public:
                                    << "ns"
                                    << _ns
                                    << "key"
-                                   << BSON("x" << 1 << "y" << 1))));
+                                   << BSON("x" << 1 << "y" << 1)
+                                   << "v"
+                                   << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -767,7 +787,9 @@ public:
                                        << "unique"
                                        << true
                                        << "key"
-                                       << BSON("x" << 1 << "y" << 1))));
+                                       << BSON("x" << 1 << "y" << 1)
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -780,7 +802,9 @@ public:
                                    << "ns"
                                    << _ns
                                    << "key"
-                                   << BSON("x" << 1 << "y" << 1))));
+                                   << BSON("x" << 1 << "y" << 1)
+                                   << "v"
+                                   << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -795,7 +819,9 @@ public:
                                        << "ns"
                                        << _ns
                                        << "key"
-                                       << BSON("y" << 1 << "x" << 1))));
+                                       << BSON("y" << 1 << "x" << 1)
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -818,7 +844,9 @@ public:
                                    << 3600
                                    << "key"
                                    << BSON("superIdx"
-                                           << "2d"))));
+                                           << "2d")
+                                   << "v"
+                                   << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -840,7 +868,9 @@ public:
                                    << 1
                                    << "key"
                                    << BSON("superIdx"
-                                           << "2d"))));
+                                           << "2d")
+                                   << "v"
+                                   << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -864,7 +894,9 @@ public:
                                        << 3600
                                        << "key"
                                        << BSON("superIdx"
-                                               << "2d"))));
+                                               << "2d")
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -887,7 +919,9 @@ public:
                                        << 3600
                                        << "key"
                                        << BSON("superIdx"
-                                               << "2d"))));
+                                               << "2d")
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -908,7 +942,9 @@ public:
                                        << 2400
                                        << "key"
                                        << BSON("superIdx"
-                                               << "2d"))));
+                                               << "2d")
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -959,6 +995,8 @@ protected:
                     << _ns
                     << "key"
                     << BSON("a" << 1)
+                    << "v"
+                    << static_cast<int>(kIndexVersion)
                     << "storageEngine"
                     << storageEngineValue);
     }

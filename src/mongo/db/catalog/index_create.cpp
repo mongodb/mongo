@@ -147,12 +147,12 @@ void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
     }
 }
 
-Status MultiIndexBlock::init(const BSONObj& spec) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const BSONObj& spec) {
     const auto indexes = std::vector<BSONObj>(1, spec);
     return init(indexes);
 }
 
-Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
     WriteUnitOfWork wunit(_txn);
 
     invariant(_indexes.empty());
@@ -182,6 +182,9 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         _buildInBackground = (_buildInBackground && info["background"].trueValue());
     }
 
+    std::vector<BSONObj> indexInfoObjs;
+    indexInfoObjs.reserve(indexSpecs.size());
+
     for (size_t i = 0; i < indexSpecs.size(); i++) {
         BSONObj info = indexSpecs[i];
         StatusWith<BSONObj> statusWithInfo =
@@ -190,6 +193,7 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         if (!status.isOK())
             return status;
         info = statusWithInfo.getValue();
+        indexInfoObjs.push_back(info);
 
         IndexToBuild index;
         index.block.reset(new IndexCatalog::IndexBuildBlock(_txn, _collection, info));
@@ -241,7 +245,7 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         }
     }
 
-    return Status::OK();
+    return indexInfoObjs;
 }
 
 Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {

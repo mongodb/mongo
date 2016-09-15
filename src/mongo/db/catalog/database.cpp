@@ -56,6 +56,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
@@ -576,8 +577,19 @@ Collection* Database::createCollection(OperationContext* txn,
         if (collection->requiresIdIndex()) {
             if (options.autoIndexId == CollectionOptions::YES ||
                 options.autoIndexId == CollectionOptions::DEFAULT) {
+                // The creation of the _id index isn't replicated and is instead implicit in the
+                // creation of the collection. This means that the version of the _id index to build
+                // is technically unspecified. However, we're able to use the
+                // featureCompatibilityVersion of this server to determine the default index version
+                // to use because we apply commands (opType == 'c') in their own batch. This
+                // guarantees the write to the admin.system.version collection from the
+                // "setFeatureCompatibilityVersion" command either happens entirely before the
+                // collection creation or it happens entirely after.
+                const auto featureCompatibilityVersion =
+                    serverGlobalParams.featureCompatibilityVersion.load();
                 IndexCatalog* ic = collection->getIndexCatalog();
-                uassertStatusOK(ic->createIndexOnEmptyCollection(txn, ic->getDefaultIdIndexSpec()));
+                uassertStatusOK(ic->createIndexOnEmptyCollection(
+                    txn, ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));
             }
         }
 

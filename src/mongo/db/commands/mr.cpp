@@ -94,6 +94,8 @@ using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
+using IndexVersion = IndexDescriptor::IndexVersion;
+
 namespace dps = ::mongo::dotted_path_support;
 
 namespace mr {
@@ -414,8 +416,14 @@ void State::prepTempCollection() {
             incColl = incCtx.db()->createCollection(_txn, _config.incLong, options);
             invariant(incColl);
 
+            // We explicitly create a v=2 index on the "0" field so that it is always possible for a
+            // user to emit() decimal keys. Since the incremental collection is not replicated to
+            // any secondaries, there is no risk of inadvertently crashing an older version of
+            // MongoDB when the featureCompatibilityVersion of this server is 3.2.
             BSONObj indexSpec = BSON("key" << BSON("0" << 1) << "ns" << _config.incLong << "name"
-                                           << "_temp_0");
+                                           << "_temp_0"
+                                           << "v"
+                                           << static_cast<int>(IndexVersion::kV2));
             Status status =
                 incColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn, indexSpec);
             if (!status.isOK()) {

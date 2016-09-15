@@ -93,7 +93,7 @@ Status CollectionBulkLoaderImpl::init(OperationContext* txn,
     invariant(txn->getClient() == &cc());
     if (secondaryIndexSpecs.size()) {
         _secondaryIndexesBlock->ignoreUniqueConstraint();
-        auto status = _secondaryIndexesBlock->init(secondaryIndexSpecs);
+        auto status = _secondaryIndexesBlock->init(secondaryIndexSpecs).getStatus();
         if (!status.isOK()) {
             return status;
         }
@@ -101,7 +101,7 @@ Status CollectionBulkLoaderImpl::init(OperationContext* txn,
         _secondaryIndexesBlock.reset();
     }
     if (!_idIndexSpec.isEmpty()) {
-        auto status = _idIndexBlock->init(_idIndexSpec);
+        auto status = _idIndexBlock->init(_idIndexSpec).getStatus();
         if (!status.isOK()) {
             return status;
         }
