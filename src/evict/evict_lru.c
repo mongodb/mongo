@@ -961,10 +961,10 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		queue->evict_candidates = entries;
 	else {
 		/*
-		 * Find the oldest read generation apart from WT_READGEN_OLDEST
-		 * that we have in the queue, used to set the initial value for
-		 * pages read into the system.
-		 * The queue is sorted, find the first "normal" generation.
+		 * Find the oldest read generation apart that we have in the
+		 * queue, used to set the initial value for pages read into the
+		 * system.  The queue is sorted, find the first "normal"
+		 * generation.
 		 */
 		read_gen_oldest = WT_READGEN_OLDEST;
 		for (candidates = 0; candidates < entries; ++candidates) {
