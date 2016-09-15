@@ -8,8 +8,12 @@
     var assertLimit = function() {
         assert.eq(999, getJSHeapLimitMB());
     };
-    var exitCode = runMongoProgram(
-        "mongo", conn.host, "--jsHeapLimitMB", 999, "--eval", "(" + assertLimit.toString() + ")();");
+    var exitCode = runMongoProgram("mongo",
+                                   conn.host,
+                                   "--jsHeapLimitMB",
+                                   999,
+                                   "--eval",
+                                   "(" + assertLimit.toString() + ")();");
     assert.eq(0, exitCode);
 
     // verify the JSHeapLimitMB set from Mongod
