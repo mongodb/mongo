@@ -156,6 +156,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='oplog_buffer_proxy',
+    source=[
+        'oplog_buffer_proxy.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target='oplog_buffer_collection_test',
     source=[
@@ -170,6 +180,16 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/unittest/concurrency',
     ],
     NO_CRUTCH = True,
+)
+
+env.CppUnitTest(
+    target='oplog_buffer_proxy_test',
+    source=[
+        'oplog_buffer_proxy_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_buffer_proxy',
+    ],
 )
 
 env.Library(
