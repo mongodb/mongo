@@ -876,27 +876,25 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		return (0);
 
 	/* Get some more pages to consider for eviction. */
-	switch (ret = __evict_walk(cache->walk_session, queue)) {
-	case 0:
-		break;
-	case EBUSY:
-		return (0);
-	case WT_NOTFOUND:
-		/*
-		 * If we found no pages at all during the walk, something is
-		 * wrong.  Be more aggressive next time.
-		 */
+	if ((ret = __evict_walk(cache->walk_session, queue)) == EBUSY)
+		return (0);	/* An interrupt was requested, give up. */
+	WT_RET_NOTFOUND_OK(ret);
+
+	/*
+	 * If we found no pages at all during the walk, something is wrong.
+	 * Be more aggressive next time.
+	 *
+	 * Continue on to sort the queue, in case there are pages left from a
+	 * previous walk.
+	 */
+	if (ret == WT_NOTFOUND) {
 		if (F_ISSET(cache,
 		    WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD))
 			cache->evict_aggressive_score = WT_MIN(
 			    cache->evict_aggressive_score + WT_EVICT_SCORE_BUMP,
 			    WT_EVICT_SCORE_MAX);
-		WT_STAT_CONN_SET(session,
-		    cache_eviction_aggressive_set,
+		WT_STAT_CONN_SET(session, cache_eviction_aggressive_set,
 		    cache->evict_aggressive_score);
-		return (0);
-	default:
-		return (ret);
 	}
 
 	/*
@@ -932,6 +930,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	qsort(queue->evict_queue,
 	    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 
+	/* Trim empty entries from the end. */
 	while (entries > 0 && queue->evict_queue[entries - 1].ref == NULL)
 		--entries;
 
@@ -941,8 +940,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	 * candidates so we never end up with more candidates than entries.
 	 */
 	while (entries > WT_EVICT_WALK_BASE)
-		__evict_list_clear(session,
-		    &queue->evict_queue[--entries]);
+		__evict_list_clear(session, &queue->evict_queue[--entries]);
 
 	queue->evict_entries = entries;
 
@@ -963,14 +961,14 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		queue->evict_candidates = entries;
 	else {
 		/*
-		 * Find the oldest read generation we have in the queue, used
-		 * to set the initial value for pages read into the system.
+		 * Find the oldest read generation apart from WT_READGEN_OLDEST
+		 * that we have in the queue, used to set the initial value for
+		 * pages read into the system.
 		 * The queue is sorted, find the first "normal" generation.
 		 */
 		read_gen_oldest = WT_READGEN_OLDEST;
 		for (candidates = 0; candidates < entries; ++candidates) {
-			read_gen_oldest =
-			    queue->evict_queue[candidates].score;
+			read_gen_oldest = queue->evict_queue[candidates].score;
 			if (read_gen_oldest != WT_READGEN_OLDEST)
 				break;
 		}
@@ -1355,7 +1353,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		 * no good eviction candidates can be found.  Abandon the walk
 		 * if we get into that situation.
 		 */
-		give_up = pages_seen > 100 &&
+		give_up = !__wt_cache_aggressive(session) && pages_seen > 100 &&
 		    (pages_queued == 0 || (pages_seen / pages_queued) >
 		    (10 * total_slots / target_pages));
 		if (give_up)
