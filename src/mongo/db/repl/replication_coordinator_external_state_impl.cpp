@@ -694,10 +694,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                       << causedBy(shardAwareInitializationStatus);
         }
 
-        // Free any leftover locks from previous instantiations.
-        auto distLockManager = Grid::get(txn)->catalogClient(txn)->getDistLockManager();
-        distLockManager->unlockAll(txn, distLockManager->getProcessID());
-
         // If this is a config server node becoming a primary, start the balancer
         Balancer::get(txn)->startThread(txn);
     } else if (ShardingState::get(txn)->enabled()) {

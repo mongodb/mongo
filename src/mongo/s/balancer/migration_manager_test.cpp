@@ -155,6 +155,9 @@ protected:
 
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
 
+    // Cluster identity to pass to the migration manager
+    const OID _clusterIdentity{OID::gen()};
+
     std::unique_ptr<MigrationManager> _migrationManager;
 
 private:
@@ -165,8 +168,9 @@ private:
 void MigrationManagerTest::setUp() {
     ConfigServerTestFixture::setUp();
     _migrationManager = stdx::make_unique<MigrationManager>(getServiceContext());
-    _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->startRecovery();
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
 }
 
 void MigrationManagerTest::tearDown() {
@@ -830,8 +834,9 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     // Go through the lifecycle of the migration manager
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
-    _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->startRecovery();
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
 
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready("Test");
@@ -876,6 +881,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
 
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
+    _migrationManager->startRecovery();
 
     // Set up two fake active migrations by writing documents to the config.migrations collection.
     setUpMigration(collName,
@@ -889,8 +895,6 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
                    kShardId3.toString(),
                    chunk2.getShard().toString());
 
-    _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-
     auto future = launchAsync([this] {
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
@@ -900,7 +904,8 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        _migrationManager->finishRecovery(txn.get(), 0, kDefaultSecondaryThrottle, false);
+        _migrationManager->finishRecovery(
+            txn.get(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
     });
 
     // Expect two moveChunk commands.
@@ -933,15 +938,16 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
     ChunkType chunk2 =
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
-    _migrationManager->interruptAndDisableMigrations();
-    _migrationManager->drainActiveMigrations();
-
     // Set up a parsable fake active migration document in the config.migrations collection.
     setUpMigration(collName,
                    chunk1.getMin(),
                    chunk1.getMax(),
                    kShardId1.toString(),
                    chunk1.getShard().toString());
+
+    _migrationManager->interruptAndDisableMigrations();
+    _migrationManager->drainActiveMigrations();
+    _migrationManager->startRecovery();
 
     // Set up a fake active migration document that will fail MigrationType parsing -- missing
     // field.
@@ -965,8 +971,8 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
         OID::gen(),
         DistLockManager::kSingleLockAttemptTimeout));
 
-    _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->finishRecovery(
+        operationContext(), _clusterIdentity, 0, kDefaultSecondaryThrottle, false);
 
     // MigrationManagerTest::tearDown checks that the config.migrations collection is empty and all
     // distributed locks are unlocked.

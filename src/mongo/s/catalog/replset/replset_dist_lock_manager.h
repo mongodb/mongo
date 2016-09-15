@@ -76,8 +76,7 @@ public:
 
     StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
                                                             StringData name,
-                                                            StringData whyMessage,
-                                                            const OID& lockSessionID) override;
+                                                            StringData whyMessage) override;
 
     void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 

@@ -56,8 +56,7 @@ public:
 
     StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
                                                             StringData name,
-                                                            StringData whyMessage,
-                                                            const OID& lockSessionID) override;
+                                                            StringData whyMessage) override;
 
     void unlockAll(OperationContext* txn, const std::string& processID) override;
 

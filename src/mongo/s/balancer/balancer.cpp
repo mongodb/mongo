@@ -182,7 +182,7 @@ Status Balancer::startThread(OperationContext* txn) {
             invariant(!_thread.joinable());
             _state = kRunning;
 
-            _migrationManager.startRecoveryAndAcquireDistLocks(txn);
+            _migrationManager.startRecovery();
             _thread = stdx::thread([this] { _mainThread(); });
         // Intentional fall through
         case kRunning:
@@ -291,6 +291,7 @@ void Balancer::_mainThread() {
 
     const Seconds kInitBackoffInterval(10);
 
+    OID clusterIdentity = ClusterIdentityLoader::get(txn.get())->getClusterId();
 
     // Take the balancer distributed lock and hold it permanently. Do the attempts with single
     // attempts in order to not block the thread and be able to check for interrupt more frequently.
@@ -300,7 +301,7 @@ void Balancer::_mainThread() {
                 txn.get(),
                 "balancer",
                 "CSRS Balancer",
-                OID::gen(),
+                clusterIdentity,
                 DistLockManager::kSingleLockAttemptTimeout);
         if (!distLockHandleStatus.isOK()) {
             warning() << "Balancer distributed lock could not be acquired and will be retried in "
@@ -315,15 +316,16 @@ void Balancer::_mainThread() {
     }
 
     if (!_stopRequested()) {
-        log() << "CSRS balancer thread is recovering";
+        log() << "CSRS balancer thread for cluster " << clusterIdentity << " is recovering";
 
         auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
         _migrationManager.finishRecovery(txn.get(),
+                                         clusterIdentity,
                                          balancerConfig->getMaxChunkSizeBytes(),
                                          balancerConfig->getSecondaryThrottle(),
                                          balancerConfig->waitForDelete());
 
-        log() << "CSRS balancer thread is recovered";
+        log() << "CSRS balancer thread for cluster " << clusterIdentity << " is recovered";
     }
 
     // Main balancer loop

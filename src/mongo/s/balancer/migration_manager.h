@@ -100,24 +100,18 @@ public:
 
     /**
      * Non-blocking method that puts the migration manager in the kRecovering state, in which
-     * new migration requests will block until finishRecovery is called. Then does local writes to
-     * reacquire the distributed locks for active migrations.
-     *
-     * The active migration recovery may fail and be abandoned, setting the state to kEnabled.
+     * new migration requests will block until finishRecovery is called.
      */
-    void startRecoveryAndAcquireDistLocks(OperationContext* txn);
+    void startRecovery();
 
     /**
      * Blocking method that must only be called after startRecovery has been called. Recovers the
      * state of the migration manager (if necessary and able) and puts it in the kEnabled state,
      * where it will accept new migrations. Any migrations waiting on the recovery state will be
-     * unblocked once the state is kEnabled, and then this function waits for the recovered active
-     * migrations to finish before returning.
-     *
-     * The active migration recovery may fail and be abandoned, setting the state to kEnabled and
-     * unblocking any process waiting on the recovery state.
+     * unblocked.
      */
     void finishRecovery(OperationContext* txn,
+                        const OID& clusterIdentity,
                         uint64_t maxChunkSizeBytes,
                         const MigrationSecondaryThrottleOptions& secondaryThrottle,
                         bool waitForDelete);
@@ -253,24 +247,15 @@ private:
     void _waitForRecovery();
 
     /**
-     * Should only be called from startRecovery or finishRecovery functions when the migration
-     * manager is in either the kStopped or kRecovering state. Releases all the distributed locks
-     * that the balancer holds, clears the config.migrations collection, changes the state of the
-     * migration manager to kEnabled. Then unblocks all processes waiting for kEnabled state.
+     * Should only be called from within the finishRecovery function because the migration manager
+     * must be in the kRecovering state. Releases all the distributed locks that the balancer holds,
+     * clears the config.migrations collection, changes the state of the migration manager from
+     * kRecovering to kEnabled, and unblocks all processes waiting on the recovery state.
      */
     void _abandonActiveMigrationsAndEnableManager(OperationContext* txn);
 
     // The service context under which this migration manager runs.
     ServiceContext* const _serviceContext;
-
-    // Used as a constant session ID for all distributed locks that this MigrationManager holds.
-    // Currently required so that locks can be reacquired for the balancer in startRecovery and then
-    // overtaken in later operations.
-    OID _lockSessionID;
-
-    // Carries migration information over from startRecovery to finishRecovery. Should only be set
-    // in startRecovery and then accessed in finishRecovery.
-    stdx::unordered_map<NamespaceString, std::list<MigrateInfo>> _migrationRecoveryMap;
 
     // Protects the class state below.
     stdx::mutex _mutex;
@@ -282,6 +267,10 @@ private:
     // signaled when the state change is complete.
     stdx::condition_variable _condVar;
 
+    // Identity of the cluster under which this migration manager runs. Used as a constant session
+    // ID for all distributed locks that the MigrationManager holds.
+    OID _clusterIdentity;
+
     // Holds information about each collection's distributed lock and active migrations via a
     // CollectionMigrationState object.
     CollectionMigrationsStateMap _activeMigrationsWithDistLock;
@@ -289,6 +278,9 @@ private:
     // Holds information about migrations, which have been scheduled without the collection
     // distributed lock acquired (i.e., the shard is asked to acquire it).
     MigrationsList _activeMigrationsWithoutDistLock;
+
+    // Carries migration information over from startRecovery to finishRecovery.
+    stdx::unordered_map<NamespaceString, std::list<MigrateInfo>> _migrationRecoveryMap;
 };
 
 }  // namespace mongo
