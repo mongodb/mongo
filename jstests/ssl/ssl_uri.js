@@ -9,12 +9,11 @@
         assert(res.ok);
     };
 
-    var shouldFail =
-        function(uri) {
+    var shouldFail = function(uri) {
         assert.throws(function(uri) {
             var conn = new Mongo(uri);
         }, [uri], "network error while attempting to run command");
-    }
+    };
 
     // Start up a mongod with ssl required.
     var sslMongo = MongoRunner.runMongod({
