@@ -727,6 +727,9 @@ int _main(int argc, char* argv[], char** envp) {
             cout << "failed to load: " << shellGlobalParams.files[i] << endl;
             return -3;
         }
+        if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
+            return -3;
+        }
     }
 
     if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())

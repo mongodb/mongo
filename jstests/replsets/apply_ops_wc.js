@@ -128,4 +128,8 @@
 
     majorityWriteConcerns.forEach(testMajorityWriteConcerns);
 
+    // Allow clean shutdown
+    secondaries[0].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+    secondaries[1].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+
 })();
