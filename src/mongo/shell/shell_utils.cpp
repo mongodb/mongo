@@ -154,23 +154,6 @@ BSONObj isWindows(const BSONObj& a, void* data) {
 #endif
 }
 
-BSONObj isAddressSanitizerActive(const BSONObj& a, void* data) {
-    bool isSanitized = false;
-// See the following for information on how we detect address sanitizer in clang and gcc.
-//
-// - http://clang.llvm.org/docs/AddressSanitizer.html#has-feature-address-sanitizer
-// - https://gcc.gnu.org/ml/gcc-patches/2012-11/msg01827.html
-//
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-    isSanitized = true;
-#endif
-#elif defined(__SANITIZE_ADDRESS__)
-    isSanitized = true;
-#endif
-    return BSON("" << isSanitized);
-}
-
 BSONObj getBuildInfo(const BSONObj& a, void* data) {
     uassert(16822, "getBuildInfo accepts no arguments", a.nFields() == 0);
     BSONObjBuilder b;
@@ -236,7 +219,6 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_srand", JSSrand);
     scope.injectNative("_rand", JSRand);
     scope.injectNative("_isWindows", isWindows);
-    scope.injectNative("_isAddressSanitizerActive", isAddressSanitizerActive);
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
     scope.injectNative("isKeyTooLarge", isKeyTooLarge);
