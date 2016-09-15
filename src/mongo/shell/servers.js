@@ -453,23 +453,46 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return opts;
     };
 
-    var _mongodVersionSupportsNoopWrites = function(version) {
-        if (version === "latest" || version === "" || version === undefined) {
-            return true;
-        }
+    // Returns an array of integers representing the version provided.
+    // Ex: "3.3.12" => [3, 3, 12]
+    var _convertVersionToIntegerArray = function(version) {
         var versionParts =
             convertVersionStringToArray(version).slice(0, 3).map(part => parseInt(part, 10));
         if (versionParts.length === 2) {
             versionParts.push(Infinity);
         }
+        return versionParts;
+    };
 
-        if (versionParts[0] > 3 || (versionParts[0] === 3 && versionParts[1] > 3) ||
-            (versionParts[0] === 3 && versionParts[1] === 3 && versionParts[2] >= 12)) {
-            // Replication noop writes were added in 3.3.12.
+    // Returns if version2 is equal to, or came after, version 1.
+    var _isMongodVersionEqualOrAfter = function(version1, version2) {
+        if (version2 === "latest") {
+            return true;
+        }
+
+        var versionParts1 = _convertVersionToIntegerArray(version1);
+        var versionParts2 = _convertVersionToIntegerArray(version2);
+        if (versionParts2[0] > versionParts1[0] ||
+            (versionParts2[0] === versionParts1[0] && versionParts2[1] > versionParts1[1]) ||
+            (versionParts2[0] === versionParts1[0] && versionParts2[1] === versionParts1[1] &&
+             versionParts2[2] >= versionParts1[2])) {
             return true;
         }
 
         return false;
+    };
+
+    // Removes a setParameter parameter from mongods running a version that won't recognize them.
+    var _removeSetParameterIfBeforeVersion = function(opts, parameterName, requiredVersion) {
+        var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
+                                 _isMongodVersionEqualOrAfter(requiredVersion, opts.binVersion));
+        if (!versionCompatible && opts.setParameter &&
+            opts.setParameter[parameterName] != undefined) {
+            print("Removing '" + parameterName + "' setParameter with value " +
+                  opts.setParameter[parameterName] +
+                  " because it isn't compatibile with mongod running version " + opts.binVersion);
+            delete opts.setParameter[parameterName];
+        }
     };
 
     /**
@@ -495,15 +518,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
 
-        if (!_mongodVersionSupportsNoopWrites(opts.binVersion) && opts.setParameter &&
-            opts.setParameter.writePeriodicNoops != undefined) {
-            // Remove the 'writePeriodicNoops' setParameter from mongods running a version that
-            // won't recognize it.
-            print("Removing 'writePeriodNoops' setParameter with value " +
-                  opts.setParameter.writePeriodNoops +
-                  " because it isn't compatibile with mongod running version " + opts.binVersion);
-            delete opts.setParameter.writePeriodicNoops;
-        }
+        _removeSetParameterIfBeforeVersion(opts, "writePeriodicNoops", "3.3.12");
+        _removeSetParameterIfBeforeVersion(opts, "numInitialSyncAttempts", "3.3.12");
+        _removeSetParameterIfBeforeVersion(opts, "numInitialSyncConnectAttempts", "3.3.12");
 
         if (!opts.logFile && opts.useLogFiles) {
             opts.logFile = opts.dbpath + "/mongod.log";

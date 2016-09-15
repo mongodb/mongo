@@ -1236,6 +1236,13 @@ var ReplSetTest = function(opts) {
         // Turn off periodic noop writes for replica sets by default.
         options.setParameter = options.setParameter || {};
         options.setParameter.writePeriodicNoops = options.setParameter.writePeriodicNoops || false;
+        options.setParameter.numInitialSyncAttempts =
+            options.setParameter.numInitialSyncAttempts || 1;
+        // We raise the number of initial sync connect attempts for tests that disallow chaining.
+        // Disabling chaining can cause sync source selection to take longer so we must increase
+        // the number of connection attempts.
+        options.setParameter.numInitialSyncConnectAttempts =
+            options.setParameter.numInitialSyncConnectAttempts || 60;
 
         if (tojson(options) != tojson({}))
             printjson(options);

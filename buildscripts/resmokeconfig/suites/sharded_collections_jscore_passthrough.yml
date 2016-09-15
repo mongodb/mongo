@@ -85,3 +85,4 @@ executor:
         nopreallocj: ''
         set_parameters:
           enableTestCommands: 1
+          numInitialSyncAttempts: 1

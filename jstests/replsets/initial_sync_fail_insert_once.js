@@ -4,10 +4,8 @@
 
 (function() {
     var name = 'initial_sync_fail_insert_once';
-    var replSet = new ReplSetTest({
-        name: name,
-        nodes: 2,
-    });
+    var replSet = new ReplSetTest(
+        {name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=2"}});
 
     replSet.startSet();
     replSet.initiate();

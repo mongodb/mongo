@@ -82,7 +82,7 @@
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
     assert.eq(res.initialSyncStatus.appliedOps, 2);
     assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 0);
-    assert.eq(res.initialSyncStatus.maxFailedInitialSyncAttempts, 10);
+    assert.eq(res.initialSyncStatus.maxFailedInitialSyncAttempts, 1);
     assert.eq(res.initialSyncStatus.databases.databasesCloned, 2);
     assert.eq(res.initialSyncStatus.databases.test.collections, 1);
     assert.eq(res.initialSyncStatus.databases.test.clonedCollections, 1);

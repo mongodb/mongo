@@ -83,6 +83,7 @@ executor:
       mongod_options:
         set_parameters:
           enableTestCommands: 1
+          numInitialSyncAttempts: 1
         enableMajorityReadConcern: ''
       num_nodes: 2
       # Needs to be set for any ephemeral or no-journaling storage engine
