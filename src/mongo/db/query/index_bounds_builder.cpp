@@ -186,14 +186,15 @@ void IndexBoundsBuilder::allValuesForField(const BSONElement& elt, OrderedInterv
     bob.appendMinKey("");
     bob.appendMaxKey("");
     out->name = elt.fieldName();
-    out->intervals.push_back(makeRangeInterval(bob.obj(), true, true));
+    out->intervals.push_back(
+        makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
 }
 
 Interval IndexBoundsBuilder::allValues() {
     BSONObjBuilder bob;
     bob.appendMinKey("");
     bob.appendMaxKey("");
-    return makeRangeInterval(bob.obj(), true, true);
+    return makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys);
 }
 
 bool IntervalComparison(const Interval& lhs, const Interval& rhs) {
@@ -310,7 +311,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
             bob.appendNull("");
             bob.appendNull("");
             BSONObj dataObj = bob.obj();
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+            oilOut->intervals.push_back(
+                makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
 
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             return;
@@ -393,7 +395,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         CollationIndexKey::collationAwareIndexKeyAppend(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
-        oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
+        oilOut->intervals.push_back(makeRangeInterval(
+            dataObj, IndexBounds::makeBoundInclusionFromBoundBools(typeMatch(dataObj), true)));
 
         *tightnessOut = getInequalityPredicateTightness(dataElt, index);
     } else if (MatchExpression::LT == expr->matchType()) {
@@ -424,7 +427,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         CollationIndexKey::collationAwareIndexKeyAppend(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
-        Interval interval = makeRangeInterval(dataObj, typeMatch(dataObj), false);
+        Interval interval = makeRangeInterval(
+            dataObj, IndexBounds::makeBoundInclusionFromBoundBools(typeMatch(dataObj), false));
 
         // If the operand to LT is equal to the lower bound X, the interval [X, X) is invalid
         // and should not be added to the bounds.
@@ -460,7 +464,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         }
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
-        Interval interval = makeRangeInterval(dataObj, false, typeMatch(dataObj));
+        Interval interval = makeRangeInterval(
+            dataObj, IndexBounds::makeBoundInclusionFromBoundBools(false, typeMatch(dataObj)));
 
         // If the operand to GT is equal to the upper bound X, the interval (X, X] is invalid
         // and should not be added to the bounds.
@@ -499,7 +504,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
 
-        oilOut->intervals.push_back(makeRangeInterval(dataObj, true, typeMatch(dataObj)));
+        oilOut->intervals.push_back(makeRangeInterval(
+            dataObj, IndexBounds::makeBoundInclusionFromBoundBools(true, typeMatch(dataObj))));
 
         *tightnessOut = getInequalityPredicateTightness(dataElt, index);
     } else if (MatchExpression::REGEX == expr->matchType()) {
@@ -511,7 +517,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         bob.appendMaxForType("", NumberDouble);
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
-        oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+        oilOut->intervals.push_back(
+            makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
         *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
     } else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
         const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
@@ -524,7 +531,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         bob.appendMaxForType("", type);
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
-        oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+        oilOut->intervals.push_back(
+            makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
 
         *tightnessOut = tme->matchesAllNumbers() ? IndexBoundsBuilder::EXACT
                                                  : IndexBoundsBuilder::INEXACT_FETCH;
@@ -597,13 +605,11 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
 }
 
 // static
-Interval IndexBoundsBuilder::makeRangeInterval(const BSONObj& obj,
-                                               bool startInclusive,
-                                               bool endInclusive) {
+Interval IndexBoundsBuilder::makeRangeInterval(const BSONObj& obj, BoundInclusion boundInclusion) {
     Interval ret;
     ret._intervalData = obj;
-    ret.startInclusive = startInclusive;
-    ret.endInclusive = endInclusive;
+    ret.startInclusive = IndexBounds::isStartIncludedInBound(boundInclusion);
+    ret.endInclusive = IndexBounds::isEndIncludedInBound(boundInclusion);
     BSONObjIterator it(obj);
     verify(it.more());
     ret.start = it.next();
@@ -705,7 +711,8 @@ void IndexBoundsBuilder::unionize(OrderedIntervalList* oilOut) {
             bool endInclusive = iv[i + 1].endInclusive;
             iv.erase(iv.begin() + i);
             // iv[i] is now the former iv[i + 1]
-            iv[i] = makeRangeInterval(data, startInclusive, endInclusive);
+            iv[i] = makeRangeInterval(
+                data, IndexBounds::makeBoundInclusionFromBoundBools(startInclusive, endInclusive));
             // Don't increment 'i'.
         }
     }
@@ -714,12 +721,11 @@ void IndexBoundsBuilder::unionize(OrderedIntervalList* oilOut) {
 // static
 Interval IndexBoundsBuilder::makeRangeInterval(const string& start,
                                                const string& end,
-                                               bool startInclusive,
-                                               bool endInclusive) {
+                                               BoundInclusion boundInclusion) {
     BSONObjBuilder bob;
     bob.append("", start);
     bob.append("", end);
-    return makeRangeInterval(bob.obj(), startInclusive, endInclusive);
+    return makeRangeInterval(bob.obj(), boundInclusion);
 }
 
 // static
@@ -776,14 +782,16 @@ void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
     if (!start.empty()) {
         string end = start;
         end[end.size() - 1]++;
-        oilOut->intervals.push_back(makeRangeInterval(start, end, true, false));
+        oilOut->intervals.push_back(
+            makeRangeInterval(start, end, BoundInclusion::kIncludeStartKeyOnly));
     } else {
         BSONObjBuilder bob;
         bob.appendMinForType("", String);
         bob.appendMaxForType("", String);
         BSONObj dataObj = bob.obj();
         verify(dataObj.isOwned());
-        oilOut->intervals.push_back(makeRangeInterval(dataObj, true, false));
+        oilOut->intervals.push_back(
+            makeRangeInterval(dataObj, BoundInclusion::kIncludeStartKeyOnly));
     }
 
     // Regexes are after strings.

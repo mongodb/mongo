@@ -94,7 +94,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::indexScan(OperationContext* txn,
                                                          const IndexDescriptor* descriptor,
                                                          const BSONObj& startKey,
                                                          const BSONObj& endKey,
-                                                         bool endKeyInclusive,
+                                                         BoundInclusion boundInclusion,
                                                          PlanExecutor::YieldPolicy yieldPolicy,
                                                          Direction direction,
                                                          int options) {
@@ -106,7 +106,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::indexScan(OperationContext* txn,
                                                  descriptor,
                                                  startKey,
                                                  endKey,
-                                                 endKeyInclusive,
+                                                 boundInclusion,
                                                  direction,
                                                  options);
 
@@ -123,7 +123,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithIndexScan(
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
     const BSONObj& endKey,
-    bool endKeyInclusive,
+    BoundInclusion boundInclusion,
     PlanExecutor::YieldPolicy yieldPolicy,
     Direction direction) {
     auto ws = stdx::make_unique<WorkingSet>();
@@ -134,7 +134,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithIndexScan(
                                                  descriptor,
                                                  startKey,
                                                  endKey,
-                                                 endKeyInclusive,
+                                                 boundInclusion,
                                                  direction,
                                                  InternalPlanner::IXSCAN_FETCH);
 
@@ -172,7 +172,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* txn,
                                                        const IndexDescriptor* descriptor,
                                                        const BSONObj& startKey,
                                                        const BSONObj& endKey,
-                                                       bool endKeyInclusive,
+                                                       BoundInclusion boundInclusion,
                                                        Direction direction,
                                                        int options) {
     invariant(collection);
@@ -184,7 +184,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* txn,
     params.bounds.isSimpleRange = true;
     params.bounds.startKey = startKey;
     params.bounds.endKey = endKey;
-    params.bounds.endKeyInclusive = endKeyInclusive;
+    params.bounds.boundInclusion = boundInclusion;
 
     std::unique_ptr<PlanStage> root = stdx::make_unique<IndexScan>(txn, params, ws, nullptr);
 

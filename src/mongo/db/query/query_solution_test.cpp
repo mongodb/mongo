@@ -160,32 +160,32 @@ TEST(QuerySolutionTest, IntervalListNoPoints) {
 
     OrderedIntervalList a{};
     a.name = "a";
-    a.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    a.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(a);
 
     OrderedIntervalList b{};
     b.name = "b";
-    b.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    b.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(b);
 
     OrderedIntervalList c{};
     c.name = "c";
-    c.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    c.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
     OrderedIntervalList d{};
     d.name = "d";
-    d.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    d.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(d);
 
     OrderedIntervalList e{};
     e.name = "e";
-    e.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    e.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(e);
 
     node.computeProperties();
@@ -216,20 +216,20 @@ TEST(QuerySolutionTest, IntervalListSomePoints) {
 
     OrderedIntervalList c{};
     c.name = "c";
-    c.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    c.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
     OrderedIntervalList d{};
     d.name = "d";
-    d.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    d.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(d);
 
     OrderedIntervalList e{};
     e.name = "e";
-    e.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    e.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(e);
 
     node.computeProperties();
@@ -253,36 +253,38 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesFieldsContainingStrin
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 1), true, true));
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 1), BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilA);
 
     OrderedIntervalList oilB{};
     oilB.name = "b";
-    oilB.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << false << "" << true), true, true));
+    oilB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << false << "" << true), BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilB);
 
     OrderedIntervalList oilC{};
     oilC.name = "c";
-    oilC.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                                        << "a"
-                                                                        << ""
-                                                                        << "b"),
-                                                                   true,
-                                                                   true));
+    oilC.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON(""
+                                                   << "a"
+                                                   << ""
+                                                   << "b"),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilC);
 
     OrderedIntervalList oilD{};
     oilD.name = "d";
     oilD.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << BSON("foo" << 1) << "" << BSON("foo" << 2)), true, true));
+        BSON("" << BSON("foo" << 1) << "" << BSON("foo" << 2)),
+        BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilD);
 
     OrderedIntervalList oilE{};
     oilE.name = "e";
     oilE.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << BSON_ARRAY(1 << 2 << 3) << "" << BSON_ARRAY(2 << 3 << 4)), true, true));
+        BSON("" << BSON_ARRAY(1 << 2 << 3) << "" << BSON_ARRAY(2 << 3 << 4)),
+        BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilE);
 
     auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
@@ -300,7 +302,7 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromNonPointBo
     bounds.isSimpleRange = true;
     bounds.startKey = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4 << "e" << 5);
     bounds.endKey = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 5 << "e" << 5);
-    bounds.endKeyInclusive = true;
+    bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
     auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
     ASSERT_EQUALS(fields.size(), 1U);
@@ -317,7 +319,7 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromStringType
     bounds.isSimpleRange = true;
     bounds.startKey = fromjson("{'a': 1, 'b': 'a', 'c': 3, 'd': 4, 'e': 5}");
     bounds.endKey = bounds.startKey;
-    bounds.endKeyInclusive = true;
+    bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
     auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
     ASSERT_EQUALS(fields.size(), 4U);
@@ -334,7 +336,7 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromArrayTypeB
     bounds.isSimpleRange = true;
     bounds.startKey = fromjson("{'a': 1, 'b': [1,2], 'c': 3, 'd': 4, 'e': 5}");
     bounds.endKey = bounds.startKey;
-    bounds.endKeyInclusive = true;
+    bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
     auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
     ASSERT_EQUALS(fields.size(), 4U);
@@ -351,7 +353,7 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromObjectType
     bounds.isSimpleRange = true;
     bounds.startKey = fromjson("{'a': 1, 'b': {'foo': 2}, 'c': 3, 'd': 4, 'e': 5}");
     bounds.endKey = bounds.startKey;
-    bounds.endKeyInclusive = true;
+    bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
     auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
     ASSERT_EQUALS(fields.size(), 4U);
@@ -362,6 +364,59 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsFromObjectType
     ASSERT_TRUE(fields.count("e"));
 }
 
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsWithExclusiveBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1, 'b': 1}");
+    bounds.endKey = fromjson("{'a': 2, 'b': 2}");
+    bounds.boundInclusion = BoundInclusion::kExcludeBothStartAndEndKeys;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 1U);
+    ASSERT_FALSE(fields.count("a"));
+    ASSERT_TRUE(fields.count("b"));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsWithExclusiveBoundsOnBoundary) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1, 'b': 1}");
+    bounds.endKey = fromjson("{'a': '', 'b': 1}");
+    bounds.boundInclusion = BoundInclusion::kExcludeBothStartAndEndKeys;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 2U);
+    ASSERT_TRUE(fields.count("a"));
+    ASSERT_TRUE(fields.count("b"));
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesNoStringsWithEmptyExclusiveBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1}");
+    bounds.endKey = fromjson("{'a': ''}");
+    bounds.boundInclusion = BoundInclusion::kExcludeBothStartAndEndKeys;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 0U);
+}
+
+TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsWithInclusiveBounds) {
+    IndexBounds bounds;
+    BSONObj keyPattern = BSON("a" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1}");
+    bounds.endKey = fromjson("{'a': ''}");
+    bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+
+    auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
+    ASSERT_EQUALS(fields.size(), 1U);
+    ASSERT_TRUE(fields.count("a"));
+}
+
 TEST(QuerySolutionTest, IndexScanNodeRemovesNonMatchingCollatedFieldsFromSortsOnSimpleBounds) {
     IndexScanNode node{IndexEntry(BSON("a" << 1 << "b" << 1))};
     CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
@@ -370,7 +425,7 @@ TEST(QuerySolutionTest, IndexScanNodeRemovesNonMatchingCollatedFieldsFromSortsOn
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 1);
     node.bounds.endKey = BSON("a" << 2 << "b" << 1);
-    node.bounds.endKeyInclusive = true;
+    node.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
     node.computeProperties();
 
@@ -388,7 +443,7 @@ TEST(QuerySolutionTest, IndexScanNodeGetFieldsWithStringBoundsCorrectlyHandlesEn
     node.bounds.startKey = BSON("a" << 1 << "b" << 1);
     node.bounds.endKey = BSON("a" << 1 << "b"
                                   << "");
-    node.bounds.endKeyInclusive = false;
+    node.bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
 
     node.computeProperties();
 
@@ -398,7 +453,7 @@ TEST(QuerySolutionTest, IndexScanNodeGetFieldsWithStringBoundsCorrectlyHandlesEn
     ASSERT_TRUE(sorts.count(BSON("a" << 1 << "b" << 1)));
     ASSERT_TRUE(sorts.count(BSON("b" << 1)));
 
-    node.bounds.endKeyInclusive = true;
+    node.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
     node.computeProperties();
 
@@ -416,8 +471,8 @@ TEST(QuerySolutionTest, IndexScanNodeRemovesCollatedFieldsFromSortsIfCollationDi
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << MINKEY << "" << MAXKEY), true, true));
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     node.computeProperties();
@@ -432,8 +487,8 @@ TEST(QuerySolutionTest, IndexScanNodeDoesNotRemoveCollatedFieldsFromSortsIfColla
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << MINKEY << "" << MAXKEY), true, true));
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     node.computeProperties();
@@ -464,20 +519,20 @@ TEST(QuerySolutionTest, CompoundIndexWithNonMatchingCollationFiltersAllSortsWith
 
     OrderedIntervalList c{};
     c.name = "c";
-    c.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << MINKEY << "" << MAXKEY), true, true));
+    c.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << MINKEY << "" << MAXKEY), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(c);
 
     OrderedIntervalList d{};
     d.name = "d";
-    d.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    d.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(d);
 
     OrderedIntervalList e{};
     e.name = "e";
-    e.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    e.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(e);
 
     node.computeProperties();
@@ -498,7 +553,8 @@ TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersObjectField)
     OrderedIntervalList oilA{};
     oilA.name = "a";
     oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << BSON("foo" << 1) << "" << BSON("foo" << 2)), true, true));
+        BSON("" << BSON("foo" << 1) << "" << BSON("foo" << 2)),
+        BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     node.computeProperties();
@@ -516,8 +572,9 @@ TEST(QuerySolutionTest, IndexScanNodeWithNonMatchingCollationFiltersArrayField) 
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-        BSON("" << BSON_ARRAY(1) << "" << BSON_ARRAY(2)), true, true));
+    oilA.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON("" << BSON_ARRAY(1) << "" << BSON_ARRAY(2)),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     node.computeProperties();
@@ -533,18 +590,18 @@ TEST(QuerySolutionTest, WithNonMatchingCollatorAndNoEqualityPrefixSortsAreNotDup
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     OrderedIntervalList oilB{};
     oilB.name = "b";
-    oilB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                                        << "a"
-                                                                        << ""
-                                                                        << "b"),
-                                                                   true,
-                                                                   true));
+    oilB.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON(""
+                                                   << "a"
+                                                   << ""
+                                                   << "b"),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilB);
 
     node.computeProperties();
@@ -559,12 +616,12 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesStringFieldWhenNoCollator) 
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                                        << "str"
-                                                                        << ""
-                                                                        << "str"),
-                                                                   true,
-                                                                   true));
+    oilA.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON(""
+                                                   << "str"
+                                                   << ""
+                                                   << "str"),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     OrderedIntervalList oilB{};
@@ -582,7 +639,7 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldIncludesSimpleBoundsStringFieldWhen
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 2);
     node.bounds.endKey = BSON("a" << 2 << "b" << 1);
-    node.bounds.endKeyInclusive = false;
+    node.bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
 
     ASSERT_TRUE(node.hasField("a"));
     ASSERT_TRUE(node.hasField("b"));
@@ -595,18 +652,18 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesStringFieldWhenIndexHasColl
 
     OrderedIntervalList oilA{};
     oilA.name = "a";
-    oilA.intervals.push_back(
-        IndexBoundsBuilder::makeRangeInterval(BSON("" << 1 << "" << 2), true, true));
+    oilA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 1 << "" << 2), BoundInclusion::kIncludeBothStartAndEndKeys));
     node.bounds.fields.push_back(oilA);
 
     OrderedIntervalList oilB{};
     oilB.name = "b";
-    oilB.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(BSON(""
-                                                                        << "bar"
-                                                                        << ""
-                                                                        << "foo"),
-                                                                   true,
-                                                                   false));
+    oilB.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(BSON(""
+                                                   << "bar"
+                                                   << ""
+                                                   << "foo"),
+                                              BoundInclusion::kIncludeStartKeyOnly));
     node.bounds.fields.push_back(oilB);
 
     ASSERT_TRUE(node.hasField("a"));
@@ -621,7 +678,7 @@ TEST(QuerySolutionTest, IndexScanNodeHasFieldExcludesSimpleBoundsStringFieldWhen
     node.bounds.isSimpleRange = true;
     node.bounds.startKey = BSON("a" << 1 << "b" << 2);
     node.bounds.endKey = BSON("a" << 2 << "b" << 1);
-    node.bounds.endKeyInclusive = false;
+    node.bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
 
     ASSERT_TRUE(node.hasField("a"));
     ASSERT_FALSE(node.hasField("b"));

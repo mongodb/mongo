@@ -78,7 +78,7 @@ bool checkIfSingleDoc(OperationContext* txn,
                                                              idx,
                                                              newmin,
                                                              newmax,
-                                                             false,  // endKeyInclusive
+                                                             BoundInclusion::kIncludeStartKeyOnly,
                                                              PlanExecutor::YIELD_MANUAL));
     // check if exactly one document found
     PlanExecutor::ExecState state;

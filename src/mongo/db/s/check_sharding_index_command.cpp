@@ -135,14 +135,15 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
         }
 
-        unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                 collection,
-                                                                 idx,
-                                                                 min,
-                                                                 max,
-                                                                 false,  // endKeyInclusive
-                                                                 PlanExecutor::YIELD_MANUAL,
-                                                                 InternalPlanner::FORWARD));
+        unique_ptr<PlanExecutor> exec(
+            InternalPlanner::indexScan(txn,
+                                       collection,
+                                       idx,
+                                       min,
+                                       max,
+                                       BoundInclusion::kIncludeStartKeyOnly,
+                                       PlanExecutor::YIELD_MANUAL,
+                                       InternalPlanner::FORWARD));
         exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
 
         // Find the 'missingField' value used to represent a missing document field in a key of

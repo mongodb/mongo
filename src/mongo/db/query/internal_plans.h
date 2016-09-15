@@ -92,7 +92,7 @@ public:
                                                    const IndexDescriptor* descriptor,
                                                    const BSONObj& startKey,
                                                    const BSONObj& endKey,
-                                                   bool endKeyInclusive,
+                                                   BoundInclusion boundInclusion,
                                                    PlanExecutor::YieldPolicy yieldPolicy,
                                                    Direction direction = FORWARD,
                                                    int options = IXSCAN_DEFAULT);
@@ -106,7 +106,7 @@ public:
                                                              const IndexDescriptor* descriptor,
                                                              const BSONObj& startKey,
                                                              const BSONObj& endKey,
-                                                             bool endKeyInclusive,
+                                                             BoundInclusion boundInclusion,
                                                              PlanExecutor::YieldPolicy yieldPolicy,
                                                              Direction direction = FORWARD);
 
@@ -133,7 +133,7 @@ private:
                                                  const IndexDescriptor* descriptor,
                                                  const BSONObj& startKey,
                                                  const BSONObj& endKey,
-                                                 bool endKeyInclusive,
+                                                 BoundInclusion boundInclusion,
                                                  Direction direction = FORWARD,
                                                  int options = IXSCAN_DEFAULT);
 };

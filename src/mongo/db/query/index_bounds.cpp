@@ -104,7 +104,7 @@ bool IndexBounds::operator==(const IndexBounds& other) const {
     if (this->isSimpleRange) {
         return SimpleBSONObjComparator::kInstance.evaluate(this->startKey == other.startKey) &&
             SimpleBSONObjComparator::kInstance.evaluate(this->endKey == other.endKey) &&
-            (this->endKeyInclusive == other.endKeyInclusive);
+            (this->boundInclusion == other.boundInclusion);
     }
 
     if (this->fields.size() != other.fields.size()) {
@@ -135,6 +135,34 @@ string OrderedIntervalList::toString() const {
     }
     return ss;
 }
+
+bool IndexBounds::isStartIncludedInBound(BoundInclusion boundInclusion) {
+    return boundInclusion == BoundInclusion::kIncludeBothStartAndEndKeys ||
+        boundInclusion == BoundInclusion::kIncludeStartKeyOnly;
+}
+
+bool IndexBounds::isEndIncludedInBound(BoundInclusion boundInclusion) {
+    return boundInclusion == BoundInclusion::kIncludeBothStartAndEndKeys ||
+        boundInclusion == BoundInclusion::kIncludeEndKeyOnly;
+}
+
+BoundInclusion IndexBounds::makeBoundInclusionFromBoundBools(bool startKeyInclusive,
+                                                             bool endKeyInclusive) {
+    if (startKeyInclusive) {
+        if (endKeyInclusive) {
+            return BoundInclusion::kIncludeBothStartAndEndKeys;
+        } else {
+            return BoundInclusion::kIncludeStartKeyOnly;
+        }
+    } else {
+        if (endKeyInclusive) {
+            return BoundInclusion::kIncludeEndKeyOnly;
+        } else {
+            return BoundInclusion::kExcludeBothStartAndEndKeys;
+        }
+    }
+}
+
 
 bool OrderedIntervalList::operator==(const OrderedIntervalList& other) const {
     if (this->name != other.name) {
@@ -216,12 +244,17 @@ void OrderedIntervalList::complement() {
 string IndexBounds::toString() const {
     mongoutils::str::stream ss;
     if (isSimpleRange) {
-        ss << "[" << startKey.toString() << ", ";
+        if (IndexBounds::isStartIncludedInBound(boundInclusion)) {
+            ss << "[";
+        } else {
+            ss << "(";
+        }
+        ss << startKey.toString() << ", ";
         if (endKey.isEmpty()) {
             ss << "]";
         } else {
             ss << endKey.toString();
-            if (endKeyInclusive) {
+            if (IndexBounds::isEndIncludedInBound(boundInclusion)) {
                 ss << "]";
             } else {
                 ss << ")";

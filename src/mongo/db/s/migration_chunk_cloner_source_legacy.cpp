@@ -569,13 +569,14 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn
     BSONObj min = Helpers::toKeyFormat(kp.extendRangeBound(_args.getMinKey(), false));
     BSONObj max = Helpers::toKeyFormat(kp.extendRangeBound(_args.getMaxKey(), false));
 
-    std::unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                  collection,
-                                                                  idx,
-                                                                  min,
-                                                                  max,
-                                                                  false,  // endKeyInclusive
-                                                                  PlanExecutor::YIELD_MANUAL));
+    std::unique_ptr<PlanExecutor> exec(
+        InternalPlanner::indexScan(txn,
+                                   collection,
+                                   idx,
+                                   min,
+                                   max,
+                                   BoundInclusion::kIncludeStartKeyOnly,
+                                   PlanExecutor::YIELD_MANUAL));
 
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.

@@ -253,14 +253,15 @@ public:
             long long currCount = 0;
             long long numChunks = 0;
 
-            unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                     collection,
-                                                                     idx,
-                                                                     min,
-                                                                     max,
-                                                                     false,  // endKeyInclusive
-                                                                     PlanExecutor::YIELD_MANUAL,
-                                                                     InternalPlanner::FORWARD));
+            unique_ptr<PlanExecutor> exec(
+                InternalPlanner::indexScan(txn,
+                                           collection,
+                                           idx,
+                                           min,
+                                           max,
+                                           BoundInclusion::kIncludeStartKeyOnly,
+                                           PlanExecutor::YIELD_MANUAL,
+                                           InternalPlanner::FORWARD));
 
             BSONObj currKey;
             PlanExecutor::ExecState state = exec->getNext(&currKey, NULL);
@@ -334,7 +335,7 @@ public:
                                                   idx,
                                                   min,
                                                   max,
-                                                  false,  // endKeyInclusive
+                                                  BoundInclusion::kIncludeStartKeyOnly,
                                                   PlanExecutor::YIELD_MANUAL,
                                                   InternalPlanner::FORWARD);
 

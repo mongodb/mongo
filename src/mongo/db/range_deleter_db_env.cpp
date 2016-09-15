@@ -90,7 +90,7 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
         *deletedDocs =
             Helpers::removeRange(txn,
                                  KeyRange(ns, inclusiveLower, exclusiveUpper, keyPattern),
-                                 false, /*maxInclusive*/
+                                 BoundInclusion::kIncludeStartKeyOnly,
                                  writeConcern,
                                  removeSaverPtr,
                                  fromMigrate,

@@ -221,7 +221,6 @@ private:
         const Date_t expirationTime = Date_t::now() - Seconds(secondsExpireElt.numberLong());
         const BSONObj startKey = BSON("" << kDawnOfTime);
         const BSONObj endKey = BSON("" << expirationTime);
-        const bool endKeyInclusive = true;
         // The canonical check as to whether a key pattern element is "ascending" or
         // "descending" is (elt.number() >= 0).  This is defined by the Ordering class.
         const InternalPlanner::Direction direction = (key.firstElement().number() >= 0)
@@ -251,7 +250,7 @@ private:
                                                  desc,
                                                  startKey,
                                                  endKey,
-                                                 endKeyInclusive,
+                                                 BoundInclusion::kIncludeBothStartAndEndKeys,
                                                  PlanExecutor::YIELD_AUTO,
                                                  direction);
 

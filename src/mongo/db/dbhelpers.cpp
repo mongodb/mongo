@@ -295,7 +295,7 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 
 long long Helpers::removeRange(OperationContext* txn,
                                const KeyRange& range,
-                               bool maxInclusive,
+                               BoundInclusion boundInclusion,
                                const WriteConcernOptions& writeConcern,
                                RemoveSaver* callback,
                                bool fromMigrate,
@@ -337,10 +337,12 @@ long long Helpers::removeRange(OperationContext* txn,
 
         // Extend bounds to match the index we found
 
+        invariant(IndexBounds::isStartIncludedInBound(boundInclusion));
         // Extend min to get (min, MinKey, MinKey, ....)
         min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.minKey, false));
         // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
         // If not included, extend max to get (max, MinKey, MinKey, ....)
+        const bool maxInclusive = IndexBounds::isEndIncludedInBound(boundInclusion);
         max = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.maxKey, maxInclusive));
     }
 
@@ -369,7 +371,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                            desc,
                                            min,
                                            max,
-                                           maxInclusive,
+                                           boundInclusion,
                                            PlanExecutor::YIELD_MANUAL,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH));

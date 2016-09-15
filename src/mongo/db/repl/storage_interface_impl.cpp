@@ -506,7 +506,6 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
             auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
             auto bounds =
                 isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
-            bool endKeyInclusive = false;
 
             planExecutor = isFind
                 ? InternalPlanner::indexScan(txn,
@@ -514,7 +513,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
                                              indexDescriptor,
                                              bounds.first,
                                              bounds.second,
-                                             endKeyInclusive,
+                                             BoundInclusion::kIncludeStartKeyOnly,
                                              PlanExecutor::YIELD_MANUAL,
                                              direction,
                                              InternalPlanner::IXSCAN_FETCH)
@@ -524,7 +523,7 @@ StatusWith<BSONObj> _findOrDeleteOne(OperationContext* txn,
                                                        indexDescriptor,
                                                        bounds.first,
                                                        bounds.second,
-                                                       endKeyInclusive,
+                                                       BoundInclusion::kIncludeStartKeyOnly,
                                                        PlanExecutor::YIELD_MANUAL,
                                                        direction);
         }

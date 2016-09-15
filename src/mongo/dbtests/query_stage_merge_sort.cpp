@@ -154,7 +154,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
 
@@ -225,7 +225,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
 
@@ -295,7 +295,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
 
@@ -367,7 +367,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         // This is the direction along the index.
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
@@ -438,7 +438,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
 
@@ -492,7 +492,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
 
         int numIndices = 20;
@@ -551,7 +551,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
 
         // Index 'a'+i has foo equal to 'i'.
@@ -681,7 +681,7 @@ public:
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 5);
             params.bounds.endKey = BSON("" << 10);
-            params.bounds.endKeyInclusive = true;
+            params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
             params.direction = 1;
             auto fetchStage = stdx::make_unique<FetchStage>(
                 &_txn, &ws, new IndexScan(&_txn, params, &ws, nullptr), nullptr, coll);
@@ -695,7 +695,7 @@ public:
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = BSON("" << 4);
             params.bounds.endKey = BSON("" << 10);
-            params.bounds.endKeyInclusive = true;
+            params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
             params.direction = 1;
             auto fetchStage = stdx::make_unique<FetchStage>(
                 &_txn, &ws, new IndexScan(&_txn, params, &ws, nullptr), nullptr, coll);
@@ -782,7 +782,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
 
@@ -856,7 +856,7 @@ public:
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.endKeyInclusive = true;
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
         ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
 

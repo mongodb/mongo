@@ -331,7 +331,8 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* txn,
         mongo::BSONObjBuilder builder;
         it->appendHashMin(&builder, "");
         it->appendHashMax(&builder, "");
-        oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(builder.obj(), true, true));
+        oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            builder.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
     }
 
     invariant(oil.isValidFor(1));

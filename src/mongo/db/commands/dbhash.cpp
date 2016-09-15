@@ -224,7 +224,7 @@ private:
                                               desc,
                                               BSONObj(),
                                               BSONObj(),
-                                              false,  // endKeyInclusive
+                                              BoundInclusion::kIncludeStartKeyOnly,
                                               PlanExecutor::YIELD_MANUAL,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);

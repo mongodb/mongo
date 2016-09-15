@@ -834,7 +834,7 @@ public:
                                               idx,
                                               min,
                                               max,
-                                              false,  // endKeyInclusive
+                                              BoundInclusion::kIncludeStartKeyOnly,
                                               PlanExecutor::YIELD_MANUAL);
         }
 

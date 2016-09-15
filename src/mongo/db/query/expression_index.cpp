@@ -95,8 +95,8 @@ void ExpressionMapping::GeoHashsToIntervalsWithParents(
         geoHash.appendHashMin(&builder, "");
         geoHash.appendHashMax(&builder, "");
 
-        oilOut->intervals.push_back(
-            IndexBoundsBuilder::makeRangeInterval(builder.obj(), true, true));
+        oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            builder.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
     }
 }
 
@@ -152,7 +152,8 @@ void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
             b.append("start", start);
             b.append("end", end);
             invariant(start <= end);
-            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(b.obj(), true, true));
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                b.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
         } else {
             // for backwards compatibility, use strings
             std::string start = interval.toString();
@@ -160,8 +161,8 @@ void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
             end[start.size() - 1]++;
             b.append("start", start);
             b.append("end", end);
-            oilOut->intervals.push_back(
-                IndexBoundsBuilder::makeRangeInterval(b.obj(), true, false));
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                b.obj(), BoundInclusion::kIncludeStartKeyOnly));
         }
     }
 }

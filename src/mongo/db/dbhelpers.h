@@ -173,7 +173,7 @@ struct Helpers {
      */
     static long long removeRange(OperationContext* txn,
                                  const KeyRange& range,
-                                 bool maxInclusive,
+                                 BoundInclusion boundInclusion,
                                  const WriteConcernOptions& secondaryThrottle,
                                  RemoveSaver* callback = NULL,
                                  bool fromMigrate = false,
