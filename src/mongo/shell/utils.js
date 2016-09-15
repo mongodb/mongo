@@ -166,19 +166,19 @@ function __sanitizeMatch(flag) {
 }
 
 function _isAddressSanitizerActive() {
-  return __sanitizeMatch("address");
+    return __sanitizeMatch("address");
 }
 
 function _isLeakSanitizerActive() {
-  return __sanitizeMatch("leak");
+    return __sanitizeMatch("leak");
 }
 
 function _isThreadSanitizerActive() {
-  return __sanitizeMatch("thread");
+    return __sanitizeMatch("thread");
 }
 
 function _isUndefinedBehaviorSanitizerActive() {
-  return __sanitizeMatch("undefined");
+    return __sanitizeMatch("undefined");
 }
 
 jsTestName = function() {
