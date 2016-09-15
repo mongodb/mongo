@@ -32,3 +32,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
     ]
 )
+
+env.CppUnitTest(
+    target='view_catalog_test',
+    source=[
+        'view_catalog_test.cpp',
+    ],
+    LIBDEPS=[
+        'views',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
