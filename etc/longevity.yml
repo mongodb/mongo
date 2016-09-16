@@ -8,7 +8,6 @@ post:
     - command: attach.results
       params:
         file_location: work/report.json
-    - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
       params:
@@ -72,7 +71,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz --production
+          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --production
     - command: shell.exec
       params:
         script: |
@@ -112,7 +111,7 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          $DSI_PATH/bin/mongodb_setup.py --config
+          $DSI_PATH/bin/mongodb_setup.py --mongodb-binary-archive https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
 
   "run test":
     - command: shell.exec
@@ -154,7 +153,6 @@ functions:
 
   "make test log artifact":
     - command: shell.exec
-      # destroy the cluster
       params:
         working_dir: work
         script: |
@@ -164,10 +162,13 @@ functions:
           # move additional file here
           cd reports
           cp ../infrastructure_provisioning.out.yml .
+          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
           cp ../perf.json .
           cd ..
+          mkdir -p ./reports/graphs
+          touch ./reports/graphs/timeseries-p1.html
           $DSI_PATH/bin/retrieve-diag-data.sh
-          $DSI_PATH/bin/generate-timeseries-html.sh
+          $DSI_PATH/bin/generate-timeseries-html.sh || true
 
     - command: archive.targz_pack
       params:
@@ -218,8 +219,10 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/post_run_check.py --ycsb-throughput-analysis . --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
-
+          TAG="3.2.1-Baseline"
+          PROJECT="mongo-longevity"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/master/longevity_override.json"
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
 
 tasks:
 - name: compile
@@ -296,8 +299,10 @@ tasks:
     - func: "upload log file"
       vars:
         test: "ycsb"
-    - func: "destroy cluster"
     - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
 
 - name: shard_cluster_MMAPv1_test
   depends_on:
@@ -315,8 +320,10 @@ tasks:
     - func: "upload log file"
       vars:
         test: "ycsb"
-    - func: "destroy cluster"
     - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
 
 
 #######################################
