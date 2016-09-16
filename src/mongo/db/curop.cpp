@@ -44,6 +44,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -425,7 +426,7 @@ string OpDebug::report(Client* client,
     if (clientMetadata) {
         auto appName = clientMetadata.get().getApplicationName();
         if (!appName.empty()) {
-            s << " appName:" << appName;
+            s << " appName: \"" << escape(appName) << '\"';
         }
     }
 
