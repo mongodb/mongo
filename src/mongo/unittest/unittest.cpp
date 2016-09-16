@@ -439,6 +439,7 @@ TestAssertionFailure::~TestAssertionFailure() BOOST_NOEXCEPT_IF(false) {
     if (!_stream.str().empty()) {
         _exception.setMessage(_exception.getMessage() + " " + _stream.str());
     }
+    error() << "Throwing exception: " << _exception;
     throw _exception;
 }
 
