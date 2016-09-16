@@ -47,6 +47,173 @@
 #include "mongo/db/views/view_catalog.h"
 
 namespace mongo {
+
+struct CollModRequest {
+    const IndexDescriptor* idx = nullptr;
+    BSONElement indexExpireAfterSeconds = {};
+    BSONElement viewPipeLine = {};
+    std::string viewOn = {};
+    BSONElement collValidator = {};
+    std::string collValidationAction = {};
+    std::string collValidationLevel = {};
+    BSONElement usePowerOf2Sizes = {};
+    BSONElement noPadding = {};
+};
+
+StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
+                                               const NamespaceString& nss,
+                                               Collection* coll,
+                                               const BSONObj& cmdObj) {
+
+    bool isView = !coll;
+
+    CollModRequest cmr;
+
+    BSONForEach(e, cmdObj) {
+        if (str::equals("collMod", e.fieldName())) {
+            // no-op
+        } else if (str::startsWith(e.fieldName(), "$")) {
+            // no-op ignore top-level fields prefixed with $. They are for the command processor
+        } else if (QueryRequest::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
+            // no-op
+        } else if (str::equals("index", e.fieldName()) && !isView) {
+            BSONObj indexObj = e.Obj();
+            StringData indexName;
+            BSONObj keyPattern;
+
+            BSONElement nameElem = indexObj["name"];
+            BSONElement keyPatternElem = indexObj["keyPattern"];
+            if (nameElem && keyPatternElem) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "Cannot specify both key pattern and name.");
+            }
+
+            if (!nameElem && !keyPatternElem) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "Must specify either index name or key pattern.");
+            }
+
+            if (nameElem) {
+                if (nameElem.type() != BSONType::String) {
+                    return Status(ErrorCodes::InvalidOptions, "Index name must be a string.");
+                }
+                indexName = nameElem.valueStringData();
+            }
+
+            if (keyPatternElem) {
+                if (keyPatternElem.type() != BSONType::Object) {
+                    return Status(ErrorCodes::InvalidOptions, "Key pattern must be an object.");
+                }
+                keyPattern = keyPatternElem.embeddedObject();
+            }
+
+            cmr.indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
+            if (cmr.indexExpireAfterSeconds.eoo()) {
+                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field");
+            }
+            if (!cmr.indexExpireAfterSeconds.isNumber()) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "expireAfterSeconds field must be a number");
+            }
+
+            if (!indexName.empty()) {
+                cmr.idx = coll->getIndexCatalog()->findIndexByName(txn, indexName);
+                if (!cmr.idx) {
+                    return Status(ErrorCodes::IndexNotFound,
+                                  str::stream() << "cannot find index " << indexName << " for ns "
+                                                << nss.ns());
+                }
+            } else {
+                std::vector<IndexDescriptor*> indexes;
+                coll->getIndexCatalog()->findIndexesByKeyPattern(txn, keyPattern, false, &indexes);
+
+                if (indexes.size() > 1) {
+                    return Status(ErrorCodes::AmbiguousIndexKeyPattern,
+                                  str::stream() << "index keyPattern " << keyPattern << " matches "
+                                                << indexes.size()
+                                                << " indexes,"
+                                                << " must use index name. "
+                                                << "Conflicting indexes:"
+                                                << indexes[0]->infoObj()
+                                                << ", "
+                                                << indexes[1]->infoObj());
+                } else if (indexes.empty()) {
+                    return Status(ErrorCodes::IndexNotFound,
+                                  str::stream() << "cannot find index " << keyPattern << " for ns "
+                                                << nss.ns());
+                }
+
+                cmr.idx = indexes[0];
+            }
+
+            BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
+            if (oldExpireSecs.eoo()) {
+                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field to update");
+            }
+            if (!oldExpireSecs.isNumber()) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "existing expireAfterSeconds field is not a number");
+            }
+
+        } else if (str::equals("validator", e.fieldName()) && !isView) {
+            auto statusW = coll->parseValidator(e.Obj());
+            if (!statusW.isOK())
+                return statusW.getStatus();
+
+            cmr.collValidator = e;
+        } else if (str::equals("validationLevel", e.fieldName()) && !isView) {
+            auto statusW = coll->parseValidationLevel(e.String());
+            if (!statusW.isOK())
+                return statusW.getStatus();
+
+            cmr.collValidationLevel = e.String();
+        } else if (str::equals("validationAction", e.fieldName()) && !isView) {
+            auto statusW = coll->parseValidationAction(e.String());
+            if (!statusW.isOK())
+                statusW.getStatus();
+
+            cmr.collValidationAction = e.String();
+        } else if (str::equals("pipeline", e.fieldName())) {
+            if (!isView) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "'pipeline' option only supported on a view");
+            }
+            if (e.type() != mongo::Array) {
+                return Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
+            }
+            cmr.viewPipeLine = e;
+        } else if (str::equals("viewOn", e.fieldName())) {
+            if (!isView) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "'viewOn' option only supported on a view");
+            }
+            if (e.type() != mongo::String) {
+                return Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
+            }
+            cmr.viewOn = e.str();
+        } else {
+            const StringData name = e.fieldNameStringData();
+            if (isView) {
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream() << "option not supported on a view: " << name);
+            }
+            // As of SERVER-17312 we only support these two options. When SERVER-17320 is
+            // resolved this will need to be enhanced to handle other options.
+            typedef CollectionOptions CO;
+
+            if (name == "usePowerOf2Sizes")
+                cmr.usePowerOf2Sizes = e;
+            else if (name == "noPadding")
+                cmr.noPadding = e;
+            else
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream() << "unknown option to collMod: " << name);
+        }
+    }
+
+    return {std::move(cmr)};
+}
+
 Status collMod(OperationContext* txn,
                const NamespaceString& nss,
                const BSONObj& cmdObj,
@@ -87,208 +254,70 @@ Status collMod(OperationContext* txn,
                                     << nss.ns());
     }
 
+    auto statusW = parseCollModRequest(txn, nss, coll, cmdObj);
+    if (!statusW.isOK()) {
+        return statusW.getStatus();
+    }
+
+    CollModRequest cmr = statusW.getValue();
+
     WriteUnitOfWork wunit(txn);
 
-    Status errorStatus = Status::OK();
+    if (view) {
+        if (!cmr.viewPipeLine.eoo())
+            view->setPipeline(cmr.viewPipeLine);
 
-    // TODO(SERVER-25004): Separate parsing and catalog modification
-    BSONForEach(e, cmdObj) {
-        if (str::equals("collMod", e.fieldName())) {
-            // no-op
-        } else if (str::startsWith(e.fieldName(), "$")) {
-            // no-op ignore top-level fields prefixed with $. They are for the command processor
-        } else if (QueryRequest::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
-            // no-op
-        } else if (str::equals("index", e.fieldName())) {
-            if (view) {
-                errorStatus = Status(ErrorCodes::InvalidOptions, "cannot modify indexes on a view");
-                continue;
-            }
+        if (!cmr.viewOn.empty())
+            view->setViewOn(NamespaceString(dbName, cmr.viewOn));
 
-            BSONObj indexObj = e.Obj();
-            StringData indexName;
-            BSONObj keyPattern;
+        ViewCatalog* catalog = db->getViewCatalog();
 
-            BSONElement nameElem = indexObj["name"];
-            BSONElement keyPatternElem = indexObj["keyPattern"];
-            if (nameElem && keyPatternElem) {
-                errorStatus =
-                    Status(ErrorCodes::InvalidOptions, "Cannot specify both key pattern and name.");
-                continue;
-            }
-
-            if (!nameElem && !keyPatternElem) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     "Must specify either index name or key pattern.");
-                continue;
-            }
-
-            if (nameElem) {
-                if (nameElem.type() != BSONType::String) {
-                    errorStatus =
-                        Status(ErrorCodes::InvalidOptions, "Index name must be a string.");
-                    continue;
-                }
-                indexName = nameElem.valueStringData();
-            }
-
-            if (keyPatternElem) {
-                if (keyPatternElem.type() != BSONType::Object) {
-                    errorStatus =
-                        Status(ErrorCodes::InvalidOptions, "Key pattern must be an object.");
-                    continue;
-                }
-                keyPattern = keyPatternElem.embeddedObject();
-            }
-
-            BSONElement newExpireSecs = indexObj["expireAfterSeconds"];
-            if (newExpireSecs.eoo()) {
-                errorStatus = Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field");
-                continue;
-            }
-            if (!newExpireSecs.isNumber()) {
-                errorStatus =
-                    Status(ErrorCodes::InvalidOptions, "expireAfterSeconds field must be a number");
-                continue;
-            }
-
-            const IndexDescriptor* idx = nullptr;
-            if (!indexName.empty()) {
-                idx = coll->getIndexCatalog()->findIndexByName(txn, indexName);
-                if (!idx) {
-                    errorStatus =
-                        Status(ErrorCodes::IndexNotFound,
-                               str::stream() << "cannot find index " << indexName << " for ns "
-                                             << nss.ns());
-                    continue;
-                }
-            } else {
-                std::vector<IndexDescriptor*> indexes;
-                coll->getIndexCatalog()->findIndexesByKeyPattern(txn, keyPattern, false, &indexes);
-
-                if (indexes.size() > 1) {
-                    errorStatus =
-                        Status(ErrorCodes::AmbiguousIndexKeyPattern,
-                               str::stream() << "index keyPattern " << keyPattern << " matches "
-                                             << indexes.size()
-                                             << " indexes,"
-                                             << " must use index name. "
-                                             << "Conflicting indexes:"
-                                             << indexes[0]->infoObj()
-                                             << ", "
-                                             << indexes[1]->infoObj());
-                    continue;
-                } else if (indexes.empty()) {
-                    errorStatus =
-                        Status(ErrorCodes::IndexNotFound,
-                               str::stream() << "cannot find index " << keyPattern << " for ns "
-                                             << nss.ns());
-                    continue;
-                }
-
-                idx = indexes[0];
-            }
-
-            BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
-            if (oldExpireSecs.eoo()) {
-                errorStatus =
-                    Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds field to update");
-                continue;
-            }
-            if (!oldExpireSecs.isNumber()) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     "existing expireAfterSeconds field is not a number");
-                continue;
-            }
+        BSONArrayBuilder pipeline;
+        for (auto& item : view->pipeline()) {
+            pipeline.append(item);
+        }
+        auto errorStatus = catalog->modifyView(txn, nss, view->viewOn(), BSONArray(pipeline.obj()));
+        if (!errorStatus.isOK()) {
+            return errorStatus;
+        }
+    } else {
+        if (!cmr.indexExpireAfterSeconds.eoo()) {
+            BSONElement& newExpireSecs = cmr.indexExpireAfterSeconds;
+            BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
 
             if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
                 result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
                 // Change the value of "expireAfterSeconds" on disk.
                 coll->getCatalogEntry()->updateTTLSetting(
-                    txn, idx->indexName(), newExpireSecs.numberLong());
+                    txn, cmr.idx->indexName(), newExpireSecs.safeNumberLong());
                 // Notify the index catalog that the definition of this index changed.
-                idx = coll->getIndexCatalog()->refreshEntry(txn, idx);
+                cmr.idx = coll->getIndexCatalog()->refreshEntry(txn, cmr.idx);
                 result->appendAs(newExpireSecs, "expireAfterSeconds_new");
             }
-        } else if (str::equals("validator", e.fieldName())) {
-            if (view) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     "cannot modify validation options on a view");
-                continue;
-            }
+        }
 
-            auto status = coll->setValidator(txn, e.Obj());
-            if (!status.isOK())
-                errorStatus = std::move(status);
-        } else if (str::equals("validationLevel", e.fieldName())) {
-            if (view) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     "cannot modify validation options on a view");
-                continue;
-            }
+        if (!cmr.collValidator.eoo())
+            coll->setValidator(txn, cmr.collValidator.Obj());
 
-            auto status = coll->setValidationLevel(txn, e.String());
-            if (!status.isOK())
-                errorStatus = std::move(status);
-        } else if (str::equals("validationAction", e.fieldName())) {
-            if (view) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     "cannot modify validation options on a view");
-                continue;
-            }
+        if (!cmr.collValidationAction.empty())
+            coll->setValidationAction(txn, cmr.collValidationAction);
 
-            auto status = coll->setValidationAction(txn, e.String());
-            if (!status.isOK())
-                errorStatus = std::move(status);
-        } else if (str::equals("pipeline", e.fieldName())) {
-            if (!view) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     "'pipeline' option only supported on a view");
-                continue;
-            }
-            if (e.type() != mongo::Array) {
-                errorStatus =
-                    Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
-                continue;
-            }
-            view->setPipeline(e);
-        } else if (str::equals("viewOn", e.fieldName())) {
-            if (!view) {
-                errorStatus =
-                    Status(ErrorCodes::InvalidOptions, "'viewOn' option only supported on a view");
-                continue;
-            }
-            if (e.type() != mongo::String) {
-                errorStatus =
-                    Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
-                continue;
-            }
-            view->setViewOn(NamespaceString(dbName, e.str()));
-        } else {
-            // As of SERVER-17312 we only support these two options. When SERVER-17320 is
-            // resolved this will need to be enhanced to handle other options.
+        if (!cmr.collValidationLevel.empty())
+            coll->setValidationLevel(txn, cmr.collValidationLevel);
+
+        auto setCollectionOption = [&](BSONElement& COElement) {
             typedef CollectionOptions CO;
-            const StringData name = e.fieldNameStringData();
-            const int flag = (name == "usePowerOf2Sizes")
+            const StringData name = COElement.fieldNameStringData();
+
+            int flag = (name == "usePowerOf2Sizes")
                 ? CO::Flag_UsePowerOf2Sizes
                 : (name == "noPadding") ? CO::Flag_NoPadding : 0;
-            if (!flag) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     str::stream() << "unknown option to collMod: " << name);
-                continue;
-            }
-
-            if (view) {
-                errorStatus = Status(ErrorCodes::InvalidOptions,
-                                     str::stream() << "option not supported on a view: " << name);
-                continue;
-            }
 
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
 
             const int oldFlags = cce->getCollectionOptions(txn).flags;
             const bool oldSetting = oldFlags & flag;
-            const bool newSetting = e.trueValue();
+            const bool newSetting = COElement.trueValue();
 
             result->appendBool(name.toString() + "_old", oldSetting);
             result->appendBool(name.toString() + "_new", newSetting);
@@ -303,32 +332,24 @@ Status collMod(OperationContext* txn,
             const CollectionOptions newOptions = cce->getCollectionOptions(txn);
             invariant(newOptions.flags == newFlags);
             invariant(newOptions.flagsSet);
-        }
-    }
+        };
 
-    if (!errorStatus.isOK()) {
-        return errorStatus;
-    }
-
-    // Actually update the view if it was parsed successfully. Only observe non-view collMods,
-    // as view operations are observed as operations on the system.views collection.
-    if (view) {
-        ViewCatalog* catalog = db->getViewCatalog();
-
-        BSONArrayBuilder pipeline;
-        for (auto& item : view->pipeline()) {
-            pipeline.append(item);
+        if (!cmr.usePowerOf2Sizes.eoo()) {
+            setCollectionOption(cmr.usePowerOf2Sizes);
         }
-        errorStatus = catalog->modifyView(txn, nss, view->viewOn(), BSONArray(pipeline.obj()));
-        if (!errorStatus.isOK()) {
-            return errorStatus;
+
+        if (!cmr.noPadding.eoo()) {
+            setCollectionOption(cmr.noPadding);
         }
-    } else {
+
+        // Only observe non-view collMods, as view operations are observed as operations on the
+        // system.views collection.
         getGlobalServiceContext()->getOpObserver()->onCollMod(
             txn, (dbName.toString() + ".$cmd").c_str(), cmdObj);
     }
 
     wunit.commit();
+
     return Status::OK();
 }
 }  // namespace mongo

@@ -225,12 +225,13 @@ Collection::Collection(OperationContext* txn,
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
       _validationAction(uassertStatusOK(
-          _parseValidationAction(_details->getCollectionOptions(txn).validationAction))),
+          parseValidationAction(_details->getCollectionOptions(txn).validationAction))),
       _validationLevel(uassertStatusOK(
-          _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
+          parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
       _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr),
       _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()) {
+
     _magic = 1357924;
     _indexCatalog.init(txn);
     if (isCapped())
@@ -953,7 +954,7 @@ Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {
     return Status::OK();
 }
 
-StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(StringData newLevel) {
+StatusWith<Collection::ValidationLevel> Collection::parseValidationLevel(StringData newLevel) {
     if (newLevel == "") {
         // default
         return STRICT_V;
@@ -969,7 +970,7 @@ StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(String
     }
 }
 
-StatusWith<Collection::ValidationAction> Collection::_parseValidationAction(StringData newAction) {
+StatusWith<Collection::ValidationAction> Collection::parseValidationAction(StringData newAction) {
     if (newAction == "") {
         // default
         return ERROR_V;
@@ -1008,7 +1009,7 @@ StringData Collection::getValidationAction() const {
 Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationLevel> status = _parseValidationLevel(newLevel);
+    StatusWith<ValidationLevel> status = parseValidationLevel(newLevel);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -1023,7 +1024,7 @@ Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel
 Status Collection::setValidationAction(OperationContext* txn, StringData newAction) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationAction> status = _parseValidationAction(newAction);
+    StatusWith<ValidationAction> status = parseValidationAction(newAction);
     if (!status.isOK()) {
         return status.getStatus();
     }

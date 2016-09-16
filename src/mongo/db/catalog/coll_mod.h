@@ -27,12 +27,21 @@
  */
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
+class Collection;
 class NamespaceString;
 class OperationContext;
+
+struct CollModRequest;
+
+StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
+                                               const NamespaceString& nss,
+                                               Collection* coll,
+                                               const BSONObj& cmdObj);
 
 /**
  * Performs the collection modification described in "cmdObj" on the collection "ns".
