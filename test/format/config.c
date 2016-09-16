@@ -796,7 +796,7 @@ config_find(const char *s, size_t len)
 {
 	CONFIG *cp;
 
-	for (cp = c; cp->name != NULL; ++cp) 
+	for (cp = c; cp->name != NULL; ++cp)
 		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
 			return (cp);
 

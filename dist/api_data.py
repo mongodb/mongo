@@ -818,7 +818,7 @@ methods = {
         type='int'),
 ]),
 
-'WT_SESSION.create' : Method(file_config + lsm_config + source_meta + 
+'WT_SESSION.create' : Method(file_config + lsm_config + source_meta +
         index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
         fail if the object exists.  When false (the default), if the

@@ -184,12 +184,12 @@ __curds_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	WT_STAT_CONN_INCR(session, cursor_next); 
+	WT_STAT_CONN_INCR(session, cursor_next);
 	WT_STAT_DATA_INCR(session, cursor_next);
 
 	WT_ERR(__curds_txn_enter(session));
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);         
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	ret = __curds_cursor_resolve(cursor, source->next(source));
 
 err:	__curds_txn_leave(session);
@@ -217,7 +217,7 @@ __curds_prev(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session));
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);         
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	ret = __curds_cursor_resolve(cursor, source->prev(source));
 
 err:	__curds_txn_leave(session);
@@ -239,7 +239,7 @@ __curds_reset(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	WT_STAT_CONN_INCR(session, cursor_reset);      
+	WT_STAT_CONN_INCR(session, cursor_reset);
 	WT_STAT_DATA_INCR(session, cursor_reset);
 
 	WT_ERR(source->reset(source));
@@ -323,7 +323,7 @@ __curds_insert(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session));
 
-	WT_STAT_CONN_INCR(session, cursor_insert);     
+	WT_STAT_CONN_INCR(session, cursor_insert);
 	WT_STAT_DATA_INCR(session, cursor_insert);
 	WT_STAT_DATA_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
@@ -354,7 +354,7 @@ __curds_update(WT_CURSOR *cursor)
 
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 
-	WT_STAT_CONN_INCR(session, cursor_update);     
+	WT_STAT_CONN_INCR(session, cursor_update);
 	WT_STAT_DATA_INCR(session, cursor_update);
 	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
@@ -385,7 +385,7 @@ __curds_remove(WT_CURSOR *cursor)
 
 	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 
-	WT_STAT_CONN_INCR(session, cursor_remove);     
+	WT_STAT_CONN_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 

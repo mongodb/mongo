@@ -134,7 +134,6 @@ class CapturedFd(object):
                           gotstr + '"')
         self.expectpos = os.path.getsize(self.filename)
 
-
 class TestSuiteConnection(object):
     def __init__(self, conn, connlist):
         connlist.append(conn)
@@ -152,7 +151,6 @@ class TestSuiteConnection(object):
             return getattr(self, attr)
         else:
             return getattr(self._conn, attr)
-
 
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
@@ -523,7 +521,6 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def className(self):
         return self.__class__.__name__
-
 
 def longtest(description):
     """

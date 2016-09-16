@@ -57,7 +57,6 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
         self.create = False
         return conn
 
-
     def test_readonly(self):
         create_params = 'key_format=i,value_format=i'
         entries = 10

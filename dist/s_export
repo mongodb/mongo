@@ -17,7 +17,6 @@ Darwin)
 	;;
 esac
 
-
 check()
 {
 	(sed -e '/^#/d' s_export.list &&

@@ -122,6 +122,5 @@ class test_schema04(wttest.WiredTigerTestCase):
             self.create_indices()
         self.check_entries()
 
-
 if __name__ == '__main__':
     wttest.run()

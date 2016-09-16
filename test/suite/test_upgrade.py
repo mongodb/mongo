@@ -67,6 +67,5 @@ class test_upgrade(wttest.WiredTigerTestCase):
             self.upgrade(complex_populate, False)
             self.upgrade(complex_populate, True)
 
-
 if __name__ == '__main__':
     wttest.run()

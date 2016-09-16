@@ -63,7 +63,7 @@ print_cursor(WT_CURSOR *cursor)
 }
 /*! [statistics display function] */
 
-int 
+int
 print_database_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
@@ -81,7 +81,7 @@ print_database_stats(WT_SESSION *session)
 	return (ret);
 }
 
-int 
+int
 print_file_stats(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
@@ -99,7 +99,7 @@ print_file_stats(WT_SESSION *session)
 	return (ret);
 }
 
-int 
+int
 print_join_cursor_stats(WT_SESSION *session)
 {
 	WT_CURSOR *idx_cursor, *join_cursor, *stat_cursor;

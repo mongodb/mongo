@@ -501,7 +501,7 @@ main(void)
 	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
 	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
 
-	/* 
+	/*
 	 * Insert a set of keys and values.  Insert the same data into
 	 * all tables so that we can verify they're all the same after
 	 * we decrypt on read.

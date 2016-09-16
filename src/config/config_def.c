@@ -1323,7 +1323,7 @@ __wt_conn_config_discard(WT_SESSION_IMPL *session)
 	__wt_free(session, conn->config_entries);
 }
 
-/*        
+/*
  * __wt_conn_config_match --
  *      Return the static configuration entry for a method.
  */

@@ -668,7 +668,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 
-err:	
+err:
 #ifdef HAVE_DIAGNOSTIC
 	/* Check that all cursors are open as expected. */
 	if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {

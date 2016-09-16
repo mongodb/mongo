@@ -78,7 +78,6 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
                 self.session.open_cursor('statistics:', None, config), msg)
 
-
 # Test the connection "clear" configuration.
 class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_conn_clear'
@@ -98,7 +97,6 @@ class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
             'statistics:', None, 'statistics=(all,clear)')
         self.assertGreater(cursor[stat.conn.cache_bytes_dirty][2], 0)
         self.assertEqual(cursor[stat.conn.cursor_insert][2], 0)
-
 
 # Test the data-source "clear" configuration.
 class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
@@ -129,7 +127,6 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
             'statistics:' + self.uri, None, 'statistics=(all,clear)')
         self.assertEqual(cursor[stat.dsrc.cursor_insert][2], 0)
 
-
 # Test the "fast" configuration.
 class test_stat_cursor_fast(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_fast'
@@ -157,7 +154,6 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
             'statistics:' + self.uri, None, 'statistics=(all)')
         self.assertGreater(cursor[stat.dsrc.btree_entries][2], 0)
 
-
 # Test connection error combinations.
 class test_stat_cursor_conn_error(wttest.WiredTigerTestCase):
     def setUpConnectionOpen(self, dir):
@@ -172,7 +168,6 @@ class test_stat_cursor_conn_error(wttest.WiredTigerTestCase):
             msg = '/only one statistics configuration value/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open('.', config), msg)
-
 
 # Test data-source error combinations.
 class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
@@ -197,7 +192,6 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor(
                 'statistics:' + self.uri, None, config), msg)
-
 
 if __name__ == '__main__':
     wttest.run()

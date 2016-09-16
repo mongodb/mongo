@@ -101,6 +101,5 @@ class test_compress01(wttest.WiredTigerTestCase):
                 self.assertEquals(cursor.get_value(), `idx` + "abcdefg")
         cursor.close()
 
-
 if __name__ == '__main__':
     wttest.run()

@@ -99,6 +99,5 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
             self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
         statc.close()
 
-
 if __name__ == '__main__':
     wttest.run()

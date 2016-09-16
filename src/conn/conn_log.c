@@ -925,7 +925,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	/* If no log thread services are configured, we're done. */ 
+	/* If no log thread services are configured, we're done. */
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);
 

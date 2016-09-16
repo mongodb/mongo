@@ -21,7 +21,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	txn = &session->txn;
 	*opp = NULL;
 
-	/* 
+	/*
 	 * We're about to perform an update.
 	 * Make sure we have allocated a transaction ID.
 	 */

@@ -376,7 +376,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	    conn->evict_threads_max, WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL,
 	    __wt_evict_thread_run));
 
-	/* 
+	/*
 	 * Allow queues to be populated now that the eviction threads
 	 * are running.
 	 */

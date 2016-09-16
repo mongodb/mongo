@@ -830,7 +830,7 @@ config_consolidate(CONFIG *cfg)
 	CONFIG_QUEUE_ENTRY *conf_line, *test_line, *tmp;
 	char *string_key;
 
-	/* 
+	/*
 	 * This loop iterates over the config queue and for entry checks if an
 	 * entry later in the queue has the same key. If a match is found then
 	 * the current queue entry is removed and we continue.

@@ -352,7 +352,7 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	WT_RET(
 	    __wt_block_buffer_to_addr(block, addr, &offset, &size, &checksum));
 
-	/* Add to the per-file list. */ 
+	/* Add to the per-file list. */
 	WT_RET(
 	    __verify_filefrag_add(session, block, NULL, offset, size, false));
 
