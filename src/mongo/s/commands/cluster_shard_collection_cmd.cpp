@@ -426,8 +426,12 @@ public:
             // 5. If no useful index exists, and collection empty, create one on proposedKey.
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
             //    receiving shard whenever a migrate occurs.
-            Status status = clusterCreateIndex(
-                txn, nss.ns(), proposedKey, CollationSpec::kSimpleSpec, careAboutUnique);
+            //    If the collection has a default collation, explicitly send the simple
+            //    collation as part of the createIndex request.
+            BSONObj collationArg =
+                !defaultCollation.isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
+            Status status =
+                clusterCreateIndex(txn, nss.ns(), proposedKey, collationArg, careAboutUnique);
             if (!status.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
                                        << "primary shard: " << status.reason();

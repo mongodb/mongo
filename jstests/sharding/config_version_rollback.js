@@ -64,9 +64,26 @@
     });
 
     jsTest.log("Forcing original primary to step back up and become primary again.");
+
+    // Do prep work to make original primary transtion to primary again smoother by
+    // waiting for all nodes to catch up to make them eligible to become primary and
+    // step down the current primary to make it stop generating new oplog entries.
+    configRS.awaitReplication(60 * 1000);
+
+    try {
+        newPriConn.adminCommand({replSetStepDown: 60, force: true});
+    } catch (x) {
+        // replSetStepDown closes all connections, thus a network exception is expected here.
+    }
+
     // Ensure former primary is eligible to become primary once more.
     assert.commandWorked(origPriConn.adminCommand({replSetFreeze: 0}));
-    assert.commandWorked(origPriConn.adminCommand({replSetStepUp: 1}));
+
+    // Keep on trying until this node becomes the primary. One reason it can fail is when the other
+    // nodes have newer oplog entries and will thus refuse to vote for this node.
+    assert.soon(function() {
+        return (origPriConn.adminCommand({replSetStepUp: 1})).ok;
+    });
 
     assert.soon(function() {
         return origPriConn == configRS.getPrimary();

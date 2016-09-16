@@ -21,9 +21,8 @@
     s.getDB(specialDB).dropDatabase();
 
     var cursor = s.getDB("config").collections.find({_id: specialNS});
-
-    assert.eq(cursor.count(), 1);
     assert(cursor.next()["dropped"]);
+    assert(!cursor.hasNext());
 
     s.stop();
 })();
