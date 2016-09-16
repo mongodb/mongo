@@ -410,6 +410,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
         const DBClientReplicaSet* replConn = dynamic_cast<const DBClientReplicaSet*>(rawConn);
         invariant(replConn);
         ReplicaSetMonitorPtr rsMonitor = ReplicaSetMonitor::get(replConn->getSetName());
+        uassert(16388, "cannot access unknown replica set:", rsMonitor != nullptr);
         if (!rsMonitor->isKnownToHaveGoodPrimary()) {
             state->conn->donotCheckVersion();
 

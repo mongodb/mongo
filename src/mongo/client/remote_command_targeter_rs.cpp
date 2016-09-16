@@ -57,7 +57,7 @@ RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
 }
 
 ConnectionString RemoteCommandTargeterRS::connectionString() {
-    return fassertStatusOK(28712, ConnectionString::parse(_rsMonitor->getServerAddress()));
+    return uassertStatusOK(ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
 StatusWith<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
