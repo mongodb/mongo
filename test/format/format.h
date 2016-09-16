@@ -202,7 +202,7 @@ typedef struct {
 	uint32_t c_verify;
 	uint32_t c_write_pct;
 
-#define	FIX				1	
+#define	FIX				1
 #define	ROW				2
 #define	VAR				3
 	u_int type;				/* File type's flag value */

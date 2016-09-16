@@ -162,7 +162,6 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     def test_load_process_hex(self):
         self.load_process(True)
 
-
 # test_load_commandline --
 #       Test the command-line processing.
 class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
@@ -219,7 +218,6 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
         self.load_commandline(["table", "filename=bar"], False)
         self.load_commandline(["table", "source=bar"], False)
         self.load_commandline(["table", "version=(100,200)"], False)
-
 
 if __name__ == '__main__':
     wttest.run()

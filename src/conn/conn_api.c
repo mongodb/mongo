@@ -1657,7 +1657,7 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 	set = 0;
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "none", &sval)) == 0 && sval.val != 0) {
-		LF_SET(WT_CONN_STAT_NONE);
+		flags = 0;
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
@@ -1677,8 +1677,13 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
-	    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
+	    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
+		if (!LF_ISSET(WT_CONN_STAT_FAST | WT_CONN_STAT_ALL))
+			WT_RET_MSG(session, EINVAL,
+			    "the value \"clear\" can be specified only if "
+			    "either \"all\" or \"fast\" is specified");
 		LF_SET(WT_CONN_STAT_CLEAR);
+	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (set > 1)

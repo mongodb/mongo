@@ -73,12 +73,14 @@ wts_rebalance(void)
 	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
 	/* Compare the old/new versions of the object. */
-	(void)snprintf(cmd, sizeof(cmd),
 #ifdef _WIN32
+	(void)snprintf(cmd, sizeof(cmd),
 	    "fc /b %s\\rebalance.orig %s\\rebalance.new > NUL",
-#else
-	    "cmp %s/rebalance.orig %s/rebalance.new > /dev/null",
-#endif
 	    g.home, g.home);
+#else
+	(void)snprintf(cmd, sizeof(cmd),
+	    "cmp %s/rebalance.orig %s/rebalance.new > /dev/null",
+	    g.home, g.home);
+#endif
 	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 }

@@ -46,7 +46,7 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	WT_ASSERT(session, number != 0 && size != 0);
 
 	if (session != NULL)
-		WT_STAT_FAST_CONN_INCR(session, memory_allocation);
+		WT_STAT_CONN_INCR(session, memory_allocation);
 
 	if ((p = calloc(number, size)) == NULL)
 		WT_RET_MSG(session, __wt_errno(),
@@ -79,7 +79,7 @@ __wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp)
 	WT_ASSERT(session, bytes_to_allocate != 0);
 
 	if (session != NULL)
-		WT_STAT_FAST_CONN_INCR(session, memory_allocation);
+		WT_STAT_CONN_INCR(session, memory_allocation);
 
 	if ((p = malloc(bytes_to_allocate)) == NULL)
 		WT_RET_MSG(session, __wt_errno(),
@@ -121,9 +121,9 @@ __realloc_func(WT_SESSION_IMPL *session,
 
 	if (session != NULL) {
 		if (p == NULL)
-			WT_STAT_FAST_CONN_INCR(session, memory_allocation);
+			WT_STAT_CONN_INCR(session, memory_allocation);
 		else
-			WT_STAT_FAST_CONN_INCR(session, memory_grow);
+			WT_STAT_CONN_INCR(session, memory_grow);
 	}
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL)
@@ -216,7 +216,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		bytes_to_allocate =
 		    WT_ALIGN(bytes_to_allocate, S2C(session)->buffer_alignment);
 
-		WT_STAT_FAST_CONN_INCR(session, memory_allocation);
+		WT_STAT_CONN_INCR(session, memory_allocation);
 
 		if ((ret = posix_memalign(&newp,
 		    S2C(session)->buffer_alignment,
@@ -302,7 +302,7 @@ __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg)
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
 	if (session != NULL)
-		WT_STAT_FAST_CONN_INCR(session, memory_free);
+		WT_STAT_CONN_INCR(session, memory_free);
 
 	free(p);
 }

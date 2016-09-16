@@ -76,4 +76,3 @@ echo "Rebuild documentation root"
 echo "Finished packaging documentation, you should now push the results. Run:"
 echo "cd $DOC_DIR && git push origin"
 echo "To backout changes run 'git reset HEAD~1'"
-

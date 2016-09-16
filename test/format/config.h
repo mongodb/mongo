@@ -37,7 +37,7 @@ typedef struct {
 	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
 #define	C_BOOL		0x001
 
-	/* Not a simple randomization, handle outside the main loop. */ 
+	/* Not a simple randomization, handle outside the main loop. */
 #define	C_IGNORE	0x002
 
 	/* Value was set from command-line or file, ignore for all runs. */

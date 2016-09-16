@@ -668,7 +668,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 
-err:	
+err:
 #ifdef HAVE_DIAGNOSTIC
 	/* Check that all cursors are open as expected. */
 	if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
@@ -1348,11 +1348,11 @@ __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm,
 		clsm->update_count = 0;
 		WT_LSM_TREE_STAT_INCRV(session,
 		    lsm_tree->lsm_checkpoint_throttle, lsm_tree->ckpt_throttle);
-		WT_STAT_FAST_CONN_INCRV(session,
+		WT_STAT_CONN_INCRV(session,
 		    lsm_checkpoint_throttle, lsm_tree->ckpt_throttle);
 		WT_LSM_TREE_STAT_INCRV(session,
 		    lsm_tree->lsm_merge_throttle, lsm_tree->merge_throttle);
-		WT_STAT_FAST_CONN_INCRV(session,
+		WT_STAT_CONN_INCRV(session,
 		    lsm_merge_throttle, lsm_tree->merge_throttle);
 		__wt_sleep(0,
 		    lsm_tree->ckpt_throttle + lsm_tree->merge_throttle);

@@ -36,7 +36,6 @@ class Callback(wiredtiger.AsyncCallback):
     def notify(self, op, op_ret, flags):
         raise AssertionError('callback should not be called in this test')
 
-
 # test_async03.py
 #    Async operations
 # Try to run async code with an incorrect connection config.

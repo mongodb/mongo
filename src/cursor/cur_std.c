@@ -547,7 +547,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 		TAILQ_REMOVE(&session->cursors, cursor, q);
 
 		(void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
-		WT_STAT_FAST_DATA_DECR(session, session_cursor_open);
+		WT_STAT_DATA_DECR(session, session_cursor_open);
 	}
 
 	__wt_buf_free(session, &cursor->key);
@@ -763,7 +763,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	F_SET(cursor, WT_CURSTD_OPEN);
 	(void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
-	WT_STAT_FAST_DATA_INCR(session, session_cursor_open);
+	WT_STAT_DATA_INCR(session, session_cursor_open);
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);

@@ -44,22 +44,27 @@ check(uint32_t hw, uint32_t sw, size_t len, const char *msg)
 
 #define	DATASIZE	(128 * 1024)
 int
-main(void)
+main(int argc, char *argv[])
 {
+	TEST_OPTS *opts, _opts;
 	WT_RAND_STATE rnd;
 	size_t len;
 	uint32_t hw, sw;
 	u_int i, j;
 	uint8_t *data;
 
-	/* Allocate aligned memory for the data. */
-	data = dcalloc(DATASIZE, sizeof(uint8_t));
+	opts = &_opts;
+	memset(opts, 0, sizeof(*opts));
+	testutil_check(testutil_parse_opts(argc, argv, opts));
+	testutil_make_work_dir(opts->home);
+	testutil_check(
+	    wiredtiger_open(opts->home, NULL, "create", &opts->conn));
 
 	/* Initialize the RNG. */
 	testutil_check(__wt_random_init_seed(NULL, &rnd));
 
-	/* Initialize the WiredTiger library checksum functions. */
-	__wt_checksum_init();
+	/* Allocate aligned memory for the data. */
+	data = dcalloc(DATASIZE, sizeof(uint8_t));
 
 	/*
 	 * Some simple known checksums.
@@ -139,5 +144,6 @@ main(void)
 	}
 
 	free(data);
+	testutil_cleanup(opts);
 	return (EXIT_SUCCESS);
 }

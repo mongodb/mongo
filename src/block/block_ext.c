@@ -485,7 +485,7 @@ __block_extend(
 	*offp = block->size;
 	block->size += size;
 
-	WT_STAT_FAST_DATA_INCR(session, block_extension);
+	WT_STAT_DATA_INCR(session, block_extension);
 	__wt_verbose(session, WT_VERB_BLOCK,
 	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
 	    (intmax_t)size, (intmax_t)*offp);
@@ -507,7 +507,7 @@ __wt_block_alloc(
 	/* Assert we're maintaining the by-size skiplist. */
 	WT_ASSERT(session, block->live.avail.track_size != 0);
 
-	WT_STAT_FAST_DATA_INCR(session, block_alloc);
+	WT_STAT_DATA_INCR(session, block_alloc);
 	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate a block size %" PRIdMAX " that is not "
@@ -590,7 +590,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	uint32_t checksum, size;
 
 	WT_UNUSED(addr_size);
-	WT_STAT_FAST_DATA_INCR(session, block_free);
+	WT_STAT_DATA_INCR(session, block_free);
 
 	/* Crack the cookie. */
 	WT_RET(

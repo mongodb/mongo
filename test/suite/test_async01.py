@@ -107,7 +107,6 @@ class Callback(wiredtiger.AsyncCallback):
 
         return 0
 
-
 # test_async01.py
 #    Async operations
 # Basic smoke-test of file and table async ops: tests get/set key, insert
@@ -260,7 +259,6 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertTrue(callback.nsearch == self.nentries * 2)
         self.assertTrue(callback.nupdate == self.nentries)
         self.assertTrue(callback.nerror == 0)
-
 
 if __name__ == '__main__':
     wttest.run()
