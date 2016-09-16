@@ -422,7 +422,11 @@ Status StorageInterfaceImpl::createCollection(OperationContext* txn,
 Status StorageInterfaceImpl::dropCollection(OperationContext* txn, const NamespaceString& nss) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
+        AutoGetDb autoDB(txn, nss.db(), MODE_X);
+        if (!autoDB.getDb()) {
+            // Database does not exist - nothing to do.
+            return Status::OK();
+        }
         WriteUnitOfWork wunit(txn);
         const auto status = autoDB.getDb()->dropCollection(txn, nss.ns());
         if (status.isOK()) {

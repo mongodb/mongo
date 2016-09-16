@@ -580,9 +580,11 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithMissingColl
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss("foo.bar");
+    ASSERT_FALSE(AutoGetDb(txn, nss.db(), MODE_IS).getDb());
     ASSERT_OK(storage.dropCollection(txn, nss));
-    AutoGetCollectionForRead autoColl(txn, nss);
-    ASSERT_FALSE(autoColl.getCollection());
+    ASSERT_FALSE(AutoGetCollectionForRead(txn, nss).getCollection());
+    // Database should not be created after running dropCollection.
+    ASSERT_FALSE(AutoGetDb(txn, nss.db(), MODE_IS).getDb());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsInvalidNamespaceIfCollectionIsMissing) {
