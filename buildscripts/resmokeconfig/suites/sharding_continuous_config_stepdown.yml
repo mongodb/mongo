@@ -95,6 +95,7 @@ selector:
     - jstests/sharding/all_config_servers_blackholed_from_mongos.js
     - jstests/sharding/batch_write_command_sharded.js
     - jstests/sharding/config_rs_no_primary.js
+    - jstests/sharding/config_version_rollback.js
     - jstests/sharding/startup_with_all_configs_down.js
     - jstests/sharding/lagged_config_secondary.js
     - jstests/sharding/autodiscover_config_rs_from_secondary.js
