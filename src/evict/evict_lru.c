@@ -468,6 +468,14 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
 
 	/*
+	 * If application threads are blocked by the total volume of data in
+	 * cache, try dirty pages as well.
+	 */
+	if (__wt_cache_aggressive(session) &&
+	    F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD))
+		F_SET(cache, WT_CACHE_EVICT_DIRTY);
+
+	/*
 	 * Scrub dirty pages and keep them in cache if we are less than half
 	 * way to the clean or dirty trigger.
 	 */
@@ -476,6 +484,18 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	    ((cache->eviction_dirty_target + cache->eviction_dirty_trigger) *
 	    bytes_max) / 200)
 		F_SET(cache, WT_CACHE_EVICT_SCRUB);
+
+	/*
+	 * With an in-memory cache, we only do dirty eviction in order to scrub
+	 * pages.
+	 */
+	if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
+		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
+			F_SET(cache, WT_CACHE_EVICT_DIRTY);
+		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD))
+			F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
+		F_CLR(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
+	}
 
 	WT_STAT_CONN_SET(session, cache_eviction_state,
 	    F_MASK(cache, WT_CACHE_EVICT_MASK));
@@ -1348,7 +1368,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	    ret = __wt_tree_walk_count(
 	    session, &btree->evict_ref, &refs_walked, walk_flags)) {
 		/*
-		 * Check whether we're finding a good ration of candidates vs
+		 * Check whether we're finding a good ratio of candidates vs
 		 * pages seen.  Some workloads create "deserts" in trees where
 		 * no good eviction candidates can be found.  Abandon the walk
 		 * if we get into that situation.
@@ -1402,19 +1422,22 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			continue;
 		}
 
+		/* Pages that are empty or from dead trees are also good. */
 		if (__wt_page_is_empty(page) ||
-		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-		    __wt_cache_aggressive(session))
+		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 			goto fast;
 
 		/* Skip clean pages if appropriate. */
-		if (!modified && (F_ISSET(conn, WT_CONN_IN_MEMORY) ||
-		    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN)))
+		if (!modified && !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
 			continue;
 
 		/* Skip dirty pages if appropriate. */
 		if (modified && !F_ISSET(cache, WT_CACHE_EVICT_DIRTY))
 			continue;
+
+		/* If eviction gets aggressive, anything else is fair game. */
+		if (__wt_cache_aggressive(session))
+			goto fast;
 
 		/* Limit internal pages to 50% of the total. */
 		if (WT_PAGE_IS_INTERNAL(page) &&
