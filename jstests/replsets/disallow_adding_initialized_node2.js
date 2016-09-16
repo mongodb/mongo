@@ -93,9 +93,6 @@
     assert.eq(12, statusA.members[2]._id);
     assert.eq(primaryB.host, statusA.members[2].name);
     assert.eq(ReplSetTest.State.DOWN, statusA.members[2].state);
-    assert(statusA.members[2].lastHeartbeatMessage.indexOf(msgA) != -1 ||
-           statusA.members[2].lastHeartbeatMessage.indexOf(
-               'no response within election timeout period') != -1);
 
     // Replica set B's config should remain unchanged.
     assert.eq(1, statusB.members.length);
