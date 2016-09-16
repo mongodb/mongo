@@ -79,6 +79,7 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
 
 CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
     DESTRUCTOR_GUARD({
+        _releaseResources();
         _runner->cancel();
         _runner->join();
         _threadPool->join();
