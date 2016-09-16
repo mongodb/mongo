@@ -97,7 +97,7 @@ public:
     bool peek(OperationContext* txn, BSONObj* op);
     void consume(OperationContext* txn);
     void clearSyncTarget();
-    void waitForMore(OperationContext* txn);
+    void waitForMore();
 
     // For monitoring
     BSONObj getCounters();

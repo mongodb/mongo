@@ -146,9 +146,9 @@ public:
     /**
      * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
-     * Otherwise, returns true and sets "value" to last item in oplog buffer.
+     * Otherwise, returns true.
      */
-    virtual bool blockingPeek(OperationContext* txn, Value* value, Seconds waitDuration) = 0;
+    virtual bool waitForData(Seconds waitDuration) = 0;
 
     /**
      * Returns false if oplog buffer is empty.

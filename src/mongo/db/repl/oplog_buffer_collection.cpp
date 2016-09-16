@@ -176,15 +176,13 @@ bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
     return _pop_inlock(txn, value);
 }
 
-bool OplogBufferCollection::blockingPeek(OperationContext* txn,
-                                         Value* value,
-                                         Seconds waitDuration) {
+bool OplogBufferCollection::waitForData(Seconds waitDuration) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (!_cvNoLongerEmpty.wait_for(
             lk, waitDuration.toSystemDuration(), [&]() { return _count != 0; })) {
         return false;
     }
-    return _peekOneSide_inlock(txn, value, true);
+    return _count != 0;
 }
 
 bool OplogBufferCollection::peek(OperationContext* txn, Value* value) {

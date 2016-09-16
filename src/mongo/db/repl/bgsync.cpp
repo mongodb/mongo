@@ -529,11 +529,9 @@ bool BackgroundSync::peek(OperationContext* txn, BSONObj* op) {
     return _oplogBuffer->peek(txn, op);
 }
 
-void BackgroundSync::waitForMore(OperationContext* txn) {
-    BSONObj op;
+void BackgroundSync::waitForMore() {
     // Block for one second before timing out.
-    // Ignore the value of the op we peeked at.
-    _oplogBuffer->blockingPeek(txn, &op, Seconds(1));
+    _oplogBuffer->waitForData(Seconds(1));
 }
 
 void BackgroundSync::consume(OperationContext* txn) {

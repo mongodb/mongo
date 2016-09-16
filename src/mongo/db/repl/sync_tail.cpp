@@ -833,7 +833,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
                 } else {
                     // Block up to 1 second. We still return true in this case because we want this
                     // op to be the first in a new batch with a new start time.
-                    _networkQueue->waitForMore(txn);
+                    _networkQueue->waitForMore();
                 }
             }
 

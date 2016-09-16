@@ -481,7 +481,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_TRUE(doc.isEmpty());
 }
 
-TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsDocument) {
+TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_txn.get());
@@ -495,7 +495,7 @@ TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsDocument) {
     stdx::thread peekingThread([&]() {
         Client::initThread("peekingThread");
         barrier.countDownAndWait();
-        success = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc, Seconds(30));
+        success = oplogBuffer.waitForData(Seconds(30));
         count = oplogBuffer.getCount();
     });
 
@@ -505,36 +505,35 @@ TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsDocument) {
     peekingThread.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success);
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog);
     ASSERT_EQUALS(count, 1UL);
 }
 
-TEST_F(OplogBufferCollectionTest, TwoBlockingPeeksBlockAndFindSameDocument) {
+TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_txn.get());
 
     unittest::Barrier barrier(3U);
     BSONObj oplog = makeOplogEntry(1);
-    BSONObj doc1;
     bool success1 = false;
     std::size_t count1 = 0;
 
-    BSONObj doc2;
     bool success2 = false;
     std::size_t count2 = 0;
 
     stdx::thread peekingThread1([&]() {
         Client::initThread("peekingThread1");
         barrier.countDownAndWait();
-        success1 = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc1, Seconds(30));
+        success1 = oplogBuffer.waitForData(Seconds(30));
         count1 = oplogBuffer.getCount();
     });
 
     stdx::thread peekingThread2([&]() {
         Client::initThread("peekingThread2");
         barrier.countDownAndWait();
-        success2 = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc2, Seconds(30));
+        success2 = oplogBuffer.waitForData(Seconds(30));
         count2 = oplogBuffer.getCount();
     });
 
@@ -545,14 +544,15 @@ TEST_F(OplogBufferCollectionTest, TwoBlockingPeeksBlockAndFindSameDocument) {
     peekingThread2.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success1);
-    ASSERT_BSONOBJ_EQ(doc1, oplog);
+    BSONObj doc;
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(doc, oplog);
     ASSERT_EQUALS(count1, 1UL);
     ASSERT_TRUE(success2);
-    ASSERT_BSONOBJ_EQ(doc2, oplog);
     ASSERT_EQUALS(count2, 1UL);
 }
 
-TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndTimesOutWhenItDoesNotFindDocument) {
+TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_txn.get());
@@ -563,7 +563,7 @@ TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndTimesOutWhenItDoesNotFind
 
     stdx::thread peekingThread([&]() {
         Client::initThread("peekingThread");
-        success = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc, Seconds(1));
+        success = oplogBuffer.waitForData(Seconds(1));
         count = oplogBuffer.getCount();
     });
 
@@ -571,6 +571,7 @@ TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndTimesOutWhenItDoesNotFind
     peekingThread.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_FALSE(success);
+    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(count, 0UL);
 }
@@ -927,7 +928,7 @@ TEST_F(OplogBufferCollectionTest, MultipleSentinelsAreReturnedInOrder) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 }
 
-TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsSentinel) {
+TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsSentinel) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_txn.get());
@@ -941,7 +942,7 @@ TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsSentinel) {
     stdx::thread peekingThread([&]() {
         Client::initThread("peekingThread");
         barrier.countDownAndWait();
-        success = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc, Seconds(30));
+        success = oplogBuffer.waitForData(Seconds(30));
         count = oplogBuffer.getCount();
     });
 
@@ -951,36 +952,35 @@ TEST_F(OplogBufferCollectionTest, BlockingPeekBlocksAndFindsSentinel) {
     peekingThread.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success);
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(count, 1UL);
 }
 
-TEST_F(OplogBufferCollectionTest, TwoBlockingPeeksBlockAndFindSameSentinel) {
+TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameSentinel) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_txn.get());
 
     unittest::Barrier barrier(3U);
     BSONObj oplog;
-    BSONObj doc1;
     bool success1 = false;
     std::size_t count1 = 0;
 
-    BSONObj doc2;
     bool success2 = false;
     std::size_t count2 = 0;
 
     stdx::thread peekingThread1([&]() {
         Client::initThread("peekingThread1");
         barrier.countDownAndWait();
-        success1 = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc1, Seconds(30));
+        success1 = oplogBuffer.waitForData(Seconds(30));
         count1 = oplogBuffer.getCount();
     });
 
     stdx::thread peekingThread2([&]() {
         Client::initThread("peekingThread2");
         barrier.countDownAndWait();
-        success2 = oplogBuffer.blockingPeek(makeOperationContext().get(), &doc2, Seconds(30));
+        success2 = oplogBuffer.waitForData(Seconds(30));
         count2 = oplogBuffer.getCount();
     });
 
@@ -991,10 +991,11 @@ TEST_F(OplogBufferCollectionTest, TwoBlockingPeeksBlockAndFindSameSentinel) {
     peekingThread2.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success1);
-    ASSERT_TRUE(doc1.isEmpty());
+    BSONObj doc;
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(count1, 1UL);
     ASSERT_TRUE(success2);
-    ASSERT_TRUE(doc2.isEmpty());
     ASSERT_EQUALS(count2, 1UL);
 }
 

@@ -95,8 +95,9 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
     return _queue.tryPop(*value);
 }
 
-bool OplogBufferBlockingQueue::blockingPeek(OperationContext*, Value* value, Seconds waitDuration) {
-    return _queue.blockingPeek(*value, static_cast<int>(durationCount<Seconds>(waitDuration)));
+bool OplogBufferBlockingQueue::waitForData(Seconds waitDuration) {
+    Value ignored;
+    return _queue.blockingPeek(ignored, static_cast<int>(durationCount<Seconds>(waitDuration)));
 }
 
 bool OplogBufferBlockingQueue::peek(OperationContext*, Value* value) {
