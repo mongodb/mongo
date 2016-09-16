@@ -1617,8 +1617,8 @@ __evict_get_ref(
 		 * Don't force application threads to evict dirty pages if they
 		 * aren't stalled by the amount of dirty data in cache.
 		 */
-		if (!urgent_ok && (is_server || (is_app &&
-		    !F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD))) &&
+		if (!urgent_ok && (is_server ||
+		    !F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD)) &&
 		    __wt_page_is_modified(evict->ref->page)) {
 			--evict;
 			break;
