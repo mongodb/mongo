@@ -51,6 +51,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -387,19 +388,22 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                        << "to"
                        << _args.getToShardId()),
             ShardingCatalogClient::kMajorityWriteConcern);
-        if (!status.isOK()) {
-            fassertStatusOK(40137,
-                            {status.code(),
-                             str::stream()
-                                 << "Failed to commit chunk ["
-                                 << redact(
-                                        ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString())
-                                 << " due to "
-                                 << migrationCommitStatus.toString()
-                                 << ", and updating the optime with a write before refreshing the "
-                                 << "metadata also failed with "
-                                 << status.toString()});
+        if (status == ErrorCodes::CallbackCanceled && inShutdown()) {
+            // Since the server is already doing a clean shutdown, this call will just join the
+            // previous shutdown call
+            shutdown(waitForShutdown());
         }
+
+        fassertStatusOK(40137,
+                        {status.code(),
+                         str::stream()
+                             << "Failed to commit chunk ["
+                             << redact(ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString())
+                             << " due to "
+                             << migrationCommitStatus.toString()
+                             << ", and updating the optime with a write before refreshing the "
+                             << "metadata also failed with "
+                             << status.toString()});
 
         // Once the write above has succeeded we have an up to date config server optime. In this
         // case do a best effort attempt to incrementally refresh the metadata. If this fails, just
