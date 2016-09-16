@@ -187,21 +187,6 @@ Win32FileStreambuf::int_type Win32FileStreambuf::overflow(int_type ch) {
     return traits_type::eof();
 }
 
-// Win32 implementation of renameFile that handles non-ascii file names.
-int renameFile(const std::string& oldName, const std::string& newName) {
-    return _wrename(utf8ToWide(oldName).c_str(), utf8ToWide(newName).c_str());
-}
-
-}  // namespace
-#else
-
-namespace {
-
-// *nix implementation of renameFile that assumes the OS is encoding file names in UTF-8.
-int renameFile(const std::string& oldName, const std::string& newName) {
-    return rename(oldName.c_str(), newName.c_str());
-}
-
 }  // namespace
 #endif
 
@@ -239,17 +224,16 @@ Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& 
                                               << e.what());
             }
 
-            if (0 != renameFile(_writer->_fileName, renameTarget)) {
+            boost::system::error_code ec;
+            boost::filesystem::rename(_writer->_fileName, renameTarget, ec);
+            if (ec) {
                 return Status(ErrorCodes::FileRenameFailed,
                               mongoutils::str::stream() << "Failed  to rename \""
                                                         << _writer->_fileName
                                                         << "\" to \""
                                                         << renameTarget
                                                         << "\": "
-                                                        << strerror(errno)
-                                                        << " ("
-                                                        << errno
-                                                        << ')');
+                                                        << ec.message());
                 // TODO(schwerin): Make errnoWithDescription() available in the logger library, and
                 // use it here.
             }

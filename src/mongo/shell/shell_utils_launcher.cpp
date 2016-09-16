@@ -478,15 +478,9 @@ void ProgramRunner::launchProcess(int child_stdout) {
         }
     }
 
-    string args = ss.str();
+    std::wstring args = toNativeString(ss.str().c_str());
 
     // Construct the environment block which the new process will use.
-    std::unique_ptr<TCHAR[]> args_tchar(new TCHAR[args.size() + 1]);
-    size_t i;
-    for (i = 0; i < args.size(); i++)
-        args_tchar[i] = args[i];
-    args_tchar[i] = 0;
-
     // An environment block is a NULL terminated array of NULL terminated WCHAR strings. The
     // strings are of the form "name=value\0". Because the strings are variable length, we must
     // precompute the size of the array before we may allocate it.
@@ -537,7 +531,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
     dwCreationFlags |= CREATE_UNICODE_ENVIRONMENT;
 
     bool success = CreateProcessW(nullptr,
-                                  args_tchar.get(),
+                                  const_cast<LPWSTR>(args.c_str()),
                                   nullptr,
                                   nullptr,
                                   true,

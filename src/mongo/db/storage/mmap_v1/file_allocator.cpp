@@ -60,6 +60,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -397,7 +398,9 @@ void FileAllocator::run(FileAllocator* fa) {
                 ensureParentDirCreated(tmp);
 
 #if defined(_WIN32)
-                fd = _open(tmp.c_str(), _O_RDWR | _O_CREAT | O_NOATIME, _S_IREAD | _S_IWRITE);
+                fd = _wopen(toNativeString(tmp.c_str()).c_str(),
+                            _O_RDWR | _O_CREAT | O_NOATIME,
+                            _S_IREAD | _S_IWRITE);
 #else
                 fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
 #endif
@@ -422,12 +425,15 @@ void FileAllocator::run(FileAllocator* fa) {
                 close(fd);
                 fd = 0;
 
-                if (rename(tmp.c_str(), name.c_str())) {
-                    const string& errStr = errnoWithDescription();
+                boost::system::error_code ec;
+                boost::filesystem::rename(tmp.c_str(), name.c_str(), ec);
+                if (ec) {
                     const string& errMessage = str::stream() << "error: couldn't rename " << tmp
-                                                             << " to " << name << ' ' << errStr;
+                                                             << " to " << name << ' '
+                                                             << ec.message();
                     msgasserted(13653, errMessage);
                 }
+
                 flushMyDirectory(name);
 
                 log() << "done allocating datafile " << name << ", "

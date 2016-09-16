@@ -40,6 +40,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -113,7 +114,7 @@ Status StorageEngineLockFile::open() {
                                     << ex.what());
     }
 
-    HANDLE lockFileHandle = CreateFileA(_filespec.c_str(),
+    HANDLE lockFileHandle = CreateFileW(toNativeString(_filespec.c_str()).c_str(),
                                         GENERIC_READ | GENERIC_WRITE,
                                         0 /* do not allow anyone else access */,
                                         NULL,

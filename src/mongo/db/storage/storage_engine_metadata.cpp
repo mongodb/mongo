@@ -144,23 +144,25 @@ Status StorageEngineMetadata::read() {
     }
 
     std::vector<char> buffer(fileSize);
-    std::string filename = metadataPath.string();
     try {
-        std::ifstream ifs(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+        std::ifstream ifs(metadataPath.c_str(), std::ios_base::in | std::ios_base::binary);
         if (!ifs) {
             return Status(ErrorCodes::FileNotOpen,
-                          str::stream() << "Failed to read metadata from " << filename);
+                          str::stream() << "Failed to read metadata from "
+                                        << metadataPath.string());
         }
 
         // Read BSON from file
         ifs.read(&buffer[0], buffer.size());
         if (!ifs) {
             return Status(ErrorCodes::FileStreamFailed,
-                          str::stream() << "Unable to read BSON data from " << filename);
+                          str::stream() << "Unable to read BSON data from "
+                                        << metadataPath.string());
         }
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::FileStreamFailed,
-                      str::stream() << "Unexpected error reading BSON data from " << filename
+                      str::stream() << "Unexpected error reading BSON data from "
+                                    << metadataPath.string()
                                     << ": "
                                     << ex.what());
     }
@@ -169,9 +171,10 @@ Status StorageEngineMetadata::read() {
     try {
         obj = BSONObj(&buffer[0]);
     } catch (DBException& ex) {
-        return Status(
-            ErrorCodes::FailedToParse,
-            str::stream() << "Failed to convert data in " << filename << " to BSON: " << ex.what());
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Failed to convert data in " << metadataPath.string()
+                                    << " to BSON: "
+                                    << ex.what());
     }
 
     // Validate 'storage.engine' field.
@@ -214,12 +217,12 @@ Status StorageEngineMetadata::write() const {
     boost::filesystem::path metadataTempPath =
         boost::filesystem::path(_dbpath) / (kMetadataBasename + ".tmp");
     {
-        std::string filenameTemp = metadataTempPath.string();
-        std::ofstream ofs(filenameTemp.c_str(), std::ios_base::out | std::ios_base::binary);
+        std::ofstream ofs(metadataTempPath.c_str(), std::ios_base::out | std::ios_base::binary);
         if (!ofs) {
-            return Status(ErrorCodes::FileNotOpen,
-                          str::stream() << "Failed to write metadata to " << filenameTemp << ": "
-                                        << errnoWithDescription());
+            return Status(
+                ErrorCodes::FileNotOpen,
+                str::stream() << "Failed to write metadata to " << metadataTempPath.string() << ": "
+                              << errnoWithDescription());
         }
 
         BSONObj obj = BSON(
@@ -227,7 +230,9 @@ Status StorageEngineMetadata::write() const {
         ofs.write(obj.objdata(), obj.objsize());
         if (!ofs) {
             return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Failed to write BSON data to " << filenameTemp << ": "
+                          str::stream() << "Failed to write BSON data to "
+                                        << metadataTempPath.string()
+                                        << ": "
                                         << errnoWithDescription());
         }
     }
