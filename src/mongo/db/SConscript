@@ -702,6 +702,7 @@ serveronlyLibdeps = [
     "repl/bgsync",
     "repl/oplog_buffer_collection",
     "repl/oplog_buffer_blocking_queue",
+    "repl/oplog_buffer_proxy",
     "repl/repl_coordinator_global",
     "repl/repl_coordinator_impl",
     "repl/repl_settings",

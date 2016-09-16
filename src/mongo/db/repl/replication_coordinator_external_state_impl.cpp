@@ -57,6 +57,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
+#include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_initialsync.h"
@@ -834,7 +835,8 @@ void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
     OperationContext* txn) const {
     if (initialSyncOplogBuffer == kCollectionOplogBufferName) {
-        return stdx::make_unique<OplogBufferCollection>(StorageInterface::get(txn));
+        return stdx::make_unique<OplogBufferProxy>(
+            stdx::make_unique<OplogBufferCollection>(StorageInterface::get(txn)));
     } else {
         return stdx::make_unique<OplogBufferBlockingQueue>();
     }
