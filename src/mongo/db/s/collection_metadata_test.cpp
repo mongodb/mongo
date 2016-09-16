@@ -285,16 +285,12 @@ protected:
         setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
-        OID epoch = OID::gen();
-
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
-
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(epoch);
+        collType.setEpoch(chunkVersion.epoch());
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_10")
@@ -302,7 +298,7 @@ protected:
             << ChunkType::min(BSON("a" << 10))
             << ChunkType::max(BSON("a" << 20))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::DEPRECATED_epoch(chunkVersion.epoch())
             << ChunkType::shard("shard0000"));
         std::vector<BSONObj> chunksToSend{fooSingle};
 
@@ -325,6 +321,8 @@ protected:
     const CollectionMetadata& getCollMetadata() const {
         return _metadata;
     }
+
+    const ChunkVersion chunkVersion{ChunkVersion(1, 0, OID::gen())};
 
 private:
     CollectionMetadata _metadata;
@@ -355,6 +353,7 @@ TEST_F(SingleChunkFixture, getNextFromEmpty) {
     ASSERT(getCollMetadata().getNextChunk(getCollMetadata().getMinKey(), &nextChunk));
     ASSERT_EQUALS(0, nextChunk.getMin().woCompare(BSON("a" << 10)));
     ASSERT_EQUALS(0, nextChunk.getMax().woCompare(BSON("a" << 20)));
+    ASSERT_EQUALS(chunkVersion, nextChunk.getVersion());
 }
 
 TEST_F(SingleChunkFixture, GetLastChunkIsFalse) {
@@ -447,6 +446,8 @@ protected:
         return _metadata;
     }
 
+    const ChunkVersion chunkVersion{ChunkVersion(1, 0, OID::gen())};
+
 private:
     CollectionMetadata _metadata;
     const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
@@ -473,16 +474,14 @@ protected:
         setRemote(HostAndPort("FakeRemoteClient:34567"));
         configTargeter()->setFindHostReturnValue(configHost);
 
-        OID epoch = OID::gen();
-
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, OID::gen());
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(epoch);
+        collType.setEpoch(chunkVersion.epoch());
 
         std::vector<BSONObj> chunksToSend;
         chunksToSend.push_back(BSON(
@@ -491,15 +490,18 @@ protected:
             << ChunkType::min(BSON("a" << 10 << "b" << 0))
             << ChunkType::max(BSON("a" << 20 << "b" << 0))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::DEPRECATED_epoch(chunkVersion.epoch())
             << ChunkType::shard("shard0000")));
+
+        chunkVersion.incMinor();
+
         chunksToSend.push_back(BSON(
             ChunkType::name("test.foo-a_10")
             << ChunkType::ns("test.foo")
             << ChunkType::min(BSON("a" << 30 << "b" << 0))
             << ChunkType::max(BSON("a" << 40 << "b" << 0))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch)
+            << ChunkType::DEPRECATED_epoch(chunkVersion.epoch())
             << ChunkType::shard("shard0000")));
 
         auto future = launchAsync([this] {
@@ -649,6 +651,21 @@ private:
     CollectionMetadata _metadata;
     const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
+
+TEST_F(ThreeChunkWithRangeGapFixture, ChunkVersionsMatch) {
+    const OID epoch = getCollMetadata().getCollVersion().epoch();
+
+    ChunkType chunk;
+
+    ASSERT(getCollMetadata().getNextChunk(BSON("a" << MINKEY), &chunk));
+    ASSERT_EQ(ChunkVersion(1, 1, epoch), chunk.getVersion());
+
+    ASSERT(getCollMetadata().getNextChunk(BSON("a" << 30), &chunk));
+    ASSERT_EQ(ChunkVersion(1, 2, epoch), chunk.getVersion());
+
+    ASSERT(getCollMetadata().getNextChunk(BSON("a" << 10), &chunk));
+    ASSERT_EQ(ChunkVersion(1, 3, epoch), chunk.getVersion());
+}
 
 TEST_F(ThreeChunkWithRangeGapFixture, ShardOwnsDoc) {
     ASSERT(getCollMetadata().keyBelongsToMe(BSON("a" << 5)));

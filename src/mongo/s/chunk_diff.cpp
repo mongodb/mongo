@@ -32,6 +32,7 @@
 
 #include "mongo/s/chunk_diff.h"
 
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/log.h"
@@ -204,6 +205,7 @@ std::string ConfigDiffTrackerBase::QueryAndSort::toString() const {
 class Chunk;
 
 template class ConfigDiffTracker<BSONObj>;
+template class ConfigDiffTracker<CachedChunkInfo>;
 template class ConfigDiffTracker<std::shared_ptr<Chunk>>;
 
 }  // namespace mongo

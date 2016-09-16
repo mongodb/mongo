@@ -47,7 +47,7 @@ MetadataManager::MetadataManager(ServiceContext* sc, NamespaceString nss)
     : _nss(std::move(nss)),
       _serviceContext(sc),
       _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)),
-      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()),
+      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()),
       _rangesToClean(
           SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<RangeToCleanDescriptor>()) {}
 
@@ -135,7 +135,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     // Resolve any receiving chunks, which might have completed by now
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
         const BSONObj min = it->first;
-        const BSONObj max = it->second;
+        const BSONObj max = it->second.getMaxKey();
 
         // Our pending range overlaps at least one chunk
         if (rangeMapContains(remoteMetadata->getChunks(), min, max)) {
@@ -164,7 +164,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
             auto itRecv = _receivingChunks.find(overlapChunkMin.first);
             invariant(itRecv != _receivingChunks.end());
 
-            const ChunkRange receivingRange(itRecv->first, itRecv->second);
+            const ChunkRange receivingRange(itRecv->first, itRecv->second.getMaxKey());
 
             _receivingChunks.erase(itRecv);
 
@@ -181,7 +181,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     for (const auto& receivingChunk : _receivingChunks) {
         ChunkType chunk;
         chunk.setMin(receivingChunk.first);
-        chunk.setMax(receivingChunk.second);
+        chunk.setMax(receivingChunk.second.getMaxKey());
         remoteMetadata = remoteMetadata->clonePlusPending(chunk);
     }
 
@@ -203,7 +203,7 @@ void MetadataManager::beginReceive(const ChunkRange& range) {
         auto itRecv = _receivingChunks.find(overlapChunkMin.first);
         invariant(itRecv != _receivingChunks.end());
 
-        const ChunkRange receivingRange(itRecv->first, itRecv->second);
+        const ChunkRange receivingRange(itRecv->first, itRecv->second.getMaxKey());
 
         _receivingChunks.erase(itRecv);
 
@@ -214,7 +214,9 @@ void MetadataManager::beginReceive(const ChunkRange& range) {
     // Need to ensure that the background range deleter task won't delete the range we are about to
     // receive
     _removeRangeToClean_inlock(range, Status::OK());
-    _receivingChunks.insert(std::make_pair(range.getMin().getOwned(), range.getMax().getOwned()));
+    _receivingChunks.insert(
+        std::make_pair(range.getMin().getOwned(),
+                       CachedChunkInfo(range.getMax().getOwned(), ChunkVersion::IGNORED())));
 
     // For compatibility with the current range deleter, update the pending chunks on the collection
     // metadata to include the chunk being received
@@ -232,7 +234,8 @@ void MetadataManager::forgetReceive(const ChunkRange& range) {
         invariant(it != _receivingChunks.end());
 
         // Verify entire ChunkRange is identical, not just the min key.
-        invariant(SimpleBSONObjComparator::kInstance.evaluate(it->second == range.getMax()));
+        invariant(
+            SimpleBSONObjComparator::kInstance.evaluate(it->second.getMaxKey() == range.getMax()));
 
         _receivingChunks.erase(it);
     }
@@ -347,9 +350,10 @@ RangeMap MetadataManager::getCopyOfRangesToClean() {
 }
 
 RangeMap MetadataManager::_getCopyOfRangesToClean_inlock() {
-    RangeMap ranges = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>();
+    RangeMap ranges = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
     for (auto it = _rangesToClean.begin(); it != _rangesToClean.end(); ++it) {
-        ranges.insert(std::make_pair(it->first, it->second.getMax()));
+        ranges.insert(std::make_pair(
+            it->first, CachedChunkInfo(it->second.getMax(), ChunkVersion::IGNORED())));
     }
     return ranges;
 }
@@ -428,7 +432,7 @@ void MetadataManager::append(BSONObjBuilder* builder) {
     BSONArrayBuilder pcArr(builder->subarrayStart("pendingChunks"));
     for (const auto& entry : _receivingChunks) {
         BSONObjBuilder obj;
-        ChunkRange r = ChunkRange(entry.first, entry.second);
+        ChunkRange r = ChunkRange(entry.first, entry.second.getMaxKey());
         r.append(&obj);
         pcArr.append(obj.done());
     }
@@ -437,7 +441,7 @@ void MetadataManager::append(BSONObjBuilder* builder) {
     BSONArrayBuilder amrArr(builder->subarrayStart("activeMetadataRanges"));
     for (const auto& entry : _activeMetadataTracker->metadata->getChunks()) {
         BSONObjBuilder obj;
-        ChunkRange r = ChunkRange(entry.first, entry.second);
+        ChunkRange r = ChunkRange(entry.first, entry.second.getMaxKey());
         r.append(&obj);
         amrArr.append(obj.done());
     }

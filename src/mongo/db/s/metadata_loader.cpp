@@ -57,22 +57,23 @@ namespace {
  *
  * The mongod adapter here tracks only a single shard, and stores ranges by (min, max).
  */
-class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj> {
+class SCMConfigDiffTracker : public ConfigDiffTracker<CachedChunkInfo> {
 public:
     SCMConfigDiffTracker(const std::string& ns,
                          RangeMap* currMap,
                          ChunkVersion* maxVersion,
                          MaxChunkVersionMap* maxShardVersions,
                          const ShardId& currShard)
-        : ConfigDiffTracker<BSONObj>(ns, currMap, maxVersion, maxShardVersions),
+        : ConfigDiffTracker<CachedChunkInfo>(ns, currMap, maxVersion, maxShardVersions),
           _currShard(currShard) {}
 
     virtual bool isTracked(const ChunkType& chunk) const {
         return chunk.getShard() == _currShard;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
-        return make_pair(chunk.getMin(), chunk.getMax());
+    virtual pair<BSONObj, CachedChunkInfo> rangeFor(OperationContext* txn,
+                                                    const ChunkType& chunk) const {
+        return make_pair(chunk.getMin(), CachedChunkInfo(chunk.getMax(), chunk.getVersion()));
     }
 
     virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const {

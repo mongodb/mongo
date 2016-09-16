@@ -114,6 +114,13 @@ public:
     bool getDifferentChunk(const BSONObj& chunkMinKey, ChunkType* differentChunk) const;
 
     /**
+     * Validates that the passed-in chunk's bounds exactly match a chunk in the metadata cache. If
+     * the chunk's version has been set as well (it might not be in the case of request coming from
+     * a 3.2 shard), also ensures that the versions are the same.
+     */
+    Status checkChunkIsValid(const ChunkType& chunk);
+
+    /**
      * Given a key in the shard key range, get the next range which overlaps or is greater than
      * this key.
      *
@@ -184,14 +191,16 @@ public:
     std::string toStringBasic() const;
 
     /**
-     * This method is used only for unit-tests and it returns a new metadata's instance based on
-     * 'this's state by adding 'chunk'. The new metadata can never be zero.
+     * This method is used only for unit-tests and it returns a new metadata's instance based on the
+     * current state by adding a chunk with the specified bounds and version. The chunk's version
+     * must be higher than that of all chunks which are in the cache.
      *
-     * It will fassert if the chunk bounds are incorrect or overlap an existing chunk.
+     * It will fassert if the chunk bounds are incorrect or overlap an existing chunk or if the
+     * chunk version is lower than the maximum one.
      */
     std::unique_ptr<CollectionMetadata> clonePlusChunk(const BSONObj& minKey,
                                                        const BSONObj& maxKey,
-                                                       const ChunkVersion& newShardVersion) const;
+                                                       const ChunkVersion& chunkVersion) const;
 
     /**
      * Returns true if this metadata was loaded with all necessary information.

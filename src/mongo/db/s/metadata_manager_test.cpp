@@ -58,7 +58,7 @@ protected:
             ->setScheduleCleanupFunctionForTest([](const NamespaceString& nss) {});
     }
 
-    std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
+    static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
         return stdx::make_unique<CollectionMetadata>(BSON("key" << 1),
                                                      ChunkVersion(1, 0, OID::gen()));
     }
@@ -95,7 +95,7 @@ TEST_F(MetadataManagerTest, ResetActiveMetadata) {
     ASSERT_EQ(cm2Ptr, scopedMetadata2.getMetadata());
 };
 
-TEST_F(MetadataManagerTest, AddAndRemoveRanges) {
+TEST_F(MetadataManagerTest, AddAndRemoveRangesToClean) {
     MetadataManager manager(getServiceContext(), NamespaceString("TestDb", "CollDB"));
     ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
     ChunkRange cr2 = ChunkRange(BSON("key" << 10), BSON("key" << 20));
@@ -111,7 +111,7 @@ TEST_F(MetadataManagerTest, AddAndRemoveRanges) {
     ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
     auto ranges = manager.getCopyOfRangesToClean();
     auto it = ranges.find(cr2.getMin());
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     ASSERT_EQ(remainingChunk.toString(), cr2.toString());
     manager.removeRangeToClean(cr2);
 }
@@ -129,12 +129,12 @@ TEST_F(MetadataManagerTest, RemoveRangeInMiddleOfRange) {
     auto ranges = manager.getCopyOfRangesToClean();
     auto it = ranges.find(BSON("key" << 0));
     ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 4));
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     it++;
     expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
-    remainingChunk = ChunkRange(it->first, it->second);
+    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
     manager.removeRangeToClean(cr1);
@@ -151,7 +151,7 @@ TEST_F(MetadataManagerTest, RemoveRangeWithSingleRangeOverlap) {
     ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
     auto ranges = manager.getCopyOfRangesToClean();
     auto it = ranges.find(BSON("key" << 5));
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     ChunkRange expectedChunk = ChunkRange(BSON("key" << 5), BSON("key" << 10));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
@@ -159,7 +159,7 @@ TEST_F(MetadataManagerTest, RemoveRangeWithSingleRangeOverlap) {
     ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
     ranges = manager.getCopyOfRangesToClean();
     it = ranges.find(BSON("key" << 6));
-    remainingChunk = ChunkRange(it->first, it->second);
+    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
@@ -167,7 +167,7 @@ TEST_F(MetadataManagerTest, RemoveRangeWithSingleRangeOverlap) {
     ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
     ranges = manager.getCopyOfRangesToClean();
     it = ranges.find(BSON("key" << 6));
-    remainingChunk = ChunkRange(it->first, it->second);
+    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 9));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
@@ -191,11 +191,11 @@ TEST_F(MetadataManagerTest, RemoveRangeWithMultipleRangeOverlaps) {
     ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 2UL);
     auto ranges = manager.getCopyOfRangesToClean();
     auto it = ranges.find(BSON("key" << 0));
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second);
+    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 8));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
     it++;
-    remainingChunk = ChunkRange(it->first, it->second);
+    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
     expectedChunk = ChunkRange(BSON("key" << 22), BSON("key" << 30));
     ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
 
@@ -356,7 +356,7 @@ TEST_F(MetadataManagerTest, BeginReceiveWithOverlappingRange) {
 
     const auto it = copyOfPending.find(BSON("key" << 5));
     ASSERT(it != copyOfPending.end());
-    ASSERT_BSONOBJ_EQ(it->second, BSON("key" << 35));
+    ASSERT_BSONOBJ_EQ(it->second.getMaxKey(), BSON("key" << 35));
 }
 
 TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
@@ -383,7 +383,8 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
 
     const auto chunkEntry = manager.getActiveMetadata()->getChunks().begin();
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
-    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second);
+    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second.getMaxKey());
+    ASSERT_EQ(newVersion, chunkEntry->second.getVersion());
 }
 
 // Tests membership functions for _rangesToClean

@@ -63,6 +63,8 @@ using std::vector;
 
 namespace {
 
+const char kChunkVersion[] = "chunkVersion";
+
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
 bool checkIfSingleDoc(OperationContext* txn,
@@ -196,13 +198,18 @@ public:
             keyPatternObj = keyPatternElem.Obj();
         }
 
-        auto chunkRangeStatus = ChunkRange::fromBSON(cmdObj);
-        if (!chunkRangeStatus.isOK())
-            return appendCommandStatus(result, chunkRangeStatus.getStatus());
-
-        auto chunkRange = chunkRangeStatus.getValue();
+        auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
         const BSONObj min = chunkRange.getMin();
         const BSONObj max = chunkRange.getMax();
+
+        boost::optional<ChunkVersion> expectedChunkVersion;
+        auto statusWithChunkVersion =
+            ChunkVersion::parseFromBSONWithFieldForCommands(cmdObj, kChunkVersion);
+        if (statusWithChunkVersion.isOK()) {
+            expectedChunkVersion = std::move(statusWithChunkVersion.getValue());
+        } else if (statusWithChunkVersion != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(statusWithChunkVersion);
+        }
 
         vector<BSONObj> splitKeys;
         {
@@ -318,16 +325,15 @@ public:
         // With nonzero shard version, we must have a coll version >= our shard version
         invariant(collVersion >= shardVersion);
 
-        ChunkType origChunk;
-        if (!collMetadata->getNextChunk(min, &origChunk) || origChunk.getMin().woCompare(min) ||
-            origChunk.getMax().woCompare(max)) {
-            // Our boundaries are different from those passed in
-            std::string msg = str::stream() << "splitChunk cannot find chunk "
-                                            << "[" << redact(min) << "," << redact(max) << ") "
-                                            << " to split, the chunk boundaries may be stale";
-            warning() << msg;
-            throw SendStaleConfigException(
-                nss.toString(), msg, expectedCollectionVersion, shardVersion);
+        {
+            ChunkType chunkToMove;
+            chunkToMove.setMin(min);
+            chunkToMove.setMax(max);
+            if (expectedChunkVersion) {
+                chunkToMove.setVersion(*expectedChunkVersion);
+            }
+
+            uassertStatusOK(collMetadata->checkChunkIsValid(chunkToMove));
         }
 
         auto request = SplitChunkRequest(

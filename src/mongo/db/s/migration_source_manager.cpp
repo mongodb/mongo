@@ -142,26 +142,20 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     // With nonzero shard version, we must have a shard key
     invariant(!_collectionMetadata->getKeyPattern().isEmpty());
 
-    ChunkType origChunk;
-    if (!_collectionMetadata->getNextChunk(_args.getMinKey(), &origChunk) ||
-        origChunk.getMin().woCompare(_args.getMinKey()) != 0) {
-        // If this assertion is hit, it means that whoever called the shard moveChunk command
-        // (mongos or the CSRS balancer) did not check whether the chunk actually belongs to this
-        // shard. It is a benign error and does not indicate data corruption.
-        uasserted(40145,
-                  str::stream() << "Chunk " << _args.toString() << " is not owned by this shard.");
+    ChunkType chunkToMove;
+    chunkToMove.setMin(_args.getMinKey());
+    chunkToMove.setMax(_args.getMaxKey());
+    if (_args.hasChunkVersion()) {
+        chunkToMove.setVersion(_args.getChunkVersion());
     }
 
-    uassert(40146,
-            str::stream()
-                << "Unable to find a chunk '"
-                << _args.toString()
-                << "' at collection version '"
-                << collectionVersion.toString()
-                << "'. Instead found chunk with bounds '"
-                << origChunk.toString()
-                << "'.  The chunk must have been split before the moveChunk command was issued.",
-            origChunk.getMax().woCompare(_args.getMaxKey()) == 0);
+    Status chunkValidateStatus = _collectionMetadata->checkChunkIsValid(chunkToMove);
+    if (!chunkValidateStatus.isOK()) {
+        uasserted(chunkValidateStatus.code(),
+                  str::stream() << "Unable to move chunk with arguments '" << _args.toString()
+                                << "' due to error "
+                                << chunkValidateStatus.reason());
+    }
 }
 
 MigrationSourceManager::~MigrationSourceManager() {

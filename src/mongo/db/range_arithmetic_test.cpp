@@ -29,16 +29,9 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using mongo::BSONObj;
-using mongo::MAXKEY;
-using mongo::MINKEY;
-using mongo::RangeMap;
-using mongo::RangeVector;
-using mongo::SimpleBSONObjComparator;
-using mongo::rangeMapOverlaps;
-using mongo::rangeOverlaps;
 using std::make_pair;
 
 TEST(BSONRange, SmallerLowerRangeNonSubset) {
@@ -78,11 +71,15 @@ TEST(BSONRange, EqualRange) {
 }
 
 TEST(RangeMap, RangeMapOverlap) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
-    rangeMap.insert(make_pair(BSON("x" << 200), BSON("x" << 300)));
-    rangeMap.insert(make_pair(BSON("x" << 300), BSON("x" << 400)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(
+        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
+    rangeMap.insert(
+        make_pair(BSON("x" << 200), CachedChunkInfo(BSON("x" << 300), ChunkVersion(2, 0, epoch))));
+    rangeMap.insert(
+        make_pair(BSON("x" << 300), CachedChunkInfo(BSON("x" << 400), ChunkVersion(3, 0, epoch))));
 
     RangeVector overlap;
     getRangeMapOverlap(rangeMap, BSON("x" << 50), BSON("x" << 350), &overlap);
@@ -92,10 +89,13 @@ TEST(RangeMap, RangeMapOverlap) {
 }
 
 TEST(RangeMap, RangeMapOverlapPartial) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
-    rangeMap.insert(make_pair(BSON("x" << 200), BSON("x" << 300)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(
+        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
+    rangeMap.insert(
+        make_pair(BSON("x" << 200), CachedChunkInfo(BSON("x" << 300), ChunkVersion(2, 0, epoch))));
 
     RangeVector overlap;
     getRangeMapOverlap(rangeMap, BSON("x" << 150), BSON("x" << 250), &overlap);
@@ -105,9 +105,11 @@ TEST(RangeMap, RangeMapOverlapPartial) {
 }
 
 TEST(RangeMap, RangeMapOverlapInner) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(
+        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
 
     RangeVector overlap;
     getRangeMapOverlap(rangeMap, BSON("x" << 125), BSON("x" << 150), &overlap);
@@ -117,10 +119,13 @@ TEST(RangeMap, RangeMapOverlapInner) {
 }
 
 TEST(RangeMap, RangeMapNoOverlap) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
-    rangeMap.insert(make_pair(BSON("x" << 300), BSON("x" << 400)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(
+        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
+    rangeMap.insert(
+        make_pair(BSON("x" << 300), CachedChunkInfo(BSON("x" << 400), ChunkVersion(2, 0, epoch))));
 
     RangeVector overlap;
     getRangeMapOverlap(rangeMap, BSON("x" << 200), BSON("x" << 300), &overlap);
@@ -129,9 +134,11 @@ TEST(RangeMap, RangeMapNoOverlap) {
 }
 
 TEST(RangeMap, RangeMapOverlaps) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(
+        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
 
     ASSERT(rangeMapOverlaps(rangeMap, BSON("x" << 100), BSON("x" << 200)));
     ASSERT(rangeMapOverlaps(rangeMap, BSON("x" << 99), BSON("x" << 200)));
@@ -142,9 +149,11 @@ TEST(RangeMap, RangeMapOverlaps) {
 }
 
 TEST(RangeMap, RangeMapContains) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << 100), BSON("x" << 200)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(
+        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
 
     ASSERT(rangeMapContains(rangeMap, BSON("x" << 100), BSON("x" << 200)));
     ASSERT(!rangeMapContains(rangeMap, BSON("x" << 99), BSON("x" << 200)));
@@ -152,12 +161,16 @@ TEST(RangeMap, RangeMapContains) {
 }
 
 TEST(RangeMap, RangeMapContainsMinMax) {
-    SimpleBSONObjComparator bsonCmp;
-    RangeMap rangeMap = bsonCmp.makeBSONObjIndexedMap<BSONObj>();
-    rangeMap.insert(make_pair(BSON("x" << MINKEY), BSON("x" << MAXKEY)));
+    const OID epoch = OID::gen();
+
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
+    rangeMap.insert(make_pair(BSON("x" << MINKEY),
+                              CachedChunkInfo(BSON("x" << MAXKEY), ChunkVersion(1, 0, epoch))));
 
     ASSERT(rangeMapContains(rangeMap, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
     ASSERT(!rangeMapContains(rangeMap, BSON("x" << 1), BSON("x" << MAXKEY)));
     ASSERT(!rangeMapContains(rangeMap, BSON("x" << MINKEY), BSON("x" << 1)));
 }
-}
+
+}  // namespace
+}  // namespace mongo

@@ -37,6 +37,9 @@ using std::pair;
 using std::string;
 using std::stringstream;
 
+CachedChunkInfo::CachedChunkInfo(BSONObj maxKey, ChunkVersion version)
+    : _maxKey(std::move(maxKey)), _version(version) {}
+
 bool rangeContains(const BSONObj& inclusiveLower,
                    const BSONObj& exclusiveUpper,
                    const BSONObj& point) {
@@ -78,7 +81,7 @@ OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
         --low;
 
         // If the previous range's max value is lte our min value
-        if (low->second.woCompare(inclusiveLower) < 1) {
+        if (low->second.getMaxKey().woCompare(inclusiveLower) < 1) {
             low = next;
         }
     }
@@ -97,7 +100,7 @@ void getRangeMapOverlap(const RangeMap& ranges,
     overlap->clear();
     OverlapBounds bounds = rangeMapOverlapBounds(ranges, inclusiveLower, exclusiveUpper);
     for (RangeMap::const_iterator it = bounds.first; it != bounds.second; ++it) {
-        overlap->push_back(make_pair(it->first, it->second));
+        overlap->push_back(make_pair(it->first, it->second.getMaxKey()));
     }
 }
 
@@ -116,7 +119,7 @@ bool rangeMapContains(const RangeMap& ranges,
         return false;
 
     return bounds.first->first.woCompare(inclusiveLower) == 0 &&
-        bounds.first->second.woCompare(exclusiveUpper) == 0;
+        bounds.first->second.getMaxKey().woCompare(exclusiveUpper) == 0;
 }
 
 string rangeToString(const BSONObj& inclusiveLower, const BSONObj& exclusiveUpper) {
@@ -134,4 +137,5 @@ string overlapToString(RangeVector overlap) {
     }
     return ss.str();
 }
-}
+
+}  // namespace mongo
