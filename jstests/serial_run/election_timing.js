@@ -135,16 +135,8 @@
         var resStdDev = Array.stdDev(allResults);
 
         jsTestLog("Results: " + tc.name + " Average over " + allResults.length + " runs: " +
-                  resAvg + " Min: " + resMin + " Max: " + resMax + " Limit: " +
-                  tc.electionTimeoutLimitMillis / 1000 + " StdDev: " + resStdDev.toFixed(4));
-
-        allResults.forEach(function(failoverElapsedMillis) {
-            assert.lte(failoverElapsedMillis,
-                       tc.electionTimeoutLimitMillis / 1000,
-                       tc.name + ': failover (' + failoverElapsedMillis +
-                           ' sec) took too long. limit: ' + tc.electionTimeoutLimitMillis / 1000 +
-                           ' sec');
-        });
+                  resAvg + " Min: " + resMin + " Max: " + resMax + " StdDev: " +
+                  resStdDev.toFixed(4));
     });
 
     jsTestLog("Tests completed in: " + (Date.now() - testStart) / 1000 + " seconds");
