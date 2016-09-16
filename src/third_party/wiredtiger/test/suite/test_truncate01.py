@@ -76,7 +76,6 @@ class test_truncate_arguments(wttest.WiredTigerTestCase):
         c1.close()
         c2.close()
 
-
 # Test truncation of an object using its URI.
 class test_truncate_uri(wttest.WiredTigerTestCase):
     name = 'test_truncate'
@@ -100,7 +99,6 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
             self.session.truncate(uri, None, None, None)
             confirm_empty(self, uri)
             self.session.drop(uri, None)
-
 
 # Test truncation of cursors in an illegal order.
 class test_truncate_cursor_order(wttest.WiredTigerTestCase):
@@ -131,7 +129,6 @@ class test_truncate_cursor_order(wttest.WiredTigerTestCase):
             lambda: self.session.truncate(None, c1, c2, None), msg)
         c2.set_key(key_populate(c2, 20))
         self.session.truncate(None, c1, c2, None)
-
 
 # Test truncation of cursors past the end of the object.
 class test_truncate_cursor_end(wttest.WiredTigerTestCase):
@@ -173,7 +170,6 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
             self.assertEquals(c1.close(), 0)
             self.assertEquals(c2.close(), 0)
             self.session.drop(uri)
-
 
 # Test session.truncate.
 class test_truncate_cursor(wttest.WiredTigerTestCase):
@@ -446,7 +442,6 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
 
             self.truncateRangeAndCheck(uri, begin, end, expected)
             self.session.drop(uri, None)
-
 
 if __name__ == '__main__':
     wttest.run()

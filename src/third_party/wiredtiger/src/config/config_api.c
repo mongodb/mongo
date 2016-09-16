@@ -113,7 +113,7 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	/* 
+	/*
 	 * It's a logic error to specify both a session and an event handler.
 	 */
 	if (session != NULL && handler != NULL)

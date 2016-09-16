@@ -147,7 +147,6 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
             self.session.open_cursor(self.uri, None, "next_random=true"), msg)
 
-
 # Check next_random works in the presence a set of updates, some or all of
 # which are invisible to the cursor.
 class test_cursor_random_invisible(wttest.WiredTigerTestCase):
@@ -216,7 +215,6 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         cursor = s.open_cursor(uri, None, self.config)
         self.assertEquals(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), key_populate(cursor, 99))
-
 
 if __name__ == '__main__':
     wttest.run()

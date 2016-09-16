@@ -1942,7 +1942,7 @@ err:		if (ws != NULL)
 			ESET(ws_source_close(wtext, session, ws));
 	}
 
-	/*      
+	/*
 	 * If there was an error or our caller doesn't need the global lock,
 	 * release the global lock.
 	 */

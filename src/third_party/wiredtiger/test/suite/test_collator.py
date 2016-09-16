@@ -155,6 +155,5 @@ class test_collator(wttest.WiredTigerTestCase):
         self.create_indices()
         self.check_entries()
 
-
 if __name__ == '__main__':
     wttest.run()

@@ -59,6 +59,5 @@ class test_bug005(wttest.WiredTigerTestCase):
         # Verify the object again.
         self.session.verify(self.uri)
 
-
 if __name__ == '__main__':
     wttest.run()

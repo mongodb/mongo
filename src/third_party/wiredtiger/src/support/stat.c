@@ -559,12 +559,14 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction calls to get a page found queue empty",
 	"cache: eviction calls to get a page found queue empty after locking",
 	"cache: eviction currently operating in aggressive mode",
+	"cache: eviction empty score",
 	"cache: eviction server candidate queue empty when topping up",
 	"cache: eviction server candidate queue not empty when topping up",
 	"cache: eviction server evicting pages",
 	"cache: eviction server slept, because we did not make progress with eviction",
 	"cache: eviction server unable to reach eviction goal",
 	"cache: eviction state",
+	"cache: eviction walks abandoned",
 	"cache: eviction worker thread evicting pages",
 	"cache: failed eviction of pages that exceeded the in-memory maximum",
 	"cache: files with active eviction walks",
@@ -801,12 +803,14 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_get_ref_empty = 0;
 	stats->cache_eviction_get_ref_empty2 = 0;
 		/* not clearing cache_eviction_aggressive_set */
+		/* not clearing cache_eviction_empty_score */
 	stats->cache_eviction_queue_empty = 0;
 	stats->cache_eviction_queue_not_empty = 0;
 	stats->cache_eviction_server_evicting = 0;
 	stats->cache_eviction_server_slept = 0;
 	stats->cache_eviction_slow = 0;
 		/* not clearing cache_eviction_state */
+	stats->cache_eviction_walks_abandoned = 0;
 	stats->cache_eviction_worker_evicting = 0;
 	stats->cache_eviction_force_fail = 0;
 		/* not clearing cache_eviction_walks_active */
@@ -1041,6 +1045,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_get_ref_empty2);
 	to->cache_eviction_aggressive_set +=
 	    WT_STAT_READ(from, cache_eviction_aggressive_set);
+	to->cache_eviction_empty_score +=
+	    WT_STAT_READ(from, cache_eviction_empty_score);
 	to->cache_eviction_queue_empty +=
 	    WT_STAT_READ(from, cache_eviction_queue_empty);
 	to->cache_eviction_queue_not_empty +=
@@ -1051,6 +1057,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_server_slept);
 	to->cache_eviction_slow += WT_STAT_READ(from, cache_eviction_slow);
 	to->cache_eviction_state += WT_STAT_READ(from, cache_eviction_state);
+	to->cache_eviction_walks_abandoned +=
+	    WT_STAT_READ(from, cache_eviction_walks_abandoned);
 	to->cache_eviction_worker_evicting +=
 	    WT_STAT_READ(from, cache_eviction_worker_evicting);
 	to->cache_eviction_force_fail +=

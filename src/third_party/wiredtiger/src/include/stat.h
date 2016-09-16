@@ -133,105 +133,92 @@ __wt_stats_clear(void *stats_arg, int slot)
 }
 
 /*
- * Read/write statistics without any test for statistics configuration. Reading
- * and writing the field requires different actions: reading sums the values
+ * Read/write statistics if statistics gathering is enabled. Reading and
+ * writing the field requires different actions: reading sums the values
  * across the array of structures, writing updates a single structure's value.
  */
+#define	WT_STAT_ENABLED(session) (S2C(session)->stat_flags != 0)
+
 #define	WT_STAT_READ(stats, fld)					\
 	__wt_stats_aggregate(stats, WT_STATS_FIELD_TO_SLOT(stats, fld))
-#define	WT_STAT_WRITE(stats, fld, v)					\
-	(stats)->fld = (int64_t)(v)
+#define	WT_STAT_WRITE(session, stats, fld, v) do {			\
+	if (WT_STAT_ENABLED(session))					\
+		(stats)->fld = (int64_t)(v);				\
+} while (0)
 
-#define	WT_STAT_DECRV(session, stats, fld, value)			\
-	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
-#define	WT_STAT_DECRV_ATOMIC(session, stats, fld, value)		\
-	__wt_atomic_subi64(						\
-	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
+#define	WT_STAT_DECRV(session, stats, fld, value) do {			\
+	if (WT_STAT_ENABLED(session))					\
+		(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value); \
+} while (0)
+#define	WT_STAT_DECRV_ATOMIC(session, stats, fld, value) do {		\
+	if (WT_STAT_ENABLED(session))					\
+		__wt_atomic_subi64(&(stats)[WT_STATS_SLOT_ID(session)]->fld, \
+		    (int64_t)(value));					\
+} while (0)
 #define	WT_STAT_DECR(session, stats, fld)				\
 	WT_STAT_DECRV(session, stats, fld, 1)
-#define	WT_STAT_INCRV(session, stats, fld, value)			\
-	(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value)
-#define	WT_STAT_INCRV_ATOMIC(session, stats, fld, value)		\
-	__wt_atomic_addi64(						\
-	    &(stats)[WT_STATS_SLOT_ID(session)]->fld, (int64_t)(value))
+#define	WT_STAT_INCRV(session, stats, fld, value) do {			\
+	if (WT_STAT_ENABLED(session))					\
+		(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value); \
+} while (0)
+#define	WT_STAT_INCRV_ATOMIC(session, stats, fld, value) do {		\
+	if (WT_STAT_ENABLED(session))					\
+		__wt_atomic_addi64(&(stats)[WT_STATS_SLOT_ID(session)]->fld, \
+		    (int64_t)(value));					\
+} while (0)
 #define	WT_STAT_INCR(session, stats, fld)				\
 	WT_STAT_INCRV(session, stats, fld, 1)
 #define	WT_STAT_SET(session, stats, fld, value) do {			\
-	__wt_stats_clear(stats, WT_STATS_FIELD_TO_SLOT(stats, fld));	\
-	(stats)[0]->fld = (int64_t)(value);				\
+	if (WT_STAT_ENABLED(session)) {					\
+		__wt_stats_clear(stats,					\
+		    WT_STATS_FIELD_TO_SLOT(stats, fld));		\
+		(stats)[0]->fld = (int64_t)(value);			\
+	}								\
 } while (0)
 
 /*
- * Update statistics if "fast" statistics are configured.
+ * Update connection handle statistics if statistics gathering is enabled.
  */
-#define	WT_STAT_FAST_DECRV(session, stats, fld, value) do {		\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_DECRV(session, stats, fld, value);		\
-} while (0)
-#define	WT_STAT_FAST_DECR(session, stats, fld)				\
-	WT_STAT_FAST_DECRV(session, stats, fld, 1)
-#define	WT_STAT_FAST_DECRV_ATOMIC(session, stats, fld, value) do {	\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_DECRV_ATOMIC(session, stats, fld, value);	\
-} while (0)
-#define	WT_STAT_FAST_INCRV(session, stats, fld, value) do {		\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_INCRV(session, stats, fld, value);		\
-} while (0)
-#define	WT_STAT_FAST_INCR(session, stats, fld)				\
-	WT_STAT_FAST_INCRV(session, stats, fld, 1)
-#define	WT_STAT_FAST_INCRV_ATOMIC(session, stats, fld, value) do {	\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_INCRV_ATOMIC(session, stats, fld, value);	\
-} while (0)
-#define	WT_STAT_FAST_SET(session, stats, fld, value) do {		\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_SET(session, stats, fld, value);		\
-} while (0)
+#define	WT_STAT_CONN_DECR(session, fld)					\
+	WT_STAT_DECR(session, S2C(session)->stats, fld)
+#define	WT_STAT_CONN_DECR_ATOMIC(session, fld)				\
+	WT_STAT_DECRV_ATOMIC(session, S2C(session)->stats, fld, 1)
+#define	WT_STAT_CONN_DECRV(session, fld, value)				\
+	WT_STAT_DECRV(session, S2C(session)->stats, fld, value)
+#define	WT_STAT_CONN_INCR(session, fld)					\
+	WT_STAT_INCR(session, S2C(session)->stats, fld)
+#define	WT_STAT_CONN_INCR_ATOMIC(session, fld)				\
+	WT_STAT_INCRV_ATOMIC(session, S2C(session)->stats, fld, 1)
+#define	WT_STAT_CONN_INCRV(session, fld, value)				\
+	WT_STAT_INCRV(session, S2C(session)->stats, fld, value)
+#define	WT_STAT_CONN_SET(session, fld, value)				\
+	WT_STAT_SET(session, S2C(session)->stats, fld, value)
 
 /*
- * Update connection handle statistics if "fast" statistics are configured.
- */
-#define	WT_STAT_FAST_CONN_DECR(session, fld)				\
-	WT_STAT_FAST_DECR(session, S2C(session)->stats, fld)
-#define	WT_STAT_FAST_CONN_DECR_ATOMIC(session, fld)			\
-	WT_STAT_FAST_DECRV_ATOMIC(session, S2C(session)->stats, fld, 1)
-#define	WT_STAT_FAST_CONN_DECRV(session, fld, value)			\
-	WT_STAT_FAST_DECRV(session, S2C(session)->stats, fld, value)
-#define	WT_STAT_FAST_CONN_INCR(session, fld)				\
-	WT_STAT_FAST_INCR(session, S2C(session)->stats, fld)
-#define	WT_STAT_FAST_CONN_INCR_ATOMIC(session, fld)			\
-	WT_STAT_FAST_INCRV_ATOMIC(session, S2C(session)->stats, fld, 1)
-#define	WT_STAT_FAST_CONN_INCRV(session, fld, value)			\
-	WT_STAT_FAST_INCRV(session, S2C(session)->stats, fld, value)
-#define	WT_STAT_FAST_CONN_SET(session, fld, value)			\
-	WT_STAT_FAST_SET(session, S2C(session)->stats, fld, value)
-
-/*
- * Update data-source handle statistics if "fast" statistics are configured
+ * Update data-source handle statistics if statistics gathering is enabled
  * and the data-source handle is set.
  *
  * XXX
  * We shouldn't have to check if the data-source handle is NULL, but it's
  * necessary until everything is converted to using data-source handles.
  */
-#define	WT_STAT_FAST_DATA_DECRV(session, fld, value) do {		\
+#define	WT_STAT_DATA_DECRV(session, fld, value) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_FAST_DECRV(					\
+		WT_STAT_DECRV(						\
 		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
-#define	WT_STAT_FAST_DATA_DECR(session, fld)				\
-	WT_STAT_FAST_DATA_DECRV(session, fld, 1)
-#define	WT_STAT_FAST_DATA_INCRV(session, fld, value) do {		\
+#define	WT_STAT_DATA_DECR(session, fld)					\
+	WT_STAT_DATA_DECRV(session, fld, 1)
+#define	WT_STAT_DATA_INCRV(session, fld, value) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_FAST_INCRV(					\
+		WT_STAT_INCRV(						\
 		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
-#define	WT_STAT_FAST_DATA_INCR(session, fld)				\
-	WT_STAT_FAST_DATA_INCRV(session, fld, 1)
-#define	WT_STAT_FAST_DATA_SET(session, fld, value) do {			\
+#define	WT_STAT_DATA_INCR(session, fld)					\
+	WT_STAT_DATA_INCRV(session, fld, 1)
+#define	WT_STAT_DATA_SET(session, fld, value) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_FAST_SET(					\
+		WT_STAT_SET(						\
 		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
 
@@ -286,12 +273,14 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_get_ref_empty;
 	int64_t cache_eviction_get_ref_empty2;
 	int64_t cache_eviction_aggressive_set;
+	int64_t cache_eviction_empty_score;
 	int64_t cache_eviction_queue_empty;
 	int64_t cache_eviction_queue_not_empty;
 	int64_t cache_eviction_server_evicting;
 	int64_t cache_eviction_server_slept;
 	int64_t cache_eviction_slow;
 	int64_t cache_eviction_state;
+	int64_t cache_eviction_walks_abandoned;
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_eviction_force_fail;
 	int64_t cache_eviction_walks_active;

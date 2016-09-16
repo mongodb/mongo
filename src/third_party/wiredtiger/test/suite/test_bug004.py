@@ -90,6 +90,5 @@ class test_bug004(wttest.WiredTigerTestCase):
             self.assertEquals(
                 c1.get_value(), value_populate(c1, i) + 'abcdef' * 100)
 
-
 if __name__ == '__main__':
     wttest.run()

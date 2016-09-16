@@ -276,18 +276,21 @@ main(int argc, char *argv[])
 	(void)snprintf(cmd, sizeof(cmd),
 	    "cp -rp %s/* %s; rm -f %s/WiredTiger.lock",
 	    home, home_wr, home_wr);
-	(void)system(cmd);
+	if ((status = system(cmd)) < 0)
+		testutil_die(status, "system: %s", cmd);
 
 	(void)snprintf(cmd, sizeof(cmd),
 	    "cp -rp %s/* %s; chmod 0555 %s; chmod -R 0444 %s/*",
 	    home, home_rd, home_rd, home_rd);
-	(void)system(cmd);
+	if ((status = system(cmd)) < 0)
+		testutil_die(status, "system: %s", cmd);
 
 	(void)snprintf(cmd, sizeof(cmd),
 	    "cp -rp %s/* %s; rm -f %s/WiredTiger.lock; "
 	    "chmod 0555 %s; chmod -R 0444 %s/*",
 	    home, home_rd2, home_rd2, home_rd2, home_rd2);
-	(void)system(cmd);
+	if ((status = system(cmd)) < 0)
+		testutil_die(status, "system: %s", cmd);
 
 	/*
 	 * Run four scenarios.  Sometimes expect errors, sometimes success.
@@ -326,16 +329,15 @@ main(int argc, char *argv[])
 	 * same memory image.  Therefore the WT process structure is set in
 	 * the child even though it should not be.  So use 'system' to spawn
 	 * an entirely new process.
+	 *
+	 * The child will exit with success if its test passes.
 	 */
 	(void)snprintf(
 	    cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
-		testutil_die(status, "system");
-	/*
-	 * The child will exit with success if its test passes.
-	 */
+		testutil_die(status, "system: %s", cmd);
 	if (WEXITSTATUS(status) != 0)
-		testutil_die(WEXITSTATUS(status), "system");
+		testutil_die(WEXITSTATUS(status), "system: %s", cmd);
 
 	/*
 	 * Scenario 2.  Run child with writable config.
@@ -343,10 +345,9 @@ main(int argc, char *argv[])
 	(void)snprintf(
 	    cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
-		testutil_die(status, "system");
-
+		testutil_die(status, "system: %s", cmd);
 	if (WEXITSTATUS(status) != 0)
-		testutil_die(WEXITSTATUS(status), "system");
+		testutil_die(WEXITSTATUS(status), "system: %s", cmd);
 
 	/*
 	 * Reopen the two writable directories and rerun the child.
@@ -365,9 +366,9 @@ main(int argc, char *argv[])
 	(void)snprintf(
 	    cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
-		testutil_die(status, "system");
+		testutil_die(status, "system: %s", cmd);
 	if (WEXITSTATUS(status) != 0)
-		testutil_die(WEXITSTATUS(status), "system");
+		testutil_die(WEXITSTATUS(status), "system: %s", cmd);
 
 	/*
 	 * Scenario 4.  Run child with writable config.
@@ -375,9 +376,9 @@ main(int argc, char *argv[])
 	(void)snprintf(
 	    cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
-		testutil_die(status, "system");
+		testutil_die(status, "system: %s", cmd);
 	if (WEXITSTATUS(status) != 0)
-		testutil_die(WEXITSTATUS(status), "system");
+		testutil_die(WEXITSTATUS(status), "system: %s", cmd);
 
 	/*
 	 * Clean-up.
@@ -395,10 +396,12 @@ main(int argc, char *argv[])
 	 * be removed by scripts.
 	 */
 	(void)snprintf(cmd, sizeof(cmd), "chmod 0777 %s %s", home_rd, home_rd2);
-	(void)system(cmd);
+	if ((status = system(cmd)) < 0)
+		testutil_die(status, "system: %s", cmd);
 	(void)snprintf(cmd, sizeof(cmd), "chmod -R 0666 %s/* %s/*",
 	    home_rd, home_rd2);
-	(void)system(cmd);
+	if ((status = system(cmd)) < 0)
+		testutil_die(status, "system: %s", cmd);
 	printf(" *** Readonly test successful ***\n");
 	return (EXIT_SUCCESS);
 }

@@ -235,7 +235,7 @@ __cursor_col_search(
 {
 	WT_DECL_RET;
 
-	WT_WITH_PAGE_INDEX(session, 
+	WT_WITH_PAGE_INDEX(session,
 	    ret = __wt_col_search(session, cbt->iface.recno, leaf, cbt));
 	return (ret);
 }
@@ -250,7 +250,7 @@ __cursor_row_search(
 {
 	WT_DECL_RET;
 
-	WT_WITH_PAGE_INDEX(session, 
+	WT_WITH_PAGE_INDEX(session,
 	    ret = __wt_row_search(session, &cbt->iface.key, leaf, cbt, insert));
 	return (ret);
 }
@@ -290,8 +290,8 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_reset);
-	WT_STAT_FAST_DATA_INCR(session, cursor_reset);
+	WT_STAT_CONN_INCR(session, cursor_reset);
+	WT_STAT_DATA_INCR(session, cursor_reset);
 
 	return (__cursor_reset(cbt));
 }
@@ -315,8 +315,8 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	upd = NULL;					/* -Wuninitialized */
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_search);
-	WT_STAT_FAST_DATA_INCR(session, cursor_search);
+	WT_STAT_CONN_INCR(session, cursor_search);
+	WT_STAT_DATA_INCR(session, cursor_search);
 
 	/*
 	 * If we have a page pinned, search it; if we don't have a page pinned,
@@ -387,8 +387,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	upd = NULL;					/* -Wuninitialized */
 	exact = 0;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_search_near);
-	WT_STAT_FAST_DATA_INCR(session, cursor_search_near);
+	WT_STAT_CONN_INCR(session, cursor_search_near);
+	WT_STAT_DATA_INCR(session, cursor_search_near);
 
 	/*
 	 * If we have a row-store page pinned, search it; if we don't have a
@@ -499,9 +499,9 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_insert);
-	WT_STAT_FAST_DATA_INCR(session, cursor_insert);
-	WT_STAT_FAST_DATA_INCRV(session,
+	WT_STAT_CONN_INCR(session, cursor_insert);
+	WT_STAT_DATA_INCR(session, cursor_insert);
+	WT_STAT_DATA_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
@@ -562,8 +562,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		WT_STAT_CONN_INCR(session, cursor_restart);
+		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
 	/* Insert doesn't maintain a position across calls, clear resources. */
@@ -644,8 +644,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		WT_STAT_CONN_INCR(session, cursor_restart);
+		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
 	WT_TRET(__curfile_leave(cbt));
@@ -670,9 +670,9 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_remove);
-	WT_STAT_FAST_DATA_INCR(session, cursor_remove);
-	WT_STAT_FAST_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
+	WT_STAT_CONN_INCR(session, cursor_remove);
+	WT_STAT_DATA_INCR(session, cursor_remove);
+	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
 retry:	WT_RET(__cursor_func_init(cbt, true));
 
@@ -721,8 +721,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		WT_STAT_CONN_INCR(session, cursor_restart);
+		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
 	/*
@@ -754,10 +754,9 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_update);
-	WT_STAT_FAST_DATA_INCR(session, cursor_update);
-	WT_STAT_FAST_DATA_INCRV(
-	    session, cursor_update_bytes, cursor->value.size);
+	WT_STAT_CONN_INCR(session, cursor_update);
+	WT_STAT_DATA_INCR(session, cursor_update);
+	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -811,8 +810,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		WT_STAT_CONN_INCR(session, cursor_restart);
+		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
 
@@ -861,8 +860,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	if (btree->type != BTREE_ROW)
 		WT_RET(ENOTSUP);
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_next);
-	WT_STAT_FAST_DATA_INCR(session, cursor_next);
+	WT_STAT_CONN_INCR(session, cursor_next);
+	WT_STAT_DATA_INCR(session, cursor_next);
 
 	/*
 	 * If retrieving random values without sampling, or we don't have a
@@ -1093,8 +1092,8 @@ retry:	WT_RET(__wt_btcur_remove(start));
 	}
 
 	if (ret == WT_RESTART) {
-		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		WT_STAT_CONN_INCR(session, cursor_restart);
+		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
 
@@ -1148,8 +1147,8 @@ retry:	WT_RET(__wt_btcur_remove(start));
 	}
 
 	if (ret == WT_RESTART) {
-		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		WT_STAT_CONN_INCR(session, cursor_restart);
+		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
 
@@ -1170,7 +1169,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 
 	session = (WT_SESSION_IMPL *)start->iface.session;
 	btree = start->btree;
-	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
+	WT_STAT_DATA_INCR(session, cursor_truncate);
 
 	/*
 	 * For recovery, log the start and stop keys for a truncate operation,

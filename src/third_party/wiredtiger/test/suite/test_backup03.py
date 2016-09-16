@@ -149,6 +149,5 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate()
         self.backup_table_cursor(self.list)
 
-
 if __name__ == '__main__':
     wttest.run()

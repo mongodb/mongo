@@ -183,6 +183,5 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     def test_dump_api_hex(self):
         self.dump(True, True)
 
-
 if __name__ == '__main__':
     wttest.run()

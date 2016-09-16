@@ -138,6 +138,5 @@ class test_encrypt01(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.get_value(), val)
         cursor.close()
 
-
 if __name__ == '__main__':
     wttest.run()

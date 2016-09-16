@@ -126,6 +126,5 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
         else:
             self.check_backup(self.conn.open_session())
 
-
 if __name__ == '__main__':
     wttest.run()

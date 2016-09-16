@@ -54,7 +54,7 @@ __wt_metadata_cursor_open(
 	 */
 	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 
-	/* 
+	/*
 	 * Special settings for metadata: skew eviction so metadata almost
 	 * always stays in cache and make sure metadata is logged if possible.
 	 *

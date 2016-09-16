@@ -181,7 +181,6 @@ struct __wt_cache {
 #define	WT_CACHE_EVICT_MASK	  0x0FF
 #define	WT_CACHE_POOL_MANAGER	  0x100 /* The active cache pool manager */
 #define	WT_CACHE_POOL_RUN	  0x200 /* Cache pool thread running */
-#define	WT_CACHE_WALK_REVERSE	  0x400 /* Scan backwards for candidates */
 	uint32_t flags;
 };
 

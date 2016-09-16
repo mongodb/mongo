@@ -33,8 +33,8 @@ __ovfl_read(WT_SESSION_IMPL *session,
 	store->data = WT_PAGE_HEADER_BYTE(btree, dsk);
 	store->size = dsk->u.datalen;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_read_overflow);
-	WT_STAT_FAST_DATA_INCR(session, cache_read_overflow);
+	WT_STAT_CONN_INCR(session, cache_read_overflow);
+	WT_STAT_DATA_INCR(session, cache_read_overflow);
 
 	return (0);
 }
@@ -209,8 +209,8 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	 */
 	if (!visible) {
 		WT_RET(__ovfl_cache(session, page, vpack));
-		WT_STAT_FAST_CONN_INCR(session, cache_overflow_value);
-		WT_STAT_FAST_DATA_INCR(session, cache_overflow_value);
+		WT_STAT_CONN_INCR(session, cache_overflow_value);
+		WT_STAT_DATA_INCR(session, cache_overflow_value);
 	}
 
 	/*

@@ -49,8 +49,8 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 		__wt_sleep(0, WT_THOUSAND);
 	}
 
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
+	WT_STAT_DATA_INCR(session, cache_eviction_hazard);
+	WT_STAT_CONN_INCR(session, cache_eviction_hazard);
 	return (EBUSY);
 }
 
@@ -86,17 +86,17 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	too_big = page->memory_footprint >= btree->splitmempage;
 	if ((ret = __wt_evict(session, ref, false)) == 0) {
 		if (too_big)
-			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+			WT_STAT_CONN_INCR(session, cache_eviction_force);
 		else
 			/*
 			 * If the page isn't too big, we are evicting it because
 			 * it had a chain of deleted entries that make traversal
 			 * expensive.
 			 */
-			WT_STAT_FAST_CONN_INCR(
+			WT_STAT_CONN_INCR(
 			    session, cache_eviction_force_delete);
 	} else
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
+		WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
@@ -146,8 +146,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	/* Count evictions of internal pages during normal operation. */
 	if (!closing && WT_PAGE_IS_INTERNAL(page)) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
+		WT_STAT_CONN_INCR(session, cache_eviction_internal);
+		WT_STAT_DATA_INCR(session, cache_eviction_internal);
 	}
 
 	/*
@@ -176,19 +176,19 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		WT_ERR(__evict_page_dirty_update(session, ref, closing));
 
 	if (clean_page) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_clean);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_clean);
+		WT_STAT_CONN_INCR(session, cache_eviction_clean);
+		WT_STAT_DATA_INCR(session, cache_eviction_clean);
 	} else {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
+		WT_STAT_CONN_INCR(session, cache_eviction_dirty);
+		WT_STAT_DATA_INCR(session, cache_eviction_dirty);
 	}
 
 	if (0) {
 err:		if (!closing)
 			__evict_exclusive_clear(session, ref);
 
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
+		WT_STAT_CONN_INCR(session, cache_eviction_fail);
+		WT_STAT_DATA_INCR(session, cache_eviction_fail);
 	}
 
 	return (ret);
