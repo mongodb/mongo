@@ -18,7 +18,7 @@
     jsTest.log("Enabling Failpoint failCollectionInserts on " + tojson(secondary));
     assert.commandWorked(secondary.getDB("admin").adminCommand({
         configureFailPoint: "failCollectionInserts",
-        mode: {times: 2},
+        mode: {times: 1},
         data: {collectionNS: coll.getFullName()}
     }));
 
