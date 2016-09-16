@@ -115,7 +115,14 @@
 
     // Test that the "compact" command doesn't upgrade existing indexes to the latest version.
     testIndexVersionAutoUpgrades(function(coll) {
-        assert.commandWorked(coll.getDB().runCommand({compact: coll.getName()}));
+        var res = coll.getDB().runCommand({compact: coll.getName()});
+        if (res.ok === 0) {
+            // Ephemeral storage engines don't support the "compact" command. The existing indexes
+            // should remain unchanged.
+            assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+        } else {
+            assert.commandWorked(res);
+        }
         return coll;
     }, false);
 
