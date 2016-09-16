@@ -94,6 +94,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target="collator_factory_icu_test",
     source=[
+        "collator_factory_icu_locales_test.cpp",
         "collator_factory_icu_test.cpp",
     ],
     LIBDEPS=[

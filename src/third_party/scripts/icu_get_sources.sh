@@ -9,14 +9,24 @@
 # list each locale for which collation data should be packaged as part of the generated custom data
 # file.
 #
+# The script accepts a single optional argument, which is the path to the .dat archive to use as the
+# source of the trimmed-down ICU .dat files generated as output. If omitted, the .dat archive which
+# is included in the ICU source code is used by default.
+#
 # This script returns a zero exit code on success.
 
 set -euo pipefail
 IFS=$'\n\t'
 
-if [ "$#" -ne 0 ]; then
+# Expect 0 or 1 arguments.
+if [ "$#" -gt 1 ]; then
     echo "$0: too many arguments" >&2
     exit 1
+fi
+
+# Set value of original .dat archive from the first argument.
+if [ "$#" -eq 1 ]; then
+    ORIGINAL_DATA_FILE=${1}
 fi
 
 KERNEL="$(uname)"
@@ -72,7 +82,11 @@ make install
 # Generate trimmed-down list of data to include in custom data files.
 #
 
-ORIGINAL_DATA_FILE="${TARBALL_DIR}/source/data/in/icudt${MAJOR_VERSION}l.dat"
+# If the original data file wasn't passed as an argument, use the one from the ICU source tree.
+if [ -z ${ORIGINAL_DATA_FILE+x} ]; then
+    ORIGINAL_DATA_FILE="${TARBALL_DIR}/source/data/in/icudt${MAJOR_VERSION}l.dat"
+fi
+
 ORIGINAL_DATA_LIST="${DATA_DIR}/icudt${MAJOR_VERSION}l.lst.orig"
 NEW_DATA_LIST="${DATA_DIR}/icudt${MAJOR_VERSION}l.lst"
 
