@@ -18,7 +18,7 @@
     conf.members[1].votes = 0;
     conf.members[1].priority = 0;
     printjson(conf);
-    assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
+    rst.initiate(conf);
 
     var primary = rst.getPrimary();  // Waits for PRIMARY state.
     var slave = rst.nodes[1];
