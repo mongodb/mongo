@@ -95,7 +95,7 @@ StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationConte
 }
 
 StatusWith<DistLockHandle> DistLockManagerMock::tryLockWithLocalWriteConcern(
-    OperationContext* txn, StringData name, StringData whyMessage) {
+    OperationContext* txn, StringData name, StringData whyMessage, const OID& lockSessionID) {
     // Not yet implemented
     MONGO_UNREACHABLE;
 }

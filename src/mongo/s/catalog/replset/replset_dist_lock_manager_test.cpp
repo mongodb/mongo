@@ -1987,7 +1987,7 @@ TEST_F(ReplSetDistLockManagerFixture, TryLockWithLocalWriteConcernBusy) {
     // Will be different from the actual lock session id. For testing only.
     retLockDoc.setLockID(OID::gen());
 
-    OID lockSessionIDPassed;
+    OID lockSessionIDPassed = OID::gen();
 
     getMockCatalog()->expectGrabLock(
         [this, &lockName, &now, &whyMsg, &lockSessionIDPassed](StringData lockID,
@@ -2001,14 +2001,14 @@ TEST_F(ReplSetDistLockManagerFixture, TryLockWithLocalWriteConcernBusy) {
             ASSERT_EQUALS(getProcessID(), processId);
             ASSERT_GREATER_THAN_OR_EQUALS(time, now);
             ASSERT_EQUALS(whyMsg, why);
+            ASSERT_EQUALS(lockSessionIDPassed, lockSessionID);
 
-            lockSessionIDPassed = lockSessionID;
             getMockCatalog()->expectNoGrabLock();  // Call only once.
         },
         {ErrorCodes::LockStateChangeFailed, "Unable to take lock"});
 
-    auto lockStatus =
-        distLock()->tryLockWithLocalWriteConcern(operationContext(), lockName, whyMsg);
+    auto lockStatus = distLock()->tryLockWithLocalWriteConcern(
+        operationContext(), lockName, whyMsg, lockSessionIDPassed);
     ASSERT_EQ(ErrorCodes::LockBusy, lockStatus.getStatus());
 }
 

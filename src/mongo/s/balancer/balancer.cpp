@@ -177,7 +177,7 @@ void Balancer::onTransitionToPrimary(OperationContext* txn) {
     invariant(_state == kStopped);
     _state = kRunning;
 
-    _migrationManager.startRecovery();
+    _migrationManager.startRecoveryAndAcquireDistLocks(txn);
 
     invariant(!_thread.joinable());
     invariant(!_threadOperationContext);
@@ -304,8 +304,6 @@ void Balancer::_mainThread() {
 
     const Seconds kInitBackoffInterval(10);
 
-    OID clusterIdentity = ClusterIdentityLoader::get(txn.get())->getClusterId();
-
     // Take the balancer distributed lock and hold it permanently. Do the attempts with single
     // attempts in order to not block the thread and be able to check for interrupt more frequently.
     while (!_stopRequested()) {
@@ -314,7 +312,7 @@ void Balancer::_mainThread() {
                 txn.get(),
                 "balancer",
                 "CSRS Balancer",
-                clusterIdentity,
+                OID::gen(),
                 DistLockManager::kSingleLockAttemptTimeout);
         if (!distLockHandleStatus.isOK()) {
             warning() << "Balancer distributed lock could not be acquired and will be retried in "
@@ -329,16 +327,15 @@ void Balancer::_mainThread() {
     }
 
     if (!_stopRequested()) {
-        log() << "CSRS balancer thread for cluster " << clusterIdentity << " is recovering";
+        log() << "CSRS balancer thread is recovering";
 
         auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
         _migrationManager.finishRecovery(txn.get(),
-                                         clusterIdentity,
                                          balancerConfig->getMaxChunkSizeBytes(),
                                          balancerConfig->getSecondaryThrottle(),
                                          balancerConfig->waitForDelete());
 
-        log() << "CSRS balancer thread for cluster " << clusterIdentity << " is recovered";
+        log() << "CSRS balancer thread is recovered";
     }
 
     // Main balancer loop

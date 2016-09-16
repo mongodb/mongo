@@ -425,8 +425,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
 }
 
 StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
-    OperationContext* txn, StringData name, StringData whyMessage) {
-    const DistLockHandle lockSessionID = OID::gen();
+    OperationContext* txn, StringData name, StringData whyMessage, const OID& lockSessionID) {
     const string who = str::stream() << _processID << ":" << getThreadName();
 
     auto lockStatus = _catalog->grabLock(txn,
