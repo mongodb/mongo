@@ -220,6 +220,15 @@ std::string Fetcher::getDiagnosticString() const {
     output << " query metadata: " << _metadata;
     output << " active: " << _active;
     output << " timeout: " << _timeout;
+    output << " inShutdown: " << _inShutdown;
+    output << " first: " << _first;
+    output << " firstCommandScheduler: " << _firstRemoteCommandScheduler.toString();
+
+    if (_getMoreCallbackHandle.isValid()) {
+        output << " getMoreHandle.valid: " << _getMoreCallbackHandle.isValid();
+        output << " getMoreHandle.cancelled: " << _getMoreCallbackHandle.isCanceled();
+    }
+
     return output;
 }
 

@@ -123,6 +123,8 @@ public:
      */
     void join();
 
+    std::string toString() const;
+
 private:
     /**
      * Schedules remote command to be run by the executor.
@@ -130,17 +132,13 @@ private:
      * When this function is called for the first time by startup(), "requestCount" will be 0.
      * The executor will invoke _remoteCommandCallback() with the remote command response and
      * ("requestCount" + 1).
-     * By passing "requestCount" between tasks, we avoid having to synchronize access to this count
-     * if it were a field.
      */
-    Status _schedule_inlock(std::size_t requestCount);
+    Status _schedule_inlock();
 
     /**
      * Callback for remote command.
-     * "requestCount" is number of requests scheduled prior to this response.
      */
-    void _remoteCommandCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba,
-                                std::size_t requestCount);
+    void _remoteCommandCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba);
 
     /**
      * Notifies caller that the scheduler has completed processing responses.
@@ -153,6 +151,8 @@ private:
     const executor::RemoteCommandRequest _request;
     const executor::TaskExecutor::RemoteCommandCallbackFn _callback;
     std::unique_ptr<RetryPolicy> _retryPolicy;
+    std::size_t _currentAttempt{0};
+    Milliseconds _currentUsedMillis{0};
 
     // Protects member data of this scheduler declared after mutex.
     mutable stdx::mutex _mutex;
@@ -196,6 +196,8 @@ public:
      * "getMaximumResponseElapsedTotal()").
      */
     virtual bool shouldRetryOnError(ErrorCodes::Error error) const = 0;
+
+    virtual std::string toString() const = 0;
 };
 
 }  // namespace mongo

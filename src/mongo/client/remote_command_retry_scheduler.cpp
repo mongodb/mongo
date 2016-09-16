@@ -51,6 +51,7 @@ public:
     std::size_t getMaximumAttempts() const override;
     Milliseconds getMaximumResponseElapsedTotal() const override;
     bool shouldRetryOnError(ErrorCodes::Error error) const override;
+    std::string toString() const override;
 
 private:
     std::size_t _maximumAttempts;
@@ -65,6 +66,21 @@ RetryPolicyImpl::RetryPolicyImpl(std::size_t maximumAttempts,
       _maximumResponseElapsedTotal(maximumResponseElapsedTotal),
       _retryableErrors(retryableErrors) {
     std::sort(_retryableErrors.begin(), _retryableErrors.end());
+}
+
+std::string RetryPolicyImpl::toString() const {
+    str::stream output;
+    output << "RetryPolicyImpl";
+    output << " maxAttempts: " << _maximumAttempts;
+    output << " maxTimeMillis: " << _maximumResponseElapsedTotal;
+
+    if (_retryableErrors.size() > 0) {
+        output << "Retryable Errors: ";
+        for (auto error : _retryableErrors) {
+            output << error;
+        }
+    }
+    return output;
 }
 
 std::size_t RetryPolicyImpl::getMaximumAttempts() const {
@@ -161,12 +177,10 @@ Status RemoteCommandRetryScheduler::startup() {
         return Status(ErrorCodes::IllegalOperation, "fetcher already scheduled");
     }
 
-    auto scheduleStatus = _schedule_inlock(0);
+    auto scheduleStatus = _schedule_inlock();
     if (!scheduleStatus.isOK()) {
         return scheduleStatus;
     }
-
-    _active = true;
     return Status::OK();
 }
 
@@ -191,28 +205,48 @@ void RemoteCommandRetryScheduler::join() {
     _condition.wait(lock, [this]() { return !_active; });
 }
 
-Status RemoteCommandRetryScheduler::_schedule_inlock(std::size_t requestCount) {
+std::string RemoteCommandRetryScheduler::toString() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    str::stream output;
+    output << "RemoteCommandRetryScheduler";
+    output << " request: " << _request.toString();
+    output << " active: " << _active;
+    if (_remoteCommandCallbackHandle.isValid()) {
+        output << " callbackHandle.valid: " << _remoteCommandCallbackHandle.isValid();
+        output << " callbackHandle.cancelled: " << _remoteCommandCallbackHandle.isCanceled();
+    }
+    output << " attempt: " << _currentAttempt;
+    output << " retryPolicy: " << _retryPolicy->toString();
+    return output;
+}
+
+Status RemoteCommandRetryScheduler::_schedule_inlock() {
+    ++_currentAttempt;
     auto scheduleResult = _executor->scheduleRemoteCommand(
         _request,
-        stdx::bind(&RemoteCommandRetryScheduler::_remoteCommandCallback,
-                   this,
-                   stdx::placeholders::_1,
-                   requestCount + 1));
+        stdx::bind(
+            &RemoteCommandRetryScheduler::_remoteCommandCallback, this, stdx::placeholders::_1));
 
     if (!scheduleResult.isOK()) {
         return scheduleResult.getStatus();
     }
 
     _remoteCommandCallbackHandle = scheduleResult.getValue();
+    _active = true;
     return Status::OK();
 }
 
 void RemoteCommandRetryScheduler::_remoteCommandCallback(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba, std::size_t requestCount) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba) {
     auto status = rcba.response.status;
+    auto currentAttempt = _currentAttempt;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        currentAttempt = _currentAttempt;
+    }
 
     if (status.isOK() || status == ErrorCodes::CallbackCanceled ||
-        requestCount == _retryPolicy->getMaximumAttempts() ||
+        currentAttempt == _retryPolicy->getMaximumAttempts() ||
         !_retryPolicy->shouldRetryOnError(status.code())) {
         _onComplete(rcba);
         return;
@@ -220,8 +254,7 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
 
     // TODO(benety): Check cumulative elapsed time of failed responses received against retry
     // policy. Requires SERVER-24067.
-
-    auto scheduleStatus = _schedule_inlock(requestCount);
+    auto scheduleStatus = _schedule_inlock();
     if (!scheduleStatus.isOK()) {
         _onComplete({rcba.executor, rcba.myHandle, rcba.request, scheduleStatus});
         return;
