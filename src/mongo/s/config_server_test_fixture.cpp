@@ -108,7 +108,7 @@ void ConfigServerTestFixture::setUp() {
 std::unique_ptr<DistLockCatalog> ConfigServerTestFixture::makeDistLockCatalog(
     ShardRegistry* shardRegistry) {
     invariant(shardRegistry);
-    return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
+    return stdx::make_unique<DistLockCatalogImpl>(shardRegistry, false);
 }
 
 std::unique_ptr<DistLockManager> ConfigServerTestFixture::makeDistLockManager(

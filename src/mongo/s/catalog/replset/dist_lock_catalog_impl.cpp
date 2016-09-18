@@ -62,8 +62,6 @@ namespace {
 const char kFindAndModifyResponseResultDocField[] = "value";
 const char kLocalTimeField[] = "localTime";
 
-const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
-
 /**
  * Returns the resulting new object from the findAndModify response object.
  * Returns LockStateChangeFailed if value field was null, which indicates that
@@ -129,15 +127,18 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
 
 }  // unnamed namespace
 
-DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry)
-    : _client(shardRegistry), _lockPingNS(LockpingsType::ConfigNS), _locksNS(LocksType::ConfigNS) {}
+DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry, bool isLocal)
+    : _client(shardRegistry),
+      _isLocal(isLocal),
+      _lockPingNS(LockpingsType::ConfigNS),
+      _locksNS(LocksType::ConfigNS) {}
 
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* txn,
                                                        StringData processID) {
-    auto findResult = _findOnConfig(
-        txn, kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), BSONObj(), 1);
+    auto findResult =
+        _findOnConfig(txn, _lockPingNS, BSON(LockpingsType::process() << processID), BSONObj(), 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -376,7 +377,7 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {
     auto resultStatus = _client->getConfigShard()->runCommandWithFixedRetryAttempts(
         txn,
-        kReadPref,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
         BSON("serverStatus" << 1),
         Shard::kDefaultConfigCommandTimeout,
@@ -410,8 +411,8 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(Opera
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* txn,
                                                        const OID& lockSessionID) {
-    auto findResult = _findOnConfig(
-        txn, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
+    auto findResult =
+        _findOnConfig(txn, _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -436,8 +437,7 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* txn,
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* txn, StringData name) {
-    auto findResult =
-        _findOnConfig(txn, kReadPref, _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
+    auto findResult = _findOnConfig(txn, _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -478,15 +478,20 @@ Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId
     return findAndModifyStatus.getStatus();
 }
 
-StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
-    OperationContext* txn,
-    const ReadPreferenceSetting& readPref,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& sort,
-    boost::optional<long long> limit) {
+StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(OperationContext* txn,
+                                                               const NamespaceString& nss,
+                                                               const BSONObj& query,
+                                                               const BSONObj& sort,
+                                                               boost::optional<long long> limit) {
     auto result = _client->getConfigShard()->exhaustiveFindOnConfig(
-        txn, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        (_isLocal ? repl::ReadConcernLevel::kLocalReadConcern
+                  : repl::ReadConcernLevel::kMajorityReadConcern),
+        nss,
+        query,
+        sort,
+        limit);
     if (!result.isOK()) {
         return result.getStatus();
     }
