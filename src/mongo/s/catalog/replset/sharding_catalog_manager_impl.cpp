@@ -75,12 +75,15 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(dontUpsertShardIdentityOnNewShards);
 
 using std::string;
 using std::vector;
@@ -829,22 +832,25 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
         }
     }
 
-    auto commandRequest = createShardIdentityUpsertForAddShard(txn, shardType.getName());
+    if (!MONGO_FAIL_POINT(dontUpsertShardIdentityOnNewShards)) {
+        auto commandRequest = createShardIdentityUpsertForAddShard(txn, shardType.getName());
 
-    LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
+        LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
 
-    auto swCommandResponse = _runCommandForAddShard(txn, targeter.get(), "admin", commandRequest);
-    if (!swCommandResponse.isOK()) {
-        return swCommandResponse.getStatus();
-    }
+        auto swCommandResponse =
+            _runCommandForAddShard(txn, targeter.get(), "admin", commandRequest);
+        if (!swCommandResponse.isOK()) {
+            return swCommandResponse.getStatus();
+        }
 
-    auto commandResponse = std::move(swCommandResponse.getValue());
+        auto commandResponse = std::move(swCommandResponse.getValue());
 
-    BatchedCommandResponse batchResponse;
-    auto batchResponseStatus =
-        Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
-    if (!batchResponseStatus.isOK()) {
-        return batchResponseStatus;
+        BatchedCommandResponse batchResponse;
+        auto batchResponseStatus =
+            Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
+        if (!batchResponseStatus.isOK()) {
+            return batchResponseStatus;
+        }
     }
 
     log() << "going to insert new entry for shard into config.shards: " << shardType.toString();

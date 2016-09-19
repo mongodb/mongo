@@ -9,6 +9,7 @@ selector:
     - jstests/sharding/shard_aware_init.js
     - jstests/sharding/shard_aware_on_add_shard.js
     - jstests/sharding/shard_aware_on_config_election.js
+    - jstests/sharding/shard_aware_on_set_shard_version.js
     - jstests/sharding/shard_aware_primary_failover.js
     - jstests/sharding/shard_identity_config_update.js
     - jstests/sharding/add_shard_to_zone.js
