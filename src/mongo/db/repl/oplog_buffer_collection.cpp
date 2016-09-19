@@ -217,7 +217,8 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
         return true;
     }
     auto scanDirection = StorageInterface::ScanDirection::kForward;
-    auto result = _storageInterface->deleteOne(txn, _nss, kIdIdxName, scanDirection);
+    auto result = _storageInterface->deleteOne(
+        txn, _nss, kIdIdxName, scanDirection, {}, BoundInclusion::kIncludeStartKeyOnly);
     if (!result.isOK()) {
         if (result != ErrorCodes::CollectionIsEmpty) {
             fassert(40162, result.getStatus());
@@ -244,7 +245,8 @@ bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
     }
     auto scanDirection = front ? StorageInterface::ScanDirection::kForward
                                : StorageInterface::ScanDirection::kBackward;
-    auto result = _storageInterface->findOne(txn, _nss, kIdIdxName, scanDirection);
+    auto result = _storageInterface->findOne(
+        txn, _nss, kIdIdxName, scanDirection, {}, BoundInclusion::kIncludeStartKeyOnly);
     if (!result.isOK()) {
         if (result != ErrorCodes::CollectionIsEmpty) {
             fassert(40163, result.getStatus());

@@ -107,12 +107,16 @@ public:
     StatusWith<BSONObj> findOne(OperationContext* txn,
                                 const NamespaceString& nss,
                                 boost::optional<StringData> indexName,
-                                ScanDirection scanDirection) override;
+                                ScanDirection scanDirection,
+                                const BSONObj& startKey,
+                                BoundInclusion boundInclusion) override;
 
     StatusWith<BSONObj> deleteOne(OperationContext* txn,
                                   const NamespaceString& nss,
                                   boost::optional<StringData> indexName,
-                                  ScanDirection scanDirection) override;
+                                  ScanDirection scanDirection,
+                                  const BSONObj& startKey,
+                                  BoundInclusion boundInclusion) override;
 
     Status isAdminDbValid(OperationContext* txn) override;
 
