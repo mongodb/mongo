@@ -103,8 +103,11 @@ using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 const char localDbName[] = "local";
 const char configCollectionName[] = "local.system.replset";
+const auto configDatabaseName = localDbName;
 const char lastVoteCollectionName[] = "local.replset.election";
+const auto lastVoteDatabaseName = localDbName;
 const char meCollectionName[] = "local.me";
+const auto meDatabaseName = localDbName;
 const char tsFieldName[] = "ts";
 
 const char kCollectionOplogBufferName[] = "collection";
@@ -446,7 +449,7 @@ OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* txn) {
     OID myRID;
     {
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lock(txn->lockState(), localDbName, MODE_X);
+        Lock::DBLock lock(txn->lockState(), meDatabaseName, MODE_X);
 
         BSONObj me;
         // local.me is an identifier for a server for getLastError w:2+
@@ -494,7 +497,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbWriteLock(txn->lockState(), localDbName, MODE_X);
+            Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();
         }
@@ -532,7 +535,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbWriteLock(txn->lockState(), localDbName, MODE_X);
+            Lock::DBLock dbWriteLock(txn->lockState(), lastVoteDatabaseName, MODE_X);
             Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
             return Status::OK();
         }
