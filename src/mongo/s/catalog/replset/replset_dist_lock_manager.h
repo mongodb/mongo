@@ -93,7 +93,7 @@ private:
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */
-    void queueUnlock(const DistLockHandle& lockSessionID, const boost::optional<StringData>& name);
+    void queueUnlock(const DistLockHandle& lockSessionID, const boost::optional<std::string>& name);
 
     /**
      * Periodically pings and checks if there are locks queued that needs unlocking.
@@ -139,7 +139,7 @@ private:
     // 2. Attempting to grab or overtake a lock resulted in an error where we are uncertain
     //    whether the modification was actually applied or not, and call unlock to make
     //    sure that it was cleaned up.
-    std::deque<std::pair<DistLockHandle, boost::optional<StringData>>> _unlockList;  // (M)
+    std::deque<std::pair<DistLockHandle, boost::optional<std::string>>> _unlockList;  // (M)
 
     bool _isShutDown = false;              // (M)
     stdx::condition_variable _shutDownCV;  // (M)

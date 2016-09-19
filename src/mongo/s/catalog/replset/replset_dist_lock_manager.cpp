@@ -142,7 +142,7 @@ void ReplSetDistLockManager::doTask() {
             }
             elapsedSincelastPing.reset();
 
-            std::deque<std::pair<DistLockHandle, boost::optional<StringData>>> toUnlockBatch;
+            std::deque<std::pair<DistLockHandle, boost::optional<std::string>>> toUnlockBatch;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
                 toUnlockBatch.swap(_unlockList);
@@ -154,9 +154,8 @@ void ReplSetDistLockManager::doTask() {
                                     "status unlock not initialized!");
                 if (toUnlock.second) {
                     // A non-empty _id (name) field was provided, unlock by ts (sessionId) and _id.
-                    unlockStatus =
-                        _catalog->unlock(txn.get(), toUnlock.first, toUnlock.second.get());
-                    nameMessage = " and " + LocksType::name() + ": " + toUnlock.second->toString();
+                    unlockStatus = _catalog->unlock(txn.get(), toUnlock.first, *toUnlock.second);
+                    nameMessage = " and " + LocksType::name() + ": " + *toUnlock.second;
                 } else {
                     unlockStatus = _catalog->unlock(txn.get(), toUnlock.first);
                 }
@@ -347,7 +346,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         if (status != ErrorCodes::LockStateChangeFailed) {
             // An error occurred but the write might have actually been applied on the
             // other side. Schedule an unlock to clean it up just in case.
-            queueUnlock(lockSessionID, name);
+            queueUnlock(lockSessionID, name.toString());
             return status;
         }
 
@@ -464,7 +463,7 @@ void ReplSetDistLockManager::unlock(OperationContext* txn,
     auto unlockStatus = _catalog->unlock(txn, lockSessionID, name);
 
     if (!unlockStatus.isOK()) {
-        queueUnlock(lockSessionID, name);
+        queueUnlock(lockSessionID, name.toString());
     } else {
         LOG(0) << "distributed lock with " << LocksType::lockID() << ": '" << lockSessionID
                << "' and " << LocksType::name() << ": '" << name.toString() << "' unlocked.";
@@ -485,7 +484,7 @@ Status ReplSetDistLockManager::checkStatus(OperationContext* txn,
 }
 
 void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
-                                         const boost::optional<StringData>& name) {
+                                         const boost::optional<std::string>& name) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _unlockList.push_back(std::make_pair(lockSessionID, name));
 }
