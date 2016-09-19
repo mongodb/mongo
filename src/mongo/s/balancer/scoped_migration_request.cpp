@@ -46,6 +46,7 @@ namespace {
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
+const int kDuplicateKeyErrorMaxRetries = 2;
 }
 
 ScopedMigrationRequest::ScopedMigrationRequest(OperationContext* txn,
@@ -95,54 +96,81 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
 
     // Try to write a unique migration document to config.migrations.
     MigrationType migrationType(migrateInfo);
-    Status result = grid.catalogClient(txn)->insertConfigDocument(
-        txn, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
+    for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
+        Status result = grid.catalogClient(txn)->insertConfigDocument(
+            txn, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
 
-    if (result == ErrorCodes::DuplicateKey) {
-        // If the exact migration described by "migrateInfo" is active, return a scoped object for
-        // the request because this migration request will join the active one once scheduled.
-        auto statusWithMigrationQueryResult =
-            grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                txn,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                NamespaceString(MigrationType::ConfigNS),
-                migrationType.toBSON(),
-                BSONObj(),
-                1);
+        if (result == ErrorCodes::DuplicateKey) {
+            // If the exact migration described by "migrateInfo" is active, return a scoped object
+            // for the request because this migration request will join the active one once
+            // scheduled.
+            auto statusWithMigrationQueryResult =
+                grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                    txn,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    repl::ReadConcernLevel::kLocalReadConcern,
+                    NamespaceString(MigrationType::ConfigNS),
+                    BSON(MigrationType::name(migrateInfo.getName())),
+                    BSONObj(),
+                    boost::none);
+            if (!statusWithMigrationQueryResult.isOK()) {
+                return {statusWithMigrationQueryResult.getStatus().code(),
+                        str::stream()
+                            << "Failed to verify whether conflicting migration is in "
+                            << "progress for migration '"
+                            << redact(migrateInfo.toString())
+                            << "' while trying to query config.migrations."
+                            << causedBy(redact(statusWithMigrationQueryResult.getStatus()))};
+            }
+            if (statusWithMigrationQueryResult.getValue().docs.empty()) {
+                // The document that caused the DuplicateKey error is no longer in the collection,
+                // so retrying the insert might succeed.
+                continue;
+            }
+            invariant(statusWithMigrationQueryResult.getValue().docs.size() == 1);
 
-        if (!statusWithMigrationQueryResult.isOK()) {
-            return {statusWithMigrationQueryResult.getStatus().code(),
-                    str::stream() << "Failed to verify whether conflicting migration is in "
-                                  << "progress for migration '"
-                                  << migrateInfo.toString()
-                                  << "' while trying to persist migration to config.migrations."
-                                  << causedBy(redact(statusWithMigrationQueryResult.getStatus()))};
+            BSONObj activeMigrationBSON = statusWithMigrationQueryResult.getValue().docs.front();
+            auto statusWithActiveMigration = MigrationType::fromBSON(activeMigrationBSON);
+            if (!statusWithActiveMigration.isOK()) {
+                return {statusWithActiveMigration.getStatus().code(),
+                        str::stream() << "Failed to verify whether conflicting migration is in "
+                                      << "progress for migration '"
+                                      << redact(migrateInfo.toString())
+                                      << "' while trying to parse active migration document '"
+                                      << redact(activeMigrationBSON.toString())
+                                      << "'."
+                                      << causedBy(redact(statusWithActiveMigration.getStatus()))};
+            }
+
+            MigrateInfo activeMigrateInfo = statusWithActiveMigration.getValue().toMigrateInfo();
+            if (activeMigrateInfo.to != migrateInfo.to ||
+                activeMigrateInfo.from != migrateInfo.from) {
+                log() << "Failed to write document '" << redact(migrateInfo.toString())
+                      << "' to config.migrations because there is already an active migration for"
+                      << " that chunk: '" << redact(activeMigrateInfo.toString()) << "'."
+                      << causedBy(redact(result));
+                return result;
+            }
+
+            result = Status::OK();
         }
 
-        if (statusWithMigrationQueryResult.getValue().docs.size() != 1) {
-            invariant(statusWithMigrationQueryResult.getValue().docs.size() == 0);
-            log() << "Failed to write document '" << migrateInfo
-                  << "' to config.migrations because there is already an active migration for "
-                  << "this chunk" << causedBy(redact(result));
+        // As long as there isn't a DuplicateKey error, the document may have been written, and it's
+        // safe (won't delete another migration's document) and necessary to try to clean up the
+        // document via the destructor.
+        ScopedMigrationRequest scopedMigrationRequest(
+            txn, NamespaceString(migrateInfo.ns), migrateInfo.minKey);
+
+        // If there was a write error, let the object go out of scope and clean up in the
+        // destructor.
+        if (!result.isOK()) {
             return result;
         }
 
-        result = Status::OK();
+        return std::move(scopedMigrationRequest);
     }
 
-    // As long as there isn't a DuplicateKey error, the document may have been written, and it's
-    // safe (won't delete another migration's document) and necessary to try to clean up the
-    // document via the destructor.
-    ScopedMigrationRequest scopedMigrationRequest(
-        txn, NamespaceString(migrateInfo.ns), migrateInfo.minKey);
-
-    // If there was a write error, let the object go out of scope and clean up in the destructor.
-    if (!result.isOK()) {
-        return result;
-    }
-
-    return std::move(scopedMigrationRequest);
+    MONGO_UNREACHABLE;
 }
 
 ScopedMigrationRequest ScopedMigrationRequest::createForRecovery(OperationContext* txn,
@@ -153,6 +181,8 @@ ScopedMigrationRequest ScopedMigrationRequest::createForRecovery(OperationContex
 
 void ScopedMigrationRequest::keepDocumentOnDestruct() {
     _txn = nullptr;
+    LOG(1) << "Keeping config.migrations document with namespace '" << _nss << "' and minKey '"
+           << _minKey << "' for balancer recovery";
 }
 
 }  // namespace mongo
