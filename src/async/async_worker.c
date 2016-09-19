@@ -37,7 +37,7 @@ retry:
 	 */
 	while (last_consume == async->head &&
 	    async->flush_state != WT_ASYNC_FLUSHING) {
-		WT_STAT_FAST_CONN_INCR(session, async_nowork);
+		WT_STAT_CONN_INCR(session, async_nowork);
 		if (++tries < MAX_ASYNC_YIELD)
 			/*
 			 * Initially when we find no work, allow other

@@ -119,7 +119,6 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         self.forward(cursor, v)
         self.backward(cursor, list(reversed(v)))
 
-
 # Basic testing of variable-length column-store with big records.
 class test_colmax(wttest.WiredTigerTestCase):
     name = 'test_colmax'
@@ -203,7 +202,6 @@ class test_colmax(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.remove(), 0)
         cursor.set_key(key_populate(cursor, recno))
         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-
 
 if __name__ == '__main__':
     wttest.run()

@@ -84,6 +84,5 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
 
         self.assertEqual(i, self.nops)
 
-
 if __name__ == '__main__':
     wttest.run()

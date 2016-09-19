@@ -64,9 +64,9 @@ mkdir $CSUITE_DIRECTORY/$TEST_NAME
 #include "test_util.h"
 
 /*
- * JIRA ticket reference: 
- * Test case description: 
- * Failure mode: 
+ * JIRA ticket reference:
+ * Test case description:
+ * Failure mode:
  */
 
 void (*custom_die)(void) = NULL;
@@ -91,7 +91,6 @@ main(int argc, char *argv[])
 }
 EOF
 ) > $CSUITE_DIRECTORY/$TEST_NAME/main.c
-
 
 # Now update the C test suite makefile to include the new test case
 

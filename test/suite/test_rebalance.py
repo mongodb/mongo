@@ -76,6 +76,5 @@ class test_rebalance(wttest.WiredTigerTestCase):
             self.rebalance(complex_populate, False)
             self.rebalance(complex_populate, True)
 
-
 if __name__ == '__main__':
     wttest.run()

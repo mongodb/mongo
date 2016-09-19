@@ -74,6 +74,5 @@ class test_bug006(wttest.WiredTigerTestCase):
 
         self.session.drop(uri, None)
 
-
 if __name__ == '__main__':
     wttest.run()

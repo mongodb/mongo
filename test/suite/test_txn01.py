@@ -131,7 +131,6 @@ class test_txn01(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
         self.check(cursor, self.nentries, self.nentries)
 
-
 # Test that read-committed is the default isolation level.
 class test_read_committed_default(wttest.WiredTigerTestCase):
     uri = 'table:test_txn'
@@ -161,7 +160,6 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
         self.assertEqual(self.cursor_count(cursor), 1)
         s.commit_transaction()
         s.close()
-
 
 if __name__ == '__main__':
     wttest.run()

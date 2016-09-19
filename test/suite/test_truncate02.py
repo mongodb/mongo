@@ -204,6 +204,5 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
                 self.cursor_count(cursor, self.nentries)
         cursor.close()
 
-
 if __name__ == '__main__':
     wttest.run()

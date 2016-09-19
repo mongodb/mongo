@@ -104,7 +104,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	bm = btree->bm;
 	ref = NULL;
 
-	WT_STAT_FAST_DATA_INCR(session, session_compact);
+	WT_STAT_DATA_INCR(session, session_compact);
 
 	/*
 	 * Check if compaction might be useful -- the API layer will quit trying
@@ -151,7 +151,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_page_modify_init(session, ref->page));
 		__wt_page_modify_set(session, ref->page);
 
-		WT_STAT_FAST_DATA_INCR(session, btree_compact_rewrite);
+		WT_STAT_DATA_INCR(session, btree_compact_rewrite);
 	}
 
 err:	if (ref != NULL)

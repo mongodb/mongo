@@ -21,7 +21,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	txn = &session->txn;
 	*opp = NULL;
 
-	/* 
+	/*
 	 * We're about to perform an update.
 	 * Make sure we have allocated a transaction ID.
 	 */
@@ -414,7 +414,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	if (txn->isolation == WT_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
-				WT_STAT_FAST_DATA_INCR(
+				WT_STAT_DATA_INCR(
 				    session, txn_update_conflict);
 				return (WT_ROLLBACK);
 			}

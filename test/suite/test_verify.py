@@ -197,6 +197,5 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
 
-
 if __name__ == '__main__':
     wttest.run()

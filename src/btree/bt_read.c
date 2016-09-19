@@ -431,8 +431,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	dsk = tmp.data;
 	if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE) && __wt_las_is_written(session)) {
-		WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
-		WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
+		WT_STAT_CONN_INCR(session, cache_read_lookaside);
+		WT_STAT_DATA_INCR(session, cache_read_lookaside);
 
 		WT_ERR(__las_page_instantiate(
 		    session, ref, btree->id, addr, addr_size));
@@ -481,8 +481,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	 * eviction server can dominate these statistics.
 	 */
 	if (!LF_ISSET(WT_READ_CACHE)) {
-		WT_STAT_FAST_CONN_INCR(session, cache_pages_requested);
-		WT_STAT_FAST_DATA_INCR(session, cache_pages_requested);
+		WT_STAT_CONN_INCR(session, cache_pages_requested);
+		WT_STAT_DATA_INCR(session, cache_pages_requested);
 	}
 
 	for (evict_soon = stalled = false,
@@ -525,7 +525,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				return (WT_NOTFOUND);
 
 			/* Waiting on another thread's read, stall. */
-			WT_STAT_FAST_CONN_INCR(session, page_read_blocked);
+			WT_STAT_CONN_INCR(session, page_read_blocked);
 			stalled = true;
 			break;
 		case WT_REF_LOCKED:
@@ -533,7 +533,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				return (WT_NOTFOUND);
 
 			/* Waiting on eviction, stall. */
-			WT_STAT_FAST_CONN_INCR(session, page_locked_blocked);
+			WT_STAT_CONN_INCR(session, page_locked_blocked);
 			stalled = true;
 			break;
 		case WT_REF_SPLIT:
@@ -560,8 +560,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			WT_RET(__wt_hazard_set(session, ref, &busy));
 #endif
 			if (busy) {
-				WT_STAT_FAST_CONN_INCR(
-				    session, page_busy_blocked);
+				WT_STAT_CONN_INCR(session, page_busy_blocked);
 				break;
 			}
 
@@ -590,7 +589,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
 					ret = 0;
-					WT_STAT_FAST_CONN_INCR(session,
+					WT_STAT_CONN_INCR(session,
 					    page_forcible_evict_blocked);
 					stalled = true;
 					break;
@@ -661,7 +660,7 @@ skip_evict:
 				continue;
 		}
 		sleep_cnt = WT_MIN(sleep_cnt + WT_THOUSAND, 10000);
-		WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
+		WT_STAT_CONN_INCRV(session, page_sleep, sleep_cnt);
 		__wt_sleep(0, sleep_cnt);
 	}
 }

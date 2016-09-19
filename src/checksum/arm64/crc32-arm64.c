@@ -32,14 +32,18 @@
 #include <asm/hwcap.h>
 #include <sys/auxv.h>
 
+#ifndef __GNUC__
+#define	__asm__	asm
+#endif
+
 #define	CRC32CX(crc,value)						\
-	asm("crc32cx %w[c], %w[c], %x[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
+	__asm__("crc32cx %w[c], %w[c], %x[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
 #define	CRC32CW(crc,value)						\
-	asm("crc32cw %w[c], %w[c], %w[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
+	__asm__("crc32cw %w[c], %w[c], %w[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
 #define	CRC32CH(crc,value)						\
-	asm("crc32ch %w[c], %w[c], %w[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
+	__asm__("crc32ch %w[c], %w[c], %w[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
 #define	CRC32CB(crc,value)						\
-	asm("crc32cb %w[c], %w[c], %w[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
+	__asm__("crc32cb %w[c], %w[c], %w[v]" : [c]"+r"(*&crc) : [v]"r"(+value))
 
 /*
  * __wt_checksum_hw --

@@ -83,7 +83,6 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
 
-
     # Forward iteration.
     def test_forward_iter(self):
         self.create_table()

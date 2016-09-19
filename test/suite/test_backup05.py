@@ -80,7 +80,6 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.drop(self.emptyuri, None)
             self.session.create(self.emptyuri, self.create_params)
 
-
         # Open the new directory and verify
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)

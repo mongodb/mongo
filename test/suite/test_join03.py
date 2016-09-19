@@ -152,6 +152,5 @@ class test_join03(wttest.WiredTigerTestCase):
             for csvformat in [ 'SS', 'ii', 'Si', 'iS' ]:
                 self.join(csvformat, '', extraargs)
 
-
 if __name__ == '__main__':
     wttest.run()

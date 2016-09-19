@@ -171,6 +171,5 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         self.compare(self.uri, full_dir, self.dir)
         self.compare(self.uri, None, self.dir)
 
-
 if __name__ == '__main__':
     wttest.run()

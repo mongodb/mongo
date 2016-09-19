@@ -390,7 +390,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		return (0);
 	session->last_sweep = now;
 
-	WT_STAT_FAST_CONN_INCR(session, dh_session_sweeps);
+	WT_STAT_CONN_INCR(session, dh_session_sweeps);
 
 	dhandle_cache = TAILQ_FIRST(&session->dhandles);
 	while (dhandle_cache != NULL) {
@@ -402,7 +402,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		    (dhandle->timeofdeath != 0 &&
 		    difftime(now, dhandle->timeofdeath) >
 		    conn->sweep_idle_time))) {
-			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
+			WT_STAT_CONN_INCR(session, dh_session_handles);
 			WT_ASSERT(session, !WT_IS_METADATA(session, dhandle));
 			__session_discard_dhandle(session, dhandle_cache);
 		}

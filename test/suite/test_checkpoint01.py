@@ -136,7 +136,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
                 (self.checkpoints[checkpoint_name][0], 0)
         self.check()
 
-
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
@@ -202,7 +201,6 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
         self.session.checkpoint("drop=(checkpoint-2)")
         self.session.checkpoint("drop=(from=all)")
 
-
 # Check that you can checkpoint targets.
 class test_checkpoint_target(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
@@ -249,7 +247,6 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
         self.check(self.uri + '2', 'UPDATE')
         self.check(self.uri + '3', 'ORIGINAL')
 
-
 # Check that you can't write checkpoint cursors.
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
@@ -273,7 +270,6 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: cursor.update(), msg)
         cursor.close()
-
 
 # Check that WiredTigerCheckpoint works as a checkpoint specifier.
 class test_checkpoint_last(wttest.WiredTigerTestCase):
@@ -306,7 +302,6 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
             # Don't close the checkpoint cursor, we want it to remain open until
             # the test completes.
 
-
 # Check we can't use the reserved name as an application checkpoint name.
 class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
     def test_checkpoint_illegal_name(self):
@@ -331,7 +326,6 @@ class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.checkpoint(conf), msg)
 
-
 # Check we can't name checkpoints that include LSM tables.
 class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
     def test_checkpoint_lsm_name(self):
@@ -340,7 +334,6 @@ class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
         msg = '/object does not support named checkpoints/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.checkpoint("name=ckpt"), msg)
-
 
 class test_checkpoint_empty(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
@@ -416,7 +409,6 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(
             self.uri, None, "checkpoint=WiredTigerCheckpoint")
         self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
-
 
 if __name__ == '__main__':
     wttest.run()

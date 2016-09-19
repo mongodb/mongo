@@ -151,7 +151,6 @@ class tabconfig:
                         idx.formats += self.valueformats[colno - self.nkeys]
                 prob *= 0.5
 
-
 class cgconfig:
     """
     Configuration for a column group used in the test.
