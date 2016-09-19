@@ -404,6 +404,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver",
         "$BUILD_DIR/mongo/db/auth/authservercommon",
+        "$BUILD_DIR/mongo/logger/max_log_size",
         "$BUILD_DIR/mongo/rpc/command_reply",
         "$BUILD_DIR/mongo/rpc/command_request",
         "$BUILD_DIR/mongo/rpc/metadata",

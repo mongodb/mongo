@@ -36,6 +36,7 @@
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/client.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/logger/max_log_size.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -43,6 +44,7 @@ namespace {
 
 // Server parameter controlling whether or not user ids are included in log entries.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(logUserIds, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(maxLogSizeKB, int, 10);
 
 /**
  * Note: When appending new strings to the builder, make sure to pass false to the
@@ -69,7 +71,13 @@ void appendServerExtraLogContext(BufBuilder& builder) {
     builder.appendChar(' ');
 }
 
+int getMaxLogSizeKB() {
+    return maxLogSizeKB.load();
+}
+
 MONGO_INITIALIZER(SetServerLogContextFunction)(InitializerContext*) {
+    logger::MaxLogSizeKB::setGetter(getMaxLogSizeKB);
+
     if (!logUserIds)
         return Status::OK();
 
