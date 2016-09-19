@@ -66,16 +66,21 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata() {
 }
 
 void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> remoteMetadata) {
-    LOG(1) << "Refreshing the active metadata from "
-           << (_activeMetadataTracker->metadata ? _activeMetadataTracker->metadata->toStringBasic()
-                                                : "(empty)")
-           << ", to " << (remoteMetadata ? remoteMetadata->toStringBasic() : "(empty)");
-
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
 
-    // Collection is not sharded anymore
+    // Collection was never sharded in the first place. This check is necessary in order to avoid
+    // extraneous logging in the not-a-shard case, because all call sites always try to get the
+    // collection sharding information regardless of whether the node is sharded or not.
+    if (!remoteMetadata && !_activeMetadataTracker->metadata) {
+        invariant(_receivingChunks.empty());
+        invariant(_rangesToClean.empty());
+        return;
+    }
+
+    // Collection is becoming unsharded
     if (!remoteMetadata) {
-        log() << "Marking collection as not sharded.";
+        log() << "Marking collection " << _nss.ns() << " with "
+              << _activeMetadataTracker->metadata->toStringBasic() << " as no longer sharded";
 
         _receivingChunks.clear();
         _rangesToClean.clear();
@@ -84,12 +89,14 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
         return;
     }
 
+    // We should never be setting unsharded metadata
     invariant(!remoteMetadata->getCollVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
     invariant(!remoteMetadata->getShardVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
 
-    // Collection is not sharded currently
+    // Collection is becoming sharded
     if (!_activeMetadataTracker->metadata) {
-        log() << "Marking collection as sharded with " << remoteMetadata->toStringBasic();
+        log() << "Marking collection " << _nss.ns() << " as sharded with "
+              << remoteMetadata->toStringBasic();
 
         invariant(_receivingChunks.empty());
         invariant(_rangesToClean.empty());
@@ -102,7 +109,9 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     // was dropped and recreated, so we must entirely reset the metadata state
     if (_activeMetadataTracker->metadata->getCollVersion().epoch() !=
         remoteMetadata->getCollVersion().epoch()) {
-        log() << "Overwriting collection metadata due to epoch change.";
+        log() << "Overwriting metadata for collection " << _nss.ns() << " from "
+              << _activeMetadataTracker->metadata->toStringBasic() << " to "
+              << remoteMetadata->toStringBasic() << " due to epoch change";
 
         _receivingChunks.clear();
         _rangesToClean.clear();
@@ -113,12 +122,15 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
 
     // We already have newer version
     if (_activeMetadataTracker->metadata->getCollVersion() >= remoteMetadata->getCollVersion()) {
-        LOG(1) << "Attempted to refresh active metadata "
+        LOG(1) << "Ignoring refresh of active metadata "
                << _activeMetadataTracker->metadata->toStringBasic() << " with an older "
                << remoteMetadata->toStringBasic();
-
         return;
     }
+
+    LOG(1) << "Refreshing metadata for collection " << _nss.ns() << " from "
+           << _activeMetadataTracker->metadata->toStringBasic() << " to "
+           << remoteMetadata->toStringBasic();
 
     // Resolve any receiving chunks, which might have completed by now
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
@@ -129,8 +141,8 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
         if (rangeMapContains(remoteMetadata->getChunks(), min, max)) {
             // The remote metadata contains a chunk we were earlier in the process of receiving, so
             // we deem it successfully received.
-            LOG(2) << "Verified chunk " << ChunkRange(min, max).toString()
-                   << " was migrated earlier to this shard";
+            LOG(2) << "Verified chunk " << redact(ChunkRange(min, max).toString())
+                   << " for collection " << _nss.ns() << " has been migrated to this shard earlier";
 
             _receivingChunks.erase(it++);
             continue;
