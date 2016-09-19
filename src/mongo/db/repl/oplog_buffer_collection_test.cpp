@@ -283,20 +283,34 @@ TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
-    BSONObj oplog = makeOplogEntry(1);
+    BSONObj oplog1 = makeOplogEntry(1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.push(_txn.get(), oplog);
+    oplogBuffer.push(_txn.get(), oplog1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
+    // _peekOneSide should provide correct bound inclusion to storage engine when collection has one
+    // document.
     BSONObj doc;
     ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
-    ASSERT_BSONOBJ_EQ(doc, oplog);
+    ASSERT_BSONOBJ_EQ(doc, oplog1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+
+    BSONObj oplog2 = makeOplogEntry(2);
+    oplogBuffer.push(_txn.get(), oplog2);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
+
+    // _peekOneSide should return same result after adding new oplog entry.
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(doc, oplog1);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
-        ASSERT_BSONOBJ_EQ(oplog,
+        ASSERT_BSONOBJ_EQ(oplog2,
+                          OplogBufferCollection::extractEmbeddedOplogDocument(
+                              unittest::assertGet(iter->next()).first));
+        ASSERT_BSONOBJ_EQ(oplog1,
                           OplogBufferCollection::extractEmbeddedOplogDocument(
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
@@ -322,7 +336,7 @@ TEST_F(OplogBufferCollectionTest, PeekWithNoDocumentsReturnsFalse) {
     }
 }
 
-TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
+TEST_F(OplogBufferCollectionTest, PopDoesNotRemoveDocumentFromCollection) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
@@ -340,6 +354,9 @@ TEST_F(OplogBufferCollectionTest, PopRemovesDocument) {
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
+        ASSERT_BSONOBJ_EQ(oplog,
+                          OplogBufferCollection::extractEmbeddedOplogDocument(
+                              unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
     }
 }
@@ -375,7 +392,7 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
     oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    {
+    auto checkDocumentsInCollection = [&]() {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
         ASSERT_BSONOBJ_EQ(oplog[2],
@@ -388,7 +405,8 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
                           OplogBufferCollection::extractEmbeddedOplogDocument(
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-    }
+    };
+    checkDocumentsInCollection();
 
     BSONObj doc;
     ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
@@ -414,6 +432,9 @@ TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[2]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    // tryPop does not remove documents from collection.
+    checkDocumentsInCollection();
 }
 
 TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
@@ -699,7 +720,7 @@ TEST_F(OplogBufferCollectionTest, SentinelInMiddleIsReturnedInOrder) {
     oplogBuffer.pushEvenIfFull(_txn.get(), oplog[3]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 4UL);
 
-    {
+    auto checkDocumentsInCollection = [&]() {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
         ASSERT_BSONOBJ_EQ(oplog[3],
@@ -712,7 +733,8 @@ TEST_F(OplogBufferCollectionTest, SentinelInMiddleIsReturnedInOrder) {
                           OplogBufferCollection::extractEmbeddedOplogDocument(
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-    }
+    };
+    checkDocumentsInCollection();
 
     auto sentinels = oplogBuffer.getSentinels_forTest();
     ASSERT_EQUALS(sentinels.size(), 1UL);
@@ -753,6 +775,9 @@ TEST_F(OplogBufferCollectionTest, SentinelInMiddleIsReturnedInOrder) {
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[3]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    // tryPop does not remove documents from collection.
+    checkDocumentsInCollection();
 }
 
 TEST_F(OplogBufferCollectionTest, SentinelAtBeginningIsReturnedAtBeginning) {
@@ -766,14 +791,15 @@ TEST_F(OplogBufferCollectionTest, SentinelAtBeginningIsReturnedAtBeginning) {
     oplogBuffer.pushEvenIfFull(_txn.get(), oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    {
+    auto checkDocumentsInCollection = [&]() {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
         ASSERT_BSONOBJ_EQ(oplog[1],
                           OplogBufferCollection::extractEmbeddedOplogDocument(
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-    }
+    };
+    checkDocumentsInCollection();
 
     auto sentinels = oplogBuffer.getSentinels_forTest();
     ASSERT_EQUALS(sentinels.size(), 1UL);
@@ -795,6 +821,9 @@ TEST_F(OplogBufferCollectionTest, SentinelAtBeginningIsReturnedAtBeginning) {
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    // tryPop does not remove documents from collection.
+    checkDocumentsInCollection();
 }
 
 TEST_F(OplogBufferCollectionTest, SentinelAtEndIsReturnedAtEnd) {
@@ -808,14 +837,15 @@ TEST_F(OplogBufferCollectionTest, SentinelAtEndIsReturnedAtEnd) {
     oplogBuffer.pushEvenIfFull(_txn.get(), oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    {
+    auto checkDocumentsInCollection = [&]() {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
         ASSERT_BSONOBJ_EQ(oplog[0],
                           OplogBufferCollection::extractEmbeddedOplogDocument(
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-    }
+    };
+    checkDocumentsInCollection();
 
     auto sentinels = oplogBuffer.getSentinels_forTest();
     ASSERT_EQUALS(sentinels.size(), 1UL);
@@ -837,6 +867,9 @@ TEST_F(OplogBufferCollectionTest, SentinelAtEndIsReturnedAtEnd) {
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    // tryPop does not remove documents from collection.
+    checkDocumentsInCollection();
 }
 
 TEST_F(OplogBufferCollectionTest, MultipleSentinelsAreReturnedInOrder) {
@@ -856,7 +889,7 @@ TEST_F(OplogBufferCollectionTest, MultipleSentinelsAreReturnedInOrder) {
     oplogBuffer.pushEvenIfFull(_txn.get(), oplog[5]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 6UL);
 
-    {
+    auto checkDocumentsInCollection = [&]() {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
         auto iter = collectionReader.makeIterator();
         ASSERT_BSONOBJ_EQ(oplog[4],
@@ -866,7 +899,8 @@ TEST_F(OplogBufferCollectionTest, MultipleSentinelsAreReturnedInOrder) {
                           OplogBufferCollection::extractEmbeddedOplogDocument(
                               unittest::assertGet(iter->next()).first));
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-    }
+    };
+    checkDocumentsInCollection();
 
     auto sentinels = oplogBuffer.getSentinels_forTest();
     ASSERT_EQUALS(sentinels.size(), 4UL);
@@ -926,6 +960,9 @@ TEST_F(OplogBufferCollectionTest, MultipleSentinelsAreReturnedInOrder) {
     ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+
+    // tryPop does not remove documents from collection.
+    checkDocumentsInCollection();
 }
 
 TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsSentinel) {

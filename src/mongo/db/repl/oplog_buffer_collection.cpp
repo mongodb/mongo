@@ -216,17 +216,12 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
         *value = BSONObj();
         return true;
     }
-    auto scanDirection = StorageInterface::ScanDirection::kForward;
-    auto result = _storageInterface->deleteOne(
-        txn, _nss, kIdIdxName, scanDirection, {}, BoundInclusion::kIncludeStartKeyOnly);
-    if (!result.isOK()) {
-        if (result != ErrorCodes::CollectionIsEmpty) {
-            fassert(40162, result.getStatus());
-        }
+
+    if (!_peekOneSide_inlock(txn, value, true)) {
         return false;
     }
-    _lastPoppedTimestamp = result.getValue()["_id"].timestamp();
-    *value = extractEmbeddedOplogDocument(result.getValue()).getOwned();
+
+    _lastPoppedTimestamp = (*value)["ts"].timestamp();
     invariant(_count > 0);
     invariant(_size >= std::size_t(value->objsize()));
     _count--;
@@ -245,8 +240,19 @@ bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
     }
     auto scanDirection = front ? StorageInterface::ScanDirection::kForward
                                : StorageInterface::ScanDirection::kBackward;
-    auto result = _storageInterface->findOne(
-        txn, _nss, kIdIdxName, scanDirection, {}, BoundInclusion::kIncludeStartKeyOnly);
+    BSONObj startKey;
+    auto boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
+
+    // Previously popped documents are not actually removed from the collection. When peeking at the
+    // front of the buffer, we use the last popped timestamp to skip ahead to the first document
+    // that has not been popped.
+    if (front && !_lastPoppedTimestamp.isNull()) {
+        startKey = BSON("" << _lastPoppedTimestamp);
+        boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
+    }
+
+    auto result =
+        _storageInterface->findOne(txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion);
     if (!result.isOK()) {
         if (result != ErrorCodes::CollectionIsEmpty) {
             fassert(40163, result.getStatus());
