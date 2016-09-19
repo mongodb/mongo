@@ -70,7 +70,6 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	}
 	snprintf(uri, urilen, "statistics:%s", objname);
 
-	
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",

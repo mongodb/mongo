@@ -100,6 +100,5 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertLess(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
         stat_cursor.close()
 
-
 if __name__ == '__main__':
     wttest.run()

@@ -1183,8 +1183,8 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    (WT_INSERT_KEY_SIZE(ins) + WT_UPDATE_MEMSIZE(ins->upd));
 		if (count > WT_MIN_SPLIT_COUNT &&
 		    size > (size_t)btree->maxleafpage) {
-			WT_STAT_FAST_CONN_INCR(session, cache_inmem_splittable);
-			WT_STAT_FAST_DATA_INCR(session, cache_inmem_splittable);
+			WT_STAT_CONN_INCR(session, cache_inmem_splittable);
+			WT_STAT_DATA_INCR(session, cache_inmem_splittable);
 			return (true);
 		}
 	}
@@ -1233,8 +1233,8 @@ __wt_page_can_evict(
 	 * been written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
 	if (modified && btree->checkpointing != WT_CKPT_OFF) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_CONN_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_DATA_INCR(session, cache_eviction_checkpoint);
 		return (false);
 	}
 
@@ -1411,7 +1411,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * come or go, we'll check the slots for all of the sessions that could
 	 * have been active when we started our check.
 	 */
-	WT_STAT_FAST_CONN_INCR(session, cache_hazard_checks);
+	WT_STAT_CONN_INCR(session, cache_hazard_checks);
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (s = conn->sessions, i = 0, j = 0, max = 0;
 	    i < session_cnt; ++s, ++i) {
@@ -1420,19 +1420,19 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_ORDERED_READ(hazard_size, s->hazard_size);
 		if (s->hazard_size > max) {
 			max = s->hazard_size;
-			WT_STAT_FAST_CONN_SET(session,
+			WT_STAT_CONN_SET(session,
 			    cache_hazard_max, max);
 		}
 		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp) {
 			++j;
 			if (hp->page == page) {
-				WT_STAT_FAST_CONN_INCRV(session,
+				WT_STAT_CONN_INCRV(session,
 				    cache_hazard_walks, j);
 				return (hp);
 			}
 		}
 	}
-	WT_STAT_FAST_CONN_INCRV(session, cache_hazard_walks, j);
+	WT_STAT_CONN_INCRV(session, cache_hazard_walks, j);
 	return (NULL);
 }
 

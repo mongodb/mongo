@@ -646,7 +646,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 	/* Open any indices. */
 	WT_RET(__curtable_open_indices(ctable));
 	WT_RET(__wt_scr_alloc(session, 128, &key));
-	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
+	WT_STAT_DATA_INCR(session, cursor_truncate);
 
 	/*
 	 * Step through the cursor range, removing the index entries.

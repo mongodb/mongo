@@ -100,6 +100,5 @@ class test_util09(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["loadtext", "table:" + self.tablename], infilename="loadtext.in")
         self.check_keys(self.tablename, keys)
 
-
 if __name__ == '__main__':
     wttest.run()

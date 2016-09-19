@@ -566,7 +566,7 @@ statistics will be logged to the file; if the database is configured
 with "all" or "fast", the corresponding statistics will be logged to the
 file.
 
-In previous releases, the WT_SESSION::cursor method took 
+In previous releases, the WT_SESSION::cursor method took
 \c statistics_clear and a \c statistics_fast configurations.  The
 \c statistics_clear configuration defaulted to false; when set to true,
 statistics counters were reset after they were gathered by the cursor.

@@ -334,9 +334,9 @@ err:	session->compact = NULL;
 	WT_TRET(__wt_session_release_resources(session));
 
 	if (ret != 0)
-		WT_STAT_FAST_CONN_INCR(session, session_table_compact_fail);
+		WT_STAT_CONN_INCR(session, session_table_compact_fail);
 	else
-		WT_STAT_FAST_CONN_INCR(session, session_table_compact_success);
+		WT_STAT_CONN_INCR(session, session_table_compact_success);
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -357,7 +357,7 @@ __wt_session_compact_readonly(
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL_NOCONF(session, compact);
 
-	WT_STAT_FAST_CONN_INCR(session, session_table_compact_fail);
+	WT_STAT_CONN_INCR(session, session_table_compact_fail);
 	ret = __wt_session_notsup(session);
 err:	API_END_RET(session, ret);
 }

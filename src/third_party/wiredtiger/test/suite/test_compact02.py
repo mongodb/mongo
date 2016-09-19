@@ -147,6 +147,5 @@ class test_compact02(wttest.WiredTigerTestCase):
         # After compact, the file size should be less than half the full size.
         self.assertLess(sz, self.fullsize / 2)
 
-
 if __name__ == '__main__':
     wttest.run()

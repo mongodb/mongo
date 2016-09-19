@@ -114,6 +114,5 @@ class test_cursor_pin(wttest.WiredTigerTestCase):
             list(range(self.nentries + 1, self.nentries + 1000) +\
                  range(self.nentries + 2001, self.nentries + 3000)))
 
-
 if __name__ == '__main__':
     wttest.run()

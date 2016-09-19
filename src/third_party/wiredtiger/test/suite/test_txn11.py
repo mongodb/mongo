@@ -62,7 +62,6 @@ class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
             checkpoints += 1
         return
 
-
     def test_ops(self):
         # Populate a table
         simple_populate(self, self.source_uri, 'key_format=S', self.nrows)

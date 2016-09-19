@@ -297,6 +297,5 @@ class test_bug008(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.get_key(), key_populate(cursor, 119))
             self.assertEqual(cursor.get_value(), value_populate(cursor, 119))
 
-
 if __name__ == '__main__':
     wttest.run()

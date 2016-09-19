@@ -1,7 +1,7 @@
 # Data for log.py, describes the format of log records
 
 # There are a small number of main log record types.
-# 
+#
 # Some log record types, such as transaction commit, also include a list of
 # "log operations" within the same log record.  Both log record types and log
 # operations are described here.

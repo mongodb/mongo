@@ -530,7 +530,7 @@ __statlog_server(void *arg)
 		/* Wait until the next event. */
 		__wt_cond_wait(session, conn->stat_cond, conn->stat_usecs);
 
-		if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
+		if (WT_STAT_ENABLED(session))
 			WT_ERR(__statlog_log_one(session, &path, &tmp));
 	}
 

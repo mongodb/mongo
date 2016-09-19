@@ -143,7 +143,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new, old;
 
-	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
+	WT_STAT_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
 	new = old = *l;
@@ -177,7 +177,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	uint16_t ticket;
 	int pause_cnt;
 
-	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
+	WT_STAT_CONN_INCR(session, rwlock_read);
 
 	WT_DIAGNOSTIC_YIELD;
 
@@ -247,7 +247,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, new, old;
 
-	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
+	WT_STAT_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
 	old = new = *l;
@@ -278,7 +278,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	uint16_t ticket;
 	int pause_cnt;
 
-	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
+	WT_STAT_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
 
