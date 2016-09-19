@@ -274,11 +274,20 @@ unsigned long long checkIfReplMissingFromCommandLine(OperationContext* txn) {
  * these versions.
  */
 bool isSubjectToSERVER23299(OperationContext* txn) {
+    // We are already called under global X lock as part of the startup sequence
+    invariant(txn->lockState()->isW());
+
     if (storageGlobalParams.readOnly) {
         return false;
     }
+
+    // Ensure that the local database is open since we are still early in the server startup
+    // sequence
     dbHolder().openDb(txn, startupLogCollectionName.db());
-    AutoGetCollectionForRead autoColl(txn, startupLogCollectionName);
+
+    // Only used as a shortcut to obtain a reference to the startup log collection
+    AutoGetCollection autoColl(txn, startupLogCollectionName, MODE_IS);
+
     // No startup log or an empty one means either that the user was not running an affected
     // version, or that they manually deleted the startup collection since they last started an
     // affected version.
