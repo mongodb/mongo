@@ -195,6 +195,22 @@ void ASIOConnection::cancelTimeout() {
 void ASIOConnection::setup(Milliseconds timeout, SetupCallback cb) {
     _impl->strand().dispatch([this, timeout, cb] {
         _setupCallback = [this, cb](ConnectionInterface* ptr, Status status) {
+            {
+                stdx::lock_guard<stdx::mutex> lk(_impl->_access->mutex);
+                _impl->_access->id++;
+
+                // If our connection timeout callback ran but wasn't the reason we exited
+                // the state machine, clear any TIMED_OUT state.
+                if (status.isOK()) {
+                    _impl->_transitionToState_inlock(
+                        NetworkInterfaceASIO::AsyncOp::State::kUninitialized);
+                    _impl->_transitionToState_inlock(
+                        NetworkInterfaceASIO::AsyncOp::State::kInProgress);
+                    _impl->_transitionToState_inlock(
+                        NetworkInterfaceASIO::AsyncOp::State::kFinished);
+                }
+            }
+
             cancelTimeout();
             cb(ptr, status);
         };
