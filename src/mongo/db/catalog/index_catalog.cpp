@@ -404,6 +404,8 @@ void IndexCatalog::IndexBuildBlock::fail() {
 void IndexCatalog::IndexBuildBlock::success() {
     Collection* collection = _catalog->_collection;
     fassert(17207, collection->ok());
+    NamespaceString ns(_indexNamespace);
+    invariant(_txn->lockState()->isDbLockedForMode(ns.db(), MODE_X));
 
     collection->getCatalogEntry()->indexBuildSuccess(_txn, _indexName);
 
@@ -413,6 +415,8 @@ void IndexCatalog::IndexBuildBlock::success() {
     fassert(17331, entry && entry == _entry);
 
     OperationContext* txn = _txn;
+    LOG(2) << "marking index " << _indexName << " as ready in snapshot id "
+           << txn->recoveryUnit()->getSnapshotId();
     _txn->recoveryUnit()->onCommit([txn, entry, collection] {
         // Note: this runs after the WUOW commits but before we release our X lock on the
         // collection. This means that any snapshot created after this must include the full index,
