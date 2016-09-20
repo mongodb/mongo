@@ -1201,25 +1201,27 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
     }
 
     const auto targetOpTime = settings.getOpTime();
+
     if (targetOpTime.isNull()) {
         return Status::OK();
     }
 
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-        // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
-        // an error. However, we consider all writes "committed" and can treat MajorityReadConcern
-        // as LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
+        // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return an
+        // error. However, we consider all writes "committed" and can treat MajorityReadConcern as
+        // LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
         return {ErrorCodes::NotAReplicaSet,
                 "node needs to be a replica set member to use read concern"};
     }
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+
     if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {
         return {ErrorCodes::CommandNotSupported,
                 "Current storage engine does not support majority readConcerns"};
     }
 
-    auto getCurrentOpTime = [this, isMajorityReadConcern, targetOpTime] {
+    auto getCurrentOpTime = [this, isMajorityReadConcern] {
         auto committedOptime =
             _currentCommittedSnapshot ? _currentCommittedSnapshot->opTime : OpTime();
         return isMajorityReadConcern ? committedOptime : _getMyLastAppliedOpTime_inlock();
@@ -1231,29 +1233,18 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
     }
 
     while (targetOpTime > getCurrentOpTime()) {
-        Status interruptedStatus = txn->checkForInterruptNoAssert();
-        if (!interruptedStatus.isOK()) {
-            return interruptedStatus;
-        }
-
-        if (_inShutdown) {
-            return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
-        }
-
-        // Now we have to wait to be notified when
-        // either the optime or committed snapshot change.
-
-        // If we are doing a majority read concern we only need to wait
-        // for a new snapshot.
+        // If we are doing a majority read concern we only need to wait for a new snapshot.
         if (isMajorityReadConcern) {
             // Wait for a snapshot that meets our needs (< targetOpTime).
-            if (txn->hasDeadline()) {
-                LOG(2) << "waitUntilOpTime: waiting for a new snapshot to occur until: "
-                       << txn->getDeadline();
-                _currentCommittedSnapshotCond.wait_until(lock,
-                                                         txn->getDeadline().toSystemTimePoint());
-            } else {
-                _currentCommittedSnapshotCond.wait(lock);
+            LOG(3) << "waitUntilOpTime: waiting for a new snapshot until " << txn->getDeadline();
+
+            auto waitStatus = txn->waitForConditionOrInterruptNoAssertUntil(
+                _currentCommittedSnapshotCond, lock, txn->getDeadline());
+            if (!waitStatus.isOK()) {
+                return waitStatus.getStatus();
+            } else if (waitStatus.getValue() == stdx::cv_status::timeout) {
+                return {ErrorCodes::ExceededTimeLimit,
+                        "Exceeded time limit while waiting for majority read"};
             }
 
             LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
@@ -1265,11 +1256,15 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
         WaiterInfoGuard waitInfo(
             &_opTimeWaiterList, txn->getOpID(), targetOpTime, nullptr, &condVar);
 
-        LOG(3) << "Waiting for OpTime: " << waitInfo.waiter;
-        if (txn->hasDeadline()) {
-            condVar.wait_until(lock, txn->getDeadline().toSystemTimePoint());
-        } else {
-            condVar.wait(lock);
+        LOG(3) << "waituntilOpTime: waiting for OpTime " << waitInfo.waiter << " until "
+               << txn->getDeadline();
+
+        auto waitStatus =
+            txn->waitForConditionOrInterruptNoAssertUntil(condVar, lock, txn->getDeadline());
+        if (!waitStatus.isOK()) {
+            return waitStatus.getStatus();
+        } else if (waitStatus.getValue() == stdx::cv_status::timeout) {
+            return {ErrorCodes::ExceededTimeLimit, "Exceeded time limit while waiting for opTime"};
         }
     }
 
