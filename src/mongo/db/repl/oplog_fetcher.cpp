@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
@@ -240,27 +241,25 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
     return info;
 }
 
-OplogFetcher::OplogFetcher(executor::TaskExecutor* exec,
+OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            OpTimeWithHash lastFetched,
                            HostAndPort source,
-                           NamespaceString oplogNSS,
+                           NamespaceString nss,
                            ReplicaSetConfig config,
                            DataReplicatorExternalState* dataReplicatorExternalState,
                            EnqueueDocumentsFn enqueueDocumentsFn,
                            OnShutdownCallbackFn onShutdownCallbackFn)
-    : _dataReplicatorExternalState(dataReplicatorExternalState),
+    : _executor(executor),
+      _source(source),
+      _nss(nss),
+      _metadataObject(uassertStatusOK(makeMetadataObject(config.getProtocolVersion() == 1LL))),
+      _remoteCommandTimeout(config.getElectionTimeoutPeriod()),
+      _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
       _awaitDataTimeout(calculateAwaitDataTimeout(config)),
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(lastFetched),
-      _fetcher(exec,
-               source,
-               oplogNSS.db().toString(),
-               makeFindCommandObject(dataReplicatorExternalState, oplogNSS, lastFetched.opTime),
-               stdx::bind(
-                   &OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
-               uassertStatusOK(makeMetadataObject(config.getProtocolVersion() == 1LL)),
-               config.getElectionTimeoutPeriod()) {
+      _fetcher(_makeFetcher(_lastFetched.opTime)) {
     uassert(ErrorCodes::BadValue, "null last optime fetched", !lastFetched.opTime.isNull());
     uassert(ErrorCodes::InvalidReplicaSetConfig,
             "uninitialized replica set configuration",
@@ -279,23 +278,23 @@ std::string OplogFetcher::toString() const {
     return str::stream() << "OplogReader -"
                          << " last optime fetched: " << _lastFetched.opTime.toString()
                          << " last hash fetched: " << _lastFetched.value
-                         << " fetcher: " << _fetcher.getDiagnosticString();
+                         << " fetcher: " << _fetcher->getDiagnosticString();
 }
 
 bool OplogFetcher::isActive() const {
-    return _fetcher.isActive();
+    return _fetcher->isActive();
 }
 
 Status OplogFetcher::startup() {
-    return _fetcher.schedule();
+    return _fetcher->schedule();
 }
 
 void OplogFetcher::shutdown() {
-    _fetcher.shutdown();
+    _fetcher->shutdown();
 }
 
 void OplogFetcher::join() {
-    _fetcher.join();
+    _fetcher->join();
 }
 
 OpTimeWithHash OplogFetcher::getLastOpTimeWithHashFetched() const {
@@ -304,15 +303,15 @@ OpTimeWithHash OplogFetcher::getLastOpTimeWithHashFetched() const {
 }
 
 BSONObj OplogFetcher::getCommandObject_forTest() const {
-    return _fetcher.getCommandObject();
+    return _fetcher->getCommandObject();
 }
 
 BSONObj OplogFetcher::getMetadataObject_forTest() const {
-    return _fetcher.getMetadataObject();
+    return _metadataObject;
 }
 
 Milliseconds OplogFetcher::getRemoteCommandTimeout_forTest() const {
-    return _fetcher.getTimeout();
+    return _remoteCommandTimeout;
 }
 
 Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
@@ -344,7 +343,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         const auto& metadataObj = queryResponse.otherFields.metadata;
         auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
         if (!metadataResult.isOK()) {
-            error() << "invalid replication metadata from sync source " << _fetcher.getSource()
+            error() << "invalid replication metadata from sync source " << _fetcher->getSource()
                     << ": " << metadataResult.getStatus() << ": " << metadataObj;
             _onShutdown(metadataResult.getStatus());
             return;
@@ -407,9 +406,9 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         _lastFetched = opTimeWithHash;
     }
 
-    if (_dataReplicatorExternalState->shouldStopFetching(_fetcher.getSource(), metadata)) {
+    if (_dataReplicatorExternalState->shouldStopFetching(_fetcher->getSource(), metadata)) {
         _onShutdown(Status(ErrorCodes::InvalidSyncSource,
-                           str::stream() << "sync source " << _fetcher.getSource().toString()
+                           str::stream() << "sync source " << _fetcher->getSource().toString()
                                          << " (last optime: "
                                          << metadata.getLastOpVisible().toString()
                                          << "; sync source index: "
@@ -442,6 +441,16 @@ void OplogFetcher::_onShutdown(Status status, OpTimeWithHash opTimeWithHash) {
     _onShutdownCallbackFn(status, opTimeWithHash);
 }
 
+std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(OpTime lastFetchedOpTime) {
+    return stdx::make_unique<Fetcher>(
+        _executor,
+        _source,
+        _nss.db().toString(),
+        makeFindCommandObject(_dataReplicatorExternalState, _nss, lastFetchedOpTime),
+        stdx::bind(&OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
+        _metadataObject,
+        _remoteCommandTimeout);
+}
 
 }  // namespace repl
 }  // namespace mongo

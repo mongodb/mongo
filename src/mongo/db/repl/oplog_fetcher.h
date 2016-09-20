@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
@@ -121,7 +123,7 @@ public:
      *
      * Throws a UserException if validation fails on any of the provided arguments.
      */
-    OplogFetcher(executor::TaskExecutor* exec,
+    OplogFetcher(executor::TaskExecutor* executor,
                  OpTimeWithHash lastFetched,
                  HostAndPort source,
                  NamespaceString nss,
@@ -201,10 +203,20 @@ private:
     void _onShutdown(Status status);
     void _onShutdown(Status status, OpTimeWithHash opTimeWithHash);
 
+    /**
+     * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
+     */
+    std::unique_ptr<Fetcher> _makeFetcher(OpTime lastFetchedOpTime);
+
     // Protects member data of this OplogFetcher.
     mutable stdx::mutex _mutex;
 
-    DataReplicatorExternalState* _dataReplicatorExternalState;
+    executor::TaskExecutor* const _executor;
+    const HostAndPort _source;
+    const NamespaceString _nss;
+    const BSONObj _metadataObject;
+    const Milliseconds _remoteCommandTimeout;
+    DataReplicatorExternalState* const _dataReplicatorExternalState;
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
     const OnShutdownCallbackFn _onShutdownCallbackFn;
@@ -214,7 +226,7 @@ private:
     // "_enqueueDocumentsFn".
     OpTimeWithHash _lastFetched;
 
-    Fetcher _fetcher;
+    std::unique_ptr<Fetcher> _fetcher;
 };
 
 }  // namespace repl
