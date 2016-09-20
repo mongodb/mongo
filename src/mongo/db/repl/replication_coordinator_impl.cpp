@@ -1242,13 +1242,10 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
             // Wait for a snapshot that meets our needs (< targetOpTime).
             LOG(3) << "waitUntilOpTime: waiting for a new snapshot until " << txn->getDeadline();
 
-            auto waitStatus = txn->waitForConditionOrInterruptNoAssertUntil(
-                _currentCommittedSnapshotCond, lock, txn->getDeadline());
+            auto waitStatus =
+                txn->waitForConditionOrInterruptNoAssert(_currentCommittedSnapshotCond, lock);
             if (!waitStatus.isOK()) {
-                return waitStatus.getStatus();
-            } else if (waitStatus.getValue() == stdx::cv_status::timeout) {
-                return {ErrorCodes::ExceededTimeLimit,
-                        "Exceeded time limit while waiting for majority read"};
+                return waitStatus;
             }
 
             LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
@@ -1263,12 +1260,9 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
         LOG(3) << "waituntilOpTime: waiting for OpTime " << waitInfo.waiter << " until "
                << txn->getDeadline();
 
-        auto waitStatus =
-            txn->waitForConditionOrInterruptNoAssertUntil(condVar, lock, txn->getDeadline());
+        auto waitStatus = txn->waitForConditionOrInterruptNoAssert(condVar, lock);
         if (!waitStatus.isOK()) {
-            return waitStatus.getStatus();
-        } else if (waitStatus.getValue() == stdx::cv_status::timeout) {
-            return {ErrorCodes::ExceededTimeLimit, "Exceeded time limit while waiting for opTime"};
+            return waitStatus;
         }
     }
 
