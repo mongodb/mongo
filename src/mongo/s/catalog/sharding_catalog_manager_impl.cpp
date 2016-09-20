@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/replset/sharding_catalog_manager_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
 
 #include <iomanip>
 

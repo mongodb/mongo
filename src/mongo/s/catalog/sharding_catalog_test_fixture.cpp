@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
+#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 
 namespace mongo {
 

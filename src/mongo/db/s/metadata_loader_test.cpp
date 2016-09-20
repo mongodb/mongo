@@ -32,7 +32,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"
-#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
+#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 

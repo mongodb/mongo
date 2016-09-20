@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/catalog/replset_dist_lock_manager.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"

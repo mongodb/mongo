@@ -49,7 +49,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
-#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/catalog/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
