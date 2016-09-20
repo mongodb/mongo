@@ -653,7 +653,7 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     _typeBits.appendDecimalExponent(biasedExponent & TypeBits::kStoredDecimalExponentMask);
 
     uint32_t signalingFlags = Decimal128::kNoFlag;
-    double bin = dec.toDouble(&signalingFlags, Decimal128::kRoundTowardZero);
+    const double bin = dec.toDouble(&signalingFlags, Decimal128::kRoundTowardZero);
 
     // Easy case: the decimal actually is a double. True for many integers, fractions like 1.5, etc.
     if (!Decimal128::hasFlag(signalingFlags, Decimal128::kInexact) &&
@@ -664,7 +664,8 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
 
     // Values smaller than the double normalized range need special handling: a regular double
     // wouldn't give 15 digits, if any at all.
-    if (std::abs(bin) < std::numeric_limits<double>::min()) {
+    const double absBin = std::abs(bin);
+    if (absBin < std::numeric_limits<double>::min()) {
         _appendTinyDecimalWithoutTypeBits(dec, bin, invert);
         return;
     }
@@ -673,7 +674,7 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     // to the maximum double, the original decimal was outside of the range of finite doubles.
     // Because all decimals larger than the max finite double round down to that value, strict
     // less-than would be incorrect.
-    if (std::abs(bin) >= std::numeric_limits<double>::max()) {
+    if (absBin >= std::numeric_limits<double>::max()) {
         _appendHugeDecimalWithoutTypeBits(dec, invert);
         return;
     }
@@ -687,10 +688,22 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     // must set 'storedValue', overwriting the NaN.
     Decimal128 storedValue = Decimal128::kPositiveNaN;
 
-    // For doubles in this range, 'bin' may have lost precision in the integer part, which would
-    // lead to miscompares with integers. So, instead handle explicitly.
-    if ((bin <= -kMaxIntForDouble || bin >= kMaxIntForDouble) && bin > -kMinLargeDouble &&
-        bin < kMinLargeDouble) {
+    if (absBin >= kMinLargeDouble) {
+        // Large finite decimals that are not exactly equal to a double require a decimal
+        // continuation, even if they only have 15 significant digits, as there only is a single bit
+        // for the DCM.
+        _appendLargeDouble(bin, kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits, invert);
+        storedValue = Decimal128(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
+
+    } else if (absBin < kTiniestDoubleWith2BitDCM) {
+        // Small finite decimals not exactly equal to a double similarly require a decimal
+        // continuation if they're small enough to only have a single bit for the DCM.
+        _appendSmallDouble(bin, kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits, invert);
+        storedValue = Decimal128(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
+
+    } else if (absBin >= kMaxIntForDouble) {
+        // For doubles in this range, 'bin' may have lost precision in the integer part, which would
+        // lead to miscompares with integers. So, instead handle explicitly.
         uint32_t signalingFlags = Decimal128::kNoFlag;
         Decimal128 truncated = dec.quantize(
             Decimal128::kNormalizedZero, &signalingFlags, Decimal128::kRoundTowardZero);
@@ -714,12 +727,11 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
 
         storedValue = Decimal128(isNegative, Decimal128::kExponentBias, 0, integerPart);
 
-        // Common case: the coefficient less than 1E15, so at most 15 digits, and the number is
-        // in the normal range of double, so the decimal can be represented with at least 15 digits
-        // of precision by the double 'bin'
     } else if (dec.getCoefficientHigh() == 0 && dec.getCoefficientLow() < k1E15) {
-        dassert(Decimal128(
-                    std::abs(bin), Decimal128::kRoundTo15Digits, Decimal128::kRoundTowardPositive)
+        // Common case: the coefficient less than 1E15, so at most 15 digits, and the number is
+        // in the range of double where we have 2 spare bits for the DCM, so the decimal can be
+        // represented with at least 15 digits of precision by the double 'bin'.
+        dassert(Decimal128(absBin, Decimal128::kRoundTo15Digits, Decimal128::kRoundTowardPositive)
                     .isEqual(dec.toAbs()));
         _appendDoubleWithoutTypeBits(bin, kDCMEqualToDoubleRoundedUpTo15Digits, invert);
         return;
@@ -891,6 +903,7 @@ void KeyString::_appendSmallDouble(double value, DecimalContinuationMarker dcm, 
         encoded |= dcm;
         dassert(encoded >> 62 == 0x3);
     } else {
+        invariant(dcm != kDCMEqualToDoubleRoundedUpTo15Digits);  // only single DCM bit here
         // Values in the range [numeric_limits<double>::denorm_min(), 2**(-255)) get the prefixes
         // 0b01 or 0b10. The 0b00 prefix is used by _appendHugeDecimalWithoutTypeBits for decimals
         // smaller than that.
@@ -909,6 +922,7 @@ void KeyString::_appendSmallDouble(double value, DecimalContinuationMarker dcm, 
 void KeyString::_appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert) {
     dassert(!std::isnan(value));
     dassert(value != 0.0);
+    invariant(dcm != kDCMEqualToDoubleRoundedUpTo15Digits);  // only single DCM bit here
 
     _append(value > 0 ? CType::kNumericPositiveLargeMagnitude
                       : CType::kNumericNegativeLargeMagnitude,
@@ -972,7 +986,8 @@ void KeyString::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
     dassert(encoded >> 62 == 0x1);
     _append(endian::nativeToBig(encoded), isNegative ? !invert : invert);
 
-    Decimal128 storedVal(scaledBin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
+    // Round down, so it is certain that in all cases a non-negative continuation can be found.
+    Decimal128 storedVal(scaledBin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardZero);
     storedVal =
         storedVal
             .multiply(kTinyDoubleExponentDownshiftFactorAsDecimal, Decimal128::kRoundTowardZero)
@@ -1429,13 +1444,14 @@ void toBsonValue(uint8_t ctype,
 
                     // If the actual double would be subnormal, scale in decimal domain.
                     Decimal128 dec;
-                    if (scaledBin < DBL_MIN * kTinyDoubleExponentUpshiftFactor) {
-                        // For conversion from binary->decimal scale away from zero,
-                        // otherwise round toward. Needs to be done consistently in read/write.
+                    if (scaledBin <
+                        std::numeric_limits<double>::min() * kTinyDoubleExponentUpshiftFactor) {
+                        // For subnormals, we rounded down everywhere, to ensure that the
+                        // continuation will always be positive. Needs to be done consistently in
+                        // encoding/decoding (see storedVal in _appendTinyDecimalWithoutTypeBits).
 
-                        Decimal128 scaledDec = Decimal128(scaledBin,
-                                                          Decimal128::kRoundTo34Digits,
-                                                          Decimal128::kRoundTowardPositive);
+                        Decimal128 scaledDec = Decimal128(
+                            scaledBin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardZero);
                         dec = scaledDec.multiply(kTinyDoubleExponentDownshiftFactorAsDecimal,
                                                  Decimal128::kRoundTowardZero);
                     } else {
