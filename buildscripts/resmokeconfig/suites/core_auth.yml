@@ -10,8 +10,6 @@ selector:
     exclude_files:
     # Skip any tests that run with auth explicitly.
     - jstests/core/*[aA]uth*.js
-    # Skip these additional tests when running with auth enabled.
-    - jstests/core/bench_test*.js
 
 executor:
   js_test:

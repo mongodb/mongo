@@ -23,8 +23,8 @@
         var benchArgs = {ops: benchOps, parallel: 2, seconds: 1, host: db.getMongo().host};
         if (jsTest.options().auth) {
             benchArgs['db'] = 'admin';
-            benchArgs['username'] = jsTest.options().adminUser;
-            benchArgs['password'] = jsTest.options().adminPassword;
+            benchArgs['username'] = jsTest.options().authUser;
+            benchArgs['password'] = jsTest.options().authPassword;
         }
         return benchRun(benchArgs);
     }
