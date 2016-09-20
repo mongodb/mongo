@@ -758,6 +758,7 @@ Status applyOperation_inlock(OperationContext* txn,
                     // Wait for thread to start and register itself
                     IndexBuilder::waitForBgIndexStarting();
                 }
+                txn->recoveryUnit()->abandonSnapshot();
             } else {
                 IndexBuilder builder(indexSpec);
                 Status status = builder.buildInForeground(txn, db);

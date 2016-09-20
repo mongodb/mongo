@@ -203,10 +203,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     WT_SESSION* s = _session->getSession();
     if (commit) {
         invariantWTOK(s->commit_transaction(s, NULL));
-        LOG(3) << "WT commit_transaction";
+        LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
         invariantWTOK(s->rollback_transaction(s, NULL));
-        LOG(3) << "WT rollback_transaction";
+        LOG(3) << "WT rollback_transaction for snapshot id " << _mySnapshotId;
     }
     _active = false;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
@@ -248,7 +248,7 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
         invariantWTOK(s->begin_transaction(s, NULL));
     }
 
-    LOG(3) << "WT begin_transaction";
+    LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;
     _timer.reset();
     _active = true;
 }

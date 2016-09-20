@@ -57,6 +57,10 @@ public:
         return _id != other._id;
     }
 
+    std::string toString() const {
+        return std::to_string(_id);
+    }
+
 private:
     uint64_t _id;
 };
