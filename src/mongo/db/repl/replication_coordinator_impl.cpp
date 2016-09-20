@@ -1233,6 +1233,10 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* txn,
     }
 
     while (targetOpTime > getCurrentOpTime()) {
+        if (_inShutdown) {
+            return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
+        }
+
         // If we are doing a majority read concern we only need to wait for a new snapshot.
         if (isMajorityReadConcern) {
             // Wait for a snapshot that meets our needs (< targetOpTime).
