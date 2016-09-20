@@ -1,11 +1,13 @@
 /**
  * Tests that initial sync can complete after a failed insert to a cloned collection.
+ * The failpoint may fail once or twice depending on the order of the results of listCollection,
+ * so we allow initial sync to retry 3 times.
  */
 
 (function() {
     var name = 'initial_sync_fail_insert_once';
     var replSet = new ReplSetTest(
-        {name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=2"}});
+        {name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=3"}});
 
     replSet.startSet();
     replSet.initiate();
@@ -18,7 +20,7 @@
     jsTest.log("Enabling Failpoint failCollectionInserts on " + tojson(secondary));
     assert.commandWorked(secondary.getDB("admin").adminCommand({
         configureFailPoint: "failCollectionInserts",
-        mode: {times: 1},
+        mode: {times: 2},
         data: {collectionNS: coll.getFullName()}
     }));
 
