@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, mongos: 1, verbose: 3});
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
