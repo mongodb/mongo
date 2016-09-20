@@ -132,6 +132,15 @@ StatusWith<DistLockHandle> acquireDistLock(OperationContext* txn,
     return std::move(statusWithDistLockHandle.getValue());
 }
 
+/**
+ * Checks whether the Status has an error caused by replSetStepDown or server shut down.
+ */
+bool isInterruptError(Status status) {
+    return (status == ErrorCodes::BalancerInterrupted ||
+            ErrorCodes::isInterruption(status.code()) ||
+            ErrorCodes::isShutdownError(status.code()));
+}
+
 }  // namespace
 
 MigrationManager::MigrationManager(ServiceContext* serviceContext)
@@ -191,7 +200,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
             if (responseStatus == ErrorCodes::LockBusy) {
                 rescheduledMigrations.emplace_back(std::move(migrateInfo));
             } else {
-                if (responseStatus == ErrorCodes::BalancerInterrupted) {
+                if (isInterruptError(responseStatus)) {
                     auto it = scopedMigrationRequests.find(migrateInfo.getName());
                     invariant(it != scopedMigrationRequests.end());
                     it->second.keepDocumentOnDestruct();
@@ -222,7 +231,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
                                           waitForDelete)
                                     ->get();
 
-        if (responseStatus == ErrorCodes::BalancerInterrupted) {
+        if (isInterruptError(responseStatus)) {
             statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
         }
 
@@ -275,8 +284,12 @@ Status MigrationManager::executeManualMigration(
         return Status::OK();
     }
 
-    if (status == ErrorCodes::BalancerInterrupted) {
+    if (isInterruptError(status)) {
         statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
+        // We want the mongos to get a retriable error, and not make its replica set monitor
+        // interpret something like InterruptedDueToReplStateChange as the config server when the
+        // error comes from the shard.
+        status = {ErrorCodes::BalancerInterrupted, status.reason()};
     }
 
     return status;
