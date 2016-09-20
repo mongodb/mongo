@@ -208,6 +208,11 @@ private:
     // The main balancer thread
     stdx::thread _thread;
 
+    // The operation context of the main balancer thread. This value may only be available in the
+    // kRunning state and is used to force interrupt of any blocking calls made by the balancer
+    // thread.
+    OperationContext* _threadOperationContext{nullptr};
+
     // This thread is only available in the kStopping state and is necessary for the migration
     // manager shutdown to not deadlock with replica set step down. In particular, the migration
     // manager's order of lock acquisition is mutex, then collection lock, whereas stepdown first

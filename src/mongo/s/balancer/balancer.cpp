@@ -180,6 +180,7 @@ void Balancer::onTransitionToPrimary(OperationContext* txn) {
     _migrationManager.startRecovery();
 
     invariant(!_thread.joinable());
+    invariant(!_threadOperationContext);
     _thread = stdx::thread([this] { _mainThread(); });
 }
 
@@ -189,6 +190,13 @@ void Balancer::onStepDownFromPrimary() {
         return;
 
     _state = kStopping;
+
+    // Interrupt the balancer thread if it has been started. We are guaranteed that the operation
+    // context of that thread is still alive, because we hold the balancer mutex.
+    if (_threadOperationContext) {
+        stdx::lock_guard<Client> scopedClientLock(*_threadOperationContext->getClient());
+        _threadOperationContext->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+    }
 
     // Schedule a separate thread to shutdown the migration manager in order to avoid deadlock with
     // replication step down
@@ -288,6 +296,11 @@ void Balancer::_mainThread() {
     auto shardingContext = Grid::get(txn.get());
 
     log() << "CSRS balancer is starting";
+
+    {
+        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
+        _threadOperationContext = txn.get();
+    }
 
     const Seconds kInitBackoffInterval(10);
 
@@ -421,6 +434,7 @@ void Balancer::_mainThread() {
     {
         stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
         _migrationManagerInterruptThread = {};
+        _threadOperationContext = nullptr;
     }
 
     log() << "CSRS balancer is now stopped";
