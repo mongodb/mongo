@@ -70,7 +70,7 @@ public:
      * would have the same outcome as calling SyncTail::syncApply() ('convertUpdatesToUpserts'
      * value will be embedded in the function implementation).
      */
-    using ApplyOperationFn = stdx::function<void(OperationPtrs*)>;
+    using ApplyOperationFn = stdx::function<Status(OperationPtrs*)>;
 
     using MultiApplyFn = stdx::function<StatusWith<OpTime>(
         OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn)>;

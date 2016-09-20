@@ -69,9 +69,12 @@ void MultiApplierTest::tearDown() {
     executor::ThreadPoolExecutorTest::tearDown();
 }
 
+Status applyOperation(MultiApplier::OperationPtrs*) {
+    return Status::OK();
+};
+
 TEST_F(MultiApplierTest, InvalidConstruction) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
     auto multiApply = [](OperationContext*,
                          MultiApplier::Operations,
                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
@@ -136,7 +139,6 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
 
 TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUponCancellation) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     bool multiApplyInvoked = false;
     auto multiApply = [&](OperationContext* txn,
@@ -169,7 +171,6 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
 
 TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
@@ -199,7 +200,6 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
 
 TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCallbackStatus) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
@@ -232,7 +232,6 @@ TEST_F(
     MultiApplierTest,
     MultiApplierProvidesOperationContextToMultiApplyFunctionButDisposesBeforeInvokingFinishCallback) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     OperationContext* multiApplyTxn = nullptr;
     MultiApplier::Operations operationsToApply;

@@ -68,10 +68,10 @@ private:
                                    MultiApplier::Operations ops,
                                    MultiApplier::ApplyOperationFn applyOperation) override;
 
-    void _multiSyncApply(MultiApplier::OperationPtrs* ops) override;
+    Status _multiSyncApply(MultiApplier::OperationPtrs* ops) override;
 
-    void _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
-                                const HostAndPort& source) override;
+    Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                  const HostAndPort& source) override;
 
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;

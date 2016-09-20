@@ -74,7 +74,9 @@ protected:
     StorageInterfaceMock* _storageInterface = nullptr;
 
     // Implements the MultiApplier::ApplyOperationFn interface and does nothing.
-    static void noopApplyOperationFn(MultiApplier::OperationPtrs*) {}
+    static Status noopApplyOperationFn(MultiApplier::OperationPtrs*) {
+        return Status::OK();
+    }
 
 private:
     void setUp() override;
@@ -501,10 +503,12 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* txn,
                                           const CollectionOptions& options) {
     auto writerPool = SyncTail::makeWriterPool();
     MultiApplier::Operations operationsApplied;
-    auto applyOperationFn = [&operationsApplied](MultiApplier::OperationPtrs* operationsToApply) {
+    auto applyOperationFn =
+        [&operationsApplied](MultiApplier::OperationPtrs* operationsToApply) -> Status {
         for (auto&& opPtr : *operationsToApply) {
             operationsApplied.push_back(*opPtr);
         }
+        return Status::OK();
     };
     createCollection(txn, nss, options);
 
@@ -548,12 +552,13 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     stdx::mutex mutex;
     std::vector<MultiApplier::Operations> operationsApplied;
     auto applyOperationFn = [&mutex, &operationsApplied](
-        MultiApplier::OperationPtrs* operationsForWriterThreadToApply) {
+        MultiApplier::OperationPtrs* operationsForWriterThreadToApply) -> Status {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         operationsApplied.emplace_back();
         for (auto&& opPtr : *operationsForWriterThreadToApply) {
             operationsApplied.back().push_back(*opPtr);
         }
+        return Status::OK();
     };
 
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss1, BSON("x" << 1));

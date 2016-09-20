@@ -253,7 +253,12 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
 // state of the container after calling. However, these functions cannot modify the pointed-to
 // operations because the OperationPtrs container contains const pointers.
 void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
-void multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
+
+// Used by 3.2 initial sync.
+void multiInitialSyncApply_abortOnFailure(MultiApplier::OperationPtrs* ops, SyncTail* st);
+
+// Used by 3.4 initial sync.
+Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
 
 /**
  * Testing-only version of multiSyncApply that returns an error instead of aborting.

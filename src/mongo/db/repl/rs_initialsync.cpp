@@ -293,7 +293,7 @@ Status _initialSync(BackgroundSync* bgsync) {
         }
     }
 
-    InitialSync init(bgsync, multiInitialSyncApply);
+    InitialSync init(bgsync, multiInitialSyncApply_abortOnFailure);
     init.setHostname(r.getHost().toString());
 
     BSONObj lastOp = r.getLastOp(rsOplogName);

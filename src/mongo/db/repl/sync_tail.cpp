@@ -439,14 +439,17 @@ void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherP
 
 // Doles out all the work to the writer pool threads.
 // Does not modify writerVectors, but passes non-const pointers to inner vectors into func.
-void applyOps(std::vector<MultiApplier::OperationPtrs>* writerVectors,
+void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               OldThreadPool* writerPool,
-              const MultiApplier::ApplyOperationFn& func) {
+              const MultiApplier::ApplyOperationFn& func,
+              std::vector<Status>* statusVector) {
+    invariant(writerVectors.size() == statusVector->size());
     TimerHolder timer(&applyBatchStats);
-    for (auto&& ops : *writerVectors) {
-        if (!ops.empty()) {
-            auto opsPtr = &ops;
-            writerPool->schedule([&func, opsPtr] { func(opsPtr); });
+    for (size_t i = 0; i < writerVectors.size(); i++) {
+        if (!writerVectors[i].empty()) {
+            writerPool->schedule([&func, &writerVectors, statusVector, i] {
+                (*statusVector)[i] = func(&writerVectors[i]);
+            });
         }
     }
 }
@@ -614,7 +617,12 @@ void fillWriterVectors(OperationContext* txn,
 // Applies a batch of oplog entries, by using a set of threads to apply the operations and then
 // writes the oplog entries to the local oplog.
 OpTime SyncTail::multiApply(OperationContext* txn, MultiApplier::Operations ops) {
-    auto applyOperation = [this](MultiApplier::OperationPtrs* ops) { _applyFunc(ops, this); };
+    auto applyOperation = [this](MultiApplier::OperationPtrs* ops) -> Status {
+        _applyFunc(ops, this);
+        // This function is used by 3.2 initial sync and steady state data replication.
+        // _applyFunc() will throw or abort on error, so we return OK here.
+        return Status::OK();
+    };
     return fassertStatusOK(
         34437, repl::multiApply(txn, _writerPool.get(), std::move(ops), applyOperation));
 }
@@ -1144,10 +1152,16 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 }
 
 // This free function is used by the initial sync writer threads to apply each op
-void multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st) {
+void multiInitialSyncApply_abortOnFailure(MultiApplier::OperationPtrs* ops, SyncTail* st) {
     initializeWriterThread();
     auto txn = cc().makeOperationContext();
     fassertNoTrace(15915, multiInitialSyncApply_noAbort(txn.get(), ops, st));
+}
+
+Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st) {
+    initializeWriterThread();
+    auto txn = cc().makeOperationContext();
+    return multiInitialSyncApply_noAbort(txn.get(), ops, st);
 }
 
 Status multiInitialSyncApply_noAbort(OperationContext* txn,
@@ -1238,6 +1252,7 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
                 "attempting to replicate ops while primary"};
     }
 
+    std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     {
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on our stack, including writerVectors.
@@ -1253,7 +1268,14 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
         storage->setOplogDeleteFromPoint(txn, Timestamp());
         storage->setMinValidToAtLeast(txn, ops.back().getOpTime());
 
-        applyOps(&writerVectors, workerPool, applyOperation);
+        applyOps(writerVectors, workerPool, applyOperation, &statusVector);
+    }
+
+    // If any of the statuses is not ok, return error.
+    for (auto& status : statusVector) {
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     // We have now written all database writes and updated the oplog to match.

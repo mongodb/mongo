@@ -822,12 +822,14 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     return repl::multiApply(txn, _writerPool.get(), std::move(ops), applyOperation);
 }
 
-void ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::OperationPtrs* ops) {
+Status ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::OperationPtrs* ops) {
     // SyncTail* argument is not used by repl::multiSyncApply().
     repl::multiSyncApply(ops, nullptr);
+    // multiSyncApply() will throw or abort on error, so we hardcode returning OK.
+    return Status::OK();
 }
 
-void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
+Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     MultiApplier::OperationPtrs* ops, const HostAndPort& source) {
 
     // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
@@ -836,7 +838,7 @@ void ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     // be accessing any SyncTail functionality that require these constructor parameters.
     SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
     syncTail.setHostname(source.toString());
-    repl::multiInitialSyncApply(ops, &syncTail);
+    return repl::multiInitialSyncApply(ops, &syncTail);
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
