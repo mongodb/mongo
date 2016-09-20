@@ -31,9 +31,6 @@
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -42,7 +39,6 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -268,18 +264,12 @@ public:
                 }
             }
 
-            // Skipping views is only necessary for internal cloning operations.
-            bool skipViews = filterElt.type() == mongo::Object &&
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
-            if (!skipViews) {
-                db->getViewCatalog()->iterate(txn, [&](const ViewDefinition& view) {
-                    BSONObj viewBson = buildViewBson(view);
-                    if (!viewBson.isEmpty()) {
-                        _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
-                    }
-                });
-            }
+            db->getViewCatalog()->iterate(txn, [&](const ViewDefinition& view) {
+                BSONObj viewBson = buildViewBson(view);
+                if (!viewBson.isEmpty()) {
+                    _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
+                }
+            });
         }
 
         const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
