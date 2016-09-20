@@ -280,16 +280,14 @@ Status MigrationManager::executeManualMigration(
     auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
     invariant(chunk);
 
-    if (chunk->getShardId() == migrateInfo.to) {
-        return Status::OK();
-    }
-
     if (isInterruptError(status)) {
         statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
         // We want the mongos to get a retriable error, and not make its replica set monitor
         // interpret something like InterruptedDueToReplStateChange as the config server when the
         // error comes from the shard.
-        status = {ErrorCodes::BalancerInterrupted, status.reason()};
+        return {ErrorCodes::BalancerInterrupted, status.reason()};
+    } else if (chunk->getShardId() == migrateInfo.to) {
+        return Status::OK();
     }
 
     return status;
