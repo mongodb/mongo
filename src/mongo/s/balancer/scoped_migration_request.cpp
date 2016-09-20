@@ -105,7 +105,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                 txn,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kMajorityReadConcern,
+                repl::ReadConcernLevel::kLocalReadConcern,
                 NamespaceString(MigrationType::ConfigNS),
                 migrationType.toBSON(),
                 BSONObj(),

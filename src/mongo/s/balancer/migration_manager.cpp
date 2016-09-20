@@ -311,7 +311,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
         Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             txn,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReadConcernLevel::kLocalReadConcern,
             NamespaceString(MigrationType::ConfigNS),
             BSONObj(),
             BSONObj(),
