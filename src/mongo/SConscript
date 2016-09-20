@@ -128,6 +128,7 @@ baseLibDeps=[
     '$BUILD_DIR/third_party/shim_pcrecpp',
     '$BUILD_DIR/third_party/shim_intel_decimal128',
     '$BUILD_DIR/third_party/shim_tz',
+    'logger/max_log_size',
     'util/debugger',
     'util/quick_exit',
 ]
