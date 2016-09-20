@@ -32,21 +32,68 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 
+constexpr StringData FeatureCompatibilityVersion::k32IncompatibleIndexName;
 constexpr StringData FeatureCompatibilityVersion::kCollection;
 constexpr StringData FeatureCompatibilityVersion::kCommandName;
 constexpr StringData FeatureCompatibilityVersion::kParameterName;
 constexpr StringData FeatureCompatibilityVersion::kVersionField;
 constexpr StringData FeatureCompatibilityVersion::kVersion34;
 constexpr StringData FeatureCompatibilityVersion::kVersion32;
+
+namespace {
+const BSONObj k32IncompatibleIndexSpec =
+    BSON(IndexDescriptor::kIndexVersionFieldName
+         << static_cast<int>(IndexDescriptor::IndexVersion::kV2)
+         << IndexDescriptor::kKeyPatternFieldName
+         << BSON(FeatureCompatibilityVersion::kVersionField << 1)
+         << IndexDescriptor::kNamespaceFieldName
+         << FeatureCompatibilityVersion::kCollection
+         << IndexDescriptor::kIndexNameFieldName
+         << FeatureCompatibilityVersion::k32IncompatibleIndexName);
+
+BSONObj makeUpdateCommand(StringData newVersion, BSONObj writeConcern) {
+    BSONObjBuilder updateCmd;
+
+    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
+    updateCmd.append("update", nss.coll());
+    {
+        BSONArrayBuilder updates(updateCmd.subarrayStart("updates"));
+        {
+            BSONObjBuilder updateSpec(updates.subobjStart());
+            {
+                BSONObjBuilder queryFilter(updateSpec.subobjStart("q"));
+                queryFilter.append("_id", FeatureCompatibilityVersion::kParameterName);
+            }
+            {
+                BSONObjBuilder updateMods(updateSpec.subobjStart("u"));
+                updateMods.append(FeatureCompatibilityVersion::kVersionField, newVersion);
+            }
+            updateSpec.appendBool("upsert", true);
+        }
+    }
+
+    if (!writeConcern.isEmpty()) {
+        updateCmd.append(WriteConcernOptions::kWriteConcernField, writeConcern);
+    }
+
+    return updateCmd.obj();
+}
+}  // namespace
 
 StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibilityVersion::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
@@ -125,30 +172,73 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
             version == FeatureCompatibilityVersion::kVersion34 ||
                 version == FeatureCompatibilityVersion::kVersion32);
 
-    // Update admin.system.version.
-    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
-    BSONObjBuilder updateCmd;
-    updateCmd.append("update", nss.coll());
-    updateCmd.append(
-        "updates",
-        BSON_ARRAY(BSON("q" << BSON("_id" << FeatureCompatibilityVersion::kParameterName) << "u"
-                            << BSON(FeatureCompatibilityVersion::kVersionField << version)
-                            << "upsert"
-                            << true)));
-    updateCmd.append("writeConcern",
-                     BSON("w"
-                          << "majority"));
     DBDirectClient client(txn);
-    BSONObj result;
-    client.runCommand(nss.db().toString(), updateCmd.obj(), result);
-    uassertStatusOK(getStatusFromCommandResult(result));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(result));
+    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
-    // Update server parameter.
     if (version == FeatureCompatibilityVersion::kVersion34) {
+        // We build a v=2 index on the "admin.system.version" collection as part of setting the
+        // featureCompatibilityVersion to 3.4. This is a new index version that isn't supported by
+        // versions of MongoDB earlier than 3.4 that will cause 3.2 secondaries to crash when it is
+        // replicated.
+        std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
+
+        {
+            ScopedTransaction transaction(txn, MODE_IX);
+            AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
+
+            IndexBuilder builder(k32IncompatibleIndexSpec);
+            auto status = builder.buildInForeground(txn, autoDB.getDb());
+            uassertStatusOK(status);
+
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wuow(txn);
+                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                    txn, autoDB.getDb()->getSystemIndexesName(), k32IncompatibleIndexSpec);
+                wuow.commit();
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "FeatureCompatibilityVersion::set", nss.ns());
+        }
+
+        // We then update the featureCompatibilityVersion document stored in the
+        // "admin.system.version" collection. We do this after creating the v=2 index in order to
+        // maintain the invariant that if the featureCompatibilityVersion is 3.4, then
+        // 'k32IncompatibleIndexSpec' index exists on the "admin.system.version" collection.
+        BSONObj updateResult;
+        client.runCommand(nss.db().toString(),
+                          makeUpdateCommand(version, WriteConcernOptions::Majority),
+                          updateResult);
+        uassertStatusOK(getStatusFromCommandResult(updateResult));
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(updateResult));
+
+        // We then update the value of the featureCompatibilityVersion server parameter.
         serverGlobalParams.featureCompatibility.version.store(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
     } else if (version == FeatureCompatibilityVersion::kVersion32) {
+        // We update the featureCompatibilityVersion document stored in the "admin.system.version"
+        // collection. We do this before dropping the v=2 index in order to maintain the invariant
+        // that if the featureCompatibilityVersion is 3.4, then 'k32IncompatibleIndexSpec' index
+        // exists on the "admin.system.version" collection. We don't attach a "majority" write
+        // concern to this update because we're going to do so anyway for the "dropIndexes" command.
+        BSONObj updateResult;
+        client.runCommand(nss.db().toString(), makeUpdateCommand(version, BSONObj()), updateResult);
+        uassertStatusOK(getStatusFromCommandResult(updateResult));
+
+        // We then drop the v=2 index on the "admin.system.version" collection to enable 3.2
+        // secondaries to sync from this mongod.
+        BSONObjBuilder dropIndexesCmd;
+        dropIndexesCmd.append("dropIndexes", nss.coll());
+        dropIndexesCmd.append("index", FeatureCompatibilityVersion::k32IncompatibleIndexName);
+        dropIndexesCmd.append("writeConcern", WriteConcernOptions::Majority);
+
+        BSONObj dropIndexesResult;
+        client.runCommand(nss.db().toString(), dropIndexesCmd.done(), dropIndexesResult);
+        auto status = getStatusFromCommandResult(dropIndexesResult);
+        if (status != ErrorCodes::IndexNotFound) {
+            uassertStatusOK(status);
+        }
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(dropIndexesResult));
+
+        // We then update the value of the featureCompatibilityVersion server parameter.
         serverGlobalParams.featureCompatibility.version.store(
             ServerGlobalParams::FeatureCompatibility::Version::k32);
     }
@@ -167,11 +257,30 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
             }
         }
 
-        // Insert featureCompatibilityDocument into admin.system.version.
         txn->setReplicatedWrites(false);
         NamespaceString nss(FeatureCompatibilityVersion::kCollection);
-        CollectionOptions options;
-        uassertStatusOK(storageInterface->createCollection(txn, nss, options));
+
+        // We build a v=2 index on the "admin.system.version" collection as part of setting the
+        // featureCompatibilityVersion to 3.4. This is a new index version that isn't supported by
+        // versions of MongoDB earlier than 3.4 that will cause 3.2 secondaries to crash when it is
+        // cloned.
+        std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
+
+        {
+            ScopedTransaction transaction(txn, MODE_IX);
+            AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
+
+            IndexBuilder builder(k32IncompatibleIndexSpec);
+            auto status = builder.buildInForeground(txn, autoDB.getDb());
+            uassertStatusOK(status);
+        }
+
+        // We then insert the featureCompatibilityVersion document into the "admin.system.version"
+        // collection. We do this after creating the v=2 index in order to maintain the invariant
+        // that if the featureCompatibilityVersion is 3.4, then 'k32IncompatibleIndexSpec' index
+        // exists on the "admin.system.version" collection. If we happened to fail to insert the
+        // document when starting up, then on a subsequent start-up we'd no longer consider the data
+        // files "clean" and would instead be in featureCompatibilityVersion=3.2.
         uassertStatusOK(storageInterface->insertDocument(
             txn,
             nss,
@@ -179,7 +288,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
                        << FeatureCompatibilityVersion::kVersionField
                        << FeatureCompatibilityVersion::kVersion34)));
 
-        // Update server parameter.
+        // We then update the value of the featureCompatibilityVersion server parameter.
         serverGlobalParams.featureCompatibility.version.store(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
     }

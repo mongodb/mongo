@@ -9,6 +9,10 @@ selector:
     exclude_files:
     # Disable config_server_checks.js since it starts mmap servers.
     - jstests/replsets/config_server_checks.js
+    # TODO SERVER-26179: Initial sync hangs when buildIndexes=false and a non-_id index exists.
+    - jstests/replsets/buildindexes.js
+    - jstests/replsets/initial_sync3.js
+    - jstests/replsets/ismaster1.js
 
 executor:
   js_test:

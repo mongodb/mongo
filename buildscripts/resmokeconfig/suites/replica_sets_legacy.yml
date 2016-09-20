@@ -19,6 +19,10 @@ selector:
     - jstests/replsets/stepup.js
     # The combination of new bridges and PV0 can lead to an improper spanning tree in sync2.js.
     - jstests/replsets/sync2.js
+    # TODO SERVER-26179: Initial sync hangs when buildIndexes=false and a non-_id index exists.
+    - jstests/replsets/buildindexes.js
+    - jstests/replsets/initial_sync3.js
+    - jstests/replsets/ismaster1.js
 
 executor:
   js_test:

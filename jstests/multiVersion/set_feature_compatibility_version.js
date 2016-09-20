@@ -2,7 +2,8 @@
 (function() {
     "use strict";
 
-    load('jstests/libs/override_methods/multiversion_override_balancer_control.js');
+    load("jstests/libs/get_index_helpers.js");
+    load("jstests/libs/override_methods/multiversion_override_balancer_control.js");
 
     var res;
     const latest = "latest";
@@ -28,6 +29,16 @@
     assert.eq(res.featureCompatibilityVersion, "3.4");
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
 
+    // There should be a v=2 index on the "admin.system.version" collection when the
+    // featureCompatibilityVersion is initialized to 3.4. Additionally, the index version of this
+    // index should be returned from the "listIndexes" command as a decimal value.
+    var allIndexes = adminDB.system.version.getIndexes();
+    var spec = GetIndexHelpers.findByName(allIndexes, "incompatible_with_version_32");
+    assert.neq(null,
+               spec,
+               "Index with name 'incompatible_with_version_32' not found: " + tojson(allIndexes));
+    assert.eq(new NumberDecimal("2"), spec.v, tojson(spec));
+
     // featureCompatibilityVersion cannot be set to invalid value.
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.0"}));
@@ -49,12 +60,31 @@
     assert.eq(res.featureCompatibilityVersion, "3.2");
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.2");
 
+    // The v=2 index that was created on the "admin.system.version" collection should be removed
+    // when the featureCompatibilityVersion is set to 3.2.
+    allIndexes = adminDB.system.version.getIndexes();
+    spec = GetIndexHelpers.findByName(allIndexes, "incompatible_with_version_32");
+    assert.eq(null,
+              spec,
+              "Expected index with name 'incompatible_with_version_32' to have been removed: " +
+                  tojson(allIndexes));
+
     // featureCompatibilityVersion can be set to 3.4.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
     assert.commandWorked(res);
     assert.eq(res.featureCompatibilityVersion, "3.4");
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
+
+    // There should be a v=2 index on the "admin.system.version" collection when the
+    // featureCompatibilityVersion is set to 3.4. Additionally, the index version of this index
+    // should be returned from the "listIndexes" command as a decimal value.
+    allIndexes = adminDB.system.version.getIndexes();
+    spec = GetIndexHelpers.findByName(allIndexes, "incompatible_with_version_32");
+    assert.neq(null,
+               spec,
+               "Index with name 'incompatible_with_version_32' not found: " + tojson(allIndexes));
+    assert.eq(new NumberDecimal("2"), spec.v, tojson(spec));
 
     MongoRunner.stopMongod(conn);
 
@@ -166,6 +196,84 @@
     assert.commandWorked(res);
     assert.eq(res.featureCompatibilityVersion, "3.2");
     rst.stopSet();
+
+    // Test that a 3.2 secondary crashes when performing an initial sync from a 3.4 primary with
+    // featureCompatibilityVersion=3.4.
+    rst = new ReplSetTest({nodes: [{binVersion: latest}, {binVersion: downgrade}]});
+    rst.startSet();
+
+    // Rig the election so that the node running latest version becomes the primary.
+    replSetConfig = rst.getReplSetConfig();
+    replSetConfig.members[1].priority = 0;
+    rst.initiate(replSetConfig);
+
+    primaryAdminDB = rst.getPrimary().getDB("admin");
+    res = assert.commandWorked(
+        primaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+    assert.eq(res.featureCompatibilityVersion, "3.4", tojson(res));
+
+    // Verify that the 3.2 secondary terminates when the "listIndexes" command returns decimal data.
+    secondaryAdminDB = rst.getSecondary().getDB("admin");
+    assert.soon(
+        function() {
+            try {
+                secondaryAdminDB.runCommand({ping: 1});
+            } catch (e) {
+                return true;
+            }
+            return false;
+        },
+        function() {
+            return "Expected 3.2 secondary to terminate due to reading decimal data, but it" +
+                " didn't. Indexes on the 3.2 secondary's admin.system.version collection: " +
+                tojson(secondaryAdminDB.system.version.getIndexes());
+        });
+    rst.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+
+    // Test that a 3.2 secondary can successfully perform initial sync from a 3.4 primary with
+    // featureCompatibilityVersion=3.2.
+    rst = new ReplSetTest({nodes: [{binVersion: latest}]});
+    rst.startSet();
+    rst.initiate();
+
+    primaryAdminDB = rst.getPrimary().getDB("admin");
+    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
+    secondaryAdminDB = rst.add({binVersion: downgrade}).getDB("admin");
+
+    // We also add a 3.4 secondary so that a majority of the replica set is still available after
+    // setting the featureCompatibilityVersion to 3.4.
+    rst.add({binVersion: latest});
+
+    // Rig the election so that the first node running latest version remains the primary after the
+    // 3.2 secondary is added to the replica set.
+    replSetConfig = rst.getReplSetConfig();
+    replSetConfig.version = 2;
+    replSetConfig.members[1].priority = 0;
+    replSetConfig.members[2].priority = 0;
+    assert.commandWorked(primaryAdminDB.runCommand({replSetReconfig: replSetConfig}));
+
+    // Verify that the 3.2 secondary successfully performed its initial sync.
+    assert.writeOK(
+        primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
+
+    // Test that a 3.2 secondary crashes when syncing from a 3.4 primary and the
+    // featureCompatibilityVersion is set to 3.4.
+    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
+    assert.soon(
+        function() {
+            try {
+                secondaryAdminDB.runCommand({ping: 1});
+            } catch (e) {
+                return true;
+            }
+            return false;
+        },
+        function() {
+            return "Expected 3.2 secondary to terminate due to attempting to build a v=2 index," +
+                " but it didn't. Indexes on the 3.2 secondary's admin.system.version" +
+                " collection: " + tojson(secondaryAdminDB.system.version.getIndexes());
+        });
+    rst.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
 
     //
     // Sharding tests.

@@ -35,11 +35,13 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
@@ -161,6 +163,27 @@ public:
                 indexSpec = cce->getIndexSpec(txn, indexNames[i]);
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
+
+            if (ns.ns() == FeatureCompatibilityVersion::kCollection &&
+                indexNames[i] == FeatureCompatibilityVersion::k32IncompatibleIndexName) {
+                BSONObjBuilder bob;
+
+                for (auto&& indexSpecElem : indexSpec) {
+                    auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+                    if (indexSpecElemFieldName == IndexDescriptor::kIndexVersionFieldName) {
+                        // Include the index version in the command response as a decimal type
+                        // instead of as a 32-bit integer. This is a new BSON type that isn't
+                        // supported by versions of MongoDB earlier than 3.4 that will cause 3.2
+                        // secondaries to crash when performing initial sync.
+                        bob.append(IndexDescriptor::kIndexVersionFieldName,
+                                   indexSpecElem.numberDecimal());
+                    } else {
+                        bob.append(indexSpecElem);
+                    }
+                }
+
+                indexSpec = bob.obj();
+            }
 
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);

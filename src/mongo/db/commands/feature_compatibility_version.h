@@ -41,6 +41,7 @@ class OperationContext;
 
 class FeatureCompatibilityVersion {
 public:
+    static constexpr StringData k32IncompatibleIndexName = "incompatible_with_version_32"_sd;
     static constexpr StringData kCollection = "admin.system.version"_sd;
     static constexpr StringData kCommandName = "setFeatureCompatibilityVersion"_sd;
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
