@@ -49,6 +49,12 @@ const BSONField<std::string> AddShardRequest::configsvrAddShard("_configsvrAddSh
 const BSONField<std::string> AddShardRequest::shardName("name");
 const BSONField<long long> AddShardRequest::maxSizeMB("maxSize");
 
+namespace {
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                Seconds(15));
+}
+
 AddShardRequest::AddShardRequest(ConnectionString connString)
     : _connString(std::move(connString)) {}
 
@@ -122,6 +128,9 @@ BSONObj AddShardRequest::toCommandForConfig() {
     if (hasName()) {
         cmdBuilder.append(shardName.name(), *_name);
     }
+
+    cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
+
     return cmdBuilder.obj();
 }
 
