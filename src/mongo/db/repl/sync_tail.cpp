@@ -133,24 +133,26 @@ public:
         return Status::OK();
     }
 } exportedBatchLimitOperationsParam;
-}  // namespace
-
-static Counter64 opsAppliedStats;
 
 // The oplog entries applied
-static ServerStatusMetricField<Counter64> displayOpsApplied("repl.apply.ops", &opsAppliedStats);
+Counter64 opsAppliedStats;
+ServerStatusMetricField<Counter64> displayOpsApplied("repl.apply.ops", &opsAppliedStats);
+
+// Number of times we tried to go live as a secondary.
+Counter64 attemptsToBecomeSecondary;
+ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
+    "repl.apply.attemptsToBecomeSecondary", &attemptsToBecomeSecondary);
 
 // Number and time of each ApplyOps worker pool round
-static TimerStats applyBatchStats;
-static ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches",
-                                                                   &applyBatchStats);
+TimerStats applyBatchStats;
+ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches", &applyBatchStats);
 void initializePrefetchThread() {
     if (!Client::getCurrent()) {
         Client::initThreadIfNotAlready();
         AuthorizationSession::get(cc())->grantInternalAuthorization();
     }
 }
-namespace {
+
 bool isCrudOpType(const char* field) {
     switch (field[0]) {
         case 'd':
@@ -160,9 +162,6 @@ bool isCrudOpType(const char* field) {
     }
     return false;
 }
-}
-
-namespace {
 
 class ApplyBatchFinalizer {
 public:
@@ -262,7 +261,7 @@ void ApplyBatchFinalizerForJournal::_run() {
         _recordDurable(latestOpTime);
     }
 }
-}  // anonymous namespace containing ApplyBatchFinalizer definitions.
+}  // namespace
 
 SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
     : SyncTail(q, func, makeWriterPool()) {}
@@ -632,6 +631,9 @@ void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* repl
     if (replCoord->isInPrimaryOrSecondaryState()) {
         return;
     }
+
+    // This needs to happen after the attempt so readers can be sure we've already tried.
+    ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
 
     ScopedTransaction transaction(txn, MODE_S);
     Lock::GlobalRead readLock(txn->lockState());
