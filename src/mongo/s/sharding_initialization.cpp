@@ -84,8 +84,7 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<Network
 std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
                                                          ShardRegistry* shardRegistry,
                                                          StringData distLockProcessId) {
-    auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(
-        shardRegistry, serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
     auto distLockManager =
         stdx::make_unique<ReplSetDistLockManager>(service,
                                                   distLockProcessId,

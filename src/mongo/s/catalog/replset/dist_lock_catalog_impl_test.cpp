@@ -97,7 +97,7 @@ protected:
 
     std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {
         invariant(shardRegistry);
-        return stdx::make_unique<DistLockCatalogImpl>(shardRegistry, false);
+        return stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
     }
 
     std::unique_ptr<DistLockManager> makeDistLockManager(

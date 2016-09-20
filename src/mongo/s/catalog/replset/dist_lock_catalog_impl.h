@@ -48,12 +48,7 @@ struct ReadPreferenceSetting;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
 public:
-    /**
-     * Constructs a new dist lock catalog, specifying whether it is being used locally on the config
-     * server or remotely (from a shard or mongos). See the comment for the associated class
-     * variable for more information.
-     */
-    DistLockCatalogImpl(ShardRegistry* shardRegistry, bool isLocal);
+    DistLockCatalogImpl(ShardRegistry* shardRegistry);
 
     virtual ~DistLockCatalogImpl();
 
@@ -100,16 +95,13 @@ private:
     Status _unlock(OperationContext* txn, const FindAndModifyRequest& request);
 
     StatusWith<std::vector<BSONObj>> _findOnConfig(OperationContext* txn,
+                                                   const ReadPreferenceSetting& readPref,
                                                    const NamespaceString& nss,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit);
 
-    ShardRegistry* const _client;
-
-    // Indicates whether this catalog manager is used as a local or remote instance. Controls the
-    // read concern level used for dist lock information lookup.
-    const bool _isLocal;
+    ShardRegistry* _client;
 
     // These are not static to avoid initialization order fiasco.
     const NamespaceString _lockPingNS;

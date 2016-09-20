@@ -34,12 +34,10 @@ load('./jstests/libs/chunk_manipulation_util.js');
         staticMongod, mongos.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
     waitForMigrateStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
-    // Stepdown the primary in order to force the balancer to stop. Use a timeout of 5 seconds for
-    // both step down operations, because mongos will retry to find the CSRS primary for up to 20
-    // seconds and we have two successive ones.
+    // Stepdown the primary in order to force the balancer to stop
     assert.throws(function() {
         assert.commandWorked(
-            st.configRS.getPrimary().adminCommand({replSetStepDown: 5, force: true}));
+            st.configRS.getPrimary().adminCommand({replSetStepDown: 10, force: true}));
     });
 
     // Ensure a new primary is found promptly
@@ -47,16 +45,6 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     assert.eq(1, mongos.getDB('config').chunks.find({shard: st.shard0.shardName}).itcount());
     assert.eq(0, mongos.getDB('config').chunks.find({shard: st.shard1.shardName}).itcount());
-
-    // At this point, the balancer is in recovery mode. Ensure that stepdown can be done again and
-    // the recovery mode interrupted.
-    assert.throws(function() {
-        assert.commandWorked(
-            st.configRS.getPrimary().adminCommand({replSetStepDown: 5, force: true}));
-    });
-
-    // Ensure a new primary is found promptly
-    st.configRS.getPrimary(30000);
 
     unpauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
