@@ -1328,7 +1328,7 @@ private:
     // Storage interface used by data replicator.
     StorageInterface* _storage;  // (PS)
     // Data Replicator used to replicate data
-    std::unique_ptr<DataReplicator> _dr;  // (M)
+    std::shared_ptr<DataReplicator> _dr;  // (I) pointer set under mutex, copied by callers.
 
     // Hands out the next snapshot name.
     AtomicUInt64 _snapshotNameGenerator;  // (S)

@@ -1345,7 +1345,6 @@ void DataReplicator::_changeStateIfNeeded() {
 }
 
 Status DataReplicator::scheduleShutdown(OperationContext* txn) {
-    log() << "Scheduling shutdown in the future, creating shutdownEvent.";
     auto eventStatus = _exec->makeEvent();
     if (!eventStatus.isOK()) {
         return eventStatus.getStatus();
@@ -1360,8 +1359,10 @@ Status DataReplicator::scheduleShutdown(OperationContext* txn) {
                                          "Shutdown issued for the operation."};
         }
         _cancelAllHandles_inlock();
-        _oplogBuffer->shutdown(txn);
-        _oplogBuffer.reset();
+        if (_oplogBuffer) {
+            _oplogBuffer->shutdown(txn);
+            _oplogBuffer.reset();
+        }
     }
 
     // Schedule _doNextActions in case nothing is active to trigger the _onShutdown event.

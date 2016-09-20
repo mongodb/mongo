@@ -100,10 +100,6 @@
     assert(!res.initialSyncStatus,
            "Response should not have an 'initialSyncStatus' field: " + tojson(res));
 
-    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
-    assert(!res.initialSyncStatus,
-           "Response should not have an 'initialSyncStatus' field: " + tojson(res));
-
     assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}),
                                  ErrorCodes.TypeMismatch);
 })();
