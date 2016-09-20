@@ -98,7 +98,7 @@ void DatabaseClonerTest::setUp() {
                const std::vector<BSONObj>& secondaryIndexSpecs) {
             const auto collInfo = &_collections[nss];
             (collInfo->loader = new CollectionBulkLoaderMock(&collInfo->stats))
-                ->init(nullptr, nullptr, secondaryIndexSpecs);
+                ->init(nullptr, secondaryIndexSpecs);
 
             return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
                 std::unique_ptr<CollectionBulkLoader>(collInfo->loader));

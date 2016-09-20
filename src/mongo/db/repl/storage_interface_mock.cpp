@@ -91,12 +91,11 @@ OpTime StorageInterfaceMock::getAppliedThrough(OperationContext* txn) {
     return _appliedThrough;
 }
 
-Status CollectionBulkLoaderMock::init(OperationContext* txn,
-                                      Collection* coll,
+Status CollectionBulkLoaderMock::init(Collection* coll,
                                       const std::vector<BSONObj>& secondaryIndexSpecs) {
     LOG(1) << "CollectionBulkLoaderMock::init called";
     stats->initCalled = true;
-    return initFn(txn, coll, secondaryIndexSpecs);
+    return initFn(coll, secondaryIndexSpecs);
 };
 
 Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,

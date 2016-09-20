@@ -70,9 +70,7 @@ public:
                              std::unique_ptr<AutoGetCollection> autoColl);
     virtual ~CollectionBulkLoaderImpl();
 
-    virtual Status init(OperationContext* txn,
-                        Collection* coll,
-                        const std::vector<BSONObj>& secondaryIndexSpecs) override;
+    virtual Status init(Collection* coll, const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
     virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                    const std::vector<BSONObj>::const_iterator end) override;

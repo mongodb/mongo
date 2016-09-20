@@ -251,6 +251,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
     // Setup cond_var for signalling when done.
     std::unique_ptr<CollectionBulkLoader> loaderToReturn;
+    Collection* collection;
 
     auto status = runner->runSynchronousTask([&](OperationContext* txn) -> Status {
         // We are not replicating nor validating writes under this OperationContext*.
@@ -264,7 +265,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             ScopedTransaction transaction(txn, MODE_IX);
             auto db = stdx::make_unique<AutoGetOrCreateDb>(txn, nss.db(), MODE_IX);
             auto coll = stdx::make_unique<AutoGetCollection>(txn, nss, MODE_X);
-            Collection* collection = coll->getCollection();
+            collection = coll->getCollection();
 
             if (collection) {
                 return {ErrorCodes::NamespaceExists, "Collection already exists."};
@@ -285,11 +286,6 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
                                                                       std::move(runner),
                                                                       std::move(db),
                                                                       std::move(coll));
-            invariant(collection);
-            auto status = loader->init(txn, collection, secondaryIndexSpecs);
-            if (!status.isOK()) {
-                return status;
-            }
 
             // Move the loader into the StatusWith.
             loaderToReturn = std::move(loader);
@@ -303,6 +299,11 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         return status;
     }
 
+    invariant(collection);
+    status = loaderToReturn->init(collection, secondaryIndexSpecs);
+    if (!status.isOK()) {
+        return status;
+    }
     return std::move(loaderToReturn);
 }
 
