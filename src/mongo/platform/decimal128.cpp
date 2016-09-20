@@ -173,35 +173,6 @@ BID_UINT128 decimal128ToLibraryType(Decimal128::Value value) {
     dec128.w[kHigh64] = value.high64;
     return dec128;
 }
-
-/**
- * This helper function takes an intel decimal 128 library type and quantizes
- * it to 15 decimal digits.
- * BID_UINT128 value : the value to quantize
- * RoundingMode roundMode : the rounding mode to be used for quantizing operations
- * int base10Exp : the base 10 exponent of value to scale the quantizer by
- * uint32_t* signalingFlags : flags for signaling imprecise results
- */
-BID_UINT128 quantizeTo15DecimalDigits(BID_UINT128 value,
-                                      Decimal128::RoundingMode roundMode,
-                                      int base10Exp,
-                                      std::uint32_t* signalingFlags) {
-    BID_UINT128 quantizerReference;
-
-    // The quantizer starts at 1E-15
-    quantizerReference.w[kHigh64] = 0x3022000000000000;
-    quantizerReference.w[kLow64] = 0x0000000000000001;
-
-    // Scale the quantizer by the base 10 exponent. This is necessary to keep
-    // the scale of the quantizer reference correct. For example, the decimal value 101
-    // needs a different quantizer (1E-12) than the decimal value 1001 (1E-11) to yield
-    // a 15 digit decimal precision.
-    quantizerReference = bid128_scalbn(quantizerReference, base10Exp, roundMode, signalingFlags);
-
-    value = bid128_quantize(value, quantizerReference, roundMode, signalingFlags);
-    return value;
-}
-
 }  // namespace
 
 Decimal128::Decimal128(std::int32_t int32Value)
@@ -226,132 +197,105 @@ Decimal128::Decimal128(std::int64_t int64Value)
  * with the appropriate quantum (Q) to yield exactly 15 digits of precision.
  * For example,
  *     doubleValue = 0.1
- *     dec128 = Decimal128(doubleValue)
- *     Q = 1E-16
+ *     dec128 = Decimal128(doubleValue)  <== 0.1000000000000000055511151231257827
+ *     Q = 1E-15
  *     dec128.quantize(Q)
  *     ==> 0.100000000000000
  *
- * The value to quantize dec128 on (Q) is directly related to the base 10 exponent
- * of the passed in doubleValue,
- *     Q = 1 * 10 ^ (-15 + Base10Exp(doubleValue))
+ * The value to quantize dec128 on (Q) is related to the base 10 exponent of the rounded
+ * doubleValue,
+ *     Q = 10 ** (floor(log10(doubleValue rounded to 15 decimal digits)) - 14)
  *
- * doubleValue's exponent is stored in base 2 (binary floating point), so we need to
- * convert the base 2 exponent to base 10 to calculate Q.
  *
  * ===============================================================================
  *
  * Convert a double's base 2 exponent to base 10 using integer arithmetic.
  *
- * Given doubleValue with exponent Base2Exp, we would like to find Base10Exp such that:
- * (1) 10^Base10Exp >= |doubleValue|
- * (2) 10^(Base10Exp-1) < |doubleValue|
+ * Given doubleValue with exponent base2Exp, we would like to find base10Exp such that:
+ *   (1) 10**base10Exp > |doubleValue rounded to 15 decimal digits|
+ *   (2) 10**(base10Exp-1) <= |doubleValue rounded to 15 decimal digits|
  *
- * We will use Base10Exp = E * 301 / 1000 as a starting guess.
- *
- * This formula is derived from the fact that 10^(E*log10(2)) == 2^E as
- * 301 / 1000 approximates log10(2).
- *
- * If there exists an M = Base10Exp-1 such that 10^M is also greater than doubleValue,
- * our guess was off and we will need to decrement Base10Exp and re-quantize our value.
- *
- * The total absolute error is caused by:
- *
- * - Rounding inaccuracy from using the fraction 0.301 instead of log10(2) = 0.301029...
- *   Max Absolute Error = Max(N) * RelError
- *                      = 308 * ((0.301 - log10(2)) / log10(2)) = -0.03069
- *
- * - Inaccuracy from the fact that our formula looks at comparing to 2^E instead of numbers
- *   up to but not including 2^(E+1)
- *   Max Absolute Error = -log10(2) = -0.30103
- *
- * - Integer arithmetic inaccuracy from one division (301/1000)
- *   Up until the integer division truncation, our total error is between -0.33072 and 0,
- *   which means after truncation our total error can be no more than -1. It is either 0 or -1.
- *
- * In the worst case, the total error is -1, so we never have to attempt to discover the
- * correct Base10Exp more than once extra.
- *
- * Since the above explanation does not take into account the sign of the double's binary
- * exponent, we do that now. We will use the Base2Exp E of +/- 5 to demonstrate.
- * For each doubleValue in the table, we would like to calculate a 'Shift' such that:
- *     doubleValue.quantize(10^Shift) has 15 digits of precision
+ * Given a double precision number of the form 2**E, we can compute base10Exp such that these
+ * conditions hold for 2**E. However, because the absolute value of doubleValue maybe up to a
+ * factor of two higher, the required base10Exp may be 1 higher. Exactly knowing in which case we
+ * are would require knowing how the double value will round, so just try with the lowest
+ * possible base10Exp, and retry if we need to increase the exponent by 1. It is important to first
+ * try the lower exponent, as the other way around might unnecessarily lose a significant digit,
+ * as in 0.9999999999999994 (15 nines) -> 1.00000000000000 (14 zeros) instead of 0.999999999999999
+ * (15 nines).
  *
  *    +-------------+-------------------+----------------------+---------------------------+
- *    | doubleValue |      Base2Exp     |       Base10Exp      |   Shift (Q = 10^Shift)    |
+ *    | doubleValue |      base2Exp     |  computed base10Exp  | Q                         |
  *    +-------------+-------------------+----------------------+---------------------------+
- *    | 100000      |                17 |                    5 | -15 + 6                   |
- *    | 500000      |                19 |                    5 | -15 + 6                   |
- *    | 999999      |                20 |                    6 | -15 + 6                   |
- *    | .00001      |               -16 |                   -4 | -15 - 4                   |
- *    | .00005      |               -14 |                   -4 | -15 - 4                   |
- *    | .00009      |               -13 |                   -3 | -15 - 4                   |
+ *    | 100000      |                16 |                    4 | 10**(5 - 14) <= Retry     |
+ *    | 500000      |                18 |                    5 | 10**(5 - 14)              |
+ *    | 999999      |                19 |                    5 | 10**(5 - 14)              |
+ *    | .00001      |               -17 |                   -6 | 10**(5 - 14) <= Retry     |
+ *    | .00005      |               -15 |                   -5 | 10**(5 - 14)              |
+ *    | .00009      |               -14 |                   -5 | 10**(5 - 14)              |
  *    +-------------+-------------------+----------------------+---------------------------+
- *    Note: This table was produced using C++'s integer truncation semantics, which
- *          rounds towards zero instead of flooring (ie -9/10 returns 0 not -1).
- *
- * For positive Base2Exp, we want a shift of 6.
- *  - Common case: Base10Exp = 5, so add 1 to get 6.
- *  - Uncommon case: Base10Exp = 6, but we added 1 to address the common case,
- *    so subtract 1 and requantize.
- *
- * For negative Base2Exp, we want a shift of -4
- *  - Common case: Base10Exp = -4, so leave as is.
- *  - Uncommon case: Base10Exp = -3, so subtract 1 and requantize.
- *
- * In the worst case, proven by the above error analysis, we only need to
- * requantize once to yield exactly 15 decimal digits of precision.
  */
 Decimal128::Decimal128(double doubleValue,
                        RoundingPrecision roundPrecision,
                        RoundingMode roundMode) {
-    BID_UINT128 convertedDoubleValue;
     std::uint32_t throwAwayFlag = 0;
-    convertedDoubleValue = binary64_to_bid128(doubleValue, roundMode, &throwAwayFlag);
+    Decimal128 convertedDoubleValue(
+        libraryTypeToValue(binary64_to_bid128(doubleValue, roundMode, &throwAwayFlag)));
 
     // If the original number was zero, infinity, or NaN, there's no need to quantize
     if (doubleValue == 0.0 || std::isinf(doubleValue) || std::isnan(doubleValue) ||
         roundPrecision == kRoundTo34Digits) {
-        _value = libraryTypeToValue(convertedDoubleValue);
+        *this = convertedDoubleValue;
         return;
     }
 
-    // Get the base2 exponent from doubleValue
+    // Get the base2 exponent from doubleValue.
     int base2Exp;
     frexp(doubleValue, &base2Exp);
 
-    // Estimate doubleValue's base10 exponent from its base2 exponent by
-    // multiplying by an approximation of log10(2).
-    // Since 10^(x*log10(2)) == 2^x, this initial guess gets us very close.
+    // As frexp normalizes doubleValue between 0.5 and 1.0 rather than 1.0 and 2.0, adjust.
+    base2Exp--;
+
+
+    // We will use base10Exp = base2Exp * 30103 / (100*1000) as lowerbound (using integer division).
+    //
+    // This formula is derived from the following, with base2Exp the binary exponent of doubleValue:
+    //   (1) 10**(base2Exp * log10(2)) == 2**base2Exp
+    //   (2) 0.30103 closely approximates log10(2)
+    //
+    // Exhaustive testing using Python shows :
+    //     { base2Exp * 30103 / (100 * 1000) == math.floor(math.log10(2**base2Exp))
+    //       for base2Exp in xrange(-1074, 1023) } == { True }
     int base10Exp = (base2Exp * 30103) / (100 * 1000);
 
-    // Although both 1000 and .001 have a base 10 exponent of magnitude 3, they have
-    // a different number of leading/trailing zeros. Adjust base10Exp to compensate.
-    if (base2Exp >= 0)
-        base10Exp++;
+    // As integer division truncates, rather than rounds down (as in Python), adjust accordingly.
+    if (base2Exp < 0)
+        base10Exp--;
 
-    _value = libraryTypeToValue(
-        quantizeTo15DecimalDigits(convertedDoubleValue, roundMode, base10Exp, &throwAwayFlag));
+    Decimal128 Q(0, base10Exp - 14 + Decimal128::kExponentBias, 0, 1);
+    *this = convertedDoubleValue.quantize(Q, roundMode);
 
     // Check if the quantization was done correctly: _value stores exactly 15
     // decimal digits of precision (15 digits can fit into the low 64 bits of the decimal)
-    if (_value.low64 < 100000000000000ull || _value.low64 > 999999999999999ull) {
+    uint64_t kSmallest15DigitInt = 1E14;     // A 1 with 14 zeros
+    uint64_t kLargest15DigitInt = 1E15 - 1;  // 15 nines
+    if (getCoefficientLow() > kLargest15DigitInt) {
         // If we didn't precisely get 15 digits of precision, the original base 10 exponent
-        // guess was 1 off, so quantize once more with base10Exp - 1
-        base10Exp--;
-        _value = libraryTypeToValue(
-            quantizeTo15DecimalDigits(convertedDoubleValue, roundMode, base10Exp, &throwAwayFlag));
+        // guess was 1 off, so quantize once more with base10Exp + 1
+        Q = Decimal128(0, base10Exp - 13 + Decimal128::kExponentBias, 0, 1);
+        *this = convertedDoubleValue.quantize(Q, roundMode);
     }
 
     // The decimal must have exactly 15 digits of precision
     invariant(getCoefficientHigh() == 0);
-    invariant(_value.low64 >= 100000000000000ull && _value.low64 <= 999999999999999ull);
+    invariant(getCoefficientLow() >= kSmallest15DigitInt);
+    invariant(getCoefficientLow() <= kLargest15DigitInt);
 }
 
 Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode) {
     std::uint32_t throwAwayFlag = 0;
     *this = Decimal128(stringValue, &throwAwayFlag, roundMode);
 }
-
 
 Decimal128::Decimal128(std::string stringValue,
                        std::uint32_t* signalingFlags,
