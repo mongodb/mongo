@@ -159,6 +159,15 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
             return;
         }
 
+        // Report a useful error message when we are illegally attempting to connect to 3.4 config
+        // servers in 3.4 feature compatibility mode.
+        uassert(ErrorCodes::MustUpgrade,
+                str::stream() << "Using a 3.2 mongos with a cluster that has "
+                                 "featureCompatibilityVersion 3.4 is not a supported "
+                                 "configuration. See "
+                                 "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
+                configServerModeNumber < 2);
+
         uassert(28785,
                 str::stream() << "Unrecognized configsvr version number: " << configServerModeNumber
                               << ". Expected either 0 or 1",

@@ -835,6 +835,14 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                     conn->isMaster(ignoredOutParam, &reply);
                     pingMicros = timer.micros();
                     conn.done();  // return to pool on success.
+                } catch (const DBException& ex) {
+                    // If this mongos is being used in an illegal configuration and must be
+                    // upgraded, bubble up the error.
+                    Status status = ex.toStatus();
+                    if (status == ErrorCodes::MustUpgrade) {
+                        throw;
+                    }
+                    reply = BSONObj();  // should be a no-op but want to be sure
                 } catch (...) {
                     reply = BSONObj();  // should be a no-op but want to be sure
                 }

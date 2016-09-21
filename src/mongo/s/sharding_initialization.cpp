@@ -199,6 +199,11 @@ Status initializeGlobalShardingState(OperationContext* txn,
                 // retry.
                 return status;
             }
+
+            if (status == ErrorCodes::MustUpgrade) {
+                return status;
+            }
+
             if (status == ErrorCodes::ReplicaSetNotFound) {
                 // ReplicaSetNotFound most likely means we've been waiting for the config replica
                 // set to come up for so long that the ReplicaSetMonitor stopped monitoring the set.
