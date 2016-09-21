@@ -377,8 +377,10 @@ void MigrationManager::finishRecovery(OperationContext* txn,
                                       bool waitForDelete) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (_state == State::kStopping)
+        if (_state == State::kStopping) {
+            _migrationRecoveryMap.clear();
             return;
+        }
 
         // If recovery was abandoned in startRecovery, then there is no more to do.
         if (_state == State::kEnabled) {
@@ -388,6 +390,11 @@ void MigrationManager::finishRecovery(OperationContext* txn,
 
         invariant(_state == State::kRecovering);
     }
+
+    auto scopedGuard = MakeGuard([&] {
+        _migrationRecoveryMap.clear();
+        _abandonActiveMigrationsAndEnableManager(txn);
+    });
 
     // Schedule recovered migrations.
     vector<ScopedMigrationRequest> scopedMigrationRequests;
@@ -400,11 +407,9 @@ void MigrationManager::finishRecovery(OperationContext* txn,
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
             warning() << "Unable to reload chunk metadata for collection '"
-                      << nssAndMigrateInfos.first << "' during balancer"
-                      << " recovery. Abandoning recovery."
+                      << nssAndMigrateInfos.first
+                      << "' during balancer recovery. Abandoning recovery."
                       << causedBy(redact(scopedCMStatus.getStatus()));
-
-            _abandonActiveMigrationsAndEnableManager(txn);
             return;
         }
 
@@ -445,6 +450,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
     }
 
     _migrationRecoveryMap.clear();
+    scopedGuard.Dismiss();
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -732,6 +738,10 @@ void MigrationManager::_waitForRecovery() {
 
 void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext* txn) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    if (_state == State::kStopping) {
+        // The balancer was interrupted. Let the next balancer recover the state.
+        return;
+    }
     invariant(_state == State::kRecovering);
 
     auto catalogClient = Grid::get(txn)->catalogClient(txn);

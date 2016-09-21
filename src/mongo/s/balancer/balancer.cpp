@@ -326,17 +326,15 @@ void Balancer::_mainThread() {
         break;
     }
 
-    if (!_stopRequested()) {
-        log() << "CSRS balancer thread is recovering";
+    log() << "CSRS balancer thread is recovering";
 
-        auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
-        _migrationManager.finishRecovery(txn.get(),
-                                         balancerConfig->getMaxChunkSizeBytes(),
-                                         balancerConfig->getSecondaryThrottle(),
-                                         balancerConfig->waitForDelete());
+    auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
+    _migrationManager.finishRecovery(txn.get(),
+                                     balancerConfig->getMaxChunkSizeBytes(),
+                                     balancerConfig->getSecondaryThrottle(),
+                                     balancerConfig->waitForDelete());
 
-        log() << "CSRS balancer thread is recovered";
-    }
+    log() << "CSRS balancer thread is recovered";
 
     // Main balancer loop
     while (!_stopRequested()) {
