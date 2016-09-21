@@ -451,14 +451,6 @@ double ProcessInfo::getSystemMemoryPressurePercentage() {
 }
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
-    // [dm] i don't think mallinfo works. (64 bit.)  ??
-    struct mallinfo malloc_info =
-        mallinfo();  // structure has same name as function that returns it. (see malloc.h)
-    info.append("heap_usage_bytes",
-                static_cast<long long>(malloc_info.uordblks) /*main arena*/ +
-                    static_cast<long long>(malloc_info.hblkhd) /*mmap blocks*/);
-    // docs claim hblkhd is included in uordblks but it isn't
-
     LinuxProc p(_pid);
     if (p._maj_flt <= std::numeric_limits<long long>::max())
         info.appendNumber("page_faults", static_cast<long long>(p._maj_flt));
