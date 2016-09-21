@@ -66,6 +66,11 @@ selector:
     # Testing features that do not exist on v3.2 shards.
     - jstests/sharding/migration_server_status.js
     - jstests/sharding/movechunk_parallel.js
+    # These tests do not use ShardingTest which handles setting the featureCompatibilityVersion to
+    # 3.2 when in a mixed configuration. Enable when 3.4 becomes last-stable.
+    - jstests/sharding/autodiscover_config_rs_from_secondary.js
+    - jstests/sharding/config_rs_change.js
+    - jstests/sharding/mongos_wait_csrs_initiate.js
 
 executor:
   js_test:

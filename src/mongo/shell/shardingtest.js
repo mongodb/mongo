@@ -1226,29 +1226,29 @@ var ShardingTest = function(params) {
      */
     function shouldSetFeatureCompatibilityVersion32() {
         if (otherParams.configOptions && otherParams.configOptions.binVersion &&
-            otherParams.configOptions.binVersion === '3.2') {
+            MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion) === '3.2') {
             return false;
         }
         if (jsTestOptions().shardMixedBinVersions) {
             return true;
         }
         if (otherParams.shardOptions && otherParams.shardOptions.binVersion &&
-            otherParams.shardOptions.binVersion === '3.2') {
+            MongoRunner.getBinVersionFor(otherParams.shardOptions.binVersion) === '3.2') {
             return true;
         }
         for (var i = 0; i < numShards; i++) {
             if (otherParams['d' + i] && otherParams['d' + i].binVersion &&
-                otherParams['d' + i].binVersion === '3.2') {
+                MongoRunner.getBinVersionFor(otherParams['d' + i].binVersion) === '3.2') {
                 return true;
             }
         }
         if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion &&
-            otherParams.mongosOptions.binVersion === '3.2') {
+            MongoRunner.getBinVersionFor(otherParams.mongosOptions.binVersion) === '3.2') {
             return true;
         }
         for (var i = 0; i < numMongos; i++) {
             if (otherParams['s' + i] && otherParams['s' + i].binVersion &&
-                otherParams['s' + i].binVersion === '3.2') {
+                MongoRunner.getBinVersionFor(otherParams['s' + i].binVersion) === '3.2') {
                 return true;
             }
         }

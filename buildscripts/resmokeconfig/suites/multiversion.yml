@@ -8,6 +8,9 @@ selector:
     - jstests/multiVersion/transitioning_to_and_from_WT.js
     # TODO: SERVER-21578
     - jstests/multiVersion/balancer_multiVersion_detect.js
+    # TODO: SERVER-26261
+    - jstests/multiVersion/2_test_launching_cluster.js
+    - jstests/multiVersion/dumprestore_sharded.js
 
 # Multiversion tests start their own mongod's.
 executor:
