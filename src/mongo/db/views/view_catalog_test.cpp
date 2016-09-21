@@ -210,6 +210,83 @@ TEST_F(ViewCatalogFixture, CreateViewCycles) {
     }
 }
 
+TEST_F(ViewCatalogFixture, CreateViewWithPipelineExactMaxSize) {
+    BSONArrayBuilder builder;
+    int objsize = BSON("$match" << BSON("x"
+                                        << "foobar"))
+                      .objsize();
+
+    int pipelineSize = 0;
+
+    for (; pipelineSize < ViewGraph::kMaxViewPipelineSizeBytes; pipelineSize += objsize) {
+        builder << BSON("$match" << BSON("x"
+                                         << "foobar"));
+    }
+
+    ASSERT_EQ(pipelineSize, ViewGraph::kMaxViewPipelineSizeBytes);
+
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+    const BSONObj collation;
+
+    auto pipeline = builder.arr();
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, pipeline, collation));
+}
+
+TEST_F(ViewCatalogFixture, CreateViewWithPipelineExceedingMaxSize) {
+    BSONArrayBuilder builder;
+
+    int objsize = BSON("$match" << BSON("x"
+                                        << "foo"))
+                      .objsize();
+
+    int pipelineSize = 0;
+
+    for (; pipelineSize < ViewGraph::kMaxViewPipelineSizeBytes + 1; pipelineSize += objsize) {
+        builder << BSON("$match" << BSON("x"
+                                         << "foo"));
+    }
+
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+    const BSONObj collation;
+
+    auto pipeline = builder.arr();
+
+    ASSERT_NOT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, pipeline, collation));
+}
+
+TEST_F(ViewCatalogFixture, CreateViewWithCumulativePipelineExceedingMaxSize) {
+    BSONArrayBuilder builder1;
+    BSONArrayBuilder builder2;
+
+    int objsize = BSON("$match" << BSON("x"
+                                        << "foo"))
+                      .objsize();
+
+    int pipelineSize = 0;
+
+    for (; pipelineSize < ViewGraph::kMaxViewPipelineSizeBytes + 1; pipelineSize += objsize * 2) {
+        builder1 << BSON("$match" << BSON("x"
+                                          << "foo"));
+        builder2 << BSON("$match" << BSON("x"
+                                          << "foo"));
+    }
+
+    auto pipeline1 = builder1.arr();
+    auto pipeline2 = builder2.arr();
+
+    const NamespaceString view1("db.view1");
+    const NamespaceString view2("db.view2");
+    const NamespaceString viewOn("db.coll");
+    const BSONObj collation1;
+    const BSONObj collation2;
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, viewOn, pipeline1, collation1));
+    ASSERT_NOT_OK(viewCatalog.createView(opCtx.get(), view2, view1, pipeline2, collation2));
+}
+
 TEST_F(ViewCatalogFixture, DropMissingView) {
     NamespaceString viewName("db.view");
     ASSERT_NOT_OK(viewCatalog.dropView(opCtx.get(), viewName));
