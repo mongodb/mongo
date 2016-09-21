@@ -42,8 +42,6 @@
     // Make sure mongos A is up-to-date
     mongosA.getDB("admin").runCommand({flushRouterConfig: 1});
 
-    config.printShardingStatus(true);
-
     jsTestLog("Running count!");
 
     printjson(collB.count());
