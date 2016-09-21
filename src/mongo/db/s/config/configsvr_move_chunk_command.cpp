@@ -65,7 +65,7 @@ public:
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     Status checkAuthForCommand(Client* client,
