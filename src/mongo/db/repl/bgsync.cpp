@@ -369,6 +369,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
                                             source,
                                             NamespaceString(rsOplogName),
                                             config,
+                                            0,
                                             &dataReplicatorExternalState,
                                             stdx::bind(&BackgroundSync::_enqueueDocuments,
                                                        this,

@@ -198,6 +198,7 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(
                               source,
                               nss,
                               _createConfig(true),
+                              0,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
                               stdx::ref(*shutdownState));
@@ -228,6 +229,7 @@ TEST_F(OplogFetcherTest, InvalidConstruction) {
                                              source,
                                              nss,
                                              _createConfig(true),
+                                             0,
                                              dataReplicatorExternalState.get(),
                                              enqueueDocumentsFn,
                                              [](Status, OpTimeWithHash) {}),
@@ -241,6 +243,7 @@ TEST_F(OplogFetcherTest, InvalidConstruction) {
                                              source,
                                              nss,
                                              _createConfig(true),
+                                             0,
                                              dataReplicatorExternalState.get(),
                                              OplogFetcher::EnqueueDocumentsFn(),
                                              [](Status, OpTimeWithHash) {}),
@@ -254,6 +257,7 @@ TEST_F(OplogFetcherTest, InvalidConstruction) {
                                              source,
                                              nss,
                                              ReplicaSetConfig(),
+                                             0,
                                              dataReplicatorExternalState.get(),
                                              enqueueDocumentsFn,
                                              [](Status, OpTimeWithHash) {}),
@@ -267,6 +271,7 @@ TEST_F(OplogFetcherTest, InvalidConstruction) {
                                              source,
                                              nss,
                                              _createConfig(true),
+                                             0,
                                              dataReplicatorExternalState.get(),
                                              enqueueDocumentsFn,
                                              OplogFetcher::OnShutdownCallbackFn()),
@@ -291,6 +296,7 @@ TEST_F(
                                source,
                                nss,
                                _createConfig(true),
+                               0,
                                dataReplicatorExternalState.get(),
                                enqueueDocumentsFn,
                                [](Status, OpTimeWithHash) {})
@@ -311,6 +317,7 @@ TEST_F(
                                source,
                                nss,
                                _createConfig(true),
+                               0,
                                dataReplicatorExternalState.get(),
                                enqueueDocumentsFn,
                                [](Status, OpTimeWithHash) {})
@@ -328,6 +335,7 @@ TEST_F(OplogFetcherTest, MetadataObjectContainsReplSetMetadataFieldUnderProtocol
                                     source,
                                     nss,
                                     _createConfig(true),
+                                    0,
                                     dataReplicatorExternalState.get(),
                                     enqueueDocumentsFn,
                                     [](Status, OpTimeWithHash) {})
@@ -342,6 +350,7 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                                     source,
                                     nss,
                                     _createConfig(false),
+                                    0,
                                     dataReplicatorExternalState.get(),
                                     enqueueDocumentsFn,
                                     [](Status, OpTimeWithHash) {})
@@ -358,6 +367,7 @@ TEST_F(OplogFetcherTest, RemoteCommandTimeoutShouldEqualElectionTimeout) {
                                 source,
                                 nss,
                                 config,
+                                0,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
                                 [](Status, OpTimeWithHash) {})
@@ -372,6 +382,7 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProt
                                 source,
                                 nss,
                                 config,
+                                0,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
                                 [](Status, OpTimeWithHash) {})
@@ -385,6 +396,7 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0)
                                 source,
                                 nss,
                                 _createConfig(false),
+                                0,
                                 dataReplicatorExternalState.get(),
                                 enqueueDocumentsFn,
                                 [](Status, OpTimeWithHash) {})
@@ -400,6 +412,7 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFromStarti
                               source,
                               nss,
                               _createConfig(true),
+                              0,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
                               [](Status, OpTimeWithHash) {});
@@ -423,6 +436,7 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownAfterStartupStopsTheOplogFetcher) {
                               source,
                               nss,
                               _createConfig(true),
+                              0,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
                               stdx::ref(shutdownState));
@@ -665,6 +679,7 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionPro
                               source,
                               nss,
                               _createConfig(isV1ElectionProtocol),
+                              0,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
                               stdx::ref(shutdownState));

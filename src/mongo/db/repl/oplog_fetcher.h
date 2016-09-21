@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
@@ -128,6 +129,7 @@ public:
                  HostAndPort source,
                  NamespaceString nss,
                  ReplicaSetConfig config,
+                 std::size_t maxFetcherRestarts,
                  DataReplicatorExternalState* dataReplicatorExternalState,
                  EnqueueDocumentsFn enqueueDocumentsFn,
                  OnShutdownCallbackFn onShutdownCallbackFn);
@@ -216,6 +218,10 @@ private:
     const NamespaceString _nss;
     const BSONObj _metadataObject;
     const Milliseconds _remoteCommandTimeout;
+
+    // Maximum number of times to restart the fetcher consecutively on non-cancellation errors.
+    const std::size_t _maxFetcherRestarts;
+
     DataReplicatorExternalState* const _dataReplicatorExternalState;
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
