@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <cstddef>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
@@ -332,6 +333,12 @@ public:
      * Returns true if the user specified to use the data replicator for initial sync.
      */
     virtual bool shouldUseDataReplicatorInitialSync() const = 0;
+
+    /**
+     * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog
+     * tailing query on non-cancellation errors.
+     */
+    virtual std::size_t getOplogFetcherMaxFetcherRestarts() const = 0;
 
     /*
      * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,

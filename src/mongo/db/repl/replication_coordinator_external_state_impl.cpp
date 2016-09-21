@@ -123,6 +123,33 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
                                       std::string,
                                       kCollectionOplogBufferName);
 
+// Set this to specify maximum number of times the oplog fetcher will consecutively restart the
+// oplog tailing query on non-cancellation errors.
+server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
+    oplogFetcherMaxFetcherRestarts(10);
+class ExportedOplogFetcherMaxFetcherRestartsServerParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedOplogFetcherMaxFetcherRestartsServerParameter();
+    Status validate(const int& potentialNewValue) override;
+} _exportedOplogFetcherMaxFetcherRestartsServerParameter;
+
+ExportedOplogFetcherMaxFetcherRestartsServerParameter::
+    ExportedOplogFetcherMaxFetcherRestartsServerParameter()
+    : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+          ServerParameterSet::getGlobal(),
+          "oplogFetcherMaxFetcherRestarts",
+          &oplogFetcherMaxFetcherRestarts) {}
+
+Status ExportedOplogFetcherMaxFetcherRestartsServerParameter::validate(
+    const int& potentialNewValue) {
+    if (potentialNewValue < 0) {
+        return Status(ErrorCodes::BadValue,
+                      "oplogFetcherMaxFetcherRestarts must be greater than or equal to 0");
+    }
+    return Status::OK();
+}
+
 MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
     if ((initialSyncOplogBuffer != kCollectionOplogBufferName) &&
         (initialSyncOplogBuffer != kBlockingQueueOplogBufferName)) {
@@ -858,6 +885,10 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteady
 
 bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync() const {
     return !use3dot2InitialSync;
+}
+
+std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
+    return oplogFetcherMaxFetcherRestarts;
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {

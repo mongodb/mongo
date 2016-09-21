@@ -290,6 +290,10 @@ bool ReplicationCoordinatorExternalStateMock::shouldUseDataReplicatorInitialSync
     return true;
 }
 
+std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRestarts() const {
+    return 0;
+}
+
 void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {
     _isReadCommittedSupported = val;
 }

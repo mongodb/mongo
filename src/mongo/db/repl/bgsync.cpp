@@ -363,20 +363,20 @@ void BackgroundSync::_produce(OperationContext* txn) {
             };
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _oplogFetcher =
-            stdx::make_unique<OplogFetcher>(executor,
-                                            OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
-                                            source,
-                                            NamespaceString(rsOplogName),
-                                            config,
-                                            0,
-                                            &dataReplicatorExternalState,
-                                            stdx::bind(&BackgroundSync::_enqueueDocuments,
-                                                       this,
-                                                       stdx::placeholders::_1,
-                                                       stdx::placeholders::_2,
-                                                       stdx::placeholders::_3),
-                                            onOplogFetcherShutdownCallbackFn);
+        _oplogFetcher = stdx::make_unique<OplogFetcher>(
+            executor,
+            OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
+            source,
+            NamespaceString(rsOplogName),
+            config,
+            _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
+            &dataReplicatorExternalState,
+            stdx::bind(&BackgroundSync::_enqueueDocuments,
+                       this,
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2,
+                       stdx::placeholders::_3),
+            onOplogFetcherShutdownCallbackFn);
         oplogFetcher = _oplogFetcher.get();
     } catch (const mongo::DBException& ex) {
         fassertFailedWithStatus(34440, exceptionToStatus());

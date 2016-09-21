@@ -219,7 +219,7 @@ private:
     const BSONObj _metadataObject;
     const Milliseconds _remoteCommandTimeout;
 
-    // Maximum number of times to restart the fetcher consecutively on non-cancellation errors.
+    // Maximum number of times to consecutively restart the fetcher on non-cancellation errors.
     const std::size_t _maxFetcherRestarts;
 
     DataReplicatorExternalState* const _dataReplicatorExternalState;

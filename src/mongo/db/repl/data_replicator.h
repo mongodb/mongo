@@ -153,6 +153,10 @@ struct DataReplicatorOptions {
 
     SyncSourceSelector* syncSourceSelector = nullptr;
 
+    // The oplog fetcher will restart the oplog tailing query this many times on non-cancellation
+    // failures.
+    std::size_t oplogFetcherMaxFetcherRestarts = 0;
+
     std::string toString() const {
         return str::stream() << "DataReplicatorOptions -- "
                              << " localOplogNs: " << localOplogNS.toString()
