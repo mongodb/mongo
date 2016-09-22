@@ -699,9 +699,6 @@ ExitCode _initAndListen(int listenPort) {
         web.detach();
     }
 
-#ifndef _WIN32
-    mongo::signalForkSuccess();
-#endif
     AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
         Status status = authindex::verifySystemIndexes(startupOpCtx.get());
@@ -819,6 +816,10 @@ ExitCode _initAndListen(int listenPort) {
         error() << "Failed to start the listener: " << start.toString();
         return EXIT_NET_ERROR;
     }
+
+#ifndef _WIN32
+    mongo::signalForkSuccess();
+#endif
 
     return waitForShutdown();
 }

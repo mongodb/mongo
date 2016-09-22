@@ -284,10 +284,6 @@ static ExitCode runMongosServer() {
         Grid::get(opCtx.get())->getBalancerConfiguration()->refreshAndCheck(opCtx.get());
     }
 
-#if !defined(_WIN32)
-    mongo::signalForkSuccess();
-#endif
-
     if (serverGlobalParams.isHttpInterfaceEnabled) {
         std::shared_ptr<DbWebServer> dbWebServer(new DbWebServer(serverGlobalParams.bind_ip,
                                                                  serverGlobalParams.port + 1000,
@@ -324,6 +320,10 @@ static ExitCode runMongosServer() {
     if (!start.isOK()) {
         return EXIT_NET_ERROR;
     }
+
+#if !defined(_WIN32)
+    mongo::signalForkSuccess();
+#endif
 
     // Block until shutdown.
     return waitForShutdown();
