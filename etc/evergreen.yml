@@ -560,6 +560,11 @@ functions:
             export PATH="$PATH:/opt/node/bin"
           fi
 
+          # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
+          echo "jstestfuzz self-tests are starting"
+          npm test > /dev/null
+          echo "jstestfuzz self-tests finished"
+
           npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
     - command: archive.targz_pack
       params:
