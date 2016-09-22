@@ -27,6 +27,8 @@
  */
 #include "test_util.h"
 
+#include <signal.h>
+
 /*
  * JIRA ticket reference: WT-2719
  * Test case description: Fuzz testing for WiredTiger reconfiguration.
@@ -191,6 +193,41 @@ handle_message(WT_EVENT_HANDLER *handler,
 
 static WT_EVENT_HANDLER event_handler = { NULL, handle_message, NULL, NULL };
 
+static const char *current;			/* Current test configuration */
+
+static void on_alarm(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void
+on_alarm(int signo)
+{
+	(void)signo;				/* Unused parameter */
+
+	fprintf(stderr, "configuration timed out: %s\n", current);
+	abort();
+
+	/* NOTREACHED */
+}
+
+static void
+reconfig(TEST_OPTS *opts, WT_SESSION *session, const char *config)
+{
+	int ret;
+
+	current = config;
+
+	/*
+	 * Reconfiguration starts and stops servers, so hangs are more likely
+	 * here than in other tests. Don't let the test run too long and get
+	 * a core dump when it happens.
+	 */
+	(void)alarm(60);
+	if ((ret = opts->conn->reconfigure(opts->conn, config)) != 0) {
+		fprintf(stderr, "%s: %s\n",
+		    config, session->strerror(session, ret));
+		exit (EXIT_FAILURE);
+	}
+	(void)alarm(0);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -200,7 +237,6 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	u_int i, j;
-	int ret;
 	const char *p;
 	char *config;
 
@@ -226,13 +262,12 @@ main(int argc, char *argv[])
 	len = WT_ELEMENTS(list) * 64;
 	config = dmalloc(len);
 
+	/* Set an alarm so we can debug hangs. */
+	(void)signal(SIGALRM, on_alarm);
+
 	/* A linear pass through the list. */
 	for (i = 0; i < WT_ELEMENTS(list); ++i)
-		if ((ret = opts->conn->reconfigure(opts->conn, list[i])) != 0) {
-			fprintf(stderr, "%s: %s\n",
-			    list[i], session->strerror(session, ret));
-			return (EXIT_FAILURE);
-		}
+		reconfig(opts, session, list[i]);
 
 	/*
 	 * A linear pass through the list, adding random elements.
@@ -264,11 +299,7 @@ main(int argc, char *argv[])
 			}
 			strcat(config, p);
 		}
-		if ((ret = opts->conn->reconfigure(opts->conn, config)) != 0) {
-			fprintf(stderr, "%s: %s\n",
-			    config, session->strerror(session, ret));
-			return (EXIT_FAILURE);
-		}
+		reconfig(opts, session, config);
 	}
 
 	/*
