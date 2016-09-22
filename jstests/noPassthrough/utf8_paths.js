@@ -10,12 +10,19 @@
 
     // Test MongoD
     let testMongoD = function() {
-        let conn = MongoRunner.runMongod({
+        let options = {
             dbpath: path,
             useLogFiles: true,
             pidfilepath: path + "/pidfile",
-            directoryperdb: "",
-        });
+        };
+
+        // directoryperdb is only supported with the wiredTiger, and mmapv1 storage engines
+        if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger" ||
+            jsTest.options().storageEngine === "mmapv1") {
+            options["directoryperdb"] = "";
+        }
+
+        let conn = MongoRunner.runMongod(options);
         assert.neq(null, conn, 'mongod was unable to start up');
 
         let coll = conn.getCollection(db_name + ".foo");
