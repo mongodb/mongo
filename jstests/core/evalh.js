@@ -9,6 +9,7 @@
 
     // Call the native implementation auth function and verify it does not exist under the db.eval
     // javascript context.
-    assert.throws( function() { db.eval('db.getMongo().auth("reader", "reader")'); });
+    assert.throws(function() {
+        db.eval('db.getMongo().auth("reader", "reader")');
+    });
 })();
-
