@@ -89,7 +89,7 @@ var ReplSetTest = function(opts) {
     var _unbridgedPorts;
     var _unbridgedNodes;
 
-    this.kDefaultTimeoutMS = 5 * 60 * 1000;
+    this.kDefaultTimeoutMS = 10 * 60 * 1000;
 
     // Publicly exposed variables
 

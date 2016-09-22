@@ -23,7 +23,7 @@
         ]
     });
 
-    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 
     var secondary = replSet.getSecondary();
     jsTestLog('Disable replication on the SECONDARY ' + secondary.host);

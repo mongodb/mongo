@@ -19,7 +19,7 @@ masterCollection.save({a: 1});
 var newNode = replTest.add();
 replTest.reInitiate();
 
-replTest.waitForState(replTest.nodes[1], ReplSetTest.State.SECONDARY, 60 * 1000);
+replTest.waitForState(replTest.nodes[1], ReplSetTest.State.SECONDARY);
 // Allow documents to propagate to new replica set member.
 replTest.awaitReplication();
 

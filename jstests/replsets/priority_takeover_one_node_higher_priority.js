@@ -13,7 +13,7 @@
     replSet.startSet();
     replSet.initiate();
 
-    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
     var primary = replSet.getPrimary();
 
     replSet.awaitSecondaryNodes();

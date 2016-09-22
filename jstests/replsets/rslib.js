@@ -138,7 +138,7 @@ var startSetIfSupportsReadMajority;
             }
             printjson(state);
             return true;
-        }, "not all members ready", timeout || 60000);
+        }, "not all members ready", timeout || 10 * 60 * 1000);
 
         print("All members are now in state PRIMARY, SECONDARY, or ARBITER");
     };
