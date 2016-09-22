@@ -50,11 +50,11 @@ var testName = 'mongofiles_list';
     clearRawMongoProgramOutput();
 
     // ensure tool runs without error
-    assert.eq(runMongoProgram.apply(this, ['mongofiles',
-          '--port', conn.port,
-          '--quiet', 'list']
-      .concat(passthrough.args)),
-        0, 'list command failed but was expected to succeed');
+    var pid = startMongoProgramNoConnect.apply(this, ['mongofiles',
+        '--port', conn.port,
+        '--quiet', 'list']
+      .concat(passthrough.args));
+    assert.eq(waitProgram(pid), 0, 'list command failed but was expected to succeed');
 
     jsTest.log('Verifying list output');
 
@@ -63,7 +63,7 @@ var testName = 'mongofiles_list';
       files = rawMongoProgramOutput()
         .split('\n')
         .filter(function(line) {
-          return line.match(inputFileRegex);
+          return line.indexOf('sh'+pid) !== -1 && line.match(inputFileRegex);
         });
       return files.length;
     }, 'should find some files');

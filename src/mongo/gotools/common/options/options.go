@@ -4,6 +4,7 @@ package options
 
 import (
 	"github.com/jessevdk/go-flags"
+	"github.com/mongodb/mongo-tools/common/failpoint"
 	"github.com/mongodb/mongo-tools/common/log"
 
 	"fmt"
@@ -64,7 +65,8 @@ type General struct {
 	Help    bool `long:"help" description:"print usage"`
 	Version bool `long:"version" description:"print the tool version and exit"`
 
-	MaxProcs int `long:"numThreads" default:"0" hidden:"true"`
+	MaxProcs   int    `long:"numThreads" default:"0" hidden:"true"`
+	Failpoints string `long:"failpoints" hidden:"true"`
 }
 
 // Struct holding verbosity-related options
@@ -176,6 +178,9 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 	if _, err := opts.parser.AddGroup("verbosity options", "", opts.Verbosity); err != nil {
 		panic(fmt.Errorf("couldn't register verbosity options: %v", err))
 	}
+
+	// this call disables failpoints if compiled without failpoint support
+	EnableFailpoints(opts)
 
 	if enabled.Connection {
 		if _, err := opts.parser.AddGroup("connection options", "", opts.Connection); err != nil {
@@ -298,7 +303,9 @@ func (o *ToolOptions) AddOptions(opts ExtraOptions) {
 // Parse the command line args.  Returns any extra args not accounted for by
 // parsing, as well as an error if the parsing returns an error.
 func (o *ToolOptions) Parse() ([]string, error) {
-	return o.parser.Parse()
+	args, err := o.parser.Parse()
+	failpoint.ParseFailpoints(o.Failpoints)
+	return args, err
 }
 
 func (opts *ToolOptions) handleUnknownOption(option string, arg flags.SplitArgument, args []string) ([]string, error) {

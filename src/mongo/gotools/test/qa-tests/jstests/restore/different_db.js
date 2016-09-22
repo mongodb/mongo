@@ -36,9 +36,11 @@
 
   // insert a bunch of data
   collNames.forEach(function(collName) {
+    var data = [];
     for (var i = 0; i < 500; i++) {
-      sourceDB[collName].insert({_id: i+'_'+collName});
+      data.push({_id: i+'_'+collName});
     }
+    sourceDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(500, sourceDB[collName].count());
   });

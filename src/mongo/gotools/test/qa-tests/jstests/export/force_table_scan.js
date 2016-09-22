@@ -20,9 +20,11 @@
   var testColl = testDB.data;
 
   // insert some data
+  var data = [];
   for (var i = 0; i < 50; i++) {
-    testColl.insert({_id: i});
+    data.push({_id: i});
   }
+  testColl.insertMany(data);
   // sanity check the insertion worked
   assert.eq(50, testColl.count());
 

@@ -2,70 +2,92 @@ package progress
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/text"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/mongodb/mongo-tools/common/text"
 )
+
+// Manager is an interface which tools can use to registers progressors which
+// track the progress of any arbitrary operation.
+type Manager interface {
+	// Attach registers the progressor with the manager under the given name.
+	// Any call to Attach must have a matching call to Detach.
+	Attach(name string, progressor Progressor)
+
+	// Detach removes the progressor with the given name from the manager
+	Detach(name string)
+}
 
 const GridPadding = 2
 
-// Manager handles thread-safe synchronized progress bar writing, so that all
-// given progress bars are written in a group at a given interval.
-// The current implementation maintains insert order when printing,
-// such that new bars appear at the bottom of the group.
-type Manager struct {
-	waitTime time.Duration
-	writer   io.Writer
-	bars     []*Bar
-	barsLock *sync.Mutex
-	stopChan chan struct{}
+// BarWriter implements Manager. It periodically prints the status of all of its
+// progressors in the form of pretty progress bars. It handles thread-safe
+// synchronized progress bar writing, so that its progressors are written in a
+// group at a given interval. It maintains insertion order when printing, such
+// that new bars appear at the bottom of the group.
+type BarWriter struct {
+	sync.Mutex
+
+	waitTime  time.Duration
+	writer    io.Writer
+	bars      []*Bar
+	stopChan  chan struct{}
+	barLength int
+	isBytes   bool
 }
 
-// NewProgressBarManager returns an initialized Manager with the given
-// time.Duration to wait between writes
-func NewProgressBarManager(w io.Writer, waitTime time.Duration) *Manager {
-	return &Manager{
-		waitTime: waitTime,
-		writer:   w,
-		barsLock: &sync.Mutex{},
-		stopChan: make(chan struct{}),
+// NewBarWriter returns an initialized BarWriter with the given bar length and
+// byte-formatting toggle, waiting the given duration between writes
+func NewBarWriter(w io.Writer, waitTime time.Duration, barLength int, isBytes bool) *BarWriter {
+	return &BarWriter{
+		waitTime:  waitTime,
+		writer:    w,
+		stopChan:  make(chan struct{}),
+		barLength: barLength,
+		isBytes:   isBytes,
 	}
 }
 
-// Attach registers the given progress bar with the manager. Should be used as
-//  myManager.Attach(myBar)
-//  defer myManager.Detach(myBar)
-func (manager *Manager) Attach(pb *Bar) {
-	// first some quick error checks
-	if pb.Name == "" {
-		panic("cannot attach a nameless bar to a progress bar manager")
+// Attach registers the given progressor with the manager
+func (manager *BarWriter) Attach(name string, progressor Progressor) {
+	pb := &Bar{
+		Name:      name,
+		Watching:  progressor,
+		BarLength: manager.barLength,
+		IsBytes:   manager.isBytes,
 	}
 	pb.validate()
 
-	manager.barsLock.Lock()
-	defer manager.barsLock.Unlock()
+	manager.Lock()
+	defer manager.Unlock()
 
 	// make sure we are not adding the same bar again
 	for _, bar := range manager.bars {
-		if bar.Name == pb.Name {
-			panic(fmt.Sprintf("progress bar with name '%v' already exists in manager", pb.Name))
+		if bar.Name == name {
+			panic(fmt.Sprintf("progress bar with name '%s' already exists in manager", name))
 		}
 	}
 
 	manager.bars = append(manager.bars, pb)
 }
 
-// Detach removes the given progress bar from the manager.
-// Insert order is maintained for consistent ordering of the printed bars.
-//  Note: the manager removes progress bars by "Name" not by memory location
-func (manager *Manager) Detach(pb *Bar) {
-	if pb.Name == "" {
-		panic("cannot detach a nameless bar from a progress bar manager")
+// Detach removes the progressor with the given name from the manager. Insert
+// order is maintained for consistent ordering of the printed bars.
+func (manager *BarWriter) Detach(name string) {
+	manager.Lock()
+	defer manager.Unlock()
+	var pb *Bar
+	for _, bar := range manager.bars {
+		if bar.Name == name {
+			pb = bar
+			break
+		}
 	}
-
-	manager.barsLock.Lock()
-	defer manager.barsLock.Unlock()
+	if pb == nil {
+		panic("could not find progressor")
+	}
 
 	grid := &text.GridWriter{
 		ColumnPadding: GridPadding,
@@ -88,9 +110,9 @@ func (manager *Manager) Detach(pb *Bar) {
 }
 
 // helper to render all bars in order
-func (manager *Manager) renderAllBars() {
-	manager.barsLock.Lock()
-	defer manager.barsLock.Unlock()
+func (manager *BarWriter) renderAllBars() {
+	manager.Lock()
+	defer manager.Unlock()
 	grid := &text.GridWriter{
 		ColumnPadding: GridPadding,
 	}
@@ -107,14 +129,14 @@ func (manager *Manager) renderAllBars() {
 }
 
 // Start kicks of the timed batch writing of progress bars.
-func (manager *Manager) Start() {
+func (manager *BarWriter) Start() {
 	if manager.writer == nil {
-		panic("Cannot use a progress.Manager with an unset Writer")
+		panic("Cannot use a progress.BarWriter with an unset Writer")
 	}
 	go manager.start()
 }
 
-func (manager *Manager) start() {
+func (manager *BarWriter) start() {
 	if manager.waitTime <= 0 {
 		manager.waitTime = DefaultWaitTime
 	}
@@ -133,6 +155,6 @@ func (manager *Manager) start() {
 
 // Stop ends the main manager goroutine, stopping the manager's bars
 // from being rendered.
-func (manager *Manager) Stop() {
+func (manager *BarWriter) Stop() {
 	manager.stopChan <- struct{}{}
 }

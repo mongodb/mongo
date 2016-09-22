@@ -59,27 +59,31 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent) error {
 	}
 	defer session.Close()
 
-	// get the indexes
-	indexesIter, err := db.GetIndexes(session.DB(intent.DB).C(intent.C))
-	if err != nil {
-		return err
-	}
-	if indexesIter == nil {
-		log.Logvf(log.Always, "the collection %v appears to have been dropped after the dump started", intent.Namespace())
-		return nil
-	}
-
-	indexOpts := &bson.D{}
-	for indexesIter.Next(indexOpts) {
-		convertedIndex, err := bsonutil.ConvertBSONValueToJSON(*indexOpts)
+	if intent.IsView() {
+		log.Logvf(log.DebugLow, "not dumping indexes metadata for '%v' because it is a view", intent.Namespace())
+	} else {
+		// get the indexes
+		indexesIter, err := db.GetIndexes(session.DB(intent.DB).C(intent.C))
 		if err != nil {
-			return fmt.Errorf("error converting index (%#v): %v", convertedIndex, err)
+			return err
 		}
-		meta.Indexes = append(meta.Indexes, convertedIndex)
-	}
+		if indexesIter == nil {
+			log.Logvf(log.Always, "the collection %v appears to have been dropped after the dump started", intent.Namespace())
+			return nil
+		}
 
-	if err := indexesIter.Err(); err != nil {
-		return fmt.Errorf("error getting indexes for collection `%v`: %v", nsID, err)
+		indexOpts := &bson.D{}
+		for indexesIter.Next(indexOpts) {
+			convertedIndex, err := bsonutil.ConvertBSONValueToJSON(*indexOpts)
+			if err != nil {
+				return fmt.Errorf("error converting index (%#v): %v", convertedIndex, err)
+			}
+			meta.Indexes = append(meta.Indexes, convertedIndex)
+		}
+
+		if err := indexesIter.Err(); err != nil {
+			return fmt.Errorf("error getting indexes for collection `%v`: %v", nsID, err)
+		}
 	}
 
 	// Finally, we send the results to the writer as JSON bytes

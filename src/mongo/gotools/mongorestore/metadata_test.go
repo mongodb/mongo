@@ -61,6 +61,7 @@ func TestCollectionExists(t *testing.T) {
 
 			Reset(func() {
 				session.DB(ExistsDB).DropDatabase()
+				session.Close()
 			})
 		})
 

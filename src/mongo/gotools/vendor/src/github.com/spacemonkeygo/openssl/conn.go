@@ -26,6 +26,9 @@ int sk_X509_num_not_a_macro(STACK_OF(X509) *sk) { return sk_X509_num(sk); }
 X509 *sk_X509_value_not_a_macro(STACK_OF(X509)* sk, int i) {
    return sk_X509_value(sk, i);
 }
+long SSL_set_tlsext_host_name_not_a_macro(SSL *ssl, const char *name) {
+   return SSL_set_tlsext_host_name(ssl, name);
+}
 const char * SSL_get_cipher_name_not_a_macro(const SSL *ssl) {
    return SSL_get_cipher_name(ssl);
 }
@@ -568,6 +571,17 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 
 func (c *Conn) UnderlyingConn() net.Conn {
 	return c.conn
+}
+
+func (c *Conn) SetTlsExtHostName(name string) error {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if C.SSL_set_tlsext_host_name_not_a_macro(c.ssl, cname) == 0 {
+		return errorFromErrorQueue()
+	}
+	return nil
 }
 
 func (c *Conn) VerifyResult() VerifyResult {

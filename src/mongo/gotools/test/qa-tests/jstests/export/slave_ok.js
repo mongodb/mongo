@@ -23,9 +23,11 @@
 
   // insert some data
   var testDB = primary.getDB('test');
+  var data = [];
   for (var i = 0; i < 10; i++) {
-    testDB.data.insert({_id: i});
+    data.push({_id: i});
   }
+  testDB.data.insertMany(data);
   replTest.awaitReplication();
 
   // sanity check the insertion worked

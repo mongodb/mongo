@@ -223,13 +223,20 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			So(imp.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
+		Convey("an error should be thrown if --mode is incorrect", func() {
+			imp, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			imp.IngestOptions.Mode = "wrong"
+			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+		})
+
 		Convey("an error should be thrown if a field in the --upsertFields "+
 			"argument starts with a dollar sign", func() {
 			imp, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
-			imp.IngestOptions.Upsert = true
+			imp.IngestOptions.Mode = modeUpsert
 			imp.IngestOptions.UpsertFields = "a,$b,c"
 			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
 			imp.IngestOptions.UpsertFields = "a,.b,c"
@@ -237,22 +244,34 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("no error should be thrown if --upsertFields is supplied without "+
-			"--upsert", func() {
+			"--mode=xxx", func() {
 			imp, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
 			imp.IngestOptions.UpsertFields = "a,b,c"
 			So(imp.ValidateSettings([]string{}), ShouldBeNil)
+			So(imp.IngestOptions.Mode, ShouldEqual, modeUpsert)
 		})
 
-		Convey("if --upsert is used without --upsertFields, _id should be set as "+
+		Convey("an error should be thrown if --upsertFields is used with "+
+			"--mode=insert", func() {
+			imp, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			imp.InputOptions.HeaderLine = true
+			imp.InputOptions.Type = CSV
+			imp.IngestOptions.Mode = modeInsert
+			imp.IngestOptions.UpsertFields = "a"
+			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
+		})
+
+		Convey("if --mode=upsert is used without --upsertFields, _id should be set as "+
 			"the upsert field", func() {
 			imp, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
-			imp.IngestOptions.Upsert = true
+			imp.IngestOptions.Mode = modeUpsert
 			imp.IngestOptions.UpsertFields = ""
 			So(imp.ValidateSettings([]string{}), ShouldBeNil)
 			So(imp.upsertFields, ShouldResemble, []string{"_id"})
@@ -264,7 +283,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
-			imp.IngestOptions.Upsert = true
+			imp.IngestOptions.Mode = modeUpsert
 			imp.IngestOptions.UpsertFields = "a,b,c"
 			So(imp.ValidateSettings([]string{}), ShouldBeNil)
 		})
@@ -663,7 +682,7 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldEqual, io.EOF)
 			So(numImported, ShouldEqual, 0)
 		})
-		Convey("CSV import with --upsert and --upsertFields should succeed", func() {
+		Convey("CSV import with --mode=upsert and --upsertFields should succeed", func() {
 			imp, err := NewMongoImport()
 			So(err, ShouldBeNil)
 
@@ -683,7 +702,7 @@ func TestImportDocuments(t *testing.T) {
 			}
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
-		Convey("CSV import with --upsert/--upsertFields with duplicate id should succeed "+
+		Convey("CSV import with --mode=upsert/--upsertFields with duplicate id should succeed "+
 			"if stopOnError is not set", func() {
 			imp, err := NewMongoImport()
 			So(err, ShouldBeNil)
@@ -691,7 +710,7 @@ func TestImportDocuments(t *testing.T) {
 			imp.InputOptions.File = "testdata/test_duplicate.csv"
 			fields := "_id,b,c"
 			imp.InputOptions.Fields = &fields
-			imp.IngestOptions.Upsert = true
+			imp.IngestOptions.Mode = modeUpsert
 			imp.upsertFields = []string{"_id"}
 			numImported, err := imp.ImportDocuments()
 			So(err, ShouldBeNil)

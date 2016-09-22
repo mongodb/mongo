@@ -145,7 +145,7 @@ func ValidateDBName(database string) error {
 	// check for illegal characters
 	for _, illegalRune := range InvalidDBChars {
 		if strings.ContainsRune(database, illegalRune) {
-			return fmt.Errorf("illegal character '%c' found in '%v'", illegalRune, database)
+			return fmt.Errorf("illegal character '%c' found in db name '%v'", illegalRune, database)
 		}
 	}
 

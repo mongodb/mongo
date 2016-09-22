@@ -26,12 +26,22 @@
   var sharedCollName = 'bothColl';
 
   // insert a bunch of data
+  var data = {};
+  data[oneOnlyCollName] = [];
+  data[twoOnlyCollName] = [];
+  data[sharedCollName+'one'] = [];
+  data[sharedCollName+'two'] = [];
   for (var i = 0; i < 50; i++) {
-    dbOne[oneOnlyCollName].insert({_id: i+'_'+oneOnlyCollName});
-    dbTwo[twoOnlyCollName].insert({_id: i+'_'+twoOnlyCollName});
-    dbOne[sharedCollName].insert({_id: i+'_dbOne_'+sharedCollName});
-    dbTwo[sharedCollName].insert({_id: i+'_dbTwo_'+sharedCollName});
+    data[oneOnlyCollName].push({_id: i+'_'+oneOnlyCollName});
+    data[twoOnlyCollName].push({_id: i+'_'+twoOnlyCollName});
+    data[sharedCollName+'one'].push({_id: i+'_dbOne_'+sharedCollName});
+    data[sharedCollName+'two'].push({_id: i+'_dbTwo_'+sharedCollName});
   }
+  dbOne[oneOnlyCollName].insertMany(data[oneOnlyCollName]);
+  dbTwo[twoOnlyCollName].insertMany(data[twoOnlyCollName]);
+  dbOne[sharedCollName].insertMany(data[sharedCollName+'one']);
+  dbTwo[sharedCollName].insertMany(data[sharedCollName+'two']);
+
   // sanity check the insertion worked
   assert.eq(50, dbOne[oneOnlyCollName].count());
   assert.eq(50, dbTwo[twoOnlyCollName].count());

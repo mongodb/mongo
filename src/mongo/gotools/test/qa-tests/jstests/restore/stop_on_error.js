@@ -9,9 +9,11 @@
 
   var dbOne = toolTest.db.getSiblingDB('dbOne');
   // create a test collection
+  var data = [];
   for (var i=0; i<=100; i++) {
-    dbOne.test.insert({_id: i, x: i*i});
+    data.push({_id: i, x: i*i});
   }
+  dbOne.test.insertMany(data);
 
   // dump it
   var dumpTarget = 'stop_on_error_dump';

@@ -70,16 +70,16 @@ func (bdo *BSONDumpOptions) GetBSONReader() (io.ReadCloser, error) {
 	return ReadNopCloser{os.Stdin}, nil
 }
 
-func printJSON(doc *bson.Raw, out io.Writer, pretty bool) error {
+func formatJSON(doc *bson.Raw, pretty bool) ([]byte, error) {
 	decodedDoc := bson.D{}
 	err := bson.Unmarshal(doc.Data, &decodedDoc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	extendedDoc, err := bsonutil.ConvertBSONValueToJSON(decodedDoc)
 	if err != nil {
-		return fmt.Errorf("error converting BSON to extended JSON: %v", err)
+		return nil, fmt.Errorf("error converting BSON to extended JSON: %v", err)
 	}
 	jsonBytes, err := json.Marshal(extendedDoc)
 	if pretty {
@@ -88,10 +88,9 @@ func printJSON(doc *bson.Raw, out io.Writer, pretty bool) error {
 		jsonBytes = jsonFormatted.Bytes()
 	}
 	if err != nil {
-		return fmt.Errorf("error converting doc to JSON: %v", err)
+		return nil, fmt.Errorf("error converting doc to JSON: %v", err)
 	}
-	_, err = out.Write(jsonBytes)
-	return err
+	return jsonBytes, nil
 }
 
 // JSON iterates through the BSON file and for each document it finds,
@@ -110,7 +109,7 @@ func (bd *BSONDump) JSON() (int, error) {
 
 	var result bson.Raw
 	for decodedStream.Next(&result) {
-		if err := printJSON(&result, bd.Out, bd.BSONDumpOptions.Pretty); err != nil {
+		if bytes, err := formatJSON(&result, bd.BSONDumpOptions.Pretty); err != nil {
 			log.Logvf(log.Always, "unable to dump document %v: %v", numFound+1, err)
 
 			//if objcheck is turned on, stop now. otherwise keep on dumpin'
@@ -118,7 +117,8 @@ func (bd *BSONDump) JSON() (int, error) {
 				return numFound, err
 			}
 		} else {
-			_, err := bd.Out.Write([]byte("\n"))
+			bytes = append(bytes, '\n')
+			_, err := bd.Out.Write(bytes)
 			if err != nil {
 				return numFound, err
 			}

@@ -20,15 +20,17 @@
   var testColl = testDB.data;
 
   // insert some data, in a different order than we'll be sorting it
+  var data = [];
   for (var i = 30; i > 20; i--) {
-    testColl.insert({a: i});
+    data.push({a: i});
   }
   for (i = 31; i < 50; i++) {
-    testColl.insert({a: i});
+    data.push({a: i});
   }
   for (i = 20; i >= 0; i--) {
-    testColl.insert({a: i});
+    data.push({a: i});
   }
+  testColl.insertMany(data, {ordered: true});
   // sanity check the insertion worked
   assert.eq(50, testColl.count());
 

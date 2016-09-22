@@ -55,11 +55,18 @@ type IngestOptions struct {
 	// Forces mongoimport to halt the import operation at the first insert or upsert error.
 	StopOnError bool `long:"stopOnError" description:"stop importing at first insert/upsert error"`
 
-	// Modifies the import process to update existing objects in the database if they match --upsertFields.
-	Upsert bool `long:"upsert" description:"insert or update objects that already exist"`
+	// Modify the import process.
+	// Always insert the documents if they are new (do NOT match --upsertFields).
+	// For existing documents (match --upsertFields) in the database:
+	// "insert": Insert only, skip exisiting documents.
+	// "upsert": Insert new documents or replace existing ones.
+	// "merge": Insert new documents or modify existing ones; Preserve values in the database that are not overwritten.
+	Mode string `long:"mode" choice:"insert" choice:"upsert" choice:"merge" description:"insert: insert only. upsert: insert or replace existing documents. merge: insert or modify existing documents. defaults to insert"`
+
+	Upsert bool `long:"upsert" hidden:"true" description:"(deprecated; same as --mode=upsert) insert or update objects that already exist"`
 
 	// Specifies a list of fields for the query portion of the upsert; defaults to _id field.
-	UpsertFields string `long:"upsertFields" value-name:"<field>[,<field>]*" description:"comma-separated fields for the query part of the upsert"`
+	UpsertFields string `long:"upsertFields" value-name:"<field>[,<field>]*" description:"comma-separated fields for the query part when --mode is set to upsert or merge"`
 
 	// Sets write concern level for write operations.
 	WriteConcern string `long:"writeConcern" default:"majority" value-name:"<write-concern-specifier>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`

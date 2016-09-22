@@ -25,9 +25,11 @@
 
   // insert some data to be dumped
   collNames.forEach(function(collName) {
+    var data = [];
     for (var i = 0; i < 10; i++) {
-      testDB[collName].insert({_id: i, num: i+1, s: ''+i});
+      data.push({_id: i, num: i+1, s: ''+i});
     }
+    testDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(10, testDB[collName].count());
   });

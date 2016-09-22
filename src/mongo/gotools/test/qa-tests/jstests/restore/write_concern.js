@@ -20,9 +20,11 @@
   var dbOne = rs.getPrimary().getDB("dbOne");
 
   // create a test collection
+  var data = [];
   for (var i=0; i<=100; i++) {
-    dbOne.test.insert({_id: i, x: i*i});
+    data.push({_id: i, x: i*i});
   }
+  dbOne.test.insertMany(data);
   rs.awaitReplication();
 
   // dump the data that we'll

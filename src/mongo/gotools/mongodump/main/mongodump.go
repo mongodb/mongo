@@ -3,12 +3,19 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongodump"
+)
+
+const (
+	progressBarLength   = 24
+	progressBarWaitTime = time.Second * 3
 )
 
 func main() {
@@ -51,10 +58,16 @@ func main() {
 	opts.Direct = (setName == "")
 	opts.ReplicaSetName = setName
 
+	// kick off the progress bar manager
+	progressManager := progress.NewBarWriter(log.Writer(0), progressBarWaitTime, progressBarLength, false)
+	progressManager.Start()
+	defer progressManager.Stop()
+
 	dump := mongodump.MongoDump{
-		ToolOptions:   opts,
-		OutputOptions: outputOpts,
-		InputOptions:  inputOpts,
+		ToolOptions:     opts,
+		OutputOptions:   outputOpts,
+		InputOptions:    inputOpts,
+		ProgressManager: progressManager,
 	}
 
 	finishedChan := signals.HandleWithInterrupt(dump.HandleInterrupt)

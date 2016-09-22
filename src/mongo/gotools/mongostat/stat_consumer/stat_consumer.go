@@ -3,7 +3,9 @@ package stat_consumer
 import (
 	"fmt"
 	"io"
+	"os"
 
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
 	"github.com/mongodb/mongo-tools/mongostat/status"
 )
@@ -76,6 +78,10 @@ func (sc *StatConsumer) Update(newStat *status.ServerStatus) (l *line.StatLine, 
 // It returns true if the formatter should no longer receive data
 func (sc *StatConsumer) FormatLines(lines []*line.StatLine) bool {
 	str := sc.formatter.FormatLines(lines, sc.headers, sc.keyNames)
-	fmt.Fprintf(sc.writer, "%s", str)
+	_, err := fmt.Fprintf(sc.writer, "%s", str)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error writing formatted output: %v", err)
+		os.Exit(util.ExitError)
+	}
 	return sc.formatter.IsFinished()
 }

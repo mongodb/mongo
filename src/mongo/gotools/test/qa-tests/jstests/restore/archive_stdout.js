@@ -28,10 +28,14 @@
 
   var testDb = toolTest.db;
   testDb.dropDatabase();
+  var fooData = [];
+  var barData = [];
   for (var i = 0; i < 500; i++) {
-    testDb.foo.insert({i: i});
-    testDb.bar.insert({i: i*5});
+    fooData.push({i: i});
+    barData.push({i: i*5});
   }
+  testDb.foo.insertMany(fooData);
+  testDb.bar.insertMany(barData);
   assert.eq(500, testDb.foo.count(), 'foo should have our test documents');
   assert.eq(500, testDb.bar.count(), 'bar should have our test documents');
 

@@ -36,9 +36,11 @@
   testColl.ensureIndex({num: 1}, {v: 0});
 
   // insert some data
+  var data = [];
   for (var i = 0; i < 10; i++) {
-    testColl.insert({num: i});
+    data.push({num: i});
   }
+  testColl.insertMany(data);
   // sanity check the insert worked
   assert.eq(10, testColl.count());
 

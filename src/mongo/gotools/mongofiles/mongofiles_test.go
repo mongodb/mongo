@@ -111,6 +111,7 @@ func simpleMongoFilesInstance(args []string) (*MongoFiles, error) {
 // get an id of an existing file, for _id access
 func idOfFile(mf *MongoFiles, filename string) string {
 	session, _ := mf.SessionProvider.GetSession()
+	defer session.Close()
 	gfs := session.DB(mf.StorageOptions.DB).GridFS(mf.StorageOptions.GridFSPrefix)
 	gFile, _ := gfs.Open(filename)
 	bytes, _ := json.Marshal(gFile.Id())

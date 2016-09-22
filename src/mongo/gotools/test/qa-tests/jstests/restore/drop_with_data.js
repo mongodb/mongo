@@ -25,9 +25,11 @@
 
   // insert a bunch of data to be dumped
   collNames.forEach(function(collName) {
+    var data = [];
     for (var i = 0; i < 500; i++) {
-      testDB[collName].insert({_id: i+'_'+collName});
+      data.push({_id: i+'_'+collName});
     }
+    testDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(500, testDB[collName].count());
   });
@@ -44,9 +46,11 @@
     // sanity check the drop worked
     assert.eq(0, testDB[collName].count());
 
+    var data = [];
     for (var i = 500; i < 600; i++) {
-      testDB[collName].insert({_id: i+'_'+collName});
+      data.push({_id: i+'_'+collName});
     }
+    testDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(100, testDB[collName].count());
   });

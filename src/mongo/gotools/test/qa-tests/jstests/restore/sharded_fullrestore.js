@@ -15,9 +15,11 @@
   var sourceDB = toolTest.db.getSiblingDB('blahblah');
 
   // put in some sample data
+  var data = [];
   for (var i=0; i<100; i++) {
-    sourceDB.test.insert({x: 1});
+    data.push({x: 1});
   }
+  sourceDB.test.insertMany(data);
 
   // dump the data
   var ret = toolTest.runTool.apply(toolTest, ['dump']

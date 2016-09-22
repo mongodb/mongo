@@ -41,55 +41,48 @@
     assert.docEq(importedDoc, expectedDocs[2]);
   };
 
-  var reset = function(coll) {
-    assert.eq.soon(0, function() {
-      coll.drop();
-      return coll.count();
-    }, "collection should be empty after drop");
-  };
-
   var toolTest = getToolTest("import_fields");
-  var db1 = toolTest.db;
-  var commonToolArgs= getCommonToolArguments();
-
-  var c = db1.c.getDB().getSiblingDB("testdb")["testcoll"];
+  var commonToolArgs = getCommonToolArguments();
+  var d = toolTest.db;
+  var c;
 
   // parseGrace=fail should cause a failure
+  c = d.testcoll1;
   var ret = toolTest.runTool.apply(toolTest, ["import", "--file",
     "jstests/import/testdata/parse_grace.csv",
     "--type", "csv",
-    "--db", "testdb",
-    "--collection", "testcoll",
+    "--db", d.getName(),
+    "--collection", c.getName(),
     "--columnsHaveTypes",
     "--parseGrace", "stop",
     "--headerline"]
     .concat(commonToolArgs));
   assert.neq(ret, 0);
-  reset(c);
 
   // parseGrace=skipRow should not import the row
   // with an un-coercable field
+  c = d.testcoll2;
   ret = toolTest.runTool.apply(toolTest, ["import", "--file",
     "jstests/import/testdata/parse_grace.csv",
     "--type", "csv",
-    "--db", "testdb",
-    "--collection", "testcoll",
+    "--db", d.getName(),
+    "--collection", c.getName(),
     "--columnsHaveTypes",
     "--parseGrace", "skipRow",
     "--headerline"]
     .concat(commonToolArgs));
   checkCollectionContents(c);
   assert.eq(c.count(), 2);
-  reset(c);
 
   // parseGrace=skipField should not import the
   // an un-coercable field, but still keep the rest
   // of the row
+  c = d.testcoll3;
   ret = toolTest.runTool.apply(toolTest, ["import", "--file",
     "jstests/import/testdata/parse_grace.csv",
     "--type", "csv",
-    "--db", "testdb",
-    "--collection", "testcoll",
+    "--db", d.getName(),
+    "--collection", c.getName(),
     "--columnsHaveTypes",
     "--parseGrace", "skipField",
     "--headerline"]
@@ -98,14 +91,14 @@
   assert.eq(c.count(), 3);
   assert.neq(c.findOne({a: "bar"}), null);
   assert.eq(c.findOne({a: "bar"}).c.xyz, undefined);
-  reset(c);
 
   // parseGrace=autoCast should import the un-coercable field
+  c = d.testcoll4;
   ret = toolTest.runTool.apply(toolTest, ["import", "--file",
     "jstests/import/testdata/parse_grace.csv",
     "--type", "csv",
-    "--db", "testdb",
-    "--collection", "testcoll",
+    "--db", d.getName(),
+    "--collection", c.getName(),
     "--columnsHaveTypes",
     "--parseGrace", "autoCast",
     "--headerline"]
@@ -115,7 +108,6 @@
   var importedDoc = c.findOne({a: "bar"});
   delete importedDoc["_id"];
   assert.docEq(importedDoc, expectedDocs[1]);
-  reset(c);
 
   toolTest.stop();
 }());

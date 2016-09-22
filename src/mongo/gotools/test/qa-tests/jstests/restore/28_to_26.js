@@ -25,9 +25,11 @@
   var testColl = testDB.coll;
 
   // insert some documents
+  var data = [];
   for (var i = 0; i < 50; i++) {
-    testColl.insert({_id: i});
+    data.push({_id: i});
   }
+  testColl.insertMany(data);
   // sanity check the insert worked
   assert.eq(50, testColl.count());
 

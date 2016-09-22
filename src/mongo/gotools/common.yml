@@ -27,6 +27,7 @@ mongo_tools_variables:
     osx_1010_ssl_task_list: &osx_1010_ssl_tasks
       - name: dist
       - name: qa-tests
+      - name: native-cert-ssl
     solaris_task_list: &solaris_tasks
       - name: db
       - name: dist
@@ -49,9 +50,7 @@ mongo_tools_variables:
       - name: qa-dump-restore-archiving
       - name: qa-dump-restore-gzip
       - name: qa-tests-wt
-      - name: text
       - name: unit
-      - name: util
       - name: vet
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
       - name: dist
@@ -60,6 +59,7 @@ mongo_tools_variables:
       - name: legacy28
       - name: qa-tests
       - name: qa-tests-unstable
+      - name: native-cert-ssl
     ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
       - name: db
       - name: dist
@@ -70,8 +70,7 @@ mongo_tools_variables:
       - name: legacy26
       - name: legacy24
       - name: qa-tests
-      - name: text
-      - name: util
+      - name: native-cert-ssl
     ubuntu1204_race_task_list: &ubuntu1204_race_tasks
       - name: db
       - name: dist
@@ -83,9 +82,7 @@ mongo_tools_variables:
       - name: legacy24
       - name: qa-tests
       - name: qa-tests-wt
-      - name: text
       - name: unit
-      - name: util
     windows_32_task_list: &windows_32_tasks
       - name: db
         distros:
@@ -133,6 +130,7 @@ mongo_tools_variables:
       - name: integration-auth
       - name: legacy28
       - name: qa-tests
+      - name: native-cert-ssl
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: db
       - name: dist
@@ -146,6 +144,7 @@ mongo_tools_variables:
         distros:
         - windows-64-vs2013-test
       - name: unit
+      - name: native-cert-ssl
     rhel71_enterprise_task_list: &rhel71_enterprise_tasks
       - name: db
       - name: dist
@@ -157,8 +156,28 @@ mongo_tools_variables:
       - name: qa-tests
       - name: qa-tests-unstable
       - name: qa-tests-wt
-      - name: text
-      - name: util
+      - name: native-cert-ssl
+    rhel72_enterprise_task_list: &rhel72_enterprise_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: kerberos
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
+      - name: qa-tests-unstable
+      - name: qa-tests-wt
+      - name: native-cert-ssl
+    ubuntu1604_ssl_task_list: &ubuntu1604_ssl_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
+      - name: qa-tests-unstable
+      - name: qa-tests-wt
+      - name: native-cert-ssl
 
 
 ## Common mongodb arguments
@@ -240,7 +259,7 @@ functions:
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
 
         . ./set_gopath.sh
-        ${gorootvars} go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
+        ${gorootvars} go build ${args} -tags "failpoints ${build_tags}" -o bin/${tool} ${tool}/main/${tool}.go
         ./bin/${tool} --version
 
   "download mongod":
@@ -250,7 +269,8 @@ functions:
       script: |
         set -x
         mongotarget=$(if [ "${mongo_target}" ]; then echo "${mongo_target}"; else echo "${mongo_os}"; fi)
-        dlurl=$(python binaryurl.py --edition=${mongo_edition} --target=$mongotarget --version=${mongo_version})
+        mongoversion=$(if [ "${mongo_version_always_use_latest}" ]; then echo "latest"; else echo "${mongo_version}"; fi)
+        dlurl=$(python binaryurl.py --edition=${mongo_edition} --target=$mongotarget --version=$mongoversion --arch=${mongo_arch|x86_64})
         filename=$(echo $dlurl | sed -e "s_.*/__")
         mkdir mongodb
         cd mongodb
@@ -322,7 +342,7 @@ functions:
         export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         export basedir=`pwd`
         cd ${package}
-        go test ${coverage_args} ${args} ${build_tags} -test.v > unit.suite
+        go test ${coverage_args} ${args} -tags "${build_tags}" -test.v > unit.suite
         export exitcode=$?
         cat unit.suite
         cp unit.suite $basedir/.
@@ -362,14 +382,14 @@ functions:
         . ./set_gopath.sh
 
         # run unit tests under common package
-        for i in "common/bsonutil" "common/json" "common/archive" "common/log" "common/options" "common/progress" "common/text"; do
-            cd $i
-            COMMON_SUBPKG=$(basename $i)
+        for i in archive bsonutil failpoint intents json log options progress text util; do
+            cd common/$i
+            COMMON_SUBPKG=$i
             COVERAGE_ARGS=""
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$COMMON_SUBPKG.out"
             fi;
-            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags} -test.v > $COMMON_SUBPKG.suite
+            ${library_path} go test $COVERAGE_ARGS ${args} -tags "failpoints ${build_tags}" -test.v > $COMMON_SUBPKG.suite
             if [ $? -ne 0 ]; then
                 echo "suite failed, will exit with error on finish"
                 export exitcode=1
@@ -386,7 +406,7 @@ functions:
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$i.out"
             fi;
-            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags} -test.v > $i.suite
+            ${library_path} go test $COVERAGE_ARGS ${args} -tags "${build_tags}" -test.v > $i.suite
             if [ $? -ne 0 ]; then
                 echo "suite failed, will exit with error on finish"
                 export exitcode=1
@@ -424,7 +444,7 @@ functions:
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$i.out"
             fi;
-            ${library_path} go test $COVERAGE_ARGS -test.v ${args} ${build_tags} > $i.suite
+            ${library_path} go test $COVERAGE_ARGS -test.v ${args} -tags "${build_tags}" > $i.suite
             if [ $? -ne 0 ]; then
                 echo "suite failed, will exit with error on finish"
                 export exitcode=1
@@ -570,6 +590,19 @@ post:
         rm -rf /data/db/*
         exit 0
 
+timeout:
+  - command: shell.exec
+    params:
+      silent: true
+      script: |
+        # don't attempt to abort on any distro which has a special way of
+        # killing everything (i.e. using taskkill on Windows)
+        if [ "${killall_mci}" = "" ]; then
+          all_tools="bsondump mongodump mongoexport mongofiles mongoimport mongooplog mongorestore mongostat mongotop"
+          # send SIGABRT to print a stacktrace for any hung tool
+          pkill -ABRT "^($(echo -n $all_tools | tr ' ' '|'))\$"
+        fi
+
 
 tasks:
 - name: db
@@ -586,7 +619,7 @@ tasks:
           - key: "package"
             value: "common/db"
           - key: "args"
-            value: "-test.types=db"
+            value: "${args} -test.types=db"
     - func: "download mongod"
       vars:
         mongo_version: "3.2"
@@ -686,7 +719,7 @@ tasks:
       params:
         updates:
           - key: "args"
-            value: "-test.types=${integration_test_args}"
+            value: "${args} -test.types=${integration_test_args}"
     - func: "download mongod"
       vars:
         mongo_version: "3.2"
@@ -707,7 +740,7 @@ tasks:
       params:
         updates:
           - key: "args"
-            value: "-test.types=${integration_test_args},auth"
+            value: "${args} -test.types=${integration_test_args},auth"
           - key: "mongod_args"
             concat: " --auth"
           - key: "auth_username"
@@ -736,7 +769,7 @@ tasks:
       params:
         updates:
           - key: "args"
-            value: "-test.types=kerberos"
+            value: "${args} -test.types=kerberos"
     - func: "setup integration test"
     - func: "run tool integration tests"
 
@@ -1034,6 +1067,68 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
+        resmoke_args: "--excludeWithAnyTags=requires_unstable ${resmoke_args}"
+
+- name: native-cert-ssl
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "latest"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongotop
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -e
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv ./mongodb/mongos${extension} .
+          mv test/qa-tests/* .
+          chmod +x mongo*
+          chmod +x bsondump*
+          rm -rf /data/install /data/multiversion
+          python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
+          chmod 400 jstests/libs/key*
+
+          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
 
 - name: qa-dump-restore-archiving
   depends_on:
@@ -1059,6 +1154,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_archive"
+        resmoke_args: "--excludeWithAnyTags=requires_unstable ${resmoke_args}"
 
 - name: qa-dump-restore-gzip
   depends_on:
@@ -1084,6 +1180,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_gzip"
+        resmoke_args: "--excludeWithAnyTags=requires_unstable ${resmoke_args}"
 
 - name: qa-tests-wt
   depends_on:
@@ -1130,22 +1227,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core"
-        resmoke_args: "--storageEngine=wiredTiger ${resmoke_args}"
-
-- name: text
-  commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/text"
-    - func: "run unit test"
+        resmoke_args: "--excludeWithAnyTags=requires_unstable --storageEngine=wiredTiger ${resmoke_args}"
 
 - name: unit
   commands:
@@ -1205,21 +1287,6 @@ tasks:
     - func: "upload html coverage"
     - func: "upload text coverage"
 
-- name: util
-  commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/util"
-    - func: "run unit test"
-
 - name: vet
   commands:
     - command: git.get_project
@@ -1250,7 +1317,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "osx"
     arch: "osx/x86_64"
-    build_tags: -tags "ssl"
+    build_tags: "ssl"
     resmoke_args: --excludeWithAnyTags=requires_many_files
   tasks: *osx_1010_tasks
 
@@ -1264,7 +1331,7 @@ buildvariants:
     mongo_os: "osx"
     mongo_target: "osx-ssl"
     arch: "osx/x86_64"
-    build_tags: -tags "ssl"
+    build_tags: "ssl"
     edition: ssl
     resmoke_args: --excludeWithAnyTags=requires_many_files
   tasks: *osx_1010_ssl_tasks
@@ -1282,7 +1349,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1204"
     mongo_edition: "targeted"
-    build_tags: -tags "ssl"
+    build_tags: "ssl"
     arch: "linux/x86_64"
     integration_test_args: integration
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
@@ -1297,7 +1364,7 @@ buildvariants:
     <<: *mongo_ssl_startup_args
     mongo_os: "ubuntu1204"
     mongo_edition: "enterprise"
-    build_tags: -tags "ssl"
+    build_tags: "ssl"
     edition: ssl
     arch: "linux/x86_64"
     smoke_use_ssl: --use-ssl
@@ -1315,7 +1382,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1204"
     mongo_edition: "enterprise"
-    build_tags: -tags "ssl sasl"
+    build_tags: "ssl sasl"
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
     arch: "linux/x86_64"
@@ -1334,9 +1401,11 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "rhel71"
     mongo_edition: "enterprise"
+    mongo_arch: "ppc64le"
     # RHEL 7.1 PPC64LE machines kerberos setup does not work for mongo-tools
-    #build_tags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
-    build_tags: -gccgoflags "$(pkg-config --libs --cflags libssl)" -tags 'ssl'
+    #args: ... libsasl2; build_tags "sasl ssl"
+    args: -gccgoflags "$(pkg-config --libs --cflags libssl)"
+    build_tags: 'ssl'
     resmoke_use_ssl: _ssl
     library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
     resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 4
@@ -1346,6 +1415,51 @@ buildvariants:
     run_kinit: true
     integration_test_args: integration
   tasks: *rhel71_enterprise_tasks
+
+- name: rhel72-s390x-enterprise
+  display_name: Linux s390x RHEL 7.2 Enterprise
+  run_on:
+  - rhel72-zseries-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel72"
+    mongo_edition: "enterprise"
+    mongo_arch: "s390x"
+    args: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)"
+    build_tags: "sasl ssl"
+    resmoke_use_ssl: _ssl
+    library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
+    resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 2
+    multiversion_override: "skip"
+    mongo_version_always_use_latest: true
+    arch: "linux/s390x"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *rhel72_enterprise_tasks
+
+- name: ubuntu1604-arm64
+  display_name: Linux ARM64 Ubuntu 16.04 SSL
+  run_on:
+  - ubuntu1604-arm64-small
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1604"
+    mongo_edition: "targeted"
+    mongo_arch: "arm64"
+    args: -gccgoflags "$(pkg-config --libs --cflags libcrypto libssl)"
+    build_tags: "ssl"
+    resmoke_use_ssl: _ssl
+    library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
+    resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 2
+    multiversion_override: "skip"
+    mongo_version_always_use_latest: true
+    arch: "linux/arm64"
+    edition: ssl
+    integration_test_args: integration
+  tasks: *ubuntu1604_ssl_tasks
 
 #######################################
 #         Solaris Buildvariant        #
@@ -1359,7 +1473,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "sunos5"
     library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
-    build_tags: -gccgoflags "-lsocket -lnsl"
+    args: -gccgoflags "-lsocket -lnsl"
     resmoke_args: --excludeWithAnyTags=requires_large_ram -j$(kstat cpu | sort -u | grep -c "^module")
   tasks: *solaris_tasks
 
@@ -1374,6 +1488,7 @@ buildvariants:
     <<: *mongod_win32_startup_args
     <<: *mongo_default_startup_args
     mongo_target: "windows_i686"
+    mongo_arch: "i386"
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     resmoke_args: --excludeWithAnyTags=requires_large_ram
@@ -1405,7 +1520,7 @@ buildvariants:
     <<: *mongo_ssl_startup_args
     mongo_os: "windows-64"
     mongo_target: "windows_x86_64-2008plus-ssl"
-    build_tags: -tags "ssl"
+    build_tags: "ssl"
     edition: ssl
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
@@ -1428,7 +1543,7 @@ buildvariants:
     mongo_os: "windows-64"
     mongo_edition: "enterprise"
     mongo_target: "windows"
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
     resmoke_args: --excludeWithAnyTags=requires_large_ram,requires_mongo_24
@@ -1456,7 +1571,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1204"
     mongo_edition: "enterprise"
-    build_tags: -tags "ssl"
+    build_tags: "ssl"
     arch: "linux/x86_64"
     args: "-race"
     resmoke_args: --excludeWithAnyTags=requires_large_ram
@@ -1472,7 +1587,7 @@ buildvariants:
   run_on:
   - suse11-test
   expansions:
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
   tasks:
   - name: dist
 
@@ -1481,17 +1596,7 @@ buildvariants:
   run_on:
   - suse12-test
   expansions:
-    build_tags: -tags "sasl ssl"
-  tasks:
-  - name: dist
-
-- name: rhel55
-  display_name: RHEL 5.5 SSL
-  run_on:
-  - rhel55
-  expansions:
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
   tasks:
   - name: dist
 
@@ -1501,7 +1606,7 @@ buildvariants:
   - rhel62-test
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
   tasks:
   - name: dist
 
@@ -1511,7 +1616,7 @@ buildvariants:
   - rhel70
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
   tasks:
   - name: dist
 
@@ -1520,7 +1625,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
   tasks:
   - name: dist
 
@@ -1530,6 +1635,6 @@ buildvariants:
   - debian71-test
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    build_tags: -tags "sasl ssl"
+    build_tags: "sasl ssl"
   tasks:
   - name: dist

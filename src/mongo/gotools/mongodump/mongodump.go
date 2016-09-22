@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/auth"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/failpoint"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
@@ -24,11 +25,7 @@ import (
 	"time"
 )
 
-const (
-	progressBarLength   = 24
-	progressBarWaitTime = time.Second * 3
-	defaultPermissions  = 0755
-)
+const defaultPermissions = 0755
 
 // MongoDump is a container for the user-specified options and
 // internal state used for running mongodump.
@@ -37,6 +34,8 @@ type MongoDump struct {
 	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions
 	OutputOptions *OutputOptions
+
+	ProgressManager progress.Manager
 
 	// useful internals that we don't directly expose as options
 	sessionProvider *db.SessionProvider
@@ -47,7 +46,6 @@ type MongoDump struct {
 	isMongos        bool
 	authVersion     int
 	archive         *archive.Writer
-	progressManager *progress.Manager
 	// shutdownIntentsNotifier is provided to the multiplexer
 	// as well as the signal handler, and allows them to notify
 	// the intent dumpers that they should shutdown
@@ -168,12 +166,13 @@ func (dump *MongoDump) Init() error {
 	}
 
 	dump.manager = intents.NewIntentManager()
-	dump.progressManager = progress.NewProgressBarManager(log.Writer(0), progressBarWaitTime)
 	return nil
 }
 
 // Dump handles some final options checking and executes MongoDump.
 func (dump *MongoDump) Dump() (err error) {
+	defer dump.sessionProvider.Close()
+
 	dump.shutdownIntentsNotifier = newNotifier()
 
 	if dump.InputOptions.HasQuery() {
@@ -306,6 +305,7 @@ func (dump *MongoDump) Dump() (err error) {
 		if err != nil {
 			return err
 		}
+		defer session.Close()
 		buildInfo, err := session.BuildInfo()
 		var serverVersion string
 		if err != nil {
@@ -363,16 +363,17 @@ func (dump *MongoDump) Dump() (err error) {
 		}
 	}
 
+	if failpoint.Enabled(failpoint.PauseBeforeDumping) {
+		time.Sleep(15 * time.Second)
+	}
+
 	// IO Phase II
 	// regular collections
 
 	// TODO, either remove this debug or improve the language
 	log.Logvf(log.DebugHigh, "dump phase II: regular collections")
 
-	// kick off the progress bar manager and begin dumping intents
-	dump.progressManager.Start()
-	defer dump.progressManager.Stop()
-
+	// begin dumping intents
 	if err := dump.DumpIntents(); err != nil {
 		return err
 	}
@@ -454,10 +455,12 @@ func (dump *MongoDump) DumpIntents() error {
 					resultChan <- nil
 					return
 				}
-				err := dump.DumpIntent(intent)
-				if err != nil {
-					resultChan <- err
-					return
+				if intent.BSONFile != nil {
+					err := dump.DumpIntent(intent)
+					if err != nil {
+						resultChan <- err
+						return
+					}
 				}
 				dump.manager.Finish(intent)
 			}
@@ -496,12 +499,14 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	switch {
 	case len(dump.query) > 0:
 		findQuery = session.DB(intent.DB).C(intent.C).Find(dump.query)
+	case dump.OutputOptions.ViewsAsCollections:
+		// views have an implied aggregation which does not support snapshot
+		fallthrough
 	case dump.InputOptions.TableScan:
 		// ---forceTablesScan runs the query without snapshot enabled
 		findQuery = session.DB(intent.DB).C(intent.C).Find(nil)
 	default:
 		findQuery = session.DB(intent.DB).C(intent.C).Find(nil).Snapshot()
-
 	}
 
 	var dumpCount int64
@@ -552,6 +557,10 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 // dumped, and any errors that occured.
 func (dump *MongoDump) dumpQueryToWriter(
 	query *mgo.Query, intent *intents.Intent) (int64, error) {
+	// don't dump any data for views being dumped as views
+	if intent.IsView() && !dump.OutputOptions.ViewsAsCollections {
+		return 0, nil
+	}
 	var total int
 	var err error
 	if len(dump.query) == 0 {
@@ -565,13 +574,10 @@ func (dump *MongoDump) dumpQueryToWriter(
 	}
 
 	dumpProgressor := progress.NewCounter(int64(total))
-	bar := &progress.Bar{
-		Name:      intent.Namespace(),
-		Watching:  dumpProgressor,
-		BarLength: progressBarLength,
+	if dump.ProgressManager != nil {
+		dump.ProgressManager.Attach(intent.Namespace(), dumpProgressor)
+		defer dump.ProgressManager.Detach(intent.Namespace())
 	}
-	dump.progressManager.Attach(bar)
-	defer dump.progressManager.Detach(bar)
 
 	err = dump.dumpIterToWriter(query.Iter(), intent.BSONFile, dumpProgressor)
 	_, dumpCount := dumpProgressor.Progress()

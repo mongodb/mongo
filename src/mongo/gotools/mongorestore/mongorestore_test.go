@@ -59,6 +59,7 @@ func TestMongorestore(t *testing.T) {
 			SessionProvider: provider,
 		}
 		session, _ := provider.GetSession()
+		defer session.Close()
 		c1 := session.DB("db1").C("c1")
 		c1.DropCollection()
 		Convey("and an explicit target restores from that dump directory", func() {

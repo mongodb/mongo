@@ -21,9 +21,11 @@
   var testDB = toolTest.db.getSiblingDB('test');
 
   // insert a bunch of data
+  var data = [];
   for (var i = 0; i < 500; i++) {
-    testDB.coll.insert({_id: i});
+    data.push({_id: i});
   }
+  testDB.coll.insertMany(data);
   // sanity check the insertion worked
   assert.eq(500, testDB.coll.count());
 

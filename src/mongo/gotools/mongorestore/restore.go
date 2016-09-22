@@ -14,19 +14,10 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-const (
-	progressBarLength   = 24
-	progressBarWaitTime = time.Second * 3
-	insertBufferFactor  = 16
-)
+const insertBufferFactor = 16
 
 // RestoreIntents iterates through all of the intents stored in the IntentManager, and restores them.
 func (restore *MongoRestore) RestoreIntents() error {
-	// start up the progress bar manager
-	restore.progressManager = progress.NewProgressBarManager(log.Writer(0), progressBarWaitTime)
-	restore.progressManager.Start()
-	defer restore.progressManager.Stop()
-
 	log.Logvf(log.DebugLow, "restoring up to %v collections in parallel", restore.OutputOptions.NumParallelCollections)
 
 	if restore.OutputOptions.NumParallelCollections > 0 {
@@ -219,14 +210,11 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	documentCount := int64(0)
 	watchProgressor := progress.NewCounter(fileSize)
-	bar := &progress.Bar{
-		Name:      fmt.Sprintf("%v.%v", dbName, colName),
-		Watching:  watchProgressor,
-		BarLength: progressBarLength,
-		IsBytes:   true,
+	if restore.ProgressManager != nil {
+		name := fmt.Sprintf("%v.%v", dbName, colName)
+		restore.ProgressManager.Attach(name, watchProgressor)
+		defer restore.ProgressManager.Detach(name)
 	}
-	restore.progressManager.Attach(bar)
-	defer restore.progressManager.Detach(bar)
 
 	maxInsertWorkers := restore.OutputOptions.NumInsertionWorkers
 	if restore.OutputOptions.MaintainInsertionOrder {

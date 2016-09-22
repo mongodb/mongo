@@ -428,19 +428,23 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
-	versionDoc := struct {
-		CurrentVersion int `bson:"currentVersion"`
-	}{}
-	bsonSource.Next(&versionDoc)
-	if err := bsonSource.Err(); err != nil {
-		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.Location, err)
+	versionDoc := bson.M{}
+	for bsonSource.Next(&versionDoc) {
+		id, ok := versionDoc["_id"].(string)
+		if ok && id == "authSchema" {
+			authVersion, ok := versionDoc["currentVersion"].(int)
+			if ok {
+				return authVersion, nil
+			}
+			return 0, fmt.Errorf("can't unmarshal system.version curentVersion as an int")
+		}
+		log.Logvf(log.DebugLow, "system.version document is not an authSchema %v", versionDoc["_id"])
 	}
-	authVersion := versionDoc.CurrentVersion
-	if authVersion == 0 {
-		// 0 is not a possible valid version number, so this can only indicate bad input
-		return 0, fmt.Errorf("system.version bson file does not have 'currentVersion' field")
+	err = bsonSource.Err()
+	if err != nil {
+		log.Logvf(log.Info, "can't unmarshal system.version document: %v", err)
 	}
-	return authVersion, nil
+	return 0, fmt.Errorf("system.version bson file does not have authSchema document")
 }
 
 // ValidateAuthVersions compares the authentication version of the dump files and the

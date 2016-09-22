@@ -34,11 +34,13 @@
   var indexesPre = testColl.getIndexes();
 
   // insert some data
+  var data = [];
   for (var i = 0; i < 5; i++) {
-    testColl.insert({a: i, b: i+1, listField: [i, i+1]});
-    testColl.insert({textField: 'hola '+i});
-    testColl.insert({geoField: {type: 'Point', coordinates: [i, i+1]}});
+    data.push({a: i, b: i+1, listField: [i, i+1]});
+    data.push({textField: 'hola '+i});
+    data.push({geoField: {type: 'Point', coordinates: [i, i+1]}});
   }
+  testColl.insertMany(data);
   // sanity check the data was inserted
   assert.eq(15, testColl.count());
 

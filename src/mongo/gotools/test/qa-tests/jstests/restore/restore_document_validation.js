@@ -28,13 +28,15 @@
   var testDB = toolTest.db.getSiblingDB('test');
 
   // create 1000 documents, half of which will pass the validation
+  var data = [];
   for (var i = 0; i < 1000; i++) {
     if (i%2 === 0) {
-      testDB.bar.insert({_id: i, num: i+1, s: String(i)});
+      data.push({_id: i, num: i+1, s: String(i)});
     } else {
-      testDB.bar.insert({_id: i, num: i+1, s: String(i), baz: i});
+      data.push({_id: i, num: i+1, s: String(i), baz: i});
     }
   }
+  testDB.bar.insertMany(data, {ordered: true});
   // sanity check the insertion worked
   assert.eq(1000, testDB.bar.count(), 'all documents should be inserted');
 

@@ -23,14 +23,20 @@
 
     // create a fake oplog consisting of a large number of inserts
     var xStr = new Array(documentSize).join("x"); // ~documentSize bytes string
+    var data = [];
     for (var i = 0; i < oplogSize; i++) {
-      testColl.insert({
+      data.push({
         ts: new Timestamp(0, i),
         op: "i",
         o: {_id: i, x: xStr},
         ns: "test.op"
       });
+      if (data.length === 1000) {
+        testColl.insertMany(data);
+        data = [];
+      }
     }
+    testColl.insertMany(data);
 
     // dump the fake oplog
     var ret = toolTest.runTool.apply(toolTest, ['dump',

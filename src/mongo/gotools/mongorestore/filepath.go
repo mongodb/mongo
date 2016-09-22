@@ -414,6 +414,10 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 				log.Logvf(log.Info, "found collection %v bson to restore to %v", sourceNS, destNS)
 				restore.manager.PutWithNamespace(sourceNS, intent)
 			case MetadataFileType:
+				if collection == "system.profile" {
+					log.Logvf(log.DebugLow, "skipping restore of system.profile metadata")
+					continue
+				}
 				if !restore.includer.Has(sourceNS) {
 					log.Logvf(log.DebugLow, "skipping restoring %v.%v metadata, it is not included", db, collection)
 					continue

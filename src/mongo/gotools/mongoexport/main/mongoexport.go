@@ -2,15 +2,23 @@
 package main
 
 import (
+	"os"
+	"time"
+
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"os"
+)
+
+const (
+	progressBarLength   = 24
+	progressBarWaitTime = time.Second
 )
 
 func main() {
@@ -54,6 +62,7 @@ func main() {
 	opts.ReplicaSetName = setName
 
 	provider, err := db.NewSessionProvider(*opts)
+	defer provider.Close()
 
 	// temporarily allow secondary reads for the isMongos check
 	provider.SetReadPreference(mgo.Nearest)
@@ -103,11 +112,17 @@ func main() {
 		log.Logvf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
+
+	progressManager := progress.NewBarWriter(log.Writer(0), progressBarWaitTime, progressBarLength, false)
+	progressManager.Start()
+	defer progressManager.Stop()
+
 	exporter := mongoexport.MongoExport{
 		ToolOptions:     *opts,
 		OutputOpts:      outputOpts,
 		InputOpts:       inputOpts,
 		SessionProvider: provider,
+		ProgressManager: progressManager,
 	}
 
 	err = exporter.ValidateSettings()

@@ -43,10 +43,11 @@
   }
 
   // create a test collection
-  var col = db.getCollection(colName);
+  var data = [];
   for (var i=0; i<=100; i++) {
-    col.insert({_id: i, x: i*i});
+    data.push({_id: i, x: i*i});
   }
+  db.getCollection(colName).insertMany(data);
   rs.awaitReplication();
 
   // export the data that we'll use

@@ -20,7 +20,7 @@ rm -rf vendor/pkg
 . ./set_gopath.sh
 mkdir -p bin
 
-for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
+for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog mongoreplay; do
         echo "Building ${i}..."
         go build -o "bin/$i" -tags "$tags" "$i/main/$i.go"
         ./bin/$i --version

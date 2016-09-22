@@ -53,7 +53,9 @@ import (
 type Method *C.EVP_MD
 
 var (
+	SHA1_Method   Method = C.EVP_sha1()
 	SHA256_Method Method = C.EVP_sha256()
+	SHA512_Method Method = C.EVP_sha512()
 )
 
 type PublicKey interface {
@@ -281,6 +283,41 @@ func LoadPrivateKeyFromPEMWidthPassword(pem_block []byte, password string) (
 	return p, nil
 }
 
+// LoadPrivateKeyFromDER loads a private key from a DER-encoded block.
+func LoadPrivateKeyFromDER(der_block []byte) (PrivateKey, error) {
+	if len(der_block) == 0 {
+		return nil, errors.New("empty der block")
+	}
+	bio := C.BIO_new_mem_buf(unsafe.Pointer(&der_block[0]),
+		C.int(len(der_block)))
+	if bio == nil {
+		return nil, errors.New("failed creating bio")
+	}
+	defer C.BIO_free(bio)
+
+	rsakey := C.d2i_RSAPrivateKey_bio(bio, nil)
+	if rsakey == nil {
+		return nil, errors.New("failed reading rsa key")
+	}
+	defer C.RSA_free(rsakey)
+
+	// convert to PKEY
+	key := C.EVP_PKEY_new()
+	if key == nil {
+		return nil, errors.New("failed converting to evp_pkey")
+	}
+	if C.EVP_PKEY_set1_RSA(key, (*C.struct_rsa_st)(rsakey)) != 1 {
+		C.EVP_PKEY_free(key)
+		return nil, errors.New("failed converting to evp_pkey")
+	}
+
+	p := &pKey{key: key}
+	runtime.SetFinalizer(p, func(p *pKey) {
+		C.EVP_PKEY_free(p.key)
+	})
+	return p, nil
+}
+
 // LoadPublicKeyFromPEM loads a public key from a PEM-encoded block.
 func LoadPublicKeyFromPEM(pem_block []byte) (PublicKey, error) {
 	if len(pem_block) == 0 {
@@ -353,7 +390,11 @@ func LoadPublicKeyFromDER(der_block []byte) (PublicKey, error) {
 
 // GenerateRSAKey generates a new RSA private key with an exponent of 3.
 func GenerateRSAKey(bits int) (PrivateKey, error) {
-	exponent := 3
+	return GenerateRSAKeyWithExponent(bits, 3)
+}
+
+// GenerateRSAKeyWithExponent generates a new RSA private key.
+func GenerateRSAKeyWithExponent(bits int, exponent int) (PrivateKey, error) {
 	rsa := C.RSA_generate_key(C.int(bits), C.ulong(exponent), nil, nil)
 	if rsa == nil {
 		return nil, errors.New("failed to generate RSA key")

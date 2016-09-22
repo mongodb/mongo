@@ -24,11 +24,17 @@
   var collThree = dbTwo.collThree;
 
   // insert a bunch of data
+  var dataOne = [];
+  var dataTwo = [];
+  var dataThree = [];
   for (var i = 0; i < 50; i++) {
     collOne.insert({_id: i+'_collOne'});
     collTwo.insert({_id: i+'_collTwo'});
     collThree.insert({_id: i+'_collThree'});
   }
+  collOne.insertMany(dataOne);
+  collTwo.insertMany(dataTwo);
+  collThree.insertMany(dataThree);
   // sanity check the insertion worked
   assert.eq(50, collOne.count());
   assert.eq(50, collTwo.count());

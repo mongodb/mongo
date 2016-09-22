@@ -45,7 +45,14 @@ func TestNewSessionProvider(t *testing.T) {
 			session, err := provider.GetSession()
 			So(err, ShouldBeNil)
 			So(session, ShouldNotBeNil)
+			session.Close()
 			So(provider.masterSession, ShouldNotBeNil)
+			err = provider.masterSession.Ping()
+			So(err, ShouldBeNil)
+			provider.Close()
+			So(func() {
+				provider.masterSession.Ping()
+			}, ShouldPanic)
 
 		})
 

@@ -12,9 +12,11 @@
   dbOne.setProfilingLevel(2);
 
   // create some test data
+  var data = [];
   for (var i=0; i<=100; i++) {
-    dbOne.test.insert({_id: i, x: i*i});
+    data.push({_id: i, x: i*i});
   }
+  dbOne.test.insertMany(data);
   // run some queries to end up in the profile collection
   dbOne.test.find({_id: 3});
   dbOne.test.find({_id: 30});

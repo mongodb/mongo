@@ -109,6 +109,14 @@ func (intent *Intent) IsSpecialCollection() bool {
 	return intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion()
 }
 
+func (it *Intent) IsView() bool {
+	if it.Options == nil {
+		return false
+	}
+	_, isView := it.Options.Map()["viewOn"]
+	return isView
+}
+
 func (existing *Intent) MergeIntent(intent *Intent) {
 	// merge new intent into old intent
 	if existing.BSONFile == nil {

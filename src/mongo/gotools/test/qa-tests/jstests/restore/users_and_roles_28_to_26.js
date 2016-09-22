@@ -47,9 +47,11 @@
   });
 
   // insert some data
+  var data = [];
   for (var i = 0; i < 10; i++) {
-    testDB.data.insert({_id: i});
+    data.push({_id: i});
   }
+  testDB.data.insertMany(data);
   // sanity check the insertion worked
   assert.eq(10, testDB.data.count());
 

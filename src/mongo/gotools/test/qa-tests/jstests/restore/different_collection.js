@@ -26,9 +26,11 @@
   var sourceCollName = 'sourceColl';
 
   // insert a bunch of data
+  var data = [];
   for (var i = 0; i < 500; i++) {
-    sourceDB[sourceCollName].insert({_id: i});
+    data.push({_id: i});
   }
+  sourceDB[sourceCollName].insertMany(data);
   // sanity check the insertion worked
   assert.eq(500, sourceDB[sourceCollName].count());
 

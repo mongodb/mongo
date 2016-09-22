@@ -27,6 +27,13 @@ const (
 	JSON = "json"
 )
 
+// Modes accepted by mongoimport.
+const (
+	modeInsert = "insert"
+	modeUpsert = "upsert"
+	modeMerge  = "merge"
+)
+
 const (
 	workerBufferSize  = 16
 	progressBarLength = 24
@@ -154,17 +161,39 @@ func (imp *MongoImport) ValidateSettings(args []string) error {
 		}
 	}
 
+	// deprecated
+	if imp.IngestOptions.Upsert == true {
+		imp.IngestOptions.Mode = modeUpsert
+	}
+
+	// parse UpsertFields, may set default mode to modeUpsert
 	if imp.IngestOptions.UpsertFields != "" {
-		imp.IngestOptions.Upsert = true
+		if imp.IngestOptions.Mode == "" {
+			imp.IngestOptions.Mode = modeUpsert
+		} else if imp.IngestOptions.Mode == modeInsert {
+			return fmt.Errorf("can not use --upsertFields with --mode=insert")
+		}
 		imp.upsertFields = strings.Split(imp.IngestOptions.UpsertFields, ",")
 		if err := validateFields(imp.upsertFields); err != nil {
 			return fmt.Errorf("invalid --upsertFields argument: %v", err)
 		}
-	} else if imp.IngestOptions.Upsert {
+	} else if imp.IngestOptions.Mode != modeInsert {
 		imp.upsertFields = []string{"_id"}
 	}
 
-	if imp.IngestOptions.Upsert {
+	// set default mode, must be after parsing UpsertFields
+	if imp.IngestOptions.Mode == "" {
+		imp.IngestOptions.Mode = modeInsert
+	}
+
+	// double-check mode choices
+	if !(imp.IngestOptions.Mode == modeInsert ||
+		imp.IngestOptions.Mode == modeUpsert ||
+		imp.IngestOptions.Mode == modeMerge) {
+		return fmt.Errorf("invalid --mode argument: %v", imp.IngestOptions.Mode)
+	}
+
+	if imp.IngestOptions.Mode != modeInsert {
 		imp.IngestOptions.MaintainInsertionOrder = true
 		log.Logvf(log.Info, "using upsert fields: %v", imp.upsertFields)
 	}
@@ -440,13 +469,13 @@ func (imp *MongoImport) runInsertionWorker(readDocs chan bson.D) (err error) {
 	collection := session.DB(imp.ToolOptions.DB).C(imp.ToolOptions.Collection)
 
 	var inserter flushInserter
-	if imp.IngestOptions.Upsert {
-		inserter = imp.newUpserter(collection)
-	} else {
+	if imp.IngestOptions.Mode == modeInsert {
 		inserter = db.NewBufferedBulkInserter(collection, imp.IngestOptions.BulkBufferSize, !imp.IngestOptions.StopOnError)
 		if !imp.IngestOptions.MaintainInsertionOrder {
 			inserter.(*db.BufferedBulkInserter).Unordered()
 		}
+	} else {
+		inserter = imp.newUpserter(collection)
 	}
 
 readLoop:
@@ -500,10 +529,12 @@ func (up *upserter) Insert(doc interface{}) error {
 	document := doc.(bson.D)
 	selector := constructUpsertDocument(up.imp.upsertFields, document)
 	var err error
-	if selector == nil {
+	if selector == nil { // modeInsert || doc-not-exist
 		err = up.collection.Insert(document)
-	} else {
+	} else if up.imp.IngestOptions.Mode == modeUpsert {
 		_, err = up.collection.Upsert(selector, document)
+	} else { // modeMerge
+		_, err = up.collection.Upsert(selector, bson.M{"$set": document})
 	}
 	return err
 }

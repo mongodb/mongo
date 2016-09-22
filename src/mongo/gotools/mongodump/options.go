@@ -54,6 +54,7 @@ type OutputOptions struct {
 	ExcludedCollections        []string `long:"excludeCollection" value-name:"<collection-name>" description:"collection to exclude from the dump (may be specified multiple times to exclude additional collections)"`
 	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" value-name:"<collection-prefix>" description:"exclude all collections from the dump that have the given prefix (may be specified multiple times to exclude additional prefixes)"`
 	NumParallelCollections     int      `long:"numParallelCollections" short:"j" description:"number of collections to dump in parallel (4 by default)" default:"4" default-mask:"-"`
+	ViewsAsCollections         bool     `long:"viewsAsCollections" description:"dump views as normal collections with their produced data, omitting standard collections"`
 }
 
 // Name returns a human-readable group name for output options.

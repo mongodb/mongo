@@ -23,9 +23,11 @@
     oneM+=oneK;
   }
 
+  var data = [];
   for (i=0; i<=32; i++) {
-    dbOne.test.insert({data: oneM});
+    data.push({data: oneM});
   }
+  dbOne.test.insertMany(data);
 
   // dump it
   var dumpTarget = 'large_bulk_dump';

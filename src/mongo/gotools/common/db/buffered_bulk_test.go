@@ -22,6 +22,8 @@ func TestBufferedBulkInserterInserts(t *testing.T) {
 			Auth: &options.Auth{},
 		}
 		provider, err := NewSessionProvider(opts)
+		So(provider, ShouldNotBeNil)
+		So(err, ShouldBeNil)
 		session, err := provider.GetSession()
 		So(session, ShouldNotBeNil)
 		So(err, ShouldBeNil)
@@ -102,6 +104,8 @@ func TestBufferedBulkInserterInserts(t *testing.T) {
 
 		Reset(func() {
 			session.DB("tools-test").DropDatabase()
+			session.Close()
+			provider.Close()
 		})
 	})
 

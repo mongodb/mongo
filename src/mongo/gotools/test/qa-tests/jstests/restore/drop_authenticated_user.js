@@ -47,9 +47,11 @@
   });
 
   // insert some data
+  var data = [];
   for (var i = 0; i < 10; i++) {
-    adminDB.data.insert({_id: i});
+    data.push({_id: i});
   }
+  adminDB.data.insertMany(data);
   // sanity check the insertion worked
   assert.eq(10, adminDB.data.count());
 
@@ -74,9 +76,11 @@
   });
 
   // insert some data to be removed when --drop is run
+  data = [];
   for (i = 10; i < 20; i++) {
-    adminDB.data.insert({_id: i});
+    data.push({_id: i});
   }
+  adminDB.data.insertMany(data);
   // sanity check the insertion worked
   assert.eq(10, adminDB.data.count());
 

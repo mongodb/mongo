@@ -116,6 +116,13 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 	return self.masterSession.Copy(), nil
 }
 
+// Close closes the master session in the connection pool
+func (self *SessionProvider) Close() {
+	self.masterSessionLock.Lock()
+	defer self.masterSessionLock.Unlock()
+	self.masterSession.Close()
+}
+
 // refresh is a helper for modifying the session based on the
 // session provider flags passed in with SetFlags.
 // This helper assumes a lock is already taken.

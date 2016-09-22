@@ -27,7 +27,6 @@
 
   var commonToolArgs = getCommonToolArguments();
   var db = st.s.getDB(dbName);
-  var col = db.getCollection(colName);
 
   function writeConcernTestFunc(exitCode, writeConcern, name) {
     jsTest.log(name);
@@ -50,9 +49,11 @@
   }
 
   // create a test collection
+  var data = [];
   for (var i=0; i<=100; i++) {
-    col.insert({_id: i, x: i*i});
+    data.push({_id: i, x: i*i});
   }
+  db.getCollection(colName).insertMany(data);
   rs.awaitReplication();
 
   // setup: export the data that we'll use

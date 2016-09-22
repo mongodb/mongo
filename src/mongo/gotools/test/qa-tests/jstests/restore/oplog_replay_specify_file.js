@@ -25,14 +25,16 @@
   var oplogSize = 100;
 
   // Create a fake oplog consisting of 100 inserts.
+  var data = [];
   for (var i = 0; i < oplogSize; i++) {
-    testColl.insert({
+    data.push({
       ts: new Timestamp(0, i),
       op: "i",
       o: {_id: i, x: 'a' + i},
       ns: "test.op"
     });
   }
+  testColl.insertMany(data, {ordered: true});
 
   // Dump the fake oplog.
   var ret = toolTest.runTool.apply(toolTest, ['dump',

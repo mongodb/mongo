@@ -117,7 +117,20 @@ func DialSession(network, addr string, ctx *Ctx, flags DialFlags,
 		c.Close()
 		return nil, err
 	}
-	// XXX removed SNI
+	if session != nil {
+		err := conn.setSession(session)
+		if err != nil {
+			c.Close()
+			return nil, err
+		}
+	}
+	if flags&DisableSNI == 0 {
+		err = conn.SetTlsExtHostName(host)
+		if err != nil {
+			conn.Close()
+			return nil, err
+		}
+	}
 	err = conn.Handshake()
 	if err != nil {
 		conn.Close()

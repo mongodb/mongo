@@ -1,20 +1,27 @@
-*.swp
+*.bson
+*.dump
 *.exe
+*.json
+*.log
+*.out
+*.pcap
+*.playback
 *.pyc
+*.swp
+*.swp
+*.tape
+*.temp
+*.zip
+
+*temp*
 
 bin/
 
 vendor/pkg
 
-bsondump/main/bsondump
-mongodump/main/mongodump
-mongoexport/main/mongoexport
-mongofiles/main/mongofiles
-mongoimport/main/mongoimport
-mongooplog/main/mongooplog
-mongorestore/main/mongorestore
-mongotop/main/mongotop
-mongostat/main/mongostat
-
 .gopath
 .godeps
+.idea
+
+tags
+node_modules

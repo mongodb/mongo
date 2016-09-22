@@ -32,13 +32,13 @@ type MongoRestore struct {
 	NSOptions     *NSOptions
 
 	SessionProvider *db.SessionProvider
+	ProgressManager progress.Manager
 
 	TargetDirectory string
 
 	// other internal state
-	manager         *intents.Manager
-	safety          *mgo.Safe
-	progressManager *progress.Manager
+	manager *intents.Manager
+	safety  *mgo.Safe
 
 	objCheck         bool
 	oplogLimit       bson.MongoTimestamp

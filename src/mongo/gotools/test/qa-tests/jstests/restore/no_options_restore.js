@@ -49,9 +49,11 @@
 
   // insert some data into all three collections
   ['withOptions', 'withoutOptions', 'capped'].forEach(function(collName) {
+    var data = [];
     for (var i = 0; i < 50; i++) {
-      testDB[collName].insert({_id: i});
+      data.push({_id: i});
     }
+    testDB[collName].insertMany(data);
     // sanity check the insertions worked
     assert.eq(50, testDB[collName].count());
   });

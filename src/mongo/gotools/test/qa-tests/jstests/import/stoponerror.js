@@ -11,7 +11,7 @@
   var db = db1.getSiblingDB("dupetest");
   db.dropDatabase();
 
-  // Verify that --upsert with --upsertFields works by applying update w/ query on the fields
+  // Verify that --mode=upsert with --upsertFields works by applying update w/ query on the fields
   db.c.insert({_id: 1234, b: "000000", c: 222});
   assert.eq(db.c.count(), 1, "collection count should be 1 at setup");
   var ret = toolTest.runTool.apply(toolTest, ["import", "--file",

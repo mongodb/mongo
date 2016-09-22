@@ -25,9 +25,11 @@
   // only be restoring one.
   var collNames = ['coll1', 'coll2'];
   collNames.forEach(function(collName) {
+    var data = [];
     for (var i = 0; i < 500; i++) {
-      sourceDB[collName].insert({_id: i+'_'+collName});
+      data.push({_id: i+'_'+collName});
     }
+    sourceDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(500, sourceDB[collName].count());
   });
@@ -45,9 +47,11 @@
     assert.eq(0, sourceDB[collName].count());
 
     // insert a disjoint set of data from the dump
+    var data = [];
     for (var i = 500; i < 600; i++) {
-      sourceDB[collName].insert({_id: i+'_'+collName});
+      data.push({_id: i+'_'+collName});
     }
+    sourceDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(100, sourceDB[collName].count());
   });
@@ -55,9 +59,11 @@
   // insert data into the same collections in a different db
   var otherDB = toolTest.db.getSiblingDB('other');
   collNames.forEach(function(collName) {
+    var data = [];
     for (var i = 500; i < 600; i++) {
-      otherDB[collName].insert({_id: i+'_'+collName});
+      data.push({_id: i+'_'+collName});
     }
+    otherDB[collName].insertMany(data);
     // sanity check the insertion worked
     assert.eq(100, otherDB[collName].count());
   });
