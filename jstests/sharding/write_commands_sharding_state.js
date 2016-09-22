@@ -8,23 +8,25 @@
     var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 
     var dbTestName = 'WriteCommandsTestDB';
+    var collName = dbTestName + '.TestColl';
 
     assert.commandWorked(st.s0.adminCommand({enablesharding: dbTestName}));
     st.ensurePrimaryShard(dbTestName, 'shard0000');
 
-    assert.commandWorked(st.s0.adminCommand(
-        {shardCollection: dbTestName + '.TestColl', key: {Key: 1}, unique: true}));
+    assert.commandWorked(
+        st.s0.adminCommand({shardCollection: collName, key: {Key: 1}, unique: true}));
 
     // Split at keys 10 and 20
-    assert.commandWorked(st.s0.adminCommand({split: dbTestName + '.TestColl', middle: {Key: 10}}));
-    assert.commandWorked(st.s0.adminCommand({split: dbTestName + '.TestColl', middle: {Key: 20}}));
+    assert.commandWorked(st.s0.adminCommand({split: collName, middle: {Key: 10}}));
+    assert.commandWorked(st.s0.adminCommand({split: collName, middle: {Key: 20}}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
 
-    // Move < 10 to shard0000, 10 and 20 to shard00001
-    st.s0.adminCommand({moveChunk: dbTestName + '.TestColl', find: {Key: 0}, to: 'shard0000'});
-    st.s0.adminCommand({moveChunk: dbTestName + '.TestColl', find: {Key: 19}, to: 'shard0001'});
-    st.s0.adminCommand({moveChunk: dbTestName + '.TestColl', find: {Key: 21}, to: 'shard0001'});
+    // Move 10 and 20 to shard00001
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: collName, find: {Key: 19}, to: 'shard0001'}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: collName, find: {Key: 21}, to: 'shard0001'}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
 
@@ -45,7 +47,8 @@
     assert.eq(1, st.d1.getDB(dbTestName).TestColl.find({Key: 21}).count());
 
     // Move chunk [0, 19] to shard0000 and make sure the documents are correctly placed
-    st.s0.adminCommand({moveChunk: dbTestName + '.TestColl', find: {Key: 19}, to: 'shard0000'});
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: collName, find: {Key: 19}, to: 'shard0000'}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
     printjson(st.d0.getDB(dbTestName).TestColl.find({}).toArray());
