@@ -401,13 +401,16 @@ void MigrationManager::finishRecovery(OperationContext* txn,
     vector<shared_ptr<Notification<Status>>> responses;
 
     for (auto& nssAndMigrateInfos : _migrationRecoveryMap) {
-        auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nssAndMigrateInfos.first);
+        auto& nss = nssAndMigrateInfos.first;
+        auto& migrateInfos = nssAndMigrateInfos.second;
+        invariant(!migrateInfos.empty());
+
+        auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
         if (!scopedCMStatus.isOK()) {
             // This shouldn't happen because the collection was intact and sharded when the previous
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
-            warning() << "Unable to reload chunk metadata for collection '"
-                      << nssAndMigrateInfos.first
+            warning() << "Unable to reload chunk metadata for collection '" << nss
                       << "' during balancer recovery. Abandoning recovery."
                       << causedBy(redact(scopedCMStatus.getStatus()));
             return;
@@ -416,36 +419,39 @@ void MigrationManager::finishRecovery(OperationContext* txn,
         auto scopedCM = std::move(scopedCMStatus.getValue());
         ChunkManager* const cm = scopedCM.cm();
 
-        auto itMigrateInfo = nssAndMigrateInfos.second.begin();
-        invariant(itMigrateInfo != nssAndMigrateInfos.second.end());
-        while (itMigrateInfo != nssAndMigrateInfos.second.end()) {
-            auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, itMigrateInfo->minKey);
+        int scheduledMigrations = 0;
+
+        while (!migrateInfos.empty()) {
+            const auto migrationInfo = std::move(migrateInfos.front());
+            migrateInfos.pop_front();
+
+            auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrationInfo.minKey);
             invariant(chunk);
 
-            if (chunk->getShardId() != itMigrateInfo->from) {
-                // Chunk is no longer on the source shard of the migration. Erase the migration doc
-                // and drop the distlock if it is only held for this migration.
-                ScopedMigrationRequest::createForRecovery(
-                    txn, NamespaceString(itMigrateInfo->ns), itMigrateInfo->minKey);
-                if (nssAndMigrateInfos.second.size() == 1) {
-                    Grid::get(txn)->catalogClient(txn)->getDistLockManager()->unlock(
-                        txn, _lockSessionID, itMigrateInfo->ns);
-                }
-                itMigrateInfo = nssAndMigrateInfos.second.erase(itMigrateInfo);
-            } else {
-                scopedMigrationRequests.emplace_back(ScopedMigrationRequest::createForRecovery(
-                    txn, NamespaceString(itMigrateInfo->ns), itMigrateInfo->minKey));
-
-                responses.emplace_back(
-                    _schedule(txn,
-                              *itMigrateInfo,
-                              false,  // Config server takes the collection dist lock
-                              maxChunkSizeBytes,
-                              secondaryThrottle,
-                              waitForDelete));
-
-                ++itMigrateInfo;
+            if (chunk->getShardId() != migrationInfo.from) {
+                // Chunk is no longer on the source shard specified by this migration. Erase the
+                // migration recovery document associated with it.
+                ScopedMigrationRequest::createForRecovery(txn, nss, migrationInfo.minKey);
+                continue;
             }
+
+            scopedMigrationRequests.emplace_back(
+                ScopedMigrationRequest::createForRecovery(txn, nss, migrationInfo.minKey));
+
+            scheduledMigrations++;
+
+            responses.emplace_back(_schedule(txn,
+                                             migrationInfo,
+                                             false,  // Config server takes the collection dist lock
+                                             maxChunkSizeBytes,
+                                             secondaryThrottle,
+                                             waitForDelete));
+        }
+
+        // If no migrations were scheduled for this namespace, free the dist lock
+        if (!scheduledMigrations) {
+            Grid::get(txn)->catalogClient(txn)->getDistLockManager()->unlock(
+                txn, _lockSessionID, nss.ns());
         }
     }
 
