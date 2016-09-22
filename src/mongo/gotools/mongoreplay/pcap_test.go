@@ -155,7 +155,7 @@ func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier ve
 	}
 
 	t.Log("Recording playbackfile from pcap file")
-	err = Record(ctx, playbackWriter)
+	err = Record(ctx, playbackWriter, false)
 	if err != nil {
 		t.Errorf("error makign tape file: %v\n", err)
 	}

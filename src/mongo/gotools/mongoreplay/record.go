@@ -17,6 +17,7 @@ type RecordCommand struct {
 	GlobalOpts *Options `no-flag:"true"`
 	OpStreamSettings
 	Gzip         bool   `long:"gzip" description:"compress output file with Gzip"`
+	FullReplies  bool   `long:"full-replies" description:"save full reply payload in playback file"`
 	PlaybackFile string `short:"p" description:"path to playback file to record to" long:"playback-file" required:"yes"`
 }
 
@@ -139,18 +140,23 @@ func (record *RecordCommand) Execute(args []string) error {
 		return err
 	}
 
-	return Record(ctx, playbackWriter)
+	return Record(ctx, playbackWriter, record.FullReplies)
 
 }
 
 // Record writes pcap data into a playback file
 func Record(ctx *packetHandlerContext,
-	playbackWriter *PlaybackWriter) error {
+	playbackWriter *PlaybackWriter,
+	noShortenReply bool) error {
 
 	ch := make(chan error)
 	go func() {
 		defer close(ch)
 		for op := range ctx.mongoOpStream.Ops {
+			if (op.Header.OpCode == OpCodeReply || op.Header.OpCode == OpCodeCommandReply) &&
+				!noShortenReply {
+				op.ShortenReply()
+			}
 			bsonBytes, err := bson.Marshal(op)
 			if err != nil {
 				ch <- fmt.Errorf("error marshaling message: %v", err)

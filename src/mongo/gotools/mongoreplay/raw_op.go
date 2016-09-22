@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	mgo "github.com/10gen/llmgo"
 )
@@ -51,21 +50,31 @@ func (op *RawOp) FromReader(r io.Reader) error {
 }
 
 // ShortReplyFromReader reads an op from the given reader. It only holds on
-// to header-related information
-func (op *RawOp) ShortReplyFromReader(r io.Reader) error {
+// to header-related information and the first document.
+func (op *RawOp) ShortenReply() error {
 	if op.Header.MessageLength < MsgHeaderLen {
-		return nil
+		return fmt.Errorf("expected message header to have length: %d bytes but was %d bytes", MsgHeaderLen, op.Header.MessageLength)
 	}
 	if op.Header.MessageLength > MaxMessageSize {
 		return fmt.Errorf("wire message size, %v, was greater then the maximum, %v bytes", op.Header.MessageLength, MaxMessageSize)
 	}
-	op.Body = make([]byte, 20) // op_replies have an additional 20 bytes of header that we capture
-	_, err := io.ReadFull(r, op.Body)
-	if err != nil {
-		return err
+
+	switch op.Header.OpCode {
+	case OpCodeReply:
+		firstDocSize := getInt32(op.Body, 20+MsgHeaderLen)
+		op.Body = op.Body[0:(20 + MsgHeaderLen + firstDocSize)]
+
+	case OpCodeCommandReply:
+		commandReplyDocSize := getInt32(op.Body, MsgHeaderLen)
+		metadataDocSize := getInt32(op.Body, int(commandReplyDocSize)+MsgHeaderLen)
+		firstOutputDocSize := getInt32(op.Body, int(commandReplyDocSize+metadataDocSize)+MsgHeaderLen)
+		shortReplySize := commandReplyDocSize + metadataDocSize + firstOutputDocSize + MsgHeaderLen
+		op.Body = op.Body[0:shortReplySize]
+
+	default:
+		return fmt.Errorf("unexpected op type : %v", op.Header.OpCode)
 	}
-	_, err = io.CopyN(ioutil.Discard, r, int64(op.Header.MessageLength-MsgHeaderLen-20))
-	return err
+	return nil
 }
 
 // Parse returns the underlying op from its given RawOp form.

@@ -492,6 +492,136 @@ func TestOpCommandReplyGetCursorID(t *testing.T) {
 	}
 }
 
+func TestShortenLegacyReply(t *testing.T) {
+	generator := newRecordedOpGenerator()
+
+	op := ReplyOp{}
+	op.ReplyDocs = 2
+
+	result, err := generator.fetchRecordedOpsFromConn(&op.ReplyOp)
+
+	doc1 := &testDoc{
+		Name:           "Op Raw Short Reply Test 1",
+		DocumentNumber: 1,
+		Success:        true,
+	}
+	doc2 := &testDoc{
+		Name:           "Op Raw Short Reply Test 2",
+		DocumentNumber: 2,
+		Success:        true,
+	}
+
+	asByte1, err := bson.Marshal(doc1)
+	if err != nil {
+		t.Errorf("could not marshal bson: %v", err)
+	}
+
+	asByte2, err := bson.Marshal(doc2)
+	if err != nil {
+		t.Errorf("could not marshal bson: %v", err)
+	}
+
+	// add the two docs as the docs from the reply
+	result.RawOp.Body = append(result.RawOp.Body, asByte1...)
+	result.RawOp.Body = append(result.RawOp.Body, asByte2...)
+
+	// reply should be functional and parseable
+	parsed, err := result.RawOp.Parse()
+	if err != nil {
+		t.Errorf("error parsing op: %v", err)
+	}
+
+	fullReply, ok := parsed.(*ReplyOp)
+	if !ok {
+		t.Errorf("parsed op was wrong type")
+	}
+	if !(len(fullReply.Docs) == 2) {
+		t.Errorf("parsed reply has wrong number of docs: %d", len(fullReply.Docs))
+	}
+
+	// shorten the reply
+	result.ShortenReply()
+
+	parsed, err = result.RawOp.Parse()
+	if err != nil {
+		t.Errorf("error parsing op: %v", err)
+	}
+
+	fullReply, ok = parsed.(*ReplyOp)
+	if !ok {
+		t.Errorf("parsed op was wrong type")
+	}
+
+	// ensure that the reply now has only 1 document
+	if !(len(fullReply.Docs) == 1) {
+		t.Errorf("parsed reply has wrong number of docs: %d", len(fullReply.Docs))
+	}
+}
+
+func TestShortenCommandReply(t *testing.T) {
+	generator := newRecordedOpGenerator()
+
+	op := CommandReplyOp{}
+	op.Metadata = &testDoc{
+		Name:           "Metadata",
+		DocumentNumber: 100000,
+		Success:        true,
+	}
+	op.CommandReply = &testDoc{
+		Name:           "Command Reply",
+		DocumentNumber: 200000,
+		Success:        true,
+	}
+
+	doc1 := testDoc{
+		Name:           "Op Raw Short Reply Test 1",
+		DocumentNumber: 1,
+		Success:        true,
+	}
+	doc2 := testDoc{
+		Name:           "Op Raw Short Reply Test 2",
+		DocumentNumber: 2,
+		Success:        true,
+	}
+	op.OutputDocs = []interface{}{doc1, doc2}
+
+	result, err := generator.fetchRecordedOpsFromConn(&op.CommandReplyOp)
+
+	// reply should be functional and parseable
+	parsed, err := result.RawOp.Parse()
+	if err != nil {
+		t.Errorf("error parsing op: %v", err)
+	}
+
+	t.Logf("parsed Op: %v", parsed)
+
+	fullReply, ok := parsed.(*CommandReplyOp)
+	if !ok {
+		t.Errorf("parsed op was wrong type")
+	}
+	if !(len(fullReply.OutputDocs) == 2) {
+		t.Errorf("parsed reply has wrong number of docs: %d", len(fullReply.OutputDocs))
+	}
+
+	// shorten the reply
+	result.ShortenReply()
+
+	parsed, err = result.RawOp.Parse()
+	if err != nil {
+		t.Errorf("error parsing op: %v", err)
+	}
+
+	fullReply, ok = parsed.(*CommandReplyOp)
+	if !ok {
+		t.Errorf("parsed op was wrong type")
+	}
+
+	// ensure that the reply now has only 1 document
+	if !(len(fullReply.OutputDocs) == 1) {
+		t.Errorf("parsed reply has wrong number of docs: %d", len(fullReply.OutputDocs))
+	}
+}
+
 func TestLegacyOpReplyGetCursorID(t *testing.T) {
 	testCursorID := int64(123)
 	doc := &struct {

@@ -28,7 +28,7 @@ done
 
 command -v mongoreplay >/dev/null
 if [ $? != 0 ]; then
-  log "mongoreplay must be in PATH"
+  echo "mongoreplay must be in PATH"
   exit 1
 fi
 

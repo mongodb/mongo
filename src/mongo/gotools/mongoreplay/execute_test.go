@@ -4,14 +4,10 @@ import (
 	"testing"
 
 	mgo "github.com/10gen/llmgo"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/options"
 )
 
 func TestCompleteReply(t *testing.T) {
 	context := NewExecutionContext(&StatCollector{})
-
-	log.SetVerbosity(&options.Verbosity{[]bool{true, true, true, true, true}, false})
 
 	// AddFromWire takes a recorded request and a live reply to the re-execution
 	// of that reply

@@ -149,17 +149,24 @@ func (op *CommandReplyOp) FromReader(r io.Reader) error {
 		return err
 	}
 
-	lengthRead := len(commandReplyAsSlice) + len(metadataAsSlice)
 	op.OutputDocs = make([]interface{}, 0)
-	docLen := 0
-	for lengthRead+docLen < int(op.Header.MessageLength)-MsgHeaderLen {
+	for {
 		docAsSlice, err := ReadDocument(r)
+		if err != nil {
+			if err != io.EOF {
+				// Broken BSON in reply data. TODO log something here?
+				return err
+			}
+			break
+		}
+		if len(docAsSlice) == 0 {
+			break
+		}
 		doc := &bson.Raw{}
 		err = bson.Unmarshal(docAsSlice, doc)
 		if err != nil {
 			return err
 		}
-		docLen += len(docAsSlice)
 		op.OutputDocs = append(op.OutputDocs, doc)
 	}
 	return nil
