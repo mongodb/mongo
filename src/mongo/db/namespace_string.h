@@ -58,10 +58,10 @@ public:
     // Reserved system namespaces
 
     // Namespace for the admin database
-    static const StringData kAdminDb;
+    static constexpr StringData kAdminDb = "admin"_sd;
 
     // Namespace for the local database
-    static const StringData kLocalDb;
+    static constexpr StringData kLocalDb = "local"_sd;
 
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;

@@ -70,18 +70,18 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
 }
 }  // namespace
 
-const StringData IndexDescriptor::k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
-const StringData IndexDescriptor::kBackgroundFieldName = "background"_sd;
-const StringData IndexDescriptor::kCollationFieldName = "collation"_sd;
-const StringData IndexDescriptor::kDropDuplicatesFieldName = "dropDups"_sd;
-const StringData IndexDescriptor::kIndexNameFieldName = "name"_sd;
-const StringData IndexDescriptor::kIndexVersionFieldName = "v"_sd;
-const StringData IndexDescriptor::kKeyPatternFieldName = "key"_sd;
-const StringData IndexDescriptor::kNamespaceFieldName = "ns"_sd;
-const StringData IndexDescriptor::kPartialFilterExprFieldName = "partialFilterExpression"_sd;
-const StringData IndexDescriptor::kSparseFieldName = "sparse"_sd;
-const StringData IndexDescriptor::kTextVersionFieldName = "textIndexVersion"_sd;
-const StringData IndexDescriptor::kUniqueFieldName = "unique"_sd;
+constexpr StringData IndexDescriptor::k2dsphereVersionFieldName;
+constexpr StringData IndexDescriptor::kBackgroundFieldName;
+constexpr StringData IndexDescriptor::kCollationFieldName;
+constexpr StringData IndexDescriptor::kDropDuplicatesFieldName;
+constexpr StringData IndexDescriptor::kIndexNameFieldName;
+constexpr StringData IndexDescriptor::kIndexVersionFieldName;
+constexpr StringData IndexDescriptor::kKeyPatternFieldName;
+constexpr StringData IndexDescriptor::kNamespaceFieldName;
+constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
+constexpr StringData IndexDescriptor::kSparseFieldName;
+constexpr StringData IndexDescriptor::kTextVersionFieldName;
+constexpr StringData IndexDescriptor::kUniqueFieldName;
 
 bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     switch (indexVersion) {

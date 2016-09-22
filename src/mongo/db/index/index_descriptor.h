@@ -56,18 +56,18 @@ class IndexDescriptor {
 public:
     enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
 
-    static const StringData k2dsphereVersionFieldName;
-    static const StringData kBackgroundFieldName;
-    static const StringData kCollationFieldName;
-    static const StringData kDropDuplicatesFieldName;
-    static const StringData kIndexNameFieldName;
-    static const StringData kIndexVersionFieldName;
-    static const StringData kKeyPatternFieldName;
-    static const StringData kNamespaceFieldName;
-    static const StringData kPartialFilterExprFieldName;
-    static const StringData kSparseFieldName;
-    static const StringData kTextVersionFieldName;
-    static const StringData kUniqueFieldName;
+    static constexpr StringData k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
+    static constexpr StringData kBackgroundFieldName = "background"_sd;
+    static constexpr StringData kCollationFieldName = "collation"_sd;
+    static constexpr StringData kDropDuplicatesFieldName = "dropDups"_sd;
+    static constexpr StringData kIndexNameFieldName = "name"_sd;
+    static constexpr StringData kIndexVersionFieldName = "v"_sd;
+    static constexpr StringData kKeyPatternFieldName = "key"_sd;
+    static constexpr StringData kNamespaceFieldName = "ns"_sd;
+    static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
+    static constexpr StringData kSparseFieldName = "sparse"_sd;
+    static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
+    static constexpr StringData kUniqueFieldName = "unique"_sd;
 
     /**
      * OnDiskIndexData is a pointer to the memory mapped per-index data.

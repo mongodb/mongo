@@ -102,8 +102,8 @@ bool legalClientSystemNS(StringData ns) {
     return false;
 }
 
-const StringData NamespaceString::kAdminDb = "admin"_sd;
-const StringData NamespaceString::kLocalDb = "local"_sd;
+constexpr StringData NamespaceString::kAdminDb;
+constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
 
 const NamespaceString NamespaceString::kConfigCollectionNamespace(kConfigCollection);
