@@ -267,8 +267,7 @@ var testAllModes = function(conn, hostList, isMongos) {
     });
 };
 
-var st = new ShardingTest(
-    {shards: {rs0: {nodes: NODE_COUNT, verbose: 1}}, other: {mongosOptions: {verbose: 3}}});
+var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT}}});
 st.stopBalancer();
 
 ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
@@ -324,6 +323,14 @@ var replConn = new Mongo(st.rs0.getURL());
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);
 _awaitRSHostViaRSMonitor(secondary.name, {ok: true, tags: SECONDARY_TAG}, st.rs0.name);
+
+st.rs0.nodes.forEach(function(conn) {
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, logComponentVerbosity: {command: {verbosity: 1}}}));
+});
+
+assert.commandWorked(
+    st.s.adminCommand({setParameter: 1, logComponentVerbosity: {network: {verbosity: 3}}}));
 
 testAllModes(replConn, st.rs0.nodes, false);
 
