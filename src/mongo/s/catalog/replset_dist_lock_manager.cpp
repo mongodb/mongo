@@ -428,6 +428,12 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
     OperationContext* txn, StringData name, StringData whyMessage, const OID& lockSessionID) {
     const string who = str::stream() << _processID << ":" << getThreadName();
 
+    LOG(1) << "trying to acquire new distributed lock for " << name
+           << " ( lock timeout : " << durationCount<Milliseconds>(_lockExpiration)
+           << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
+           << " ms, process : " << _processID << " )"
+           << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage.toString();
+
     auto lockStatus = _catalog->grabLock(txn,
                                          name,
                                          lockSessionID,
@@ -442,6 +448,8 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
         return lockStatus.getStatus();
     }
 
+    log() << "distributed lock '" << name << "' acquired for '" << whyMessage.toString()
+          << "', ts : " << lockSessionID;
     return lockSessionID;
 }
 
