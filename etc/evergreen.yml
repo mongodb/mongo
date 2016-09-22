@@ -1161,6 +1161,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: aggregation_sharded_collections_passthrough_WT
+  depends_on:
+  - name: aggregation_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_sharded_collections_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: audit
   commands:
   - func: "do setup"
@@ -2848,6 +2859,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
   - name: dbtest
@@ -3002,6 +3014,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
   - name: dbtest
@@ -3820,6 +3833,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit_WT
   - name: auth_WT
   - name: auth_audit_WT
@@ -4223,6 +4237,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
   - name: dbtest
@@ -4335,6 +4350,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
   - name: dbtest
@@ -4809,6 +4825,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
   - name: dbtest
@@ -5020,6 +5037,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
   - name: auth
@@ -5224,6 +5242,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
   - name: auth
@@ -5734,6 +5753,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   # - name: audit
   - name: audit_WT
   # - name: auth
@@ -5869,6 +5889,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   # - name: audit
   - name: audit_WT
   # - name: auth
@@ -6281,6 +6302,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit_WT
   - name: auth_WT
   - name: auth_audit_WT
@@ -6539,6 +6561,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit_WT
   - name: auth_WT
   - name: auth_audit_WT
@@ -7184,6 +7207,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: auth
   - name: auth_audit
@@ -7347,6 +7371,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: auth
   - name: auth_audit
@@ -7423,6 +7448,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: auth
   - name: auth_audit
@@ -7581,6 +7607,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
   - name: auth
@@ -7749,6 +7776,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
   - name: auth
@@ -7904,6 +7932,7 @@ buildvariants:
   - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
   - name: auth
