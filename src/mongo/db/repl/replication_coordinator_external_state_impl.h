@@ -36,10 +36,10 @@
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_source_feedback.h"
+#include "mongo/db/repl/task_runner.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
@@ -179,7 +179,8 @@ private:
     // Initial sync stuff
     StartInitialSyncFn _startInitialSyncIfNeededFn;
     StartSteadyReplicationFn _startSteadReplicationFn;
-    std::unique_ptr<stdx::thread> _initialSyncThread;
+    OldThreadPool _initialSyncThreadPool;
+    TaskRunner _initialSyncRunner;
 
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;

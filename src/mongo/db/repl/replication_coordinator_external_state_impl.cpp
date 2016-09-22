@@ -184,7 +184,9 @@ std::unique_ptr<ThreadPool> makeThreadPool() {
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
     StorageInterface* storageInterface)
-    : _storageInterface(storageInterface) {
+    : _storageInterface(storageInterface),
+      _initialSyncThreadPool(OldThreadPool::DoNotStartThreadsTag(), 1, "initial sync-"),
+      _initialSyncRunner(&_initialSyncThreadPool) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
@@ -194,27 +196,31 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 }
 
 void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
-    LockGuard lk(_threadMutex);
-
-    _initialSyncThread.reset(new stdx::thread{[finished, this]() {
+    _initialSyncRunner.schedule([finished, this](OperationContext* txn, const Status& status) {
+        if (status == ErrorCodes::CallbackCanceled) {
+            return TaskRunner::NextAction::kDisposeOperationContext;
+        }
         Client::initThreadIfNotAlready("initial sync");
         // Do initial sync.
         syncDoInitialSync(this);
         finished();
-    }});
+        return TaskRunner::NextAction::kDisposeOperationContext;
+    });
 }
 
 void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
     stdx::function<void(OperationContext* txn)> run) {
-
-    LockGuard lk(_threadMutex);
-    _initialSyncThread.reset(new stdx::thread{[run, this]() {
-        Client::initThreadIfNotAlready("initial sync");
-        auto txn = cc().makeOperationContext();
+    _initialSyncRunner.cancel();
+    _initialSyncRunner.join();
+    _initialSyncRunner.schedule([run, this](OperationContext* txn, const Status& status) {
+        if (status == ErrorCodes::CallbackCanceled) {
+            return TaskRunner::NextAction::kDisposeOperationContext;
+        }
         invariant(txn);
         invariant(txn->getClient());
-        run(txn.get());
-    }});
+        run(txn);
+        return TaskRunner::NextAction::kDisposeOperationContext;
+    });
 }
 
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
@@ -247,7 +253,6 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldSSF = std::move(_syncSourceFeedbackThread);
     auto oldBgSync = std::move(_bgSync);
     auto oldApplier = std::move(_applierThread);
-    auto oldInitSyncThread = std::move(_initialSyncThread);
     if (oldSSF) {
         log() << "Stopping replication reporter thread";
         _syncSourceFeedback.shutdown();
@@ -272,9 +277,9 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
         oldBgSync->join(txn);
     }
 
-    if (oldInitSyncThread) {
-        oldInitSyncThread->join();
-    }
+    _initialSyncRunner.cancel();
+    _initialSyncRunner.join();
+
     lock->lock();
 }
 
@@ -297,6 +302,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         makeThreadPool(), executor::makeNetworkInterface("NetworkInterfaceASIO-RS"));
     _taskExecutor->startup();
 
+    _initialSyncThreadPool.startThreads();
     _writerPool = SyncTail::makeWriterPool();
 
     _storageInterface->startup();
