@@ -826,7 +826,8 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
             if (versionResponse.getStatus().code() == ErrorCodes::CommandNotFound) {
                 return Status(ErrorCodes::OperationFailed,
                               "featureCompatibilityVersion for cluster is 3.4, cannot add a shard "
-                              "with version below 3.4");
+                              "with version below 3.4. See "
+                              "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
             }
             return versionResponse.getValue().commandStatus;
         }

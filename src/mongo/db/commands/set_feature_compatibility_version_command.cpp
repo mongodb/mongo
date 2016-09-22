@@ -62,8 +62,10 @@ public:
     }
 
     virtual void help(std::stringstream& help) const {
-        help << "set the minimum allowed version in the cluster, which determines what features "
-                "are available";
+        help << "Set the API version exposed by this node. If set to \"3.2\", then 3.4 "
+                "features are disabled. If \"3.4\", then 3.4 features are enabled, and all nodes "
+                "in the cluster must be version 3.4. See "
+                "http://dochub.mongodb.org/core/3.4-feature-compatibility.";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -90,26 +92,37 @@ public:
         for (auto&& elem : cmdObj) {
             if (elem.fieldNameStringData() == FeatureCompatibilityVersion::kCommandName) {
                 uassert(ErrorCodes::TypeMismatch,
-                        str::stream() << FeatureCompatibilityVersion::kCommandName
-                                      << " must be of type String, but was of type "
-                                      << typeName(elem.type()),
+                        str::stream()
+                            << FeatureCompatibilityVersion::kCommandName
+                            << " must be of type String, but was of type "
+                            << typeName(elem.type())
+                            << " in: "
+                            << cmdObj
+                            << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
                         elem.type() == BSONType::String);
                 version = elem.String();
             } else {
                 uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "unrecognized field '" << elem.fieldName() << "'");
+                          str::stream()
+                              << "unrecognized field '"
+                              << elem.fieldName()
+                              << "' in: "
+                              << cmdObj
+                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.");
             }
         }
 
         uassert(ErrorCodes::BadValue,
                 str::stream() << "invalid value for " << FeatureCompatibilityVersion::kCommandName
-                              << ", found "
-                              << version
                               << ", expected '"
                               << FeatureCompatibilityVersion::kVersion34
                               << "' or '"
                               << FeatureCompatibilityVersion::kVersion32
-                              << "'",
+                              << "', found "
+                              << version
+                              << " in: "
+                              << cmdObj
+                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
                 version == FeatureCompatibilityVersion::kVersion34 ||
                     version == FeatureCompatibilityVersion::kVersion32);
 

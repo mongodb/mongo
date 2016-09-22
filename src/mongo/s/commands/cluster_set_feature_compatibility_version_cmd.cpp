@@ -64,8 +64,10 @@ public:
     }
 
     virtual void help(std::stringstream& help) const {
-        help << "set the minimum allowed version for the cluster, which determines what features "
-                "are available";
+        help << "Set the API version for the cluster. If set to \"3.2\", then 3.4 features are "
+                "disabled. If \"3.4\", then 3.4 features are enabled, and all nodes in the cluster "
+                "must be version 3.4. See "
+                "http://dochub.mongodb.org/core/3.4-feature-compatibility.";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -95,19 +97,30 @@ public:
                     ErrorCodes::TypeMismatch,
                     str::stream()
                         << "setFeatureCompatibilityVersion must be of type String, but was of type "
-                        << typeName(elem.type()),
+                        << typeName(elem.type())
+                        << " in: "
+                        << cmdObj
+                        << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
                     elem.type() == BSONType::String);
                 version = elem.String();
             } else {
                 uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "unrecognized field '" << elem.fieldName() << "'");
+                          str::stream()
+                              << "unrecognized field '"
+                              << elem.fieldName()
+                              << "' in: "
+                              << cmdObj
+                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.");
             }
         }
 
         uassert(ErrorCodes::BadValue,
-                str::stream() << "invalid value for setFeatureCompatibilityVersion, found "
+                str::stream() << "invalid value for setFeatureCompatibilityVersion, expected '3.4' "
+                                 "or '3.2', found "
                               << version
-                              << ", expected '3.4' or '3.2'",
+                              << " in: "
+                              << cmdObj
+                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
                 version == "3.4" || version == "3.2");
 
         // Forward to config shard, which will forward to all shards.
