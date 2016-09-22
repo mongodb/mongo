@@ -106,22 +106,24 @@ using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 /**
  * Take a non-command op and apply it locally
  * Used for applying from an oplog
- * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
+ * @param inSteadyStateReplication convert some updates to upserts for idempotency reasons
  * @param incrementOpsAppliedStats is called whenever an op is applied.
  * Returns failure status if the op was an update that could not be applied.
  */
 Status applyOperation_inlock(OperationContext* txn,
                              Database* db,
                              const BSONObj& op,
-                             bool convertUpdateToUpsert = false,
+                             bool inSteadyStateReplication = false,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
 /**
  * Take a command op and apply it locally
  * Used for applying from an oplog
+ * inSteadyStateReplication indicates whether we are in steady state replication, rather than
+ * initial sync.
  * Returns failure status if the op that could not be applied.
  */
-Status applyCommand_inlock(OperationContext* txn, const BSONObj& op);
+Status applyCommand_inlock(OperationContext* txn, const BSONObj& op, bool inSteadyStateReplication);
 
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.

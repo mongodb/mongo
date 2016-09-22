@@ -284,7 +284,7 @@ bool SyncTail::peek(OperationContext* txn, BSONObj* op) {
 // static
 Status SyncTail::syncApply(OperationContext* txn,
                            const BSONObj& op,
-                           bool convertUpdateToUpsert,
+                           bool inSteadyStateReplication,
                            ApplyOperationInLockFn applyOperationInLock,
                            ApplyCommandInLockFn applyCommandInLock,
                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
@@ -316,7 +316,7 @@ Status SyncTail::syncApply(OperationContext* txn,
             Lock::GlobalWrite globalWriteLock(txn->lockState());
 
             // special case apply for commands to avoid implicit database creation
-            Status status = applyCommandInLock(txn, op);
+            Status status = applyCommandInLock(txn, op, inSteadyStateReplication);
             incrementOpsAppliedStats();
             return status;
         }
@@ -330,7 +330,7 @@ Status SyncTail::syncApply(OperationContext* txn,
         DisableDocumentValidation validationDisabler(txn);
 
         Status status =
-            applyOperationInLock(txn, db, op, convertUpdateToUpsert, incrementOpsAppliedStats);
+            applyOperationInLock(txn, db, op, inSteadyStateReplication, incrementOpsAppliedStats);
         if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
             throw WriteConflictException();
         }
@@ -390,10 +390,12 @@ Status SyncTail::syncApply(OperationContext* txn,
     return Status(ErrorCodes::BadValue, ss);
 }
 
-Status SyncTail::syncApply(OperationContext* txn, const BSONObj& op, bool convertUpdateToUpsert) {
+Status SyncTail::syncApply(OperationContext* txn,
+                           const BSONObj& op,
+                           bool inSteadyStateReplication) {
     return SyncTail::syncApply(txn,
                                op,
-                               convertUpdateToUpsert,
+                               inSteadyStateReplication,
                                applyOperation_inlock,
                                applyCommand_inlock,
                                stdx::bind(&Counter64::increment, &opsAppliedStats, 1ULL));
@@ -1045,8 +1047,8 @@ bool SyncTail::shouldRetry(OperationContext* txn, const BSONObj& o) {
 void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail*) {
     initializeWriterThread();
     auto txn = cc().makeOperationContext();
-    auto syncApply = [](OperationContext* txn, const BSONObj& op, bool convertUpdateToUpsert) {
-        return SyncTail::syncApply(txn, op, convertUpdateToUpsert);
+    auto syncApply = [](OperationContext* txn, const BSONObj& op, bool inSteadyStateReplication) {
+        return SyncTail::syncApply(txn, op, inSteadyStateReplication);
     };
 
     fassertNoTrace(16359, multiSyncApply_noAbort(txn.get(), ops, syncApply));
@@ -1067,7 +1069,9 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                          [](const OplogEntry* l, const OplogEntry* r) { return l->ns < r->ns; });
     }
 
-    bool convertUpdatesToUpserts = true;
+    // This function is only called in steady state replication.
+    const bool inSteadyStateReplication = true;
+
     // doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
     // of a failed group and not allowing further group inserts until that op has been processed.
     auto doNotGroupBeforePoint = oplogEntryPointers->begin();
@@ -1116,7 +1120,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
                 try {
                     // Apply the group of inserts.
                     uassertStatusOK(
-                        syncApply(txn, groupedInsertBuilder.done(), convertUpdatesToUpserts));
+                        syncApply(txn, groupedInsertBuilder.done(), inSteadyStateReplication));
                     // It succeeded, advance the oplogEntriesIterator to the end of the
                     // group of inserts.
                     oplogEntriesIterator = endOfGroupableOpsIterator - 1;
@@ -1136,7 +1140,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 
         try {
             // Apply an individual (non-grouped) op.
-            const Status status = syncApply(txn, entry->raw, convertUpdatesToUpserts);
+            const Status status = syncApply(txn, entry->raw, inSteadyStateReplication);
 
             if (!status.isOK()) {
                 severe() << "Error applying operation (" << redact(entry->raw)
@@ -1175,15 +1179,24 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
     // allow us to get through the magic barrier
     txn->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    bool convertUpdatesToUpserts = false;
+    // This function is only called in initial sync, as its name suggests.
+    const bool inSteadyStateReplication = false;
 
     for (auto it = ops->begin(); it != ops->end(); ++it) {
         auto& entry = **it;
         try {
-            const Status s = SyncTail::syncApply(txn, entry.raw, convertUpdatesToUpserts);
+            const Status s = SyncTail::syncApply(txn, entry.raw, inSteadyStateReplication);
             if (!s.isOK()) {
+                // Don't retry on commands.
+                if (entry.isCommand()) {
+                    error() << "Error applying command (" << redact(entry.raw)
+                            << "): " << redact(s);
+                    return s;
+                }
+
+                // We might need to fetch the missing docs from the sync source.
                 if (st->shouldRetry(txn, entry.raw)) {
-                    const Status s2 = SyncTail::syncApply(txn, entry.raw, convertUpdatesToUpserts);
+                    const Status s2 = SyncTail::syncApply(txn, entry.raw, inSteadyStateReplication);
                     if (!s2.isOK()) {
                         severe() << "Error applying operation (" << redact(entry.raw)
                                  << "): " << redact(s2);

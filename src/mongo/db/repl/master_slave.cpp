@@ -640,14 +640,14 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
 
 void ReplSource::applyCommand(OperationContext* txn, const BSONObj& op) {
     try {
-        Status status = applyCommand_inlock(txn, op);
+        Status status = applyCommand_inlock(txn, op, true);
         if (!status.isOK()) {
             SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
             sync.setHostname(hostName);
             if (sync.shouldRetry(txn, op)) {
                 uassert(28639,
                         "Failure retrying initial sync update",
-                        applyCommand_inlock(txn, op).isOK());
+                        applyCommand_inlock(txn, op, true).isOK());
             }
         }
     } catch (UserException& e) {

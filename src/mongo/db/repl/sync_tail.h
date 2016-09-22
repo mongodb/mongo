@@ -65,22 +65,26 @@ public:
      * Used for applying from an oplog.
      * 'db' is the database where the op will be applied.
      * 'opObj' is a BSONObj describing the op to be applied.
-     * 'convertUpdateToUpsert' indicates to convert some updates to upserts for idempotency reasons.
+     * 'inSteadyStateReplication' indicates to convert some updates to upserts for idempotency
+     * reasons.
      * 'opCounter' is used to update server status metrics.
      * Returns failure status if the op was an update that could not be applied.
      */
     using ApplyOperationInLockFn = stdx::function<Status(OperationContext* txn,
                                                          Database* db,
                                                          const BSONObj& opObj,
-                                                         bool convertUpdateToUpsert,
+                                                         bool inSteadyStateReplication,
                                                          IncrementOpsAppliedStatsFn opCounter)>;
 
     /**
      * Type of function that takes a command op and applies it locally.
      * Used for applying from an oplog.
+     * inSteadyStateReplication indicates whether we are in steady state replication, rather than
+     * initial sync.
      * Returns failure status if the op that could not be applied.
      */
-    using ApplyCommandInLockFn = stdx::function<Status(OperationContext*, const BSONObj&)>;
+    using ApplyCommandInLockFn =
+        stdx::function<Status(OperationContext*, const BSONObj&, bool inSteadyStateReplication)>;
 
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<OldThreadPool> writerPool);
@@ -98,12 +102,12 @@ public:
      */
     static Status syncApply(OperationContext* txn,
                             const BSONObj& o,
-                            bool convertUpdateToUpsert,
+                            bool inSteadyStateReplication,
                             ApplyOperationInLockFn applyOperationInLock,
                             ApplyCommandInLockFn applyCommandInLock,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
-    static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
+    static Status syncApply(OperationContext* txn, const BSONObj& o, bool inSteadyStateReplication);
 
     void oplogApplication(ReplicationCoordinator* replCoord);
     bool peek(OperationContext* txn, BSONObj* obj);
@@ -266,7 +270,7 @@ Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
  * SyncTail::syncApply.
  */
 using SyncApplyFn =
-    stdx::function<Status(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert)>;
+    stdx::function<Status(OperationContext* txn, const BSONObj& o, bool inSteadyStateReplication)>;
 Status multiSyncApply_noAbort(OperationContext* txn,
                               MultiApplier::OperationPtrs* ops,
                               SyncApplyFn syncApply);

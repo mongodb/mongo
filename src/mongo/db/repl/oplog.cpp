@@ -654,7 +654,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
 Status applyOperation_inlock(OperationContext* txn,
                              Database* db,
                              const BSONObj& op,
-                             bool convertUpdateToUpsert,
+                             bool inSteadyStateReplication,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
     LOG(3) << "applying op: " << redact(op);
 
@@ -870,7 +870,7 @@ Status applyOperation_inlock(OperationContext* txn,
         opCounters->gotUpdate();
 
         BSONObj updateCriteria = o2;
-        const bool upsert = valueB || convertUpdateToUpsert;
+        const bool upsert = valueB || inSteadyStateReplication;
 
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply update due to missing _id: " << op.toString(),
@@ -965,7 +965,9 @@ Status applyOperation_inlock(OperationContext* txn,
     return Status::OK();
 }
 
-Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
+Status applyCommand_inlock(OperationContext* txn,
+                           const BSONObj& op,
+                           bool inSteadyStateReplication) {
     const char* names[] = {"o", "ns", "op"};
     BSONElement fields[3];
     op.getFields(3, names, fields);
@@ -996,6 +998,14 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }
+    }
+
+    // Applying renameCollection during initial sync might lead to data corruption, so we restart
+    // the initial sync.
+    if (!inSteadyStateReplication && o.firstElementFieldName() == std::string("renameCollection")) {
+        return Status(ErrorCodes::OplogOperationUnsupported,
+                      str::stream() << "Applying renameCollection not supported in initial sync: "
+                                    << redact(op));
     }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not
