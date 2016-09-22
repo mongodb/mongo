@@ -25,7 +25,7 @@ var doTest = function() {
     var conns = replTest.startSet();
     replTest.initiate();
 
-    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 5 * 60 * 1000);
+    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
     var master = replTest.getPrimary();
     var foo = master.getDB("foo");
@@ -73,27 +73,27 @@ var doTest = function() {
     });
     admin_s2.runCommand({replSetFreeze: 999999});
 
-    replTest.waitForState(
-        replTest.nodes[2], [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING], 60 * 1000);
+    replTest.waitForState(replTest.nodes[2],
+                          [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING]);
 
     jsTest.log("7. Kill #1 in the middle of syncing");
     replTest.stop(0);
 
     jsTest.log("8. Check that #3 makes it into secondary state");
-    replTest.waitForState(
-        replTest.nodes[2], [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY], 60 * 1000);
+    replTest.waitForState(replTest.nodes[2],
+                          [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
     jsTest.log("9. Bring #1 back up");
     replTest.start(0, {}, true);
-    replTest.waitForState(
-        replTest.nodes[0], [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY], 60 * 1000);
+    replTest.waitForState(replTest.nodes[0],
+                          [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
     jsTest.log("10. Initial sync should succeed");
-    replTest.waitForState(
-        replTest.nodes[2], [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY], 60 * 1000);
+    replTest.waitForState(replTest.nodes[2],
+                          [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
     jsTest.log("11. Ensure #1 becomes primary");
-    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
     jsTest.log("12. Everyone happy eventually");
     replTest.awaitReplication(2 * 60 * 1000);

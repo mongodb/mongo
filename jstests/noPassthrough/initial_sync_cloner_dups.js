@@ -86,8 +86,7 @@
     // Wait for the secondary to get ReplSetInitiate command.
     replTest.waitForState(
         secondary,
-        [ReplSetTest.State.STARTUP_2, ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY],
-        60 * 1000);
+        [ReplSetTest.State.STARTUP_2, ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
 
     // This fail point will cause the first intial sync to fail, and leave an op in the buffer to
     // verify the fix from SERVER-17807

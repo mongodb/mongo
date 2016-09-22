@@ -17,7 +17,7 @@ var config = {
     ]
 };
 var r = replTest.initiate(config);
-replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 // Make sure we have a master
 var master = replTest.getPrimary();
 var a_conn = conns[0];

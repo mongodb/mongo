@@ -19,7 +19,7 @@
             {_id: 4, host: nodes[4].host, priority: 0},
         ],
     });
-    replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
     replTest.awaitNodesAgreeOnPrimary();
     var primary = replTest.getPrimary();
     replTest.awaitReplication();

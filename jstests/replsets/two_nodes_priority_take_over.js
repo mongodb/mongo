@@ -29,7 +29,7 @@ if (false) {
         });
 
         // The first node will be the primary at the beginning.
-        rst.waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+        rst.waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY);
 
         // Get the term when replset is stable.
         var res = rst.getPrimary().adminCommand("replSetGetStatus");

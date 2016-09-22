@@ -23,9 +23,9 @@
         assert.throws(function() {
             primary.getDB("admin").runCommand({replSetStepDown: 60, force: true});
         });
-        rst.waitForState(primary, ReplSetTest.State.SECONDARY, 60 * 1000);
+        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
         if (waitForPrimary) {
-            rst.waitForState(secondary, ReplSetTest.State.PRIMARY, 60 * 1000);
+            rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
         }
         // When the primary steps down, it closes all client connections. Since 'conn' may be a
         // direct connection to the primary and the shell doesn't automatically retry operations on

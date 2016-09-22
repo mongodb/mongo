@@ -227,7 +227,7 @@
         }
 
         // Wait up to 5 minutes until restarted node is in state secondary.
-        rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
+        rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY);
 
         // Add new hidden node to replSetTest
         var hiddenCfg =
@@ -261,8 +261,7 @@
 
         // Wait up to 5 minutes until the new hidden node is in state RECOVERING.
         rst.waitForState(rst.nodes[numNodes],
-                         [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY],
-                         5 * 60 * 1000);
+                         [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
 
         // Stop CRUD client and FSM client.
         assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
@@ -271,7 +270,7 @@
         stopMongoProgramByPid(fsmPid);
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
-        rst.waitForState(rst.nodes[numNodes], ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
+        rst.waitForState(rst.nodes[numNodes], ReplSetTest.State.SECONDARY);
 
         // Wait for secondaries to finish catching up before shutting down.
         primary = rst.getPrimary();
