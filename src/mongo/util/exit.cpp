@@ -159,6 +159,7 @@ void shutdownNoTerminate() {
     {
         stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
         shutdownTasksInProgress = false;
+        shutdownExitCode.emplace(EXIT_WINDOWS_SERVICE_STOP);
     }
 
     shutdownTasksComplete.notify_all();
