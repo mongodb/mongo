@@ -638,35 +638,42 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
                                        set<ShardId>& shardIds,
                                        string& errmsg) {
     num = 0;
-    set<string> seen;
+    set<std::string> seen;
     while (true) {
-        CollectionInfoMap::iterator i = _collections.begin();
-        for (; i != _collections.end(); ++i) {
-            if (i->second.isSharded()) {
+        std::string aCollection;
+        {
+            stdx::lock_guard<stdx::mutex> lk(_lock);
+
+            CollectionInfoMap::iterator i = _collections.begin();
+            for (; i != _collections.end(); ++i) {
+                if (i->second.isSharded()) {
+                    break;
+                }
+            }
+
+            if (i == _collections.end()) {
                 break;
             }
+
+            aCollection = i->first;
+            if (seen.count(aCollection)) {
+                errmsg = "seen a collection twice!";
+                return false;
+            }
+
+            seen.insert(aCollection);
+            LOG(1) << "\t dropping sharded collection: " << aCollection;
+
+            i->second.getCM()->getAllShardIds(&shardIds);
         }
+        // drop lock before network activity
 
-        if (i == _collections.end()) {
-            break;
-        }
-
-        if (seen.count(i->first)) {
-            errmsg = "seen a collection twice!";
-            return false;
-        }
-
-        seen.insert(i->first);
-        LOG(1) << "\t dropping sharded collection: " << i->first;
-
-        i->second.getCM()->getAllShardIds(&shardIds);
-
-        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, NamespaceString(i->first)));
+        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, NamespaceString(aCollection)));
 
         // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
         // unsharded in the meantime
-        if (!removeSharding(txn, i->first)) {
-            warning() << "collection " << i->first
+        if (!removeSharding(txn, aCollection)) {
+            warning() << "collection " << aCollection
                       << " was reloaded as unsharded before drop completed"
                       << " during drop of all collections";
         }
