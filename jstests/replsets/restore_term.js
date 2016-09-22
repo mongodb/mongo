@@ -25,7 +25,6 @@ load("jstests/replsets/rslib.js");
     // Initiate the replset in protocol version 1.
     var conf = rst.getReplSetConfig();
     conf.settings = conf.settings || {};
-    conf.settings.electionTimeoutMillis = 2000;
     conf.protocolVersion = 1;
     rst.initiate(conf);
     rst.awaitSecondaryNodes();
