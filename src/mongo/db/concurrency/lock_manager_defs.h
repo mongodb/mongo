@@ -334,77 +334,112 @@ struct LockRequest {
      */
     void initNew(Locker* locker, LockGrantNotification* notify);
 
-
+    // This is the Locker, which created this LockRequest. Pointer is not owned, just referenced.
+    // Must outlive the LockRequest.
     //
-    // These fields are maintained by the Locker class
-    //
-
-    // This is the Locker, which created this LockRequest. Pointer is not owned, just
-    // referenced. Must outlive the LockRequest.
+    // Written at construction time by Locker
+    // Read by LockManager on any thread
+    // No synchronization
     Locker* locker;
 
-    // Not owned, just referenced. If a request is in the WAITING or CONVERTING state, must
-    // live at least until LockManager::unlock is cancelled or the notification has been
-    // invoked.
+    // Notification to be invoked when the lock is granted. Pointer is not owned, just referenced.
+    // If a request is in the WAITING or CONVERTING state, must live at least until
+    // LockManager::unlock is cancelled or the notification has been invoked.
+    //
+    // Written at construction time by Locker
+    // Read by LockManager
+    // No synchronization
     LockGrantNotification* notify;
 
-
+    // If the request cannot be granted right away, whether to put it at the front or at the end of
+    // the queue. By default, requests are put at the back. If a request is requested to be put at
+    // the front, this effectively bypasses fairness. Default is FALSE.
     //
-    // These fields are maintained by both the LockManager and Locker class
-    //
-
-    // If the request cannot be granted right away, whether to put it at the front or at the
-    // end of the queue. By default, requests are put at the back. If a request is requested
-    // to be put at the front, this effectively bypasses fairness. Default is FALSE.
+    // Written at construction time by Locker
+    // Read by LockManager on any thread
+    // No synchronization
     bool enqueueAtFront;
 
     // When this request is granted and as long as it is on the granted queue, the particular
-    // resource's policy will be changed to "compatibleFirst". This means that even if there
-    // are pending requests on the conflict queue, if a compatible request comes in it will be
-    // granted immediately. This effectively turns off fairness.
+    // resource's policy will be changed to "compatibleFirst". This means that even if there are
+    // pending requests on the conflict queue, if a compatible request comes in it will be granted
+    // immediately. This effectively turns off fairness.
+    //
+    // Written at construction time by Locker
+    // Read by LockManager on any thread
+    // No synchronization
     bool compatibleFirst;
 
-    // When set, an attempt is made to execute this request using partitioned lockheads.
-    // This speeds up the common case where all requested locking modes are compatible with
-    // each other, at the cost of extra overhead for conflicting modes.
+    // When set, an attempt is made to execute this request using partitioned lockheads. This speeds
+    // up the common case where all requested locking modes are compatible with each other, at the
+    // cost of extra overhead for conflicting modes.
+    //
+    // Written at construction time by LockManager
+    // Read by LockManager on any thread
+    // No synchronization
     bool partitioned;
 
-    // How many times has LockManager::lock been called for this request. Locks are released
-    // when their recursive count drops to zero.
+    // How many times has LockManager::lock been called for this request. Locks are released when
+    // their recursive count drops to zero.
+    //
+    // Written by LockManager on Locker thread
+    // Read by LockManager on Locker thread
+    // Read by Locker on Locker thread
+    // No synchronization
     unsigned recursiveCount;
 
+    // Pointer to the lock to which this request belongs, or null if this request has not yet been
+    // assigned to a lock or if it belongs to the PartitionedLockHead for locker (in which case
+    // partitionedLock must be set). The LockHead should be alive as long as there are LockRequests
+    // on it, so it is safe to have this pointer hanging around.
     //
-    // These fields are owned and maintained by the LockManager class exclusively
-    //
-
-
-    // Pointer to the lock to which this request belongs, or null if this request has not yet
-    // been assigned to a lock or if it belongs to the PartitionedLockHead for locker. The
-    // LockHead should be alive as long as there are LockRequests on it, so it is safe to have
-    // this pointer hanging around.
+    // Written by LockManager on any thread
+    // Read by LockManager on any thread
+    // Protected by LockHead bucket's mutex
     LockHead* lock;
 
     // Pointer to the partitioned lock to which this request belongs, or null if it is not
-    // partitioned. Only one of 'lock' and 'partitionedLock' is non-NULL, and a request can
-    // only transition from 'partitionedLock' to 'lock', never the other way around.
+    // partitioned. Only one of 'lock' and 'partitionedLock' is non-NULL, and a request can only
+    // transition from 'partitionedLock' to 'lock', never the other way around.
+    //
+    // Written by LockManager on any thread
+    // Read by LockManager on any thread
+    // Protected by LockHead bucket's mutex
     PartitionedLockHead* partitionedLock;
 
-    // The reason intrusive linked list is used instead of the std::list class is to allow
-    // for entries to be removed from the middle of the list in O(1) time, if they are known
-    // instead of having to search for them and we cannot persist iterators, because the list
-    // can be modified while an iterator is held.
+    // The linked list chain on which this request hangs off the owning lock head. The reason
+    // intrusive linked list is used instead of the std::list class is to allow for entries to be
+    // removed from the middle of the list in O(1) time, if they are known instead of having to
+    // search for them and we cannot persist iterators, because the list can be modified while an
+    // iterator is held.
+    //
+    // Written by LockManager on any thread
+    // Read by LockManager on any thread
+    // Protected by LockHead bucket's mutex
     LockRequest* prev;
     LockRequest* next;
 
-    // Current status of this request.
+    // The current status of this request. Always starts at STATUS_NEW.
+    //
+    // Written by LockManager on any thread
+    // Read by LockManager on any thread
+    // Protected by LockHead bucket's mutex
     Status status;
 
-    // If not granted, the mode which has been requested for this lock. If granted, the mode
-    // in which it is currently granted.
+    // If this request is not granted, the mode which has been requested for this lock. If granted,
+    // the mode in which it is currently granted.
+    //
+    // Written by LockManager on any thread
+    // Read by LockManager on any thread
+    // Protected by LockHead bucket's mutex
     LockMode mode;
 
-    // This value is different from MODE_NONE only if a conversion is requested for a lock and
-    // that conversion cannot be immediately granted.
+    // This value is different from MODE_NONE only if a conversion is requested for a lock and that
+    // conversion cannot be immediately granted.
+    //
+    // Written by LockManager on any thread
+    // Read by LockManager on any thread
+    // Protected by LockHead bucket's mutex
     LockMode convertMode;
 };
 

@@ -35,20 +35,39 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
-
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
-using std::string;
+extern bool _supportsDocLocking;
 
 namespace {
-const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
-const int kMinPerfMillis = 30;   // min duration for reliable timing
+
+const int kMaxPerfThreads = 16;    // max number of threads to use for lock perf
+const int kMaxStressThreads = 32;  // max number of threads to use for lock stress
+const int kMinPerfMillis = 30;     // min duration for reliable timing
+
+/**
+ * Temporarily forces setting of the docLockingSupported global for testing purposes.
+ */
+class ForceSupportsDocLocking {
+public:
+    explicit ForceSupportsDocLocking(bool supported) : _oldSupportsDocLocking(_supportsDocLocking) {
+        _supportsDocLocking = supported;
+    }
+
+    ~ForceSupportsDocLocking() {
+        _supportsDocLocking = _oldSupportsDocLocking;
+    }
+
+private:
+    bool _oldSupportsDocLocking;
+};
 
 /**
  * Calls fn the given number of iterations, spread out over up to maxThreads threads.
@@ -95,7 +114,6 @@ void perfTest(stdx::function<void(int threadNr)> fn, int maxThreads) {
               << " ns per call" << (kDebugBuild ? " (DEBUG BUILD!)" : "");
     }
 }
-}  // namespace
 
 TEST(DConcurrency, ResourceMutex) {
     Lock::ResourceMutex mtx;
@@ -300,7 +318,7 @@ TEST(DConcurrency, DBLockTakesS) {
 
     Lock::DBLock dbRead(&ls, "db", MODE_S);
 
-    const ResourceId resIdDb(RESOURCE_DATABASE, string("db"));
+    const ResourceId resIdDb(RESOURCE_DATABASE, std::string("db"));
     ASSERT(ls.getLockMode(resIdDb) == MODE_S);
 }
 
@@ -309,7 +327,7 @@ TEST(DConcurrency, DBLockTakesX) {
 
     Lock::DBLock dbWrite(&ls, "db", MODE_X);
 
-    const ResourceId resIdDb(RESOURCE_DATABASE, string("db"));
+    const ResourceId resIdDb(RESOURCE_DATABASE, std::string("db"));
     ASSERT(ls.getLockMode(resIdDb) == MODE_X);
 }
 
@@ -447,28 +465,185 @@ TEST(DConcurrency, IsCollectionLocked_DB_Locked_IX) {
     }
 }
 
+TEST(DConcurrency, Stress) {
+    const int kNumIterations = 5000;
+
+    ProgressMeter progressMeter(kNumIterations * kMaxStressThreads);
+    std::array<DefaultLockerImpl, kMaxStressThreads> locker;
+
+    AtomicInt32 ready{0};
+    std::vector<stdx::thread> threads;
+
+    for (int threadId = 0; threadId < kMaxStressThreads; threadId++)
+        threads.emplace_back([&, threadId]() {
+            // Busy-wait until everybody is ready
+            ready.fetchAndAdd(1);
+            while (ready.load() < kMaxStressThreads)
+                ;
+
+            for (int i = 0; i < kNumIterations; i++) {
+                const bool sometimes = (std::rand() % 15 == 0);
+
+                if (i % 7 == 0 && threadId == 0 /* Only one upgrader legal */) {
+                    Lock::GlobalWrite w(&locker[threadId]);
+                    if (i % 7 == 2) {
+                        Lock::TempRelease t(&locker[threadId]);
+                    }
+
+                    ASSERT(locker[threadId].isW());
+                } else if (i % 7 == 1) {
+                    Lock::GlobalRead r(&locker[threadId]);
+                    ASSERT(locker[threadId].isReadLocked());
+                } else if (i % 7 == 2) {
+                    Lock::GlobalWrite w(&locker[threadId]);
+                    if (sometimes) {
+                        Lock::TempRelease t(&locker[threadId]);
+                    }
+
+                    ASSERT(locker[threadId].isW());
+                } else if (i % 7 == 3) {
+                    Lock::GlobalWrite w(&locker[threadId]);
+                    { Lock::TempRelease t(&locker[threadId]); }
+
+                    Lock::GlobalRead r(&locker[threadId]);
+                    if (sometimes) {
+                        Lock::TempRelease t(&locker[threadId]);
+                    }
+
+                    ASSERT(locker[threadId].isW());
+                } else if (i % 7 == 4) {
+                    Lock::GlobalRead r(&locker[threadId]);
+                    Lock::GlobalRead r2(&locker[threadId]);
+                    ASSERT(locker[threadId].isReadLocked());
+                } else if (i % 7 == 5) {
+                    { Lock::DBLock r(&locker[threadId], "foo", MODE_S); }
+                    { Lock::DBLock r(&locker[threadId], "bar", MODE_S); }
+                } else if (i % 7 == 6) {
+                    if (i > kNumIterations / 2) {
+                        int q = i % 11;
+
+                        if (q == 0) {
+                            Lock::DBLock r(&locker[threadId], "foo", MODE_S);
+                            ASSERT(locker[threadId].isDbLockedForMode("foo", MODE_S));
+
+                            Lock::DBLock r2(&locker[threadId], "foo", MODE_S);
+                            ASSERT(locker[threadId].isDbLockedForMode("foo", MODE_S));
+
+                            Lock::DBLock r3(&locker[threadId], "local", MODE_S);
+                            ASSERT(locker[threadId].isDbLockedForMode("foo", MODE_S));
+                            ASSERT(locker[threadId].isDbLockedForMode("local", MODE_S));
+                        } else if (q == 1) {
+                            // test locking local only -- with no preceding lock
+                            { Lock::DBLock x(&locker[threadId], "local", MODE_S); }
+
+                            Lock::DBLock x(&locker[threadId], "local", MODE_X);
+
+                            if (sometimes) {
+                                Lock::TempRelease t(&locker[threadId]);
+                            }
+                        } else if (q == 2) {
+                            { Lock::DBLock x(&locker[threadId], "admin", MODE_S); }
+                            { Lock::DBLock x(&locker[threadId], "admin", MODE_X); }
+                        } else if (q == 3) {
+                            Lock::DBLock x(&locker[threadId], "foo", MODE_X);
+                            Lock::DBLock y(&locker[threadId], "admin", MODE_S);
+                        } else if (q == 4) {
+                            Lock::DBLock x(&locker[threadId], "foo2", MODE_S);
+                            Lock::DBLock y(&locker[threadId], "admin", MODE_S);
+                        } else if (q == 5) {
+                            Lock::DBLock x(&locker[threadId], "foo", MODE_IS);
+                        } else if (q == 6) {
+                            Lock::DBLock x(&locker[threadId], "foo", MODE_IX);
+                            Lock::DBLock y(&locker[threadId], "local", MODE_IX);
+                        } else {
+                            Lock::DBLock w(&locker[threadId], "foo", MODE_X);
+
+                            { Lock::TempRelease t(&locker[threadId]); }
+
+                            Lock::DBLock r2(&locker[threadId], "foo", MODE_S);
+                            Lock::DBLock r3(&locker[threadId], "local", MODE_S);
+                        }
+                    } else {
+                        Lock::DBLock r(&locker[threadId], "foo", MODE_S);
+                        Lock::DBLock r2(&locker[threadId], "foo", MODE_S);
+                        Lock::DBLock r3(&locker[threadId], "local", MODE_S);
+                    }
+                }
+
+                progressMeter.hit();
+            }
+        });
+
+    for (auto& thread : threads)
+        thread.join();
+
+    {
+        MMAPV1LockerImpl ls;
+        Lock::GlobalWrite w(&ls);
+    }
+
+    {
+        MMAPV1LockerImpl ls;
+        Lock::GlobalRead r(&ls);
+    }
+}
+
+TEST(DConcurrency, StressPartitioned) {
+    const int kNumIterations = 5000;
+
+    ProgressMeter progressMeter(kNumIterations * kMaxStressThreads);
+    std::array<DefaultLockerImpl, kMaxStressThreads> locker;
+
+    AtomicInt32 ready{0};
+    std::vector<stdx::thread> threads;
+
+    for (int threadId = 0; threadId < kMaxStressThreads; threadId++)
+        threads.emplace_back([&, threadId]() {
+            // Busy-wait until everybody is ready
+            ready.fetchAndAdd(1);
+            while (ready.load() < kMaxStressThreads)
+                ;
+
+            for (int i = 0; i < kNumIterations; i++) {
+                if (threadId == 0) {
+                    if (i % 100 == 0) {
+                        Lock::GlobalWrite w(&locker[threadId]);
+                        continue;
+                    } else if (i % 100 == 1) {
+                        Lock::GlobalRead w(&locker[threadId]);
+                        continue;
+                    }
+
+                    // Intentional fall through
+                }
+
+                if (i % 2 == 0) {
+                    Lock::DBLock x(&locker[threadId], "foo", MODE_IS);
+                } else {
+                    Lock::DBLock x(&locker[threadId], "foo", MODE_IX);
+                    Lock::DBLock y(&locker[threadId], "local", MODE_IX);
+                }
+
+                progressMeter.hit();
+            }
+        });
+
+    for (auto& thread : threads)
+        thread.join();
+
+    {
+        MMAPV1LockerImpl ls;
+        Lock::GlobalWrite w(&ls);
+    }
+
+    {
+        MMAPV1LockerImpl ls;
+        Lock::GlobalRead r(&ls);
+    }
+}
+
 // These tests exercise single- and multi-threaded performance of uncontended lock acquisition. It
-// is meither practical nor useful to run them on debug builds.
-
-extern bool _supportsDocLocking;
-namespace {
-/**
- * Temporarily forces setting of the docLockingSupported global for testing purposes.
- */
-class ForceSupportsDocLocking {
-public:
-    explicit ForceSupportsDocLocking(bool supported) : _oldSupportsDocLocking(_supportsDocLocking) {
-        _supportsDocLocking = supported;
-    }
-
-    ~ForceSupportsDocLocking() {
-        _supportsDocLocking = _oldSupportsDocLocking;
-    }
-
-private:
-    bool _oldSupportsDocLocking;
-};
-}  // namespace
+// is neither practical nor useful to run them on debug builds.
 
 TEST(Locker, PerformanceStdMutex) {
     stdx::mutex mtx;
@@ -531,4 +706,6 @@ TEST(Locker, PerformanceMMAPv1CollectionExclusive) {
         },
         kMaxPerfThreads);
 }
+
+}  // namespace
 }  // namespace mongo

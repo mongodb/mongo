@@ -43,6 +43,7 @@ env.CppUnitTest(
             'lock_stats_test.cpp',
     ],
     LIBDEPS=[
-        'lock_manager'
+        '$BUILD_DIR/mongo/util/progress_meter',
+        'lock_manager',
     ]
 )
