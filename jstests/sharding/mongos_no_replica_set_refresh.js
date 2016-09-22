@@ -4,6 +4,8 @@ load("jstests/replsets/rslib.js");
 (function() {
     'use strict';
 
+    var five_minutes = 5 * 60 * 1000;
+
     var numRSHosts = function() {
         var result = assert.commandWorked(rsObj.nodes[0].adminCommand({ismaster: 1}));
         return result.hosts.length + result.passives.length;
@@ -24,6 +26,9 @@ load("jstests/replsets/rslib.js");
         jsTest.log("Waiting for the shard to discover that it now has " + expectedNumHosts +
                    " hosts.");
         var numHostsSeenByShard;
+
+        // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
+        // seconds.
         assert.soon(
             function() {
                 numHostsSeenByShard = numRSHosts();
@@ -32,11 +37,15 @@ load("jstests/replsets/rslib.js");
             function() {
                 return ("Expected shard to see " + expectedNumHosts + " hosts but found " +
                         numHostsSeenByShard);
-            });
+            },
+            five_minutes);
 
         jsTest.log("Waiting for the mongos to discover that the shard now has " + expectedNumHosts +
                    " hosts.");
         var numHostsSeenByMongos;
+
+        // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
+        // seconds.
         assert.soon(
             function() {
                 numHostsSeenByMongos = numMongosHosts();
@@ -45,7 +54,8 @@ load("jstests/replsets/rslib.js");
             function() {
                 return ("Expected mongos to see " + expectedNumHosts +
                         " hosts on shard but found " + numHostsSeenByMongos);
-            });
+            },
+            five_minutes);
     };
 
     var st = new ShardingTest({
