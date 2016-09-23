@@ -469,7 +469,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
                   << source << " for " << blacklistDuration << ".";
         _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
     } else if (!fetcherReturnStatus.isOK()) {
-        warning() << "Fetcher error querying oplog: " << redact(fetcherReturnStatus);
+        warning() << "Fetcher stopped querying remote oplog with error: "
+                  << redact(fetcherReturnStatus);
     }
 }
 

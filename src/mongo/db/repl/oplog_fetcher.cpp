@@ -325,7 +325,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     // if target cut connections between connecting and querying (for
     // example, because it stepped down) we might not have a cursor
     if (!result.isOK()) {
-        LOG(2) << "Error returned from oplog query: " << redact(result.getStatus());
+        LOG(1) << "Error returned from oplog query: " << redact(result.getStatus());
         _onShutdown(result.getStatus());
         return;
     }
@@ -375,6 +375,8 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
             _onShutdown(status, opTimeWithHash);
             return;
         }
+
+        LOG(1) << "oplog fetcher successfully fetched from " << _source;
 
         // If this is the first batch and no rollback is needed, skip the first document.
         firstDocToApply++;
