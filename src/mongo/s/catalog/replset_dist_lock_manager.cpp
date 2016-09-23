@@ -442,15 +442,20 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
                                          Date_t::now(),
                                          whyMessage.toString(),
                                          DistLockCatalog::kLocalWriteConcern);
-    if (lockStatus == ErrorCodes::LockStateChangeFailed) {
-        return {ErrorCodes::LockBusy, str::stream() << "Unable to acquire " << name};
-    } else if (!lockStatus.isOK()) {
-        return lockStatus.getStatus();
+
+    if (lockStatus.isOK()) {
+        log() << "distributed lock '" << name << "' acquired for '" << whyMessage.toString()
+              << "', ts : " << lockSessionID;
+        return lockSessionID;
     }
 
-    log() << "distributed lock '" << name << "' acquired for '" << whyMessage.toString()
-          << "', ts : " << lockSessionID;
-    return lockSessionID;
+    LOG(1) << "distributed lock '" << name << "' was not acquired.";
+
+    if (lockStatus == ErrorCodes::LockStateChangeFailed) {
+        return {ErrorCodes::LockBusy, str::stream() << "Unable to acquire " << name};
+    }
+
+    return lockStatus.getStatus();
 }
 
 void ReplSetDistLockManager::unlock(OperationContext* txn, const DistLockHandle& lockSessionID) {

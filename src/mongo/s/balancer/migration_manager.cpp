@@ -353,9 +353,9 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
                     ->getDistLockManager()
                     ->tryLockWithLocalWriteConcern(txn, migrateInfo.ns, whyMessage, _lockSessionID);
             if (!statusWithDistLockHandle.isOK() &&
-                statusWithDistLockHandle.getStatus() != ErrorCodes::LockStateChangeFailed) {
-                // LockStateChangeFailed is alright because that should mean a 3.2 shard has it for
-                // the active migration.
+                statusWithDistLockHandle.getStatus() != ErrorCodes::LockBusy) {
+                // LockBusy is alright because that should mean a 3.2 shard has it for the active
+                // migration.
                 warning() << "Failed to acquire distributed lock for collection '"
                           << redact(migrateInfo.ns)
                           << "' during balancer recovery of an active migration. Abandoning"
