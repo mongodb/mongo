@@ -126,7 +126,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
 // Set this to specify maximum number of times the oplog fetcher will consecutively restart the
 // oplog tailing query on non-cancellation errors.
 server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
-    oplogFetcherMaxFetcherRestarts(10);
+    oplogFetcherMaxFetcherRestarts(3);
 class ExportedOplogFetcherMaxFetcherRestartsServerParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
