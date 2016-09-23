@@ -49,6 +49,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/wire_version.h"
@@ -766,7 +767,10 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
     }
     if (existingShard.getValue()) {
         // These hosts already belong to an existing shard, so report success and terminate the
-        // addShard request.
+        // addShard request.  Make sure to set the last optime for the client to the system last
+        // optime so that we'll still wait for replication so that this state is visible in the
+        // committed snapshot.
+        repl::ReplClientInfo::forClient(txn->getClient()).setLastOpToSystemLastOpTime(txn);
         return existingShard.getValue()->getName();
     }
 
