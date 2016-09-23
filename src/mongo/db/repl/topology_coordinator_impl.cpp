@@ -259,7 +259,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             if (attempts == 0) {
                 // Candidate must be a voter if we are a voter.
                 if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
-                    LOG(2) << "Cannot select sync source voting differences: "
+                    LOG(2) << "Cannot select sync source because of voting differences: "
                            << itMemberConfig.getHostAndPort();
                     continue;
                 }
@@ -271,13 +271,13 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 }
                 // Candidates cannot be excessively behind.
                 if (it->getAppliedOpTime() < oldestSyncOpTime) {
-                    LOG(2) << "Cannot select sync source because it is older than us: "
+                    LOG(2) << "Cannot select sync source because it is too far behind: "
                            << itMemberConfig.getHostAndPort();
                     continue;
                 }
                 // Candidate must not have a configured delay larger than ours.
                 if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay()) {
-                    LOG(2) << "Cannot select sync source with slaveDelay differences: "
+                    LOG(2) << "Cannot select sync source with larger slaveDelay than ours: "
                            << itMemberConfig.getHostAndPort();
                     continue;
                 }
@@ -301,7 +301,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             if ((closestIndex != -1) &&
                 (_getPing(itMemberConfig.getHostAndPort()) >
                  _getPing(_rsConfig.getMemberAt(closestIndex).getHostAndPort()))) {
-                LOG(2) << "Cannot select sync source which is older than the best candidate: "
+                LOG(2) << "Cannot select sync source with higher latency than the best candidate: "
                        << itMemberConfig.getHostAndPort();
 
                 continue;
