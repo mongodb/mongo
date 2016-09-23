@@ -2,7 +2,7 @@
 
 # Check WiredTiger error/return macros.
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 cd ..
 
@@ -79,3 +79,5 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
 
 done
+
+exit 0

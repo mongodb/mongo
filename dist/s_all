@@ -124,3 +124,4 @@ echo 'dist/s_all run finished'
 if test $errmode -ne 0; then
 	exit $errfound;
 fi
+exit 0

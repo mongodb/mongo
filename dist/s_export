@@ -3,7 +3,7 @@
 # Check for illegal external symbols.
 #
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 case `uname` in
 Darwin)

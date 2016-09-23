@@ -2,7 +2,7 @@
 
 # Build a list of internal function and variable prototypes.
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # proto --
 #	extract public functions.
@@ -83,3 +83,5 @@ l=`sed \
     -e '/os_win/d' \
     -e 's/[	 ].*$//' filelist`
 externs
+
+exit 0
