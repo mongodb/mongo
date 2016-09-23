@@ -389,7 +389,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
                        << _args.getToShardId()),
             ShardingCatalogClient::kMajorityWriteConcern);
         if ((ErrorCodes::isInterruption(status.code()) ||
-             ErrorCodes::isShutdownError(status.code())) &&
+             ErrorCodes::isShutdownError(status.code()) ||
+             status == ErrorCodes::CallbackCanceled) &&
             inShutdown()) {
             // Since the server is already doing a clean shutdown, this call will just join the
             // previous shutdown call
