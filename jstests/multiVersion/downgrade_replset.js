@@ -31,7 +31,11 @@ var coll = "test.foo";
 // do this prior to writing any data to the replica set so that any indexes created during this test
 // are compatible with 3.2. This effectively allows us to emulate upgrading to the latest version
 // with existing data files and then trying to downgrade back to 3.2.
+//
+// We wait for the feature compatibility version to be set to "3.2" on all nodes of the replica set
+// in order to ensure that all nodes can be successfully downgraded.
 assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
+rst.awaitReplication();
 
 jsTest.log("Inserting documents into collection.");
 for (var i = 0; i < 10; i++) {
