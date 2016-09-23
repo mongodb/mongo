@@ -296,6 +296,12 @@ static ExitCode runMongosServer() {
                 return EXIT_CLEAN;
             }
             error() << "Error initializing sharding system: " << status;
+
+            // Exit gracefully if this mongos is being used incorrectly in a mixed 3.2/3.4 cluster.
+            if (status == ErrorCodes::MustUpgrade) {
+                dbexit(EXIT_SHARDING_ERROR);
+            }
+
             return EXIT_SHARDING_ERROR;
         }
 
