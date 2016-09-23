@@ -14,7 +14,7 @@
     s.ensurePrimaryShard(specialDB, 'shard0000');
     assert.commandWorked(s.s0.adminCommand({shardcollection: specialNS, key: {num: 1}}));
 
-    var exists = s.getDB("config").collections.find({_id: specialNS}).count();
+    var exists = s.getDB("config").collections.find({_id: specialNS}).itcount();
     assert.eq(exists, 1);
 
     // Test that drop database properly cleans up config
