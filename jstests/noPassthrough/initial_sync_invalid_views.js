@@ -13,13 +13,20 @@
     replSet.initiate();
     let primary = replSet.getPrimary();
 
+    let primaryParams = primary.adminCommand({getCmdLineOpts: 1}).parsed.setParameter;
+    let secondaryParams = {};
+    if (!primaryParams.use3dot2InitialSync) {
+        secondaryParams.use3dot2InitialSync = false;
+    }
+    if (!primaryParams.initialSyncOplogBuffer) {
+        secondaryParams.initialSyncOplogBuffer = "collection";
+    }
+
     let coll = primary.getDB('test').foo;
     assert.writeOK(coll.insert({a: 1}));
 
     // Add a secondary node but make it hang before copying databases.
-    let secondary = replSet.add({
-        setParameter: {use3dot2InitialSync: false, initialSyncOplogBuffer: "collection"},
-    });
+    let secondary = replSet.add({setParameter: secondaryParams});
     secondary.setSlaveOk();
 
     assert.commandWorked(secondary.getDB('admin').runCommand(
