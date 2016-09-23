@@ -128,9 +128,9 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
         return;
     }
 
-    LOG(1) << "Refreshing metadata for collection " << _nss.ns() << " from "
-           << _activeMetadataTracker->metadata->toStringBasic() << " to "
-           << remoteMetadata->toStringBasic();
+    log() << "Refreshing metadata for collection " << _nss.ns() << " from "
+          << _activeMetadataTracker->metadata->toStringBasic() << " to "
+          << remoteMetadata->toStringBasic();
 
     // Resolve any receiving chunks, which might have completed by now
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
