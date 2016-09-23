@@ -61,12 +61,20 @@ func (op *RawOp) ShortenReply() error {
 
 	switch op.Header.OpCode {
 	case OpCodeReply:
+		if op.Header.MessageLength <= 20+MsgHeaderLen {
+			//there are no reply docs
+			return nil
+		}
 		firstDocSize := getInt32(op.Body, 20+MsgHeaderLen)
 		op.Body = op.Body[0:(20 + MsgHeaderLen + firstDocSize)]
 
 	case OpCodeCommandReply:
 		commandReplyDocSize := getInt32(op.Body, MsgHeaderLen)
 		metadataDocSize := getInt32(op.Body, int(commandReplyDocSize)+MsgHeaderLen)
+		if op.Header.MessageLength <= commandReplyDocSize+metadataDocSize+MsgHeaderLen {
+			//there are no reply docs
+			return nil
+		}
 		firstOutputDocSize := getInt32(op.Body, int(commandReplyDocSize+metadataDocSize)+MsgHeaderLen)
 		shortReplySize := commandReplyDocSize + metadataDocSize + firstOutputDocSize + MsgHeaderLen
 		op.Body = op.Body[0:shortReplySize]

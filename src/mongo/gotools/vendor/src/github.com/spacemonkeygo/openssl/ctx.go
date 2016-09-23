@@ -84,22 +84,6 @@ static long SSL_CTX_set_tlsext_servername_callback_not_a_macro(
 #define SSL_OP_NO_COMPRESSION 0
 #endif
 
-static const SSL_METHOD *OUR_TLSv1_1_method() {
-#if defined(TLS1_1_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
-    return TLSv1_1_method();
-#else
-    return NULL;
-#endif
-}
-
-static const SSL_METHOD *OUR_TLSv1_2_method() {
-#if defined(TLS1_2_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
-    return TLSv1_2_method();
-#else
-    return NULL;
-#endif
-}
-
 #if defined SSL_CTRL_SET_TLSEXT_HOSTNAME
 	extern int sni_cb(SSL *ssl_conn, int *ad, void *arg);
 #endif
@@ -187,10 +171,6 @@ func NewCtxWithVersion(version SSLVersion) (*Ctx, error) {
 	switch version {
 	case TLSv1:
 		method = C.TLSv1_method()
-	case TLSv1_1:
-		method = C.OUR_TLSv1_1_method()
-	case TLSv1_2:
-		method = C.OUR_TLSv1_2_method()
 	case AnyVersion:
 		method = C.SSLv23_method()
 	}

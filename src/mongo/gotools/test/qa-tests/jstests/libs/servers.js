@@ -386,6 +386,17 @@
         return true;
       };
 
+      var addOptionsToFullArgs = function(k, v) {
+        if (v === undefined || v === null)
+            return;
+
+        fullArgs.push("--" + k);
+
+        if (v != "") {
+            fullArgs.push("" + v);
+        }
+      };
+
       for (var k in o) {
         // Make sure our logical option should be added to the array of options
         if (!o.hasOwnProperty(k) ||
@@ -406,14 +417,14 @@
             }
             fullArgs.push(temp);
           }
+        } else if (k === "setParameter" && isObject(o[k])) {
+            // If the value associated with the setParameter option is an object, we want
+            // to add all key-value pairs in that object as separate --setParameters.
+            Object.keys(o[k]).forEach(function(paramKey) {
+                addOptionsToFullArgs(k, "" + paramKey + "=" + o[k][paramKey]);
+            });
         } else {
-          if (o[k] === undefined || o[k] === null) {
-            continue;
-          }
-          fullArgs.push("--" + k);
-          if (o[k] !== "") {
-            fullArgs.push(String(o[k]));
-          }
+            addOptionsToFullArgs(k, o[k]);
         }
       }
     } else {

@@ -53,7 +53,9 @@ func VerifySystemAuthVersion(sessionProvider *db.SessionProvider) error {
 		return fmt.Errorf("error getting session from server: %v", err)
 	}
 	defer session.Close()
-	versionEntries := session.DB("admin").C("system.version")
+
+	authSchemaQuery := bson.M{"_id": "authSchema"}
+	versionEntries := session.DB("admin").C("system.version").Find(authSchemaQuery)
 	if count, err := versionEntries.Count(); err != nil {
 		return fmt.Errorf("error checking pressence of auth version: %v", err)
 	} else if count == 0 {
