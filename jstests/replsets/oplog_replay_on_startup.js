@@ -15,6 +15,8 @@
     rst.initiate();
 
     var conn = rst.getPrimary();  // Waits for PRIMARY state.
+    var nojournal = Array.contains(conn.adminCommand({getCmdLineOpts: 1}).argv, '--nojournal');
+    var storageEngine = jsTest.options().storageEngine;
     var term = conn.getCollection('local.oplog.rs').find().sort({$natural: -1}).limit(1).next().t;
     if (typeof(term) == 'undefined') {
         term = -1;  // Use a dummy term for PV0.
@@ -29,6 +31,12 @@
         expectedState,
         expectedApplied,
     }) {
+        if (nojournal && (storageEngine === 'mmapv1') && expectedState === 'FATAL') {
+            // We can't test fatal states on mmap without a journal because it won't be able
+            // to start up again.
+            return;
+        }
+
         if (term != -1) {
             term++;  // Each test gets a new term on PV1 to ensure OpTimes always move forward.
         }
