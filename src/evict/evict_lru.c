@@ -431,7 +431,6 @@ __evict_update_work(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	double dirty_trigger;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 
 	conn = S2C(session);
@@ -456,15 +455,13 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 		F_SET(cache, WT_CACHE_EVICT_CLEAN);
-	if (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100)
+	if (__wt_eviction_clean_needed(session, NULL))
 		F_SET(cache, WT_CACHE_EVICT_CLEAN_HARD);
 
 	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
 	if (dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100)
 		F_SET(cache, WT_CACHE_EVICT_DIRTY);
-	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
-		dirty_trigger = (double)cache->eviction_dirty_trigger;
-	if (dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100)
+	if (__wt_eviction_dirty_needed(session, NULL))
 		F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
 
 	/*
@@ -496,6 +493,12 @@ __evict_update_work(WT_SESSION_IMPL *session)
 			F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
 		F_CLR(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 	}
+
+	/* If threads are blocked by eviction we should be looking for pages. */
+	WT_ASSERT(session, !F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) ||
+	    F_ISSET(cache, WT_CACHE_EVICT_CLEAN));
+	WT_ASSERT(session, !F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD) ||
+	    F_ISSET(cache, WT_CACHE_EVICT_DIRTY));
 
 	WT_STAT_CONN_SET(session, cache_eviction_state,
 	    F_MASK(cache, WT_CACHE_EVICT_MASK));

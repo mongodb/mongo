@@ -175,7 +175,7 @@ struct __wt_cache {
 #define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
 #define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
 #define	WT_CACHE_EVICT_DIRTY_HARD 0x008 /* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_SCRUB	  0x010 /* Scrub dirty pages pages */
+#define	WT_CACHE_EVICT_SCRUB	  0x010 /* Scrub dirty pages */
 #define	WT_CACHE_EVICT_URGENT	  0x020 /* Pages are in the urgent queue */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 #define	WT_CACHE_EVICT_MASK	  0x0FF
