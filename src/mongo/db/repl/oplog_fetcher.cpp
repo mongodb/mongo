@@ -262,14 +262,12 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(lastFetched),
       _fetcher(_makeFetcher(_lastFetched.opTime)) {
-    uassert(ErrorCodes::BadValue, "null last optime fetched", !lastFetched.opTime.isNull());
+    uassert(ErrorCodes::BadValue, "null last optime fetched", !_lastFetched.opTime.isNull());
     uassert(ErrorCodes::InvalidReplicaSetConfig,
             "uninitialized replica set configuration",
             config.isInitialized());
     uassert(ErrorCodes::BadValue, "null enqueueDocuments function", enqueueDocumentsFn);
     uassert(ErrorCodes::BadValue, "null onShutdownCallback function", onShutdownCallbackFn);
-
-    readersCreatedStats.increment();
 }
 
 OplogFetcher::~OplogFetcher() {
@@ -284,19 +282,40 @@ std::string OplogFetcher::toString() const {
 }
 
 bool OplogFetcher::isActive() const {
-    return _fetcher->isActive();
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _active;
 }
 
 Status OplogFetcher::startup() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (_active) {
+        return Status(ErrorCodes::IllegalOperation, "oplog fetcher already active");
+    }
+    if (_inShutdown) {
+        return Status(ErrorCodes::ShutdownInProgress, "oplog fetcher shutting down");
+    }
+
+    auto status = _scheduleFetcher_inlock();
+    if (status.isOK()) {
+        _active = true;
+    }
+    return status;
+}
+
+Status OplogFetcher::_scheduleFetcher_inlock() {
+    readersCreatedStats.increment();
     return _fetcher->schedule();
 }
 
 void OplogFetcher::shutdown() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _inShutdown = true;
     _fetcher->shutdown();
 }
 
 void OplogFetcher::join() {
-    _fetcher->join();
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _condition.wait(lock, [this]() { return !_active; });
 }
 
 OpTimeWithHash OplogFetcher::getLastOpTimeWithHashFetched() const {
@@ -305,6 +324,7 @@ OpTimeWithHash OplogFetcher::getLastOpTimeWithHashFetched() const {
 }
 
 BSONObj OplogFetcher::getCommandObject_forTest() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _fetcher->getCommandObject();
 }
 
@@ -320,18 +340,71 @@ Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
     return _awaitDataTimeout;
 }
 
+bool OplogFetcher::inShutdown_forTest() const {
+    return _isInShutdown();
+}
+
 void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
                              BSONObjBuilder* getMoreBob) {
-    // if target cut connections between connecting and querying (for
-    // example, because it stepped down) we might not have a cursor
-    if (!result.isOK()) {
-        LOG(1) << "Error returned from oplog query: " << redact(result.getStatus());
-        _onShutdown(result.getStatus());
+    const auto& responseStatus = result.getStatus();
+    if (ErrorCodes::CallbackCanceled == responseStatus) {
+        LOG(1) << "oplog query cancelled";
+        _finishCallback(responseStatus);
+        return;
+    }
+
+    // If target cut connections between connecting and querying (for
+    // example, because it stepped down) we might not have a cursor.
+    if (!responseStatus.isOK()) {
+        {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (_inShutdown) {
+                log() << "Error returned from oplog query while canceling query: "
+                      << redact(responseStatus);
+            } else if (_fetcherRestarts == _maxFetcherRestarts) {
+                log() << "Error returned from oplog query (no more query restarts left): "
+                      << redact(responseStatus);
+            } else {
+                log() << "Restarting oplog query due to error: " << redact(responseStatus)
+                      << ". Last fetched optime (with hash): " << _lastFetched
+                      << ". Restarts remaining: " << (_maxFetcherRestarts - _fetcherRestarts);
+                _fetcherRestarts++;
+                // Destroying current instance in _shuttingDownFetcher will possibly block.
+                _shuttingDownFetcher.reset();
+                // Move the old fetcher into the shutting down instance.
+                _shuttingDownFetcher.swap(_fetcher);
+                // Create and start fetcher with new starting optime.
+                _fetcher = _makeFetcher(_lastFetched.opTime);
+                auto scheduleStatus = _scheduleFetcher_inlock();
+                if (scheduleStatus.isOK()) {
+                    log() << "Scheduled new oplog query " << _fetcher->toString();
+                    return;
+                }
+                error() << "Error scheduling new oplog query: " << redact(scheduleStatus)
+                        << ". Returning current oplog query error: " << redact(responseStatus);
+            }
+        }
+        _finishCallback(responseStatus);
+        return;
+    }
+
+    // Reset fetcher restart counter on successful response.
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        invariant(_active);
+        _fetcherRestarts = 0;
+    }
+
+    if (_isInShutdown()) {
+        _finishCallback(Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"));
         return;
     }
 
     // Stop fetching and return immediately on fail point.
+    // This fail point is intended to make the oplog fetcher ignore the downloaded batch of
+    // operations and not error out.
     if (MONGO_FAIL_POINT(stopOplogFetcher)) {
+        _finishCallback(Status::OK());
         return;
     }
 
@@ -347,7 +420,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         if (!metadataResult.isOK()) {
             error() << "invalid replication metadata from sync source " << _fetcher->getSource()
                     << ": " << metadataResult.getStatus() << ": " << metadataObj;
-            _onShutdown(metadataResult.getStatus());
+            _finishCallback(metadataResult.getStatus());
             return;
         }
         metadata = metadataResult.getValue();
@@ -372,7 +445,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         auto status = checkRemoteOplogStart(documents, opTimeWithHash);
         if (!status.isOK()) {
             // Stop oplog fetcher and execute rollback.
-            _onShutdown(status, opTimeWithHash);
+            _finishCallback(status, opTimeWithHash);
             return;
         }
 
@@ -385,7 +458,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     auto validateResult = OplogFetcher::validateDocuments(
         documents, queryResponse.first, opTimeWithHash.opTime.getTimestamp());
     if (!validateResult.isOK()) {
-        _onShutdown(validateResult.getStatus(), opTimeWithHash);
+        _finishCallback(validateResult.getStatus(), opTimeWithHash);
         return;
     }
     auto info = validateResult.getValue();
@@ -411,23 +484,23 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     if (_dataReplicatorExternalState->shouldStopFetching(_fetcher->getSource(), metadata)) {
-        _onShutdown(Status(ErrorCodes::InvalidSyncSource,
-                           str::stream() << "sync source " << _fetcher->getSource().toString()
-                                         << " (last optime: "
-                                         << metadata.getLastOpVisible().toString()
-                                         << "; sync source index: "
-                                         << metadata.getSyncSourceIndex()
-                                         << "; primary index: "
-                                         << metadata.getPrimaryIndex()
-                                         << ") is no longer valid"),
-                    opTimeWithHash);
+        _finishCallback(Status(ErrorCodes::InvalidSyncSource,
+                               str::stream() << "sync source " << _fetcher->getSource().toString()
+                                             << " (last optime: "
+                                             << metadata.getLastOpVisible().toString()
+                                             << "; sync source index: "
+                                             << metadata.getSyncSourceIndex()
+                                             << "; primary index: "
+                                             << metadata.getPrimaryIndex()
+                                             << ") is no longer valid"),
+                        opTimeWithHash);
         return;
     }
 
     // No more data. Stop processing and return Status::OK along with last
     // fetch info.
     if (!getMoreBob) {
-        _onShutdown(Status::OK(), opTimeWithHash);
+        _finishCallback(Status::OK(), opTimeWithHash);
         return;
     }
 
@@ -437,12 +510,18 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
                                                         _awaitDataTimeout));
 }
 
-void OplogFetcher::_onShutdown(Status status) {
-    _onShutdown(status, getLastOpTimeWithHashFetched());
+void OplogFetcher::_finishCallback(Status status) {
+    _finishCallback(status, getLastOpTimeWithHashFetched());
 }
 
-void OplogFetcher::_onShutdown(Status status, OpTimeWithHash opTimeWithHash) {
+void OplogFetcher::_finishCallback(Status status, OpTimeWithHash opTimeWithHash) {
+    invariant(isActive());
+
     _onShutdownCallbackFn(status, opTimeWithHash);
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _active = false;
+    _condition.notify_all();
 }
 
 std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(OpTime lastFetchedOpTime) {
@@ -454,6 +533,11 @@ std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(OpTime lastFetchedOpTime) {
         stdx::bind(&OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
         _metadataObject,
         _remoteCommandTimeout);
+}
+
+bool OplogFetcher::_isInShutdown() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _inShutdown;
 }
 
 }  // namespace repl

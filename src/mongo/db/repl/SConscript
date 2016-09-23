@@ -721,6 +721,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'oplog_fetcher',
         'data_replicator_external_state_mock',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )

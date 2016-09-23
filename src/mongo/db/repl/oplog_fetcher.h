@@ -39,7 +39,9 @@
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -188,7 +190,19 @@ public:
      */
     Milliseconds getAwaitDataTimeout_forTest() const;
 
+    /**
+     * Returns whether the oplog fetcher is in shutdown.
+     *
+     * For testing only.
+     */
+    bool inShutdown_forTest() const;
+
 private:
+    /**
+     * Schedules fetcher and updates counters.
+     */
+    Status _scheduleFetcher_inlock();
+
     /**
      * Processes each batch of results from the tailable cursor started by the fetcher on the sync
      * source.
@@ -202,16 +216,23 @@ private:
      * Notifies caller that the oplog fetcher has completed processing operations from
      * the remote oplog.
      */
-    void _onShutdown(Status status);
-    void _onShutdown(Status status, OpTimeWithHash opTimeWithHash);
+    void _finishCallback(Status status);
+    void _finishCallback(Status status, OpTimeWithHash opTimeWithHash);
 
     /**
      * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
      */
     std::unique_ptr<Fetcher> _makeFetcher(OpTime lastFetchedOpTime);
 
+    /**
+     * Returns whether the oplog fetcher is in shutdown.
+     */
+    bool _isInShutdown() const;
+
     // Protects member data of this OplogFetcher.
     mutable stdx::mutex _mutex;
+
+    mutable stdx::condition_variable _condition;
 
     executor::TaskExecutor* const _executor;
     const HostAndPort _source;
@@ -232,7 +253,17 @@ private:
     // "_enqueueDocumentsFn".
     OpTimeWithHash _lastFetched;
 
+    // _active is true when a fetcher is scheduled to be run by the executor.
+    bool _active = false;
+
+    // _inShutdown is true after shutdown() is called.
+    bool _inShutdown = false;
+
+    // Fetcher restarts since the last successful oplog query response.
+    std::size_t _fetcherRestarts = 0;
+
     std::unique_ptr<Fetcher> _fetcher;
+    std::unique_ptr<Fetcher> _shuttingDownFetcher;
 };
 
 }  // namespace repl
