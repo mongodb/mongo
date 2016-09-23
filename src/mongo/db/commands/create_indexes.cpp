@@ -65,6 +65,8 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace {
 
 const StringData kIndexesFieldName = "indexes"_sd;
+const StringData kCommandName = "createIndexes"_sd;
+const StringData kWriteConcern = "writeConcern"_sd;
 
 /**
  * Parses the index specifications from 'cmdObj', validates them, and returns equivalent index
@@ -106,16 +108,22 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             }
 
             hasIndexesField = true;
-        } else {
-            // TODO SERVER-769: Validate top-level options to the "createIndexes" command.
+        } else if (kCommandName == cmdElemFieldName || kWriteConcern == cmdElemFieldName) {
+            // Both the command name and writeConcern are valid top-level fields.
             continue;
+        } else {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Invalid field specified for " << kCommandName << " command: "
+                                  << cmdElemFieldName};
         }
     }
 
     if (!hasIndexesField) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "The '" << kIndexesFieldName
-                              << "' field is a required argument of the createIndexes command"};
+                              << "' field is a required argument of the "
+                              << kCommandName
+                              << " command"};
     }
 
     if (indexSpecs.empty()) {
@@ -205,7 +213,7 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
  */
 class CmdCreateIndex : public Command {
 public:
-    CmdCreateIndex() : Command("createIndexes") {}
+    CmdCreateIndex() : Command(kCommandName) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
@@ -276,7 +284,7 @@ public:
                 invariant(collection);
                 wunit.commit();
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
             result.appendBool("createdCollectionAutomatically", true);
         }
 
@@ -328,7 +336,7 @@ public:
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             indexInfoObjs = uassertStatusOK(indexer.init(specs));
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
 
         // If we're a background index, replace exclusive db lock with an intent lock, so that
         // other readers and writers can proceed during this phase.
@@ -401,7 +409,7 @@ public:
 
             wunit.commit();
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn));
 

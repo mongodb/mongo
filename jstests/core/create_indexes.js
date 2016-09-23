@@ -138,4 +138,18 @@
     res = t.runCommand('createIndexes', {indexes: [{key: {d: 1}, name: 'd_1', v: 1}]});
     assert.commandWorked(res, 'v1 index creation should succeed');
 
+    // Test that index creation fails with an invalid top-level field.
+    res = t.runCommand('createIndexes', {indexes: [{key: {e: 1}, name: 'e_1'}], 'invalidField': 1});
+    assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+
+    // Test that index creation fails with an invalid field in the index spec for index version V2.
+    res = t.runCommand('createIndexes',
+                       {indexes: [{key: {e: 1}, name: 'e_1', 'v': 2, 'invalidField': 1}]});
+    assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+
+    // Test that index creation fails with an invalid field in the index spec for index version V1.
+    res = t.runCommand('createIndexes',
+                       {indexes: [{key: {e: 1}, name: 'e_1', 'v': 1, 'invalidField': 1}]});
+    assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+
 }());

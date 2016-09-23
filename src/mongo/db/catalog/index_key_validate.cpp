@@ -33,6 +33,7 @@
 #include <boost/optional.hpp>
 #include <cmath>
 #include <limits>
+#include <set>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -147,6 +148,11 @@ StatusWith<BSONObj> validateIndexSpec(
     bool hasVersionField = false;
     bool hasCollationField = false;
 
+    auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
+    if (!fieldNamesValidStatus.isOK()) {
+        return fieldNamesValidStatus;
+    }
+
     boost::optional<IndexVersion> resolvedIndexVersion;
 
     for (auto&& indexSpecElem : indexSpec) {
@@ -235,7 +241,8 @@ StatusWith<BSONObj> validateIndexSpec(
 
             hasCollationField = true;
         } else {
-            // TODO SERVER-769: Validate index options specified in the "createIndexes" command.
+            // We can assume field name is valid at this point. Validation of fieldname is handled
+            // prior to this in validateIndexSpecFieldNames().
             continue;
         }
     }
@@ -283,4 +290,46 @@ StatusWith<BSONObj> validateIndexSpec(
 
     return indexSpec;
 }
+
+Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
+    const std::set<StringData> allowedFieldNames = {
+        IndexDescriptor::k2dIndexMaxFieldName,
+        IndexDescriptor::k2dIndexBitsFieldName,
+        IndexDescriptor::k2dIndexMaxFieldName,
+        IndexDescriptor::k2dIndexMinFieldName,
+        IndexDescriptor::k2dsphereCoarsestIndexedLevel,
+        IndexDescriptor::k2dsphereFinestIndexedLevel,
+        IndexDescriptor::k2dsphereVersionFieldName,
+        IndexDescriptor::kBackgroundFieldName,
+        IndexDescriptor::kCollationFieldName,
+        IndexDescriptor::kDefaultLanguageFieldName,
+        IndexDescriptor::kDropDuplicatesFieldName,
+        IndexDescriptor::kExpireAfterSecondsFieldName,
+        IndexDescriptor::kGeoHaystackBucketSize,
+        IndexDescriptor::kIndexNameFieldName,
+        IndexDescriptor::kIndexVersionFieldName,
+        IndexDescriptor::kKeyPatternFieldName,
+        IndexDescriptor::kLanguageOverrideFieldName,
+        IndexDescriptor::kNamespaceFieldName,
+        IndexDescriptor::kPartialFilterExprFieldName,
+        IndexDescriptor::kSparseFieldName,
+        IndexDescriptor::kStorageEngineFieldName,
+        IndexDescriptor::kTextVersionFieldName,
+        IndexDescriptor::kUniqueFieldName,
+        IndexDescriptor::kWeightsFieldName,
+        // Index creation under legacy writeMode can result in an index spec with an _id field.
+        "_id"};
+
+    for (auto&& indexSpecElem : indexSpec) {
+        auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+        if (!allowedFieldNames.count(indexSpecElemFieldName)) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field '" << indexSpecElemFieldName
+                                  << "' is not valid for an index specification"};
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo

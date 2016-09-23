@@ -411,7 +411,12 @@ for (var test = 0; test < numTests; test++) {
 
     var indexDoc = {"locs.loc": "2d"};
     randIndexAdditions(indexDoc);
-    t.ensureIndex(indexDoc, env);
+
+    // "earth" is used to drive test setup and not a valid createIndexes option or required at this
+    // point. It must be removed before calling ensureIndexes().
+    delete env.earth;
+
+    assert.commandWorked(t.ensureIndex(indexDoc, env));
     assert.isnull(db.getLastError());
 
     var padding = "x";

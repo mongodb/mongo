@@ -370,5 +370,21 @@ TEST(IndexSpecValidateTest, AcceptsIndexSpecIfCollationIsPresentAndVersionIsEqua
         sorted(result.getValue()));
 }
 
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV2) {
+    auto result =
+        validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2 << "unknownField" << 1),
+                          kTestNamespace,
+                          ServerGlobalParams::FeatureCompatibility::Version::k34);
+    ASSERT_EQ(ErrorCodes::BadValue, result);
+}
+
+TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV1) {
+    auto result =
+        validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 1 << "unknownField" << 1),
+                          kTestNamespace,
+                          ServerGlobalParams::FeatureCompatibility::Version::k34);
+    ASSERT_EQ(ErrorCodes::BadValue, result);
+}
+
 }  // namespace
 }  // namespace mongo

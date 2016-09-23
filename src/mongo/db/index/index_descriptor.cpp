@@ -70,18 +70,29 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
 }
 }  // namespace
 
+constexpr StringData IndexDescriptor::k2dIndexBitsFieldName;
+constexpr StringData IndexDescriptor::k2dIndexMaxFieldName;
+constexpr StringData IndexDescriptor::k2dIndexMinFieldName;
+constexpr StringData IndexDescriptor::k2dsphereCoarsestIndexedLevel;
+constexpr StringData IndexDescriptor::k2dsphereFinestIndexedLevel;
 constexpr StringData IndexDescriptor::k2dsphereVersionFieldName;
 constexpr StringData IndexDescriptor::kBackgroundFieldName;
 constexpr StringData IndexDescriptor::kCollationFieldName;
+constexpr StringData IndexDescriptor::kDefaultLanguageFieldName;
 constexpr StringData IndexDescriptor::kDropDuplicatesFieldName;
+constexpr StringData IndexDescriptor::kExpireAfterSecondsFieldName;
+constexpr StringData IndexDescriptor::kGeoHaystackBucketSize;
 constexpr StringData IndexDescriptor::kIndexNameFieldName;
 constexpr StringData IndexDescriptor::kIndexVersionFieldName;
 constexpr StringData IndexDescriptor::kKeyPatternFieldName;
+constexpr StringData IndexDescriptor::kLanguageOverrideFieldName;
 constexpr StringData IndexDescriptor::kNamespaceFieldName;
 constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
 constexpr StringData IndexDescriptor::kSparseFieldName;
+constexpr StringData IndexDescriptor::kStorageEngineFieldName;
 constexpr StringData IndexDescriptor::kTextVersionFieldName;
 constexpr StringData IndexDescriptor::kUniqueFieldName;
+constexpr StringData IndexDescriptor::kWeightsFieldName;
 
 bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     switch (indexVersion) {

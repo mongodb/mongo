@@ -56,18 +56,29 @@ class IndexDescriptor {
 public:
     enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
 
+    static constexpr StringData k2dIndexBitsFieldName = "bits"_sd;
+    static constexpr StringData k2dIndexMinFieldName = "min"_sd;
+    static constexpr StringData k2dIndexMaxFieldName = "max"_sd;
+    static constexpr StringData k2dsphereCoarsestIndexedLevel = "coarsestIndexedLevel"_sd;
+    static constexpr StringData k2dsphereFinestIndexedLevel = "finestIndexedLevel"_sd;
     static constexpr StringData k2dsphereVersionFieldName = "2dsphereIndexVersion"_sd;
     static constexpr StringData kBackgroundFieldName = "background"_sd;
     static constexpr StringData kCollationFieldName = "collation"_sd;
+    static constexpr StringData kDefaultLanguageFieldName = "default_language"_sd;
     static constexpr StringData kDropDuplicatesFieldName = "dropDups"_sd;
+    static constexpr StringData kExpireAfterSecondsFieldName = "expireAfterSeconds"_sd;
+    static constexpr StringData kGeoHaystackBucketSize = "bucketSize"_sd;
     static constexpr StringData kIndexNameFieldName = "name"_sd;
     static constexpr StringData kIndexVersionFieldName = "v"_sd;
     static constexpr StringData kKeyPatternFieldName = "key"_sd;
+    static constexpr StringData kLanguageOverrideFieldName = "language_override"_sd;
     static constexpr StringData kNamespaceFieldName = "ns"_sd;
     static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
     static constexpr StringData kSparseFieldName = "sparse"_sd;
+    static constexpr StringData kStorageEngineFieldName = "storageEngine"_sd;
     static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
     static constexpr StringData kUniqueFieldName = "unique"_sd;
+    static constexpr StringData kWeightsFieldName = "weights"_sd;
 
     /**
      * OnDiskIndexData is a pointer to the memory mapped per-index data.
