@@ -456,13 +456,13 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 		F_SET(cache, WT_CACHE_EVICT_CLEAN);
 	if (__wt_eviction_clean_needed(session, NULL))
-		F_SET(cache, WT_CACHE_EVICT_CLEAN_HARD);
+		F_SET(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 
 	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
 	if (dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100)
 		F_SET(cache, WT_CACHE_EVICT_DIRTY);
 	if (__wt_eviction_dirty_needed(session, NULL))
-		F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
+		F_SET(cache, WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_DIRTY_HARD);
 
 	/*
 	 * If application threads are blocked by the total volume of data in
@@ -1774,22 +1774,9 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	/* Wake the eviction server if we need to do work. */
 	__wt_evict_server_wake(session);
 
-	/*
-	 * If we're busy, either because of the transaction check we just did,
-	 * or because our caller is waiting on a longer-than-usual event (such
-	 * as a page read), limit the work to a single eviction and return. If
-	 * that's not the case, we can do more.
-	 */
 	init_evict_count = cache->pages_evict;
 
 	for (;;) {
-		/* Check if we have become busy. */
-		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
-		    txn_global->current != txn_global->oldest_id)
-			busy = true;
-
-		max_pages_evicted = busy ? 5 : 20;
-
 		/*
 		 * A pathological case: if we're the oldest transaction in the
 		 * system and the eviction server is stuck trying to find space,
@@ -1801,6 +1788,20 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 			WT_STAT_CONN_INCR(session, txn_fail_cache);
 			return (WT_ROLLBACK);
 		}
+
+		/*
+		 * Check if we have become busy.
+		 *
+		 * If we're busy (because of the transaction check we just did
+		 * or because our caller is waiting on a longer-than-usual event
+		 * such as a page read), and the cache level drops below 100%,
+		 * limit the work to 5 evictions and return. If that's not the
+		 * case, we can do more.
+		 */
+		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
+		    txn_global->current != txn_global->oldest_id)
+			busy = true;
+		max_pages_evicted = busy ? 5 : 20;
 
 		/* See if eviction is still needed. */
 		if (!__wt_eviction_needed(session, busy, &pct_full) ||
