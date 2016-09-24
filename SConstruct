@@ -1915,11 +1915,10 @@ def doConfigure(myenv):
         conf.Finish()
 
     if get_option('runtime-hardening') == "on":
-        # Clang honors these flags, but doesn't actually do anything with them for compatibility, so we
-        # need to only do this for GCC. On clang, we do things differently. Note that we need to add
-        # these to the LINKFLAGS as well, since otherwise we might not link libssp when we need to (see
-        # SERVER-12456).
-        if myenv.ToolchainIs('gcc'):
+        # Enable 'strong' stack protection preferentially, but fall back to 'all' if it is not
+        # available. Note that we need to add these to the LINKFLAGS as well, since otherwise we
+        # might not link libssp when we need to (see SERVER-12456).
+        if myenv.ToolchainIs('gcc', 'clang'):
             if AddToCCFLAGSIfSupported(myenv, '-fstack-protector-strong'):
                 myenv.Append(
                     LINKFLAGS=[
@@ -1932,10 +1931,10 @@ def doConfigure(myenv):
                         '-fstack-protector-all',
                     ]
                 )
-        elif myenv.ToolchainIs('clang'):
-            # TODO: Clang stack hardening. There are several interesting
-            # things to try here, but they each have consequences we need
-            # to investigate.
+
+        if myenv.ToolchainIs('clang'):
+            # TODO: There are several interesting things to try here, but they each have
+            # consequences we need to investigate.
             #
             # - fsanitize=bounds: This does static bounds checking. We can
             #   probably turn this on along with fsanitize-trap so that we
