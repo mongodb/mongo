@@ -843,6 +843,9 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
     std::vector<const PlanStage*> stages;
     flattenExecTree(root, &stages);
 
+    statsOut->totalKeysExamined = 0;
+    statsOut->totalDocsExamined = 0;
+
     for (size_t i = 0; i < stages.size(); i++) {
         statsOut->totalKeysExamined +=
             getKeysExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
