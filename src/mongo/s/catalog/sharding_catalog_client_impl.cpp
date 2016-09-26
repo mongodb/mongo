@@ -1376,9 +1376,10 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
             return Status::OK();
         } else {
             errMsg = str::stream() << "chunk operation commit failed: version "
-                                   << lastChunkVersion.toString() << " doesn't exist in namespace"
-                                   << nss << ". Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue().response;
+                                   << lastChunkVersion.toString()
+                                   << " doesn't exist in namespace: " << redact(nss)
+                                   << ". Unable to save chunk ops. Command: " << redact(cmd)
+                                   << ". Result: " << redact(response.getValue().response);
         }
         return Status(status.code(), errMsg);
     }
