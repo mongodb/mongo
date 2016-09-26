@@ -1,0 +1,34 @@
+selector:
+  js_test:
+    roots:
+    - jstestfuzz/out/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+        global_vars:
+          TestData:
+            ignoreCommandsIncompatibleWithInitialSync: true
+    hooks:
+    - class: BackgroundInitialSync
+      n: 1
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+            forceValidationWithFeatureCompatibilityVersion: "3.4"
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        oplogSize: 511
+        verbose: ''
+        set_parameters:
+          logComponentVerbosity:
+            replication: 2
+          enableTestCommands: 1
+          numInitialSyncAttempts: 2
+          numInitialSyncConnectAttempts: 60
+      num_nodes: 2
+      start_initial_sync_node: True

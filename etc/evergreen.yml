@@ -1353,6 +1353,58 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
 
+## jstestfuzz initial sync replica set mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_initsync
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_initsync --storageEngine=mmapv1
+
+## jstestfuzz initial sync replica set WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_initsync_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_initsync --storageEngine=wiredTiger
+
+## jstestfuzz initial sync replica set mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_resync
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_resync --storageEngine=mmapv1
+
+## jstestfuzz initial sync replica set WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_resync_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication_resync --storageEngine=wiredTiger
+
 ## jstestfuzz sharded cluster mmapv1 ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded
@@ -5559,6 +5611,8 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_replication_initsync
+  - name: jstestfuzz_replication_initsync_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
