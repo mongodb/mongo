@@ -56,7 +56,7 @@ errchk()
 
 	# Some tests shouldn't return an error, we exclude them here.
 	case "$1" in
-	*s_export*)
+	*s_export|*s_tags)
 		break;;
 	*)
 		errfound=1;;
@@ -124,3 +124,4 @@ echo 'dist/s_all run finished'
 if test $errmode -ne 0; then
 	exit $errfound;
 fi
+exit 0

@@ -2,8 +2,8 @@
 
 # Check for illegal external symbols.
 #
-t=__a.c
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
 
 case `uname` in
 Darwin)
@@ -40,8 +40,10 @@ check()
 }
 
 # This check would normally be done after the library is built, but this way
-# we don't forget about a symbol during development.   Check the previously
-# built library, if it exists.
+# we don't forget about a symbol during development. We usually build in the
+# top-level or build_posix directories, check the previously built library,
+# if it exists. And, allow this script to be run from the top-level directory
+# as well as locally.
 for d in .libs build_posix/.libs; do
 	f="$d/libwiredtiger.a"
 	test -f $f && check $f

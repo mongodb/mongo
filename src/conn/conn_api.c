@@ -1055,13 +1055,16 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	const char *p;
+	bool locked;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	locked = false;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
 
 	/* Serialize reconfiguration. */
 	__wt_spin_lock(session, &conn->reconfig_lock);
+	locked = true;
 
 	/*
 	 * The configuration argument has been checked for validity, update the
@@ -1096,7 +1099,8 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
-err:	__wt_spin_unlock(session, &conn->reconfig_lock);
+err:	if (locked)
+		__wt_spin_unlock(session, &conn->reconfig_lock);
 
 	API_END_RET(session, ret);
 }
@@ -1117,11 +1121,11 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	*wt_sessionp = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	session_ret = NULL;
 
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
+	session_ret = NULL;
 	WT_ERR(__wt_open_session(
 	    conn, event_handler, config, true, &session_ret));
 	*wt_sessionp = &session_ret->iface;
