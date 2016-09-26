@@ -669,8 +669,8 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         op.setQuery_inlock(query);
     }
 
-    Status status =
-        AuthorizationSession::get(client)->checkAuthForUpdate(nsString, query, toupdate, upsert);
+    Status status = AuthorizationSession::get(client)
+                        ->checkAuthForUpdate(txn, nsString, query, toupdate, upsert);
     audit::logUpdateAuthzCheck(client, nsString, query, toupdate, upsert, multi, status.code());
     uassertStatusOK(status);
 
@@ -818,7 +818,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
         op.setNS_inlock(nsString.ns());
     }
 
-    Status status = AuthorizationSession::get(client)->checkAuthForDelete(nsString, pattern);
+    Status status = AuthorizationSession::get(client)->checkAuthForDelete(txn, nsString, pattern);
     audit::logDeleteAuthzCheck(client, nsString, pattern, status.code());
     uassertStatusOK(status);
 
@@ -1181,7 +1181,7 @@ void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Mess
         // Check auth for insert (also handles checking if this is an index build and checks
         // for the proper privileges in that case).
         Status status =
-            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(nsString, obj);
+            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(txn, nsString, obj);
         audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }

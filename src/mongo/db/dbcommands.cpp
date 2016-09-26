@@ -1230,8 +1230,7 @@ void Command::execCommand(OperationContext* txn,
         }
 
         ImpersonationSessionGuard guard(txn);
-        uassertStatusOK(
-            _checkAuthorization(command, txn->getClient(), dbname, request.getCommandArgs()));
+        uassertStatusOK(checkAuthorization(command, txn, dbname, request.getCommandArgs()));
 
         repl::ReplicationCoordinator* replCoord =
             repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());

@@ -110,7 +110,7 @@ void Command::execCommandClientBasic(OperationContext* txn,
         return;
     }
 
-    Status status = _checkAuthorization(c, &client, dbname, cmdObj);
+    Status status = checkAuthorization(c, txn, dbname, cmdObj);
     if (!status.isOK()) {
         appendCommandStatus(result, status);
         return;

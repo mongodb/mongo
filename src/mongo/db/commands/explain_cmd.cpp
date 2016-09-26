@@ -88,9 +88,9 @@ public:
      * the command that you are explaining. The auth check is performed recursively
      * on the nested command.
      */
-    virtual Status checkAuthForCommand(ClientBasic* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    virtual Status checkAuthForOperation(OperationContext* txn,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj) {
         if (Object != cmdObj.firstElement().type()) {
             return Status(ErrorCodes::BadValue, "explain command requires a nested object");
         }
@@ -104,7 +104,7 @@ public:
             return Status(ErrorCodes::CommandNotFound, ss);
         }
 
-        return commToExplain->checkAuthForCommand(client, dbname, explainObj);
+        return commToExplain->checkAuthForOperation(txn, dbname, explainObj);
     }
 
     virtual bool run(OperationContext* txn,

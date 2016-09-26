@@ -8,6 +8,16 @@ env.CppUnitTest('collection_options_test', ['collection_options_test.cpp'],
                 LIBDEPS=['collection_options'])
 
 env.Library(
+    target='document_validation',
+    source=[
+        "document_validation.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.Library(
     target='index_key_validate',
     source=[
         "index_key_validate.cpp",

@@ -37,13 +37,12 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/apply_ops.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/commands/apply_ops_cmd_common.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
@@ -78,12 +77,13 @@ public:
         help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , "
                 "res : ... } ] }";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        // applyOps can do pretty much anything, so require all privileges.
-        RoleGraph::generateUniversalPrivileges(out);
+
+    virtual Status checkAuthForOperation(OperationContext* txn,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj) final {
+        return checkAuthForApplyOpsCommand(txn, dbname, cmdObj);
     }
+
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,

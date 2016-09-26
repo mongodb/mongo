@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -243,12 +244,14 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
+Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
+                                                const NamespaceString& ns,
                                                 const BSONObj& document) {
     if (ns.coll() == StringData("system.indexes", StringData::LiteralTag())) {
         BSONElement nsElement = document["ns"];
         if (nsElement.type() != String) {
-            return Status(ErrorCodes::Unauthorized,
+            return Status(nsElement.type() == BSONType::EOO ? ErrorCodes::NoSuchKey
+                                                            : ErrorCodes::TypeMismatch,
                           "Cannot authorize inserting into "
                           "system.indexes documents without a string-typed \"ns\" field.");
         }
@@ -258,7 +261,14 @@ Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
                           str::stream() << "not authorized to create index on " << indexNS.ns());
         }
     } else {
-        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
+        ActionSet required;
+        required.addAction(ActionType::insert);
+
+        if (documentValidationDisabled(txn)) {
+            required.addAction(ActionType::bypassDocumentValidation);
+        }
+
+        if (!isAuthorizedForActionsOnNamespace(ns, required)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized for insert on " << ns.ns());
         }
@@ -267,28 +277,35 @@ Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForUpdate(const NamespaceString& ns,
+Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
+                                                const NamespaceString& ns,
                                                 const BSONObj& query,
                                                 const BSONObj& update,
                                                 bool upsert) {
-    if (!upsert) {
-        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::update)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized for update on " << ns.ns());
-        }
-    } else {
-        ActionSet required;
-        required.addAction(ActionType::update);
+    ActionSet required;
+    required.addAction(ActionType::update);
+    StringData operationType = "update";
+
+    if (upsert) {
         required.addAction(ActionType::insert);
-        if (!isAuthorizedForActionsOnNamespace(ns, required)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized for upsert on " << ns.ns());
-        }
+        operationType = "upsert";
     }
+
+    if (documentValidationDisabled(txn)) {
+        required.addAction(ActionType::bypassDocumentValidation);
+    }
+
+    if (!isAuthorizedForActionsOnNamespace(ns, required)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "not authorized for " << operationType << " on " << ns.ns());
+    }
+
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns, const BSONObj& query) {
+Status AuthorizationSession::checkAuthForDelete(OperationContext* txn,
+                                                const NamespaceString& ns,
+                                                const BSONObj& query) {
     if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized to remove from " << ns.ns());

@@ -48,6 +48,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/serverauth',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/apply_ops_cmd_common',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/curop',
@@ -92,6 +93,21 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/query/command_request_response',
+    ],
+)
+
+env.Library(
+    target='apply_ops_cmd_common',
+    source=[
+        'apply_ops_cmd_common.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

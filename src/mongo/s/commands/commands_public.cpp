@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/apply_ops_cmd_common.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/lasterror.h"
@@ -1371,11 +1372,11 @@ public:
 class ApplyOpsCmd : public PublicGridCommand {
 public:
     ApplyOpsCmd() : PublicGridCommand("applyOps") {}
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        // applyOps can do pretty much anything, so require all privileges.
-        RoleGraph::generateUniversalPrivileges(out);
+
+    virtual Status checkAuthForOperation(OperationContext* txn,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj) {
+        return checkAuthForApplyOpsCommand(txn, dbname, cmdObj);
     }
     virtual bool run(OperationContext* txn,
                      const string& dbName,

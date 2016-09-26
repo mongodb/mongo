@@ -312,6 +312,12 @@ Status Command::parseCommandCursorOptions(const BSONObj& cmdObj,
     return Status::OK();
 }
 
+Status Command::checkAuthForOperation(OperationContext* txn,
+                                      const std::string& dbname,
+                                      const BSONObj& cmdObj) {
+    return checkAuthForCommand(txn->getClient(), dbname, cmdObj);
+}
+
 Status Command::checkAuthForCommand(ClientBasic* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj) {
@@ -341,16 +347,17 @@ void Command::logIfSlow(const Timer& timer, const string& msg) {
 }
 
 static Status _checkAuthorizationImpl(Command* c,
-                                      ClientBasic* client,
+                                      OperationContext* txn,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj) {
     namespace mmb = mutablebson;
+    auto client = txn->getClient();
     if (c->adminOnly() && dbname != "admin") {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << c->name << " may only be run against the admin database.");
     }
     if (AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
-        Status status = c->checkAuthForCommand(client, dbname, cmdObj);
+        Status status = c->checkAuthForOperation(txn, dbname, cmdObj);
         if (status == ErrorCodes::Unauthorized) {
             mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
             c->redactForLogging(&cmdToLog);
@@ -370,16 +377,16 @@ static Status _checkAuthorizationImpl(Command* c,
     return Status::OK();
 }
 
-Status Command::_checkAuthorization(Command* c,
-                                    ClientBasic* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj) {
+Status Command::checkAuthorization(Command* c,
+                                   OperationContext* txn,
+                                   const std::string& dbname,
+                                   const BSONObj& cmdObj) {
     namespace mmb = mutablebson;
-    Status status = _checkAuthorizationImpl(c, client, dbname, cmdObj);
+    Status status = _checkAuthorizationImpl(c, txn, dbname, cmdObj);
     if (!status.isOK()) {
-        log(LogComponent::kAccessControl) << status << std::endl;
+        log(LogComponent::kAccessControl) << status;
     }
-    audit::logCommandAuthzCheck(client, dbname, cmdObj, c, status.code());
+    audit::logCommandAuthzCheck(txn->getClient(), dbname, cmdObj, c, status.code());
     return status;
 }
 
