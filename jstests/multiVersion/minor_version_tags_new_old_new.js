@@ -2,6 +2,8 @@
 (function() {
     'use strict';
 
+    load("jstests/replsets/rslib.js");
+
     // 3.2.1 is the final version to use the old style replSetUpdatePosition command.
     var oldVersion = "3.2.1";
     var newVersion = "latest";
@@ -113,7 +115,7 @@
         version: 2,
     };
 
-    assert.commandWorked(replTest.getPrimary().adminCommand({replSetReconfig: replSetConfig}));
+    reconfig(replTest, replSetConfig);
 
     replTest.waitForState(replTest.nodes[2], ReplSetTest.State.PRIMARY, 60 * 1000);
     replTest.awaitReplication();

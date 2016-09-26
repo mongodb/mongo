@@ -2,6 +2,7 @@
 (function() {
     "use strict";
 
+    load("jstests/replsets/rslib.js");
     load("jstests/libs/get_index_helpers.js");
     load("jstests/libs/override_methods/multiversion_override_balancer_control.js");
 
@@ -250,7 +251,7 @@
     replSetConfig.version = 2;
     replSetConfig.members[1].priority = 0;
     replSetConfig.members[2].priority = 0;
-    assert.commandWorked(primaryAdminDB.runCommand({replSetReconfig: replSetConfig}));
+    reconfig(rst, replSetConfig);
 
     // Verify that the 3.2 secondary successfully performed its initial sync.
     assert.writeOK(

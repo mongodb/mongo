@@ -5,6 +5,7 @@
  * nodes.
  */
 load('jstests/libs/parallelTester.js');
+load("jstests/replsets/rslib.js");
 
 // Seed random numbers and print the seed. To reproduce a failed test, look for the seed towards
 // the beginning of the output, and give it as an argument to randomize.
@@ -688,7 +689,7 @@ function doMultiThreadedWork(primary, numThreads) {
     config.settings = {chainingAllowed: false};
     config.protocolVersion = 0;
     config.version = 2;
-    assert.commandWorked(replTest.getPrimary().adminCommand({replSetReconfig: config}));
+    reconfig(replTest, config);
 
     // Ensure all are synced.
     replTest.awaitSecondaryNodes(120000);
@@ -714,11 +715,7 @@ function doMultiThreadedWork(primary, numThreads) {
         }
         highestPriority++;
         printjson(config);
-        try {
-            primary.getDB("admin").runCommand({replSetReconfig: config});
-        } catch (e) {
-            // Expected to fail, as we'll have to reconnect.
-        }
+        reconfig(replTest, config);
         replTest.awaitReplication(60000);  // 2 times the election period.
         assert.soon(primaryChanged(replTest.nodes, replTest, primaryIndex),
                     "waiting for higher priority primary to be elected",
