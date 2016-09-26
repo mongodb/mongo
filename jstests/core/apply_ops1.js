@@ -60,6 +60,139 @@
         db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
         'applyOps should fail on non-"n" operation type with empty "ns" field value');
 
+    // Excessively nested applyOps commands gracefully fail.
+    assert.commandFailed(db.adminCommand({
+        "applyOps": [{
+            "ts": {"$timestamp": {"t": 1, "i": 100}},
+            "h": 0,
+            "v": 2,
+            "op": "c",
+            "ns": "test.$cmd",
+            "o": {
+                "applyOps": [{
+                    "ts": {"$timestamp": {"t": 1, "i": 100}},
+                    "h": 0,
+                    "v": 2,
+                    "op": "c",
+                    "ns": "test.$cmd",
+                    "o": {
+                        "applyOps": [{
+                            "ts": {"$timestamp": {"t": 1, "i": 100}},
+                            "h": 0,
+                            "v": 2,
+                            "op": "c",
+                            "ns": "test.$cmd",
+                            "o": {
+                                "applyOps": [{
+                                    "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                    "h": 0,
+                                    "v": 2,
+                                    "op": "c",
+                                    "ns": "test.$cmd",
+                                    "o": {
+                                        "applyOps": [{
+                                            "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                            "h": 0,
+                                            "v": 2,
+                                            "op": "c",
+                                            "ns": "test.$cmd",
+                                            "o": {
+                                                "applyOps": [{
+                                                    "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                                    "h": 0,
+                                                    "v": 2,
+                                                    "op": "c",
+                                                    "ns": "test.$cmd",
+                                                    "o": {
+                                                        "applyOps": [{
+                                                            "ts":
+                                                                {"$timestamp": {"t": 1, "i": 100}},
+                                                            "h": 0,
+                                                            "v": 2,
+                                                            "op": "c",
+                                                            "ns": "test.$cmd",
+                                                            "o": {
+                                                                "applyOps": [{
+                                                                    "ts": {
+                                                                        "$timestamp":
+                                                                            {"t": 1, "i": 100}
+                                                                    },
+                                                                    "h": 0,
+                                                                    "v": 2,
+                                                                    "op": "c",
+                                                                    "ns": "test.$cmd",
+                                                                    "o": {
+                                                                        "applyOps": [{
+                                                                            "ts": {
+                                                                                "$timestamp": {
+                                                                                    "t": 1,
+                                                                                    "i": 100
+                                                                                }
+                                                                            },
+                                                                            "h": 0,
+                                                                            "v": 2,
+                                                                            "op": "c",
+                                                                            "ns": "test.$cmd",
+                                                                            "o": {
+                                                                                "applyOps": [{
+                                                                                    "ts": {
+                                                                                        "$timestamp":
+                                                                                            {
+                                                                                              "t":
+                                                                                                  1,
+                                                                                              "i":
+                                                                                                  100
+                                                                                            }
+                                                                                    },
+                                                                                    "h": 0,
+                                                                                    "v": 2,
+                                                                                    "op": "c",
+                                                                                    "ns":
+                                                                                        "test.$cmd",
+                                                                                    "o": {
+                                                                                        "applyOps": [{
+                                                                                            "ts": {
+                                                                                                "$timestamp": {
+                                                                                                    "t":
+                                                                                                        1,
+                                                                                                    "i":
+                                                                                                        100
+                                                                                                }
+                                                                                            },
+                                                                                            "h": 0,
+                                                                                            "v": 2,
+                                                                                            "op":
+                                                                                                "c",
+                                                                                            "ns":
+                                                                                                "test.$cmd",
+                                                                                            "o": {
+                                                                                                "applyOps":
+                                                                                                    []
+                                                                                            }
+                                                                                        }]
+                                                                                    }
+                                                                                }]
+                                                                            }
+                                                                        }]
+                                                                    }
+                                                                }]
+                                                            }
+                                                        }]
+                                                    }
+                                                }]
+                                            }
+                                        }]
+                                    }
+                                }]
+                            }
+                        }]
+                    }
+                }]
+            }
+        }]
+    }),
+                         "Excessively nested applyOps should be rejected");
+
     // Missing 'o' field value in an operation of type 'i' on 'system.indexes' collection.
     assert.commandFailedWithCode(
         db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes'}]}),
@@ -147,7 +280,8 @@
         "Applying an insert operation on a non-existent collection should fail");
 
     assert.commandWorked(db.createCollection(t.getName()));
-    var a = db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]});
+    var a = assert.commandWorked(
+        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
     assert.eq(1, t.find().count(), "Valid insert failed");
     assert.eq(true, a.results[0], "Bad result value for valid insert");
 
@@ -162,12 +296,12 @@
     };
     assert.eq(o, t.findOne(), "Mismatching document inserted.");
 
-    var res = db.runCommand({
+    var res = assert.commandWorked(db.runCommand({
         applyOps: [
             {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
             {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
         ]
-    });
+    }));
 
     o.x++;
     o.x++;

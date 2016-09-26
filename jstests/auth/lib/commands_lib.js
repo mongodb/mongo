@@ -232,24 +232,242 @@ var authCommandsLib = {
               roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager)
           }]
         },
+
         {
-          testname: "applyOps",
-          command: {applyOps: "x"},
+          testname: "applyOps_empty",
+          command: {applyOps: []},
+          skipSharded: true,
           testcases: [
               {
-                runOnDb: adminDbName,
                 roles: {__system: 1},
-                privileges: [{resource: {anyResource: true}, actions: ["anyAction"]}],
-                expectFail: true
+                runOnDb: adminDbName,
               },
               {
-                runOnDb: firstDbName,
                 roles: {__system: 1},
-                privileges: [{resource: {anyResource: true}, actions: ["anyAction"]}],
-                expectFail: true
+                runOnDb: firstDbName,
               }
           ]
         },
+        {
+          testname: "applyOps_precondition",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1473353037, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "n",
+                  "ns": "",
+                  "o": {}
+              }],
+              preCondition: [{ns: firstDbName + ".x", q: {x: 5}, res: []}]
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges: [
+                    {resource: {db: firstDbName, collection: "x"}, actions: ["find"]},
+                    {
+                      resource: {cluster: true},
+                      actions: ["appendOplogNote"],
+                      removeWhenTestingAuthzFailure: false
+                    },
+                ],
+              },
+          ]
+        },
+        {
+          testname: "applyOps_noop",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1473353037, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "n",
+                  "ns": "",
+                  "o": {}
+              }]
+          },
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["appendOplogNote"]}, ],
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {cluster: true}, actions: ["appendOplogNote"]}, ],
+                expectFailure: true
+              }
+          ]
+        },
+        {
+          testname: "applyOps_c_renameCollection_twoDbs",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1474051004, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "c",
+                  "ns": "test.$cmd",
+                  "o": {
+                      "renameCollection": firstDbName + ".x",
+                      "to": secondDbName + ".y",
+                      "stayTemp": false,
+                      "dropTarget": false
+                  }
+              }]
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({});
+              db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
+              db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+              db.getSisterDB(secondDbName).y.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {
+                      resource: {db: firstDbName, collection: "x"},
+                      actions: ["find", "dropCollection"]
+                    },
+                    {
+                      resource: {db: secondDbName, collection: "y"},
+                      actions: ["insert", "createIndex"]
+                    }
+                ]
+              },
+          ]
+        },
+        {
+          testname: "applyOps_insert",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1474051453, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "i",
+                  "ns": firstDbName + ".x",
+                  "o": {"_id": ObjectId("57dc3d7da4fce4358afa85b8"), "data": 5}
+              }]
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_write,
+                privileges:
+                    [{resource: {db: firstDbName, collection: "x"}, actions: ["insert"]}, ],
+              },
+          ]
+        },
+        {
+          testname: "applyOps_upsert",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1474053682, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "u",
+                  "ns": firstDbName + ".x",
+                  "o2": {"_id": 1},
+                  "o": {"_id": 1, "data": 8}
+              }]
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({_id: 1, data: 1});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.merge(roles_write, {restore: 0}, true),
+                privileges: [
+                    {resource: {db: firstDbName, collection: "x"}, actions: ["update", "insert"]},
+                ],
+              },
+          ]
+        },
+        {
+          testname: "applyOps_update",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1474053682, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "u",
+                  "ns": firstDbName + ".x",
+                  "o2": {"_id": 1},
+                  "o": {"_id": 1, "data": 8}
+              }],
+              alwaysUpsert: false
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({_id: 1, data: 1});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.merge(roles_write, {restore: 0}, true),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "x"}, actions: ["update"]}, ],
+              },
+          ]
+        },
+        {
+          testname: "applyOps_delete",
+          command: {
+              applyOps: [{
+                  "ts": Timestamp(1474056194, 1),
+                  "h": NumberLong(0),
+                  "v": 2,
+                  "op": "d",
+                  "ns": firstDbName + ".x",
+                  "o": {"_id": 1}
+              }]
+          },
+          skipSharded: true,
+          setup: function(db) {
+              db.getSisterDB(firstDbName).x.save({_id: 1, data: 1});
+          },
+          teardown: function(db) {
+              db.getSisterDB(firstDbName).x.drop();
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.merge(roles_write, {restore: 0}, true),
+                privileges:
+                    [{resource: {db: firstDbName, collection: "x"}, actions: ["remove"]}, ],
+              },
+          ]
+        },
+
         {
           testname: "aggregate_readonly",
           command: {aggregate: "foo", pipeline: []},

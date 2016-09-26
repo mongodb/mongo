@@ -43,4 +43,13 @@ Status checkAuthForApplyOpsCommand(OperationContext* txn,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj);
 
+enum class ApplyOpsValidity { kOk, kNeedsSuperuser };
+
+/**
+ * Returns either kNeedsSuperuser, if the provided applyOps command contains an empty applyOps
+ * command, or kOk if no other handlable conditions detected. May throw exceptions if the input
+ * is malformed.
+ */
+ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj);
+
 }  // namespace mongo
