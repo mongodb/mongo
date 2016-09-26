@@ -136,6 +136,7 @@ env.Library(
         "write_commands/write_commands.cpp",
     ],
     LIBDEPS=[
+        'apply_ops_cmd_common',
         'core',
         'killcursors_common',
         '$BUILD_DIR/mongo/base',
@@ -173,6 +174,22 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
     ],
 )
+
+env.Library(
+    target='apply_ops_cmd_common',
+    source=[
+        'apply_ops_cmd_common.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
 
 env.Library(
     target="list_collections_filter",

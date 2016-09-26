@@ -410,7 +410,7 @@ void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Mess
     invariant(insertOp.ns == nsString);
     for (const auto& obj : insertOp.documents) {
         Status status =
-            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(nsString, obj);
+            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(txn, nsString, obj);
         audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }
@@ -422,9 +422,10 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     auto& singleUpdate = updateOp.updates[0];
     invariant(updateOp.ns == nsString);
 
-    Status status = AuthorizationSession::get(txn->getClient())
-                        ->checkAuthForUpdate(
-                            nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
+    Status status =
+        AuthorizationSession::get(txn->getClient())
+            ->checkAuthForUpdate(
+                txn, nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
     audit::logUpdateAuthzCheck(txn->getClient(),
                                nsString,
                                singleUpdate.query,
@@ -443,7 +444,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     invariant(deleteOp.ns == nsString);
 
     Status status = AuthorizationSession::get(txn->getClient())
-                        ->checkAuthForDelete(nsString, singleDelete.query);
+                        ->checkAuthForDelete(txn, nsString, singleDelete.query);
     audit::logDeleteAuthzCheck(txn->getClient(), nsString, singleDelete.query, status.code());
     uassertStatusOK(status);
 

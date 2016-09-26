@@ -30,6 +30,7 @@
 
 #include "mongo/db/ops/write_ops_parsers.h"
 
+#include "mongo/bson/util/bson_check.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/dbmessage.h"
@@ -52,16 +53,6 @@ void checkTypeInArray(BSONType expectedType,
             str::stream() << "Wrong type for " << arrayElem.fieldNameStringData() << '['
                           << elem.fieldNameStringData()
                           << "]. Expected a "
-                          << typeName(expectedType)
-                          << ", got a "
-                          << typeName(elem.type())
-                          << '.',
-            elem.type() == expectedType);
-}
-
-void checkType(BSONType expectedType, const BSONElement& elem) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Wrong type for '" << elem.fieldNameStringData() << "'. Expected a "
                           << typeName(expectedType)
                           << ", got a "
                           << typeName(elem.type())
@@ -97,7 +88,7 @@ void parseWriteCommand(StringData dbName,
     for (BSONElement field : cmd) {
         if (firstElement) {
             // The key is the command name and the value is the collection name
-            checkType(String, field);
+            checkBSONType(String, field);
             op->ns = NamespaceString(dbName, field.valueStringData());
             firstElement = false;
             continue;
@@ -107,7 +98,7 @@ void parseWriteCommand(StringData dbName,
         if (fieldName == "bypassDocumentValidation") {
             op->bypassDocumentValidation = field.trueValue();
         } else if (fieldName == "ordered") {
-            checkType(Bool, field);
+            checkBSONType(Bool, field);
             op->continueOnError = !field.Bool();
         } else if (fieldName == uniqueFieldName) {
             haveUniqueField = true;
@@ -136,7 +127,7 @@ InsertOp parseInsertCommand(StringData dbName, const BSONObj& cmd) {
     BSONElement documents;
     InsertOp op;
     parseWriteCommand(dbName, cmd, "documents", &documents, &op);
-    checkType(Array, documents);
+    checkBSONType(Array, documents);
     for (auto doc : documents.Obj()) {
         checkTypeInArray(Object, doc, documents);
         op.documents.push_back(doc.Obj());
@@ -157,7 +148,7 @@ UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd) {
     BSONElement updates;
     UpdateOp op;
     parseWriteCommand(dbName, cmd, "updates", &updates, &op);
-    checkType(Array, updates);
+    checkBSONType(Array, updates);
     for (auto doc : updates.Obj()) {
         checkTypeInArray(Object, doc, updates);
         op.updates.emplace_back();
@@ -168,20 +159,20 @@ UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd) {
             const StringData fieldName = field.fieldNameStringData();
             if (fieldName == "q") {
                 haveQ = true;
-                checkType(Object, field);
+                checkBSONType(Object, field);
                 update.query = field.Obj();
             } else if (fieldName == "u") {
                 haveU = true;
-                checkType(Object, field);
+                checkBSONType(Object, field);
                 update.update = field.Obj();
             } else if (fieldName == "collation") {
-                checkType(Object, field);
+                checkBSONType(Object, field);
                 update.collation = field.Obj();
             } else if (fieldName == "multi") {
-                checkType(Bool, field);
+                checkBSONType(Bool, field);
                 update.multi = field.Bool();
             } else if (fieldName == "upsert") {
-                checkType(Bool, field);
+                checkBSONType(Bool, field);
                 update.upsert = field.Bool();
             } else {
                 uasserted(ErrorCodes::FailedToParse,
@@ -200,7 +191,7 @@ DeleteOp parseDeleteCommand(StringData dbName, const BSONObj& cmd) {
     BSONElement deletes;
     DeleteOp op;
     parseWriteCommand(dbName, cmd, "deletes", &deletes, &op);
-    checkType(Array, deletes);
+    checkBSONType(Array, deletes);
     for (auto doc : deletes.Obj()) {
         checkTypeInArray(Object, doc, deletes);
         op.deletes.emplace_back();
@@ -211,10 +202,10 @@ DeleteOp parseDeleteCommand(StringData dbName, const BSONObj& cmd) {
             const StringData fieldName = field.fieldNameStringData();
             if (fieldName == "q") {
                 haveQ = true;
-                checkType(Object, field);
+                checkBSONType(Object, field);
                 del.query = field.Obj();
             } else if (fieldName == "collation") {
-                checkType(Object, field);
+                checkBSONType(Object, field);
                 del.collation = field.Obj();
             } else if (fieldName == "limit") {
                 haveLimit = true;
