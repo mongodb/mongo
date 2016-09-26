@@ -92,6 +92,8 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
+        validateApplyOpsCommand(cmdObj);
+
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(txn);

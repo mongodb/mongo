@@ -28,6 +28,8 @@
 
 #include "mongo/db/commands/apply_ops_cmd_common.h"
 
+#include <stack>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -112,22 +114,82 @@ Status checkOperationAuthorization(OperationContext* txn,
 
     return Status(ErrorCodes::FailedToParse, "Unrecognized opType");
 }
-
 }  // namespace
 
+ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
+    const size_t maxApplyOpsDepth = 10;
+    std::stack<std::pair<size_t, BSONObj>> toCheck;
+
+    auto operationContainsApplyOps = [](const BSONObj& opObj) {
+        BSONElement opTypeElem = opObj["op"];
+        checkBSONType(BSONType::String, opTypeElem);
+        const StringData opType = opTypeElem.checkAndGetStringData();
+
+        if (opType == "c"_sd) {
+            BSONElement oElem = opObj["o"];
+            checkBSONType(BSONType::Object, oElem);
+            BSONObj o = oElem.Obj();
+
+            if (o.firstElement().fieldNameStringData() == "applyOps"_sd) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Insert the top level applyOps command into the stack.
+    toCheck.emplace(std::make_pair(0, cmdObj));
+
+    while (!toCheck.empty()) {
+        std::pair<size_t, BSONObj> item = toCheck.top();
+        toCheck.pop();
+
+        checkBSONType(BSONType::Array, item.second.firstElement());
+        // Check if the applyOps command is empty. This is probably not something that should
+        // happen, so require a superuser to do this.
+        if (item.second.firstElement().Array().empty()) {
+            return ApplyOpsValidity::kNeedsSuperuser;
+        }
+
+        // For each applyOps command, iterate the ops.
+        for (BSONElement element : item.second.firstElement().Array()) {
+            checkBSONType(BSONType::Object, element);
+            BSONObj elementObj = element.Obj();
+
+            // If the op itself contains an applyOps...
+            if (operationContainsApplyOps(elementObj)) {
+                // And we've recursed too far, then bail out.
+                uassert(ErrorCodes::FailedToParse,
+                        "Too many nested applyOps",
+                        item.first < maxApplyOpsDepth);
+
+                // Otherwise, if the op contains an applyOps, but we haven't recursed too far:
+                // extract the applyOps command, and insert it into the stack.
+                checkBSONType(BSONType::Object, elementObj["o"]);
+                BSONObj oObj = elementObj["o"].Obj();
+                toCheck.emplace(std::make_pair(item.first + 1, std::move(oObj)));
+            }
+        }
+    }
+
+    return ApplyOpsValidity::kOk;
+}
 
 Status checkAuthForApplyOpsCommand(OperationContext* txn,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) {
     AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
 
-
-    std::vector<Privilege> universalPrivileges;
-    RoleGraph::generateUniversalPrivileges(&universalPrivileges);
-    if (!authSession->isAuthorizedForPrivileges(universalPrivileges)) {
-        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    ApplyOpsValidity validity = validateApplyOpsCommand(cmdObj);
+    if (validity == ApplyOpsValidity::kNeedsSuperuser) {
+        std::vector<Privilege> universalPrivileges;
+        RoleGraph::generateUniversalPrivileges(&universalPrivileges);
+        if (!authSession->isAuthorizedForPrivileges(universalPrivileges)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        return Status::OK();
     }
-
+    fassert(40314, validity == ApplyOpsValidity::kOk);
 
     boost::optional<DisableDocumentValidation> maybeDisableValidation;
     if (shouldBypassDocumentValidationForCommand(cmdObj))
