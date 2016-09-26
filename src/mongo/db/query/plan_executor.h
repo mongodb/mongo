@@ -298,6 +298,10 @@ public:
      * underlying tree without getting results back.
      *
      * If a YIELD_AUTO policy is set on this executor, then this will automatically yield.
+     *
+     * Returns ErrorCodes::QueryPlanKilled if the plan executor was killed during a yield. If this
+     * error occurs, it is illegal to subsequently access the collection, since it may have been
+     * dropped.
      */
     Status executePlan();
 

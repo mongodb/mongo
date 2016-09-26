@@ -530,12 +530,18 @@ Status PlanExecutor::executePlan() {
     }
 
     if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+        if (killed()) {
+            return Status(ErrorCodes::QueryPlanKilled,
+                          str::stream() << "Operation aborted because: " << *_killReason);
+        }
+
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "Exec error: " << WorkingSetCommon::toStatusString(obj)
                                     << ", state: "
                                     << PlanExecutor::statestr(state));
     }
 
+    invariant(!killed());
     invariant(PlanExecutor::IS_EOF == state);
     return Status::OK();
 }
