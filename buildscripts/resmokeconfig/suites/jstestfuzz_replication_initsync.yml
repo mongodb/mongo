@@ -1,0 +1,31 @@
+selector:
+  js_test:
+    roots:
+    - jstestfuzz/out/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+        global_vars:
+          TestData:
+            ignoreCommandsIncompatibleWithInitialSync: true
+    hooks:
+    - class: BackgroundInitialSync
+      n: 4
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    # Need to run CleanEveryN here because collection dropping is blacklisted.
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        oplogSize: 511
+        set_parameters:
+          enableTestCommands: 1
+      num_nodes: 2
+      start_initial_sync_node: True
