@@ -2,7 +2,7 @@
 
 # Complain about unused statistics fields.
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # List of files to search: skip stat.c, it lists all of the fields by
 # definition.

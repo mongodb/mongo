@@ -53,7 +53,7 @@ if [ $# -ne 0 ]; then
 	exit 0
 fi
 
-trap 'rm -f $c1 $c2 $c3 $c4; exit 0' 0 1 2 3 13 15
+trap 'rm -f $c1 $c2 $c3 $c4' 0 1 2 3 13 15
 
 year=`date +%Y`
 
@@ -141,3 +141,5 @@ special_copyright LICENSE 1 "$string1"
 special_copyright src/docs/build-javadoc.sh 1 "$string2"
 special_copyright src/docs/style/footer.html 2 "$string2"
 special_copyright src/utilities/util_cpyright.c 1 "$string3"
+
+exit 0

@@ -2,7 +2,7 @@
 
 # Single space and remove trailing whitespace from source files.
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # Clear lines that only contain whitespace, compress multiple empty lines
 # into a single line, discard trailing empty lines.
@@ -30,3 +30,5 @@ find bench dist examples ext src test \
 | while read f ; do
 	whitespace $f
 done
+
+exit 0
