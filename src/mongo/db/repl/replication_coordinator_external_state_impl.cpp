@@ -251,6 +251,10 @@ void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationConte
 
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(OperationContext* txn,
                                                                           UniqueLock* lock) {
+    // Make sue no other _stopDataReplication calls are in progress.
+    _dataReplicationStopped.wait(*lock, [this]() { return !_stoppingDataReplication; });
+    _stoppingDataReplication = true;
+
     auto oldSSF = std::move(_syncSourceFeedbackThread);
     auto oldBgSync = std::move(_bgSync);
     auto oldApplier = std::move(_applierThread);
@@ -282,6 +286,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     _initialSyncRunner.join();
 
     lock->lock();
+    _stoppingDataReplication = false;
+    _dataReplicationStopped.notify_all();
 }
 
 
