@@ -423,7 +423,8 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		 * level.
 		 */
 		__wt_sleep(0, 10 * stepdown_us);
-		cache->eviction_scrub_limit = current_dirty - delta;
+		cache->eviction_scrub_limit =
+		    WT_MAX(cache->eviction_dirty_target, current_dirty - delta);
 		WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target,
 		    cache->eviction_scrub_limit);
 		WT_RET(__wt_epoch(session, &last));

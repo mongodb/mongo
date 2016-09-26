@@ -193,7 +193,7 @@ __wt_cache_bytes_other(WT_CACHE *cache)
  * __wt_session_can_wait --
  *	Return if a session available for a potentially slow operation.
  */
-static inline int
+static inline bool
 __wt_session_can_wait(WT_SESSION_IMPL *session)
 {
 	/*
@@ -202,17 +202,71 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 	 * the system cache.
 	 */
 	if (!F_ISSET(session, WT_SESSION_CAN_WAIT))
-		return (0);
+		return (false);
 
 	/*
 	 * LSM sets the no-eviction flag when holding the LSM tree lock, in that
 	 * case, or when holding the schema lock, we don't want to highjack the
 	 * thread for eviction.
 	 */
-	if (F_ISSET(session, WT_SESSION_NO_EVICTION | WT_SESSION_LOCKED_SCHEMA))
-		return (0);
+	return (!F_ISSET(
+	    session, WT_SESSION_NO_EVICTION | WT_SESSION_LOCKED_SCHEMA));
+}
 
-	return (1);
+/*
+ * __wt_eviction_clean_needed --
+ *	Return if an application thread should do eviction due to the total
+ *	volume of dirty data in cache.
+ */
+static inline bool
+__wt_eviction_clean_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
+{
+	WT_CACHE *cache;
+	uint64_t bytes_inuse, bytes_max;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_max = S2C(session)->cache_size + 1;
+	bytes_inuse = __wt_cache_bytes_inuse(cache);
+
+	if (pct_fullp != NULL)
+		*pct_fullp = (u_int)((100 * bytes_inuse) / bytes_max);
+
+	return (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100);
+}
+
+/*
+ * __wt_eviction_dirty_needed --
+ *	Return if an application thread should do eviction due to the total
+ *	volume of dirty data in cache.
+ */
+static inline bool
+__wt_eviction_dirty_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
+{
+	WT_CACHE *cache;
+	double dirty_trigger;
+	uint64_t dirty_inuse, bytes_max;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_max = S2C(session)->cache_size + 1;
+	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
+
+	if (pct_fullp != NULL)
+		*pct_fullp = (u_int)((100 * dirty_inuse) / bytes_max);
+
+	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
+		dirty_trigger = (double)cache->eviction_dirty_trigger;
+
+	return (dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100);
 }
 
 /*
@@ -223,42 +277,30 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 static inline bool
 __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_CACHE *cache;
-	double dirty_trigger;
-	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 	u_int pct_dirty, pct_full;
+	bool clean_needed, dirty_needed;
 
-	conn = S2C(session);
-	cache = conn->cache;
+	cache = S2C(session)->cache;
 
 	/*
 	 * If the connection is closing we do not need eviction from an
 	 * application thread.  The eviction subsystem is already closed.
 	 */
-	if (F_ISSET(conn, WT_CONN_CLOSING))
+	if (F_ISSET(S2C(session), WT_CONN_CLOSING))
 		return (false);
 
-	/*
-	 * Avoid division by zero if the cache size has not yet been set in a
-	 * shared cache.
-	 */
-	bytes_max = conn->cache_size + 1;
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
+	clean_needed = __wt_eviction_clean_needed(session, &pct_full);
+	dirty_needed = __wt_eviction_dirty_needed(session, &pct_dirty);
 
 	/*
 	 * Calculate the cache full percentage; anything over the trigger means
 	 * we involve the application thread.
 	 */
-	if (pct_fullp != NULL) {
-		pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
-		pct_dirty = (u_int)((100 * dirty_inuse) / bytes_max);
-
+	if (pct_fullp != NULL)
 		*pct_fullp = (u_int)WT_MAX(0, 100 - WT_MIN(
 		    (int)cache->eviction_trigger - (int)pct_full,
 		    (int)cache->eviction_dirty_trigger - (int)pct_dirty));
-	}
 
 	/*
 	 * Only check the dirty trigger when the session is not busy.
@@ -268,11 +310,7 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
 	 * The next transaction in this session will not be able to start until
 	 * the cache is under the limit.
 	 */
-	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
-		dirty_trigger = (double)cache->eviction_dirty_trigger;
-	return (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
-	    (!busy &&
-	    dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100));
+	return (clean_needed || (!busy && dirty_needed));
 }
 
 /*
