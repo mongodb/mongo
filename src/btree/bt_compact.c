@@ -171,30 +171,64 @@ int
 __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_BM *bm;
+	WT_DECL_RET;
 	size_t addr_size;
 	u_int type;
 	const uint8_t *addr;
 
-	*skipp = false;				/* Default to reading. */
-	type = 0;				/* Keep compiler quiet. */
+	/*
+	 * Skip deleted pages, rewriting them doesn't seem useful; in a better
+	 * world we'd write the parent to delete the page.
+	 */
+	if (ref->state == WT_REF_DELETED) {
+		*skipp = true;
+		return (0);
+	}
 
-	bm = S2BT(session)->bm;
+	*skipp = false;				/* Default to reading */
 
 	/*
-	 * We aren't holding a hazard pointer, so we can't look at the page
-	 * itself, all we can look at is the WT_REF information.  If there's no
-	 * address, the page isn't on disk, but we have to read internal pages
-	 * to walk the tree regardless; throw up our hands and read it.
+	 * If the page is in-memory, we want to look at it (it may have been
+	 * modified and written, and the current location is the interesting
+	 * one in terms of compaction, not the original location).
+	 *
+	 * This test could be combined with the next one, but this is a cheap
+	 * test and the next one is expensive.
 	 */
-	__wt_ref_info(ref, &addr, &addr_size, &type);
-	if (addr == NULL)
+	if (ref->state != WT_REF_DISK)
 		return (0);
 
 	/*
+	 * There's nothing to prevent the WT_REF state from changing underfoot,
+	 * which can change its address. For example, the WT_REF address might
+	 * reference an on-page cell, and page eviction can free that memory.
+	 * Lock the WT_REF so we can look at its address.
+	 */
+	if (!__wt_atomic_casv32(&ref->state, WT_REF_DISK, WT_REF_LOCKED))
+		return (0);
+
+	/*
+	 * The page is on disk, so there had better be an address; assert that
+	 * fact, test at run-time to avoid the core dump.
+	 *
 	 * Internal pages must be read to walk the tree; ask the block-manager
 	 * if it's useful to rewrite leaf pages, don't do the I/O if a rewrite
 	 * won't help.
 	 */
-	return (type == WT_CELL_ADDR_INT ? 0 :
-	    bm->compact_page_skip(bm, session, addr, addr_size, skipp));
+	__wt_ref_info(ref, &addr, &addr_size, &type);
+	WT_ASSERT(session, addr != NULL);
+	if (addr != NULL && type != WT_CELL_ADDR_INT) {
+		bm = S2BT(session)->bm;
+		ret = bm->compact_page_skip(
+		    bm, session, addr, addr_size, skipp);
+	}
+
+	/*
+	 * Reset the WT_REF state and push the change. The full-barrier isn't
+	 * necessary, but it's better to keep pages in circulation than not.
+	 */
+	ref->state = WT_REF_DISK;
+	WT_FULL_BARRIER();
+
+	return (ret);
 }

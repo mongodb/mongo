@@ -166,9 +166,10 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 			/*
 			 * If this was the last hazard pointer in the session,
-			 * we may need to update our transactional context.
+			 * reset the size so that checks can skip this session.
 			 */
-			--session->nhazard;
+			if (--session->nhazard == 0)
+				WT_PUBLISH(session->hazard_size, 0);
 			return (0);
 		}
 
