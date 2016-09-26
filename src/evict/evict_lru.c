@@ -1579,13 +1579,12 @@ __evict_get_ref(
 	if (is_server &&
 	    (cache->evict_empty_score > WT_EVICT_SCORE_CUTOFF ||
 	    __evict_queue_empty(cache->evict_fill_queue, false))) {
-		do {
+		while ((ret = __wt_spin_trylock(
+		    session, &cache->evict_queue_lock)) == EBUSY)
 			if ((!urgent_ok ||
 			    __evict_queue_empty(urgent_queue, false)) &&
 			    !__evict_queue_full(cache->evict_fill_queue))
 				return (WT_NOTFOUND);
-		} while ((ret = __wt_spin_trylock(
-		    session, &cache->evict_queue_lock)) == EBUSY);
 
 		WT_RET(ret);
 	} else
@@ -1621,7 +1620,8 @@ __evict_get_ref(
 	 */
 	for (;;) {
 		/* Verify there are still pages available. */
-		if (__evict_queue_empty(queue, is_server)) {
+		if (__evict_queue_empty(
+		    queue, is_server && queue != urgent_queue)) {
 			WT_STAT_CONN_INCR(
 			    session, cache_eviction_get_ref_empty2);
 			return (WT_NOTFOUND);
