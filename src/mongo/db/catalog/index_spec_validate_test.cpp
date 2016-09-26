@@ -375,7 +375,7 @@ TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV2) {
         validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 2 << "unknownField" << 1),
                           kTestNamespace,
                           ServerGlobalParams::FeatureCompatibility::Version::k34);
-    ASSERT_EQ(ErrorCodes::BadValue, result);
+    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption, result);
 }
 
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV1) {
@@ -383,7 +383,7 @@ TEST(IndexSpecValidateTest, ReturnsAnErrorIfUnknownFieldIsPresentInSpecV1) {
         validateIndexSpec(BSON("key" << BSON("field" << 1) << "v" << 1 << "unknownField" << 1),
                           kTestNamespace,
                           ServerGlobalParams::FeatureCompatibility::Version::k34);
-    ASSERT_EQ(ErrorCodes::BadValue, result);
+    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption, result);
 }
 
 }  // namespace

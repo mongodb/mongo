@@ -42,6 +42,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/represent_as.h"
 
@@ -50,6 +51,13 @@ namespace mongo {
 using std::string;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
+
+namespace {
+// When the skipIndexCreateFieldNameValidation failpoint is enabled, validation for index field
+// names will be disabled. This will allow for creation of indexes with invalid field names in their
+// specification.
+MONGO_FP_DECLARE(skipIndexCreateFieldNameValidation);
+}
 
 Status validateKeyPattern(const BSONObj& key) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
@@ -291,7 +299,16 @@ StatusWith<BSONObj> validateIndexSpec(
     return indexSpec;
 }
 
+/**
+ * Top-level index spec field names are validated here. When adding a new field with a document as
+ * value, is the the sub-module's responsibility to ensure that the content is valid and that only
+ * expected fields are present at creation time
+ */
 Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
+    if (MONGO_FAIL_POINT(skipIndexCreateFieldNameValidation)) {
+        return Status::OK();
+    }
+
     const std::set<StringData> allowedFieldNames = {
         IndexDescriptor::k2dIndexMaxFieldName,
         IndexDescriptor::k2dIndexBitsFieldName,
@@ -323,9 +340,10 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
         if (!allowedFieldNames.count(indexSpecElemFieldName)) {
-            return {ErrorCodes::BadValue,
+            return {ErrorCodes::InvalidIndexSpecificationOption,
                     str::stream() << "The field '" << indexSpecElemFieldName
-                                  << "' is not valid for an index specification"};
+                                  << "' is not valid for an index specification. Specification: "
+                                  << indexSpec};
         }
     }
 

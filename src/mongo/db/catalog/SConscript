@@ -28,6 +28,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 

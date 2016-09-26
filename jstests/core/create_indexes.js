@@ -145,11 +145,11 @@
     // Test that index creation fails with an invalid field in the index spec for index version V2.
     res = t.runCommand('createIndexes',
                        {indexes: [{key: {e: 1}, name: 'e_1', 'v': 2, 'invalidField': 1}]});
-    assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+    assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
 
     // Test that index creation fails with an invalid field in the index spec for index version V1.
     res = t.runCommand('createIndexes',
                        {indexes: [{key: {e: 1}, name: 'e_1', 'v': 1, 'invalidField': 1}]});
-    assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+    assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
 
 }());

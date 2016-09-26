@@ -8,6 +8,7 @@ var awaitOpTime;
 var startSetIfSupportsReadMajority;
 var waitUntilAllNodesCaughtUp;
 var updateConfigIfNotDurable;
+var reInitiateWithoutThrowingOnAbortedMember;
 
 (function() {
     "use strict";
@@ -233,5 +234,25 @@ var updateConfigIfNotDurable;
             config.writeConcernMajorityJournalDefault = false;
         }
         return config;
+    };
+
+    /**
+     * Performs a reInitiate() call on 'replSetTest', ignoring errors that are related to an aborted
+     * secondary member. All other errors are rethrown.
+     */
+    reInitiateWithoutThrowingOnAbortedMember = function(replSetTest) {
+        try {
+            replSetTest.reInitiate();
+        } catch (e) {
+            // reInitiate can throw because it tries to run an ismaster command on
+            // all secondaries, including the new one that may have already aborted
+            const errMsg = tojson(e);
+            if (errMsg.indexOf("error doing query: failed") > -1 ||
+                errMsg.indexOf("socket exception") > -1) {
+                // Ignore these exceptions, which are indicative of an aborted node
+            } else {
+                throw e;
+            }
+        }
     };
 }());

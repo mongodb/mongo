@@ -495,6 +495,13 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
 
     auto indexVersion = static_cast<IndexVersion>(*vEltAsInt);
 
+    if (indexVersion >= IndexVersion::kV2) {
+        auto status = validateIndexSpecFieldNames(spec);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
     if (indexVersion == IndexVersion::kV0 &&
         !txn->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
