@@ -7,6 +7,11 @@ db.things.drop();
 var other = {s: "other thing", n: 1};
 db.otherthings.save(other);
 
+// Verify that the DBPointer prototype is not serializable
+assert.throws(function() {
+    db.things.save({a: DBPointer.prototype});
+});
+
 db.things.save({name: "abc"});
 x = db.things.findOne();
 x.o = new DBPointer("otherthings", other._id);
