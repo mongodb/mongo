@@ -5,9 +5,6 @@
     "use strict";
 
     const options = {setParameter: "maxLogSizeKB=9"};
-    if (jsTestOptions().storageEngine == "wiredTiger") {
-        options.enableMajorityReadConcern = "";
-    }
     const conn = MongoRunner.runMongod(options);
 
     var db = conn.getDB('db');

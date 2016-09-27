@@ -39,7 +39,6 @@ selector:
     - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
     - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
     - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-    - jstests/core/loglong.js  # Log lines different on mongos.
     - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
     # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos.
     - jstests/core/invalid_db_name.js
