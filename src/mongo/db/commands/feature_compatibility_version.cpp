@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -44,6 +46,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -92,6 +95,18 @@ BSONObj makeUpdateCommand(StringData newVersion, BSONObj writeConcern) {
     }
 
     return updateCmd.obj();
+}
+
+StringData getFeatureCompatibilityVersionString(
+    ServerGlobalParams::FeatureCompatibility::Version version) {
+    switch (version) {
+        case ServerGlobalParams::FeatureCompatibility::Version::k34:
+            return FeatureCompatibilityVersion::kVersion34;
+        case ServerGlobalParams::FeatureCompatibility::Version::k32:
+            return FeatureCompatibilityVersion::kVersion32;
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 }  // namespace
 
@@ -310,8 +325,10 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(const BSONObj& doc) {
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
         return;
     }
-    serverGlobalParams.featureCompatibility.version.store(
-        uassertStatusOK(FeatureCompatibilityVersion::parse(doc)));
+    auto newVersion = uassertStatusOK(FeatureCompatibilityVersion::parse(doc));
+    log() << "setting featureCompatibilityVersion to "
+          << getFeatureCompatibilityVersionString(newVersion);
+    serverGlobalParams.featureCompatibility.version.store(newVersion);
 }
 
 void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
@@ -320,6 +337,7 @@ void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
         return;
     }
+    log() << "setting featureCompatibilityVersion to " << FeatureCompatibilityVersion::kVersion32;
     serverGlobalParams.featureCompatibility.version.store(
         ServerGlobalParams::FeatureCompatibility::Version::k32);
 }
@@ -336,19 +354,10 @@ public:
                           false   // allowedToChangeAtRuntime
                           ) {}
 
-    StringData featureCompatibilityVersionStr() {
-        switch (serverGlobalParams.featureCompatibility.version.load()) {
-            case ServerGlobalParams::FeatureCompatibility::Version::k34:
-                return FeatureCompatibilityVersion::kVersion34;
-            case ServerGlobalParams::FeatureCompatibility::Version::k32:
-                return FeatureCompatibilityVersion::kVersion32;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
     virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        b.append(name, featureCompatibilityVersionStr());
+        b.append(name,
+                 getFeatureCompatibilityVersionString(
+                     serverGlobalParams.featureCompatibility.version.load()));
     }
 
     virtual Status set(const BSONElement& newValueElement) {
