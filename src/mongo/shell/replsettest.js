@@ -853,11 +853,14 @@ var ReplSetTest = function(opts) {
         this.getPrimary();
         var res = {};
         res.master = this.liveNodes.master.getDB(db).runCommand("dbhash");
+        Object.defineProperty(res.master, "_mongo", {value: this.liveNodes.master});
         res.slaves = [];
         this.liveNodes.slaves.forEach(function(node) {
             var isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
             if (!isArbiter) {
-                res.slaves.push(node.getDB(db).runCommand("dbhash"));
+                var slaveRes = node.getDB(db).runCommand("dbhash");
+                Object.defineProperty(slaveRes, "_mongo", {value: node});
+                res.slaves.push(slaveRes);
             }
         });
         return res;
@@ -1058,12 +1061,7 @@ var ReplSetTest = function(opts) {
                 dbHashes.slaves.forEach(secondaryDBHash => {
                     assert.commandWorked(secondaryDBHash);
 
-                    var secondary =
-                        rst.liveNodes.slaves.find(node => node.host === secondaryDBHash.host);
-                    assert(
-                        secondary,
-                        'could not find the replica set secondary listed in the dbhash response ' +
-                            tojson(secondaryDBHash));
+                    var secondary = secondaryDBHash._mongo;
 
                     var primaryCollections = Object.keys(primaryDBHash.collections);
                     var secondaryCollections = Object.keys(secondaryDBHash.collections);
