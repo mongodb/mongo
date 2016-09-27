@@ -34,6 +34,7 @@ t.drop();
 t.save({a: 1});
 t.save({a: 1});
 t.save({a: 1, b: 1});
+t.save({_id: 1});
 
 // Add 2 indexes.
 // 1st index is more efficient.
@@ -49,6 +50,7 @@ var queryAA = {a: "A"};
 var queryA1 = {a: 1, b: 1};
 var projectionA1 = {_id: 0, a: 1};
 var sortA1 = {a: -1};
+var queryID = {_id: 1};
 
 //
 // Tests for planCacheListFilters, planCacheClearFilters, planCacheSetFilter
@@ -139,6 +141,13 @@ assert.eq(true, planAfterSetFilter.filterSet, 'missing or invalid filterSet fiel
 // If the planner still tries to use the user hint, we will get a 'bad hint' error.
 t.find(queryA1, projectionA1).sort(sortA1).hint(indexA1).itcount();
 
+// Test that index filters are ignored for idhack queries.
+assert.commandWorked(t.runCommand('planCacheSetFilter', {query: queryID, indexes: [indexA1]}));
+var explain = t.explain("executionStats").find(queryID).finish();
+assert.commandWorked(explain);
+var planStage = getPlanStage(explain.executionStats.executionStages, 'IDHACK');
+assert.neq(null, planStage);
+
 // Clear filters
 // Clearing filters on a missing collection should be a no-op.
 assert.commandWorked(missingCollection.runCommand('planCacheClearFilters'));
@@ -208,7 +217,7 @@ assert.commandWorked(t.runCommand('planCacheSetFilter',
 // Ensure that index key patterns in planCacheSetFilter select any index with a matching key
 // pattern.
 
-var explain = t.find(queryAA).explain();
+explain = t.find(queryAA).explain();
 assert(isIxscan(explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
 
 explain = t.find(queryAA).collation(collationEN).explain();

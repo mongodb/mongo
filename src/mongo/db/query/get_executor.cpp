@@ -143,16 +143,19 @@ void fillOutPlannerParams(OperationContext* txn,
     }
 
     // If query supports index filters, filter params.indices by indices in query settings.
-    QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
-    PlanCacheKey planCacheKey =
-        collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
+    // Ignore index filters when it is possible to use the id-hack.
+    if (!IDHackStage::supportsQuery(collection, *canonicalQuery)) {
+        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+        PlanCacheKey planCacheKey =
+            collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
 
-    // Filter index catalog if index filters are specified for query.
-    // Also, signal to planner that application hint should be ignored.
-    if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
-            querySettings->getAllowedIndicesFilter(planCacheKey)) {
-        filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
-        plannerParams->indexFiltersApplied = true;
+        // Filter index catalog if index filters are specified for query.
+        // Also, signal to planner that application hint should be ignored.
+        if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
+                querySettings->getAllowedIndicesFilter(planCacheKey)) {
+            filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
+            plannerParams->indexFiltersApplied = true;
+        }
     }
 
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
