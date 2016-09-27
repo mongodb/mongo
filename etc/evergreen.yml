@@ -458,9 +458,19 @@ functions:
             export PATH="$PATH:/opt/node/bin"
           fi
 
-          # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
           echo "jstestfuzz self-tests are starting"
-          npm test > /dev/null
+          set +o errexit
+          npm test > npm_test-${task_id}.log 2>&1
+          if [ $? -ne 0 ]; then
+            which node
+            node --version
+            which npm
+            npm --version
+            cat npm_test-${task_id}.log
+            exit 1
+          fi
+          rm -f npm_test-${task_id}.log
+          set -o errexit
           echo "jstestfuzz self-tests finished"
 
           npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
