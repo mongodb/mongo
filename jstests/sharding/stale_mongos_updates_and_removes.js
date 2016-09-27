@@ -172,7 +172,7 @@ var checkAllUpdateQueries = function(makeMongosStaleFunc) {
 };
 
 var st = new ShardingTest({shards: 2, mongos: 2});
-st.disableAutoSplit();
+
 var dbName = 'test';
 var collNS = dbName + '.foo';
 var numShardKeys = 10;

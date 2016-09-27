@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
+    var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
     // The balancer is by default stopped, thus it will NOT interfere unpredictably with the chunk
     // moves/splits depending on the timing.

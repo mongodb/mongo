@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
+    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 
     var db = s.getDB("test");

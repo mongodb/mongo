@@ -1,11 +1,11 @@
 /**
  * Test write concern with w parameter will not cause an error when writes to mongos would trigger
- * writes to config servers (in this test, split chunks is used).
+ * writes to config servers (in this test, autosplit is used).
  */
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, rs: true, other: {chunkSize: 1}});
+    var st = new ShardingTest({shards: 1, rs: true, other: {chunkSize: 1, enableAutoSplit: true}});
 
     var mongos = st.s;
     var testDB = mongos.getDB('test');

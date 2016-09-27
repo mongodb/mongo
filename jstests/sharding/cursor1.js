@@ -4,9 +4,6 @@
 
     var s = new ShardingTest({name: "sharding_cursor1", shards: 2});
 
-    // This test handles chunk splitting manually.
-    s.disableAutoSplit();
-
     s.config.settings.find().forEach(printjson);
 
     // create a sharded 'test.foo', for the moment with just one chunk

@@ -47,6 +47,14 @@
             arguments[0].other.enableBalancer = true;
         }
 
+        // In ShardingTest, enableAutoSplit defaults to the value of enableBalancer. However, this
+        // override causes enableBalancer to always be true when constructing ShardingTest. So, if
+        // enableAutoSplit is not specified, make sure enableAutoSplit defaults to the original
+        // enableBalancer value.
+        if (!("enableAutoSplit" in arguments[0].other)) {
+            arguments[0].other.enableAutoSplit = originalEnableBalancer;
+        }
+
         // Construct the original object
         originalShardingTest.apply(this, arguments);
 
