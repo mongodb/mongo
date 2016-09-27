@@ -93,9 +93,12 @@ Status CollectionBulkLoaderImpl::init(Collection* coll,
             invariant(txn);
             invariant(coll);
             invariant(txn->getClient() == &cc());
-            if (secondaryIndexSpecs.size()) {
+            std::vector<BSONObj> specs(secondaryIndexSpecs);
+            // This enforces the buildIndexes setting in the replica set configuration.
+            _secondaryIndexesBlock->removeExistingIndexes(&specs);
+            if (specs.size()) {
                 _secondaryIndexesBlock->ignoreUniqueConstraint();
-                auto status = _secondaryIndexesBlock->init(secondaryIndexSpecs).getStatus();
+                auto status = _secondaryIndexesBlock->init(specs).getStatus();
                 if (!status.isOK()) {
                     return status;
                 }
