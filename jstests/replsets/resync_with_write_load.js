@@ -11,10 +11,11 @@ var conns = replTest.startSet();
 var config = {
     "_id": testName,
     "members": [
-        {"_id": 0, "host": nodes[0], priority: 4},
-        {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2]}
-    ]
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1], priority: 0},
+        {"_id": 2, "host": nodes[2], priority: 0}
+    ],
+    settings: {chainingAllowed: false}
 };
 var r = replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
