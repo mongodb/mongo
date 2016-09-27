@@ -12,6 +12,9 @@
 
     // Prevent any replication from happening, so that the initial writes that the config
     // server performs on first transition to primary can be rolled back.
+    //
+    // We cannot stop bgsync here because the new primary needs it to complete drain mode,
+    // so we let the bgsync on secondaries keep trying but fail to sync anything new.
     nodes.forEach(function(node) {
         assert.commandWorked(node.getDB('admin').runCommand(
             {configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));

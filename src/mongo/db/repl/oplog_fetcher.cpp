@@ -400,11 +400,13 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         return;
     }
 
-    // Stop fetching and return immediately on fail point.
+    // Stop fetching and return on fail point.
     // This fail point is intended to make the oplog fetcher ignore the downloaded batch of
     // operations and not error out.
     if (MONGO_FAIL_POINT(stopOplogFetcher)) {
         _finishCallback(Status::OK());
+        // Wait for a while, otherwise, it will keep busy waiting.
+        sleepmillis(100);
         return;
     }
 
