@@ -486,6 +486,8 @@ if has_option("use-new-tools"):
     toolsRoot = "src/mongo-tools"
     for t in rewrittenTools:
         installExternalBinary(env, "%s/%s" % (toolsRoot, t))
+    if has_option("build-mongoreplay") and get_option("build-mongoreplay") == "true":
+        installExternalBinary(env, "%s/%s" % (toolsRoot, "mongoreplay"))
 
 # legacy tools
 installBinary(env, "mongoperf")

@@ -447,11 +447,10 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongosniff binary due to libpcap dynamic
-    # linkage.  FIXME: this removal should go away
-    # eventually.
-    if os.path.exists(sdir + "bin/mongosniff"):
-      os.unlink(sdir + "bin/mongosniff")
+    # Remove the mongoreplay binary due to libpcap dynamic
+    # linkage.
+    if os.path.exists(sdir + "bin/mongoreplay"):
+      os.unlink(sdir + "bin/mongoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir, distro, build_os, spec):

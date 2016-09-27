@@ -324,7 +324,13 @@ functions:
         sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
 
-        for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
+        build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog"
+
+        if [ "${build_mongoreplay}" = "true" ]; then
+            build_tools="$build_tools mongoreplay"
+        fi
+
+        for i in $build_tools; do
              ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
              "../../mongo-tools/$i${exe|}" --version
         done
@@ -825,7 +831,7 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} ${additional_targets|} MONGO_VERSION=${version}
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} ${additional_targets|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -2851,6 +2857,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -2974,6 +2981,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3006,6 +3014,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3114,6 +3123,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3181,6 +3191,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3245,6 +3256,7 @@ buildvariants:
     packager_distro: ubuntu1204
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3361,6 +3373,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3477,6 +3490,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3596,6 +3610,7 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: enterprise
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3670,6 +3685,7 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: org
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3747,6 +3763,7 @@ buildvariants:
     packager_arch: ppc64le
     packager_distro: ubuntu1604
     repo_edition: enterprise
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3825,6 +3842,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1604
     repo_edition: enterprise
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3918,6 +3936,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4003,6 +4022,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4718,6 +4738,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_jobs_available: 1
+    build_mongoreplay: true
   tasks:
   - name: compile
   - name: aggregation
@@ -4820,6 +4841,7 @@ buildvariants:
     tooltags: "-tags ssl"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_jobs_available: 1
+    build_mongoreplay: true
   tasks:
   - name: compile
   - name: aggregation
@@ -4915,6 +4937,7 @@ buildvariants:
     push_arch: x86_64
     num_jobs_available: 1
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
+    build_mongoreplay: true
   tasks:
   - name: compile
   - name: aggregation
@@ -4961,6 +4984,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_jobs_available: 1
+    build_mongoreplay: true
   tasks:
   - name: compile
   - name: audit
@@ -5023,6 +5047,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     requires:
@@ -5233,6 +5258,7 @@ buildvariants:
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -5436,6 +5462,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -5489,6 +5516,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -5606,6 +5634,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -5744,6 +5773,7 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -5880,6 +5910,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6018,6 +6049,7 @@ buildvariants:
     packager_distro: ubuntu1204
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6072,6 +6104,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6126,6 +6159,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6169,6 +6203,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ -j$(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6190,6 +6225,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: "--mongosSetParameters='{messagePortImpl: 'ASIO'}' --mongodSetParameters='{messagePortImpl: 'ASIO'}'"
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6239,6 +6275,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6294,6 +6331,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: enterprise
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6384,6 +6422,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6857,6 +6896,7 @@ buildvariants:
     packager_distro: debian71
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6911,6 +6951,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: enterprise
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6963,6 +7004,7 @@ buildvariants:
     packager_distro: debian71
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7082,6 +7124,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: org
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7200,6 +7243,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7282,6 +7326,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7364,6 +7409,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7441,6 +7487,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7524,6 +7571,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=rocksdb
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7599,6 +7647,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
+    build_mongoreplay: true
   tasks:
   - name: compile
   - name: aggregation
@@ -7737,6 +7786,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
+    build_mongoreplay: true
   tasks:
   - name: compile
   - name: jstestfuzz
@@ -7766,6 +7816,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1"
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip CXXFLAGS="-nostdlib -nostdinc++" LIBPATH=/opt/mongodbtoolchain/v2/lib/gcc/x86_64-mongodb-linux/5.4.0 CPPPATH="/opt/mongodbtoolchain/v2/include/c++/5.4.0/ /opt/mongodbtoolchain/v2/include/c++/5.4.0/x86_64-mongodb-linux" CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" VARIANT_DIR=build
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7904,6 +7955,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
     scons_cache_mode: all
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7923,6 +7975,7 @@ buildvariants:
     compile_flags: --allocator=system --dbg=on --opt=on --ssl -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on --cxx-std=14
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8057,6 +8110,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
+    build_mongoreplay: true
   tasks:
   - name: compile
     distros:

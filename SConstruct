@@ -384,6 +384,11 @@ add_option('use-new-tools',
     nargs=0,
 )
 
+add_option('build-mongoreplay',
+    help='when building with --use-new-tools, build mongoreplay ( requires pcap dev )',
+    nargs=1,
+)
+
 add_option('use-cpu-profiler',
     help='Link against the google-perftools profiler library',
     nargs=0,
