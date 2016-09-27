@@ -293,6 +293,10 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<DBPointerInfo>().getJSClass() == jsclass) {
+                uassert(ErrorCodes::BadValue,
+                        "can't serialize DBPointer prototype",
+                        scope->getProto<DBPointerInfo>().getProto() != obj);
+
                 JS::RootedValue id(_context);
                 o.getValue("id", &id);
 
