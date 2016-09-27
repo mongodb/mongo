@@ -410,13 +410,13 @@ connection_runtime_config = [
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
         this much dirty content, expressed as a percentage of the total cache
-        size.  Ignored if \c in_memory is \c true''',
+        size.''',
         min=1, max=99),
     Config('eviction_dirty_trigger', '20', r'''
         trigger application threads to perform eviction when the cache contains
         at least this much dirty content, expressed as a percentage of the
         total cache size. This setting only alters behavior if it is lower than
-        eviction_trigger. Ignored if \c in_memory is \c true''',
+        eviction_trigger''',
         min=1, max=99),
     Config('eviction_target', '80', r'''
         perform eviction in worker threads when the cache contains at least

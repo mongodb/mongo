@@ -1815,14 +1815,13 @@ struct __wt_connection {
 	 * default \c 5.}
 	 * @config{eviction_dirty_target, perform eviction in worker threads
 	 * when the cache contains at least this much dirty content\, expressed
-	 * as a percentage of the total cache size.  Ignored if \c in_memory is
-	 * \c true., an integer between 1 and 99; default \c 5.}
+	 * as a percentage of the total cache size., an integer between 1 and
+	 * 99; default \c 5.}
 	 * @config{eviction_dirty_trigger, trigger application threads to
 	 * perform eviction when the cache contains at least this much dirty
 	 * content\, expressed as a percentage of the total cache size.  This
-	 * setting only alters behavior if it is lower than eviction_trigger.
-	 * Ignored if \c in_memory is \c true., an integer between 1 and 99;
-	 * default \c 20.}
+	 * setting only alters behavior if it is lower than eviction_trigger.,
+	 * an integer between 1 and 99; default \c 20.}
 	 * @config{eviction_target, perform eviction in worker threads when the
 	 * cache contains at least this much content\, expressed as a percentage
 	 * of the total cache size.  Must be less than \c eviction_trigger., an
@@ -2281,13 +2280,12 @@ struct __wt_connection {
  * is \c true., an integer between 0 and 99; default \c 5.}
  * @config{eviction_dirty_target, perform eviction in worker threads when the
  * cache contains at least this much dirty content\, expressed as a percentage
- * of the total cache size.  Ignored if \c in_memory is \c true., an integer
- * between 1 and 99; default \c 5.}
+ * of the total cache size., an integer between 1 and 99; default \c 5.}
  * @config{eviction_dirty_trigger, trigger application threads to perform
  * eviction when the cache contains at least this much dirty content\, expressed
  * as a percentage of the total cache size.  This setting only alters behavior
- * if it is lower than eviction_trigger.  Ignored if \c in_memory is \c true.,
- * an integer between 1 and 99; default \c 20.}
+ * if it is lower than eviction_trigger., an integer between 1 and 99; default
+ * \c 20.}
  * @config{eviction_target, perform eviction in worker threads when the cache
  * contains at least this much content\, expressed as a percentage of the total
  * cache size.  Must be less than \c eviction_trigger., an integer between 10
