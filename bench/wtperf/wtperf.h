@@ -95,12 +95,6 @@ struct __truncate_queue_entry {
 	TAILQ_ENTRY(__truncate_queue_entry) q;
 };
 
-struct __config_queue_entry {
-	char *string;
-	TAILQ_ENTRY(__config_queue_entry) c;
-};
-typedef struct __config_queue_entry CONFIG_QUEUE_ENTRY;
-
 /* Steering for the throttle configuration */
 typedef struct {
 	struct timespec last_increment;	/* Time that we last added more ops */
@@ -120,15 +114,15 @@ struct __config {			/* Configuration structure */
 	char *monitor_dir;		/* Monitor output dir */
 	char *partial_config;		/* Config string for partial logging */
 	char *reopen_config;		/* Config string for conn reopen */
-	char *base_uri;			/* Object URI */
-	char *log_table_uri;		/* URI for log table */
-	char **uris;			/* URIs if multiple tables */
+	char *log_table_uri;            /* URI for log table */
+	char **uris;			/* URIs */
 
 	WT_CONNECTION *conn;		/* Database connection */
 
 	FILE *logf;			/* Logging handle */
 
-	char *async_config;		/* Config string for async */
+	char	*async_config;		/* Config string for async */
+	bool	 use_asyncops;		/* Use async operations */
 
 	const char *compress_ext;	/* Compression extension for conn */
 	const char *compress_table;	/* Compression arg to table create */
@@ -142,9 +136,7 @@ struct __config {			/* Configuration structure */
 	WORKLOAD	*workload;	/* Workloads */
 	u_int		 workload_cnt;
 
-	uint32_t	 use_asyncops;	/* Use async operations */
 	/* State tracking variables. */
-
 	uint64_t ckpt_ops;		/* checkpoint operations */
 	uint64_t insert_ops;		/* insert operations */
 	uint64_t read_ops;		/* read operations */
@@ -154,10 +146,10 @@ struct __config {			/* Configuration structure */
 	uint64_t insert_key;		/* insert key */
 	uint64_t log_like_table_key;	/* used to allocate IDs for log table */
 
-	volatile int ckpt;		/* checkpoint in progress */
-	volatile int error;		/* thread error */
-	volatile int stop;		/* notify threads to stop */
-	volatile int in_warmup;		/* Running warmup phase */
+	volatile bool ckpt;		/* checkpoint in progress */
+	volatile bool error;		/* thread error */
+	volatile bool stop;		/* notify threads to stop */
+	volatile bool in_warmup;	/* running warmup phase */
 
 	volatile bool idle_cycle_run;	/* Signal for idle cycle thread */
 
@@ -171,13 +163,7 @@ struct __config {			/* Configuration structure */
 	/* Queue head for use with the Truncate Logic */
 	TAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
 
-	/* Queue head to save a copy of the config to be output */
-	TAILQ_HEAD(__config_qh, __config_queue_entry) config_head;
-
-	/* Fields changeable on command line are listed in wtperf_opt.i */
-#define	OPT_DECLARE_STRUCT
-#include "wtperf_opt.i"
-#undef OPT_DECLARE_STRUCT
+	CONFIG_OPTS *opts;		/* Global configuration */
 };
 
 #define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
@@ -261,35 +247,33 @@ struct __config_thread {		/* Per-thread structure */
 };
 
 void	 cleanup_truncate_config(CONFIG *);
-int	 config_compress(CONFIG *);
-void	 config_free(CONFIG *);
-void	 config_copy(CONFIG *, const CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
-int	 config_opt_line(CONFIG *, const char *);
-int	 config_opt_str(CONFIG *, const char *, const char *);
-void	 config_to_file(CONFIG *);
-void	 config_consolidate(CONFIG *);
-void	 config_print(CONFIG *);
+void	 config_opt_cleanup(CONFIG_OPTS *);
+void	 config_opt_init(CONFIG_OPTS **);
+void	 config_opt_log(CONFIG_OPTS *, const char *);
+int	 config_opt_name_value(CONFIG *, const char *, const char *);
+void	 config_opt_print(CONFIG *);
+int	 config_opt_str(CONFIG *, const char *);
+void	 config_opt_usage(void);
 int	 config_sanity(CONFIG *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
+void	 latency_print(CONFIG *);
 void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
-void	 latency_print(CONFIG *);
 int	 run_truncate(
-    CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
+	    CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
 void	 setup_throttle(CONFIG_THREAD*);
 int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 int	 start_idle_table_cycle(CONFIG *, pthread_t *);
 int	 stop_idle_table_cycle(CONFIG *, pthread_t);
+void	 worker_throttle(CONFIG_THREAD*);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
 uint64_t sum_read_ops(CONFIG *);
 uint64_t sum_truncate_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
-void	 usage(void);
-void	 worker_throttle(CONFIG_THREAD*);
 
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 #if defined(__GNUC__)
@@ -300,10 +284,14 @@ __attribute__((format (printf, 4, 5)))
 static inline void
 generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 {
+	CONFIG_OPTS *opts;
+
+	opts = cfg->opts;
+
 	/*
 	 * Don't change to snprintf, sprintf is faster in some tests.
 	 */
-	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
+	sprintf(key_buf, "%0*" PRIu64, opts->key_sz - 1, keyno);
 }
 
 static inline void

@@ -150,33 +150,25 @@ number of async worker threads
 @par checkpoint_interval (unsigned int, default=120)
 checkpoint every interval seconds during the workload phase.
 @par checkpoint_stress_rate (unsigned int, default=0)
-checkpoint every rate operations during the populate phase in the
-populate thread(s), 0 to disable
+checkpoint every rate operations during the populate phase in the  populate thread(s), 0 to disable
 @par checkpoint_threads (unsigned int, default=0)
 number of checkpoint threads
-@par conn_config (string, default=create)
+@par conn_config (string, default="create")
 connection configuration string
 @par compact (boolean, default=false)
 post-populate compact for LSM merging activity
-@par compression (string, default=none)
-compression extension.  Allowed configuration values are: 'none',
-'lz4', 'snappy', 'zlib'
+@par compression (string, default="none")
+compression extension.  Allowed configuration values are:  'none', 'lz4', 'snappy', 'zlib'
 @par create (boolean, default=true)
 do population phase; false to use existing database
 @par database_count (unsigned int, default=1)
-number of WiredTiger databases to use. Each database will execute the
-workload using a separate home directory and complete set of worker
-threads
-@par drop_tables (unsigned int, default=0)
-Whether to drop all tables at the end of the run, and report time
-taken to do the drop.
+number of WiredTiger databases to use. Each database will execute the  workload using a separate home directory and complete set of worker  threads
+@par drop_tables (boolean, default=false)
+Whether to drop all tables at the end of the run, and report time taken  to do the drop.
 @par icount (unsigned int, default=5000)
-number of records to initially populate. If multiple tables are
-configured the count is spread evenly across all tables.
+number of records to initially populate. If multiple tables are  configured the count is spread evenly across all tables.
 @par idle_table_cycle (unsigned int, default=0)
-Enable regular create and drop of idle tables, value is the maximum
-number of seconds a create or drop is allowed before flagging an
-error. Default 0 which means disabled.
+Enable regular create and drop of idle tables, value is the maximum  number of seconds a create or drop is allowed before flagging an error.  Default 0 which means disabled.
 @par index (boolean, default=false)
 Whether to create an index on the value field.
 @par insert_rmw (boolean, default=false)
@@ -188,28 +180,21 @@ perform partial logging on first table only.
 @par log_like_table (boolean, default=false)
 Append all modification operations to another shared table.
 @par min_throughput (unsigned int, default=0)
-notify if any throughput measured is less than this amount. Aborts or
-prints warning based on min_throughput_fatal setting. Requires
-sample_interval to be configured
+notify if any throughput measured is less than this amount.  Aborts or prints warning based on min_throughput_fatal setting.  Requires sample_interval to be configured
 @par min_throughput_fatal (boolean, default=false)
 print warning (false) or abort (true) of min_throughput failure.
 @par max_latency (unsigned int, default=0)
-notify if any latency measured exceeds this number of
-milliseconds.Aborts or prints warning based on min_throughput_fatal
-setting. Requires sample_interval to be configured
+notify if any latency measured exceeds this number of milliseconds. Aborts or prints warning based on min_throughput_fatal setting.  Requires sample_interval to be configured
 @par max_latency_fatal (boolean, default=false)
 print warning (false) or abort (true) of max_latency failure.
 @par pareto (unsigned int, default=0)
-use pareto distribution for random numbers. Zero to disable, otherwise
-a percentage indicating how aggressive the distribution should be.
+use pareto distribution for random numbers. Zero  to disable, otherwise a percentage indicating how aggressive the  distribution should be.
 @par populate_ops_per_txn (unsigned int, default=0)
-number of operations to group into each transaction in the populate
-phase, zero for auto-commit
+number of operations to group into each transaction in the populate  phase, zero for auto-commit
 @par populate_threads (unsigned int, default=1)
 number of populate threads, 1 for bulk load
 @par random_range (unsigned int, default=0)
-if non zero choose a value from within this range as the key for
-insert operations
+if non zero choose a value from within this range as the key for  insert operations
 @par random_value (boolean, default=false)
 generate random content for the value
 @par range_partition (boolean, default=false)
@@ -217,9 +202,7 @@ partition data by range (vs hash)
 @par read_range (unsigned int, default=0)
 scan a range of keys after each search
 @par readonly (boolean, default=false)
-reopen the connection between populate and workload phases in readonly
-mode.  Requires reopen_connection turned on (default).  Requires that
-read be the only workload specified
+reopen the connection between populate and workload phases in readonly  mode.  Requires reopen_connection turned on (default).  Requires that  read be the only workload specified
 @par reopen_connection (boolean, default=true)
 close and reopen the connection between populate and workload phases
 @par report_interval (unsigned int, default=2)
@@ -231,40 +214,22 @@ total workload seconds
 @par sample_interval (unsigned int, default=0)
 performance logging every interval seconds, 0 to disable
 @par sample_rate (unsigned int, default=50)
-how often the latency of operations is measured. One for every
-operation,two for every second operation, three for every third
-operation etc.
-@par sess_config (string, default=)
+how often the latency of operations is measured. One for every operation, two for every second operation, three for every third operation etc.
+@par sess_config (string, default="")
 session configuration string
 @par session_count_idle (unsigned int, default=0)
 number of idle sessions to create. Default 0.
-@par table_config (string, default=key_format=S,value_format=S,type=lsm,exclusive=true,allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,split_pct=100)
+@par table_config (string, default="key_format=S,value_format=S,type=lsm,exclusive=true, allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb, split_pct=100")
 table configuration string
 @par table_count (unsigned int, default=1)
-number of tables to run operations over. Keys are divided evenly over
-the tables. Cursors are held open on all tables. Default 1, maximum
-99999.
+number of tables to run operations over. Keys are divided evenly  over the tables. Cursors are held open on all tables. Default 1, maximum  99999.
 @par table_count_idle (unsigned int, default=0)
 number of tables to create, that won't be populated. Default 0.
-@par threads (string, default=)
-workload configuration: each 'count' entry is the total number of
-threads, and the 'insert', 'read' and 'update' entries are the ratios
-of insert, read and update operations done by each worker thread; If a
-throttle value is provided each thread will do a maximum of that
-number of operations per second; multiple workload configurations may
-be specified per threads configuration; for example, a more complex
-threads configuration might be
-'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'
-which would create 2 threads doing nothing but reads and 8 threads
-each doing 50% inserts and 25% reads and updates.  Allowed
-configuration values are 'count', 'throttle', 'update_delta', 'reads',
-'inserts', 'updates', 'truncate', 'truncate_pct' and 'truncate_count'.
-There are also behavior modifiers, supported modifiers are
-'ops_per_txn'
-@par transaction_config (string, default=)
-transaction configuration string, relevant when populate_opts_per_txn
-is nonzero
-@par table_name (string, default=test)
+@par threads (string, default="")
+workload configuration: each 'count'  entry is the total number of threads, and the 'insert', 'read' and  'update' entries are the ratios of insert, read and update operations  done by each worker thread; If a throttle value is provided each thread  will do a maximum of that number of operations per second; multiple  workload configurations may be specified per threads configuration;  for example, a more complex threads configuration might be  'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'  which would create 2 threads doing nothing but reads and 8 threads  each doing 50% inserts and 25% reads and updates.  Allowed configuration  values are 'count', 'throttle', 'update_delta', 'reads', 'inserts',  'updates', 'truncate', 'truncate_pct' and 'truncate_count'. There are  also behavior modifiers, supported modifiers are 'ops_per_txn'
+@par transaction_config (string, default="")
+WT_SESSION.begin_transaction configuration string, applied during the  populate phase when populate_ops_per_txn is nonzero
+@par table_name (string, default="test")
 table name
 @par truncate_single_ops (boolean, default=false)
 Implement truncate via cursor remove instead of session API

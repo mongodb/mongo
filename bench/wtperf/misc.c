@@ -32,20 +32,22 @@
 int
 setup_log_file(CONFIG *cfg)
 {
+	CONFIG_OPTS *opts;
+	size_t len;
 	int ret;
 	char *fname;
 
+	opts = cfg->opts;
 	ret = 0;
 
-	if (cfg->verbose < 1)
+	if (opts->verbose < 1)
 		return (0);
 
-	fname = dcalloc(strlen(cfg->monitor_dir) +
-	    strlen(cfg->table_name) + strlen(".stat") + 2, 1);
-
-	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
-	cfg->logf = fopen(fname, "w");
-	if (cfg->logf == NULL) {
+	len = strlen(cfg->monitor_dir) +
+	    strlen(opts->table_name) + strlen(".stat") + 2;
+	fname = dmalloc(len);
+	snprintf(fname, len, "%s/%s.stat", cfg->monitor_dir, opts->table_name);
+	if ((cfg->logf = fopen(fname, "w")) == NULL) {
 		ret = errno;
 		fprintf(stderr, "%s: %s\n", fname, strerror(ret));
 	}
@@ -64,15 +66,18 @@ setup_log_file(CONFIG *cfg)
 void
 lprintf(const CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 {
+	CONFIG_OPTS *opts;
 	va_list ap;
 
-	if (err == 0 && level <= cfg->verbose) {
+	opts = cfg->opts;
+
+	if (err == 0 && level <= opts->verbose) {
 		va_start(ap, fmt);
 		vfprintf(cfg->logf, fmt, ap);
 		va_end(ap);
 		fprintf(cfg->logf, "\n");
 
-		if (level < cfg->verbose) {
+		if (level < opts->verbose) {
 			va_start(ap, fmt);
 			vprintf(fmt, ap);
 			va_end(ap);
