@@ -1952,9 +1952,9 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& ns) {
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
-    if (_memberState.rollback() && ns.isOplog()) {
-        return Status(ErrorCodes::NotMasterOrSecondary,
-                      "cannot read from oplog collection while in rollback");
+    if ((_memberState.startup2() || _memberState.rollback()) && ns.isOplog()) {
+        return {ErrorCodes::NotMasterOrSecondary,
+                "Oplog collection reads are not allowed while in the rollback or startup state."};
     }
     if (txn->getClient()->isInDirectClient()) {
         return Status::OK();
