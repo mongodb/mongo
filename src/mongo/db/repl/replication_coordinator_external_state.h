@@ -60,7 +60,7 @@ class ReplSettings;
 class ReplicationCoordinator;
 class ReplicationExecutor;
 
-using OnInitialSyncFinishedFn = stdx::function<void()>;
+using OnInitialSyncFinishedFn = stdx::function<void(OperationContext* txn)>;
 using StartInitialSyncFn = stdx::function<void(OnInitialSyncFinishedFn callback)>;
 using StartSteadyReplicationFn = stdx::function<void()>;
 /**

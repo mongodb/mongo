@@ -258,17 +258,15 @@ bool _initialSyncApplyOplog(OperationContext* txn,
  * ErrorCode::InitialSyncOplogSourceMissing if the node fails to find an sync source, Status::OK
  * if everything worked, and ErrorCode::InitialSyncFailure for all other error cases.
  */
-Status _initialSync(BackgroundSync* bgsync) {
+Status _initialSync(OperationContext* txn, BackgroundSync* bgsync) {
     log() << "initial sync pending";
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
-    txn.setReplicatedWrites(false);
-    DisableDocumentValidation validationDisabler(&txn);
+    txn->setReplicatedWrites(false);
+    DisableDocumentValidation validationDisabler(txn);
     ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
     // reset state for initial sync
-    truncateAndResetOplog(&txn, replCoord, bgsync);
+    truncateAndResetOplog(txn, replCoord, bgsync);
 
     OplogReader r;
 
@@ -276,7 +274,7 @@ Status _initialSync(BackgroundSync* bgsync) {
     while (r.getHost().empty()) {
         // We must prime the sync source selector so that it considers all candidates regardless
         // of oplog position, by passing in null OpTime as the last op fetched time.
-        r.connectToSyncSource(&txn, OpTime(), replCoord);
+        r.connectToSyncSource(txn, OpTime(), replCoord);
 
         if (r.getHost().empty()) {
             std::string msg =
@@ -304,7 +302,7 @@ Status _initialSync(BackgroundSync* bgsync) {
     }
 
     log() << "initial sync drop all databases";
-    dropAllDatabasesExceptLocal(&txn);
+    dropAllDatabasesExceptLocal(txn);
 
     if (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
         log() << "initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled. "
@@ -341,17 +339,17 @@ Status _initialSync(BackgroundSync* bgsync) {
         }
         auto collections = fetchStatus.getValue();
 
-        ScopedTransaction transaction(&txn, MODE_IX);
-        Lock::DBLock dbWrite(txn.lockState(), db, MODE_X);
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
-        auto createStatus = cloner.createCollectionsForDb(&txn, collections, db);
+        auto createStatus = cloner.createCollectionsForDb(txn, collections, db);
         if (!createStatus.isOK()) {
             return createStatus;
         }
         collectionsPerDb.emplace(db, std::move(collections));
     }
     for (auto&& dbCollsPair : collectionsPerDb) {
-        if (!_initialSyncClone(&txn,
+        if (!_initialSyncClone(txn,
                                cloner,
                                r.conn()->getServerAddress(),
                                dbCollsPair.first,
@@ -366,15 +364,15 @@ Status _initialSync(BackgroundSync* bgsync) {
     // prime oplog, but don't need to actually apply the op as the cloned data already reflects it.
     fassertStatusOK(
         40142,
-        StorageInterface::get(&txn)->insertDocument(&txn, NamespaceString(rsOplogName), lastOp));
+        StorageInterface::get(txn)->insertDocument(txn, NamespaceString(rsOplogName), lastOp));
     OpTime lastOptime = OplogEntry(lastOp).getOpTime();
-    ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
+    ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOptime);
     replCoord->setMyLastAppliedOpTime(lastOptime);
     setNewTimestamp(lastOptime.getTimestamp());
 
     std::string msg = "oplog sync 1 of 3";
     log() << msg;
-    if (!_initialSyncApplyOplog(&txn, &init, &r, bgsync)) {
+    if (!_initialSyncApplyOplog(txn, &init, &r, bgsync)) {
         return Status(ErrorCodes::InitialSyncFailure,
                       str::stream() << "initial sync failed: " << msg);
     }
@@ -385,7 +383,7 @@ Status _initialSync(BackgroundSync* bgsync) {
     // TODO: replace with "tail" instance below, since we don't need to retry/reclone missing docs.
     msg = "oplog sync 2 of 3";
     log() << msg;
-    if (!_initialSyncApplyOplog(&txn, &init, &r, bgsync)) {
+    if (!_initialSyncApplyOplog(txn, &init, &r, bgsync)) {
         return Status(ErrorCodes::InitialSyncFailure,
                       str::stream() << "initial sync failed: " << msg);
     }
@@ -394,7 +392,7 @@ Status _initialSync(BackgroundSync* bgsync) {
     msg = "initial sync building indexes";
     log() << msg;
     for (auto&& dbCollsPair : collectionsPerDb) {
-        if (!_initialSyncClone(&txn,
+        if (!_initialSyncClone(txn,
                                cloner,
                                r.conn()->getServerAddress(),
                                dbCollsPair.first,
@@ -412,14 +410,14 @@ Status _initialSync(BackgroundSync* bgsync) {
     log() << msg;
 
     InitialSync tail(bgsync, multiSyncApply);  // Use the non-initial sync apply code
-    if (!_initialSyncApplyOplog(&txn, &tail, &r, bgsync)) {
+    if (!_initialSyncApplyOplog(txn, &tail, &r, bgsync)) {
         return Status(ErrorCodes::InitialSyncFailure,
                       str::stream() << "initial sync failed: " << msg);
     }
 
     // ---------
 
-    Status status = getGlobalAuthorizationManager()->initialize(&txn);
+    Status status = getGlobalAuthorizationManager()->initialize(txn);
     if (!status.isOK()) {
         warning() << "Failed to reinitialize auth data after initial sync. " << status;
         return status;
@@ -429,7 +427,7 @@ Status _initialSync(BackgroundSync* bgsync) {
 
     // Initial sync is now complete.
     // Clear the initial sync flag -- cannot be done under a db lock, or recursive.
-    StorageInterface::get(&txn)->clearInitialSyncFlag(&txn);
+    StorageInterface::get(txn)->clearInitialSyncFlag(txn);
 
     // Clear maint. mode.
     while (replCoord->getMaintenanceMode()) {
@@ -500,7 +498,8 @@ Status checkAdminDatabase(OperationContext* txn, Database* adminDb) {
     return Status::OK();
 }
 
-void syncDoInitialSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
+void syncDoInitialSync(OperationContext* txn,
+                       ReplicationCoordinatorExternalState* replicationCoordinatorExternalState) {
     stdx::unique_lock<stdx::mutex> lk(_initialSyncMutex, stdx::defer_lock);
     if (!lk.try_lock()) {
         uasserted(34474, "Initial Sync Already Active.");
@@ -509,25 +508,23 @@ void syncDoInitialSync(ReplicationCoordinatorExternalState* replicationCoordinat
     std::unique_ptr<BackgroundSync> bgsync;
     {
         log() << "Starting replication fetcher thread for initial sync";
-        auto txn = cc().makeOperationContext();
         bgsync = stdx::make_unique<BackgroundSync>(
             replicationCoordinatorExternalState,
-            replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(txn.get()));
-        bgsync->startup(txn.get());
-        createOplog(txn.get());
+            replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(txn));
+        bgsync->startup(txn);
+        createOplog(txn);
     }
-    ON_BLOCK_EXIT([&bgsync]() {
+    ON_BLOCK_EXIT([txn, &bgsync]() {
         log() << "Stopping replication fetcher thread for initial sync";
-        auto txn = cc().makeOperationContext();
-        bgsync->shutdown(txn.get());
-        bgsync->join(txn.get());
+        bgsync->shutdown(txn);
+        bgsync->join(txn);
     });
 
     int failedAttempts = 0;
     while (failedAttempts < kMaxFailedAttempts) {
         try {
             // leave loop when successful
-            Status status = _initialSync(bgsync.get());
+            Status status = _initialSync(txn, bgsync.get());
             if (status.isOK()) {
                 break;
             } else {

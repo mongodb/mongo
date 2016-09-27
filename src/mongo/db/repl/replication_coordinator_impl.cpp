@@ -644,14 +644,13 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             _externalState->startSteadyStateReplication(txn, this);
         });
     } else {
-        _externalState->startInitialSync([this, startCompleted]() {
-            auto txn = cc().makeOperationContext();
+        _externalState->startInitialSync([this, startCompleted](OperationContext* txn) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (!_inShutdown) {
                 if (startCompleted) {
                     startCompleted();
                 }
-                _externalState->startSteadyStateReplication(txn.get(), this);
+                _externalState->startSteadyStateReplication(txn, this);
             }
         });
     }

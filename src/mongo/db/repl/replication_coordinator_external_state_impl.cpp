@@ -200,10 +200,9 @@ void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFini
         if (status == ErrorCodes::CallbackCanceled) {
             return TaskRunner::NextAction::kDisposeOperationContext;
         }
-        Client::initThreadIfNotAlready("initial sync");
         // Do initial sync.
-        syncDoInitialSync(this);
-        finished();
+        syncDoInitialSync(txn, this);
+        finished(txn);
         return TaskRunner::NextAction::kDisposeOperationContext;
     });
 }
