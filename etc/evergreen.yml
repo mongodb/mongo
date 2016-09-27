@@ -54,28 +54,6 @@ variables:
       enable_coredumps: false
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
-- &jepsen_config_vars
-  hang_analyzer_processes: "java"
-  jepsen_key_time_limit: --key-time-limit 15
-  jepsen_protocol_version: --protocol-version 1
-  jepsen_read_concern: ""
-  jepsen_read_with_find_and_modify: ""
-  jepsen_storage_engine: ""
-  jepsen_time_limit: --time-limit 300
-  jepsen_write_concern: ""
-
-# Template for running Jepsen tests
-- &run_jepsen_template
-  name: run_jepsen_template
-  depends_on:
-  - name: compile
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-
 - &jstestfuzz_config_vars
   resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
   should_shuffle: false
@@ -133,7 +111,6 @@ variables:
   - ubuntu1404
   - ubuntu1604
   - ubuntu1604-arm64
-  - ubuntu1404-jepsen
   - ubuntu1404-rocksdb
   - debian71
   - debian81
@@ -443,85 +420,6 @@ functions:
 
         ${resmoke_wrapper} PATH="$path_value" ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
-
-  "do jepsen setup" :
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          git clone git@github.com:10gen/jepsen.git
-          cd jepsen/jepsen
-          git checkout mongodb-master
-          branch=$(git symbolic-ref --short HEAD)
-          commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-          echo "Git branch: $branch, commit: $commit"
-          lein install
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          # On each LXC host do the following:
-          #   Check to see if it's running, if not try to restart it.
-          #   Copy the mongodb tarball to /root.
-          numVms=5
-          exit_failure_code=0
-          ${set_sudo}
-          for i in $(seq 1 $numVms)
-          do
-            hostn=n$i
-            hostn_log=/var/log/lxc/$hostn.log
-            $sudo lxc-wait -n $hostn -s 'RUNNING' -t 0
-            lxc_code=$?
-            lxc_restarts=0
-            # If the LXC host is not running, try 5 times to start it.
-            while [ $lxc_code -ne 0 ]
-            do
-              lxc_restarts=$((lxc_restarts+1))
-              echo "Restarting host $hostn, attempt $lxc_restarts"
-              # When restarting, increase the logging level to INFO for the LXC log.
-              $sudo lxc-start -n $hostn --logpriority=INFO --logfile=$hostn_log -d
-              $sudo lxc-wait -n $hostn -s 'RUNNING' -t 60
-              lxc_code=$?
-              if [ $lxc_restarts -eq 5 ]; then
-                break
-              fi
-            done
-            scp -o ConnectTimeout=30 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
-            exit_code=$?
-            # If the copy fails, then tail the LXC host log.
-            if [ $exit_code -ne 0 ]; then
-              echo "Copy to host $hostn failed!"
-              $sudo tail -n 100 $hostn_log
-              exit_failure_code=$exit_code
-            fi
-          done
-          exit $exit_failure_code
-
-  "run jepsen test" :
-    - command: shell.exec
-      type: test
-      timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
-      params:
-        working_dir: src/jepsen/mongodb
-        script: |
-          set -o verbose
-          start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
-          exit_code=$?
-          end_time=$(date +%s)
-          elapsed_secs=$((end_time-start_time))
-          if [ $exit_code -eq 0 ]; then
-            status='"pass"'
-            failures=0
-          else
-            status='"fail"'
-            failures=1
-          fi
-          # Create report.json
-          echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > ../../report.json
-          exit $exit_code
-
   "run jstestfuzz":
     - command: shell.exec
       params:
@@ -564,7 +462,7 @@ functions:
           echo "jstestfuzz self-tests are starting"
           npm test > /dev/null
           echo "jstestfuzz self-tests finished"
-          
+
           npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
     - command: archive.targz_pack
       params:
@@ -794,75 +692,6 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: gcov intermediate files - Execution ${execution}
-      optional: true
-
-  # Gather and archive the Jepsen mongod logs.
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        # For Jepsen tasks, archive the mongod log files.
-        if [ -d jepsen ]; then
-          # Copy mongod.log & stdout.log from each LXC host for archive purposes. Note that
-          # stdout.log is also generated as a result of starting mongod.
-          # The logs can reside in 1 of 2 places:
-          #   If the task completed: /root
-          #   If the task failed to complete: /opt/mongodb
-          # There may be logs in both places, but the ones in /opt/mongodb should override
-          # the ones in /root, since the logs in /root could be from a previous successful run.
-          numVms=5
-          for i in $(seq 1 $numVms)
-          do
-            hostn=n$i
-            for log_dir in /root /opt/mongodb
-            do
-              for log in mongod.log stdout.log
-              do
-                outlog="$(echo $log | cut -f1 -d '.')-n$i.log"
-                scp -q root@$hostn:$log_dir/$log $outlog 2> /dev/null
-                if [ -f $outlog ]; then
-                  echo "Copied $log_dir/$log from $hostn to $outlog"
-                fi
-              done
-            done
-          done
-        fi
-  - command: archive.targz_pack
-    params:
-      target: "src/jepsen-mongod-logs.tgz"
-      source_dir: "src"
-      include:
-        - "mongod*.log"
-        - "stdout*.log"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/jepsen-mongod-logs.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Jepsen mongod Logs - ${execution}
-      optional: true
-
-  # Gather and archive the Jepsen results.
-  - command: archive.targz_pack
-    params:
-      target: "src/jepsen-results.tgz"
-      source_dir: "src/jepsen/mongodb/store"
-      include:
-        - "./**"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/jepsen-results.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Jepsen Test Results - ${execution}
       optional: true
 
   # Gather and archive mongo coredumps.
@@ -1134,19 +963,6 @@ tasks:
       resmoke_wrapper: ${python|python} buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeat=2
       run_multiple_jobs: true
-
-## jepsen WT ##
-- <<: *run_jepsen_template
-  name: jepsen_findAndModify_WT
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-      hang_analyzer_processes: "java"
-      jepsen_read_with_find_and_modify: --read-with-find-and-modify
-      jepsen_storage_engine: --storage-engine wiredTiger
 
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
@@ -3572,9 +3388,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jepsen_findAndModify_WT
-    distros:
-    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -6263,9 +6076,6 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jepsen_findAndModify_WT
-    distros:
-    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
@@ -8220,23 +8030,6 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
-
-- name: ubuntu1404-jepsen
-  display_name: ~ Jepsen Ubuntu 14.04
-  run_on:
-  - ubuntu1404-jepsen
-  expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    use_scons_cache: true
-  tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: jepsen_findAndModify_WT
-  - name: unittests
-    distros:
-    - ubuntu1404-test
 
 - name: initsync-3dot2-rhel-62
   display_name: "~ Initial Sync 3.2 Enterprise RHEL 6.2"
