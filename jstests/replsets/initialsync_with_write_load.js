@@ -58,7 +58,7 @@ var work = function() {
         else
             sleep(1);
     }
-    print("finshing loadgen");
+    print("finishing loadgen");
 };
 // insert enough that resync node has to go through oplog replay in each step
 var loadGen = startParallelShell(work, replTest.ports[0]);
