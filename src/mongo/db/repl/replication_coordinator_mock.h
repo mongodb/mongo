@@ -262,6 +262,8 @@ public:
 
     virtual Status stepUpIfEligible() override;
 
+    virtual bool isLinearizableReadConcernEnabled() const override;
+
     /**
      * Sets the return value for calls to getConfig.
      */

@@ -355,6 +355,11 @@ public:
      * Stops periodic noop writes to oplog.
      */
     virtual void stopNoopWriter() = 0;
+
+    /**
+     * Returns true if linearizable read concern is supported.
+     */
+    virtual bool isLinearizableReadConcernEnabled() const = 0;
 };
 
 }  // namespace repl

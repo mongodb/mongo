@@ -339,6 +339,8 @@ public:
 
     virtual Status stepUpIfEligible() override;
 
+    virtual bool isLinearizableReadConcernEnabled() const override;
+
     // ================== Test support API ===================
 
     /**

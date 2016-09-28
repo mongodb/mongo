@@ -3878,6 +3878,9 @@ void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
     _indexPrefetchConfig = cfg;
 }
 
+bool ReplicationCoordinatorImpl::isLinearizableReadConcernEnabled() const {
+    return _externalState->isLinearizableReadConcernEnabled();
+}
 
 }  // namespace repl
 }  // namespace mongo

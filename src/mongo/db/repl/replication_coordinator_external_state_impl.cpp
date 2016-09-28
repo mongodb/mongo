@@ -118,6 +118,8 @@ const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
 // repl::SnapshotThread introduces.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
 
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableLinearizableReadConcern, bool, false);
+
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(use3dot2InitialSync, bool, false);
 
 // Set this to specify whether to use a collection to buffer the oplog on the destination server
@@ -897,6 +899,10 @@ bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync
 
 std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
     return oplogFetcherMaxFetcherRestarts;
+}
+
+bool ReplicationCoordinatorExternalStateImpl::isLinearizableReadConcernEnabled() const {
+    return enableLinearizableReadConcern;
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {

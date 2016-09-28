@@ -294,6 +294,10 @@ std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRe
     return 0;
 }
 
+bool ReplicationCoordinatorExternalStateMock::isLinearizableReadConcernEnabled() const {
+    return false;
+}
+
 void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {
     _isReadCommittedSupported = val;
 }
