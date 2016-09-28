@@ -12,6 +12,26 @@
     let collNames = viewsDB.getCollectionNames();
     assert.eq(0, collNames.length, tojson(collNames));
 
+    // You cannot create a view that starts with 'system.'.
+    assert.commandFailedWithCode(viewsDB.runCommand({create: "system.views", viewOn: "collection"}),
+                                 ErrorCodes.InvalidNamespace,
+                                 "Created an illegal view named 'system.views'");
+
+    // We don't run this check on MMAPv1 as it automatically creates a system.indexes collection
+    // when creating a database, which causes this command to fail with NamespaceAlreadyExists.
+    if (jsTest.options().storageEngine !== "mmapv1") {
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "system.indexes", viewOn: "collection"}),
+            ErrorCodes.InvalidNamespace,
+            "Created an illegal view named 'system.indexes'");
+    }
+
+    // Collections that start with 'system.' that are not special to MongoDB fail with a different
+    // error code.
+    assert.commandFailedWithCode(viewsDB.runCommand({create: "system.foo", viewOn: "collection"}),
+                                 ErrorCodes.BadValue,
+                                 "Created an illegal view named 'system.foo'");
+
     // Create a collection for test purposes.
     assert.commandWorked(viewsDB.runCommand({create: "collection"}));
 
