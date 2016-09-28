@@ -46,8 +46,7 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 	    session, cfg, "eviction_checkpoint_target", &cval));
 	cache->eviction_checkpoint_target = (u_int)cval.val;
 
-	WT_RET(__wt_config_gets(
-	    session, cfg, "eviction_dirty_target", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
 	cache->eviction_dirty_target = (u_int)cval.val;
 
 	/*
@@ -62,13 +61,11 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 	 * lower than the dirty target.
 	 */
 	if (cache->eviction_checkpoint_target > 0 &&
-	    cache->eviction_checkpoint_target <
-	    cache->eviction_dirty_target)
+	    cache->eviction_checkpoint_target < cache->eviction_dirty_target)
 		cache->eviction_checkpoint_target =
 		    cache->eviction_dirty_target;
 
-	WT_RET(__wt_config_gets(
-	    session, cfg, "eviction_dirty_trigger", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_trigger", &cval));
 	cache->eviction_dirty_trigger = (u_int)cval.val;
 
 	/*

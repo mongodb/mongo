@@ -32,7 +32,7 @@
  * Put the initial config together for running a throttled workload.
  */
 void
-setup_throttle(CONFIG_THREAD *thread)
+setup_throttle(WTPERF_THREAD *thread)
 {
 	THROTTLE_CONFIG *throttle_cfg;
 
@@ -78,7 +78,7 @@ setup_throttle(CONFIG_THREAD *thread)
  * counter to perform more operations.
  */
 void
-worker_throttle(CONFIG_THREAD *thread)
+worker_throttle(WTPERF_THREAD *thread)
 {
 	THROTTLE_CONFIG *throttle_cfg;
 	struct timespec now;

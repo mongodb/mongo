@@ -168,7 +168,7 @@ config_unescape(char *orig)
  *	Parse the thread configuration.
  */
 static int
-config_threads(CONFIG *cfg, const char *config, size_t len)
+config_threads(WTPERF *wtperf, const char *config, size_t len)
 {
 	WORKLOAD *workp;
 	WT_CONFIG_ITEM groupk, groupv, k, v;
@@ -176,19 +176,19 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	int ret;
 
 	group = scan = NULL;
-	if (cfg->workload != NULL) {
+	if (wtperf->workload != NULL) {
 		/*
 		 * This call overrides an earlier call.  Free and
 		 * reset everything.
 		 */
-		free(cfg->workload);
-		cfg->workload = NULL;
-		cfg->workload_cnt = 0;
-		cfg->workers_cnt = 0;
+		free(wtperf->workload);
+		wtperf->workload = NULL;
+		wtperf->workload_cnt = 0;
+		wtperf->workers_cnt = 0;
 	}
 	/* Allocate the workload array. */
-	cfg->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
-	cfg->workload_cnt = 0;
+	wtperf->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
+	wtperf->workload_cnt = 0;
 
 	/*
 	 * The thread configuration may be in multiple groups, that is, we have
@@ -207,14 +207,14 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			goto err;
 
 		/* Move to the next workload slot. */
-		if (cfg->workload_cnt == WORKLOAD_MAX) {
+		if (wtperf->workload_cnt == WORKLOAD_MAX) {
 			fprintf(stderr,
 			    "too many workloads configured, only %d workloads "
 			    "supported\n",
 			    WORKLOAD_MAX);
 			return (EINVAL);
 		}
-		workp = &cfg->workload[cfg->workload_cnt++];
+		workp = &wtperf->workload[wtperf->workload_cnt++];
 
 		while ((ret = scan->next(scan, &k, &v)) == 0) {
 			if (STRING_MATCH("count", k.str, k.len)) {
@@ -247,9 +247,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				if ((workp->truncate = v.val) != 1)
 					goto err;
 				/* There can only be one Truncate thread. */
-				if (F_ISSET(cfg, CFG_TRUNCATE))
+				if (F_ISSET(wtperf, CFG_TRUNCATE))
 					goto err;
-				F_SET(cfg, CFG_TRUNCATE);
+				F_SET(wtperf, CFG_TRUNCATE);
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
@@ -277,13 +277,13 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 						goto err;
 					/* Special random value */
 					workp->update_delta = INT64_MAX;
-					F_SET(cfg, CFG_GROW);
+					F_SET(wtperf, CFG_GROW);
 				} else {
 					workp->update_delta = v.val;
 					if (v.val > 0)
-						F_SET(cfg, CFG_GROW);
+						F_SET(wtperf, CFG_GROW);
 					if (v.val < 0)
-						F_SET(cfg, CFG_SHRINK);
+						F_SET(wtperf, CFG_SHRINK);
 				}
 				continue;
 			}
@@ -313,7 +313,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		if (workp->truncate != 0 &&
 		    (workp->insert > 0 || workp->read > 0 || workp->update > 0))
 			goto err;
-		cfg->workers_cnt += (u_int)workp->threads;
+		wtperf->workers_cnt += (u_int)workp->threads;
 	}
 
 	ret = group->close(group);
@@ -341,7 +341,7 @@ err:	if (group != NULL)
  * value.
  */
 static int
-config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
+config_opt(WTPERF *wtperf, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	CONFIG_OPTS *opts;
 	CONFIG_OPT *desc;
@@ -350,7 +350,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 	size_t i, newlen;
 	void *valueloc;
 
-	opts = cfg->opts;
+	opts = wtperf->opts;
 
 	desc = NULL;
 	for (i = 0; i < WT_ELEMENTS(config_opts_desc); i++)
@@ -446,7 +446,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		 */
 		if (v->type == WT_CONFIG_ITEM_STRUCT &&
 		    STRING_MATCH("threads", k->str, k->len))
-			return (config_threads(cfg, v->str, v->len));
+			return (config_threads(wtperf, v->str, v->len));
 
 		if (v->type != WT_CONFIG_ITEM_STRING &&
 		    v->type != WT_CONFIG_ITEM_ID) {
@@ -474,7 +474,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
  * via lines ending in '\'.
  */
 int
-config_opt_file(CONFIG *cfg, const char *filename)
+config_opt_file(WTPERF *wtperf, const char *filename)
 {
 	FILE *fp;
 	size_t linelen, optionpos;
@@ -574,7 +574,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		if (contline)
 			optionpos += linelen;
 		else {
-			if ((ret = config_opt_str(cfg, option)) != 0) {
+			if ((ret = config_opt_str(wtperf, option)) != 0) {
 				fprintf(stderr, "wtperf: %s: %d: parse error\n",
 				    filename, linenum);
 				break;
@@ -604,7 +604,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
  * been joined.
  */
 int
-config_opt_str(CONFIG *cfg, const char *optstr)
+config_opt_str(WTPERF *wtperf, const char *optstr)
 {
 	CONFIG_OPTS *opts;
 	CONFIG_QUEUE_ENTRY *config_line;
@@ -613,12 +613,12 @@ config_opt_str(CONFIG *cfg, const char *optstr)
 	size_t len;
 	int ret, t_ret;
 
-	opts = cfg->opts;
+	opts = wtperf->opts;
 
 	len = strlen(optstr);
 	if ((ret = wiredtiger_config_parser_open(
 	    NULL, optstr, len, &scan)) != 0) {
-		lprintf(cfg, ret, 0, "Error in config_scan_begin");
+		lprintf(wtperf, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
 
@@ -639,10 +639,10 @@ config_opt_str(CONFIG *cfg, const char *optstr)
 				ret = 0;
 			break;
 		}
-		ret = config_opt(cfg, &k, &v);
+		ret = config_opt(wtperf, &k, &v);
 	}
 	if ((t_ret = scan->close(scan)) != 0) {
-		lprintf(cfg, ret, 0, "Error in config_scan_end");
+		lprintf(wtperf, ret, 0, "Error in config_scan_end");
 		if (ret == 0)
 			ret = t_ret;
 	}
@@ -655,7 +655,7 @@ config_opt_str(CONFIG *cfg, const char *optstr)
  *	Set a name/value configuration pair.
  */
 int
-config_opt_name_value(CONFIG *cfg, const char *name, const char *value)
+config_opt_name_value(WTPERF *wtperf, const char *name, const char *value)
 {
 	size_t len;
 	int ret;
@@ -664,7 +664,7 @@ config_opt_name_value(CONFIG *cfg, const char *name, const char *value)
 	len = strlen(name) + strlen(value) + 4;
 	optstr = dmalloc(len);
 	snprintf(optstr, len, "%s=\"%s\"", name, value);
-	ret = config_opt_str(cfg, optstr);
+	ret = config_opt_str(wtperf, optstr);
 	free(optstr);
 	return (ret);
 }
@@ -674,13 +674,13 @@ config_opt_name_value(CONFIG *cfg, const char *name, const char *value)
  *	Configuration sanity checks.
  */
 int
-config_sanity(CONFIG *cfg)
+config_sanity(WTPERF *wtperf)
 {
 	CONFIG_OPTS *opts;
 	WORKLOAD *workp;
 	u_int i;
 
-	opts = cfg->opts;
+	opts = wtperf->opts;
 
 	/* Various intervals should be less than the run-time. */
 	if (opts->run_time > 0 &&
@@ -710,7 +710,7 @@ config_sanity(CONFIG *cfg)
 	}
 
 	if (opts->value_sz_max < opts->value_sz) {
-		if (F_ISSET(cfg, CFG_GROW)) {
+		if (F_ISSET(wtperf, CFG_GROW)) {
 			fprintf(stderr, "value_sz_max %" PRIu32
 			    " must be greater than or equal to value_sz %"
 			    PRIu32 "\n", opts->value_sz_max, opts->value_sz);
@@ -719,7 +719,7 @@ config_sanity(CONFIG *cfg)
 			opts->value_sz_max = opts->value_sz;
 	}
 	if (opts->value_sz_min > opts->value_sz) {
-		if (F_ISSET(cfg, CFG_SHRINK)) {
+		if (F_ISSET(wtperf, CFG_SHRINK)) {
 			fprintf(stderr, "value_sz_min %" PRIu32
 			    " must be less than or equal to value_sz %"
 			    PRIu32 "\n", opts->value_sz_min, opts->value_sz);
@@ -728,9 +728,9 @@ config_sanity(CONFIG *cfg)
 			opts->value_sz_min = opts->value_sz;
 	}
 
-	if (opts->readonly && cfg->workload != NULL)
-		for (i = 0, workp = cfg->workload;
-		    i < cfg->workload_cnt; ++i, ++workp)
+	if (opts->readonly && wtperf->workload != NULL)
+		for (i = 0, workp = wtperf->workload;
+		    i < wtperf->workload_cnt; ++i, ++workp)
 			if (workp->insert != 0 || workp->update != 0 ||
 			    workp->truncate != 0) {
 				fprintf(stderr,
@@ -809,16 +809,16 @@ config_opt_log(CONFIG_OPTS *opts, const char *path)
  *	Print out the configuration in verbose mode.
  */
 void
-config_opt_print(CONFIG *cfg)
+config_opt_print(WTPERF *wtperf)
 {
 	CONFIG_OPTS *opts;
 	WORKLOAD *workp;
 	u_int i;
 
-	opts = cfg->opts;
+	opts = wtperf->opts;
 
 	printf("Workload configuration:\n");
-	printf("\t" "Home: %s\n", cfg->home);
+	printf("\t" "Home: %s\n", wtperf->home);
 	printf("\t" "Table name: %s\n", opts->table_name);
 	printf("\t" "Connection configuration: %s\n", opts->conn_config);
 	if (opts->sess_config != NULL)
@@ -836,10 +836,10 @@ config_opt_print(CONFIG *cfg)
 
 	printf("\t" "Workload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
 	    opts->run_time, opts->run_ops);
-	if (cfg->workload != NULL) {
+	if (wtperf->workload != NULL) {
 		printf("\t" "Workload configuration(s):\n");
-		for (i = 0, workp = cfg->workload;
-		    i < cfg->workload_cnt; ++i, ++workp)
+		for (i = 0, workp = wtperf->workload;
+		    i < wtperf->workload_cnt; ++i, ++workp)
 			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
 			    ", reads=%" PRId64 ", updates=%" PRId64
 			    ", truncates=% " PRId64 ")\n",
