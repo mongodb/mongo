@@ -117,6 +117,7 @@ public:
         BSONElement version;
         BSONElement o;
         BSONElement o2;
+        BSONElement ts;
     };
 
     class OpQueue {
@@ -146,9 +147,17 @@ public:
         size_t _size;
     };
 
-    // returns true if we should continue waiting for BSONObjs, false if we should
-    // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-    bool tryPopAndWaitForMore(OperationContext* txn, OpQueue* ops);
+    /**
+     * Attempts to pop an OplogEntry off the BGSync queue and add it to ops.
+     *
+     * If slaveDelayLimit is provided, only operations with a timestamp <= the provided Date_t will
+     * be included in the batch. Returns true if the (possibly empty) batch in ops should be ended
+     * and a new one started. If ops is empty on entry and nothing can be added yet, will wait up to
+     * a second before returning.
+     */
+    bool tryPopAndWaitForMore(OperationContext* txn,
+                              OpQueue* ops,
+                              boost::optional<Date_t> slaveDelayLimit = {});
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
@@ -172,7 +181,6 @@ protected:
     // Cap the batches using the limit on journal commits.
     // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
     static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
-    static const int replBatchLimitSeconds = 1;
     static const unsigned int replBatchLimitOperations = 5000;
 
     // Apply a batch of operations, using multiple threads.
