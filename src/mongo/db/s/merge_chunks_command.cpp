@@ -106,7 +106,7 @@ Status mergeChunks(OperationContext* txn,
     //
 
     ChunkVersion shardVersion;
-    Status refreshStatus = shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersion);
+    Status refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersion);
 
     if (!refreshStatus.isOK()) {
         std::string errmsg = str::stream()
@@ -283,7 +283,7 @@ Status mergeChunks(OperationContext* txn,
     //
     {
         ChunkVersion shardVersionAfterMerge;
-        refreshStatus = shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersionAfterMerge);
+        refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersionAfterMerge);
 
         if (!refreshStatus.isOK()) {
             std::string errmsg = str::stream() << "failed to refresh metadata for merge chunk ["

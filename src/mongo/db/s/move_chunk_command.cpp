@@ -156,7 +156,7 @@ public:
         grid.shardRegistry()->reload(txn);
 
         auto scopedRegisterMigration =
-            uassertStatusOK(shardingState->registerMigration(moveChunkRequest));
+            uassertStatusOK(shardingState->registerDonateChunk(moveChunkRequest));
 
         Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 

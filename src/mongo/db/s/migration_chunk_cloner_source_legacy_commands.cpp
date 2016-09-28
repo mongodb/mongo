@@ -60,7 +60,7 @@ public:
     AutoGetActiveCloner(OperationContext* txn, const MigrationSessionId& migrationSessionId) {
         ShardingState* const gss = ShardingState::get(txn);
 
-        const auto nss = gss->getActiveMigrationNss();
+        const auto nss = gss->getActiveDonateChunkNss();
         uassert(ErrorCodes::NotYetInitialized, "No active migrations were found", nss);
 
         // Once the collection is locked, the migration status cannot change

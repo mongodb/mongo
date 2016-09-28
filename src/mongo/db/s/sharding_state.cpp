@@ -328,9 +328,9 @@ Status ShardingState::onStaleShardVersion(OperationContext* txn,
 }
 
 Status ShardingState::refreshMetadataNow(OperationContext* txn,
-                                         const string& ns,
+                                         const NamespaceString& nss,
                                          ChunkVersion* latestShardVersion) {
-    auto refreshLatestShardVersionStatus = _refreshMetadata(txn, NamespaceString(ns), nullptr);
+    auto refreshLatestShardVersionStatus = _refreshMetadata(txn, nss, nullptr);
     if (!refreshLatestShardVersionStatus.isOK()) {
         return refreshLatestShardVersionStatus.getStatus();
     }
@@ -731,18 +731,19 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
     return (metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED());
 }
 
-StatusWith<ScopedRegisterMigration> ShardingState::registerMigration(const MoveChunkRequest& args) {
+StatusWith<ScopedRegisterDonateChunk> ShardingState::registerDonateChunk(
+    const MoveChunkRequest& args) {
     if (_migrationDestManager.isActive()) {
         return {ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Unable to start new migration because this shard is currently "
                                  "receiving a chunk"};
     }
 
-    return _activeMigrationsRegistry.registerMigration(args);
+    return _activeMigrationsRegistry.registerDonateChunk(args);
 }
 
-boost::optional<NamespaceString> ShardingState::getActiveMigrationNss() {
-    return _activeMigrationsRegistry.getActiveMigrationNss();
+boost::optional<NamespaceString> ShardingState::getActiveDonateChunkNss() {
+    return _activeMigrationsRegistry.getActiveDonateChunkNss();
 }
 
 BSONObj ShardingState::getActiveMigrationStatusReport(OperationContext* txn) {

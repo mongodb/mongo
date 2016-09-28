@@ -124,7 +124,7 @@ public:
         shardingState->setShardName(toShard.toString());
         const ShardId fromShard(cmdObj["fromShardName"].String());
 
-        const string ns = cmdObj.firstElement().String();
+        const NamespaceString nss(cmdObj.firstElement().String());
 
         BSONObj min = cmdObj["min"].Obj().getOwned();
         BSONObj max = cmdObj["max"].Obj().getOwned();
@@ -134,7 +134,7 @@ public:
         // consistent and predictable, generally we'd refresh anyway, and to be paranoid.
         ChunkVersion currentVersion;
 
-        Status status = shardingState->refreshMetadataNow(txn, ns, &currentVersion);
+        Status status = shardingState->refreshMetadataNow(txn, nss, &currentVersion);
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start recv'ing chunk "
                                    << "[" << redact(min) << "," << redact(max) << ")"
@@ -166,8 +166,8 @@ public:
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
-        Status startStatus = shardingState->migrationDestinationManager()->start(
-            ns,
+        uassertStatusOK(shardingState->migrationDestinationManager()->start(
+            nss,
             migrationSessionId,
             statusWithFromShardConnectionString.getValue(),
             fromShard,
@@ -176,10 +176,7 @@ public:
             max,
             shardKeyPattern,
             currentVersion.epoch(),
-            writeConcern);
-        if (!startStatus.isOK()) {
-            return appendCommandStatus(result, startStatus);
-        }
+            writeConcern));
 
         result.appendBool("started", true);
         return true;

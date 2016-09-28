@@ -85,60 +85,60 @@ MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
     return assertGet(MoveChunkRequest::createFromCommand(nss, builder.obj()));
 }
 
-TEST_F(MoveChunkRegistration, ScopedRegisterMigrationMoveConstructorAndAssignment) {
-    auto originalScopedRegisterMigration = assertGet(
-        _registry.registerMigration(createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
-    ASSERT(originalScopedRegisterMigration.mustExecute());
+TEST_F(MoveChunkRegistration, ScopedRegisterDonateChunkMoveConstructorAndAssignment) {
+    auto originalScopedRegisterDonateChunk = assertGet(_registry.registerDonateChunk(
+        createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
+    ASSERT(originalScopedRegisterDonateChunk.mustExecute());
 
-    ScopedRegisterMigration movedScopedRegisterMigration(
-        std::move(originalScopedRegisterMigration));
-    ASSERT(movedScopedRegisterMigration.mustExecute());
+    ScopedRegisterDonateChunk movedScopedRegisterDonateChunk(
+        std::move(originalScopedRegisterDonateChunk));
+    ASSERT(movedScopedRegisterDonateChunk.mustExecute());
 
-    originalScopedRegisterMigration = std::move(movedScopedRegisterMigration);
-    ASSERT(originalScopedRegisterMigration.mustExecute());
+    originalScopedRegisterDonateChunk = std::move(movedScopedRegisterDonateChunk);
+    ASSERT(originalScopedRegisterDonateChunk.mustExecute());
 
     // Need to signal the registered migration so the destructor doesn't invariant
-    originalScopedRegisterMigration.complete(Status::OK());
+    originalScopedRegisterDonateChunk.complete(Status::OK());
 }
 
 TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
-    ASSERT(!_registry.getActiveMigrationNss());
+    ASSERT(!_registry.getActiveDonateChunkNss());
 
     const NamespaceString nss("TestDB", "TestColl");
 
-    auto originalScopedRegisterMigration =
-        assertGet(_registry.registerMigration(createMoveChunkRequest(nss)));
+    auto originalScopedRegisterDonateChunk =
+        assertGet(_registry.registerDonateChunk(createMoveChunkRequest(nss)));
 
-    ASSERT_EQ(nss.ns(), _registry.getActiveMigrationNss()->ns());
+    ASSERT_EQ(nss.ns(), _registry.getActiveDonateChunkNss()->ns());
 
     // Need to signal the registered migration so the destructor doesn't invariant
-    originalScopedRegisterMigration.complete(Status::OK());
+    originalScopedRegisterDonateChunk.complete(Status::OK());
 }
 
 TEST_F(MoveChunkRegistration, SecondMigrationReturnsConflictingOperationInProgress) {
-    auto originalScopedRegisterMigration = assertGet(_registry.registerMigration(
+    auto originalScopedRegisterDonateChunk = assertGet(_registry.registerDonateChunk(
         createMoveChunkRequest(NamespaceString("TestDB", "TestColl1"))));
 
-    auto secondScopedRegisterMigrationStatus =
-        _registry.registerMigration(createMoveChunkRequest(NamespaceString("TestDB", "TestColl2")));
+    auto secondScopedRegisterDonateChunkStatus = _registry.registerDonateChunk(
+        createMoveChunkRequest(NamespaceString("TestDB", "TestColl2")));
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
-              secondScopedRegisterMigrationStatus.getStatus());
+              secondScopedRegisterDonateChunkStatus.getStatus());
 
-    originalScopedRegisterMigration.complete(Status::OK());
+    originalScopedRegisterDonateChunk.complete(Status::OK());
 }
 
 TEST_F(MoveChunkRegistration, SecondMigrationWithSameArgumentsJoinsFirst) {
-    auto originalScopedRegisterMigration = assertGet(
-        _registry.registerMigration(createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
-    ASSERT(originalScopedRegisterMigration.mustExecute());
+    auto originalScopedRegisterDonateChunk = assertGet(_registry.registerDonateChunk(
+        createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
+    ASSERT(originalScopedRegisterDonateChunk.mustExecute());
 
-    auto secondScopedRegisterMigration = assertGet(
-        _registry.registerMigration(createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
-    ASSERT(!secondScopedRegisterMigration.mustExecute());
+    auto secondScopedRegisterDonateChunk = assertGet(_registry.registerDonateChunk(
+        createMoveChunkRequest(NamespaceString("TestDB", "TestColl"))));
+    ASSERT(!secondScopedRegisterDonateChunk.mustExecute());
 
-    originalScopedRegisterMigration.complete({ErrorCodes::InternalError, "Test error"});
+    originalScopedRegisterDonateChunk.complete({ErrorCodes::InternalError, "Test error"});
     ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"),
-              secondScopedRegisterMigration.waitForCompletion(getTxn()));
+              secondScopedRegisterDonateChunk.waitForCompletion(getTxn()));
 }
 
 }  // namespace

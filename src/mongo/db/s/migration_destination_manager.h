@@ -87,7 +87,7 @@ public:
     /**
      * Returns OK if migration started successfully.
      */
-    Status start(const std::string& ns,
+    Status start(const NamespaceString& nss,
                  const MigrationSessionId& sessionId,
                  const ConnectionString& fromShardConnString,
                  const ShardId& fromShard,
@@ -117,8 +117,7 @@ private:
     /**
      * Thread which drives the migration apply process on the recipient side.
      */
-    void _migrateThread(std::string ns,
-                        BSONObj min,
+    void _migrateThread(BSONObj min,
                         BSONObj max,
                         BSONObj shardKeyPattern,
                         ConnectionString fromShardConnString,
@@ -126,7 +125,6 @@ private:
                         WriteConcernOptions writeConcern);
 
     void _migrateDriver(OperationContext* txn,
-                        const std::string& ns,
                         const BSONObj& min,
                         const BSONObj& max,
                         const BSONObj& shardKeyPattern,
@@ -194,7 +192,8 @@ private:
 
     // Migration session ID uniquely identifies the migration and indicates whether the prepare
     // method has been called.
-    boost::optional<MigrationSessionId> _sessionId{boost::none};
+    boost::optional<MigrationSessionId> _sessionId;
+
     // A condition variable on which to wait for the prepare method to be called.
     stdx::condition_variable _isActiveCV;
 

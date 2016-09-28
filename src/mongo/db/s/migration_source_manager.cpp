@@ -102,8 +102,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
 
     ChunkVersion shardVersion;
 
-    Status refreshStatus =
-        shardingState->refreshMetadataNow(txn, _args.getNss().ns(), &shardVersion);
+    Status refreshStatus = shardingState->refreshMetadataNow(txn, _args.getNss(), &shardVersion);
     if (!refreshStatus.isOK()) {
         uasserted(refreshStatus.code(),
                   str::stream() << "cannot start migrate of chunk "
@@ -412,8 +411,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         // case do a best effort attempt to incrementally refresh the metadata. If this fails, just
         // clear it up so that subsequent requests will try to do a full refresh.
         ChunkVersion unusedShardVersion;
-        Status refreshStatus = ShardingState::get(txn)->refreshMetadataNow(
-            txn, _args.getNss().ns(), &unusedShardVersion);
+        Status refreshStatus =
+            ShardingState::get(txn)->refreshMetadataNow(txn, _args.getNss(), &unusedShardVersion);
 
         if (refreshStatus.isOK()) {
             ScopedTransaction scopedXact(txn, MODE_IS);

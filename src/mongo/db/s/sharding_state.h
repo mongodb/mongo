@@ -185,7 +185,7 @@ public:
      * @return latestShardVersion the version that is now stored for this collection
      */
     Status refreshMetadataNow(OperationContext* txn,
-                              const std::string& ns,
+                              const NamespaceString& nss,
                               ChunkVersion* latestShardVersion);
 
     void appendInfo(OperationContext* txn, BSONObjBuilder& b);
@@ -203,24 +203,24 @@ public:
 
     /**
      * If there are no migrations running on this shard, registers an active migration with the
-     * specified arguments and returns a ScopedRegisterMigration, which must be signaled by the
+     * specified arguments and returns a ScopedRegisterDonateChunk, which must be signaled by the
      * caller before it goes out of scope.
      *
      * If there is an active migration already running on this shard and it has the exact same
-     * arguments, returns a ScopedRegisterMigration, which can be used to join the existing one.
+     * arguments, returns a ScopedRegisterDonateChunk, which can be used to join the existing one.
      *
      * Othwerwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedRegisterMigration> registerMigration(const MoveChunkRequest& args);
+    StatusWith<ScopedRegisterDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
 
     /**
-     * If a migration has been previously registered through a call to registerMigration returns
+     * If a migration has been previously registered through a call to registerDonateChunk returns
      * that namespace. Otherwise returns boost::none.
      *
      * This method can be called without any locks, but once the namespace is fetched it needs to be
      * re-checked after acquiring some intent lock on that namespace.
      */
-    boost::optional<NamespaceString> getActiveMigrationNss();
+    boost::optional<NamespaceString> getActiveDonateChunkNss();
 
     /**
      * Get a migration status report from the migration registry. If no migration is active, this
@@ -278,8 +278,6 @@ public:
     }
 
 private:
-    friend class ScopedRegisterMigration;
-
     // Map from a namespace into the sharding state for each collection we have
     typedef stdx::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>
         CollectionShardingStateMap;

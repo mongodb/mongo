@@ -44,16 +44,16 @@ ActiveMigrationsRegistry::~ActiveMigrationsRegistry() {
     invariant(!_activeMoveChunkState);
 }
 
-StatusWith<ScopedRegisterMigration> ActiveMigrationsRegistry::registerMigration(
+StatusWith<ScopedRegisterDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     const MoveChunkRequest& args) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_activeMoveChunkState) {
         _activeMoveChunkState.emplace(args);
-        return {ScopedRegisterMigration(this, true, _activeMoveChunkState->notification)};
+        return {ScopedRegisterDonateChunk(this, true, _activeMoveChunkState->notification)};
     }
 
     if (_activeMoveChunkState->args == args) {
-        return {ScopedRegisterMigration(nullptr, false, _activeMoveChunkState->notification)};
+        return {ScopedRegisterDonateChunk(nullptr, false, _activeMoveChunkState->notification)};
     }
 
     return {
@@ -63,7 +63,7 @@ StatusWith<ScopedRegisterMigration> ActiveMigrationsRegistry::registerMigration(
             << _activeMoveChunkState->args.getNss().ns()};
 }
 
-boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveMigrationNss() {
+boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkNss() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_activeMoveChunkState) {
         return _activeMoveChunkState->args.getNss();
@@ -99,13 +99,13 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
     return BSONObj();
 }
 
-void ActiveMigrationsRegistry::_clearMigration() {
+void ActiveMigrationsRegistry::_clearDonateChunk() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_activeMoveChunkState);
     _activeMoveChunkState.reset();
 }
 
-ScopedRegisterMigration::ScopedRegisterMigration(
+ScopedRegisterDonateChunk::ScopedRegisterDonateChunk(
     ActiveMigrationsRegistry* registry,
     bool forUnregister,
     std::shared_ptr<Notification<Status>> completionNotification)
@@ -113,35 +113,35 @@ ScopedRegisterMigration::ScopedRegisterMigration(
       _forUnregister(forUnregister),
       _completionNotification(std::move(completionNotification)) {}
 
-ScopedRegisterMigration::~ScopedRegisterMigration() {
+ScopedRegisterDonateChunk::~ScopedRegisterDonateChunk() {
     if (_registry && _forUnregister) {
         // If this is a newly started migration the caller must always signal on completion
         invariant(*_completionNotification);
-        _registry->_clearMigration();
+        _registry->_clearDonateChunk();
     }
 }
 
-ScopedRegisterMigration::ScopedRegisterMigration(ScopedRegisterMigration&& other) {
+ScopedRegisterDonateChunk::ScopedRegisterDonateChunk(ScopedRegisterDonateChunk&& other) {
     *this = std::move(other);
 }
 
-ScopedRegisterMigration& ScopedRegisterMigration::operator=(ScopedRegisterMigration&& other) {
+ScopedRegisterDonateChunk& ScopedRegisterDonateChunk::operator=(ScopedRegisterDonateChunk&& other) {
     if (&other != this) {
         _registry = other._registry;
+        other._registry = nullptr;
         _forUnregister = other._forUnregister;
         _completionNotification = std::move(other._completionNotification);
-        other._registry = nullptr;
     }
 
     return *this;
 }
 
-void ScopedRegisterMigration::complete(Status status) {
+void ScopedRegisterDonateChunk::complete(Status status) {
     invariant(_forUnregister);
     _completionNotification->set(status);
 }
 
-Status ScopedRegisterMigration::waitForCompletion(OperationContext* txn) {
+Status ScopedRegisterDonateChunk::waitForCompletion(OperationContext* txn) {
     invariant(!_forUnregister);
     return _completionNotification->get(txn);
 }

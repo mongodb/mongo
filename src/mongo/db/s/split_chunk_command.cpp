@@ -267,7 +267,7 @@ public:
 
         // Always check our version remotely
         ChunkVersion shardVersion;
-        Status refreshStatus = shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersion);
+        Status refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
@@ -364,8 +364,7 @@ public:
         //
         {
             ChunkVersion shardVersionAfterSplit;
-            refreshStatus =
-                shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersionAfterSplit);
+            refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersionAfterSplit);
 
             if (!refreshStatus.isOK()) {
                 errmsg = str::stream() << "failed to refresh metadata for split chunk ["

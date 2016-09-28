@@ -243,7 +243,7 @@ public:
         }
 
         ChunkVersion shardVersion;
-        Status status = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
+        Status status = shardingState->refreshMetadataNow(txn, NamespaceString(ns), &shardVersion);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::RemoteChangeDetected) {
                 warning() << "Shard version in transition detected while refreshing "
