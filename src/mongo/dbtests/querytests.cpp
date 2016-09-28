@@ -416,31 +416,6 @@ public:
     }
 };
 
-class ReturnOneOfManyAndTail : public ClientBase {
-public:
-    ~ReturnOneOfManyAndTail() {
-        _client.dropCollection("unittests.querytests.ReturnOneOfManyAndTail");
-    }
-    void run() {
-        const char* ns = "unittests.querytests.ReturnOneOfManyAndTail";
-        _client.createCollection(ns, 1024, true);
-        insert(ns, BSON("a" << 0));
-        insert(ns, BSON("a" << 1));
-        insert(ns, BSON("a" << 2));
-        unique_ptr<DBClientCursor> c =
-            _client.query(ns,
-                          QUERY("a" << GT << 0).hint(BSON("$natural" << 1)),
-                          1,
-                          0,
-                          0,
-                          QueryOption_CursorTailable);
-        // If only one result requested, a cursor is not saved.
-        ASSERT_EQUALS(0, c->getCursorId());
-        ASSERT(c->more());
-        ASSERT_EQUALS(1, c->next().getIntField("a"));
-    }
-};
-
 class TailNotAtEnd : public ClientBase {
 public:
     ~TailNotAtEnd() {
@@ -1783,7 +1758,6 @@ public:
         add<GetMoreKillOp>();
         add<GetMoreInvalidRequest>();
         add<PositiveLimit>();
-        add<ReturnOneOfManyAndTail>();
         add<TailNotAtEnd>();
         add<EmptyTail>();
         add<TailableDelete>();

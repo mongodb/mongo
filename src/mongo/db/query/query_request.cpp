@@ -734,6 +734,11 @@ Status QueryRequest::init(int ntoskip,
         }
     }
 
+    // An ntoreturn of 1 is special because it also means to return at most one batch.
+    if (_ntoreturn.value_or(0) == 1) {
+        _wantMore = false;
+    }
+
     // Initialize flags passed as 'queryOptions' bit vector.
     initFromInt(queryOptions);
 

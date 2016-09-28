@@ -89,11 +89,7 @@ bool shouldSaveCursor(OperationContext* txn,
     }
 
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
-    if (!qr.wantMore() && !qr.isTailable()) {
-        return false;
-    }
-
-    if (qr.getNToReturn().value_or(0) == 1) {
+    if (!qr.wantMore()) {
         return false;
     }
 

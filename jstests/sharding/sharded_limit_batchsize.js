@@ -41,6 +41,17 @@
         assert.eq(2, cursor.next()["_id"]);
         assert.eq(3, cursor.next()["_id"]);
         assert(!cursor.hasNext());
+
+        // Ensure that in the limit 1 case, which is special when in legacy readMode, the server
+        // does not leave a cursor open.
+        var openCursorsBefore =
+            assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+        cursor = coll.find().sort({x: 1}).limit(1);
+        assert(cursor.hasNext());
+        assert.eq(-10, cursor.next()["_id"]);
+        var openCursorsAfter =
+            assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+        assert.eq(openCursorsBefore, openCursorsAfter);
     }
 
     //
