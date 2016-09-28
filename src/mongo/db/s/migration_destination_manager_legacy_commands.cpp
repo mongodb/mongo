@@ -166,8 +166,11 @@ public:
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
+        auto scopedRegisterReceiveChunk(uassertStatusOK(shardingState->registerReceiveChunk(nss)));
+
         uassertStatusOK(shardingState->migrationDestinationManager()->start(
             nss,
+            std::move(scopedRegisterReceiveChunk),
             migrationSessionId,
             statusWithFromShardConnectionString.getValue(),
             fromShard,

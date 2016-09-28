@@ -263,6 +263,7 @@ BSONObj MigrationDestinationManager::getMigrationStatusReport() {
 }
 
 Status MigrationDestinationManager::start(const NamespaceString& nss,
+                                          ScopedRegisterReceiveChunk scopedRegisterReceiveChunk,
                                           const MigrationSessionId& sessionId,
                                           const ConnectionString& fromShardConnString,
                                           const ShardId& fromShard,
@@ -273,19 +274,8 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
                                           const OID& epoch,
                                           const WriteConcernOptions& writeConcern) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_sessionId) {
-        return Status(ErrorCodes::ConflictingOperationInProgress,
-                      str::stream() << "Active migration already in progress "
-                                    << "ns: "
-                                    << _nss.ns()
-                                    << ", from: "
-                                    << _fromShardConnString.toString()
-                                    << ", min: "
-                                    << _min
-                                    << ", max: "
-                                    << _max);
-    }
+    invariant(!_sessionId);
+    invariant(!_scopedRegisterReceiveChunk);
 
     _state = READY;
     _errmsg = "";
@@ -306,6 +296,8 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
     _numSteady = 0;
 
     _sessionId = sessionId;
+    _scopedRegisterReceiveChunk = std::move(scopedRegisterReceiveChunk);
+
 
     // TODO: If we are here, the migrate thread must have completed, otherwise _active above would
     // be false, so this would never block. There is no better place with the current implementation
@@ -432,7 +424,8 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
     }
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _sessionId = boost::none;
+    _sessionId.reset();
+    _scopedRegisterReceiveChunk.reset();
     _isActiveCV.notify_all();
 }
 
@@ -445,6 +438,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                                                  const WriteConcernOptions& writeConcern) {
     invariant(isActive());
     invariant(_sessionId);
+    invariant(_scopedRegisterReceiveChunk);
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
 

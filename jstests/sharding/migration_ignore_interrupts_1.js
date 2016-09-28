@@ -58,6 +58,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
         ErrorCodes.ConflictingOperationInProgress,
         "(2) A shard should not be able to be the recipient of two ongoing migrations.");
 
+    assert.commandFailed(
+        admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}),
+        ErrorCodes.ConflictingOperationInProgress,
+        "(3) A shard should not be able to be both a donor and recipient of migrations.");
+
     // Finish migration
     unpauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
     assert.doesNotThrow(function() {

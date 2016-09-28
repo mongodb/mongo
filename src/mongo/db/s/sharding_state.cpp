@@ -733,13 +733,12 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
 
 StatusWith<ScopedRegisterDonateChunk> ShardingState::registerDonateChunk(
     const MoveChunkRequest& args) {
-    if (_migrationDestManager.isActive()) {
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Unable to start new migration because this shard is currently "
-                                 "receiving a chunk"};
-    }
-
     return _activeMigrationsRegistry.registerDonateChunk(args);
+}
+
+StatusWith<ScopedRegisterReceiveChunk> ShardingState::registerReceiveChunk(
+    const NamespaceString& nss) {
+    return _activeMigrationsRegistry.registerReceiveChunk(nss);
 }
 
 boost::optional<NamespaceString> ShardingState::getActiveDonateChunkNss() {

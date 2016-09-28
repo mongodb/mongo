@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,6 +48,13 @@ ActiveMigrationsRegistry::~ActiveMigrationsRegistry() {
 StatusWith<ScopedRegisterDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     const MoveChunkRequest& args) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_activeReceiveChunkState) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Unable to start new migration because this shard is currently "
+                                 "donating chunk for "
+                              << _activeReceiveChunkState->nss.ns()};
+    }
+
     if (!_activeMoveChunkState) {
         _activeMoveChunkState.emplace(args);
         return {ScopedRegisterDonateChunk(this, true, _activeMoveChunkState->notification)};
@@ -61,6 +69,28 @@ StatusWith<ScopedRegisterDonateChunk> ActiveMigrationsRegistry::registerDonateCh
         str::stream()
             << "Unable to start new migration because this shard is currently donating chunk for "
             << _activeMoveChunkState->args.getNss().ns()};
+}
+
+StatusWith<ScopedRegisterReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
+    const NamespaceString& nss) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_activeMoveChunkState) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Unable to start new migration because this shard is currently "
+                                 "donating chunk for "
+                              << _activeMoveChunkState->args.getNss().ns()};
+    }
+
+    if (_activeReceiveChunkState) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Unable to start new migration because this shard is currently "
+                                 "donating chunk for "
+                              << _activeReceiveChunkState->nss.ns()};
+    }
+
+    _activeReceiveChunkState.emplace(nss);
+
+    return {ScopedRegisterReceiveChunk(this)};
 }
 
 boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkNss() {
@@ -105,6 +135,12 @@ void ActiveMigrationsRegistry::_clearDonateChunk() {
     _activeMoveChunkState.reset();
 }
 
+void ActiveMigrationsRegistry::_clearReceiveChunk() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_activeReceiveChunkState);
+    _activeReceiveChunkState.reset();
+}
+
 ScopedRegisterDonateChunk::ScopedRegisterDonateChunk(
     ActiveMigrationsRegistry* registry,
     bool forUnregister,
@@ -144,6 +180,29 @@ void ScopedRegisterDonateChunk::complete(Status status) {
 Status ScopedRegisterDonateChunk::waitForCompletion(OperationContext* txn) {
     invariant(!_forUnregister);
     return _completionNotification->get(txn);
+}
+
+ScopedRegisterReceiveChunk::ScopedRegisterReceiveChunk(ActiveMigrationsRegistry* registry)
+    : _registry(registry) {}
+
+ScopedRegisterReceiveChunk::~ScopedRegisterReceiveChunk() {
+    if (_registry) {
+        _registry->_clearReceiveChunk();
+    }
+}
+
+ScopedRegisterReceiveChunk::ScopedRegisterReceiveChunk(ScopedRegisterReceiveChunk&& other) {
+    *this = std::move(other);
+}
+
+ScopedRegisterReceiveChunk& ScopedRegisterReceiveChunk::operator=(
+    ScopedRegisterReceiveChunk&& other) {
+    if (&other != this) {
+        _registry = other._registry;
+        other._registry = nullptr;
+    }
+
+    return *this;
 }
 
 }  // namespace mongo

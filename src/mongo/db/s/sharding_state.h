@@ -214,6 +214,15 @@ public:
     StatusWith<ScopedRegisterDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
 
     /**
+     * If there are no migrations running on this shard, registers an active receive operation with
+     * the specified session id and returns a ScopedRegisterReceiveChunk, which will unregister it
+     * when it goes out of scope.
+     *
+     * Otherwise returns a ConflictingOperationInProgress error.
+     */
+    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss);
+
+    /**
      * If a migration has been previously registered through a call to registerDonateChunk returns
      * that namespace. Otherwise returns boost::none.
      *
