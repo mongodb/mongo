@@ -329,12 +329,18 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
                 WorkingSetCommon::toStatusString(objToIndex.value()),
             state == PlanExecutor::IS_EOF);
 
-    // Need the index build to hang before the progress meter is marked as finished so we can
-    // reliably check that the index build has actually started in js tests.
-    while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
-        log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
-        sleepmillis(1000);
+    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+        // Need the index build to hang before the progress meter is marked as finished so we can
+        // reliably check that the index build has actually started in js tests.
+        while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+            log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
+            sleepmillis(1000);
+        }
+
+        // Check for interrupt to allow for killop prior to index build completion.
+        _txn->checkForInterrupt();
     }
+
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
         // Unlock before hanging so replication recognizes we've completed.
         Locker::LockSnapshot lockInfo;
