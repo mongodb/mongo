@@ -62,6 +62,8 @@ main(int argc, char *argv[])
 	char joinuri[256];
 
 	opts = &_opts;
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 
 	testutil_check(testutil_parse_opts(argc, argv, opts));
