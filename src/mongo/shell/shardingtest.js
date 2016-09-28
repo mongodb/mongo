@@ -1226,29 +1226,34 @@ var ShardingTest = function(params) {
      */
     function shouldSetFeatureCompatibilityVersion32() {
         if (otherParams.configOptions && otherParams.configOptions.binVersion &&
-            MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion) === '3.2') {
+            MongoRunner.areBinVersionsTheSame(
+                '3.2', MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion))) {
             return false;
         }
         if (jsTestOptions().shardMixedBinVersions) {
             return true;
         }
         if (otherParams.shardOptions && otherParams.shardOptions.binVersion &&
-            MongoRunner.getBinVersionFor(otherParams.shardOptions.binVersion) === '3.2') {
+            MongoRunner.areBinVersionsTheSame(
+                '3.2', MongoRunner.getBinVersionFor(otherParams.shardOptions.binVersion))) {
             return true;
         }
         for (var i = 0; i < numShards; i++) {
             if (otherParams['d' + i] && otherParams['d' + i].binVersion &&
-                MongoRunner.getBinVersionFor(otherParams['d' + i].binVersion) === '3.2') {
+                MongoRunner.areBinVersionsTheSame(
+                    '3.2', MongoRunner.getBinVersionFor(otherParams['d' + i].binVersion))) {
                 return true;
             }
         }
         if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion &&
-            MongoRunner.getBinVersionFor(otherParams.mongosOptions.binVersion) === '3.2') {
+            MongoRunner.areBinVersionsTheSame(
+                '3.2', MongoRunner.getBinVersionFor(otherParams.mongosOptions.binVersion))) {
             return true;
         }
         for (var i = 0; i < numMongos; i++) {
             if (otherParams['s' + i] && otherParams['s' + i].binVersion &&
-                MongoRunner.getBinVersionFor(otherParams['s' + i].binVersion) === '3.2') {
+                MongoRunner.areBinVersionsTheSame(
+                    '3.2', MongoRunner.getBinVersionFor(otherParams['s' + i].binVersion))) {
                 return true;
             }
         }
@@ -1256,11 +1261,16 @@ var ShardingTest = function(params) {
     }
 
     if (shouldSetFeatureCompatibilityVersion32()) {
+        const configRS = this.configRS;
         function setFeatureCompatibilityVersion() {
             assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.2'}));
+
+            // We wait for setting the featureCompatibilityVersion to "3.2" to propagate to all
+            // nodes in the CSRS to ensure that older versions of mongos can successfully connect.
+            configRS.awaitReplication();
         }
         if (keyFile) {
-            authutil.asCluster(csrsPrimary, keyFile, setFeatureCompatibilityVersion);
+            authutil.asCluster(this.configRS.nodes, keyFile, setFeatureCompatibilityVersion);
         } else {
             setFeatureCompatibilityVersion();
         }
