@@ -181,10 +181,10 @@ class BackgroundInitialSync(JsCustomBehavior):
 
     DEFAULT_N = CleanEveryN.DEFAULT_N
 
-    def __init__(self, logger, fixture, use_resync=False, n=DEFAULT_N, shell_options=None):
+    def __init__(self, logger, fixture, use_resync=False, n=DEFAULT_N):
         description = "Background Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
-        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description, shell_options)
+        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
 
         self.use_resync = use_resync
         self.n = n
