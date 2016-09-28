@@ -133,11 +133,13 @@ StatusWith<DistLockHandle> acquireDistLock(OperationContext* txn,
 }
 
 /**
- * Checks whether the Status has an error caused by replSetStepDown or server shut down.
+ * Returns whether the specified status is an error caused by stepdown of the primary config node
+ * currently running the balancer.
  */
-bool isInterruptError(Status status) {
+bool isErrorDueToBalancerStepdown(Status status) {
     return (status == ErrorCodes::BalancerInterrupted ||
-            ErrorCodes::isInterruption(status.code()) ||
+            status == ErrorCodes::InterruptedAtShutdown ||
+            status == ErrorCodes::InterruptedDueToReplStateChange ||
             ErrorCodes::isShutdownError(status.code()));
 }
 
@@ -200,7 +202,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
             if (responseStatus == ErrorCodes::LockBusy) {
                 rescheduledMigrations.emplace_back(std::move(migrateInfo));
             } else {
-                if (isInterruptError(responseStatus)) {
+                if (isErrorDueToBalancerStepdown(responseStatus)) {
                     auto it = scopedMigrationRequests.find(migrateInfo.getName());
                     invariant(it != scopedMigrationRequests.end());
                     it->second.keepDocumentOnDestruct();
@@ -231,7 +233,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
                                           waitForDelete)
                                     ->get();
 
-        if (isInterruptError(responseStatus)) {
+        if (isErrorDueToBalancerStepdown(responseStatus)) {
             statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
         }
 
@@ -275,18 +277,22 @@ Status MigrationManager::executeManualMigration(
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    // Regardless of the failure mode, if the chunk's current shard matches the destination, deem
-    // the move as success.
     auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
     invariant(chunk);
 
-    if (isInterruptError(status)) {
+    // The order of the checks below is important due to the need for interrupted migration calls to
+    // be able to join any possibly completed migrations, which are still running in the
+    // waitForDelete step.
+    if (isErrorDueToBalancerStepdown(status)) {
         statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
+
         // We want the mongos to get a retriable error, and not make its replica set monitor
         // interpret something like InterruptedDueToReplStateChange as the config server when the
         // error comes from the shard.
         return {ErrorCodes::BalancerInterrupted, status.reason()};
     } else if (chunk->getShardId() == migrateInfo.to) {
+        // Regardless of the status, if the chunk's current shard matches the destination, deem the
+        // move as success.
         return Status::OK();
     }
 
