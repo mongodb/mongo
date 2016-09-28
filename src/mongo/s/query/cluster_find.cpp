@@ -141,6 +141,12 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(const QueryReq
     newQR->setSkip(boost::none);
     newQR->setLimit(newLimit);
     newQR->setNToReturn(newNToReturn);
+
+    // Even if the client sends us singleBatch=true (wantMore=false), we may need to retrieve
+    // multiple batches from a shard in order to return the single requested batch to the client.
+    // Therefore, we must always send singleBatch=false (wantMore=true) to the shards.
+    newQR->setWantMore(true);
+
     invariantOK(newQR->validate());
     return std::move(newQR);
 }

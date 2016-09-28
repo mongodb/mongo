@@ -54,6 +54,28 @@
         assert.eq(openCursorsBefore, openCursorsAfter);
     }
 
+    /**
+     * Test correctness of queries run with singleBatch=true.
+     */
+    function testSingleBatch(coll, numShards) {
+        // Ensure that singleBatch queries that require multiple batches from individual shards
+        // return complete results.
+        var batchSize = 5;
+        var res = assert.commandWorked(coll.getDB().runCommand({
+            find: coll.getName(),
+            filter: {x: {$lte: 10}},
+            skip: numShards * batchSize,
+            singleBatch: true,
+            batchSize: batchSize
+        }));
+        assert.eq(batchSize, res.cursor.firstBatch.length);
+        assert.eq(0, res.cursor.id);
+        var cursor = coll.find().skip(numShards * batchSize).limit(-1 * batchSize);
+        assert.eq(batchSize, cursor.itcount());
+        cursor = coll.find().skip(numShards * batchSize).batchSize(-1 * batchSize);
+        assert.eq(batchSize, cursor.itcount());
+    }
+
     //
     // Create a two-shard cluster. Have an unsharded collection and a sharded collection.
     //
@@ -88,6 +110,13 @@
         assert.writeOK(unshardedCol.insert({_id: i, x: i}));
         assert.writeOK(unshardedCol.insert({_id: -i, x: -i}));
     }
+
+    //
+    // Run tests for singleBatch queries.
+    //
+
+    testSingleBatch(shardedCol, 2);
+    testSingleBatch(unshardedCol, 1);
 
     //
     // Run tests for batch size. These should issue getmores.

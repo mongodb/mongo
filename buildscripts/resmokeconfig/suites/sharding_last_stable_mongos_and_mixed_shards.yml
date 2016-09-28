@@ -76,6 +76,9 @@ selector:
     - jstests/sharding/migration_ignore_interrupts_1.js
     # Temporarily blacklisted (see SERVER-26615).
     - jstests/sharding/addshard2.js
+    # This test checks the behavior of a singleBatch fix for mongos that does not exist in 3.2.
+    # Enable when 3.4 becomes last-stable or after backporting SERVER-26112 to the 3.2 branch.
+    - jstests/sharding/sharded_limit_batchsize.js
 
 executor:
   js_test:
