@@ -3,8 +3,7 @@
 //
 
 var options = {
-    chunkSize: 1,  // MB
-    mongosOptions: {noAutoSplit: ""}
+    chunkSize: 1  // MB
 };
 
 var st = new ShardingTest({shards: 1, mongos: 1, other: options});

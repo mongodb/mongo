@@ -5,7 +5,7 @@
     'use strict';
 
     var st = new ShardingTest(
-        {name: 'auto_rebalance_rs', mongos: 1, shards: 2, chunksize: 1, rs: {nodes: 3}});
+        {name: 'auto_rebalance_rs', mongos: 1, shards: 2, chunksize: 1, enableAutoSplit: true, rs: {nodes: 3}});
 
     assert.writeOK(st.getDB("config").settings.update(
         {_id: "balancer"}, {$set: {"_secondaryThrottle": false}}, {upsert: true}));

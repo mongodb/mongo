@@ -100,7 +100,8 @@ function runTest(test) {
 // Main
 var dbName = "test";
 var collName = "topchunk";
-var st = shardSetup({name: "topchunk", shards: 4, chunkSize: 1}, dbName, collName);
+var st = shardSetup(
+    {name: "topchunk", shards: 4, chunkSize: 1, other: {enableAutoSplit: true}}, dbName, collName);
 var db = st.getDB(dbName);
 var coll = db[collName];
 var configDB = st.s.getDB('config');
@@ -294,7 +295,9 @@ for (var i = 0; i < tests.length; i++) {
 st.stop();
 
 // Single node shard Tests
-st = shardSetup({name: "singleNode", shards: 1, chunkSize: 1}, dbName, collName);
+st = shardSetup({name: "singleNode", shards: 1, chunkSize: 1, other: {enableAutoSplit: true}},
+                dbName,
+                collName);
 db = st.getDB(dbName);
 coll = db[collName];
 configDB = st.s.getDB('config');
@@ -331,7 +334,14 @@ st.stop();
 // maxSize test
 // To set maxSize, must manually add the shards
 st = shardSetup(
-    {name: "maxSize", shards: 2, chunkSize: 1, other: {manualAddShard: true}}, dbName, collName);
+    {
+      name: "maxSize",
+      shards: 2,
+      chunkSize: 1,
+      other: {manualAddShard: true, enableAutoSplit: true}
+    },
+    dbName,
+    collName);
 db = st.getDB(dbName);
 coll = db[collName];
 configDB = st.s.getDB('config');

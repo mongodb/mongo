@@ -1,8 +1,12 @@
 // Check that doing updates done during a migrate all go to the right place
 (function() {
 
-    var s = new ShardingTest(
-        {name: "slow_sharding_balance4", shards: 2, mongos: 1, other: {chunkSize: 1}});
+    var s = new ShardingTest({
+        name: "slow_sharding_balance4",
+        shards: 2,
+        mongos: 1,
+        other: {chunkSize: 1, enableAutoSplit: true}
+    });
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');

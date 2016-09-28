@@ -62,8 +62,12 @@ var replShouldFail = function(name, opt1, opt2) {
  */
 function mixedShardTest(options1, options2, shouldSucceed) {
     try {
-        var st = new ShardingTest(
-            {mongos: [options1], config: [options1], shards: [options1, options2]});
+        var st = new ShardingTest({
+            mongos: [options1],
+            config: [options1],
+            shards: [options1, options2],
+            other: {enableAutoSplit: true}
+        });
         st.stopBalancer();
 
         // Test mongos talking to config servers

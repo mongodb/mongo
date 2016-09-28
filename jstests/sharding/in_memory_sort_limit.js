@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2});
+    var st = new ShardingTest({shards: 2, other: {enableAutoSplit: true}});
     var db = st.s.getDB('test');
     var mongosCol = db.getCollection('skip');
     db.adminCommand({enableSharding: 'test'});

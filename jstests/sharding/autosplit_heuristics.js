@@ -3,8 +3,11 @@
 // works as expected even after splitting.
 //
 
-var st =
-    new ShardingTest({shards: 1, mongos: 1, other: {mongosOptions: {chunkSize: 1, verbose: 2}}});
+var st = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    other: {mongosOptions: {chunkSize: 1, verbose: 2}, enableAutoSplit: true}
+});
 
 // The balancer is by default stopped, thus it will NOT interfere unpredictably with the chunk
 // moves/splits depending on the timing.

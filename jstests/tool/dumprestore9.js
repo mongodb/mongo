@@ -13,7 +13,7 @@ if (0) {
             name: "dumprestore9a",
             shards: 2,
             mongos: 3,
-            other: {chunkSize: 1, enableBalancer: 1}
+            other: {chunkSize: 1, enableBalancer: true}
         });
 
         step("Shard collection");

@@ -3,8 +3,7 @@
 (function() {
 
     // Turn off auto-splitting, because this test handles chunk splitting manually.
-    var s = new ShardingTest(
-        {name: "sharding_cursor1", shards: 2, other: {mongosOptions: {noAutoSplit: ""}}});
+    var s = new ShardingTest({name: "sharding_cursor1", shards: 2});
     s.config.settings.find().forEach(printjson);
 
     // create a sharded 'test.foo', for the moment with just one chunk

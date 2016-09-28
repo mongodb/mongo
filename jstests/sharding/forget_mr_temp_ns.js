@@ -2,7 +2,7 @@
 // Tests whether we forget M/R's temporary namespaces for sharded output
 //
 
-var st = new ShardingTest({shards: 1, mongos: 1});
+var st = new ShardingTest({shards: 1, mongos: 1, other: {enableAutoSplit: true}});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");

@@ -16,7 +16,7 @@ var st;
     var dataCollectionName = testDBName + ".data";
 
     jsTest.log("Setting up CSRS sharded cluster");
-    st = new ShardingTest({name: "csrs", mongos: 2, mongosOptions: {noAutoSplit: ""}, shards: 2});
+    st = new ShardingTest({name: "csrs", mongos: 2, shards: 2});
 
     jsTest.log("Enabling sharding on " + testDBName);
     assert.commandWorked(st.s0.adminCommand({enablesharding: testDBName}));

@@ -4,8 +4,7 @@
 
     var chunkSize = 1;  // In MB
 
-    var st = new ShardingTest(
-        {shards: 1, mongos: 1, other: {chunksize: chunkSize, mongosOptions: {noAutoSplit: ""}}});
+    var st = new ShardingTest({shards: 1, mongos: 1, other: {chunksize: chunkSize}});
 
     var data = "x";
     while (data.length < chunkSize * 1024 * 1024) {
