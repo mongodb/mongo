@@ -706,6 +706,8 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
         return;
     }
 
+    log() << "shutting down replication subsystems";
+
     // Used to shut down outside of the lock.
     std::shared_ptr<DataReplicator> drCopy;
     {
