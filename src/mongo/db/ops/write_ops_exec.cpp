@@ -112,7 +112,7 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
         if (logAll || logSlow) {
             Locker::LockerInfo lockerInfo;
             txn->lockState()->getLockerInfo(&lockerInfo);
-            log() << redact(curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats));
+            log() << curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats);
         }
 
         if (curOp->shouldDBProfile(executionTimeMs)) {

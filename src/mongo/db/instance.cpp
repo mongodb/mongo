@@ -695,7 +695,7 @@ void assembleResponse(OperationContext* txn,
     if (shouldLogOpDebug || debug.executionTime > logThreshold) {
         Locker::LockerInfo lockerInfo;
         txn->lockState()->getLockerInfo(&lockerInfo);
-        log() << redact(debug.report(&c, currentOp, lockerInfo.stats));
+        log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
     if (currentOp.shouldDBProfile(debug.executionTime)) {

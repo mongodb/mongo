@@ -33,7 +33,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
