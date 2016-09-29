@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-MONGO_EXPORT_SERVER_PARAMETER(scriptingEngineInterruptIntervalMS, int, 1000);
+MONGO_EXPORT_SERVER_PARAMETER(scriptingEngineInterruptIntervalMS, int, 0);
 
 int getScriptingEngineInterruptInterval() {
     return scriptingEngineInterruptIntervalMS.load();
