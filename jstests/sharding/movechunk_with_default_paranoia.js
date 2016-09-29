@@ -2,8 +2,7 @@
  * This test checks that moveParanoia defaults to off (ie the moveChunk directory will not
  * be created).
  */
-
-var st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
+var st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
 load("jstests/sharding/movechunk_include.js");
 setupMoveChunkTest(st);
 

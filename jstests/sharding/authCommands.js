@@ -7,8 +7,11 @@
     var st = new ShardingTest({
         shards: 2,
         rs: {oplogSize: 10, useHostname: false},
-        other:
-            {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2, enableAutoSplit: true},
+        other: {
+            keyFile: 'jstests/libs/key1',
+            useHostname: false,
+            chunkSize: 2,
+        },
     });
 
     var mongos = st.s;

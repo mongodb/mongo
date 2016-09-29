@@ -21,6 +21,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         configReplSetTestOptions: {settings: {chainingAllowed: false}},
         mongos: 1
     });
+    st.disableAutoSplit();
 
     var mongos = st.s;
     var dbName = "wc-test-configRS";

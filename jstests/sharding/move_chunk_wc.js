@@ -21,6 +21,7 @@ load('jstests/libs/write_concern_util.js');
         config: 1,
         configReplSetTestOptions: {settings: {chainingAllowed: false}}
     });
+    st.disableAutoSplit();
 
     var mongos = st.s;
     var dbName = "move-chunk-wc-test";

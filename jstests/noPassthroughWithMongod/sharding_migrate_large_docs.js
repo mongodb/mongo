@@ -3,6 +3,8 @@
 //
 
 var st = new ShardingTest({shards: 2, mongos: 1});
+st.disableAutoSplit();
+st.stopBalancer();
 
 var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");

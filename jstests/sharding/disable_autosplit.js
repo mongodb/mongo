@@ -1,13 +1,11 @@
-// Tests disabling of autosplit.
+// Tests disabling of autosplit from mongos
 (function() {
     'use strict';
 
     var chunkSizeMB = 1;
 
-    // Autosplit is disabled by default, but specify it anyway in case the default changes,
-    // especially since it defaults to the enableBalancer setting.
-    var st = new ShardingTest(
-        {shards: 1, mongos: 1, other: {chunkSize: chunkSizeMB, enableAutoSplit: false}});
+    var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: chunkSizeMB}});
+    st.disableAutoSplit();
 
     var data = "x";
     while (data.length < chunkSizeMB * 1024 * 1024) {

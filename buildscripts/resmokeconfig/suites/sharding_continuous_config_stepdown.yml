@@ -57,6 +57,9 @@ selector:
     - jstests/sharding/sharding_balance3.js
     - jstests/sharding/sharding_balance4.js
     - jstests/sharding/sharding_migrate_cursor1.js
+    - jstests/sharding/split_with_force.js
+    - jstests/sharding/split_with_force_small.js
+    - jstests/sharding/stale_mongos_updates_and_removes.js
     - jstests/sharding/tag_auto_split.js
     - jstests/sharding/tag_auto_split_partial_key.js
     - jstests/sharding/tag_range.js

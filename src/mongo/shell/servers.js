@@ -647,12 +647,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
         }
 
-        // If the mongos is being restarted with a newer version, make sure we remove any options
-        // that no longer exist in the newer version.
-        if (opts.restart && MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
-            delete opts.noAutoSplit;
-        }
-
         return opts;
     };
 

@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "auto2", shards: 2, mongos: 2, other: {enableAutoSplit: true}});
+    var s = new ShardingTest({name: "auto2", shards: 2, mongos: 2});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');
