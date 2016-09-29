@@ -143,8 +143,10 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     // now be visible as a committed read to both oldPrimary and newPrimary.
     assert.commandWorked(
         pureSecondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
-    assert.commandWorked(
-        newPrimaryColl.runCommand({getLastError: 1, w: 'majority', wtimeout: 30000}));
+    var gleResponse =
+        newPrimaryColl.runCommand({getLastError: 1, w: 'majority', wtimeout: 5 * 1000 * 60});
+    assert.commandWorked(gleResponse);
+    assert.eq(null, gleResponse.err, "GLE detected write error: " + tojson(gleResponse));
     assert.eq(doCommittedRead(newPrimaryColl), 'new');
     assert.eq(doCommittedRead(oldPrimaryColl), 'new');
 }());
