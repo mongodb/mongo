@@ -404,7 +404,7 @@ load('jstests/libs/write_concern_util.js');
     });
 
     function testValidWriteConcern(cmd) {
-        cmd.req.writeConcern = {w: 'majority', wtimeout: 25000};
+        cmd.req.writeConcern = {w: 'majority', wtimeout: 5 * 60 * 1000};
         jsTest.log("Testing " + tojson(cmd.req));
 
         dropTestDatabase();
