@@ -242,14 +242,14 @@ public:
 };
 
 
-RecordStore* DevNullKVEngine::getRecordStore(OperationContext* opCtx,
-                                             StringData ns,
-                                             StringData ident,
-                                             const CollectionOptions& options) {
+std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,
+                                                             StringData ns,
+                                                             StringData ident,
+                                                             const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
-        return new EphemeralForTestRecordStore(ns, &_catalogInfo);
+        return stdx::make_unique<EphemeralForTestRecordStore>(ns, &_catalogInfo);
     }
-    return new DevNullRecordStore(ns, options);
+    return stdx::make_unique<DevNullRecordStore>(ns, options);
 }
 
 SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* opCtx,

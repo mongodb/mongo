@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include <memory>
+
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 
 #include "mongo/db/index/index_descriptor.h"
@@ -81,13 +83,16 @@ public:
 };
 
 
-KVCollectionCatalogEntry::KVCollectionCatalogEntry(
-    KVEngine* engine, KVCatalog* catalog, StringData ns, StringData ident, RecordStore* rs)
+KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVEngine* engine,
+                                                   KVCatalog* catalog,
+                                                   StringData ns,
+                                                   StringData ident,
+                                                   std::unique_ptr<RecordStore> rs)
     : BSONCollectionCatalogEntry(ns),
       _engine(engine),
       _catalog(catalog),
       _ident(ident.toString()),
-      _recordStore(rs) {}
+      _recordStore(std::move(rs)) {}
 
 KVCollectionCatalogEntry::~KVCollectionCatalogEntry() {}
 

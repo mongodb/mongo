@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -54,14 +55,13 @@ public:
     // ---------
 
     /**
-     * Caller takes ownership
      * Having multiple out for the same ns is a rules violation;
      * Calling on a non-created ident is invalid and may crash.
      */
-    virtual RecordStore* getRecordStore(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options) = 0;
+    virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
+                                                        StringData ns,
+                                                        StringData ident,
+                                                        const CollectionOptions& options) = 0;
 
     virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                         StringData ident,

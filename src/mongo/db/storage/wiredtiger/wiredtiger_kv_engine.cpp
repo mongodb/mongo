@@ -35,6 +35,8 @@
 #define NVALGRIND
 #endif
 
+#include <memory>
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include <boost/filesystem.hpp>
@@ -62,6 +64,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/exit.h"
@@ -462,32 +465,33 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
 
-RecordStore* WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
-                                                StringData ns,
-                                                StringData ident,
-                                                const CollectionOptions& options) {
+std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
+                                                                StringData ns,
+                                                                StringData ident,
+                                                                const CollectionOptions& options) {
     if (options.capped) {
-        return new WiredTigerRecordStore(opCtx,
-                                         ns,
-                                         _uri(ident),
-                                         _canonicalName,
-                                         options.capped,
-                                         _ephemeral,
-                                         options.cappedSize ? options.cappedSize : 4096,
-                                         options.cappedMaxDocs ? options.cappedMaxDocs : -1,
-                                         NULL,
-                                         _sizeStorer.get());
+        return stdx::make_unique<WiredTigerRecordStore>(
+            opCtx,
+            ns,
+            _uri(ident),
+            _canonicalName,
+            options.capped,
+            _ephemeral,
+            options.cappedSize ? options.cappedSize : 4096,
+            options.cappedMaxDocs ? options.cappedMaxDocs : -1,
+            nullptr,
+            _sizeStorer.get());
     } else {
-        return new WiredTigerRecordStore(opCtx,
-                                         ns,
-                                         _uri(ident),
-                                         _canonicalName,
-                                         false,
-                                         _ephemeral,
-                                         -1,
-                                         -1,
-                                         NULL,
-                                         _sizeStorer.get());
+        return stdx::make_unique<WiredTigerRecordStore>(opCtx,
+                                                        ns,
+                                                        _uri(ident),
+                                                        _canonicalName,
+                                                        false,
+                                                        _ephemeral,
+                                                        -1,
+                                                        -1,
+                                                        nullptr,
+                                                        _sizeStorer.get());
     }
 }
 

@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <memory>
 #include <queue>
 #include <string>
 
@@ -85,10 +86,10 @@ public:
                                      StringData ident,
                                      const CollectionOptions& options);
 
-    virtual RecordStore* getRecordStore(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options);
+    virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
+                                                        StringData ns,
+                                                        StringData ident,
+                                                        const CollectionOptions& options);
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,

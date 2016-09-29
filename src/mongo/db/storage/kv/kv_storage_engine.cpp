@@ -97,8 +97,8 @@ KVStorageEngine::KVStorageEngine(KVEngine* engine, const KVStorageEngineOptions&
         uow.commit();
     }
 
-    _catalogRecordStore.reset(
-        _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions()));
+    _catalogRecordStore =
+        _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions());
     _catalog.reset(new KVCatalog(_catalogRecordStore.get(),
                                  _supportsDocLocking,
                                  _options.directoryPerDB,
