@@ -139,7 +139,7 @@ private:
             const Date_t now = Date_t::now();
             const auto interruptInterval = Milliseconds{getScriptingEngineInterruptInterval()};
 
-            if (now - lastInterruptCycle > interruptInterval) {
+            if ((interruptInterval.count() > 0) && (now - lastInterruptCycle > interruptInterval)) {
                 for (const auto& task : _tasks) {
                     if (task.second > now)
                         task.first->interrupt();
@@ -149,9 +149,13 @@ private:
 
             // wait for a task to be added or a deadline to expire
             if (_nearestDeadlineWallclock > now) {
-                if (_nearestDeadlineWallclock == Date_t::max() ||
-                    _nearestDeadlineWallclock - now > interruptInterval) {
-                    _newDeadlineAvailable.wait_for(lk, interruptInterval.toSystemDuration());
+                if (_nearestDeadlineWallclock == Date_t::max()) {
+                    if ((interruptInterval.count() > 0) &&
+                        (_nearestDeadlineWallclock - now > interruptInterval)) {
+                        _newDeadlineAvailable.wait_for(lk, interruptInterval.toSystemDuration());
+                    } else {
+                        _newDeadlineAvailable.wait(lk);
+                    }
                 } else {
                     _newDeadlineAvailable.wait_until(lk,
                                                      _nearestDeadlineWallclock.toSystemTimePoint());
