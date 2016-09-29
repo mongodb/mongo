@@ -220,7 +220,9 @@ public:
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss);
+    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
+                                                                const ChunkRange& chunkRange,
+                                                                const ShardId& fromShardId);
 
     /**
      * If a migration has been previously registered through a call to registerDonateChunk returns

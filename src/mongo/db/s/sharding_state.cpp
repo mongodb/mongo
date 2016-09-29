@@ -737,8 +737,8 @@ StatusWith<ScopedRegisterDonateChunk> ShardingState::registerDonateChunk(
 }
 
 StatusWith<ScopedRegisterReceiveChunk> ShardingState::registerReceiveChunk(
-    const NamespaceString& nss) {
-    return _activeMigrationsRegistry.registerReceiveChunk(nss);
+    const NamespaceString& nss, const ChunkRange& chunkRange, const ShardId& fromShardId) {
+    return _activeMigrationsRegistry.registerReceiveChunk(nss, chunkRange, fromShardId);
 }
 
 boost::optional<NamespaceString> ShardingState::getActiveDonateChunkNss() {

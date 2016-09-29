@@ -76,7 +76,9 @@ public:
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss);
+    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
+                                                                const ChunkRange& chunkRange,
+                                                                const ShardId& fromShardId);
 
     /**
      * If a migration has been previously registered through a call to registerDonateChunk returns
@@ -101,6 +103,11 @@ private:
         ActiveMoveChunkState(MoveChunkRequest inArgs)
             : args(std::move(inArgs)), notification(std::make_shared<Notification<Status>>()) {}
 
+        /**
+         * Constructs an error status to return in the case of conflicting operations.
+         */
+        Status constructErrorStatus() const;
+
         // Exact arguments of the currently active operation
         MoveChunkRequest args;
 
@@ -110,10 +117,22 @@ private:
 
     // Describes the state of a currently active receive chunk operation
     struct ActiveReceiveChunkState {
-        ActiveReceiveChunkState(NamespaceString inNss) : nss(std::move(inNss)) {}
+        ActiveReceiveChunkState(NamespaceString inNss, ChunkRange inRange, ShardId inFromShardId)
+            : nss(std::move(inNss)), range(std::move(inRange)), fromShardId(inFromShardId) {}
+
+        /**
+         * Constructs an error status to return in the case of conflicting operations.
+         */
+        Status constructErrorStatus() const;
 
         // Namesspace for which a chunk is being received
         NamespaceString nss;
+
+        // Bounds of the chunk being migrated
+        ChunkRange range;
+
+        // Id of the shard from which the chunk is being received
+        ShardId fromShardId;
     };
 
     /**

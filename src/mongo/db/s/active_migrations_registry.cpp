@@ -49,46 +49,34 @@ StatusWith<ScopedRegisterDonateChunk> ActiveMigrationsRegistry::registerDonateCh
     const MoveChunkRequest& args) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_activeReceiveChunkState) {
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Unable to start new migration because this shard is currently "
-                                 "donating chunk for "
-                              << _activeReceiveChunkState->nss.ns()};
+        return _activeReceiveChunkState->constructErrorStatus();
     }
 
-    if (!_activeMoveChunkState) {
-        _activeMoveChunkState.emplace(args);
-        return {ScopedRegisterDonateChunk(this, true, _activeMoveChunkState->notification)};
+    if (_activeMoveChunkState) {
+        if (_activeMoveChunkState->args == args) {
+            return {ScopedRegisterDonateChunk(nullptr, false, _activeMoveChunkState->notification)};
+        }
+
+        return _activeMoveChunkState->constructErrorStatus();
     }
 
-    if (_activeMoveChunkState->args == args) {
-        return {ScopedRegisterDonateChunk(nullptr, false, _activeMoveChunkState->notification)};
-    }
+    _activeMoveChunkState.emplace(args);
 
-    return {
-        ErrorCodes::ConflictingOperationInProgress,
-        str::stream()
-            << "Unable to start new migration because this shard is currently donating chunk for "
-            << _activeMoveChunkState->args.getNss().ns()};
+    return {ScopedRegisterDonateChunk(this, true, _activeMoveChunkState->notification)};
 }
 
 StatusWith<ScopedRegisterReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
-    const NamespaceString& nss) {
+    const NamespaceString& nss, const ChunkRange& chunkRange, const ShardId& fromShardId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_activeMoveChunkState) {
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Unable to start new migration because this shard is currently "
-                                 "donating chunk for "
-                              << _activeMoveChunkState->args.getNss().ns()};
-    }
-
     if (_activeReceiveChunkState) {
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Unable to start new migration because this shard is currently "
-                                 "donating chunk for "
-                              << _activeReceiveChunkState->nss.ns()};
+        return _activeReceiveChunkState->constructErrorStatus();
     }
 
-    _activeReceiveChunkState.emplace(nss);
+    if (_activeMoveChunkState) {
+        return _activeMoveChunkState->constructErrorStatus();
+    }
+
+    _activeReceiveChunkState.emplace(nss, chunkRange, fromShardId);
 
     return {ScopedRegisterReceiveChunk(this)};
 }
@@ -113,8 +101,8 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
     }
 
     // The state of the MigrationSourceManager could change between taking and releasing the mutex
-    // above and then taking the collection lock here, but that's fine because it isn't important
-    // to return information on a migration that just ended or started. This is just best effort and
+    // above and then taking the collection lock here, but that's fine because it isn't important to
+    // return information on a migration that just ended or started. This is just best effort and
     // desireable for reporting, and then diagnosing, migrations that are stuck.
     if (nss) {
         // Lock the collection so nothing changes while we're getting the migration report.
@@ -139,6 +127,28 @@ void ActiveMigrationsRegistry::_clearReceiveChunk() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_activeReceiveChunkState);
     _activeReceiveChunkState.reset();
+}
+
+Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() const {
+    return {ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Unable to start new migration because this shard is currently "
+                             "donating chunk "
+                          << ChunkRange(args.getMinKey(), args.getMaxKey()).toString()
+                          << " for namespace "
+                          << args.getNss().ns()
+                          << " to "
+                          << args.getToShardId()};
+}
+
+Status ActiveMigrationsRegistry::ActiveReceiveChunkState::constructErrorStatus() const {
+    return {ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Unable to start new migration because this shard is currently "
+                             "receiving chunk "
+                          << range.toString()
+                          << " for namespace "
+                          << nss.ns()
+                          << " from "
+                          << fromShardId};
 }
 
 ScopedRegisterDonateChunk::ScopedRegisterDonateChunk(

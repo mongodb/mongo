@@ -126,8 +126,7 @@ public:
 
         const NamespaceString nss(cmdObj.firstElement().String());
 
-        BSONObj min = cmdObj["min"].Obj().getOwned();
-        BSONObj max = cmdObj["max"].Obj().getOwned();
+        const auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
 
         // Refresh our collection manager from the config server, we need a collection manager to
         // start registering pending chunks. We force the remote refresh here to make the behavior
@@ -136,10 +135,8 @@ public:
 
         Status status = shardingState->refreshMetadataNow(txn, nss, &currentVersion);
         if (!status.isOK()) {
-            errmsg = str::stream() << "cannot start recv'ing chunk "
-                                   << "[" << redact(min) << "," << redact(max) << ")"
-                                   << causedBy(redact(status));
-
+            errmsg = str::stream() << "cannot start receiving chunk "
+                                   << redact(chunkRange.toString()) << causedBy(redact(status));
             warning() << errmsg;
             return false;
         }
@@ -155,8 +152,7 @@ public:
         auto statusWithFromShardConnectionString = ConnectionString::parse(cmdObj["from"].String());
         if (!statusWithFromShardConnectionString.isOK()) {
             errmsg = str::stream()
-                << "cannot start recv'ing chunk "
-                << "[" << redact(min) << "," << redact(max) << ")"
+                << "cannot start receiving chunk " << redact(chunkRange.toString())
                 << causedBy(redact(statusWithFromShardConnectionString.getStatus()));
 
             warning() << errmsg;
@@ -166,7 +162,8 @@ public:
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
-        auto scopedRegisterReceiveChunk(uassertStatusOK(shardingState->registerReceiveChunk(nss)));
+        auto scopedRegisterReceiveChunk(
+            uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
 
         uassertStatusOK(shardingState->migrationDestinationManager()->start(
             nss,
@@ -175,8 +172,8 @@ public:
             statusWithFromShardConnectionString.getValue(),
             fromShard,
             toShard,
-            min,
-            max,
+            chunkRange.getMin(),
+            chunkRange.getMax(),
             shardKeyPattern,
             currentVersion.epoch(),
             writeConcern));
