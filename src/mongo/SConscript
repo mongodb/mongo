@@ -336,23 +336,6 @@ env.Library("linenoise_utf8",
         "shell/linenoise_utf8.cpp",
     ])
 
-# --- sniffer ---
-mongosniff_built = False
-if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
-    mongosniff_built = True
-    sniffEnv = env.Clone()
-    sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
-
-    if not env.TargetOSIs('windows'):
-        sniffEnv.Append( LIBS=[ "pcap" ] )
-    else:
-        sniffEnv.Append( LIBS=[ "wpcap" ] )
-
-    sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
-                                              LIBDEPS = [
-                                                 "db/serveronly",
-                                              ] ) )
-
 # --- shell ---
 
 if not has_option('noshell') and usemozjs:
@@ -494,10 +477,6 @@ installBinary(env, "mongoperf")
 env.Alias("tools", '#/' + add_exe("mongoperf"))
 
 env.Alias("tools", "#/" + add_exe("mongobridge"))
-
-if mongosniff_built:
-    installBinary(env, "mongosniff")
-    env.Alias("tools", '#/' + add_exe("mongosniff"))
 
 installBinary( env, "mongod" )
 installBinary( env, "mongos" )
