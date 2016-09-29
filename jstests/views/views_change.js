@@ -17,12 +17,8 @@
         viewDB.runCommand({drop: "view"});
         viewDB.runCommand({drop: "viewOnView"});
         assert.commandWorked(viewDB.runCommand({create: "collection"}));
-        assert.commandWorked(viewDB.runCommand({
-            create: "view",
-            viewOn: "collection",
-            projection: {_id: 0},
-            pipeline: [{$match: {a: 1}}]
-        }));
+        assert.commandWorked(viewDB.runCommand(
+            {create: "view", viewOn: "collection", pipeline: [{$match: {a: 1}}]}));
         assert.commandWorked(viewDB.runCommand(
             {create: "viewOnView", viewOn: "view", pipeline: [{$match: {b: 1}}]}));
     };

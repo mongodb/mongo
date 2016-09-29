@@ -130,13 +130,6 @@ TEST(CollectionOptions, IgnoreMaxWrongType) {
     ASSERT_EQUALS(options.cappedMaxDocs, 0);
 }
 
-TEST(CollectionOptions, IgnoreUnregisteredFields) {
-    ASSERT_OK(CollectionOptions().parse(BSON("create"
-                                             << "c")));
-    ASSERT_OK(CollectionOptions().parse(BSON("foo"
-                                             << "bar")));
-}
-
 TEST(CollectionOptions, InvalidStorageEngineField) {
     // "storageEngine" field has to be an object if present.
     ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: 1}")));
@@ -151,13 +144,10 @@ TEST(CollectionOptions, InvalidStorageEngineField) {
 TEST(CollectionOptions, ParseEngineField) {
     CollectionOptions opts;
     ASSERT_OK(opts.parse(
-        fromjson("{unknownField: 1, "
-                 "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
+        fromjson("{storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
     checkRoundTrip(opts);
 
-    // Unrecognized field should not be present in BSON representation.
     BSONObj obj = opts.toBSON();
-    ASSERT_FALSE(obj.hasField("unknownField"));
 
     // Check "storageEngine" field.
     ASSERT_TRUE(obj.hasField("storageEngine"));
@@ -271,5 +261,12 @@ TEST(CollectionOptions, ViewParsesCorrectlyWithoutPipeline) {
 TEST(CollectionOptions, PipelineFieldRequiresViewOn) {
     CollectionOptions options;
     ASSERT_NOT_OK(options.parse(fromjson("{pipeline: [{$match: {}}]}")));
+}
+
+TEST(CollectionOptions, UnknownTopLevelOptionFailsToParse) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{invalidOption: 1}"));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
 }  // namespace mongo

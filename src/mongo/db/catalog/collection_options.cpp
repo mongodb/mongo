@@ -245,6 +245,13 @@ Status CollectionOptions::parse(const BSONObj& options) {
             }
 
             pipeline = e.Obj().getOwned();
+        } else if (fieldName == "writeConcern") {
+            continue;
+        } else {
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "The field '" << fieldName
+                                        << "' is not a valid collection option. Options: "
+                                        << options);
         }
     }
 
