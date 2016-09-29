@@ -12,7 +12,7 @@ var doTest = function() {
         shards: 2,
         chunksize: 2,
         rs: rsOpts,
-        other: {nopreallocj: 1, useHostname: false}
+        other: {nopreallocj: 1, useHostname: false, enableAutoSplit: true}
     });
 
     var mongos = st.s;
