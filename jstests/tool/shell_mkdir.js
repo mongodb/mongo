@@ -1,9 +1,10 @@
 // Test the shell's mkdir utility.
 
 (function() {
-    "use strict"
+    "use strict";
 
-        var dir = MongoRunner.dataPath + "ShellMkdirTestDirectory" removeFile(dir);
+    var dir = MongoRunner.dataPath + "ShellMkdirTestDirectory";
+    removeFile(dir);
 
     // Make a new directory
     var res = mkdir(dir);
