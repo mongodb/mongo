@@ -56,30 +56,7 @@ public:
      */
     void startPeriodicThread();
 
-    /**
-     * Returns the generated instance id string for reporting purposes.
-     */
-    const std::string& getInstanceId() const {
-        return _instanceId;
-    }
-
-    /**
-     * Reports the uptime status of the current instance to the config.pings collection. This method
-     * is best-effort and never throws.
-     *
-     * isBalancerActive indicates to external balancer control scripts whether the sharding balancer
-     *  is active or not.
-     */
-    void reportStatus(OperationContext* txn, bool isBalancerActive) const;
-
 private:
-    // String containing the hostname and the port of the server, which is running this reporter.
-    // Initialized at startup time.
-    const std::string _instanceId;
-
-    // Time the reporter started running
-    const Timer _timer;
-
     // The background uptime reporter thread (if started)
     stdx::thread _thread;
 };
