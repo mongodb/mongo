@@ -380,9 +380,25 @@ class CheckReplDBHash(JsCustomBehavior):
                                   shell_options=shell_options)
 
 
+class CheckReplOplogs(JsCustomBehavior):
+    """
+    Checks that local.oplog.rs matches on the primary and secondaries.
+    """
+    def __init__(self, logger, fixture, shell_options=None):
+        description = "Check oplogs of all replica set members"
+        js_filename = os.path.join("jstests", "hooks", "run_check_repl_oplogs.js")
+        JsCustomBehavior.__init__(self,
+                                  logger,
+                                  fixture,
+                                  js_filename,
+                                  description,
+                                  shell_options=shell_options)
+
+
 _CUSTOM_BEHAVIORS = {
     "CleanEveryN": CleanEveryN,
     "CheckReplDBHash": CheckReplDBHash,
+    "CheckReplOplogs": CheckReplOplogs,
     "ValidateCollections": ValidateCollections,
     "IntermediateInitialSync": IntermediateInitialSync,
     "BackgroundInitialSync": BackgroundInitialSync,

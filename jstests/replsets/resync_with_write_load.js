@@ -77,18 +77,10 @@ assert.commandWorked(B.adminCommand("resync"));
 print("waiting for load generation to finish");
 loadGen();
 
-// load must stop before we await replication.
-replTest.awaitReplication(240 * 1000);
+// Make sure oplogs & dbHashes match
+replTest.checkOplogs(testName);
+replTest.checkReplicatedDataHashes(testName);
 
-// Make sure oplogs match
-try {
-    replTest.ensureOplogsMatch();
-} catch (e) {
-    var aDBHash = A.runCommand("dbhash");
-    var bDBHash = B.runCommand("dbhash");
-    assert.eq(
-        aDBHash.md5, bDBHash.md5, "hashes differ: " + tojson(aDBHash) + " to " + tojson(bDBHash));
-}
 replTest.stopSet();
 
 print("*****test done******");

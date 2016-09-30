@@ -15,6 +15,7 @@ executor:
           TestData:
             skipValidationOnInvalidViewDefinitions: true
             forceValidationWithFeatureCompatibilityVersion: "3.4"
+    - class: CheckReplOplogs
     - class: CheckReplDBHash
       shell_options:
         global_vars:

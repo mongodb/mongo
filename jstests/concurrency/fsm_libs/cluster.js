@@ -436,7 +436,8 @@ var Cluster = function(options) {
                            ' assumed to still be primary, ' + phase);
 
                 // Compare the dbhashes of the primary and secondaries.
-                rst.checkReplicatedDataHashes(dbBlacklist, phase);
+                rst.checkOplogs(phase);
+                rst.checkReplicatedDataHashes(phase, dbBlacklist);
                 var totalTime = Date.now() - startTime;
                 jsTest.log('Finished consistency checks of replica set with ' + primary.host +
                            ' as primary in ' + totalTime + ' ms, ' + phase);

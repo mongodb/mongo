@@ -23,6 +23,7 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+    - class: CheckReplOplogs
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture

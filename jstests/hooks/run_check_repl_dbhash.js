@@ -72,6 +72,10 @@
         this.checkReplicatedDataHashes = function() {
             ReplSetTest({nodes: 0}).checkReplicatedDataHashes.apply(this, arguments);
         };
+
+        this.checkReplicaSet = function() {
+            ReplSetTest({nodes: 0}).checkReplicaSet.apply(this, arguments);
+        };
     };
 
     var startTime = Date.now();
