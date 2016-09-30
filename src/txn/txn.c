@@ -360,7 +360,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 			__wt_verbose(session, WT_VERB_TRANSACTION,
 			    "old snapshot %" PRIu64
 			    " pinned in session %" PRIu32 " [%s]"
-			    " with snap_min %" PRIu64 "\n",
+			    " with snap_min %" PRIu64,
 			    oldest_id, oldest_session->id,
 			    oldest_session->lastop,
 			    oldest_session->txn.snap_min);

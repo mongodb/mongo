@@ -3335,7 +3335,7 @@ supd_check_complete:
 		__wt_verbose(session, WT_VERB_SPLIT,
 		    "Reconciliation creating a page with %" PRIu32
 		    " entries, memory footprint %" WT_SIZET_FMT
-		    ", page count %" PRIu32 ", %s, split state: %d\n",
+		    ", page count %" PRIu32 ", %s, split state: %d",
 		    r->entries, r->page->memory_footprint, r->bnd_next,
 		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",
 		    r->bnd_state);

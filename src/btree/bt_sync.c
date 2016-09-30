@@ -207,13 +207,12 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 		WT_ERR(__wt_epoch(session, &end));
 		__wt_verbose(session, WT_VERB_CHECKPOINT,
-		    "__sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
-		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
-		    " bytes, %" PRIu64 " pages of internal\n\t"
-		    "Took: %" PRIu64 "ms",
+		    "__sync_file WT_SYNC_%s wrote: %" PRIu64
+		    " leaf pages (%" PRIu64 "B), %" PRIu64
+		    " internal pages (%" PRIu64 "B), and took %" PRIu64 "ms",
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
-		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
+		    leaf_pages, leaf_bytes, internal_pages, internal_bytes,
 		    WT_TIMEDIFF_MS(end, start));
 	}
 
