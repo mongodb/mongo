@@ -250,14 +250,15 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
         AutoGetCollection autoColl(txn, _args.getNss(), MODE_IS);
 
         auto css = CollectionShardingState::get(txn, _args.getNss().ns());
-        if (!css->getMetadata() ||
-            !css->getMetadata()->getCollVersion().equals(_committedMetadata->getCollVersion())) {
+        auto metadata = css->getMetadata();
+        if (!metadata || !metadata->getCollVersion().equals(_committedMetadata->getCollVersion())) {
             return {ErrorCodes::IncompatibleShardingMetadata,
                     str::stream()
                         << "Sharding metadata changed while holding distributed lock. Expected: "
                         << _committedMetadata->getCollVersion().toString()
-                        << ", actual: "
-                        << css->getMetadata()->getCollVersion().toString()};
+                        << ", but found: "
+                        << (metadata ? metadata->getCollVersion().toString()
+                                     : "collection unsharded.")};
         }
 
         // IMPORTANT: After this line, the critical section is in place and needs to be rolled back
@@ -364,6 +365,9 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
         migratingChunkToForget.setMax(_args.getMaxKey());
 
         auto css = CollectionShardingState::get(txn, _args.getNss().ns());
+        // It is possible for the collection to have been dropped before we update the metadata
+        // here. However, it is fine to update the metadata anyway because on a new command the
+        // version will be found stale and prompt a metadata refresh from the config server.
         css->refreshMetadata(
             txn, _committedMetadata->cloneMigrate(migratingChunkToForget, committedCollVersion));
         _committedMetadata = css->getMetadata();
@@ -421,6 +425,14 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
             auto refreshedMetadata =
                 CollectionShardingState::get(txn, _args.getNss())->getMetadata();
 
+            if (!refreshedMetadata) {
+                return {ErrorCodes::NamespaceNotSharded,
+                        str::stream() << "Chunk move failed because collection '"
+                                      << _args.getNss().ns()
+                                      << "' is no longer sharded. The migration commit error was: "
+                                      << migrationCommitStatus.toString()};
+            }
+
             if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
                 // The chunk modification was not applied, so report the original error
                 return {migrationCommitStatus.code(),
@@ -440,8 +452,8 @@ Status MigrationSourceManager::commitDonateChunk(OperationContext* txn) {
             CollectionShardingState::get(txn, _args.getNss())->refreshMetadata(txn, nullptr);
 
             log() << "moveChunk failed to refresh metadata for collection '" << _args.getNss().ns()
-                  << "'. Metadata will be cleared so it gets a full refresh"
-                  << causedBy(refreshStatus);
+                  << "'. Metadata was cleared so it will get a full refresh when accessed again"
+                  << redact(causedBy(refreshStatus));
 
             return {migrationCommitStatus.code(),
                     str::stream() << "Failed to refresh metadata after migration commit due to "
