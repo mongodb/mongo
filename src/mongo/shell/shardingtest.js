@@ -66,6 +66,8 @@
  *       mongosOptions {Object}: same as the mongos property above.
  *          Can be used to specify options that are common all mongos.
  *       enableBalancer {boolean} : if true, enable the balancer
+ *       enableAutoSplit {boolean} : if true, enable autosplitting; else, default to the
+ * enableBalancer setting
  *       manualAddShard {boolean}: shards will not be added if true.
  *
  *       useBridge {boolean}: If true, then a mongobridge process is started for each node in the
@@ -207,9 +209,11 @@ var ShardingTest = function(params) {
      * Configures the cluster based on the specified parameters (balancer state, etc).
      */
     function _configureCluster() {
-        // Disable the balancer unless it is explicitly turned on
         if (!otherParams.enableBalancer) {
             self.stopBalancer();
+        }
+        if (!otherParams.enableAutoSplit) {
+            self.disableAutoSplit();
         }
     }
 
@@ -774,6 +778,15 @@ var ShardingTest = function(params) {
 
         if (opts.restart) {
             opts = Object.merge(mongos.fullOptions, opts);
+
+            // If the mongos is being restarted with a newer version, make sure we remove any
+            // options that no longer exist in the newer version.
+            // Note: If a jstest specifies the mongos binVersion as an array, calling
+            // MongoRunner.areBinVersionsTheSame() will advance the binVersion iterator over that
+            // array (SERVER-26261).
+            if (MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
+                delete opts.noAutoSplit;
+            }
         }
 
         var newConn = MongoRunner.runMongos(opts);
@@ -936,6 +949,15 @@ var ShardingTest = function(params) {
     var waitForCSRSSecondaries = otherParams.hasOwnProperty('waitForCSRSSecondaries')
         ? otherParams.waitForCSRSSecondaries
         : true;
+
+    // Default enableBalancer to false.
+    otherParams.enableBalancer =
+        ("enableBalancer" in otherParams) && (otherParams.enableBalancer === true);
+
+    // Let autosplit behavior match that of the balancer if autosplit is not explicitly set.
+    if (!("enableAutoSplit" in otherParams)) {
+        otherParams.enableAutoSplit = otherParams.enableBalancer;
+    }
 
     // Allow specifying mixed-type options like this:
     // { mongos : [ { noprealloc : "" } ],
@@ -1328,6 +1350,17 @@ var ShardingTest = function(params) {
         options = Object.merge(options, otherParams["s" + i]);
 
         options.port = options.port || allocatePort();
+
+        // TODO(esha): remove after v3.4 ships.
+        // Legacy mongoses use a command line option to disable autosplit instead of reading the
+        // config.settings collection.
+        // Note: If a jstest specifies the mongos binVersion as an array, calling
+        // MongoRunner.areBinVersionsTheSame() will advance the binVersion iterator over that array
+        // (SERVER-26261).
+        if (options.binVersion && MongoRunner.areBinVersionsTheSame('3.2', options.binVersion) &&
+            !otherParams.enableAutoSplit) {
+            options.noAutoSplit = "";
+        }
 
         if (otherParams.useBridge) {
             var bridgeOptions =

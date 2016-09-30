@@ -9,7 +9,7 @@ function setupTest() {
             numReplicas: 2,
             chunkSize: 1,
             rsOptions: {oplogSize: 50},
-            enableBalancer: 1
+            enableBalancer: true
         }
     });
 
