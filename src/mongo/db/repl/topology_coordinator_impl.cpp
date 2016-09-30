@@ -190,6 +190,11 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                    << _currentPrimaryMember()->getHostAndPort();
             _syncSource = HostAndPort();
             return _syncSource;
+        } else if (_currentPrimaryIndex == _selfIndex) {
+            LOG(1)
+                << "Cannot select a sync source because chaining is not allowed and we are primary";
+            _syncSource = HostAndPort();
+            return _syncSource;
         } else {
             _syncSource = _currentPrimaryMember()->getHostAndPort();
             log() << "chaining not allowed, choosing primary as sync source candidate: "

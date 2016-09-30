@@ -531,6 +531,17 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
     // and the primary (h3) being behind our most recently applied optime
     getTopoCoord().chooseNewSyncSource(now()++, Timestamp(10, 0));
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+
+    // Become primary: should not choose self as sync source.
+    heartbeatFromMember(HostAndPort("h3"),
+                        "rs0",
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(0, 0), 0),
+                        Milliseconds(300));
+    makeSelfPrimary(Timestamp(3.0));
+    ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
 TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
@@ -568,7 +579,7 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
     ASSERT_EQUALS(h3, newSource);
 }
 
-TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimary) {
+TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version"
@@ -607,15 +618,16 @@ TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimary) {
                         Milliseconds(300));
 
     // No primary situation: should choose h2 sync source.
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().chooseNewSyncSource(now()++, Timestamp()));
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // Become primary
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    // Check sync source
-    ASSERT_EQUALS(HostAndPort(), getTopoCoord().getSyncSourceAddress());
+    // Choose same sync source even when primary.
+    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().chooseNewSyncSource(now()++, Timestamp()));
+    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 }
 
 TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet) {
