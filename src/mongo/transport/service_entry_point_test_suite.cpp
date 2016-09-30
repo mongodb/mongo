@@ -320,6 +320,7 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     Session sB(HostAndPort(), HostAndPort(), _tl.get());
     auto idA = sA.id();
     auto idB = sB.id();
+    int waitCountB = 0;
 
     stdx::promise<void> startB;
     auto startBFuture = startB.get_future();
@@ -328,7 +329,6 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     auto resumeAFuture = resumeA.get_future();
 
     stdx::promise<void> testComplete;
-
     auto testFuture = testComplete.get_future();
 
     _tl->_resetHooks();
@@ -337,15 +337,24 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     // Step 1: SEP calls sourceMessage() for A
     // Step 2: SEP calls wait() for A and we block...
     // Start Session B
-    _tl->_wait = [this, idA, &startB, &resumeAFuture](Ticket t) {
+    _tl->_wait = [this, idA, &startB, &resumeAFuture, &waitCountB](Ticket t) -> Status {
         // If we're handling B, just do a default wait
         if (t.sessionId() != idA) {
-            return _tl->_defaultWait(std::move(t));
+            if (waitCountB < 2) {
+                ++waitCountB;
+                return _tl->_defaultWait(std::move(t));
+            } else {
+                //  If we've done a full round trip, time to end session B
+                return kEndConnectionStatus;
+            }
         }
 
         // Otherwise, we need to start B and block A
         startB.set_value();
         resumeAFuture.wait();
+
+        _tl->_wait = stdx::bind(
+            &ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError, _tl.get(), _1);
 
         return Status::OK();
     };
@@ -353,20 +362,13 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     // Step 3: SEP calls sourceMessage() for B, gets tB
     // Step 4: SEP calls wait() for tB, gets { ping : 1 }
     // Step 5: SEP calls sinkMessage() for B, gets tB2
-    _tl->_sinkMessage = stdx::bind(
-        &ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait, _tl.get(), _1, _2, _3);
-
     // Step 6: SEP calls wait() for tB2, gets Status::OK()
     // Step 7: SEP calls sourceMessage() for B, gets tB3
     // Step 8: SEP calls wait() for tB3, gets an error
     // Step 9: SEP calls end(B)
     _tl->_destroy_hook = [this, idA, idB, &resumeA, &testComplete](const Session& session) {
-
         // When end(B) is called, time to resume session A
         if (session.id() == idB) {
-            _tl->_wait =
-                stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultWait, _tl.get(), _1);
-
             // Resume session A
             resumeA.set_value();
         } else {
