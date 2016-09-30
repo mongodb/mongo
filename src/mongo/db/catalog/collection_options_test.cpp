@@ -30,6 +30,8 @@
 
 #include "mongo/db/catalog/collection_options.h"
 
+#include <limits>
+
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
@@ -90,10 +92,27 @@ TEST(CollectionOptions, Validator) {
 TEST(CollectionOptions, ErrorBadSize) {
     ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{capped: true, size: -1}")));
     ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{capped: false, size: -1}")));
+    ASSERT_NOT_OK(CollectionOptions().parse(
+        BSON("capped" << true << "size" << std::numeric_limits<long long>::min())));
+    ASSERT_NOT_OK(CollectionOptions().parse(BSON("capped" << true << "size" << (1LL << 62))));
+    ASSERT_NOT_OK(CollectionOptions().parse(
+        BSON("capped" << true << "size" << std::numeric_limits<long long>::max())));
 }
 
 TEST(CollectionOptions, ErrorBadMax) {
     ASSERT_NOT_OK(CollectionOptions().parse(BSON("capped" << true << "max" << (1LL << 31))));
+}
+
+TEST(CollectionOptions, CappedSizeRoundsUpForAlignment) {
+    const long long kUnalignedCappedSize = 1000;
+    const long long kAlignedCappedSize = 1024;
+    CollectionOptions options;
+
+    // Check size rounds up to multiple of alignment.
+    ASSERT_OK(options.parse(BSON("capped" << true << "size" << kUnalignedCappedSize)));
+    ASSERT_EQUALS(options.capped, true);
+    ASSERT_EQUALS(options.cappedSize, kAlignedCappedSize);
+    ASSERT_EQUALS(options.cappedMaxDocs, 0);
 }
 
 TEST(CollectionOptions, IgnoreSizeWrongType) {
@@ -253,4 +272,4 @@ TEST(CollectionOptions, PipelineFieldRequiresViewOn) {
     CollectionOptions options;
     ASSERT_NOT_OK(options.parse(fromjson("{pipeline: [{$match: {}}]}")));
 }
-}
+}  // namespace mongo

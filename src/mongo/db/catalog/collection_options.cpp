@@ -142,6 +142,10 @@ Status CollectionOptions::parse(const BSONObj& options) {
             cappedSize = e.numberLong();
             if (cappedSize < 0)
                 return Status(ErrorCodes::BadValue, "size has to be >= 0");
+            const long long kGB = 1024 * 1024 * 1024;
+            const long long kPB = 1024 * 1024 * kGB;
+            if (cappedSize > kPB)
+                return Status(ErrorCodes::BadValue, "size cannot exceed 1 PB");
             cappedSize += 0xff;
             cappedSize &= 0xffffffffffffff00LL;
         } else if (fieldName == "max") {
