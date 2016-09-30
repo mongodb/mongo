@@ -649,7 +649,8 @@ protected:
 
     void verifySync(NetworkInterfaceMock* net, ErrorCodes::Error code) {
         // Check result
-        ASSERT_EQ(_isbr->getResult(net).getStatus().code(), code) << "status codes differ";
+        const auto status = _isbr->getResult(net).getStatus();
+        ASSERT_EQ(status.code(), code) << "status codes differ, status: " << status;
     }
 
     BSONObj getInitialSyncProgress() {
@@ -1232,7 +1233,8 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
     log() << "done playing first response of second round of responses";
 
     auto dr = &getDR();
-    ASSERT_TRUE(dr->getState() == DataReplicatorState::InitialSync);
+    ASSERT_TRUE(dr->getState() == DataReplicatorState::InitialSync) << ", state: "
+                                                                    << dr->getDiagnosticString();
     ASSERT_EQUALS(dr->getLastFetched(), OpTimeWithHash());
     ASSERT_EQUALS(dr->getLastApplied(), OpTimeWithHash());
 

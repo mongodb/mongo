@@ -658,12 +658,20 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
 
 StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
                                                          std::size_t maxAttempts) {
+    const Status shutdownStatus{ErrorCodes::ShutdownInProgress,
+                                "Shutting down while in doInitialSync."};
     if (!txn) {
         std::string msg = "Initial Sync attempted but no OperationContext*, so aborting.";
         error() << msg;
         return Status{ErrorCodes::InitialSyncFailure, msg};
     }
     UniqueLock lk(_mutex);
+    if (_inShutdown || (_initialSyncState && !_initialSyncState->status.isOK())) {
+        const auto retStatus = (_initialSyncState && !_initialSyncState->status.isOK())
+            ? _initialSyncState->status
+            : shutdownStatus;
+        return retStatus;
+    }
     _stats.initialSyncStart = _exec->now();
     if (_state != DataReplicatorState::Uninitialized) {
         if (_state == DataReplicatorState::InitialSync)
@@ -688,6 +696,10 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     _stats.maxFailedInitialSyncAttempts = maxAttempts;
     _stats.failedInitialSyncAttempts = 0;
     while (_stats.failedInitialSyncAttempts < _stats.maxFailedInitialSyncAttempts) {
+        if (_inShutdown) {
+            return shutdownStatus;
+        }
+
         Status attemptErrorStatus(Status::OK());
 
         ON_BLOCK_EXIT([this, txn, &lk, &attemptErrorStatus]() {
@@ -765,6 +777,12 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
                 }
                 lk.lock();
             }
+        }
+        if (_inShutdown) {
+            const auto retStatus = (_initialSyncState && !_initialSyncState->status.isOK())
+                ? _initialSyncState->status
+                : shutdownStatus;
+            return retStatus;
         }
 
         // Cleanup
@@ -1388,6 +1406,7 @@ Status DataReplicator::scheduleShutdown(OperationContext* txn) {
     {
         LockGuard lk(_mutex);
         invariant(!_onShutdown.isValid());
+        _inShutdown = true;
         _onShutdown = eventStatus.getValue();
         if (_initialSyncState) {
             _initialSyncState->status = {ErrorCodes::ShutdownInProgress,
@@ -1435,6 +1454,12 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
         return;
     }
 
+    {
+        LockGuard lk{_mutex};
+        if (_inShutdown) {
+            return;
+        }
+    }
     invariant(_oplogBuffer);
 
     // Wait for enough space.

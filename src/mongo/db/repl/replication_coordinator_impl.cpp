@@ -620,7 +620,13 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
 
             drCopy.reset();
             lk.lock();
-            if (!_inShutdown) {
+
+            if (ErrorCodes::CallbackCanceled == status ||
+                ErrorCodes::ShutdownInProgress == status) {
+
+                log() << "Initial Sync has been cancelled: " << status.getStatus();
+                return;
+            } else if (!_inShutdown) {
                 fassertNoTrace(40088, status.getStatus());
             } else if (!status.isOK()) {
                 log() << "Initial Sync failed during shutdown due to " << status.getStatus();
