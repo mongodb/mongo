@@ -180,7 +180,8 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
     }
 
     // If we are only allowed to sync from the primary, set that
-    if (!_rsConfig.isChainingAllowed()) {
+    if (chainingPreference == ChainingPreference::kUseConfiguration &&
+        !_rsConfig.isChainingAllowed()) {
         if (_currentPrimaryIndex == -1) {
             LOG(1) << "Cannot select a sync source because chaining is"
                       " not allowed and primary is unknown/down";

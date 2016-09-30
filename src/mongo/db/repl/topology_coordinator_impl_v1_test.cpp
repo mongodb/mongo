@@ -522,12 +522,12 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
     heartbeatFromMember(HostAndPort("h2"),
                         "rs0",
                         MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(1, 0), 0),
+                        OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
     heartbeatFromMember(HostAndPort("h2"),
                         "rs0",
                         MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(1, 0), 0),
+                        OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
     heartbeatFromMember(HostAndPort("h3"),
                         "rs0",
@@ -541,8 +541,10 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
                         Milliseconds(300));
 
     // No primary situation: should choose no sync source.
-    getTopoCoord().chooseNewSyncSource(
-        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
+    ASSERT_EQUALS(
+        HostAndPort(),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration));
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // Add primary
@@ -554,11 +556,22 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
                         Milliseconds(300));
     ASSERT_EQUALS(2, getCurrentPrimaryIndex());
 
-    // h3 is primary and should be chosen as sync source, despite being further away than h2
-    // and the primary (h3) being behind our most recently applied optime
-    getTopoCoord().chooseNewSyncSource(
-        now()++, Timestamp(10, 0), TopologyCoordinator::ChainingPreference::kUseConfiguration);
+    // h3 is primary and should be chosen as the sync source when we are not in catch-up mode,
+    // despite being further away than h2 and the primary (h3) being behind our most recently
+    // applied optime.
+    ASSERT_EQUALS(
+        HostAndPort("h3"),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(10, 0), TopologyCoordinator::ChainingPreference::kUseConfiguration));
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+
+    // When we are in catch-up mode, the chainingAllowed setting is ignored. h2 should be chosen as
+    // the sync source.
+    ASSERT_EQUALS(
+        HostAndPort("h2"),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(10, 0), TopologyCoordinator::ChainingPreference::kAllowChaining));
+    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // Become primary: should not choose self as sync source.
     heartbeatFromMember(HostAndPort("h3"),
@@ -568,8 +581,10 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
                         Milliseconds(300));
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-    getTopoCoord().chooseNewSyncSource(
-        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
+    ASSERT_EQUALS(
+        HostAndPort(),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration));
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
