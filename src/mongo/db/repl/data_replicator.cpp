@@ -677,20 +677,6 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     LOG(1) << "Creating oplogBuffer.";
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
     _oplogBuffer->startup(txn);
-    ON_BLOCK_EXIT([this, txn, &lk]() {
-        if (!lk.owns_lock()) {
-            lk.lock();
-        }
-
-        auto oldBuffer = std::move(_oplogBuffer);
-        lk.unlock();
-
-        if (oldBuffer) {
-            LOG(1) << "shutting down _oplogBuffer in doInitialSync.";
-            oldBuffer->shutdown(txn);
-            oldBuffer.reset();
-        }
-    });
 
     lk.unlock();
     // This will call through to the storageInterfaceImpl to ReplicationCoordinatorImpl.
@@ -701,6 +687,20 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     _stats.failedInitialSyncAttempts = 0;
     while (_stats.failedInitialSyncAttempts < _stats.maxFailedInitialSyncAttempts) {
         Status attemptErrorStatus(Status::OK());
+
+        ON_BLOCK_EXIT([this, txn, &lk, &attemptErrorStatus]() {
+            if (!lk.owns_lock()) {
+                lk.lock();
+            }
+            if (_anyActiveHandles_inlock()) {
+                _cancelAllHandles_inlock();
+                _waitOnAndResetAll_inlock(&lk);
+                if (!attemptErrorStatus.isOK()) {
+                    _initialSyncState.reset();
+                }
+            }
+        });
+
         _setState_inlock(DataReplicatorState::InitialSync);
         _reporterPaused = true;
         _applierPaused = true;
@@ -880,12 +880,46 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
 }
 
 bool DataReplicator::_anyActiveHandles_inlock() const {
-    return (_oplogFetcher && _oplogFetcher->isActive()) ||
-        (_initialSyncState && _initialSyncState->dbsCloner &&
-         _initialSyncState->dbsCloner->isActive()) ||
-        (_applier && _applier->isActive()) ||
-        (_shuttingDownApplier && _shuttingDownApplier->isActive()) ||
-        (_reporter && _reporter->isActive());
+    // If any component is active then retVal will be set to true.
+    bool retVal = false;
+
+    // For diagnostic reasons, do not return early once an active component is found, but instead
+    // log each active component.
+
+    if (_oplogFetcher && _oplogFetcher->isActive()) {
+        LOG(0 /*1*/) << "_oplogFetcher is active (_anyActiveHandles_inlock): "
+                     << _oplogFetcher->toString();
+        retVal = true;
+    }
+
+    if (_initialSyncState && _initialSyncState->dbsCloner &&
+        _initialSyncState->dbsCloner->isActive()) {
+        LOG(0 /*1*/) << "_initialSyncState::dbsCloner is active (_anyActiveHandles_inlock): "
+                     << _initialSyncState->dbsCloner->toString();
+        retVal = true;
+    }
+
+    if (_applier && _applier->isActive()) {
+        LOG(0 /*1*/) << "_applier is active (_anyActiveHandles_inlock): " << _applier->toString();
+        retVal = true;
+    }
+
+    if (_shuttingDownApplier && _shuttingDownApplier->isActive()) {
+        LOG(0 /*1*/) << "_shuttingDownApplier is active (_anyActiveHandles_inlock): "
+                     << _shuttingDownApplier->toString();
+        retVal = true;
+    }
+
+    if (_reporter && _reporter->isActive()) {
+        LOG(0 /*1*/) << "_reporter is active (_anyActiveHandles_inlock): " << _reporter->toString();
+        retVal = true;
+    }
+
+    if (!retVal) {
+        LOG(0 /*2*/)
+            << "DataReplicator::_anyActiveHandles_inlock returned false as nothing is active.";
+    }
+    return retVal;
 }
 
 void DataReplicator::_cancelAllHandles_inlock() {
@@ -913,7 +947,6 @@ void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
     if (_initialSyncState) {
         swapAndJoin_inlock(lk, _initialSyncState->dbsCloner, "Waiting on databases cloner: ");
     }
-    _initialSyncState.reset();
 }
 
 void DataReplicator::_doNextActions() {
@@ -1359,10 +1392,6 @@ Status DataReplicator::scheduleShutdown(OperationContext* txn) {
                                          "Shutdown issued for the operation."};
         }
         _cancelAllHandles_inlock();
-        if (_oplogBuffer) {
-            _oplogBuffer->shutdown(txn);
-            _oplogBuffer.reset();
-        }
     }
 
     // Schedule _doNextActions in case nothing is active to trigger the _onShutdown event.
@@ -1378,7 +1407,9 @@ void DataReplicator::waitForShutdown() {
     }
     _exec->waitForEvent(onShutdown);
     {
-        LockGuard lk(_mutex);
+        UniqueLock lk(_mutex);
+        _waitOnAndResetAll_inlock(&lk);
+        _oplogBuffer.reset();
         invariant(!_lastOplogEntryFetcher || !_lastOplogEntryFetcher->isActive());
         invariant(!_oplogFetcher || !_oplogFetcher->isActive());
         invariant(!_applier || !_applier->isActive());

@@ -1333,13 +1333,13 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto progress = getInitialSyncProgress();
     log() << "Progress after first failed response: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 7);
-    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0);
-    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2);
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
+    ASSERT_EQUALS(progress.nFields(), 7) << progress;
+    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
+    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
     ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
-    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
-    ASSERT_EQUALS(progress.getIntField("appliedOps"), 0);
+    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
+    ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
     ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
     // Play rest of the failed round of responses.
@@ -1356,22 +1356,24 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = getInitialSyncProgress();
     log() << "Progress after failure: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 7);
-    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1);
-    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2);
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
-    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
-    ASSERT_EQUALS(progress.getIntField("appliedOps"), 0);
+    ASSERT_EQUALS(progress.nFields(), 7) << progress;
+    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
+    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
+    ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
     ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
     BSONObj attempts = progress["initialSyncAttempts"].Obj();
-    ASSERT_EQUALS(attempts.nFields(), 1);
+    ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
     BSONObj attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 3);
+    ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("status"),
-                  std::string("FailedToParse: fail on clone -- listDBs injected failure"));
-    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt);
-    ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"));
+                  std::string("FailedToParse: fail on clone -- listDBs injected failure"))
+        << attempt0;
+    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
+    ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
+        << attempt0;
 
     // Play all but last of the successful round of responses.
     setResponses({successfulResponses.begin() + 2, successfulResponses.end() - 1});
@@ -1382,31 +1384,33 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = getInitialSyncProgress();
     log() << "Progress after all but last successful response: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 7);
-    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1);
-    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2);
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
-    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0);
+    ASSERT_EQUALS(progress.nFields(), 7) << progress;
+    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
+    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
-    ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6);
+    ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
     auto databasesProgress = progress.getObjectField("databases");
-    ASSERT_EQUALS(1, databasesProgress.getIntField("databasesCloned"));
+    ASSERT_EQUALS(1, databasesProgress.getIntField("databasesCloned")) << databasesProgress;
     auto dbProgress = databasesProgress.getObjectField("a");
-    ASSERT_EQUALS(1, dbProgress.getIntField("collections"));
-    ASSERT_EQUALS(1, dbProgress.getIntField("clonedCollections"));
+    ASSERT_EQUALS(1, dbProgress.getIntField("collections")) << dbProgress;
+    ASSERT_EQUALS(1, dbProgress.getIntField("clonedCollections")) << dbProgress;
     auto collectionProgress = dbProgress.getObjectField("a.a");
-    ASSERT_EQUALS(5, collectionProgress.getIntField("documents"));
-    ASSERT_EQUALS(1, collectionProgress.getIntField("indexes"));
-    ASSERT_EQUALS(5, collectionProgress.getIntField("fetchedBatches"));
+    ASSERT_EQUALS(5, collectionProgress.getIntField("documents")) << collectionProgress;
+    ASSERT_EQUALS(1, collectionProgress.getIntField("indexes")) << collectionProgress;
+    ASSERT_EQUALS(5, collectionProgress.getIntField("fetchedBatches")) << collectionProgress;
 
     attempts = progress["initialSyncAttempts"].Obj();
-    ASSERT_EQUALS(attempts.nFields(), 1);
+    ASSERT_EQUALS(attempts.nFields(), 1) << progress;
     attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 3);
+    ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("status"),
-                  std::string("FailedToParse: fail on clone -- listDBs injected failure"));
-    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt);
-    ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"));
+                  std::string("FailedToParse: fail on clone -- listDBs injected failure"))
+        << attempt0;
+    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
+    ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
+        << attempt0;
 
     // Play last successful response.
     setResponses({successfulResponses.end() - 1, successfulResponses.end()});
@@ -1417,28 +1421,34 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = getInitialSyncProgress();
     log() << "Progress at end: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 6);
-    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1);
-    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2);
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date);
-    ASSERT_EQUALS(progress["initialSyncEnd"].type(), Date);
-    ASSERT_EQUALS(progress["initialSyncElapsedMillis"].type(), NumberInt);
+    ASSERT_EQUALS(progress.nFields(), 8) << progress;
+    ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
+    ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncEnd"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncElapsedMillis"].type(), NumberInt) << progress;
+    ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
+    // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
+    ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
 
     attempts = progress["initialSyncAttempts"].Obj();
-    ASSERT_EQUALS(attempts.nFields(), 2);
+    ASSERT_EQUALS(attempts.nFields(), 2) << attempts;
 
     attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 3);
+    ASSERT_EQUALS(attempt0.nFields(), 3) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("status"),
-                  std::string("FailedToParse: fail on clone -- listDBs injected failure"));
-    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt);
-    ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"));
+                  std::string("FailedToParse: fail on clone -- listDBs injected failure"))
+        << attempt0;
+    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
+    ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
+        << attempt0;
 
     BSONObj attempt1 = attempts["1"].Obj();
-    ASSERT_EQUALS(attempt1.nFields(), 3);
-    ASSERT_EQUALS(attempt1.getStringField("status"), std::string("OK"));
-    ASSERT_EQUALS(attempt1["durationMillis"].type(), NumberInt);
-    ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"));
+    ASSERT_EQUALS(attempt1.nFields(), 3) << attempt1;
+    ASSERT_EQUALS(attempt1.getStringField("status"), std::string("OK")) << attempt1;
+    ASSERT_EQUALS(attempt1["durationMillis"].type(), NumberInt) << attempt1;
+    ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"))
+        << attempt1;
 }
 
 TEST_F(InitialSyncTest, DataReplicatorCreatesNewApplierForNextBatchBeforeDestroyingCurrentApplier) {
