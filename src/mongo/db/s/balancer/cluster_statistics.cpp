@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer/cluster_statistics.h"
+#include "mongo/db/s/balancer/cluster_statistics.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

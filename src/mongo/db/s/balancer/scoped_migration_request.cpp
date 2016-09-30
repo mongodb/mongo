@@ -30,11 +30,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer/scoped_migration_request.h"
+#include "mongo/db/s/balancer/scoped_migration_request.h"
 
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/balancer/type_migration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

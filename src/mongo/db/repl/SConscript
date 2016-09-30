@@ -1104,6 +1104,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
     ],

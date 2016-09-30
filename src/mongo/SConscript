@@ -251,22 +251,23 @@ generateConfigHeaderFile = env.Substfile(
 env.Alias('generated-sources', generateConfigHeaderFile)
 
 mongodLibDeps = [
-    "db/commands/core",
-    "db/conn_pool_options",
-    "db/mongod_options",
-    "db/mongodandmongos",
-    "db/mongodwebserver",
-    "db/serveronly",
-    "db/repl/replset_commands",
-    "db/repl/storage_interface_impl",
-    "executor/network_interface_factory",
+    'db/commands/core',
+    'db/conn_pool_options',
+    'db/mongod_options',
+    'db/mongodandmongos',
+    'db/mongodwebserver',
+    'db/repl/replset_commands',
+    'db/repl/storage_interface_impl',
+    'db/s/balancer',
+    'db/serveronly',
+    'executor/network_interface_factory',
     's/commands/shared_cluster_commands',
-    "transport/transport_layer_legacy",
-    "transport/service_entry_point_utils",
-    "util/clock_sources",
-    "util/fail_point",
-    "util/ntservice",
-    "util/version_impl",
+    'transport/service_entry_point_utils',
+    'transport/transport_layer_legacy',
+    'util/clock_sources',
+    'util/fail_point',
+    'util/ntservice',
+    'util/version_impl',
 ]
 
 if has_option('use-cpu-profiler'):

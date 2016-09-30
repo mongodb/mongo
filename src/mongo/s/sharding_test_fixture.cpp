@@ -49,7 +49,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"

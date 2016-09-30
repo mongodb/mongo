@@ -33,8 +33,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/balancer/balancer.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/db/s/balancer/balancer.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/mongoutils/str.h"
 

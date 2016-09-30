@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
