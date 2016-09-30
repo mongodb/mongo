@@ -65,6 +65,10 @@ StatusWith<std::unique_ptr<FTDCFileManager>> FTDCFileManager::create(
     Client* client) {
     const boost::filesystem::path dir = boost::filesystem::absolute(path);
 
+    // We don't expect to ever pass "" to create_directories below, but catch
+    // this anyway as per SERVER-26412.
+    invariant(!dir.empty());
+
     if (!boost::filesystem::exists(dir)) {
         // Create the directory
         boost::system::error_code ec;
