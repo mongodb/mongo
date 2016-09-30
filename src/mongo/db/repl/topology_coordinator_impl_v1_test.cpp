@@ -250,7 +250,8 @@ private:
 
 TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
     // if we do not have an index in the config, we should get an empty syncsource
-    HostAndPort newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    HostAndPort newSyncSource = getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_TRUE(newSyncSource.empty());
 
     updateConfig(BSON("_id"
@@ -276,7 +277,8 @@ TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // Fail due to insufficient number of pings
-    newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    newSyncSource = getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
@@ -286,37 +288,43 @@ TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
     heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime());
 
     // Should choose h2, since it is furthest ahead
-    newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    newSyncSource = getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // h3 becomes further ahead, so it should be chosen
     heartbeatFromMember(
         HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     // h3 becomes an invalid candidate for sync source; should choose h2 again
     heartbeatFromMember(
         HostAndPort("h3"), "rs0", MemberState::RS_RECOVERING, OpTime(Timestamp(2, 0), 0));
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // h3 back in SECONDARY and ahead
     heartbeatFromMember(
         HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     // h3 goes down
     receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // h3 back up and ahead
     heartbeatFromMember(
         HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -442,7 +450,8 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
                         Milliseconds(100));
 
     // Should choose primary first; it's closest
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("hprimary"), getTopoCoord().getSyncSourceAddress());
 
     // Primary goes far far away
@@ -454,34 +463,40 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
 
     // Should choose h4.  (if an arbiter has an oplog, it's a valid sync source)
     // h6 is not considered because it is outside the maxSyncLagSeconds window.
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h4"), getTopoCoord().getSyncSourceAddress());
 
     // h4 goes down; should choose h1
     receiveDownHeartbeat(HostAndPort("h4"), "rs0", OpTime());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h1"), getTopoCoord().getSyncSourceAddress());
 
     // Primary and h1 go down; should choose h6
     receiveDownHeartbeat(HostAndPort("h1"), "rs0", OpTime());
     receiveDownHeartbeat(HostAndPort("hprimary"), "rs0", OpTime());
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
 
     // h6 goes down; should choose h5
     receiveDownHeartbeat(HostAndPort("h6"), "rs0", OpTime());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
 
     // h5 goes down; should choose h3
     receiveDownHeartbeat(HostAndPort("h5"), "rs0", OpTime());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     // h3 goes down; no sync source candidates remain
     receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    getTopoCoord().chooseNewSyncSource(
+        now()++, lastOpTimeWeApplied, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
@@ -526,7 +541,8 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
                         Milliseconds(300));
 
     // No primary situation: should choose no sync source.
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // Add primary
@@ -540,7 +556,8 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
 
     // h3 is primary and should be chosen as sync source, despite being further away than h2
     // and the primary (h3) being behind our most recently applied optime
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp(10, 0));
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(10, 0), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     // Become primary: should not choose self as sync source.
@@ -551,7 +568,8 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenChainingIsDisallowed) {
                         Milliseconds(300));
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
@@ -577,16 +595,19 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
     heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot1, hbRTT300);
 
     // Should choose h3 as it is a voter
-    auto newSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    auto newSource = getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(h3, newSource);
 
     // Can't choose h2 as it is not a voter
-    newSource = getTopoCoord().chooseNewSyncSource(now()++, t10);
+    newSource = getTopoCoord().chooseNewSyncSource(
+        now()++, t10, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort(), newSource);
 
     // Should choose h3 as it is a voter, and ahead
     heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT300);
-    newSource = getTopoCoord().chooseNewSyncSource(now()++, t1);
+    newSource = getTopoCoord().chooseNewSyncSource(
+        now()++, t1, TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(h3, newSource);
 }
 
@@ -629,7 +650,10 @@ TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
                         Milliseconds(300));
 
     // No primary situation: should choose h2 sync source.
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().chooseNewSyncSource(now()++, Timestamp()));
+    ASSERT_EQUALS(
+        HostAndPort("h2"),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration));
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // Become primary
@@ -637,7 +661,10 @@ TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
     // Choose same sync source even when primary.
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().chooseNewSyncSource(now()++, Timestamp()));
+    ASSERT_EQUALS(
+        HostAndPort("h2"),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration));
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -670,7 +697,8 @@ TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourc
         HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, newOpTime, Milliseconds(100));
 
     // force should overrule other defaults
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
     getTopoCoord().setForceSyncSourceIndex(1);
     // force should cause shouldChangeSyncSource() to return true
@@ -679,11 +707,13 @@ TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourc
         HostAndPort("h2"), OpTime(), makeMetadata(oldOpTime), now()));
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("h3"), OpTime(), makeMetadata(newOpTime), now()));
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // force should only work for one call to chooseNewSyncSource
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -725,17 +755,20 @@ TEST_F(TopoCoordTest, NodeDoesNotChooseBlacklistedSyncSourceUntilBlacklistingExp
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
 
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
     getTopoCoord().blacklistSyncSource(HostAndPort("h3"), expireTime);
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     // Should choose second best choice now that h3 is blacklisted.
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // After time has passed, should go back to original sync source
-    getTopoCoord().chooseNewSyncSource(expireTime, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        expireTime, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -780,17 +813,20 @@ TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsBlacklistedAndChainingIsDis
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
 
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
     getTopoCoord().blacklistSyncSource(HostAndPort("h2"), expireTime);
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     // Can't choose any sync source now.
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // After time has passed, should go back to the primary
-    getTopoCoord().chooseNewSyncSource(expireTime, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        expireTime, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -832,20 +868,31 @@ TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
 
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().chooseNewSyncSource(now()++, Timestamp()));
+    ASSERT_EQUALS(
+        HostAndPort("h3"),
+        getTopoCoord().chooseNewSyncSource(
+            now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration));
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     // Good state setup done
 
     // Mark nodes down, ensure that we have no source and are secondary
     receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
     receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
-    ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, Timestamp()).empty());
+    ASSERT_TRUE(getTopoCoord()
+                    .chooseNewSyncSource(now()++,
+                                         Timestamp(),
+                                         TopologyCoordinator::ChainingPreference::kUseConfiguration)
+                    .empty());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 
     // Mark nodes down + unauth, ensure that we have no source and are secondary
     receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime(), ErrorCodes::Unauthorized);
     receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::Unauthorized);
-    ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, Timestamp()).empty());
+    ASSERT_TRUE(getTopoCoord()
+                    .chooseNewSyncSource(now()++,
+                                         Timestamp(),
+                                         TopologyCoordinator::ChainingPreference::kUseConfiguration)
+                    .empty());
     ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
 
     // Having an auth error but with another node up should bring us out of RECOVERING
@@ -1219,7 +1266,9 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAStaleNode) {
     ASSERT_OK(result);
     ASSERT_EQUALS("requested member \"h5:27017\" is more than 10 seconds behind us",
                   response.obj()["warning"].String());
-    getTopoCoord().chooseNewSyncSource(now()++, ourOpTime.getTimestamp());
+    getTopoCoord().chooseNewSyncSource(now()++,
+                                       ourOpTime.getTimestamp(),
+                                       TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -1266,7 +1315,9 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAValidNode) {
     ASSERT_OK(result);
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
-    getTopoCoord().chooseNewSyncSource(now()++, ourOpTime.getTimestamp());
+    getTopoCoord().chooseNewSyncSource(now()++,
+                                       ourOpTime.getTimestamp(),
+                                       TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
 }
 
@@ -1314,7 +1365,8 @@ TEST_F(TopoCoordTest,
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
     receiveDownHeartbeat(HostAndPort("h6"), "rs0", OpTime());
-    HostAndPort syncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    HostAndPort syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h6"), syncSource);
 }
 
@@ -1428,7 +1480,9 @@ TEST_F(TopoCoordTest,
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
     ASSERT_FALSE(responseObj.hasField("prevSyncTarget"));
-    getTopoCoord().chooseNewSyncSource(now()++, ourOpTime.getTimestamp());
+    getTopoCoord().chooseNewSyncSource(now()++,
+                                       ourOpTime.getTimestamp(),
+                                       TopologyCoordinator::ChainingPreference::kUseConfiguration);
     ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
 
     heartbeatFromMember(
@@ -1890,7 +1944,8 @@ TEST_F(PrepareHeartbeatResponseV1Test,
         HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
     heartbeatFromMember(
         HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
-    getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    getTopoCoord().chooseNewSyncSource(
+        now()++, Timestamp(), TopologyCoordinator::ChainingPreference::kUseConfiguration);
 
     // set up args
     ReplSetHeartbeatArgsV1 args;

@@ -3150,8 +3150,11 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const Timestamp& las
     LockGuard topoLock(_topoMutex);
 
     HostAndPort oldSyncSource = _topCoord->getSyncSourceAddress();
-    HostAndPort newSyncSource =
-        _topCoord->chooseNewSyncSource(_replExecutor.now(), lastTimestampFetched);
+    auto chainingPreference = isCatchingUp()
+        ? TopologyCoordinator::ChainingPreference::kAllowChaining
+        : TopologyCoordinator::ChainingPreference::kUseConfiguration;
+    HostAndPort newSyncSource = _topCoord->chooseNewSyncSource(
+        _replExecutor.now(), lastTimestampFetched, chainingPreference);
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge

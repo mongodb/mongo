@@ -150,7 +150,9 @@ public:
     virtual long long getTerm();
     virtual UpdateTermResult updateTerm(long long term, Date_t now);
     virtual void setForceSyncSourceIndex(int index);
-    virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied);
+    virtual HostAndPort chooseNewSyncSource(Date_t now,
+                                            const Timestamp& lastTimestampApplied,
+                                            ChainingPreference chainingPreference);
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
     virtual void unblacklistSyncSource(const HostAndPort& host, Date_t now);
     virtual void clearSyncSourceBlacklist();
