@@ -621,7 +621,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             drCopy.reset();
             lk.lock();
             if (!_inShutdown) {
-                fassertStatusOK(40088, status);
+                fassertNoTrace(40088, status.getStatus());
             } else if (!status.isOK()) {
                 log() << "Initial Sync failed during shutdown due to " << status.getStatus();
                 return;
