@@ -1282,8 +1282,8 @@ var ShardingTest = function(params) {
         return false;
     }
 
+    const configRS = this.configRS;
     if (shouldSetFeatureCompatibilityVersion32()) {
-        const configRS = this.configRS;
         function setFeatureCompatibilityVersion() {
             assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.2'}));
 
@@ -1305,6 +1305,8 @@ var ShardingTest = function(params) {
                 {_id: 'chunksize'},
                 {$set: {value: otherParams.chunkSize}},
                 {upsert: true, writeConcern: {w: 'majority', wtimeout: kDefaultWTimeoutMs}}));
+
+            configRS.awaitLastOpCommitted();
         }
 
         if (keyFile) {

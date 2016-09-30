@@ -34,6 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
@@ -71,6 +72,12 @@ void ShardingUptimeReporter::startPeriodicThread() {
             {
                 auto txn = cc().makeOperationContext();
                 reportStatus(txn.get(), false);
+
+                auto status =
+                    Grid::get(txn.get())->getBalancerConfiguration()->refreshAndCheck(txn.get());
+                if (!status.isOK()) {
+                    warning() << "failed to refresh mongos settings" << causedBy(status);
+                }
             }
 
             sleepFor(kUptimeReportInterval);
