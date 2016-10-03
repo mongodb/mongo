@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source_facet.h"
 
+#include <memory>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -42,12 +43,14 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+using std::pair;
 using std::string;
 using std::vector;
 
@@ -63,7 +66,78 @@ DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelin
     }
 }
 
-REGISTER_DOCUMENT_SOURCE(facet, DocumentSourceFacet::createFromBson);
+namespace {
+/**
+ * Extracts the names of the facets and the vectors of raw BSONObjs representing the stages within
+ * that facet's pipeline.
+ *
+ * Throws a UserException if it fails to parse for any reason.
+ */
+vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& elem) {
+    uassert(40169,
+            str::stream() << "the $facet specification must be a non-empty object, but found: "
+                          << elem,
+            elem.type() == BSONType::Object && !elem.embeddedObject().isEmpty());
+
+    vector<pair<string, vector<BSONObj>>> rawFacetPipelines;
+    for (auto&& facetElem : elem.embeddedObject()) {
+        const auto facetName = facetElem.fieldNameStringData();
+        FieldPath::uassertValidFieldName(facetName);
+        uassert(40170,
+                str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
+                              << typeName(facetElem.type()),
+                facetElem.type() == BSONType::Array);
+
+        vector<BSONObj> rawPipeline;
+        for (auto&& subPipeElem : facetElem.Obj()) {
+            uassert(40171,
+                    str::stream() << "elements of arrays in $facet spec must be non-empty objects, "
+                                  << facetName
+                                  << " argument contained an element of type "
+                                  << typeName(subPipeElem.type())
+                                  << ": "
+                                  << subPipeElem,
+                    subPipeElem.type() == BSONType::Object);
+            auto stageName = subPipeElem.Obj().firstElementFieldName();
+            uassert(
+                40331,
+                str::stream() << "specified stage is not allowed to be used within a $facet stage: "
+                              << subPipeElem,
+                !str::equals(stageName, "$out") && !str::equals(stageName, "$facet"));
+
+            rawPipeline.push_back(subPipeElem.embeddedObject());
+        }
+
+        rawFacetPipelines.emplace_back(facetName.toString(), std::move(rawPipeline));
+    }
+    return rawFacetPipelines;
+}
+}  // namespace
+
+std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
+    const AggregationRequest& request, const BSONElement& spec) {
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
+    for (auto&& rawPipeline : extractRawPipelines(spec)) {
+        liteParsedPipelines.emplace_back(
+            AggregationRequest(request.getNamespaceString(), rawPipeline.second));
+    }
+    return std::unique_ptr<DocumentSourceFacet::LiteParsed>(
+        new DocumentSourceFacet::LiteParsed(std::move(liteParsedPipelines)));
+}
+
+stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()
+    const {
+    stdx::unordered_set<NamespaceString> involvedNamespaces;
+    for (auto&& liteParsedPipeline : _liteParsedPipelines) {
+        auto involvedInSubPipe = liteParsedPipeline.getInvolvedNamespaces();
+        involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
+    }
+    return involvedNamespaces;
+}
+
+REGISTER_DOCUMENT_SOURCE(facet,
+                         DocumentSourceFacet::LiteParsed::parse,
+                         DocumentSourceFacet::createFromBson);
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     std::vector<FacetPipeline> facetPipelines, const intrusive_ptr<ExpressionContext>& expCtx) {
@@ -189,53 +263,28 @@ DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* 
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(40169,
-            str::stream() << "the $facet specification must be a non-empty object, but found: "
-                          << elem,
-            elem.type() == BSONType::Object && !elem.embeddedObject().isEmpty());
 
     std::vector<FacetPipeline> facetPipelines;
-    for (auto&& facetElem : elem.embeddedObject()) {
-        const auto facetName = facetElem.fieldNameStringData();
-        FieldPath::uassertValidFieldName(facetName);
-        uassert(40170,
-                str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
-                              << typeName(facetElem.type()),
-                facetElem.type() == BSONType::Array);
+    for (auto&& rawFacet : extractRawPipelines(elem)) {
+        const auto facetName = rawFacet.first;
 
-        vector<BSONObj> rawPipeline;
-        for (auto&& subPipeElem : facetElem.Obj()) {
-            uassert(40171,
-                    str::stream() << "elements of arrays in $facet spec must be objects, "
-                                  << facetName
-                                  << " argument contained an element of type "
-                                  << typeName(subPipeElem.type()),
-                    subPipeElem.type() == BSONType::Object);
-
-            rawPipeline.push_back(subPipeElem.embeddedObject());
-        }
-
-        auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
+        auto pipeline = uassertStatusOK(Pipeline::parse(rawFacet.second, expCtx));
 
         uassert(40172,
-                str::stream() << "sub-pipelines in $facet stage cannot be empty: "
-                              << facetElem.toString(),
+                str::stream() << "sub-pipeline in $facet stage cannot be empty: " << facetName,
                 !pipeline->getSources().empty());
 
-        // Disallow $out stages, $facet stages, and any stages that need to be the first stage in
-        // the pipeline.
+        // Disallow any stages that need to be the first stage in the pipeline.
         for (auto&& stage : pipeline->getSources()) {
-            if ((dynamic_cast<DocumentSourceOut*>(stage.get())) ||
-                (dynamic_cast<DocumentSourceFacet*>(stage.get())) ||
-                (stage->isValidInitialSource())) {
+            if (stage->isValidInitialSource()) {
                 uasserted(40173,
                           str::stream() << stage->getSourceName()
                                         << " is not allowed to be used within a $facet stage: "
-                                        << facetElem.toString());
+                                        << elem.toString());
             }
         }
 
-        facetPipelines.emplace_back(facetName.toString(), std::move(pipeline));
+        facetPipelines.emplace_back(facetName, std::move(pipeline));
     }
 
     return new DocumentSourceFacet(std::move(facetPipelines), expCtx);

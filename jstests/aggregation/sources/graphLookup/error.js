@@ -9,7 +9,10 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
     local.drop();
     local.insert({});
 
-    var pipeline = {
+    var pipeline = {$graphLookup: 4};
+    assertErrorCode(local, pipeline, 40327, "$graphLookup spec must be an object");
+
+    pipeline = {
         $graphLookup: {
             from: "foreign",
             startWith: {$literal: 0},
@@ -54,7 +57,18 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             as: "output"
         }
     };
-    assertErrorCode(local, pipeline, 40103, "from must be a string");
+    assertErrorCode(local, pipeline, 40329, "from must be a string");
+
+    pipeline = {
+        $graphLookup: {
+            from: "",
+            startWith: {$literal: 0},
+            connectToField: "a",
+            connectFromField: "b",
+            as: "output"
+        }
+    };
+    assertErrorCode(local, pipeline, 40330, "from must be a valid namespace");
 
     pipeline = {
         $graphLookup: {
@@ -201,7 +215,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
         $graphLookup:
             {startWith: {$literal: 0}, connectToField: "a", connectFromField: "b", as: "output"}
     };
-    assertErrorCode(local, pipeline, 40105, "from was not specified");
+    assertErrorCode(local, pipeline, 40328, "from was not specified");
 
     // restrictSearchWithMatch must be a valid match expression.
     pipeline = {

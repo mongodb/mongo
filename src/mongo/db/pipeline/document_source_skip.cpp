@@ -28,11 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -43,7 +45,9 @@ DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& p
                                        long long nToSkip)
     : DocumentSource(pExpCtx), _nToSkip(nToSkip) {}
 
-REGISTER_DOCUMENT_SOURCE(skip, DocumentSourceSkip::createFromBson);
+REGISTER_DOCUMENT_SOURCE(skip,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceSkip::createFromBson);
 
 const char* DocumentSourceSkip::getSourceName() const {
     return "$skip";

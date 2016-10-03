@@ -33,6 +33,7 @@
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
 namespace mongo {
@@ -41,7 +42,9 @@ using boost::intrusive_ptr;
 using parsed_aggregation_projection::ParsedAggregationProjection;
 using parsed_aggregation_projection::ProjectionType;
 
-REGISTER_DOCUMENT_SOURCE(project, DocumentSourceProject::createFromBson);
+REGISTER_DOCUMENT_SOURCE(project,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceProject::createFromBson);
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {

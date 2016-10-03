@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
@@ -39,7 +40,9 @@ using std::pair;
 using std::string;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE(bucketAuto, DocumentSourceBucketAuto::createFromBson);
+REGISTER_DOCUMENT_SOURCE(bucketAuto,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceBucketAuto::createFromBson);
 
 const char* DocumentSourceBucketAuto::getSourceName() const {
     return "$bucketAuto";

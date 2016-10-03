@@ -30,11 +30,11 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -48,7 +48,9 @@ using std::vector;
 DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _mergingPresorted(false) {}
 
-REGISTER_DOCUMENT_SOURCE(sort, DocumentSourceSort::createFromBson);
+REGISTER_DOCUMENT_SOURCE(sort,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceSort::createFromBson);
 
 const char* DocumentSourceSort::getSourceName() const {
     return "$sort";

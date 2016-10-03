@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
@@ -43,7 +44,9 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _cursorDescriptors(std::move(cursorDescriptors)), _unstarted(true) {}
 
-REGISTER_DOCUMENT_SOURCE(mergeCursors, DocumentSourceMergeCursors::createFromBson);
+REGISTER_DOCUMENT_SOURCE(mergeCursors,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceMergeCursors::createFromBson);
 
 const char* DocumentSourceMergeCursors::getSourceName() const {
     return "$mergeCursors";

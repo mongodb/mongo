@@ -34,6 +34,8 @@
 #include <vector>
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
@@ -62,6 +64,20 @@ public:
 
         std::string name;
         boost::intrusive_ptr<Pipeline> pipeline;
+    };
+
+    class LiteParsed : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+                                                 const BSONElement& spec);
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
+
+    private:
+        LiteParsed(std::vector<LiteParsedPipeline> liteParsedPipelines)
+            : _liteParsedPipelines(std::move(liteParsedPipelines)) {}
+
+        const std::vector<LiteParsedPipeline> _liteParsedPipelines;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -122,7 +138,7 @@ public:
 
 private:
     DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
-                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     Value serialize(bool explain = false) const final;
 

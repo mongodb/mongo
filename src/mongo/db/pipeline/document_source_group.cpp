@@ -28,13 +28,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/stdx/memory.h"
@@ -46,7 +48,9 @@ using std::shared_ptr;
 using std::pair;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE(group, DocumentSourceGroup::createFromBson);
+REGISTER_DOCUMENT_SOURCE(group,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceGroup::createFromBson);
 
 const char* DocumentSourceGroup::getSourceName() const {
     return "$group";

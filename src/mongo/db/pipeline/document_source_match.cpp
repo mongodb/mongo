@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <cctype>
+#include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -36,8 +36,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/stringutils.h"
 
@@ -49,7 +49,9 @@ using std::unique_ptr;
 using std::string;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE(match, DocumentSourceMatch::createFromBson);
+REGISTER_DOCUMENT_SOURCE(match,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceMatch::createFromBson);
 
 const char* DocumentSourceMatch::getSourceName() const {
     return "$match";

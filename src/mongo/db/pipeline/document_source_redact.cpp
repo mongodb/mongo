@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -46,7 +47,9 @@ DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext
                                            const intrusive_ptr<Expression>& expression)
     : DocumentSource(expCtx), _expression(expression) {}
 
-REGISTER_DOCUMENT_SOURCE(redact, DocumentSourceRedact::createFromBson);
+REGISTER_DOCUMENT_SOURCE(redact,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceRedact::createFromBson);
 
 const char* DocumentSourceRedact::getSourceName() const {
     return "$redact";

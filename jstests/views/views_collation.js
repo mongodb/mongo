@@ -77,13 +77,25 @@
             viewsDB.runCommand({aggregate: "filView", pipeline: [], collation: {locale: "en"}}),
             ErrorCodes.OptionNotSupportedOnView);
         assert.commandFailedWithCode(
+            viewsDB.runCommand({aggregate: "filView", pipeline: [], collation: {locale: "simple"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
             viewsDB.runCommand({find: "filView", collation: {locale: "fr"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({find: "filView", collation: {locale: "simple"}}),
             ErrorCodes.OptionNotSupportedOnView);
         assert.commandFailedWithCode(
             viewsDB.runCommand({count: "filView", collation: {locale: "zh"}}),
             ErrorCodes.OptionNotSupportedOnView);
         assert.commandFailedWithCode(
+            viewsDB.runCommand({count: "filView", collation: {locale: "simple"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
             viewsDB.runCommand({distinct: "filView", key: "x", collation: {locale: "es"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({distinct: "filView", key: "x", collation: {locale: "simple"}}),
             ErrorCodes.OptionNotSupportedOnView);
 
         const lookupSimpleView = {

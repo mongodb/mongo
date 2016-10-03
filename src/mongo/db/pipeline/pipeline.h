@@ -59,6 +59,10 @@ public:
      * Parses a Pipeline from a BSONElement representing a list of DocumentSources. Returns a non-OK
      * status if it failed to parse. The returned pipeline is not optimized, but the caller may
      * convert it to an optimized pipeline by calling optimizePipeline().
+     *
+     * It is illegal to create a pipeline using an ExpressionContext which contains a collation that
+     * will not be used during execution of the pipeline. Doing so may cause comparisons made during
+     * parse-time to return the wrong results.
      */
     static StatusWith<boost::intrusive_ptr<Pipeline>> parse(
         const std::vector<BSONObj>& rawPipeline,

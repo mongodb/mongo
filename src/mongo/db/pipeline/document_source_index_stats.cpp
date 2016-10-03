@@ -30,11 +30,15 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_DOCUMENT_SOURCE(indexStats, DocumentSourceIndexStats::createFromBson);
+REGISTER_DOCUMENT_SOURCE(indexStats,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceIndexStats::createFromBson);
 
 const char* DocumentSourceIndexStats::getSourceName() const {
     return "$indexStats";

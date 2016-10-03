@@ -28,9 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document_source.h"
+
+#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
@@ -38,7 +40,9 @@ using boost::intrusive_ptr;
 using std::vector;
 using std::string;
 
-REGISTER_MULTI_STAGE_ALIAS(count, DocumentSourceCount::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(count,
+                           LiteParsedDocumentSourceDefault::parse,
+                           DocumentSourceCount::createFromBson);
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

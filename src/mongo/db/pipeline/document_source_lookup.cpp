@@ -56,7 +56,31 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
       _foreignField(foreignField),
       _foreignFieldFieldName(std::move(foreignField)) {}
 
-REGISTER_DOCUMENT_SOURCE(lookup, DocumentSourceLookUp::createFromBson);
+std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceLookUp::liteParse(
+    const AggregationRequest& request, const BSONElement& spec) {
+    uassert(40319,
+            str::stream() << "the $lookup stage specification must be an object, but found "
+                          << typeName(spec.type()),
+            spec.type() == BSONType::Object);
+
+    auto specObj = spec.Obj();
+    auto fromElement = specObj["from"];
+    uassert(40320,
+            str::stream() << "missing 'from' option to $lookup stage specification: " << specObj,
+            fromElement);
+    uassert(40321,
+            str::stream() << "'from' option to $lookup must be a string, but was type "
+                          << typeName(specObj["from"].type()),
+            fromElement.type() == BSONType::String);
+
+    NamespaceString nss(request.getNamespaceString().db(), fromElement.valueStringData());
+    uassert(40322, str::stream() << "invalid $lookup namespace: " << nss.ns(), nss.isValid());
+    return stdx::make_unique<LiteParsedDocumentSourceOneForeignCollection>(std::move(nss));
+}
+
+REGISTER_DOCUMENT_SOURCE(lookup,
+                         DocumentSourceLookUp::liteParse,
+                         DocumentSourceLookUp::createFromBson);
 
 const char* DocumentSourceLookUp::getSourceName() const {
     return "$lookup";

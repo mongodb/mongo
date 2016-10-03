@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/views/resolved_view.h"
@@ -86,20 +87,14 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
     mergeCtx->inRouter = true;
     // explicitly *not* setting mergeCtx->tempDir
 
-    // Parse and optimize the pipeline specification.
-    auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
-    if (!pipeline.isOK()) {
-        return pipeline.getStatus();
-    }
+    LiteParsedPipeline liteParsedPipeline(request.getValue());
 
-    for (auto&& ns : pipeline.getValue()->getInvolvedCollections()) {
+    for (auto&& ns : liteParsedPipeline.getInvolvedNamespaces()) {
         uassert(28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
         // We won't try to execute anything on a mongos, but we still have to populate this map
         // so that any $lookups etc will be able to have a resolved view definition. It's okay
         // that this is incorrect, we will repopulate the real resolved namespace map on the
         // mongod.
-        // TODO SERVER-25038 This should become unnecessary once we can get the involved
-        // namespaces before parsing.
         mergeCtx->resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
     }
 
@@ -115,9 +110,12 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
         mergeCtx->setCollator(chunkMgr->getDefaultCollator()->clone());
     }
 
-    // Now that we know the collation we'll be using, inject the ExpressionContext and optimize.
-    // TODO SERVER-25038: this must happen before we parse the pipeline, since we can make
-    // string comparisons during parse time.
+    // Parse and optimize the pipeline specification.
+    auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
+    if (!pipeline.isOK()) {
+        return pipeline.getStatus();
+    }
+
     pipeline.getValue()->injectExpressionContext(mergeCtx);
     pipeline.getValue()->optimizePipeline();
 

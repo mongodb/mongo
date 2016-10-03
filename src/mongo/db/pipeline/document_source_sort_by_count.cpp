@@ -28,16 +28,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document_source.h"
+
+#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_MULTI_STAGE_ALIAS(sortByCount, DocumentSourceSortByCount::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(sortByCount,
+                           LiteParsedDocumentSourceDefault::parse,
+                           DocumentSourceSortByCount::createFromBson);
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

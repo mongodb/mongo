@@ -236,6 +236,7 @@ docSourceEnv.Library(
         'document_source_sort.cpp',
         'document_source_sort_by_count.cpp',
         'document_source_unwind.cpp',
+        'lite_parsed_document_source.cpp',
         ],
     LIBDEPS=[
         'accumulator',

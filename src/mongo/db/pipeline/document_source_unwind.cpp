@@ -28,10 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -163,7 +165,9 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
       _indexPath(indexPath),
       _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays, indexPath)) {}
 
-REGISTER_DOCUMENT_SOURCE(unwind, DocumentSourceUnwind::createFromBson);
+REGISTER_DOCUMENT_SOURCE(unwind,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceUnwind::createFromBson);
 
 const char* DocumentSourceUnwind::getSourceName() const {
     return "$unwind";

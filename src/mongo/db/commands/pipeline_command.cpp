@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -170,18 +171,17 @@ bool handleCursorCommand(OperationContext* txn,
 }
 
 StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNamespaces(
-    OperationContext* txn,
-    const boost::intrusive_ptr<Pipeline>& pipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    OperationContext* txn, const AggregationRequest& request) {
     // We intentionally do not drop and reacquire our DB lock after resolving the view definition in
     // order to prevent the definition for any view namespaces we've already resolved from changing.
     // This is necessary to prevent a cycle from being formed among the view definitions cached in
     // 'resolvedNamespaces' because we won't re-resolve a view namespace we've already encountered.
-    AutoGetDb autoDb(txn, expCtx->ns.db(), MODE_IS);
+    AutoGetDb autoDb(txn, request.getNamespaceString().db(), MODE_IS);
     Database* const db = autoDb.getDb();
     ViewCatalog* viewCatalog = db ? db->getViewCatalog() : nullptr;
 
-    const auto& pipelineInvolvedNamespaces = pipeline->getInvolvedCollections();
+    const LiteParsedPipeline liteParsedPipeline(request);
+    const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
@@ -215,17 +215,11 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
-            auto resolvedViewPipeline =
-                Pipeline::parse(resolvedView.getValue().getPipeline(), expCtx);
-            if (!resolvedViewPipeline.isOK()) {
-                return {ErrorCodes::FailedToParse,
-                        str::stream() << "Failed to parse definition for view '" << involvedNs.ns()
-                                      << "': "
-                                      << resolvedViewPipeline.getStatus().toString()};
-            }
+            LiteParsedPipeline resolvedViewLitePipeline(
+                {resolvedView.getValue().getNamespace(), resolvedView.getValue().getPipeline()});
 
             const auto& resolvedViewInvolvedNamespaces =
-                resolvedViewPipeline.getValue()->getInvolvedCollections();
+                resolvedViewLitePipeline.getInvolvedNamespaces();
             involvedNamespacesQueue.insert(involvedNamespacesQueue.end(),
                                            resolvedViewInvolvedNamespaces.begin(),
                                            resolvedViewInvolvedNamespaces.end());
@@ -361,14 +355,7 @@ public:
         intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(txn, request);
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
-        // Parse the pipeline.
-        auto statusWithPipeline = Pipeline::parse(request.getPipeline(), expCtx);
-        if (!statusWithPipeline.isOK()) {
-            return appendCommandStatus(result, statusWithPipeline.getStatus());
-        }
-        auto pipeline = std::move(statusWithPipeline.getValue());
-
-        auto resolvedNamespaces = resolveInvolvedNamespaces(txn, pipeline, expCtx);
+        auto resolvedNamespaces = resolveInvolvedNamespaces(txn, request);
         if (!resolvedNamespaces.isOK()) {
             return appendCommandStatus(result, resolvedNamespaces.getStatus());
         }
@@ -376,6 +363,7 @@ public:
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
         unique_ptr<PlanExecutor> exec;
+        boost::intrusive_ptr<Pipeline> pipeline;
         auto curOp = CurOp::get(txn);
         {
             // This will throw if the sharding version for this connection is out of date. If the
@@ -388,31 +376,19 @@ public:
             AutoGetCollectionOrViewForRead ctx(txn, nss);
             Collection* collection = ctx.getCollection();
 
-            // If running $collStats on a view, we do not resolve the view since we want stats
-            // on this view namespace.
-            auto startsWithCollStats = [&pipeline]() {
-                const Pipeline::SourceContainer& sources = pipeline->getSources();
-                return !sources.empty() &&
-                    dynamic_cast<DocumentSourceCollStats*>(sources.front().get());
-            };
-
             // If this is a view, resolve it by finding the underlying collection and stitching view
             // pipelines and this request's pipeline together. We then release our locks before
             // recursively calling run, which will re-acquire locks on the underlying collection.
             // (The lock must be released because recursively acquiring locks on the database will
             // prohibit yielding.)
-            if (ctx.getView() && !startsWithCollStats()) {
-                // Check that the default collation of 'view' is compatible with the
-                // operation's collation. The check is skipped if the 'request' has the empty
-                // collation, which means that no collation was specified.
+            const LiteParsedPipeline liteParsedPipeline(request);
+            if (ctx.getView() && !liteParsedPipeline.startsWithCollStats()) {
+                // Check that the default collation of 'view' is compatible with the operation's
+                // collation. The check is skipped if the 'request' has the empty collation, which
+                // means that no collation was specified.
                 if (!request.getCollation().isEmpty()) {
-                    auto operationCollator = CollatorFactoryInterface::get(txn->getServiceContext())
-                                                 ->makeFromBSON(request.getCollation());
-                    if (!operationCollator.isOK()) {
-                        return appendCommandStatus(result, operationCollator.getStatus());
-                    }
                     if (!CollatorInterface::collatorsMatch(ctx.getView()->defaultCollator(),
-                                                           operationCollator.getValue().get())) {
+                                                           expCtx->getCollator())) {
                         return appendCommandStatus(result,
                                                    {ErrorCodes::OptionNotSupportedOnView,
                                                     "Cannot override a view's default collation"});
@@ -472,6 +448,13 @@ public:
                 invariant(!expCtx->getCollator());
                 expCtx->setCollator(collection->getDefaultCollator()->clone());
             }
+
+            // Parse the pipeline.
+            auto statusWithPipeline = Pipeline::parse(request.getPipeline(), expCtx);
+            if (!statusWithPipeline.isOK()) {
+                return appendCommandStatus(result, statusWithPipeline.getStatus());
+            }
+            pipeline = std::move(statusWithPipeline.getValue());
 
             // Check that the view's collation matches the collation of any views involved
             // in the pipeline.

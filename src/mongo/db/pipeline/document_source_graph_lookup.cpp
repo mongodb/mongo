@@ -44,11 +44,35 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
-REGISTER_DOCUMENT_SOURCE(graphLookup, DocumentSourceGraphLookUp::createFromBson);
+std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceGraphLookUp::liteParse(
+    const AggregationRequest& request, const BSONElement& spec) {
+    uassert(40327,
+            str::stream() << "the $graphLookup stage specification must be an object, but found "
+                          << typeName(spec.type()),
+            spec.type() == BSONType::Object);
+
+    auto specObj = spec.Obj();
+    auto fromElement = specObj["from"];
+    uassert(40328,
+            str::stream() << "missing 'from' option to $graphLookup stage specification: "
+                          << specObj,
+            fromElement);
+    uassert(40329,
+            str::stream() << "'from' option to $graphLookup must be a string, but was type "
+                          << typeName(specObj["from"].type()),
+            fromElement.type() == BSONType::String);
+
+    NamespaceString nss(request.getNamespaceString().db(), fromElement.valueStringData());
+    uassert(40330, str::stream() << "invalid $graphLookup namespace: " << nss.ns(), nss.isValid());
+    return stdx::make_unique<LiteParsedDocumentSourceOneForeignCollection>(std::move(nss));
+}
+
+REGISTER_DOCUMENT_SOURCE(graphLookup,
+                         DocumentSourceGraphLookUp::liteParse,
+                         DocumentSourceGraphLookUp::createFromBson);
 
 const char* DocumentSourceGraphLookUp::getSourceName() const {
     return "$graphLookup";

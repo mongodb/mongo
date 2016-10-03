@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/time_support.h"
 
@@ -38,7 +39,9 @@ using boost::intrusive_ptr;
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(collStats, DocumentSourceCollStats::createFromBson);
+REGISTER_DOCUMENT_SOURCE(collStats,
+                         DocumentSourceCollStats::LiteParsed::parse,
+                         DocumentSourceCollStats::createFromBson);
 
 const char* DocumentSourceCollStats::getSourceName() const {
     return "$collStats";

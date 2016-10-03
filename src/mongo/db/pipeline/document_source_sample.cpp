@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -42,7 +43,9 @@ using boost::intrusive_ptr;
 DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _size(0) {}
 
-REGISTER_DOCUMENT_SOURCE(sample, DocumentSourceSample::createFromBson);
+REGISTER_DOCUMENT_SOURCE(sample,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceSample::createFromBson);
 
 const char* DocumentSourceSample::getSourceName() const {
     return "$sample";

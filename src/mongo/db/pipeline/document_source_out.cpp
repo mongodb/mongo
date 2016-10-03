@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
+
+#include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {
@@ -44,7 +46,21 @@ DocumentSourceOut::~DocumentSourceOut() {
         if (_mongod && _tempNs.size()) _mongod->directClient()->dropCollection(_tempNs.ns());)
 }
 
-REGISTER_DOCUMENT_SOURCE(out, DocumentSourceOut::createFromBson);
+std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceOut::liteParse(
+    const AggregationRequest& request, const BSONElement& spec) {
+    uassert(40325,
+            str::stream() << "$out stage requires a string argument, but found "
+                          << typeName(spec.type()),
+            spec.type() == BSONType::String);
+
+    NamespaceString targetNss(request.getNamespaceString().db(), spec.valueStringData());
+    uassert(40326,
+            str::stream() << "Invalid $out target namespace, " << targetNss.ns(),
+            targetNss.isValid());
+    return stdx::make_unique<LiteParsedDocumentSourceOneForeignCollection>(std::move(targetNss));
+}
+
+REGISTER_DOCUMENT_SOURCE(out, DocumentSourceOut::liteParse, DocumentSourceOut::createFromBson);
 
 const char* DocumentSourceOut::getSourceName() const {
     return "$out";

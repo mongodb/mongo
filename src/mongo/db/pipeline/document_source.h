@@ -44,6 +44,7 @@
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/granularity_rounder.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
@@ -63,6 +65,7 @@
 
 namespace mongo {
 
+class AggregationRequest;
 class Document;
 class Expression;
 class ExpressionFieldPath;
@@ -73,38 +76,57 @@ class PlanExecutor;
 class RecordCursor;
 
 /**
- * Registers a DocumentSource to have the name 'key'. When a stage with name '$key' is found,
- * 'parser' will be called to construct a DocumentSource.
+ * Registers a DocumentSource to have the name 'key'.
  *
- * This can also be used for stages like $project and $addFields which share common functionality
- * in the unregistered DocumentSourceSingleDocumentTransformation, or for any future single-stage
- * aliases.
+ * 'liteParser' takes an AggregationRequest and a BSONElement and returns a
+ * LiteParsedDocumentSource. This is used for checks that need to happen before a full parse,
+ * such as checks about which namespaces are referenced by this aggregation.
  *
- * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
- * 'createFromBson', you would add this line:
- * REGISTER_DOCUMENT_SOURCE(foo, DocumentSourceFoo::createFromBson);
+ * 'fullParser' takes a BSONElement and an ExpressionContext and returns a fully-executable
+ * DocumentSource. This will be used for optimization and execution.
+ *
+ * Stages that do not require any special pre-parse checks can use
+ * LiteParsedDocumentSourceDefault::parse as their 'liteParser'.
+ *
+ * As an example, if your stage DocumentSourceFoo looks like {$foo: <args>} and does *not* require
+ * any special pre-parse checks, you should implement a static parser like
+ * DocumentSourceFoo::createFromBson(), and register it like so:
+ * REGISTER_DOCUMENT_SOURCE(foo,
+ *                          LiteParsedDocumentSourceDefault::parse,
+ *                          DocumentSourceFoo::createFromBson);
+ *
+ * If your stage is actually an alias which needs to return more than one stage (such as
+ * $sortByCount), you should use the REGISTER_MULTI_STAGE_ALIAS macro instead.
  */
-#define REGISTER_DOCUMENT_SOURCE(key, parser)                                                      \
-    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                        \
-        auto parserWrapper = [](BSONElement stageSpec,                                             \
-                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {           \
-            return std::vector<boost::intrusive_ptr<DocumentSource>>{(parser)(stageSpec, expCtx)}; \
-        };                                                                                         \
-        DocumentSource::registerParser("$" #key, parserWrapper);                                   \
-        return Status::OK();                                                                       \
+#define REGISTER_DOCUMENT_SOURCE(key, liteParser, fullParser)                                \
+    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
+        auto fullParserWrapper = [](BSONElement stageSpec,                                   \
+                                    const boost::intrusive_ptr<ExpressionContext>& expCtx) { \
+            return std::vector<boost::intrusive_ptr<DocumentSource>>{                        \
+                (fullParser)(stageSpec, expCtx)};                                            \
+        };                                                                                   \
+        LiteParsedDocumentSource::registerParser("$" #key, liteParser);                      \
+        DocumentSource::registerParser("$" #key, fullParserWrapper);                         \
+        return Status::OK();                                                                 \
     }
 
 /**
- * Registers a multi-stage alias to have the single name 'key'. When a stage with name '$key' is
- * found, 'parser' will be called to construct a vector of DocumentSources.
+ * Registers a multi-stage alias (such as $sortByCount) to have the single name 'key'. When a stage
+ * with name '$key' is found, 'liteParser' will be used to produce a LiteParsedDocumentSource,
+ * while 'fullParser' will be called to construct a vector of DocumentSources. See the comments on
+ * REGISTER_DOCUMENT_SOURCE for more information.
  *
- * As an example, if your document source looks like {"$foo": <args>}, with a parsing function
- * 'createFromBson', you would add this line:
- * REGISTER_MULTI_STAGE_ALIAS(foo, DocumentSourceFoo::createFromBson);
+ * As an example, if your stage alias looks like {$foo: <args>} and does *not* require any special
+ * pre-parse checks, you should implement a static parser like DocumentSourceFoo::createFromBson(),
+ * and register it like so:
+ * REGISTER_MULTI_STAGE_ALIAS(foo,
+ *                            LiteParsedDocumentSourceDefault::parse,
+ *                            DocumentSourceFoo::createFromBson);
  */
-#define REGISTER_MULTI_STAGE_ALIAS(key, parser)                                  \
+#define REGISTER_MULTI_STAGE_ALIAS(key, liteParser, fullParser)                  \
     MONGO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
-        DocumentSource::registerParser("$" #key, (parser));                      \
+        LiteParsedDocumentSource::registerParser("$" #key, (liteParser));        \
+        DocumentSource::registerParser("$" #key, (fullParser));                  \
         return Status::OK();                                                     \
     }
 
@@ -1149,6 +1171,9 @@ private:
 
 class DocumentSourceOut final : public DocumentSourceNeedsMongod, public SplittableDocumentSource {
 public:
+    static std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> liteParse(
+        const AggregationRequest& request, const BSONElement& spec);
+
     // virtuals from DocumentSource
     ~DocumentSourceOut() final;
     GetNextResult getNext() final;
@@ -1764,9 +1789,13 @@ private:
 class DocumentSourceLookUp final : public DocumentSourceNeedsMongod,
                                    public SplittableDocumentSource {
 public:
+    static std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> liteParse(
+        const AggregationRequest& request, const BSONElement& spec);
+
     GetNextResult getNext() final;
     const char* getSourceName() const final;
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+
     /**
      * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwindSrc'
      * field.
@@ -1867,6 +1896,9 @@ private:
 
 class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod {
 public:
+    static std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> liteParse(
+        const AggregationRequest& request, const BSONElement& spec);
+
     GetNextResult getNext() final;
     const char* getSourceName() const final;
     void dispose() final;
@@ -2112,6 +2144,22 @@ private:
  */
 class DocumentSourceCollStats : public DocumentSourceNeedsMongod {
 public:
+    class LiteParsed final : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+                                                 const BSONElement& spec) {
+            return stdx::make_unique<LiteParsed>();
+        }
+
+        bool isCollStats() const final {
+            return true;
+        }
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+            return stdx::unordered_set<NamespaceString>();
+        }
+    };
+
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
         : DocumentSourceNeedsMongod(pExpCtx) {}
 
