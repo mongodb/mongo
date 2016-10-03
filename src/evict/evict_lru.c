@@ -1816,7 +1816,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		 * limit the work to 5 evictions and return. If that's not the
 		 * case, we can do more.
 		 */
-		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
+		if (!busy && txn_state->pinned_id != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
 			busy = true;
 		max_pages_evicted = busy ? 5 : 20;

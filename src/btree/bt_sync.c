@@ -24,14 +24,14 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_REF *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
-	uint64_t oldest_id, saved_snap_min;
+	uint64_t oldest_id, saved_pinned_id;
 	uint32_t flags;
 
 	conn = S2C(session);
 	btree = S2BT(session);
 	walk = NULL;
 	txn = &session->txn;
-	saved_snap_min = WT_SESSION_TXN_STATE(session)->snap_min;
+	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 
 	internal_bytes = leaf_bytes = 0;
@@ -225,7 +225,7 @@ err:	/* On error, clear any left-over tree walk. */
 	 * snapshot active when we started, release it.
 	 */
 	if (txn->isolation == WT_ISO_READ_COMMITTED &&
-	    saved_snap_min == WT_TXN_NONE)
+	    saved_pinned_id == WT_TXN_NONE)
 		__wt_txn_release_snapshot(session);
 
 	/* Clear the checkpoint flag and push the change. */
