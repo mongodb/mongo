@@ -51,7 +51,7 @@ class ReplaceRootTransformation final
 public:
     ReplaceRootTransformation() {}
 
-    Document applyTransformation(Document input) {
+    Document applyTransformation(Document input) final {
         // Extract subdocument in the form of a Value.
         _variables->setRoot(input);
         Value newRoot = _newRoot->evaluate(_variables.get());
@@ -81,23 +81,28 @@ public:
     }
 
     // Optimize the newRoot expression.
-    void optimize() {
+    void optimize() final {
         _newRoot->optimize();
     }
 
-    Document serialize(bool explain) const {
+    Document serialize(bool explain) const final {
         return Document{{"newRoot", _newRoot->serialize(explain)}};
     }
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const {
+    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         _newRoot->addDependencies(deps);
         // This stage will replace the entire document with a new document, so any existing fields
         // will be replaced and cannot be required as dependencies.
         return DocumentSource::EXHAUSTIVE_FIELDS;
     }
 
-    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& pExpCtx) final {
         _newRoot->injectExpressionContext(pExpCtx);
+    }
+
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        // Replaces the entire root, so all paths are modified.
+        return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}};
     }
 
     // Create the replaceRoot transformer. Uasserts on invalid input.

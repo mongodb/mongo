@@ -191,5 +191,55 @@ TEST_F(ProjectStageTest, ExclusionShouldNotAddDependencies) {
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }
 
+TEST_F(ProjectStageTest, InclusionProjectionReportsIncludedPathsFromGetModifiedPaths) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{a: true, 'b.c': {d: true}, e: {f: {g: true}}, h: {i: {$literal: true}}}"),
+        getExpCtx());
+
+    auto modifiedPaths = project->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
+    ASSERT_EQUALS(4U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("_id"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("a"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("b.c.d"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
+}
+
+TEST_F(ProjectStageTest, InclusionProjectionReportsIncludedPathsButExcludesId) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{_id: false, 'b.c': {d: true}, e: {f: {g: true}}, h: {i: {$literal: true}}}"),
+        getExpCtx());
+
+    auto modifiedPaths = project->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
+    ASSERT_EQUALS(2U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("b.c.d"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
+}
+
+TEST_F(ProjectStageTest, ExclusionProjectionReportsExcludedPathsAsModifiedPaths) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{a: false, 'b.c': {d: false}, e: {f: {g: false}}}"), getExpCtx());
+
+    auto modifiedPaths = project->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(3U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("a"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("b.c.d"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
+}
+
+TEST_F(ProjectStageTest, ExclusionProjectionReportsExcludedPathsWithIdExclusion) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{_id: false, 'b.c': {d: false}, e: {f: {g: false}}}"), getExpCtx());
+
+    auto modifiedPaths = project->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(3U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("_id"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("b.c.d"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
+}
+
 }  // namespace
 }  // namespace mongo

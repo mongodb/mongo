@@ -236,6 +236,18 @@ InclusionNode* InclusionNode::addChild(string field) {
     return insertedPair.first->second.get();
 }
 
+void InclusionNode::addPreservedPaths(std::set<std::string>* preservedPaths) const {
+    // Only our inclusion paths are preserved. This inclusion node may also have paths with
+    // associated expressions, but those paths are modified and therefore are not considered
+    // "preserved".
+    for (auto&& includedField : _inclusions) {
+        preservedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, includedField));
+    }
+    for (auto&& childPair : _children) {
+        childPair.second->addPreservedPaths(preservedPaths);
+    }
+}
+
 //
 // ParsedInclusionProjection
 //

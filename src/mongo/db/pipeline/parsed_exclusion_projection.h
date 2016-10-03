@@ -71,6 +71,7 @@ public:
      */
     ExclusionNode* addOrGetChild(FieldPath field);
 
+    void addModifiedPaths(std::set<std::string>* modifiedPaths) const;
 
 private:
     // Helpers for addOrGetChild above.
@@ -116,8 +117,14 @@ public:
      */
     Document applyProjection(Document inputDoc) const final;
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const {
+    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         return DocumentSource::SEE_NEXT;
+    }
+
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        std::set<std::string> modifiedPaths;
+        _root->addModifiedPaths(&modifiedPaths);
+        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths)};
     }
 
 private:

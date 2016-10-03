@@ -389,5 +389,52 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
 }
 
+TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    auto graphLookupStage =
+        DocumentSourceGraphLookUp::create(expCtx,
+                                          fromNs,
+                                          "results",
+                                          "from",
+                                          "to",
+                                          ExpressionFieldPath::create("startPoint"),
+                                          boost::none,
+                                          boost::none,
+                                          boost::none,
+                                          boost::none);
+
+    auto modifiedPaths = graphLookupStage->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQ(1U, modifiedPaths.paths.size());
+    ASSERT_EQ(1U, modifiedPaths.paths.count("results"));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbsorbedUnwind) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    auto unwindStage =
+        DocumentSourceUnwind::create(expCtx, "results", false, std::string("arrIndex"));
+    auto graphLookupStage =
+        DocumentSourceGraphLookUp::create(expCtx,
+                                          fromNs,
+                                          "results",
+                                          "from",
+                                          "to",
+                                          ExpressionFieldPath::create("startPoint"),
+                                          boost::none,
+                                          boost::none,
+                                          boost::none,
+                                          unwindStage);
+
+    auto modifiedPaths = graphLookupStage->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQ(2U, modifiedPaths.paths.size());
+    ASSERT_EQ(1U, modifiedPaths.paths.count("results"));
+    ASSERT_EQ(1U, modifiedPaths.paths.count("arrIndex"));
+}
+
 }  // namespace
 }  // namespace mongo

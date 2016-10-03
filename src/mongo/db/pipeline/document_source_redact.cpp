@@ -72,7 +72,7 @@ DocumentSource::GetNextResult DocumentSourceRedact::getNext() {
     return nextInput;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceRedact::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 

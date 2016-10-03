@@ -717,6 +717,31 @@ TEST_F(UnwindStageTest, ShouldPropagatePauses) {
     ASSERT_TRUE(unwind->getNext().isEOF());
 }
 
+TEST_F(UnwindStageTest, UnwindOnlyModifiesUnwoundPathWhenNotIncludingIndex) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = boost::none;
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+
+    auto modifiedPaths = unwind->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(1U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("array"));
+}
+
+TEST_F(UnwindStageTest, UnwindIncludesIndexPathWhenIncludingIndex) {
+    const bool includeNullIfEmptyOrMissing = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("arrIndex");
+    auto unwind = DocumentSourceUnwind::create(
+        getExpCtx(), "array", includeNullIfEmptyOrMissing, includeArrayIndex);
+
+    auto modifiedPaths = unwind->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(2U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("array"));
+    ASSERT_EQUALS(1U, modifiedPaths.paths.count("arrIndex"));
+}
+
 //
 // Error cases.
 //

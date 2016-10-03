@@ -28,6 +28,12 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include <memory>
+#include <set>
+
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {

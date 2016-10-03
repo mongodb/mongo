@@ -174,6 +174,48 @@ TEST(InclusionProjection, ShouldOptimizeNestedExpressions) {
     ASSERT_DOCUMENT_EQ(expectedSerialization, inclusion.serialize(true));
 }
 
+TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModified) {
+    ParsedInclusionProjection inclusion;
+    inclusion.parse(BSON(
+        "a" << wrapInLiteral("computedVal") << "b.c" << wrapInLiteral("computedVal") << "d" << true
+            << "e.f"
+            << true));
+
+    auto modifiedPaths = inclusion.getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
+    // Included paths are not modified.
+    ASSERT_EQ(modifiedPaths.paths.count("_id"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.count("d"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.count("e.f"), 1UL);
+    // Computed paths are modified.
+    ASSERT_EQ(modifiedPaths.paths.count("a"), 0UL);
+    ASSERT_EQ(modifiedPaths.paths.count("b.c"), 0UL);
+    ASSERT_EQ(modifiedPaths.paths.size(), 3UL);
+}
+
+TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModifiedWithIdExclusion) {
+    ParsedInclusionProjection inclusion;
+    inclusion.parse(BSON("_id" << false << "a" << wrapInLiteral("computedVal") << "b.c"
+                               << wrapInLiteral("computedVal")
+                               << "d"
+                               << true
+                               << "e.f"
+                               << true));
+
+    auto modifiedPaths = inclusion.getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
+    // Included paths are not modified.
+    ASSERT_EQ(modifiedPaths.paths.count("d"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.count("e.f"), 1UL);
+    // Computed paths are modified.
+    ASSERT_EQ(modifiedPaths.paths.count("a"), 0UL);
+    ASSERT_EQ(modifiedPaths.paths.count("b.c"), 0UL);
+    // _id is explicitly excluded.
+    ASSERT_EQ(modifiedPaths.paths.count("_id"), 0UL);
+
+    ASSERT_EQ(modifiedPaths.paths.size(), 2UL);
+}
+
 //
 // Top-level only.
 //

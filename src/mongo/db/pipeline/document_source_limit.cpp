@@ -53,7 +53,7 @@ const char* DocumentSourceLimit::getSourceName() const {
     return "$limit";
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceLimit::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 

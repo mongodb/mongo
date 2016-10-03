@@ -76,7 +76,7 @@ Value DocumentSourceSingleDocumentTransformation::serialize(bool explain) const 
     return Value(Document{{getSourceName(), _parsedTransform->serialize(explain)}});
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
@@ -98,6 +98,11 @@ DocumentSource::GetDepsReturn DocumentSourceSingleDocumentTransformation::getDep
 
 void DocumentSourceSingleDocumentTransformation::doInjectExpressionContext() {
     _parsedTransform->injectExpressionContext(pExpCtx);
+}
+
+DocumentSource::GetModPathsReturn DocumentSourceSingleDocumentTransformation::getModifiedPaths()
+    const {
+    return _parsedTransform->getModifiedPaths();
 }
 
 }  // namespace mongo

@@ -71,7 +71,7 @@ DocumentSource::GetNextResult DocumentSourceGeoNear::getNext() {
     return output.freeze();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGeoNear::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 

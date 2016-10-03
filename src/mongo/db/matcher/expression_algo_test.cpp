@@ -906,6 +906,28 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
                  "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
 }
 
+TEST(SplitMatchExpression, ShouldNotExtractPrefixOfDottedPathAsIndependent) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {'a.b': 1}, {'a.c': 1}]}");
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"a.b"});
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{'a.c': {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$and: [{a: {$eq: 1}}, {'a.b': {$eq: 1}}]}"));
+}
+
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
     BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
     const CollatorInterface* collator = nullptr;

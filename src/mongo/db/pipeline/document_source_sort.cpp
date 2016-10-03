@@ -138,11 +138,10 @@ Document DocumentSourceSort::serializeSortKey(bool explain) const {
     return keyObj.freeze();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSort::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
     auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
 
     if (nextLimit) {
@@ -150,11 +149,6 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::optimizeAt(
         setLimitSrc(nextLimit);
         container->erase(std::next(itr));
         return itr;
-    } else if (nextMatch && !nextMatch->isTextQuery()) {
-        // Swap the $match before the $sort, thus reducing the number of documents that pass into
-        // this stage.
-        std::swap(*itr, *std::next(itr));
-        return itr == container->begin() ? itr : std::prev(itr);
     }
     return std::next(itr);
 }

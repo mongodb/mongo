@@ -184,6 +184,13 @@ TEST_F(DocumentSourceSortTest, OutputSort) {
     ASSERT_EQUALS(outputSort.size(), 2U);
 }
 
+TEST_F(DocumentSourceSortTest, ReportsNoPathsModified) {
+    createSort(BSON("a" << 1 << "b.c" << -1));
+    auto modifiedPaths = sort()->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(0U, modifiedPaths.paths.size());
+}
+
 class DocumentSourceSortExecutionTest : public DocumentSourceSortTest {
 public:
     void checkResults(deque<DocumentSource::GetNextResult> inputDocs,

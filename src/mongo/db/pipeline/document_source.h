@@ -255,57 +255,6 @@ public:
     virtual void setSource(DocumentSource* pSource);
 
     /**
-     * Gets a BSONObjSet representing the sort order(s) of the output of the stage.
-     */
-    virtual BSONObjSet getOutputSorts() {
-        return SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    }
-
-    /**
-     * Returns an optimized DocumentSource that is semantically equivalent to this one, or
-     * nullptr if this stage is a no-op. Implementations are allowed to modify themselves
-     * in-place and return a pointer to themselves. For best results, first optimize the pipeline
-     * with the optimizePipeline() method defined in pipeline.cpp.
-     *
-     * This is intended for any operations that include expressions, and provides a hook for
-     * those to optimize those operations.
-     *
-     * The default implementation is to do nothing and return yourself.
-     */
-    virtual boost::intrusive_ptr<DocumentSource> optimize();
-
-    /**
-     * Attempt to perform an optimization with the following source in the pipeline. 'container'
-     * refers to the entire pipeline, and 'itr' points to this stage within the pipeline.
-     *
-     * The return value is an iterator over the same container which points to the first location
-     * in the container at which an optimization may be possible.
-     *
-     * For example, if a swap takes place, the returned iterator should just be the position
-     * directly preceding 'itr', if such a position exists, since the stage at that position may be
-     * able to perform further optimizations with its new neighbor.
-     */
-    virtual Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                           Pipeline::SourceContainer* container) {
-        return std::next(itr);
-    };
-
-    enum GetDepsReturn {
-        NOT_SUPPORTED = 0x0,      // The full object and all metadata may be required
-        SEE_NEXT = 0x1,           // Later stages could need either fields or metadata
-        EXHAUSTIVE_FIELDS = 0x2,  // Later stages won't need more fields from input
-        EXHAUSTIVE_META = 0x4,    // Later stages won't need more metadata from input
-        EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META,  // Later stages won't need either
-    };
-
-    /**
-     * Get the dependencies this operation needs to do its job.
-     */
-    virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
-        return NOT_SUPPORTED;
-    }
-
-    /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
      *
      * A subclass may choose to overwrite this, rather than serialize,
@@ -378,6 +327,134 @@ public:
      */
     static BSONObjSet truncateSortSet(const BSONObjSet& sorts, const std::set<std::string>& fields);
 
+    //
+    // Optimization API - These methods give each DocumentSource an opportunity to apply any local
+    // optimizations, and to provide any rule-based optimizations to swap with or absorb subsequent
+    // stages.
+    //
+
+    /**
+     * The non-virtual public interface for optimization. Attempts to do some generic optimizations
+     * such as pushing $matches as early in the pipeline as possible, then calls out to
+     * doOptimizeAt() for stage-specific optimizations.
+     *
+     * Subclasses should override doOptimizeAt() if they can apply some optimization(s) based on
+     * subsequent stages in the pipeline.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container);
+
+    /**
+     * Returns an optimized DocumentSource that is semantically equivalent to this one, or
+     * nullptr if this stage is a no-op. Implementations are allowed to modify themselves
+     * in-place and return a pointer to themselves. For best results, first optimize the pipeline
+     * with the optimizePipeline() method defined in pipeline.cpp.
+     *
+     * This is intended for any operations that include expressions, and provides a hook for
+     * those to optimize those operations.
+     *
+     * The default implementation is to do nothing and return yourself.
+     */
+    virtual boost::intrusive_ptr<DocumentSource> optimize();
+
+    //
+    // Property Analysis - These methods allow a DocumentSource to expose information about
+    // properties of themselves, such as which fields they need to apply their transformations, and
+    // whether or not they produce or preserve a sort order.
+    //
+    // Property analysis can be useful during optimization (e.g. analysis of sort orders determines
+    // whether or not a blocking group can be upgraded to a streaming group).
+    //
+
+    /**
+     * Gets a BSONObjSet representing the sort order(s) of the output of the stage.
+     */
+    virtual BSONObjSet getOutputSorts() {
+        return SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    }
+
+    struct GetModPathsReturn {
+        enum class Type {
+            // No information is available about which paths are modified.
+            kNotSupported,
+
+            // All fields will be modified. This should be used by stages like $replaceRoot which
+            // modify the entire document.
+            kAllPaths,
+
+            // A finite set of paths will be modified by this stage. This is true for something like
+            // {$project: {a: 0, b: 0}}, which will only modify 'a' and 'b', and leave all other
+            // paths unmodified.
+            kFiniteSet,
+
+            // This stage will modify an infinite set of paths, but we know which paths it will not
+            // modify. For example, the stage {$project: {_id: 1, a: 1}} will leave only the fields
+            // '_id' and 'a' unmodified, but all other fields will be projected out.
+            kAllExcept,
+        };
+
+        GetModPathsReturn(Type type, std::set<std::string>&& paths)
+            : type(type), paths(std::move(paths)) {}
+
+        Type type;
+        std::set<std::string> paths;
+    };
+
+    /**
+     * Returns information about which paths are added, removed, or updated by this stage. The
+     * default implementation uses kNotSupported to indicate that the set of modified paths for this
+     * stage is not known.
+     *
+     * See GetModPathsReturn above for the possible return values and what they mean.
+     */
+    virtual GetModPathsReturn getModifiedPaths() const {
+        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}};
+    }
+
+    /**
+     * Returns whether this stage can swap with a subsequent $match stage, provided that the match
+     * does not depend on the paths returned by getModifiedPaths().
+     *
+     * Subclasses which want to participate in match swapping should override this to return true.
+     * Such a subclass must also override getModifiedPaths() to provide information about which
+     * $match predicates be swapped before itself.
+     */
+    virtual bool canSwapWithMatch() const {
+        return false;
+    }
+
+    enum GetDepsReturn {
+        // The full object and all metadata may be required.
+        NOT_SUPPORTED = 0x0,
+
+        // Later stages could need either fields or metadata. For example, a $limit stage will pass
+        // through all fields, and they may or may not be needed by future stages.
+        SEE_NEXT = 0x1,
+
+        // Later stages won't need more fields from input. For example, an inclusion projection like
+        // {_id: 1, a: 1} will only output two fields, so future stages cannot possibly depend on
+        // any other fields.
+        EXHAUSTIVE_FIELDS = 0x2,
+
+        // Later stages won't need more metadata from input. For example, a $group stage will group
+        // documents together, discarding their text score.
+        EXHAUSTIVE_META = 0x4,
+
+        // Later stages won't need either fields or metadata.
+        EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META,
+    };
+
+    /**
+     * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
+     * all paths needed to apply their transformation to 'deps->fields', and call
+     * 'deps->setNeedTextScore()' if the text score is required.
+     *
+     * See GetDepsReturn above for the possible return values and what they mean.
+     */
+    virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
+        return NOT_SUPPORTED;
+    }
+
 protected:
     /**
        Base constructor.
@@ -392,6 +469,24 @@ protected:
      * expressions or accumulators which need to attach to the newly injected ExpressionContext.
      */
     virtual void doInjectExpressionContext() {}
+
+    /**
+     * Attempt to perform an optimization with the following source in the pipeline. 'container'
+     * refers to the entire pipeline, and 'itr' points to this stage within the pipeline. The caller
+     * must guarantee that std::next(itr) != container->end().
+     *
+     * The return value is an iterator over the same container which points to the first location
+     * in the container at which an optimization may be possible.
+     *
+     * For example, if a swap takes place, the returned iterator should just be the position
+     * directly preceding 'itr', if such a position exists, since the stage at that position may be
+     * able to perform further optimizations with its new neighbor.
+     */
+    virtual Pipeline::SourceContainer::iterator doOptimizeAt(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+        return std::next(itr);
+    };
+
 
     /*
       Most DocumentSources have an underlying source they get their data
@@ -577,8 +672,8 @@ public:
     /**
      * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     Value serialize(bool explain = false) const final;
     bool isValidInitialSource() const final {
         return true;
@@ -879,12 +974,13 @@ public:
         return pSource ? pSource->getOutputSorts()
                        : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
+
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
      * $and.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     void setSource(DocumentSource* Source) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
@@ -947,7 +1043,7 @@ public:
      * For example, {$match: {a: "foo", "b.c": 4}} split by "b" will return pointers to two stages:
      * {$match: {a: "foo"}}, and {$match: {"b.c": 4}}.
      */
-    std::pair<boost::intrusive_ptr<DocumentSource>, boost::intrusive_ptr<DocumentSource>>
+    std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
     splitSourceBy(const std::set<std::string>& fields);
 
     /**
@@ -1143,6 +1239,7 @@ public:
         virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
         virtual void injectExpressionContext(
             const boost::intrusive_ptr<ExpressionContext>& pExpCtx) = 0;
+        virtual GetModPathsReturn getModifiedPaths() const = 0;
     };
 
     DocumentSourceSingleDocumentTransformation(
@@ -1156,10 +1253,15 @@ public:
     boost::intrusive_ptr<DocumentSource> optimize() final;
     void dispose() final;
     Value serialize(bool explain) const final;
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     void doInjectExpressionContext() final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    GetModPathsReturn getModifiedPaths() const final;
+
+    bool canSwapWithMatch() const final {
+        return true;
+    }
 
 private:
     // Stores transformation logic.
@@ -1250,8 +1352,8 @@ public:
      * Attempts to duplicate the redact-safe portion of a subsequent $match before the $redact
      * stage.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
 
     void doInjectExpressionContext() final;
 
@@ -1387,8 +1489,8 @@ public:
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     Value serialize(bool explain = false) const final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
@@ -1450,17 +1552,24 @@ public:
     const char* getSourceName() const final;
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
 
+    GetModPathsReturn getModifiedPaths() const final {
+        // A $sort does not modify any paths.
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}};
+    }
+
+    bool canSwapWithMatch() const final {
+        return true;
+    }
+
     BSONObjSet getOutputSorts() final {
         return allPrefixes(_sort);
     }
 
     /**
-     * Attempts to move a subsequent $match stage before the $sort, reducing the number of
-     * documents that pass through the stage. Also attempts to absorb a subsequent $limit stage so
-     * that it an perform a top-k sort.
+     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     void dispose() final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
@@ -1601,8 +1710,8 @@ public:
      * Attempts to move a subsequent $limit before the skip, potentially allowing for forther
      * optimizations earlier in the pipeline.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     BSONObjSet getOutputSorts() final {
@@ -1661,14 +1770,16 @@ public:
     Value serialize(bool explain = false) const final;
     BSONObjSet getOutputSorts() final;
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
-
     /**
-     * If the next stage is a $match, the part of the match that is not dependent on the unwound
-     * field can be moved into a new, preceding, $match stage.
+     * Returns the unwound path, and the 'includeArrayIndex' path, if specified.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    GetModPathsReturn getModifiedPaths() const final;
+
+    bool canSwapWithMatch() const final {
+        return true;
+    }
+
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     /**
      * Creates a new $unwind DocumentSource from a BSON specification.
@@ -1725,8 +1836,8 @@ public:
      * Attempts to combine with a subsequent limit stage, setting the internal limit field
      * as a result.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     bool isValidInitialSource() const final {
         return true;
     }
@@ -1797,11 +1908,20 @@ public:
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
 
     /**
+     * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
+     */
+    GetModPathsReturn getModifiedPaths() const final;
+
+    bool canSwapWithMatch() const final {
+        return true;
+    }
+
+    /**
      * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwindSrc'
      * field.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     void dispose() final;
 
@@ -1906,10 +2026,19 @@ public:
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
 
     /**
+     * Returns the 'as' path, and possibly the fields modified by an absorbed $unwind.
+     */
+    GetModPathsReturn getModifiedPaths() const final;
+
+    bool canSwapWithMatch() const final {
+        return true;
+    }
+
+    /**
      * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) final;
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);

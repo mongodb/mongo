@@ -374,7 +374,18 @@ void DocumentSourceGraphLookUp::performSearch() {
     doBreadthFirstSearch();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
+DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() const {
+    std::set<std::string> modifiedPaths{_as.fullPath()};
+    if (_unwind) {
+        auto pathsModifiedByUnwind = _unwind.get()->getModifiedPaths();
+        invariant(pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);
+        modifiedPaths.insert(pathsModifiedByUnwind.paths.begin(),
+                             pathsModifiedByUnwind.paths.end());
+    }
+    return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths)};
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 

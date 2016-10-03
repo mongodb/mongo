@@ -269,5 +269,53 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     ASSERT_TRUE(lookup->getNext().isEOF());
 }
 
+TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+
+    // Set up the $lookup stage.
+    auto lookupSpec = Document{{"$lookup",
+                                Document{{"from", fromNs.coll()},
+                                         {"localField", "foreignId"},
+                                         {"foreignField", "_id"},
+                                         {"as", "foreignDocs"}}}}
+                          .toBson();
+    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
+
+    auto modifiedPaths = lookup->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQ(1U, modifiedPaths.paths.size());
+    ASSERT_EQ(1U, modifiedPaths.paths.count("foreignDocs"));
+}
+
+TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+
+    // Set up the $lookup stage.
+    auto lookupSpec = Document{{"$lookup",
+                                Document{{"from", fromNs.coll()},
+                                         {"localField", "foreignId"},
+                                         {"foreignField", "_id"},
+                                         {"as", "foreignDoc"}}}}
+                          .toBson();
+    auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
+
+    const bool preserveNullAndEmptyArrays = false;
+    const boost::optional<std::string> includeArrayIndex = std::string("arrIndex");
+    lookup->setUnwindStage(DocumentSourceUnwind::create(
+        expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
+
+    auto modifiedPaths = lookup->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQ(2U, modifiedPaths.paths.size());
+    ASSERT_EQ(1U, modifiedPaths.paths.count("foreignDoc"));
+    ASSERT_EQ(1U, modifiedPaths.paths.count("arrIndex"));
+}
+
 }  // namespace
 }  // namespace mongo

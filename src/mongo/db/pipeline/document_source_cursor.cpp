@@ -147,7 +147,7 @@ long long DocumentSourceCursor::getLimit() const {
     return _limit ? _limit->getLimit() : -1;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceCursor::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceCursor::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 

@@ -87,7 +87,7 @@ DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
     return nextInput;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
@@ -364,7 +364,7 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
     _expression = std::move(status.getValue());
 }
 
-pair<intrusive_ptr<DocumentSource>, intrusive_ptr<DocumentSource>>
+pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
         expression::splitMatchExpressionBy(std::move(_expression), fields));
@@ -390,15 +390,12 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     BSONObjBuilder firstBob;
     newExpr.first->serialize(&firstBob);
 
-    intrusive_ptr<DocumentSource> firstMatch(new DocumentSourceMatch(firstBob.obj(), pExpCtx));
-
     // This $match stage is still needed, so update the MatchExpression as needed.
     BSONObjBuilder secondBob;
     newExpr.second->serialize(&secondBob);
 
-    intrusive_ptr<DocumentSource> secondMatch(new DocumentSourceMatch(secondBob.obj(), pExpCtx));
-
-    return {firstMatch, secondMatch};
+    return {DocumentSourceMatch::create(firstBob.obj(), pExpCtx),
+            DocumentSourceMatch::create(secondBob.obj(), pExpCtx)};
 }
 
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(

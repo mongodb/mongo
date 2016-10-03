@@ -270,6 +270,14 @@ TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
     ASSERT_EQUALS(false, dependencies.getNeedTextScore());
 }
 
+TEST_F(ReplaceRootBasics, ReplaceRootModifiesAllFields) {
+    auto replaceRoot = createReplaceRoot(BSON("newRoot"
+                                              << "$a"));
+    auto modifiedPaths = replaceRoot->getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllPaths);
+    ASSERT_EQUALS(0U, modifiedPaths.paths.size());
+}
+
 /**
  * Fixture to test error cases of initializing the $replaceRoot stage.
  */

@@ -117,6 +117,29 @@ TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
     ASSERT_FALSE(deps.getNeedTextScore());
 }
 
+TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModified) {
+    ParsedExclusionProjection exclusion;
+    exclusion.parse(BSON("_id" << false << "a" << false << "b.c" << false));
+
+    auto modifiedPaths = exclusion.getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQ(modifiedPaths.paths.count("_id"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.count("a"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.count("b.c"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.size(), 3UL);
+}
+
+TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModifiedWhenSpecifiedAsNestedObj) {
+    ParsedExclusionProjection exclusion;
+    exclusion.parse(BSON("a" << BSON("b" << false << "c" << BSON("d" << false))));
+
+    auto modifiedPaths = exclusion.getModifiedPaths();
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQ(modifiedPaths.paths.count("a.b"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.count("a.c.d"), 1UL);
+    ASSERT_EQ(modifiedPaths.paths.size(), 2UL);
+}
+
 //
 // Tests of execution of exclusions at the top level.
 //

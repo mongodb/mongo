@@ -71,7 +71,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {
     return _nToSkip == 0 ? nullptr : this;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
