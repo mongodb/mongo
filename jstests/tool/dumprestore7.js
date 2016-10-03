@@ -1,77 +1,84 @@
-var name = "dumprestore7";
+(function() {
+    "use strict";
+    var name = "dumprestore7";
 
-function step(msg) {
-    msg = msg || "";
-    this.x = (this.x || 0) + 1;
-    print('\n' + name + ".js step " + this.x + ' ' + msg);
-}
+    var step = (function() {
+        var n = 0;
+        return function(msg) {
+            msg = msg || "";
+            print('\n' + name + ".js step " + (++n) + ' ' + msg);
+        };
+    })();
 
-step();
+    step("starting the replset test");
 
-var replTest = new ReplSetTest({name: name, nodes: 1});
-var nodes = replTest.startSet();
-replTest.initiate();
-var master = replTest.getPrimary();
+    var replTest = new ReplSetTest({name: name, nodes: 1});
+    var nodes = replTest.startSet();
+    replTest.initiate();
 
-{
-    step("first chunk of data");
-    var foo = master.getDB("foo");
-    for (i = 0; i < 20; i++) {
+    step("inserting first chunk of data");
+    var foo = replTest.getPrimary().getDB("foo");
+    for (var i = 0; i < 20; i++) {
         foo.bar.insert({x: i, y: "abc"});
     }
-}
 
-{
-    step("wait");
+    step("waiting for replication");
     replTest.awaitReplication();
+    assert.eq(foo.bar.count(), 20, "should have inserted 20 documents");
+
+    // The time of the last oplog entry.
     var time = replTest.getPrimary()
                    .getDB("local")
                    .getCollection("oplog.rs")
                    .find()
                    .limit(1)
                    .sort({$natural: -1})
-                   .next();
-    step(time.ts.t);
-}
+                   .next()
+                   .ts;
+    step("got time of last oplog entry: " + time);
 
-{
-    step("second chunk of data");
-    var foo = master.getDB("foo");
-    for (i = 30; i < 50; i++) {
+    step("inserting second chunk of data");
+    for (var i = 30; i < 50; i++) {
         foo.bar.insert({x: i, y: "abc"});
     }
-}
-{ var conn = MongoRunner.runMongod({}); }
+    assert.eq(foo.bar.count(), 40, "should have inserted 40 total documents");
 
-step("try mongodump with $timestamp");
+    step("try mongodump with $timestamp");
 
-var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
-var query = {ts: {$gt: {$timestamp: {t: time.ts.t, i: time.ts.i}}}};
+    var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
+    var query = {ts: {$gt: time}};
+    print("mongodump query: " + tojson(query));
 
-var exitCode = MongoRunner.runMongoTool("mongodump", {
-    host: "127.0.0.1:" + replTest.ports[0],
-    db: "local",
-    collection: "oplog.rs",
-    query: tojson(query),
-    out: data,
-});
-assert.eq(0, exitCode, "monogdump failed to dump the oplog");
+    var testQueryCount =
+        replTest.getPrimary().getDB("local").getCollection("oplog.rs").find(query).itcount();
+    assert.eq(testQueryCount, 20, "the query should match 20 documents");
 
-step("try mongorestore from $timestamp");
+    var exitCode = MongoRunner.runMongoTool("mongodump", {
+        host: "127.0.0.1:" + replTest.ports[0],
+        db: "local",
+        collection: "oplog.rs",
+        query: tojson(query),
+        out: data,
+    });
+    assert.eq(0, exitCode, "monogdump failed to dump the oplog");
 
-exitCode = MongoRunner.runMongoTool("mongorestore", {
-    host: "127.0.0.1:" + conn.port,
-    dir: data,
-    writeConcern: 1,
-});
-assert.eq(0, exitCode, "mongorestore failed to restore the oplog");
+    step("try mongorestore from $timestamp");
 
-var x = 9;
-x = conn.getDB("local").getCollection("oplog.rs").count();
+    var restoreMongod = MongoRunner.runMongod({});
+    exitCode = MongoRunner.runMongoTool("mongorestore", {
+        host: "127.0.0.1:" + restoreMongod.port,
+        dir: data,
+        writeConcern: 1,
+    });
+    assert.eq(0, exitCode, "mongorestore failed to restore the oplog");
 
-assert.eq(x, 20, "mongorestore should only have inserted the latter 20 entries");
+    var count = restoreMongod.getDB("local").getCollection("oplog.rs").count();
+    if (count != 20) {
+        print("mongorestore restored too many documents");
+        restoreMongod.getDB("local").getCollection("oplog.rs").find().pretty().shellPrint();
+        assert.eq(count, 20, "mongorestore should only have inserted the latter 20 entries");
+    }
 
-step("stopSet");
-replTest.stopSet();
-
-step("SUCCESS");
+    step("stopping replset test");
+    replTest.stopSet();
+})();
