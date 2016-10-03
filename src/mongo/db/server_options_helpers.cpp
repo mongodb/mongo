@@ -254,6 +254,13 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                "Desired format for timestamps in log messages. One of ctime, "
                                "iso8601-utc or iso8601-local");
 
+#if MONGO_ENTERPRISE_VERSION
+    options->addOptionChaining("security.redactClientLogData",
+                               "redactClientLogData",
+                               moe::Switch,
+                               "Redact client data written to the diagnostics log");
+#endif
+
     options->addOptionChaining("processManagement.pidFilePath",
                                "pidfilepath",
                                moe::String,
