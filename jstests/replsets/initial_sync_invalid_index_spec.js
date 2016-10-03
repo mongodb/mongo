@@ -27,13 +27,21 @@
     clearRawMongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(replTest);
 
-    const msg1 = "The field 'invalidOption' is not valid for an index specification";
-    const msg2 = "Fatal assertion 40088 InitialSyncFailure";
+    const msgInvalidOption = "The field 'invalidOption' is not valid for an index specification";
+    const msgInitialSyncFatalAssertion = "Fatal assertion 40088 InitialSyncFailure";
+
+    // As part of the initsync-3dot2-rhel-62 evergreen variant, we run this test with a setParameter
+    // of "use3dot2InitialSync=true" which exercises 3.2 initial sync behavior. This path will
+    // trigger a different fatal assertion than the normal 3.4 path, which we need to handle here.
+    // TODO: Remove this assertion check when the 'use3dot2InitialSync' setParameter is retired.
+    const msg3dot2InitialSyncFatalAssertion = "Fatal Assertion 16233";
 
     const assertFn = function() {
-        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
+        return rawMongoProgramOutput().match(msgInvalidOption) &&
+            (rawMongoProgramOutput().match(msgInitialSyncFatalAssertion) ||
+             rawMongoProgramOutput().match(msg3dot2InitialSyncFatalAssertion));
     };
-    assert.soon(assertFn, "Initial sync should have aborted on invalid index specification", 60000);
+    assert.soon(assertFn, "Initial sync should have aborted on invalid index specification");
 
     replTest.stopSet(undefined,
                      undefined,
