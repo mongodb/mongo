@@ -48,12 +48,12 @@ src/btree/row_modify.c
 src/btree/row_srch.c
 src/cache/cache_las.c
 src/checksum/arm64/crc32-arm64.c	ARM64_HOST
-src/checksum/power8/crc32.S		POWERPC_HOST
+src/checksum/power8/crc32.sx		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
 src/checksum/software/checksum.c
 src/checksum/x86/crc32-x86.c		X86_HOST
 src/checksum/zseries/crc32-s390x.c	ZSERIES_HOST
-src/checksum/zseries/crc32le-vx.S	ZSERIES_HOST
+src/checksum/zseries/crc32le-vx.sx	ZSERIES_HOST
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
