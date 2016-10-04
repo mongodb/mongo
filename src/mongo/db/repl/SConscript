@@ -72,6 +72,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
+        '$BUILD_DIR/mongo/util/progress_meter',
     ],
 )
 
