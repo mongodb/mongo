@@ -48,6 +48,8 @@ namespace mongo {
  */
 class LiteParsedDocumentSource {
 public:
+    virtual ~LiteParsedDocumentSource() = default;
+
     /*
      * This is the type of parser you should register using REGISTER_DOCUMENT_SOURCE. It need not
      * do any validation of options, only enough parsing to be able to implement the interface.
