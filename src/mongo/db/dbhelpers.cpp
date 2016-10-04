@@ -358,7 +358,7 @@ long long Helpers::removeRange(OperationContext* txn,
     while (1) {
         // Scoping for write lock.
         {
-            OldClientWriteContext ctx(txn, ns);
+            AutoGetCollection ctx(txn, NamespaceString(ns), MODE_IX, MODE_IX);
             Collection* collection = ctx.getCollection();
             if (!collection)
                 break;
