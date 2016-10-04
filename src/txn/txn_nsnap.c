@@ -149,7 +149,6 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_NAMED_SNAPSHOT *nsnap, *nsnap_new;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t pinned_id;
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
@@ -173,7 +172,7 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_calloc_one(session, &nsnap_new));
 	nsnap = nsnap_new;
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &nsnap->name));
-	nsnap->pinned_id = pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
+	nsnap->pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	nsnap->snap_min = txn->snap_min;
 	nsnap->snap_max = txn->snap_max;
 	if (txn->snapshot_count > 0) {
@@ -204,6 +203,9 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	nsnap_new = NULL;
 
 err:	if (started_txn) {
+#ifdef HAVE_DIAGNOSTIC
+		uint64_t pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
+#endif
 		WT_TRET(__wt_txn_rollback(session, NULL));
 		WT_DIAGNOSTIC_YIELD;
 		WT_ASSERT(session, !__wt_txn_visible_all(session, pinned_id));
