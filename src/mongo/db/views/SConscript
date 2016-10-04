@@ -1,0 +1,48 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='views_mongod',
+    source=[
+        'durable_view_catalog.cpp',
+        'view_sharding_check.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/views/views',
+        '$BUILD_DIR/mongo/db/catalog/catalog',
+        '$BUILD_DIR/mongo/db/s/sharding',
+    ]
+)
+
+env.Library(
+    target='views',
+    source=[
+        'view.cpp',
+        'view_catalog.cpp',
+        'view_graph.cpp',
+        'resolved_view.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/db/pipeline/aggregation',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+    ]
+)
+
+env.CppUnitTest(
+    target='view_catalog_test',
+    source=[
+        'view_catalog_test.cpp',
+    ],
+    LIBDEPS=[
+        'views',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)

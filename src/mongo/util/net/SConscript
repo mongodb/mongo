@@ -1,0 +1,94 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env.Library(
+    target='hostandport',
+    source=[
+        'hostandport.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.CppUnitTest(
+    target='hostandport_test',
+    source=[
+        'hostandport_test.cpp'
+    ],
+    LIBDEPS=[
+        'hostandport',
+    ],
+)
+
+networkEnv = env.Clone();
+
+networkEnv.InjectThirdPartyIncludePaths(libraries=[
+    'asio',
+])
+
+networkEnv.Library(
+    target='network',
+    source=[
+        "asio_message_port.cpp",
+        "asio_ssl_context.cpp",
+        "hostname_canonicalization.cpp",
+        "httpclient.cpp",
+        "listen.cpp",
+        "message.cpp",
+        "message_port.cpp",
+        "message_port_startup_param.cpp",
+        "sock.cpp",
+        "sockaddr.cpp",
+        'socket_exception.cpp',
+        "socket_poll.cpp",
+        "ssl_expiration.cpp",
+        "ssl_manager.cpp",
+        "ssl_options.cpp",
+        "thread_idle_callback.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/third_party/shim_asio',
+        'hostandport',
+    ],
+)
+
+env.Library(
+    target='message_port_mock',
+    source=[
+        "message_port_mock.cpp",
+    ],
+    LIBDEPS=[
+        'network',
+    ],
+)
+
+env.CppUnitTest(
+    target='sock_test',
+    source=[
+        'sock_test.cpp',
+    ],
+    LIBDEPS=[
+        'network',
+    ],
+)
+
+env.Library(
+    target='miniwebserver',
+    source=[
+        'miniwebserver.cpp',
+    ],
+    LIBDEPS=[
+        'network',
+    ],
+)

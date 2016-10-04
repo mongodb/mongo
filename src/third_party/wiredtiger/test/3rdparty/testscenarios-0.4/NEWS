@@ -1,0 +1,56 @@
+---------------------------
+testscenarios release notes
+---------------------------
+
+
+IN DEVELOPMENT
+~~~~~~~~~~~~~~
+
+0.4
+~~~
+
+IMPROVEMENTS
+------------
+
+* Python 3.2 support added. (Robert Collins)
+
+0.3
+~~~
+
+CHANGES
+-------
+
+* New function ``per_module_scenarios`` for tests that should be applied across 
+  multiple modules providing the same interface, some of which may not be 
+  available at run time.  (Martin Pool)
+
+* ``TestWithScenarios`` is now backed by a mixin - WithScenarios - which can be
+  mixed into different unittest implementations more cleanly (e.g. unittest2).
+  (James Polley, Robert Collins)
+
+0.2
+~~~
+
+CHANGES
+-------
+
+* Adjust the cloned tests ``shortDescription`` if one is present. (Ben Finney)
+
+* Provide a load_tests implementation for easy use, and multiply_scenarios to
+  create the cross product of scenarios. (Martin Pool)
+
+0.1
+~~~
+
+CHANGES
+-------
+
+* Created project. The primary interfaces are
+  ``testscenarios.TestWithScenarios`` and
+  ``testscenarios.generate_scenarios``. Documentation is primarily in README. 
+  (Robert Collins)
+
+* Make the README documentation doctest compatible, to be sure it works.
+  Also various presentation and language touchups. (Martin Pool)
+  (Adjusted to use doctest directly, and to not print the demo runners
+  output to stderror during make check - Robert Collins)

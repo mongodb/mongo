@@ -1,0 +1,32 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+
+selector:
+  js_test:
+    roots:
+    - jstests/aggregation/*.js
+    - jstests/aggregation/bugs/*.js
+    - jstests/aggregation/expressions/*.js
+    - jstests/aggregation/sources/*/*.js
+    - src/mongo/db/modules/*/jstests/aggregation/*.js
+    exclude_files:
+    # Skip any tests that run with auth explicitly.
+    - jstests/aggregation/*[aA]uth*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        enableEncryption: ''
+        encryptionKeyFile: *keyFile
+        set_parameters:
+          enableTestCommands: 1

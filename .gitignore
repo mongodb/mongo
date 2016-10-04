@@ -1,11 +1,19 @@
-.jsdbshell
-.dbshell
-.sconsign.dblite
-.sconf_temp
+/build
+/src/mongo/db/modules
+/.jsdbshell
+/.dbshell
+/perf.data
+/perf.data.old
+/massif.out.*
+/smoke-last.json
 
 *~
+*.swp
 *.o
+*.os
+*.obj
 *.aps
+*.ilk
 *.tar.gz
 *.suo
 *.ncb
@@ -17,51 +25,144 @@
 *.jsall
 *.pyc
 *.log
+*.exe
+*.exp
+*.lib
+*.idb
+*.pdb
+*.manifest
+*.user
+*.gch
+*.*sdf
+*.psess
+*.tmp
 *#
 .#*
 
-db/Debug
-db/oplog*
-db/.gdb*
-db/makefile.local
+/src/mongo/*/*Debug*/
+/src/mongo/*/*/*Debug*/
+/src/mongo/*/*Release*/
+/src/mongo/*/*/*Release*/
+/src/ipch
+/src/mongo/*/ipch
+/src/mongo/*/*/ipch
+/src/mongo/db/.gdb*
+/src/mongo/db/makefile.local
+/src/mongo/db/_ReSharper.db
+/src/third_party/*/*.cache
+/src/third_party/*/*.tlog
+/src/third_party/*/*.lastbuildstate
 config.log
 settings.py
+log_config.py
+/tags
+TAGS
+failfile.smoke
 
 #temp dirs
 dump
-log
+/log
 logs
-docs
+docs/html
+docs/latex
+docs/doxygen
 32bit
 scratch
 
-# binaryies
-mongo
-mongod
-mongogrid
-mongos
+# binaries
+/mongo
+/mongod
+/mongogrid
+/mongos
 
-mongodump
-mongorestore
-
-mongofiles
-mongoexport
-
-mongoimportjson
+/mongosniff
+/mongobridge
+/mongoperf
+/mongoshim
+/loadgen
+/docgen
 
 *.tgz
+*.zip
+*.tar.gz
 
 #libs
-libmongoclient.*
-libmongotestfiles.*
+/libmongoclient.*
+/libmongotestfiles.*
+/libmongoshellfiles.*
+/sharedclient
+
+/emr.jar
+*.class
 
 # examples
-firstExample
-secondExample
-whereExample
+/firstExample
+/secondExample
+/whereExample
+/bsondemo
+/rsExample
+/tutorial
 
 #tests
-test
-authTest
-clientTest
+/dbtest
+/authTest
+/perftest
+/clientTest
+/httpClientTest
 
+#debian
+build-stamp
+configure-stamp
+debian/mongodb
+# This was inserted 2009-08-16, nobody knows why.
+#debian/mongodb.*
+
+#osx
+.DS_Store
+._.DS_Store
+*.fuse_*
+
+# QtCreator
+*.config
+*.creator
+*.creator.user
+*.files
+*.includes
+*.orig
+
+#built by Visual Studio
+src/mongo/base/error_codes.cpp
+src/mongo/base/error_codes.h
+src/mongo/db/auth/action_type.cpp
+src/mongo/db/auth/action_type.h
+src/mongo/db/fts/stop_words_list.cpp
+src/mongo/db/fts/stop_words_list.h
+src/mongo/shell/mongo-server.cpp
+src/mongo/shell/mongo.cpp
+src/third_party/v8/src/experimental-libraries.cc
+src/third_party/v8/src/libraries.cc
+
+# Eclipse build artifacts
+.cproject
+.project
+.pydevproject
+
+# Idea CLion project artifacts
+.idea
+CMakeLists.txt
+
+# XCode projects
+.xcworkspace
+
+# old things that should be removed
+# maybe remove this mid 2012
+src/mongo/buildinfo.cpp
+buildinfo.cpp
+/.settings/
+
+*.msi
+*.wixobj
+*.wixpdb
+DriverInclude.wxs
+
+compile_commands.json

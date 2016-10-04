@@ -1,0 +1,12 @@
+# wtperf options file: evict lsm configuration
+conn_config="cache_size=50M,lsm_manager=(worker_thread_max=6),eviction=(threads_max=4)"
+table_config="type=lsm,lsm=(chunk_size=2M),os_cache_dirty_max=16MB"
+compact=true
+icount=10000000
+report_interval=5
+run_time=120
+populate_threads=1
+threads=((count=16,reads=1))
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5

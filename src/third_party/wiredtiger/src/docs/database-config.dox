@@ -1,0 +1,93 @@
+/*! @page database_config Database Configuration
+
+WiredTiger databases are configured using the ::wiredtiger_open call,
+which takes a configuration string argument.  In addition to this, the
+database configuration can be specified using the \c WiredTiger.config
+file or the WIREDTIGER_CONFIG environment variable.
+
+When a WiredTiger database is created, the configuration string passed
+to ::wiredtiger_open is saved to a WiredTiger home directory file named
+\c WiredTiger.basecfg, and that configuration file is read whenever the
+database is subsequently opened.
+
+The configuration string to the ::wiredtiger_open call allows applications
+to do per run settings (such as with or without statistics) or override
+original creation settings.  The user config file and the environment
+variable allow system administrators to override application settings
+without recompilation.
+
+@section config_order Configuration ordering
+
+When a database is created or opened, the order of configuration is:
+
+- Any \c WiredTiger.basecfg file,
+- which is overridden by the ::wiredtiger_open configuration string argument.
+- which is overridden by the \c WiredTiger.config file,
+- which is overridden by the \c WIREDTIGER_CONFIG environment variable,
+
+@section config_env WIREDTIGER_CONFIG environment variable
+
+If the \c WIREDTIGER_CONFIG environment variable is set, it is read as
+a configuration string.
+
+If the process is running with special privileges and \c WIREDTIGER_CONFIG
+is set, the ::wiredtiger_open function must be configured with the
+\c use_environment_priv flag, or the call to ::wiredtiger_open will fail.
+See @ref home for more details.
+
+@section config_file WiredTiger.config file
+
+If a file named \c WiredTiger.config appears in the WiredTiger home
+directory, it is read as a configuration string.
+
+The file is minimally parsed in order to build configuration strings for
+the WiredTiger configuration parser:
+
+<ul>
+<li>A backslash (<b><tt>\\</tt></b>) followed by any character other
+than a newline character leaves both characters untouched; otherwise,
+if a backslash is followed by a newline character, both the backslash
+and the newline character are discarded.
+
+<li>Any text between double-quote pairs (<b><tt>"</tt></b>) is left
+untouched, including newline and white-space characters.   Backslash
+characters escape double-quote characters: a backslash escaped
+double-quote character can neither start nor end a quoted string.
+
+<li>Comments are discarded.  If the first non-white-space character
+following an unquoted and unescaped newline character is a hash mark
+(<b><tt>#</tt></b>), all characters up to the next newline character are
+discarded.  The ending newline character cannot be escaped or quoted,
+once a comment line is identified, all characters to the next newline
+are simply discarded.
+
+<li>Otherwise, all lines are concatenated and the newline characters
+replaced with commas.
+</ul>
+
+@section config_base WiredTiger.basecfg file
+
+When a WiredTiger database is created, non-default configuration
+information specified to ::wiredtiger_open is saved to a WiredTiger home
+directory file named \c WiredTiger.basecfg, and that configuration file
+is read whenever the database is subsequently opened.
+
+For example, if a shared library extensions are required, those settings
+will be saved to the base configuration file so it's easier to write
+general-purpose applications that might not be aware of how a particular
+database was created and configured.
+
+Users should not not edit this file, set the \c WIREDTIGER_CONFIG
+environment variable or create a \c WiredTiger.config file instead, as
+those settings override the settings in the base configuration file.
+
+This file is a potential problem for applications that want to retain
+the ability to downgrade to previous releases. If a new database is
+created after an upgrade, the base configuration file might have
+configuration strings that would cause a previous version of the
+application to fail. For this reason, applications that may want to
+downgrade should configure the ::wiredtiger_open value \c config_base
+to \c false so the base configuration file is not written as part of
+database create.
+
+*/

@@ -1,0 +1,9 @@
+# wtperf options file: medium lsm configuration
+conn_config="cache_size=1G,lsm_manager=(worker_thread_max=6)"
+table_config="lsm=(chunk_size=100MB,chunk_max=1TB),type=lsm,os_cache_dirty_max=16MB"
+icount=50000000
+populate_threads=1
+compact=true
+threads=((count=16,read=1))
+run_time=120
+report_interval=5

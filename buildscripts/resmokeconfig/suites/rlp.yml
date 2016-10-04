@@ -1,0 +1,21 @@
+selector:
+  js_test:
+    roots:
+    - src/mongo/db/modules/*/jstests/rlp/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        basisTechRootDirectory: /opt/basis
+        set_parameters:
+          enableTestCommands: 1
+          rlpEnableExperimentalLanguagesForTesting: true

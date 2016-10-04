@@ -1,0 +1,329 @@
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 000 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc000libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 001 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc001libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 010 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc010libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 011 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc011libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 100 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc100libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 101 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc101libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 110 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc110libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 111 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc111libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 000 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc000libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 001 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc001libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 010 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc010libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 011 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc011libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 100 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc100libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 101 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc101libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 110 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc110libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 111 ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc111libbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+rm ../LIBRARY/libbid.a
+
+
+
+
+
+
+
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 000b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc000blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 001b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc001blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 010b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc010blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 011b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc011blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 100b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc100blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 101b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc101blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 110b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc110blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR icc 111b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/icc111blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=icc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 000b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc000blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 001b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc001blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 010b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc010blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 011b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc011blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 100b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc100blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 101b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc101blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 110b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc110blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR gcc 111b ***************************"
+echo ""
+echo ""
+make $1 clean OS_TYPE=LINUX
+cp ../LIBRARY/gcc111blibbid.a ../LIBRARY/libbid.a
+ranlib ../LIBRARY/libbid.a
+make $1 OS_TYPE=LINUX CC=gcc CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+rm ../LIBRARY/libbid.a

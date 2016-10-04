@@ -1,0 +1,386 @@
+stepback: false
+command_type: system
+
+pre:
+    - command: shell.track
+
+post:
+    - command: attach.results
+      params:
+        file_location: work/report.json
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          # call terraform destroy twice to avoid AWS timeout
+          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy
+          echo "Cluster DESTROYED."
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          # removes files from the (local) scons cache when it's over a
+          # threshold, to the $prune_ratio percentage. Ideally override
+          # these default values in the distro config in evergreen.
+
+          if [ -d "${scons_cache_path}" ]; then
+              ${python|python} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+          fi
+
+functions:
+  "prepare environment":
+    - command: shell.exec
+      params:
+        script: |
+          rm -rf ./*
+          mkdir src
+          mkdir work
+          mkdir bin
+          mkdir keys
+          pwd
+          ls
+    - command: manifest.load
+    - command: git.get_project
+      params:
+        directory: src
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          dsi: ${dsi_rev}
+          YCSB: ${YCSB_rev}
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        silent: true
+        script: |
+          # generate aws private key file
+          echo "${terraform_secret}" > secret
+          chmod 400 secret
+          echo "${ec2_pem}" > keys/aws.pem
+          chmod 400 keys/aws.pem
+    - command: shell.exec
+      params:
+        working_dir: work
+        # setup execution environment
+        # configure environment
+        script: |
+          virtualenv ./venv
+          source ./venv/bin/activate
+          pip install -r ../src/dsi/dsi/requirements.txt
+          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --production
+    - command: shell.exec
+      params:
+        script: |
+          set -v
+          source work/dsienv.sh
+          $DSI_PATH/bin/setup-dsi-env.sh
+          cp terraform/* work/
+          ls work
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+           set -v
+           ./terraform get --update
+
+  "bring up 3 shard cluster":
+    - command: shell.exec
+      # bring up the cluster
+      params:
+        working_dir: work
+        silent: true
+        script: |
+          # to create a mongod EC2 cluster
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
+
+  "configure mongodb cluster":
+    - command: shell.exec
+      # bring up the mongod
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
+          $DSI_PATH/bin/mongodb_setup.py --mongodb-binary-archive https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+
+  "run test":
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -v
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
+          source ./dsienv.sh
+          source ./venv/bin/activate
+          # Copy over the proper test control file
+          cp $DSI_PATH/test_control/test_control.${test}.longevity.yml test_control.yml
+          $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
+          echo "Complete test for ${test} with setup ${setup}!"
+    - command: "json.send"
+      params:
+          name: "perf"
+          file: "work/perf.json"
+
+  "destroy cluster":
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          # destroy the EC2 cluster
+          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy
+          # clean all file to be safe
+          rm -rf *
+          echo "Cluster DESTROYED."
+          echo "All perf results"
+          cd ..
+          cat perf.json | egrep "name|ops_per_sec"
+
+  "make test log artifact":
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -e
+          set -o verbose
+          source ./dsienv.sh
+          # move additional file here
+          cd reports
+          cp ../infrastructure_provisioning.out.yml .
+          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
+          cp ../perf.json .
+          cd ..
+          mkdir -p ./reports/graphs
+          touch ./reports/graphs/timeseries-p1.html
+          $DSI_PATH/bin/retrieve-diag-data.sh
+          $DSI_PATH/bin/generate-timeseries-html.sh || true
+
+    - command: archive.targz_pack
+      params:
+        target: "reports.tgz"
+        source_dir: "work"
+        include:
+          - "reports/**"
+
+  "upload log file":
+    - command: s3.put
+      params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            local_file: reports.tgz
+            remote_file: longevity/${build_variant}/${revision}/logs/${test}-${build_id}.${ext|tgz}
+            bucket: mciuploads
+            permissions: public-read
+            content_type: ${content_type|application/x-gzip}
+            display_name: ${test}-longevity-testlog
+    - command: s3.put
+      params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            local_file: work/reports/graphs/timeseries-p1.html
+            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
+            bucket: mciuploads
+            permissions: public-read
+            content_type: text/html
+            display_name: timeseries-p1.html
+
+  "analyze":
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "work/history.json"
+        name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "work/tags.json"
+        name: "perf"
+    - command: shell.exec
+      # post_run_check.py and longevity_override.json for DSI tests are part of dsi repo
+      type : test
+      params:
+        working_dir: work
+        script: |
+          set -o errexit
+          set -o verbose
+          TAG="3.2.1-Baseline"
+          PROJECT="mongo-longevity"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/master/longevity_override.json"
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
+
+tasks:
+- name: compile
+  commands:
+    - command: manifest.load
+    - command: git.get_project
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          MONGO_VERSION=$(git describe)
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod mongos
+
+          # strip binaries here
+          strip mongo
+          strip mongos
+          strip mongod
+          mkdir -p mongodb/bin
+          mv mongo mongodb/bin
+          mv mongod mongodb/bin
+          mv mongos mongodb/bin
+          tar cvf mongodb.tar mongodb
+          gzip mongodb.tar
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb.tar.gz
+        remote_file: longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongodb.tar.gz
+
+- name: shard_cluster_test
+  depends_on:
+    - name: compile
+  exec_timeout_secs: 216000
+  commands:
+    - func: "prepare environment"
+    - func: "bring up 3 shard cluster"
+    - func: "configure mongodb cluster"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "ycsb"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
+
+- name: shard_cluster_MMAPv1_test
+  depends_on:
+    - name: compile
+  exec_timeout_secs: 28800
+  commands:
+    - func: "prepare environment"
+    - func: "bring up 3 shard cluster"
+    - func: "configure mongodb cluster"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "ycsb"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
+
+
+#######################################
+#               Modules               #
+#######################################
+# if a module is added and to be added to the manifest
+# be sure to add the module to git.get_project revisions parameter
+modules:
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  prefix: dsi
+  branch: master
+
+- name: YCSB
+  repo: git@github.com:mongodb-labs/YCSB.git
+  prefix: YCSB
+  branch: evergreen
+
+
+
+buildvariants:
+- name: linux-wt-shard
+  display_name: Linux WT Shard
+  batchtime: 40320 # 4 weeks
+  modules: &modules
+    - dsi
+    - YCSB
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    setup: shard
+    cluster: longevity
+    numShard: 3
+    storageEngine: wiredTiger
+    use_scons_cache: true
+  run_on:
+    - "rhel70-perf-longevity"
+  tasks:
+    - name: compile
+      distros:
+      - rhel70
+    - name: shard_cluster_test
+
+- name: linux-mmapv1-shard
+  display_name: Linux MMAPv1 Shard
+  batchtime: 40320 # 4 week
+  modules: *modules
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    setup: shard
+    cluster: longevity
+    numShard: 3
+    storageEngine: mmapv1
+    use_scons_cache: true
+  run_on:
+    - "rhel70-perf-longevity"
+  tasks:
+    - name: compile
+      distros:
+      - rhel70
+    - name: shard_cluster_MMAPv1_test

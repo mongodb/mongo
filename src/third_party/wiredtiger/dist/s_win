@@ -1,0 +1,45 @@
+#!/bin/sh
+
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+# Insulate against locale-specific sort order
+LC_ALL=C
+export LC_ALL
+
+win_config()
+{
+	f='../build_win/wiredtiger_config.h'
+	egrep '#define|#undef' \
+	    ../build_posix/config.hin $f |
+	    sed 's/^.*#//' |
+	    awk '{print $2}' |
+	    egrep -v '^(LT_OBJDIR|PACKAGE|VERSION)' |
+	    sort | uniq -u > $t
+
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo "$f: configuration #defines do not match POSIX"
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		cat $t
+		exit 1
+	}
+}
+
+win_export()
+{
+	# Build the Windows list of exported symbols.
+	f='../build_win/wiredtiger.def'
+	(echo 'LIBRARY WIREDTIGER'
+	 echo 'EXPORTS'
+	 sed -e '/^$/d' \
+	     -e '/^#/d' \
+	     -e 's/^/    /') < s_export.list > $t
+	 cmp $t $f > /dev/null 2>&1 ||
+	     (echo "Building $f" && rm -f $f && cp $t $f)
+}
+
+win_config
+win_export
+
+exit 0

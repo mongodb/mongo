@@ -1,0 +1,3 @@
+rules:
+    no-unused-vars: 0
+    no-empty-function: 0

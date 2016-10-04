@@ -1,0 +1,46 @@
+{
+   <FreeBSD 8.2 dlopen #1>
+   Memcheck:Addr8
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   fun:dlopen
+   fun:__wt_dlopen
+   fun:__conn_load_extension
+   fun:wiredtiger_open
+   fun:wts_open
+   fun:wts_startup
+   fun:main
+}
+{
+   <FreeBSD 8.2 dlopen #2>
+   Memcheck:Addr8
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   obj:/libexec/ld-elf.so.1
+   fun:dlopen
+   fun:__wt_dlopen
+   fun:__conn_load_extension
+   fun:wiredtiger_open
+   fun:wts_open
+   fun:wts_startup
+   fun:main
+}
+{
+   <Berkeley DB uninitialized write>
+   Memcheck:Param
+   write(buf)
+   obj:/lib/libc.so.7
+   fun:__os_io
+   fun:__memp_pgwrite
+   fun:__memp_bhwrite
+   fun:__memp_sync_int
+   fun:__memp_fsync
+   fun:__db_sync
+   fun:__db_refresh
+   fun:__db_close
+   fun:__db_close_pp
+   fun:bdb_teardown
+   fun:main
+}

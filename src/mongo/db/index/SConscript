@@ -1,0 +1,104 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+        target='index_descriptor',
+        source=[
+            'index_descriptor.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+)
+
+env.Library(
+        target='key_generator',
+        source=[
+            'btree_key_generator.cpp',
+            'expression_keys_private.cpp',
+        ],
+        LIBDEPS=[
+            'expression_params',
+            'index_descriptor',
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+            '$BUILD_DIR/mongo/db/fts/base',
+            '$BUILD_DIR/mongo/db/geo/geoparser',
+            '$BUILD_DIR/mongo/db/index_names',
+            '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+            '$BUILD_DIR/third_party/s2/s2',
+        ],
+)
+
+env.Library(
+        target='external_key_generator',
+        source=[
+            'external_key_generator.cpp',
+        ],
+        LIBDEPS=[
+            'key_generator',
+            'expression_params',
+            '$BUILD_DIR/mongo/base',
+        ],
+)
+
+env.Library(
+        target='expression_params',
+        source=[
+            'expression_params.cpp',
+            's2_common.cpp'
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/bson/util/bson_extract',
+            '$BUILD_DIR/mongo/db/geo/geometry',
+            '$BUILD_DIR/mongo/db/geo/geoparser',
+            '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+            '$BUILD_DIR/third_party/s2/s2',
+        ]
+)
+
+env.CppUnitTest(
+        target='key_generator_test',
+        source=[
+            '2d_key_generator_test.cpp',
+            'btree_key_generator_test.cpp',
+            'hash_key_generator_test.cpp',
+            's2_key_generator_test.cpp',
+        ],
+        LIBDEPS=[
+            'key_generator',
+            '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        ],
+)
+
+serveronlyEnv = env.Clone()
+serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+serveronlyEnv.Library(
+    target="index_access_methods",
+    source=[
+        "2d_access_method.cpp",
+        "btree_access_method.cpp",
+        "fts_access_method.cpp",
+        "hash_access_method.cpp",
+        "haystack_access_method.cpp",
+        "index_access_method.cpp",
+        "s2_access_method.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/catalog',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/btree',
+        '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/third_party/shim_snappy',
+        'expression_params',
+        'index_descriptor',
+        'key_generator',
+    ],
+)

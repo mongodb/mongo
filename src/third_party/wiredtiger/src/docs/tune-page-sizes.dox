@@ -1,0 +1,142 @@
+/*! @page tune_page_sizes  Page and overflow key/value sizes
+
+There are seven page and key/value size configuration strings:
+
+- allocation size (\c allocation_size),
+- page sizes (\c internal_page_max and \c leaf_page_max),
+- key and value sizes (\c internal_key_max, \c leaf_key_max and \c leaf_value_max), and the
+- page-split percentage (\c split_pct).
+
+All seven are specified to the WT_SESSION::create method, in other
+words, they are configurable on a per-file basis.
+
+Applications commonly configure page sizes, based on their workload's
+typical key and value size. Once the correct page size has been chosen,
+appropriate defaults for the other configuration values are derived from
+the page sizes, and relatively few applications will need to modify the
+other page and key/value size configuration options.
+
+An example of configuring page and key/value sizes:
+
+@snippet ex_all.c Create a table and configure the page size
+
+@section tune_page_sizes_sizes Page, key and value sizes
+
+The \c internal_page_max and \c leaf_page_max configuration values
+specify a maximum size for Btree internal and leaf pages.  That is, when
+an internal or leaf page grows past that size, it splits into multiple
+pages.  Generally, internal pages should be sized to fit into on-chip
+caches in order to minimize cache misses when searching the tree, while
+leaf pages should be sized to maximize I/O performance (if reading from
+disk is necessary, it is usually desirable to read a large amount of
+data, assuming some locality of reference in the application's access
+pattern).
+
+The default page size configurations (2KB for \c internal_page_max, 32KB
+for \c leaf_page_max), are appropriate for applications with relatively
+small keys and values.
+
+- Applications doing full-table scans through out-of-memory workloads
+might increase both internal and leaf page sizes to transfer more data
+per I/O.
+- Applications focused on read/write amplification might decrease the page
+size to better match the underlying storage block size.
+
+When block compression has been configured, configured page sizes will
+not match the actual size of the page on disk. Block compression in
+WiredTiger happens within the I/O subsystem, and so a page might split
+even if subsequent compression would result in a resulting page size
+small enough to leave as a single page.  In other words, page sizes are
+based on in-memory sizes, not on-disk sizes. Applications needing to
+write specific sized blocks may want to consider implementing a
+WT_COMPRESSOR::compress_raw function.
+
+The page sizes also determine the default size of overflow items, that
+is, keys and values too large to easily store on a page.  Overflow items
+are stored separately in the file from the page where the item logically
+appears, and so reading or writing an overflow item is more expensive
+than an on-page item, normally requiring additional I/O.  Additionally,
+overflow values are not cached in memory. This means overflow items
+won't affect the caching behavior of the application, but it also means
+that each time an overflow value is read, it is re-read from disk.
+
+For both of these reasons, applications should avoid creating large
+numbers of commonly referenced overflow items.  This is especially
+important for keys, as keys on internal pages are referenced during
+random searches, not just during data retrieval.  Generally,
+applications should make every attempt to avoid creating overflow keys.
+
+- Applications with large keys and values, and concerned with latency,
+might increase the page size to avoid creating overflow items, in order
+to avoid the additional cost of retrieving them.
+
+- Applications with large keys and values, doing random searches, might
+decrease the page size to avoid wasting cache space on overflow items
+that aren't likely to be needed.
+
+- Applications with large keys and values, doing table scans, might
+increase the page size to avoid creating overflow items, as the overflow
+items must be read into memory in all cases, anyway.
+
+The \c internal_key_max, \c leaf_key_max and \c leaf_value_max
+configuration values allow applications to change the size at which a
+key or value will be treated as an overflow item.
+
+The value of \c internal_key_max is relative to the maximum internal
+page size.  Because the number of keys on an internal page determines
+the depth of the tree, the \c internal_key_max value can only be
+adjusted within a certain range, and the configured value will be
+automatically adjusted by WiredTiger, if necessary to ensure a
+reasonable number of keys fit on an internal page.
+
+The values of \c leaf_key_max and \c leaf_value_max are not relative to
+the maximum leaf page size. If either is larger than the maximum page
+size, the page size will be ignored when the larger keys and values are
+being written, and a larger page will be created as necessary.
+
+Most applications should not need to tune the maximum key and value
+sizes.  Applications requiring a small page size, but also having
+latency concerns such that the additional work to retrieve an overflow
+item is an issue, may find them useful.
+
+An example of configuring a large leaf overflow value:
+
+@snippet ex_all.c Create a table and configure a large leaf value max
+
+@section tune_page_sizes_split_percentage Split percentage
+
+The \c split_pct configuration string configures the size of a split
+page.  When a page grows sufficiently large that it must be written as
+multiple disk blocks, the newly written block size is \c split_pct
+percent of the maximum page size.  This value should be selected to
+avoid creating a large number of tiny pages or repeatedly splitting
+whenever new entries are inserted.  For example, if the maximum page
+size is 1MB, a \c split_pct value of 10% would potentially result in
+creating a large number of 100KB pages, which may not be optimal for
+future I/O.   Or, if the maximum page size is 1MB, a \c split_pct value
+of 90% would potentially result in repeatedly splitting pages as the
+split pages grow to 1MB over and over.  The default value for \c
+split_pct is 75%, intended to keep large pages relatively large, while
+still giving split pages room to grow.
+
+Most applications should not need to tune the split percentage size.
+
+@section tune_page_sizes_allocation_size Allocation size
+
+The \c allocation_size configuration value is the underlying unit of
+allocation for the file.  As the unit of file allocation, it sets the
+minimum page size and how much space is wasted when storing small
+amounts of data and overflow items.  For example, if the allocation size
+is set to 4KB, an overflow item of 18,000 bytes requires 5 allocation
+units and wastes about 2KB of space.  If the allocation size is 16KB,
+the same overflow item would waste more than 10KB.
+
+The default allocation size is 4KB, chosen for compatibility with
+virtual memory page sizes and direct I/O requirements on common server
+platforms.
+
+Most applications should not need to tune the allocation size; it is
+primarily intended for applications coping with the specific
+requirements some file systems make to support features like direct I/O.
+
+*/

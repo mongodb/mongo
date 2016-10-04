@@ -1,78 +1,79 @@
-Mongo Database README
+MongoDB README
 
-DOCUMENTATION
+Welcome to MongoDB!
 
-http://mongodb.onconfluence.com/display/DOCS/Mongo+Documentation
+COMPONENTS
 
-ORGANIZATION
+  mongod - The database process.
+  mongos - Sharding controller.
+  mongo  - The database shell (uses interactive javascript).
 
-db/             : core database source code
-grid/           : socket messaging stuff
-util/           : util classes
+UTILITIES
+
+  mongodump         - MongoDB dump tool - for backups, snapshots, etc.
+  mongorestore      - MongoDB restore a dump
+  mongoexport       - Export a single collection to test (JSON, CSV)
+  mongoimport       - Import from JSON or CSV
+  mongofiles        - Utility for putting and getting files from MongoDB GridFS
+  mongostat         - Show performance statistics
 
 BUILDING
 
-- Pre-requisite for 'mongo', the MongoDB interactive shell:
-
-  The shell requires the library ../v8/libv8.  There is no v8 binary distro, so
-  we recommend you install and build V8 as follows:
-
-    $ cd ..
-    $ svn checkout http://v8.googlecode.com/svn/trunk/ v8
-    $ cd v8
-    $ scons libv8.a
-
-- Then use scons to build.  
-
-  If you want to build everything (mongod, mongo, tools, etc):
-
-     $ scons .
-
-  If you only want to build the database:
-
-     $ scons
+  See docs/building.md, also www.mongodb.org search for "Building".
 
 RUNNING
 
-Run ./db and command line options will display.
+  For command line options invoke:
 
-COMPILER VERSIONS
+    $ ./mongod --help
 
-Mongo has been tested with GCC 4.1.2 and Visual Studio 2008.  Older versions
-of GCC may not be happy.
+  To run a single server database:
 
-NOTES
+    $ mkdir /data/db
+    $ ./mongod
+    $
+    $ # The mongo javascript shell connects to localhost and test database by default:
+    $ ./mongo 
+    > help
 
-Mongo uses the 10gen appserver and the Java Virtual Machine to execute 
-user program code in the database.  This feature is optional -- if you would 
-like to run the database without these installed, run with the --nojni 
-option.  With --nojni specified, the db.eval() and $where features are no 
-longer available.
+DRIVERS
 
-Mongo uses memory mapped files.  If built as a 32 bit executable, you will 
-not be able to work with large (multi-gigabyte) databases.  However, 32 bit 
-builds should work fine with small development databases.
+  Client drivers for most programming languages are available at
+  mongodb.org.  Use the shell ("mongo") for administrative tasks.
 
-To compile the unit tests, you need to install the unit test framework from:
- http://unittest.red-bean.com/
+PACKAGING
 
---- WINDOWS ---
+  Packages are created dynamically by the package.py script located in the
+  buildscripts directory. This will generate RPM and Debian packages.
 
-COMPILING
-   REQUIREMENTS
-     - python 2.6 (for scons)
-     - scons
-     - boost 1.35
-     - vc++ express
-     - windows sdk - tested with v6.0 v6.0a
-     - java sdk 1.6
+DOCUMENTATION
 
+  http://www.mongodb.org/
+ 
+CLOUD MANAGED MONGODB
 
-    you have to add java\jdk\bin\ to your path
+  http://cloud.mongodb.com/
 
-   scons
-   mkdir \data\
-   mkdir \data\db
-   db\db run
+MAIL LISTS AND IRC
 
+  http://dochub.mongodb.org/core/community
+  
+LEARN MONGODB
 
+  http://university.mongodb.com/
+
+32 BIT BUILD NOTES
+
+  MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
+  not be able to work with large (multi-gigabyte) databases.  However, 32 bit
+  builds work fine with small development databases.
+
+LICENSE
+
+  Most MongoDB source files (src/mongo folder and below) are made available
+  under the terms of the GNU Affero General Public License (AGPL).  See
+  individual files for details.
+
+  As an exception, the files in the client/, debian/, rpm/,
+  utils/mongoutils, and all subdirectories thereof are made available under
+  the terms of the Apache License, version 2.0.

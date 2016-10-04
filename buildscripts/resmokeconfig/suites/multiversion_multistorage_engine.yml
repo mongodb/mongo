@@ -1,0 +1,13 @@
+selector:
+  js_test:
+    roots:
+    - jstests/multiVersion/mixed_storage_version_replication.js
+    - jstests/multiVersion/transitioning_to_and_from_WT.js
+
+# Multiversion tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval: "load('jstests/libs/override_methods/multiversion_override_balancer_control.js');"
+        nodb: ''

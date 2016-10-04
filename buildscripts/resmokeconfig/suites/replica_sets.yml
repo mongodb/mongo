@@ -1,0 +1,11 @@
+selector:
+  js_test:
+    roots:
+    - jstests/replsets/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands

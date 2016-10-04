@@ -1,0 +1,20 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+mongobridge = env.Program(
+    target="mongobridge",
+    source=[
+        "bridge.cpp",
+        "bridge_commands.cpp",
+        "mongobridge_options.cpp",
+        "mongobridge_options_init.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/client/clientdriver",
+        "$BUILD_DIR/mongo/util/signal_handlers",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
+    ],
+)
+
+env.Install("#/", mongobridge)

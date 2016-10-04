@@ -1,0 +1,911 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "MONGO" "1" "January 30, 2015" "3.0" "mongodb-manual"
+.SH NAME
+mongo \- MongoDB Shell
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH DESCRIPTION
+.sp
+\fBmongo\fP is an interactive JavaScript shell interface to
+MongoDB, which provides a powerful interface for systems
+administrators as well as a way for developers to test queries and
+operations directly with the database. \fBmongo\fP also provides
+a fully functional JavaScript environment for use with a MongoDB. This
+document addresses the basic invocation of the \fBmongo\fP shell
+and an overview of its usage.
+.SH OPTIONS
+.SS Core Options
+.INDENT 0.0
+.TP
+.B mongo
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-shell
+Enables the shell interface. If you invoke the \fBmongo\fP command
+and specify a JavaScript file as an argument, or use \fI\%\-\-eval\fP to
+specify JavaScript on the command line, the \fI\%\-\-shell\fP option
+provides the user with a shell prompt after the file finishes executing.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-nodb
+Prevents the shell from connecting to any database instances. Later, to
+connect to a database within the shell, see
+\fImongo\-shell\-new\-connections\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-norc
+Prevents the shell from sourcing and evaluating \fB~/.mongorc.js\fP on
+start up.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-quiet
+Silences output from the shell during the connection process.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-port <port>
+Specifies the port where the \fBmongod\fP or \fBmongos\fP
+instance is listening. If \fI\-\-port\fP is not specified,
+\fBmongo\fP attempts to connect to port \fB27017\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-host <hostname>
+Specifies the name of the host machine where the \fBmongod\fP or
+\fBmongos\fP is running. If this is not specified,
+\fBmongo\fP attempts to connect to a MongoDB process running on
+the localhost.
+.sp
+To connect to a replica set, specify the \fBreplica set name\fP and a seed list of set members. Use the
+following form:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-eval <javascript>
+Evaluates a JavaScript expression that is specified as an argument.
+\fBmongo\fP does not load its own environment when evaluating code.
+As a result many options of the shell environment are not available.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-username <username>, \-u <username>
+Specifies a username with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-password\fP and
+\fB\-\-authenticationDatabase\fP options.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-password <password>, \-p <password>
+Specifies a password with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fI\-\-username\fP
+and \fI\-\-authenticationDatabase\fP options. To force \fBmongo\fP to
+prompt for a password, enter the \fI\-\-password\fP option as the
+last option and leave out the argument.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-help, \-h
+Returns information on the options and use of \fBmongo\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-version
+Returns the \fBmongo\fP release number.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-verbose
+Increases the verbosity of the output of the shell during the connection
+process.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ipv6
+Enables IPv6 support and allows the \fBmongo\fP to connect to the
+MongoDB instance using an IPv6 network. All MongoDB programs and
+processes disable IPv6 support by default.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B <db address>
+Specifies the "database address" of the database to connect to. For
+example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo admin
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The above command will connect the \fBmongo\fP shell to the
+\fIadmin database\fP on the local machine. You may specify a remote
+database instance, with the resolvable hostname or IP address. Separate
+the database name from the hostname using a \fB/\fP character. See the
+following examples:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo mongodb1.example.net
+mongo mongodb1/admin
+mongo 10.8.8.10/test
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+This syntax is the \fIonly\fP way to connect to a specific database.
+.sp
+To specify alternate hosts and a database, you must use this syntax and cannot
+use \fI\-\-host\fP or \fI\-\-port\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B <file.js>
+Specifies a JavaScript file to run and then exit. Generally this should
+be the last option specified.
+.INDENT 7.0
+.INDENT 3.5
+.SS Optional
+.sp
+To specify a JavaScript file to execute \fIand\fP allow
+\fBmongo\fP to prompt you for a password using
+\fI\-\-password\fP, pass the filename as the first parameter with
+\fI\-\-username\fP and \fI\-\-password\fP as the last options, as
+in the following:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo file.js \-\-username username \-\-password
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+Use the \fI\%\-\-shell\fP option to return to a shell after the file
+finishes running.
+.UNINDENT
+.SS Authentication Options
+.INDENT 0.0
+.TP
+.B \-\-authenticationDatabase <dbname>
+New in version 2.4.
+
+.sp
+Specifies the database that holds the user\(aqs credentials.
+.sp
+If you do not specify a value for \fI\-\-authenticationDatabase\fP, \fBmongo\fP uses the database
+specified in the connection string.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationMechanism <name>
+\fIDefault\fP: MONGODB\-CR
+.sp
+New in version 2.4.
+
+.sp
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
+mechanisms.
+
+.sp
+Specifies the authentication mechanism the \fBmongo\fP instance uses to
+authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+MONGODB\-CR
+T}	T{
+MongoDB challenge/response authentication.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in MongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiServiceName
+New in version 2.6.
+
+.sp
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBmongodb\fP\&.
+.sp
+This option is available only in MongoDB Enterprise.
+.UNINDENT
+.SS SSL Options
+.INDENT 0.0
+.TP
+.B \-\-ssl
+New in version 2.2.
+
+.sp
+Enables connection to a \fBmongod\fP or \fBmongos\fP that has
+SSL support enabled.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyFile <filename>
+New in version 2.4.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+and key. Specify the file name of the \fB\&.pem\fP file using relative
+or absolute paths.
+.sp
+This option is required when using the \fB\-\-ssl\fP option to connect
+to a \fBmongod\fP or \fBmongos\fP that has
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyPassword <value>
+New in version 2.4.
+
+.sp
+Specifies the password to de\-crypt the certificate\-key file (i.e.
+\fB\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBmongo\fP will
+redact the password from all logging and reporting output.
+.sp
+Changed in version 2.6: If the private key in the PEM file is encrypted and you do not
+specify the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongo\fP will prompt for a
+passphrase. See \fIssl\-certificate\-password\fP\&.
+
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCAFile <filename>
+New in version 2.4.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the root certificate chain
+from the Certificate Authority. Specify the file name of the
+\fB\&.pem\fP file using relative or absolute paths.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBmongo\fP shell or any other tool that connects to
+\fBmongos\fP or \fBmongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
+processes posing as valid \fBmongod\fP or \fBmongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCRLFile <filename>
+New in version 2.4.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
+List. Specify the file name of the \fB\&.pem\fP file using relative or
+absolute paths.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslFIPSMode
+New in version 2.6.
+
+.sp
+Directs the \fBmongo\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\-\-sslFIPSMode\fP option.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%MongoDB Enterprise\fP\&. See
+http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidCertificates
+New in version 2.6.
+
+.sp
+Bypasses the validation checks for server certificates and allows
+the use of invalid certificates. When using the
+\fBallowInvalidCertificates\fP setting, MongoDB logs as a
+warning the use of the invalid certificate.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBmongo\fP to connect to MongoDB instances if the hostname their
+certificates do not match the specified hostname.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.SH FILES
+.INDENT 0.0
+.TP
+.B \fB~/.dbshell\fP
+\fBmongo\fP maintains a history of commands in the \fB\&.dbshell\fP
+file.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBmongo\fP does not recorded interaction related to
+authentication in the history file, including
+\fBauthenticate\fP and \fBdb.createUser()\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Versions of Windows \fBmongo.exe\fP earlier than 2.2.0 will
+save the \fI\&.dbshell\fP file in the \fBmongo.exe\fP working
+directory.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \fB~/.mongorc.js\fP
+\fBmongo\fP will read the \fB\&.mongorc.js\fP file from the home
+directory of the user invoking \fBmongo\fP\&. In the file, users
+can define variables, customize the \fBmongo\fP shell prompt,
+or update information that they would like updated every time they
+launch a shell. If you use the shell to evaluate a JavaScript file
+or expression either on the command line with \fI\%\-\-eval\fP or
+by specifying \fI\%a .js file to mongo\fP,
+\fBmongo\fP will read the \fB\&.mongorc.js\fP file \fIafter\fP the
+JavaScript has finished processing.
+.sp
+Specify the \fI\%\-\-norc\fP option to disable
+reading \fB\&.mongorc.js\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \fB/etc/mongorc.js\fP
+Global \fBmongorc.js\fP file which the \fBmongo\fP shell
+evaluates upon start\-up. If a user also has a \fB\&.mongorc.js\fP
+file located in the \fI\%HOME\fP directory, the \fBmongo\fP
+shell evaluates the global \fB/etc/mongorc.js\fP file \fIbefore\fP
+evaluating the user\(aqs \fB\&.mongorc.js\fP file.
+.sp
+\fB/etc/mongorc.js\fP must have read permission for the user
+running the shell. The \fI\%\-\-norc\fP option for \fBmongo\fP
+suppresses only the user\(aqs \fB\&.mongorc.js\fP file.
+.sp
+On Windows, the global \fBmongorc.js </etc/mongorc.js>\fP exists
+in the \fB%ProgramData%\eMongoDB\fP directory.
+.TP
+.B \fB/tmp/mongo_edit\fI<time_t>\fP\&.js\fP
+Created by \fBmongo\fP when editing a file. If the file exists,
+\fBmongo\fP will append an integer from \fB1\fP to \fB10\fP to the
+time value to attempt to create a unique file.
+.TP
+.B \fB%TEMP%mongo_edit\fI<time_t>\fP\&.js\fP
+Created by \fBmongo.exe\fP on Windows when editing a file. If
+the file exists, \fBmongo\fP will append an integer from \fB1\fP
+to \fB10\fP to the time value to attempt to create a unique file.
+.UNINDENT
+.SH ENVIRONMENT
+.INDENT 0.0
+.TP
+.B EDITOR
+Specifies the path to an editor to use with the \fBedit\fP shell
+command.  A JavaScript variable \fBEDITOR\fP will override the value of
+\fI\%EDITOR\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B HOME
+Specifies the path to the home directory where \fBmongo\fP will
+read the \fB\&.mongorc.js\fP file and write the \fB\&.dbshell\fP
+file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B HOMEDRIVE
+On Windows systems, \fI\%HOMEDRIVE\fP specifies the path the
+directory where \fBmongo\fP will read the \fB\&.mongorc.js\fP
+file and write the \fB\&.dbshell\fP file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B HOMEPATH
+Specifies the Windows path to the home directory where
+\fBmongo\fP will read the \fB\&.mongorc.js\fP file and write
+the \fB\&.dbshell\fP file.
+.UNINDENT
+.SH KEYBOARD SHORTCUTS
+.sp
+The \fBmongo\fP shell supports the following keyboard shortcuts:
+[1]
+.TS
+center;
+|l|l|.
+_
+T{
+\fBKeybinding\fP
+T}	T{
+\fBFunction\fP
+T}
+_
+T{
+Up arrow
+T}	T{
+Retrieve previous command from history
+T}
+_
+T{
+Down\-arrow
+T}	T{
+Retrieve next command from history
+T}
+_
+T{
+Home
+T}	T{
+Go to beginning of the line
+T}
+_
+T{
+End
+T}	T{
+Go to end of the line
+T}
+_
+T{
+Tab
+T}	T{
+Autocomplete method/command
+T}
+_
+T{
+Left\-arrow
+T}	T{
+Go backward one character
+T}
+_
+T{
+Right\-arrow
+T}	T{
+Go forward one character
+T}
+_
+T{
+Ctrl\-left\-arrow
+T}	T{
+Go backward one word
+T}
+_
+T{
+Ctrl\-right\-arrow
+T}	T{
+Go forward one word
+T}
+_
+T{
+Meta\-left\-arrow
+T}	T{
+Go backward one word
+T}
+_
+T{
+Meta\-right\-arrow
+T}	T{
+Go forward one word
+T}
+_
+T{
+Ctrl\-A
+T}	T{
+Go to the beginning of the line
+T}
+_
+T{
+Ctrl\-B
+T}	T{
+Go backward one character
+T}
+_
+T{
+Ctrl\-C
+T}	T{
+Exit the \fBmongo\fP shell
+T}
+_
+T{
+Ctrl\-D
+T}	T{
+Delete a char (or exit the \fBmongo\fP shell)
+T}
+_
+T{
+Ctrl\-E
+T}	T{
+Go to the end of the line
+T}
+_
+T{
+Ctrl\-F
+T}	T{
+Go forward one character
+T}
+_
+T{
+Ctrl\-G
+T}	T{
+Abort
+T}
+_
+T{
+Ctrl\-J
+T}	T{
+Accept/evaluate the line
+T}
+_
+T{
+Ctrl\-K
+T}	T{
+Kill/erase the line
+T}
+_
+T{
+Ctrl\-L or type \fBcls\fP
+T}	T{
+Clear the screen
+T}
+_
+T{
+Ctrl\-M
+T}	T{
+Accept/evaluate the line
+T}
+_
+T{
+Ctrl\-N
+T}	T{
+Retrieve next command from history
+T}
+_
+T{
+Ctrl\-P
+T}	T{
+Retrieve previous command from history
+T}
+_
+T{
+Ctrl\-R
+T}	T{
+Reverse\-search command history
+T}
+_
+T{
+Ctrl\-S
+T}	T{
+Forward\-search command history
+T}
+_
+T{
+Ctrl\-T
+T}	T{
+Transpose characters
+T}
+_
+T{
+Ctrl\-U
+T}	T{
+Perform Unix line\-discard
+T}
+_
+T{
+Ctrl\-W
+T}	T{
+Perform Unix word\-rubout
+T}
+_
+T{
+Ctrl\-Y
+T}	T{
+Yank
+T}
+_
+T{
+Ctrl\-Z
+T}	T{
+Suspend (job control works in linux)
+T}
+_
+T{
+Ctrl\-H
+T}	T{
+Backward\-delete a character
+T}
+_
+T{
+Ctrl\-I
+T}	T{
+Complete, same as Tab
+T}
+_
+T{
+Meta\-B
+T}	T{
+Go backward one word
+T}
+_
+T{
+Meta\-C
+T}	T{
+Capitalize word
+T}
+_
+T{
+Meta\-D
+T}	T{
+Kill word
+T}
+_
+T{
+Meta\-F
+T}	T{
+Go forward one word
+T}
+_
+T{
+Meta\-L
+T}	T{
+Change word to lowercase
+T}
+_
+T{
+Meta\-U
+T}	T{
+Change word to uppercase
+T}
+_
+T{
+Meta\-Y
+T}	T{
+Yank\-pop
+T}
+_
+T{
+Meta\-Backspace
+T}	T{
+Backward\-kill word
+T}
+_
+T{
+Meta\-<
+T}	T{
+Retrieve the first command in command history
+T}
+_
+T{
+Meta\->
+T}	T{
+Retrieve the last command in command history
+T}
+_
+.TE
+.IP [1] 5
+MongoDB accommodates multiple keybinding.
+Since 2.0, \fBmongo\fP includes support for basic emacs
+keybindings.
+.SH USE
+.sp
+Typically users invoke the shell with the \fBmongo\fP command at
+the system prompt. Consider the following examples for other
+scenarios.
+.sp
+To connect to a database on a remote host using authentication and a
+non\-standard port, use the following form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \-\-username <user> \-\-password <pass> \-\-host <host> \-\-port 28015
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Alternatively, consider the following short form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \-u <user> \-p <pass> \-\-host <host> \-\-port 28015
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Replace \fB<user>\fP, \fB<pass>\fP, and \fB<host>\fP with the appropriate
+values for your situation and substitute or omit the \fI\-\-port\fP
+as needed.
+.sp
+To execute a JavaScript file without evaluating the \fB~/.mongorc.js\fP
+file before starting a shell session, use the following form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \-\-shell \-\-norc alternate\-environment.js
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+To execute a JavaScript file with authentication, with password prompted
+rather than provided on the command\-line, use the following form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo script\-file.js \-u <user> \-p
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+To print return a query as \fIJSON\fP, from the system prompt using
+the \fI\-\-eval\fP option, use the following form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \-\-eval \(aqdb.collection.find().forEach(printjson)\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Use single quotes (e.g. \fB\(aq\fP) to enclose the JavaScript, as well as
+the additional JavaScript required to generate this output.
+.SH ADDITIONAL INFORMATION
+.INDENT 0.0
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/mongo\-shell
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/method
+.IP \(bu 2
+http://docs.mongodb.org/manual/tutorial/access\-mongo\-shell\-help
+.IP \(bu 2
+http://docs.mongodb.org/manual/tutorial/getting\-started\-with\-the\-mongo\-shell
+.IP \(bu 2
+http://docs.mongodb.org/manual/core/shell\-types
+.IP \(bu 2
+http://docs.mongodb.org/manual/tutorial/write\-scripts\-for\-the\-mongo\-shell
+.UNINDENT
+.SH AUTHOR
+MongoDB Documentation Project
+.SH COPYRIGHT
+2011-2015
+.\" Generated by docutils manpage writer.
+.

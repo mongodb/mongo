@@ -1,0 +1,10 @@
+include LICENSE
+include Makefile
+include MANIFEST.in
+include NEWS
+include README.rst
+include .gitignore
+graft doc
+graft doc/_static
+graft doc/_templates
+prune doc/_build

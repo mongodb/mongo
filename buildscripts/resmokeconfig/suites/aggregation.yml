@@ -1,0 +1,22 @@
+selector:
+  js_test:
+    roots:
+    - jstests/aggregation/*.js
+    - jstests/aggregation/bugs/*.js
+    - jstests/aggregation/expressions/*.js
+    - jstests/aggregation/sources/*/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

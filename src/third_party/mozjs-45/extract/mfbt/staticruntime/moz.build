@@ -1,0 +1,29 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+Library('mfbt_staticruntime')
+
+include('../objs.mozbuild')
+
+UNIFIED_SOURCES += mfbt_src_cppsrcs
+
+DEFINES['IMPL_MFBT'] = True
+
+SOURCES += mfbt_nonunified_src_cppsrcs
+
+USE_STATIC_LIBS = True
+
+DISABLE_STL_WRAPPING = True
+
+# Suppress warnings in third-party LZ4 code.
+# TODO: Remove these suppressions after bug 993267 is fixed.
+
+if CONFIG['GNU_CXX']:
+    SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
+
+if CONFIG['_MSC_VER']:
+    # Error 4804 is "'>' : unsafe use of type 'bool' in operation"
+    SOURCES['/mfbt/Compression.cpp'].flags += ['-wd4804']

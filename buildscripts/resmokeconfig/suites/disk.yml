@@ -1,0 +1,25 @@
+selector:
+  js_test:
+    roots:
+    - jstests/disk/*.js
+    exclude_files:
+    - jstests/disk/repair2.js  # SERVER-18256
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            storageEngine: mmapv1
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+        storageEngine: mmapv1

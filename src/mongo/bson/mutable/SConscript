@@ -1,0 +1,51 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env.Library(
+    target='mutable_bson',
+    source=[
+        'document.cpp',
+        'element.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/safe_num',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='mutable_bson_test_utils',
+    source=[
+        'mutable_bson_test_utils.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'mutable_bson',
+    ],
+)
+
+env.CppUnitTest(
+    target='mutable_bson_test',
+    source=[
+        'mutable_bson_test.cpp'
+    ],
+    LIBDEPS=[
+        'mutable_bson',
+        'mutable_bson_test_utils',
+    ],
+)
+
+env.CppUnitTest(
+    target='mutable_bson_algo_test',
+    source=[
+        'mutable_bson_algo_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        'mutable_bson',
+        'mutable_bson_test_utils',
+    ],
+)
+

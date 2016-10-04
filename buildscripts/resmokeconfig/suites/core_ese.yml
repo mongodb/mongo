@@ -1,0 +1,25 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        enableEncryption: ''
+        encryptionKeyFile: *keyFile
+        set_parameters:
+          enableTestCommands: 1

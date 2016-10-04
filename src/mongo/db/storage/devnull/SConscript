@@ -1,0 +1,22 @@
+Import("env")
+
+env.Library(
+    target='storage_devnull_core',
+    source=[
+        'devnull_kv_engine.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_storage_engine',
+    ],
+)
+
+env.Library(
+    target='storage_devnull',
+    source=[
+        'devnull_init.cpp',
+    ],
+    LIBDEPS=[
+        'storage_devnull_core',
+    ],
+)

@@ -1,0 +1,16 @@
+{
+    "systemLog" : {
+        "verbosity" : 2,
+        "component" : {
+            "accessControl" : {
+                "verbosity" : 0
+            },
+            "storage" : {
+                "verbosity" : 3,
+                "journal" : {
+                    "verbosity" : 5
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+selector:
+  cpp_unit_test:
+    root: build/unittests.txt
+    include_files:
+      - build/**/s/**/*
+
+executor:
+  cpp_unit_test:
+    config: {}

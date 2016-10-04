@@ -1,0 +1,6 @@
+Import("env")
+
+env.InjectThirdPartyIncludePaths(libraries=['boost'])
+
+env.Append(CPPPATH=['#src', '$BUILD_DIR'])
+env.Library("murmurhash3", ["MurmurHash3.cpp"])

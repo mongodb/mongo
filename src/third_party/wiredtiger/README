@@ -1,0 +1,29 @@
+WiredTiger 2.8.1: (March 24, 2016)
+
+This is version 2.8.1 of WiredTiger.
+
+WiredTiger release packages and documentation can be found at:
+
+	http://source.wiredtiger.com/
+
+The documentation for this specific release can be found at:
+
+	http://source.wiredtiger.com/2.8.1/index.html
+
+The WiredTiger source code can be found at:
+
+	http://github.com/wiredtiger/wiredtiger
+
+WiredTiger uses JIRA for issue management:
+
+	http://jira.mongodb.org/browse/WT
+
+Please do not report issues through GitHub.
+
+WiredTiger licensing information can be found at:
+
+	http://source.wiredtiger.com/license.html
+
+For general questions and discussion, there's a WiredTiger group:
+
+	http://groups.google.com/group/wiredtiger-users

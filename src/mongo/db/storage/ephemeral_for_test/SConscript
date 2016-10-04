@@ -1,0 +1,75 @@
+Import("env")
+
+env.Library(
+    target= 'ephemeral_for_test_record_store',
+    source= [
+        'ephemeral_for_test_record_store.cpp'
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/storage/oplog_hack',
+        '$BUILD_DIR/mongo/util/foundation',
+        ]
+    )
+
+env.Library(
+    target= 'storage_ephemeral_for_test_core',
+    source= [
+        'ephemeral_for_test_btree_impl.cpp',
+        'ephemeral_for_test_engine.cpp',
+        'ephemeral_for_test_recovery_unit.cpp',
+        ],
+    LIBDEPS= [
+        'ephemeral_for_test_record_store',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/mongo/db/storage/journal_listener',
+        '$BUILD_DIR/mongo/util/foundation',
+        ]
+    )
+
+env.Library(
+    target= 'storage_ephemeral_for_test',
+    source= [
+        'ephemeral_for_test_init.cpp',
+        ],
+    LIBDEPS= [
+        'storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+        ]
+    )
+
+env.CppUnitTest(
+   target='storage_ephemeral_for_test_btree_test',
+   source=['ephemeral_for_test_btree_impl_test.cpp'
+           ],
+   LIBDEPS=[
+        'storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+        ]
+   )
+
+env.CppUnitTest(
+   target='storage_ephemeral_for_test_record_store_test',
+   source=['ephemeral_for_test_record_store_test.cpp'
+           ],
+   LIBDEPS=[
+        'storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
+        ]
+   )
+
+env.CppUnitTest(
+    target='storage_ephemeral_for_test_engine_test',
+    source=['ephemeral_for_test_engine_test.cpp',
+            ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        'storage_ephemeral_for_test_core',
+        ],
+    )

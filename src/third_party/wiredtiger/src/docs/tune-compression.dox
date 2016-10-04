@@ -1,0 +1,25 @@
+/*! @page tune_compression Compression
+
+WiredTiger includes a number of optional compression techniques.  Configuring
+compression generally decreases on-disk and in-memory resource requirements
+and the amount of I/O, and increases CPU cost when rows are read and written.
+
+Configuring compression may change application throughput.  For example,
+in applications using solid-state drives (where I/O is less expensive),
+turning off compression may increase application performance by reducing
+CPU costs; in applications where I/O costs are more expensive, turning on
+compression may increase application performance by reducing the overall
+number of I/O operations.
+
+An example of turning on row-store key prefix compression:
+
+@snippet ex_all.c Configure key prefix compression on
+
+An example of turning on row-store or column-store dictionary compression:
+
+@snippet ex_all.c Configure dictionary compression on
+
+See @ref file_formats_compression for more information on available
+compression techniques.
+
+ */

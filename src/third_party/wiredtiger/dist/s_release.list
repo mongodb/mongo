@@ -1,0 +1,11 @@
+# Exclusions from release packages.
+# Each non-comment line is excluded from the release.
+lang/python/src
+src/server
+test/format
+test/packing
+test/salvage
+test/snapshot
+test/thread
+tools/wtstats/template
+tools/wtstats/test

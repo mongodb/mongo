@@ -1,0 +1,57 @@
+# Build 8 flavors of libbid.a in 64-bit data mode on HPUX using the HP compiler
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_000libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_001libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_010libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_011libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_100libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_101libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_110libbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0;
+mv libbid.a cc64_111libbid.a;
+gmake clean ;
+
+
+
+
+
+# Build 8 flavors of libbid.a in 64-bit data mode on HPUX using the HP compiler
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_000blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_001blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_010blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_011blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_100blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_101blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_110blibbid.a;
+gmake clean ;
+gmake  CC=cc HPUX=1 DD64=1 BID_BIG_ENDIAN=true CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1;
+mv libbid.a cc64_111blibbid.a;
+gmake clean ;

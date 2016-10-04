@@ -1,0 +1,438 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.SConscript(
+    dirs=[
+        "collation",
+    ],
+)
+
+env.Library(
+    target='query_planner',
+    source=[
+        "canonical_query.cpp",
+        "query_settings.cpp",
+        "index_entry.cpp",
+        "index_tag.cpp",
+        "parsed_projection.cpp",
+        "plan_cache.cpp",
+        "plan_cache_indexability.cpp",
+        "plan_enumerator.cpp",
+        "planner_access.cpp",
+        "planner_analysis.cpp",
+        "planner_ixselect.cpp",
+        "query_knobs.cpp",
+        "query_planner.cpp",
+        "query_planner_common.cpp",
+        "query_solution.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/index/expression_params",
+        "$BUILD_DIR/mongo/db/index_names",
+        "$BUILD_DIR/mongo/db/matcher/expression_algo",
+        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/server_parameters",
+        "collation/collator_interface",
+        "collation/collator_factory_interface",
+        "command_request_response",
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_settings_test",
+    source=[
+        "query_settings_test.cpp",
+    ],
+    LIBDEPS=[
+        "query_planner"
+    ]
+)
+
+env.Library(
+    target='query',
+    source=[
+        "explain.cpp",
+        "get_executor.cpp",
+        "find.cpp",
+        "plan_executor.cpp",
+        "plan_ranker.cpp",
+        "plan_yield_policy.cpp",
+        "query_yield.cpp",
+        "stage_builder.cpp",
+    ],
+    LIBDEPS=[
+        "internal_plans",
+        "query_common",
+        "query_planner",
+        "query_planner_test_lib",
+        "$BUILD_DIR/mongo/db/curop",
+        "$BUILD_DIR/mongo/db/exec/exec",
+        "$BUILD_DIR/mongo/db/s/sharding",
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on files from serverOnlyFiles, and has many other
+        # missing dependencies.
+        'incomplete',
+    ]
+)
+
+# Shared mongod/mongos query code.
+env.Library(
+    target="query_common",
+    source=[
+        "collation/collator_factory_icu_decoration.cpp",
+        "find_common.cpp",
+        "explain_common.cpp",
+        "parsed_distinct.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "collation/collator_icu",
+        "query_planner",
+        "query_request",
+    ],
+)
+
+env.CppUnitTest(
+    target="parsed_distinct_test",
+    source=[
+        "parsed_distinct_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        "query_test_service_context",
+        "query_common",
+    ],
+)
+
+env.CppUnitTest(
+    target="get_executor_test",
+    source=[
+        "get_executor_test.cpp"
+    ],
+    LIBDEPS=[
+        "query",
+        "query_test_service_context",
+        "$BUILD_DIR/mongo/db/serveronly",
+        "$BUILD_DIR/mongo/dbtests/mocklib",
+    ],
+)
+
+env.Library(
+    target="index_bounds",
+    source=[
+        "expression_index.cpp",
+        "expression_index_knobs.cpp",
+        "index_bounds.cpp",
+        "index_bounds_builder.cpp",
+        "interval.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/index/expression_params",
+        "$BUILD_DIR/mongo/db/index_names",
+        "$BUILD_DIR/mongo/db/matcher/expressions_geo",
+        "$BUILD_DIR/mongo/db/mongohasher",
+        "$BUILD_DIR/mongo/db/server_parameters",
+        "collation/collator_interface",
+    ],
+)
+
+env.Library(
+    target='command_request_response',
+    source=[
+        'count_request.cpp',
+        'cursor_request.cpp',
+        'cursor_response.cpp',
+        'find_and_modify_request.cpp',
+        'getmore_request.cpp',
+        'killcursors_request.cpp',
+        'killcursors_response.cpp',
+        'view_response_formatter.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        'query_request',
+    ]
+)
+
+env.CppUnitTest(
+    target='command_request_response_test',
+    source=[
+        'count_request_test.cpp',
+        'cursor_response_test.cpp',
+        'find_and_modify_request_test.cpp',
+        'getmore_request_test.cpp',
+        'killcursors_request_test.cpp',
+        'killcursors_response_test.cpp',
+        'view_response_formatter_test.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+        'command_request_response',
+    ]
+)
+
+env.Library(
+    target="internal_plans",
+    source=[
+        "internal_plans.cpp"
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/exec',
+        '$BUILD_DIR/mongo/db/exec/working_set',
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with the 'query' library in this directory
+        'incomplete',
+    ],
+)
+
+env.Library(
+    target="query_request",
+    source=[
+        "query_request.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/repl/read_concern_args",
+    ],
+)
+
+env.Library(
+    target="query_test_service_context",
+    source=[
+        "query_test_service_context.cpp",
+    ],
+    LIBDEPS=[
+        "collation/collator_factory_mock",
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.Library(
+    target="query_planner_test_fixture",
+    source=[
+        "query_planner_test_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "query_planner_test_lib",
+        "query_test_service_context",
+        "$BUILD_DIR/mongo/unittest/unittest",
+    ],
+)
+
+env.Library(
+    target="query_planner_test_lib",
+    source=[
+        "query_planner_test_lib.cpp",
+    ],
+    LIBDEPS=[
+        "collation/collator_factory_mock",
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="canonical_query_test",
+    source=[
+        "canonical_query_test.cpp"
+    ],
+    LIBDEPS=[
+        "collation/collator_interface_mock",
+        "query_planner",
+        "query_test_service_context",
+    ],
+)
+
+env.CppUnitTest(
+    target="index_bounds_test",
+    source=[
+        "index_bounds_test.cpp"
+    ],
+    LIBDEPS=[
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="index_bounds_builder_test",
+    source=[
+        "index_bounds_builder_test.cpp"
+    ],
+    LIBDEPS=[
+        "collation/collator_interface_mock",
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="interval_test",
+    source=[
+        "interval_test.cpp"
+    ],
+    LIBDEPS=[
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_request_test",
+    source=[
+        "query_request_test.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+        "query_request",
+    ],
+)
+
+env.CppUnitTest(
+    target="lru_key_value_test",
+    source=[
+        "lru_key_value_test.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.CppUnitTest(
+    target="parsed_projection_test",
+    source=[
+        "parsed_projection_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="plan_cache_test",
+    source=[
+        "plan_cache_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_fixture",
+        "query_test_service_context",
+    ],
+)
+
+env.CppUnitTest(
+    target="plan_cache_indexability_test",
+    source=[
+        "plan_cache_indexability_test.cpp"
+    ],
+    LIBDEPS=[
+        "collation/collator_interface_mock",
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="planner_analysis_test",
+    source=[
+        "planner_analysis_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="planner_ixselect_test",
+    source=[
+        "planner_ixselect_test.cpp"
+    ],
+    LIBDEPS=[
+        "collation/collator_interface_mock",
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_planner_test",
+    source=[
+        "query_planner_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_planner_array_test",
+    source=[
+        "query_planner_array_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_planner_geo_test",
+    source=[
+        "query_planner_geo_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_planner_partialidx_test",
+    source=[
+        "query_planner_partialidx_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_planner_collation_test",
+    source=[
+        "query_planner_collation_test.cpp",
+    ],
+    LIBDEPS=[
+        "collation/collator_interface_mock",
+        "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_solution_test",
+    source=[
+        "query_solution_test.cpp",
+    ],
+    LIBDEPS=[
+        "collation/collator_factory_mock",
+        "query_planner",
+    ],
+)
+
+# $text pulls in a lot of stuff so we test it here.
+env.CppUnitTest(
+    target="query_planner_text_test",
+    source=[
+        "query_planner_text_test.cpp"
+    ],
+    LIBDEPS=[
+        "query",
+        "query_planner_test_fixture",
+        "$BUILD_DIR/mongo/db/serveronly",
+        "$BUILD_DIR/mongo/dbtests/mocklib",
+    ],
+)

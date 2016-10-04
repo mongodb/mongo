@@ -1,0 +1,22 @@
+selector:
+  js_test:
+    roots:
+    # Define these tests as the roots so that tags can be used to do further refinement. This is in
+    # contrast to using jstests/core/*.js as a root, and using include_files as a whitelist.
+    - jstests/core/bulk*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: legacy
+        writeMode: legacy
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

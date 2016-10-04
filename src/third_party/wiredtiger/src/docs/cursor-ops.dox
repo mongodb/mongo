@@ -1,0 +1,153 @@
+/*! @m_page{{c,java},cursor_ops,Cursor operations}
+
+Common operations in WiredTiger are performed using WT_CURSOR handles.
+A cursor includes:
+
+- a position within a data source
+- getter/setters for key and value fields
+- encoding of fields to store in the data source
+- methods to navigate within and iterate through the data
+
+@section cursor_opening Opening a cursor
+
+Cursors are created using the WT_SESSION::open_cursor method.  For
+example, from the program @ex_ref{ex_cursor.c}:
+
+@snippet ex_cursor.c open cursor #1
+
+Another example from the same program:
+
+@snippet ex_cursor.c open cursor #2
+
+In addition to traditional data sources, cursors in WiredTiger are used
+to access projections and even created data sources such as the run-time
+statistics:
+
+@snippet ex_cursor.c open cursor #3
+
+See @ref cursors for more information on available cursor types.
+
+@section cursor_closing Closing a cursor
+
+Cursors remain open until either WT_CURSOR::close is called or the cursor's
+session is closed, which may either be in WT_SESSION::close or
+WT_CONNECTION::close.
+
+@section cursor_position Positioning a cursor
+
+Cursors may be positioned at the beginning of the data source, the end of
+the data source, at an exact key within the data source, and near a key
+within the data source.
+
+To invalidate the position of a cursor so that subsequent iterations start
+from the beginning or end of the data source, use the WT_CURSOR::reset method:
+
+@snippet ex_cursor.c cursor reset
+
+To move a cursor forward in the data source, use the cursor WT_CURSOR::next
+method:
+
+@snippet ex_cursor.c cursor next
+
+If the WT_CURSOR::next method is called on a cursor without a position
+in the data source, it is positioned at the beginning of the data source.
+
+To move a cursor backward in the data source, use the cursor WT_CURSOR::prev
+method:
+
+@snippet ex_cursor.c cursor prev
+
+If the WT_CURSOR::prev method is called on a cursor without a position
+in the data source, it is positioned at the end of the data source.
+
+To position a cursor at a specific location in the data source, use the
+WT_CURSOR::search method:
+
+@snippet ex_cursor.c cursor search
+
+To position a cursor at or near a location in the data source, use the
+WT_CURSOR::search_near method:
+
+@snippet ex_cursor.c cursor search near
+
+Cursor positions do not survive transactions: cursors that are open during
+WT_SESSION::begin_transaction, WT_SESSION::commit_transaction or
+WT_SESSION::rollback_transaction will lose their position as if
+WT_CURSOR::reset was called.
+
+Cursors can be configured to move to a random position with WT_CURSOR::next
+is called, see @subpage cursor_random for details.
+
+@section cursor_writes Inserting and updating
+
+To insert new data, and optionally update existing data, using a cursor,
+use the WT_CURSOR::insert method:
+
+@snippet ex_cursor.c cursor insert
+
+To update existing data using a cursor, use the WT_CURSOR::update method:
+
+@snippet ex_cursor.c cursor update
+
+To remove existing data using a cursor, use the WT_CURSOR::remove method:
+
+@snippet ex_cursor.c cursor remove
+
+The WT_SESSION::open_cursor \c overwrite configuration is \c true by default,
+causing WT_CURSOR::insert, WT_CURSOR::remove and WT_CURSOR::update to ignore
+the current state of the record, and these methods will succeed regardless of
+whether or not the record previously exists.
+
+When an application configures \c overwrite to \c false, WT_CURSOR::insert will
+fail with ::WT_DUPLICATE_KEY if the record previously exists, and
+WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
+record does not previously exist.
+
+@section cursor_error Cursor position after error
+
+After any cursor handle method failure, the cursor's position is
+undetermined.  For cursor operations that expect a key to be set before the
+operation begins (including WT_CURSOR::search, WT_CURSOR::insert,
+WT_CURSOR::update and WT_CURSOR::remove), the application's key and value
+will not be cleared by an error.
+
+Applications that cannot re-position the cursor after failure must
+duplicate the cursor by calling WT_SESSION::open_cursor and passing the
+cursor as the \c to_dup parameter before calling a cursor method that will
+attempt to re-position the cursor.  Cursor duplication is not supported
+for the backup, config and statistics cursor types.
+
+@section cursor_memory_scoping Cursor key/value memory scoping
+
+When applications pass a pointer (either to a WT_ITEM or a string), to
+WT_CURSOR::set_key or WT_CURSOR::set_value, WiredTiger does not copy the
+memory referenced by the pointer. For this reason, the application must
+keep the referenced memory unchanged and valid until the next operation
+that successfully positions the cursor, modifies the underlying data,
+or the cursor is reset or closed (discarding its resources).  The
+operations that position the cursor are WT_CURSOR::next, WT_CURSOR::prev,
+WT_CURSOR::search and WT_CURSOR::search_near; the operations that modify
+the underlying data are WT_CURSOR::insert, WT_CURSOR::update and
+WT_CURSOR::remove.
+
+If a cursor operation fails (for example, due to a ::WT_ROLLBACK error),
+it may be retried without calling WT_CURSOR::set_key or
+WT_CURSOR::set_value again.  That is, the cursor may still reference the
+application-supplied memory until the cursor is successfully positioned,
+underlying data is modified, or the cursor is closed or reset.
+
+@m_if{c}
+Any pointers returned by WT_CURSOR::get_key or WT_CURSOR::get_value are
+only valid until a subsequent cursor call that successfully positions
+the cursor, modifies the underlying data, or the cursor is reset or
+closed. These pointers may reference private WiredTiger data structures
+that may not be modified or freed by the application.  If a longer scope
+is required, the application must make a copy of the memory before the
+cursor is re-used, closed or reset.
+
+The comments in this example code explain when the application can safely
+modify memory passed to WT_CURSOR::set_key or WT_CURSOR::set_value:
+
+@snippet ex_scope.c cursor scope operation
+@m_endif
+ */

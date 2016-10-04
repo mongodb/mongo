@@ -1,0 +1,125 @@
+/*! @page helium WiredTiger Helium support
+
+WiredTiger supports Levyx Inc., Helium Data Store volumes as a data-source.
+
+To configure one or more Helium volumes as WiredTiger data sources, take
+the following steps.
+
+@section helium_build Building the WiredTiger Helium Support
+
+To build the Helium support, use the configuration option \c --with-helium=DIR.
+For example:
+
+@code
+% cd wiredtiger
+% ls /usr/local/lib/Helium
+Helium Programmer's Reference.pdf	libhe.a
+README.TXT				libhe.so
+he.h
+% ./configure --with-helium=/usr/local/lib/Helium && make
+@endcode
+
+@section helium_load Loading the WiredTiger Helium Support
+
+Next, add code to your application to load the Helium shared library.
+
+The following example loads the Helium shared library, configuring and
+naming two separate Helium volumes.  The first volume is named \c dev1,
+the second volume is named \c dev2.  Volume \c dev1 has two underlying
+physical Helium devices, \c /dev/disk3s1 and \c /dev/disk4s1.  Volume
+\c dev2 has a single underlying physical Helium device, \c /dev/disk5s1.
+
+@code
+#define	HELIUM_LIBRARY_PATH	"test/helium/.libs/libwiredtiger_helium.so""
+ret = connection->load_extension(connection, HELIUM_LIBRARY_PATH,
+    "config=["
+    "dev1=[helium_devices=[\"he://.//dev/disk3s1,/dev/disk4s1\"],"
+    "helium_o_volume_truncate=1],"
+    "dev2=[helium_devices=[\"he://.//dev/disk5s1\"],"
+    "helium_o_volume_truncate=1]]");
+@endcode
+
+The \c helium_devices configuration string takes a WiredTiger string
+which is a comma-separated list of Helium devices.  (Note the quoting
+required for that to be possible.)
+
+In this example, both Helium volumes are configured to be truncated when
+first opened, and all previously existing contents discarded.
+
+When configuring a Helium volume, the following non-standard configuration
+strings are supported:
+
+<table>
+@hrow{String, Type, Meaning}
+@row{helium_devices, list, WiredTiger URI to Helium volume mapping}
+@row{helium_env_read_cache_size, int, struct he_env read_cache_size value}
+@row{helium_env_write_cache_size, int, struct he_env write_cache_size value}
+@row{helium_o_volume_truncate, boolean, HE_O_VOLUME_TRUNCATE flag}
+</table>
+
+With the exception of the configuration string \c helium_devices (which
+is WiredTiger specific), see the Helium documentation for details on
+their use.
+
+@section helium_objects Creating WiredTiger objects on Helium volumes
+
+When creating WiredTiger objects on Helium volumes, the volume names are
+used as part of the URI specified to WiredTiger methods such as
+WT_SESSION::create or WT_SESSION::rename, separated from the object name
+by a single slash character.
+
+Additionally, the \c helium \c type configuration string must be included.
+
+The following example creates a table named \c access on the Helium
+volume \c dev1, and then opens a cursor on the table:
+
+@code
+WT_CURSOR *cursor;
+WT_SESSION *session;
+
+/* Create the access table. */
+ret = session->create(
+    session, "table:dev1/access", "key_format=S,value_format=S,type=helium");
+
+/* Open a cursor on the access table. */
+ret = session->open_cursor(session, "table:dev1/access", NULL, NULL, &cursor);
+@endcode
+
+When calling WT_SESSION::create to create an object on a Helium volume,
+the following additional configuration strings are supported:
+
+<table>
+@hrow{String, Type, Meaning}
+@row{helium_o_compress, boolean, HE_I_COMPRESS flag}
+@row{helium_o_truncate, boolean, HE_O_TRUNCATE flag}
+</table>
+
+See the Helium device documentation for details on their use.
+
+For example, creating and truncating a table could be done as follows:
+
+@code
+WT_SESSION *session;
+
+/* Create and truncate the access table. */
+ret = session->create(session, "table:dev1/access",
+    "key_format=S,value_format=S,type=helium,helium_o_truncate=1");
+@endcode
+
+@section helium_notes Helium notes
+
+- Helium volumes do not support database backups.
+- Helium volumes do not support named checkpoints.
+- Helium volumes do not support compression of any kind.
+- Helium volumes do not support bulk load as a special case, and configuring
+cursors for bulk load has no effect.
+- Inserting a new record after the current maximum record in a fixed-length
+bit field column-store (that is, a store with an 'r' type key and 't' type
+value) does not implicitly create the missing records.
+
+@section helium_limitations Helium limitations
+
+- WiredTiger transactions cannot include operations on both Helium volumes
+and other stores; this will be corrected in a future release.
+
+*/

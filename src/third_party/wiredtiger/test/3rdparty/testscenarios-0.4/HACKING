@@ -1,0 +1,38 @@
+Contributing to testscenarios
+=============================
+
+Code access
++++++++++++
+
+Branch from the trunk (all patches should be for trunk unless there are
+exceptional circumstances)::
+
+  bzr branch lp:testscenarios path-to-new-local-branch
+
+Publish your branches whereever you like, I encourage launchpad hosting though,
+as it can notify me of new testscenarios branches::
+
+  bzr push lp:~YOURUSERNAME/testscearios/YOURBRANCHNAME
+
+Copyright
++++++++++
+
+Testscenarios is Copyright (C) 2009 Robert Collins. I'd like to be able to
+offer it up for stdlib inclusion once it has proved itself, so am asking for
+copyright assignment to me - or for your contributions to be under either the
+BSD or Apache-2.0 licences that Testscenarios are with (which permit inclusion
+in Python).
+
+Coding standards
+++++++++++++++++
+
+PEP-8 coding style please, though I'm not nitpicky. Make sure that 'make check'
+passes before sending in a patch.
+
+Code arrangement
+++++++++++++++++
+
+The ``testscenarios`` module should simply import classes and functions from
+more specific modules, rather than becoming large and bloated itself. For
+instance, TestWithScenarios lives in testscenarios.testcase, and is imported in
+the testscenarios __init__.py.

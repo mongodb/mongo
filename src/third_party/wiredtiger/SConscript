@@ -1,0 +1,185 @@
+# -*- mode: python; -*-
+import re
+import textwrap
+
+Import("env debugBuild")
+Import("get_option")
+Import("endian")
+
+env = env.Clone()
+env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
+
+if endian == "big":
+    env.Append(CPPDEFINES=[('WORDS_BIGENDIAN', 1)])
+
+# WiredTiger is not currently alignment clean; see
+# https://jira.mongodb.org/browse/WT-2402.
+sanitizer_list = get_option('sanitize')
+if sanitizer_list and ('undefined' in sanitizer_list.split(',')):
+    env.Append(CCFLAGS=["-fno-sanitize=alignment"])
+
+env.Append(CPPPATH=[
+        "src/include",
+    ])
+
+# Enable asserts in debug builds
+if debugBuild:
+    env.Append(CPPDEFINES=[
+        "HAVE_DIAGNOSTIC",
+        ])
+
+# Enable optional rich logging
+env.Append(CPPDEFINES=["HAVE_VERBOSE"])
+
+conf = Configure(env)
+if conf.CheckFunc("fallocate"):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_FALLOCATE"
+    ])
+if conf.CheckFunc("sync_file_range"):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_SYNC_FILE_RANGE"
+    ])
+
+if conf.CheckCHeader('x86intrin.h'):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_X86INTRIN_H"
+    ])
+env = conf.Finish();
+
+if env.TargetOSIs('windows'):
+    env.Append(CPPPATH=["build_win"])
+    env.Append(CFLAGS=[
+        "/wd4090" # Ignore warning about mismatched const qualifiers
+    ])
+    if env['MONGO_ALLOCATOR'] == 'tcmalloc':
+        env.InjectThirdPartyIncludePaths(libraries=['gperftools'])
+        env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+elif env.TargetOSIs('osx'):
+    env.Append(CPPPATH=["build_darwin"])
+elif env.TargetOSIs('solaris'):
+    env.Append(CPPPATH=["build_solaris"])
+    # For an explanation of __EXTENSIONS__,
+    # see http://docs.oracle.com/cd/E19253-01/816-5175/standards-5/index.html
+    env.Append(CPPDEFINES=["__EXTENSIONS__"])
+elif env.TargetOSIs('freebsd'):
+    env.Append(CPPPATH=["build_freebsd"])
+elif env.TargetOSIs('openbsd'):
+    env.Append(CPPPATH=["build_openbsd"])
+elif env.TargetOSIs('linux'):
+    env.Append(CPPPATH=["build_linux"])
+    env.Append(CPPDEFINES=["_GNU_SOURCE"])
+else:
+    print("Wiredtiger is not supported on this platform. " +
+        "Please generate an approriate wiredtiger_config.h")
+    Exit(1)
+
+useZlib = True
+useSnappy = True
+
+version_file = 'build_posix/aclocal/version-set.m4'
+
+VERSION_MAJOR = None
+VERSION_MINOR = None
+VERSION_PATCH = None
+VERSION_STRING = None
+
+# Read the version information from the version-set.m4 file
+for l in open(File(version_file).srcnode().abspath):
+    if re.match(r'^VERSION_[A-Z]+', l):
+        exec(l)
+
+if (VERSION_MAJOR == None or
+    VERSION_MINOR == None or
+    VERSION_PATCH == None or
+    VERSION_STRING == None):
+    print "Failed to find version variables in " + version_file
+    Exit(1)
+
+wiredtiger_includes = """
+        #include <sys/types.h>
+        #ifndef _WIN32
+        #include <inttypes.h>
+        #endif
+        #include <stdarg.h>
+        #include <stdbool.h>
+        #include <stdint.h>
+        #include <stdio.h>
+    """
+wiredtiger_includes = textwrap.dedent(wiredtiger_includes)
+replacements = {
+    '@VERSION_MAJOR@' : VERSION_MAJOR,
+    '@VERSION_MINOR@' : VERSION_MINOR,
+    '@VERSION_PATCH@' : VERSION_PATCH,
+    '@VERSION_STRING@' : VERSION_STRING,
+    '@uintmax_t_decl@': "",
+    '@uintptr_t_decl@': "",
+    '@off_t_decl@' : 'typedef int64_t wt_off_t;' if env.TargetOSIs('windows')
+        else "typedef off_t wt_off_t;",
+    '@wiredtiger_includes_decl@': wiredtiger_includes
+}
+
+env.Substfile(
+    target='wiredtiger.h',
+    source=[
+        'src/include/wiredtiger.in',
+    ],
+    SUBST_DICT=replacements)
+
+env.Alias('generated-sources', "wiredtiger.h")
+
+#
+# WiredTiger library
+#
+# Map WiredTiger build conditions: any conditions that appear in WiredTiger's
+# dist/filelist must appear here, and if the value is true, those files will be
+# included.
+#
+condition_map = {
+    'POSIX_HOST'   : not env.TargetOSIs('windows'),
+    'WINDOWS_HOST' : env.TargetOSIs('windows'),
+
+    'ARM64_HOST'   : env['TARGET_ARCH'] == 'aarch64',
+    'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
+    'X86_HOST'     : env['TARGET_ARCH'] == 'x86_64',
+    'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
+}
+
+def filtered_filelist(f):
+    for line in f:
+        file_cond = line.split()
+        if line.startswith("#") or len(file_cond) == 0:
+            continue
+        if len(file_cond) == 1 or condition_map.get(file_cond[1], False):
+            yield file_cond[0]
+
+filelistfile = 'dist/filelist'
+with open(File(filelistfile).srcnode().abspath) as filelist:
+    wtsources = list(filtered_filelist(filelist))
+
+if useZlib:
+    env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_ZLIB'])
+    wtsources.append("ext/compressors/zlib/zlib_compress.c")
+
+if useSnappy:
+    env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_SNAPPY'])
+    wtsources.append("ext/compressors/snappy/snappy_compress.c")
+
+# Use hardware by default on all platforms if available.
+# If not available at runtime, we fall back to software in some cases.
+#
+# On zSeries we may disable because SLES 11 kernel doe not support the instructions.
+if not (env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "off"):
+    env.Append(CPPDEFINES=["HAVE_CRC32_HARDWARE"])
+
+wtlib = env.Library(
+    target="wiredtiger",
+    source=wtsources,
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_snappy',
+        '$BUILD_DIR/third_party/shim_zlib',
+    ],
+)
+
+env.Depends(wtlib, [filelistfile, version_file])
+

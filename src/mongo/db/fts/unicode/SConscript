@@ -1,0 +1,80 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Command( 
+    target="codepoints_casefold.cpp",
+    source=[
+        "gen_casefold_map.py",
+        "#/src/third_party/unicode-8.0.0/CaseFolding.txt",
+        "gen_helper.py",
+    ],
+    action="$PYTHON ${SOURCES[0]} ${SOURCES[1]} $TARGETS")
+
+env.Alias('generated-sources', "codepoints_casefold.cpp")
+
+env.Command( 
+    target="codepoints_delimiter_list.cpp",
+    source=[
+        "gen_delimiter_list.py",
+        "#/src/third_party/unicode-8.0.0/PropList.txt",
+        "gen_helper.py",
+    ],
+    action="$PYTHON ${SOURCES[0]} ${SOURCES[1]} $TARGETS")
+
+env.Alias('generated-sources', "codepoints_delimiter_list.cpp")
+
+env.Command( 
+    target="codepoints_diacritic_list.cpp",
+    source=[
+        "gen_diacritic_list.py",
+        "#/src/third_party/unicode-8.0.0/PropList.txt",
+        "gen_helper.py",
+    ],
+    action="$PYTHON ${SOURCES[0]} ${SOURCES[1]} $TARGETS")
+
+env.Alias('generated-sources', "codepoints_diacritic_list.cpp")
+
+env.Library(
+    target='unicode', 
+	source=[
+        'codepoints_casefold.cpp',
+        'codepoints_delimiter_list.cpp',
+        'codepoints_diacritic_list.cpp',
+        'codepoints_diacritic_map.cpp',
+        'string.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/linenoise_utf8',
+    ]
+)
+
+env.CppUnitTest(
+    target='string_test',
+    source=[
+        'string_test.cpp'
+    ],
+    LIBDEPS=[
+        'unicode', 
+    ]
+)
+
+env.CppUnitTest(
+    target='codepoints_test',
+    source=[
+        'codepoints_test.cpp'
+    ],
+    LIBDEPS=[
+        'unicode', 
+    ]
+)
+
+env.CppUnitTest(
+    target='byte_vector_test',
+    source=[
+        'byte_vector_test.cpp'
+    ],
+    LIBDEPS=[
+    ]
+)

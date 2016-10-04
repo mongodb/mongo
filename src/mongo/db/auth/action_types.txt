@@ -1,0 +1,112 @@
+# -*- mode: python -*-
+
+# List describing the ActionTypes that should be created.
+# Please note that the order of the elements is not guaranteed to be the same across versions.
+# This means that the integer value assigned to each ActionType and used internally in ActionSet
+# also may change between versions.
+["addShard",
+"anyAction", # Special ActionType that represents *all* actions
+"appendOplogNote",
+"applicationMessage",
+"auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
+"authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
+"authenticate",  # Not used for permission checks, but to id authentication events in logs.
+"authSchemaUpgrade",
+"bypassDocumentValidation",
+"changeCustomData",
+"changePassword",
+"changeOwnPassword",
+"changeOwnCustomData",
+"cleanupOrphaned",
+"closeAllDatabases",  # Deprecated, needs to stay around for backwards compatibility
+"collMod",
+"collStats",
+"compact",
+"connPoolStats",
+"connPoolSync",
+"convertToCapped",
+"cpuProfiler",
+"createCollection",
+"createDatabase",  # Not used for permissions checks, but to id the event in logs.
+"createIndex",  # Not used for permissions checks, but to id the event in logs.
+"createRole",
+"createUser",
+"dbHash",
+"dbStats",
+"diagLogging",
+"dropAllRolesFromDatabase",  # Not used for permissions checks, but to id the event in logs.
+"dropAllUsersFromDatabase",  # Not used for permissions checks, but to id the event in logs.
+"dropCollection",
+"dropDatabase",
+"dropIndex",
+"dropRole",
+"dropUser",
+"emptycapped",
+"enableProfiler",
+"enableSharding",
+"find",
+"flushRouterConfig",
+"fsync",
+"getCmdLineOpts",
+"getLog",
+"getParameter",
+"getShardMap",
+"getShardVersion",
+"grantRole",
+"grantPrivilegesToRole",  # Not used for permissions checks, but to id the event in logs.
+"grantRolesToRole",  # Not used for permissions checks, but to id the event in logs.
+"grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
+"hostInfo",
+"impersonate",
+"indexStats",
+"inprog",
+"insert",
+"internal", # Special action type that represents internal actions
+"invalidateUserCache",
+"killCursors",
+"killop",
+"listCollections",
+"listDatabases",
+"listIndexes",
+"listShards",
+"logRotate",
+"moveChunk",
+"netstat",
+"planCacheIndexFilter", # view/update index filters
+"planCacheRead", # view contents of plan cache
+"planCacheWrite", # clear cache, drop cache entry, pin/unpin/shun plans
+"reIndex",
+"remove",
+"removeShard",
+"renameCollection",  # Not used for permissions checks, but to id the event in logs.
+"renameCollectionSameDB",
+"repairDatabase",
+"replSetConfigure",
+"replSetGetConfig",
+"replSetGetStatus",
+"replSetHeartbeat",
+"replSetReconfig",  # Not used for permissions checks, but to id the event in logs.
+"replSetStateChange",
+"resync",
+"revokeRole",
+"revokePrivilegesFromRole",  # Not used for permissions checks, but to id the event in logs.
+"revokeRolesFromRole",  # Not used for permissions checks, but to id the event in logs.
+"revokeRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
+"serverStatus",
+"setParameter",
+"shardCollection",  # Not used for permissions checks, but to id the event in logs.
+"shardingState",
+"shutdown",
+"splitChunk",
+"splitVector",
+"storageDetails",
+"top",
+"touch",
+"unlock",
+"update",
+"updateRole",  # Not used for permissions checks, but to id the event in logs.
+"updateUser",  # Not used for permissions checks, but to id the event in logs.
+"validate",
+"viewRole",
+"viewUser"]
+

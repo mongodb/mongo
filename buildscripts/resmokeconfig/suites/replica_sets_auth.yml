@@ -1,0 +1,25 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+selector:
+  js_test:
+    roots:
+    - jstests/replsets/*.js
+    exclude_files:
+    # Skip any tests that run with auth explicitly.
+    - jstests/replsets/*[aA]uth*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            auth: true
+            authMechanism: SCRAM-SHA-1
+            keyFile: *keyFile
+            keyFileData: *keyFileData
+        nodb: ''
+        readMode: commands

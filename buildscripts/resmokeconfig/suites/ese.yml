@@ -1,0 +1,12 @@
+selector:
+  js_test:
+    roots:
+    - src/mongo/db/modules/*/jstests/encryptdb/*.js
+
+# Encrypted storage engine tests start their own mongod processes
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands

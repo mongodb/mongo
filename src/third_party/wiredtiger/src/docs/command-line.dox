@@ -1,0 +1,399 @@
+/*! @page command_line WiredTiger command line utility
+
+WiredTiger includes a command line utility, \c wt.
+
+@section util_global_synopsis SYNOPSIS
+<code>wt [-LRVv] [-C config] [-E secretkey ] [-h directory] command [command-specific arguments]</code>
+
+@section util_global_description DESCRIPTION
+The \c wt tool is a command-line utility that provides access to
+various pieces of the WiredTiger functionality.
+
+@section util_global_options OPTIONS
+There are several global options:
+
+@par <code>-C config</code>
+Specify configuration strings for the ::wiredtiger_open function.
+@par <code>-E secretkey</code>
+Specify an encryption secret key for the ::wiredtiger_open function.
+@par <code>-h directory</code>
+Specify a database home directory.
+@par <code>-L</code>
+Forcibly turn off logging subsystem for debugging purposes.
+@par <code>-R</code>
+Run recovery if the underlying database is configured to do so.
+@par <code>-V</code>
+Display WiredTiger version and exit.
+@par <code>-v</code>
+Set verbose output.
+
+Unless otherwise described by a \c wt command, the \c wt tool exits zero
+on success and non-zero on error.
+
+The \c wt tool supports several commands.  If configured in the underlying
+database, some commands will run recovery when opening the database.  If
+the user wants to force recovery on any command, use the \c -R option.
+In general, commands that modify the database or tables will run recovery
+by default and commands that only read data will not run recovery.
+
+<hr>
+@section util_backup wt backup
+Perform a backup of a database or set of data sources.
+
+The \c backup command performs a backup of the database, copying the
+underlying files to a \c specified directory, which can be subsequently
+opened as a WiredTiger database.  See @ref backup for more information,
+and @ref file_permissions for specifics on the copied file permissions.
+
+@subsection util_backup_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] backup [-t uri] directory</code>
+
+@subsection util_backup_options Options
+The following are command-specific options for the \c backup command:
+
+@par <code>-t uri</code>
+By default, the \c backup command does a backup of the entire database;
+the \c -t option changes the \c backup command to do a backup of only
+the named data sources.
+
+<hr>
+@section util_compact wt compact
+Compact a table.
+
+The \c compact command attempts to rewrite the specified table to
+consume less disk space.
+
+@subsection util_compact_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] compact uri</code>
+
+@subsection util_compact_options Options
+The \c compact command has no command-specific options.
+
+<hr>
+@section util_create wt create
+Create a table.
+
+The \c create command creates the specified \c uri with the specified
+configuration.  It is equivalent to a call to WT_SESSION::create with
+the specified string arguments.
+
+@subsection util_create_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] create [-c config] uri</code>
+
+@subsection util_create_options Options
+The following are command-specific options for the \c create command:
+
+@par <code>-c</code>
+Include a configuration string to be passed to WT_SESSION::create.
+
+<hr>
+@section util_drop wt drop
+Drop a table.
+
+The \c drop command drops the specified \c uri.  It is equivalent to a
+call to WT_SESSION::drop with the "force" configuration argument.
+
+@subsection util_drop_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] drop uri</code>
+
+@subsection util_drop_options Options
+The \c drop command has no command-specific options.
+
+<hr>
+@section util_dump wt dump
+Export data in a text format.
+
+The \c dump command outputs the specified table in a portable format
+which can be re-loaded into a new table using the \c load command.
+
+See @subpage dump_formats for details of the dump file formats.
+
+@subsection util_dump_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
+
+@subsection util_dump_options Options
+The following are command-specific options for the \c dump command:
+
+@par <code>-c</code>
+By default, the \c dump command opens the most recent version of the data
+source; the \c -c option changes the \c dump command to open the named
+checkpoint.
+
+@par <code>-f</code>
+By default, the \c dump command output is written to the standard output;
+the \c -f option re-directs the output to the specified file.
+
+@par <code>-j</code>
+Dump in JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
+format.
+
+@par <code>-r</code>
+Dump in reverse order, from largest key to smallest.
+
+@par <code>-x</code>
+Dump all characters in a hexadecimal encoding (the default is to leave
+printable characters unencoded).
+
+<hr>
+@section util_list wt list
+List the tables in the database.
+
+By default, the \c list command prints out the tables stored in the
+database.  If a URI is specified as an argument, only information about
+that data source is printed.
+
+@subsection util_list_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [uri]</code>
+
+@subsection util_list_options Options
+The following are command-specific options for the \c list command:
+
+@par <code>-c</code>
+If the \c -c option is specified, the data source's checkpoints are printed
+in a human-readable format.
+
+@par <code>-v</code>
+If the \c -v option is specified, the data source's complete schema table
+value is printed.
+
+<hr>
+@section util_load wt load
+Load a table from dump output.
+
+The \c load command reads the standard input for data and loads it into
+a table, creating the table if it does not yet exist.  The data should
+be the format produced by the \c dump command; see @ref dump_formats for
+details.
+
+By default, if the table already exists, data in the table will be
+overwritten by the new data (use the \c -n option to make an attempt to
+overwrite existing data return an error).
+
+@subsection util_load_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
+
+@subsection util_load_options Options
+The following are command-specific options for the \c load command:
+
+@par <code>-a</code>
+If the \c -a option is specified, record number keys in the input are
+ignored and the data is appended to the data source and assigned new record
+number keys.  The \c -a option is only applicable when loading into a
+column store.
+
+@par <code>-f</code>
+By default, the \c load command reads from the standard input; the \c -f
+option reads the input from the specified file.
+
+@par <code>-j</code>
+Load input in the JSON (<a href="http://www.json.org">JavaScript Object
+Notation</a>) format that was created by the <code>dump -j</code> command.
+
+@par <code>-n</code>
+By default, input data will overwrite existing data where the key/value
+pair already exists in the data source; the \c -n option causes the \c
+load command to fail if there's an attempt to overwrite already existing
+data.
+
+@par <code>-r</code>
+By default, the \c load command uses the table name taken from the
+input; the \c -r option renames the data source.
+
+Additionally, \c uri and \c configuration pairs may be specified to the
+\c load command.  These configuration pairs can be used to modify the
+configuration values from the dump header passed to the WT_SESSION::create
+call.
+
+The \c uri part of the configuration pair should match only one of the
+objects being loaded, but may be a prefix of the object being matched.
+For example, the following two sets of configuration pairs are
+equivalent in the case of loading a single table named \c xxx.
+
+@code
+table block_allocation=first
+table:xxx block_allocation=first
+@endcode
+
+It's an error, however, to specify a matching prefix that matches more
+than a single object being loaded.
+
+Multiple \c configuration arguments may be specified. For example, the
+following two sets of configuration pairs are equivalent:
+
+@code
+table:xxx block_allocation=first,prefix_compress=false
+table:xxx block_allocation=first table:xxx prefix_compress=false
+@endcode
+
+<hr>
+@section util_loadtext wt loadtext
+Load text into a table.
+
+The \c loadtext command reads the standard input for text and loads it
+into a table.  The input data should be printable characters, with
+newline delimiters for each key or value.
+
+The \c loadtext command does not create the object if it does not yet
+exist.
+
+In the case of inserting values into a column-store table, each value
+is appended to the table; in the case of inserting values into a
+row-store table, lines are handled in pairs, where the first line is the
+key and the second line is the value.  If the row-store table already
+exists, data in the table will be overwritten by the new data.
+
+@subsection util_loadtext_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input] uri</code>
+
+@subsection util_loadtext_options Options
+The following are command-specific options for the \c loadtext command:
+
+@par <code>-f</code>
+By default, the \c loadtext command reads from the standard input; the
+\c -f option reads the input from the specified file.
+
+<hr>
+@section util_printlog wt printlog
+Display the database log.
+
+The \c printlog command outputs the database log.
+
+@subsection util_printlog_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] printlog [-x] [-f output]</code>
+
+@subsection util_printlog_options Options
+The following are command-specific options for the \c printlog command:
+
+@par <code>-f</code>
+By default, the \c printlog command output is written to the standard
+output; the \c -f option re-directs the output to the specified file.
+
+@par <code>-x</code>
+Keys and value items in the log are printed in hex format in addition
+to the default string format.
+
+<hr>
+@section util_read wt read
+Read records from a table.
+
+The \c read command prints out the records associated with the specified
+keys from the specified data source.  The data source must be configured
+with string or record number keys and string values.
+
+The \c read command exits non-zero if a specified record is not found.
+
+@subsection util_read_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] read uri key ...</code>
+
+@subsection util_read_options Options
+The \c read command has no command-specific options.
+
+<hr>
+@section util_rename wt rename
+Rename a table.
+
+The \c rename command renames the specified table.
+
+@subsection util_rename_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] rename uri name</code>
+
+@subsection util_rename_options Options
+The \c rename command has no command-specific options.
+
+<hr>
+@section util_salvage wt salvage
+Recover data from a corrupted table.
+
+The \c salvage command salvages the specified data source, discarding any
+data that cannot be recovered.  Underlying files are re-written in place,
+overwriting the original file contents.
+
+@subsection util_salvage_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] salvage [-F force] uri</code>
+
+@subsection util_salvage_options Options
+The following are command-specific options for the \c salvage command:
+
+@par <code>-F</code>
+By default, salvage will refuse to salvage tables that fail basic tests
+(for example, tables that don't appear to be in a WiredTiger format).
+The \c -F option forces the salvage of the table, regardless.
+
+<hr>
+@section util_stat wt stat
+Display database or data source statistics.
+
+The \c stat command outputs run-time statistics for the WiredTiger
+engine, or, if specified, for the URI on the command-line.
+
+@subsection util_stat_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] stat [-f] [uri]</code>
+
+@subsection util_stat_options Options
+The following are command-specific options for the \c stat command:
+
+@par <code>-f</code>
+Include only "fast" statistics in the output (equivalent to passing
+<code>statistics=(fast)</code>) to WT_SESSION::open_cursor.
+
+<hr>
+@section util_upgrade wt upgrade
+Upgrade a table.
+
+The \c upgrade command upgrades the specified table, exiting success if
+the data source is up-to-date, and failure if the data source cannot be
+upgraded.
+
+@subsection util_upgrade_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] upgrade uri</code>
+
+@subsection util_upgrade_options Options
+The \c upgrade command has no command-specific options.
+
+<hr>
+@section util_verify wt verify
+Check the structural integrity of a table.
+
+The \c verify command verifies the specified table, exiting success if
+the data source is correct, and failure if the data source is corrupted.
+
+@subsection util_verify_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
+
+@subsection util_verify_options Options
+The \c verify command has no command-specific options.
+
+<hr>
+@section util_write wt write
+Write records to a table.
+
+The \c write command stores records into the specified data source.
+The data source must be configured with string or record number keys and
+string values.
+
+If the \c write command is called with the \c -a option, each
+command-line argument is a single value to be appended to the specified
+column-store data source.  If the \c write command is not called with
+the \c -a option, the command-line arguments are key/value pairs.
+
+Attempting to overwrite an already existing record will fail.
+
+@subsection util_write_synopsis Synopsis
+<code>
+wt [-RVv] [-C config] [-E secretkey ] [-h directory] write -a uri value ...
+<br>
+wt [-RVv] [-C config] [-E secretkey ] [-h directory] write [-o] uri key value ...
+</code>
+
+@subsection util_write_options Options
+The following are command-specific options for the \c write command:
+
+@par <code>-a</code>
+Append each value as a new record in the data source.
+
+@par <code>-o</code>
+By default, attempting to overwrite an already existing record will
+fail.  The \c -o option changes \c write to overwrite previously
+existing records.
+
+*/

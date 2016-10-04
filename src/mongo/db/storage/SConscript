@@ -1,0 +1,197 @@
+Import("env")
+
+env.SConscript(
+    dirs=[
+        'devnull',
+        'ephemeral_for_test',
+        'kv',
+        'mmap_v1',
+        'wiredtiger',
+    ],
+)
+
+
+env.Library(
+    target='journal_listener',
+    source=[
+        'journal_listener.cpp',
+        ],
+    LIBDEPS=[
+        ],
+    )
+
+env.Library(
+    target='index_entry_comparison',
+    source=[
+        'index_entry_comparison.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ],
+    )
+
+env.Library(
+    target='key_string',
+    source=[
+        'key_string.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ],
+    )
+
+
+env.Library(
+    target='bson_collection_catalog_entry',
+    source=[
+        'bson_collection_catalog_entry.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/service_context',
+        ],
+    )
+
+env.Library(
+    target='oplog_hack',
+    source=[
+        'oplog_hack.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ]
+    )
+
+env.Library(
+    target='paths',
+    source=[
+        'paths.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='storage_options',
+    source=[
+        'storage_options.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_parameters',
+    ],
+)
+
+env.Library(
+    target='sorted_data_interface_test_harness',
+    source=[
+        'sorted_data_interface_test_bulkbuilder.cpp',
+        'sorted_data_interface_test_cursor.cpp',
+        'sorted_data_interface_test_cursor_advanceto.cpp',
+        'sorted_data_interface_test_cursor_end_position.cpp',
+        'sorted_data_interface_test_cursor_locate.cpp',
+        'sorted_data_interface_test_cursor_saverestore.cpp',
+        'sorted_data_interface_test_cursor_seek_exact.cpp',
+        'sorted_data_interface_test_dupkeycheck.cpp',
+        'sorted_data_interface_test_fullvalidate.cpp',
+        'sorted_data_interface_test_harness.cpp',
+        'sorted_data_interface_test_insert.cpp',
+        'sorted_data_interface_test_isempty.cpp',
+        'sorted_data_interface_test_rand_cursor.cpp',
+        'sorted_data_interface_test_rollback.cpp',
+        'sorted_data_interface_test_spaceused.cpp',
+        'sorted_data_interface_test_touch.cpp',
+        'sorted_data_interface_test_unindex.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'index_entry_comparison',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on newHarnessHelper, which does not have a unique definition
+        'incomplete',
+    ],
+
+)
+
+env.Library(
+    target='record_store_test_harness',
+    source=[
+        'record_store_test_capped_visibility.cpp',
+        'record_store_test_datafor.cpp',
+        'record_store_test_datasize.cpp',
+        'record_store_test_deleterecord.cpp',
+        'record_store_test_harness.cpp',
+        'record_store_test_insertrecord.cpp',
+        'record_store_test_manyiter.cpp',
+        'record_store_test_randomiter.cpp',
+        'record_store_test_recorditer.cpp',
+        'record_store_test_recordstore.cpp',
+        'record_store_test_repairiter.cpp',
+        'record_store_test_storagesize.cpp',
+        'record_store_test_touch.cpp',
+        'record_store_test_truncate.cpp',
+        'record_store_test_updaterecord.cpp',
+        'record_store_test_updatewithdamages.cpp',
+        'record_store_test_validate.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        ],
+    LIBDEPS_TAGS=[
+        # Depends on newHarnessHelper, which does not have a unique definition
+        'incomplete',
+    ],
+    )
+
+env.Library(
+    target='storage_engine_lock_file',
+    source=[
+        'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/platform/platform',
+        'paths',
+        ]
+    )
+
+env.CppUnitTest(
+    target= 'storage_engine_lock_file_test',
+    source = 'storage_engine_lock_file_test.cpp',
+    LIBDEPS=[
+        'storage_engine_lock_file',
+    ],
+)
+
+env.Library(
+    target='storage_engine_metadata',
+    source=[
+        'storage_engine_metadata.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        ]
+    )
+
+env.CppUnitTest(
+    target= 'storage_engine_metadata_test',
+    source = 'storage_engine_metadata_test.cpp',
+    LIBDEPS=[
+        'storage_engine_metadata',
+    ],
+)
+
+env.CppUnitTest(
+    target='storage_key_string_test',
+    source='key_string_test.cpp',
+    LIBDEPS=[
+        'key_string',
+        '$BUILD_DIR/mongo/base',
+        ]
+)

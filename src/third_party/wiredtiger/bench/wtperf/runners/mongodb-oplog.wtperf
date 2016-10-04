@@ -1,0 +1,11 @@
+# wtperf options file to simulate populating a MongoDB oplog
+conn_config="cache_size=2GB,checkpoint=(wait=60)"
+table_config="type=file"
+# Start with a small set of inserts in the populate phase.
+icount=50000
+report_interval=5
+run_time=500
+populate_threads=1
+# Setup three threads to insert into the oplog
+# Setup one thread to be doing truncates from the oplog
+threads=((count=3,inserts=1,throttle=4000),(count=1,truncate=1,truncate_pct=10,truncate_count=50000))

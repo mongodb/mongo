@@ -1,0 +1,10 @@
+conn_config="cache_size=2GB,statistics=[fast,clear],statistics_log=(wait=10),eviction=(threads_max=4,threads_min=4)"
+table_config="type=file,leaf_page_max=8k,internal_page_max=8k,memory_page_max=2MB,split_deepen_min_child=250"
+icount=200000
+report_interval=5
+run_time=300
+reopen_connection=false
+populate_threads=2
+value_sz=256
+read_range=100
+threads=((count=4,inserts=1,throttle=100000),(count=8,reads=1))

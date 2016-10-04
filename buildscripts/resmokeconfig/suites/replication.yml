@@ -1,0 +1,14 @@
+selector:
+  js_test:
+    roots:
+    - jstests/repl/*.js
+    exclude_files:
+    # Skip until SERVER-25618 is resolved.
+    - jstests/repl/block1.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands

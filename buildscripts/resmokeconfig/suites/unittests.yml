@@ -1,0 +1,7 @@
+selector:
+  cpp_unit_test:
+    root: build/unittests.txt
+
+executor:
+  cpp_unit_test:
+    config: {}

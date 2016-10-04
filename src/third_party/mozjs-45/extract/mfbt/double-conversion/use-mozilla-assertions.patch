@@ -1,0 +1,23 @@
+diff --git a/mfbt/double-conversion/utils.h b/mfbt/double-conversion/utils.h
+--- a/mfbt/double-conversion/utils.h
++++ b/mfbt/double-conversion/utils.h
+@@ -31,15 +31,15 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
+-#include <assert.h>
++#include "mozilla/Assertions.h"
+ #ifndef ASSERT
+-#define ASSERT(condition)      (assert(condition))
++#define ASSERT(condition)      MOZ_ASSERT(condition)
+ #endif
+ #ifndef UNIMPLEMENTED
+-#define UNIMPLEMENTED() (abort())
++#define UNIMPLEMENTED() MOZ_CRASH()
+ #endif
+ #ifndef UNREACHABLE
+-#define UNREACHABLE()   (abort())
++#define UNREACHABLE()   MOZ_CRASH()
+ #endif
+ 
+ // Double operations detection based on target architecture.

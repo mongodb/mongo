@@ -1,0 +1,20 @@
+# List of OK external symbols.
+wiredtiger_config_parser_open
+wiredtiger_config_validate
+wiredtiger_open
+wiredtiger_pack_close
+wiredtiger_pack_int
+wiredtiger_pack_item
+wiredtiger_pack_start
+wiredtiger_pack_str
+wiredtiger_pack_uint
+wiredtiger_strerror
+wiredtiger_struct_pack
+wiredtiger_struct_size
+wiredtiger_struct_unpack
+wiredtiger_unpack_int
+wiredtiger_unpack_item
+wiredtiger_unpack_start
+wiredtiger_unpack_str
+wiredtiger_unpack_uint
+wiredtiger_version

@@ -1,0 +1,35 @@
+# Don't UBSAN most of third_party, but do ubsan WT
+src:src/third_party/IntelRDFPMathLib20U1/*
+src:src/third_party/asio-asio-*/*
+src:src/third_party/boost-*/*
+src:src/third_party/gperftools-*/*
+src:src/third_party/icu4c-*/*
+src:src/third_party/libstemmer_c/*
+src:src/third_party/mozjs-*/*
+src:src/third_party/murmurhash3/*
+src:src/third_party/pcre-*/*
+src:src/third_party/s2/*
+src:src/third_party/snappy-*/*
+src:src/third_party/tz/*
+src:src/third_party/unicode-*/*
+src:src/third_party/yaml-cpp-*/*
+src:src/third_party/zlib-*/*
+
+# See SERVER-22705. We depend on the C flexible array trick
+# which trips up UBSAN.
+src:src/mongo/db/storage/mmap_v1/*
+
+# Blacklisting these functions due to a bug in libstdc++:
+# http://stackoverflow.com/questions/30122500/is-this-code-really-undefined-as-clang-seems-to-indicate
+fun:_ZStaNRSt13_Ios_FmtflagsS_
+fun:_ZStanSt13_Ios_FmtflagsS_
+
+# Blacklisting these functions due to a bug in libstdc++:
+# Maybe https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60734 or similar
+fun:_ZNSt8_Rb_tree*_M_get_insert_hint_unique_posESt23*
+fun:_ZNSt8_Rb_tree*_M_insert_I*
+# Maybe https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63345 or similar
+fun:_ZNSt8_Rb_tree*_M_insert_nodeE*
+
+# See https://bugzilla.mozilla.org/show_bug.cgi?id=744965
+fun:_ZN7mozilla*NumberEqualsInt32*

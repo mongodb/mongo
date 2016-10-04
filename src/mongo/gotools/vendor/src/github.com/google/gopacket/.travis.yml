@@ -1,0 +1,9 @@
+language: go
+install:
+ - go get github.com/google/gopacket
+ - go get github.com/google/gopacket/layers
+ - go get github.com/google/gopacket/tcpassembly
+script:
+ - go test github.com/google/gopacket
+ - go test github.com/google/gopacket/layers
+ - go test github.com/google/gopacket/tcpassembly

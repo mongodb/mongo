@@ -1,0 +1,272 @@
+{
+    "nodes": [
+        {
+            "node": {
+                "_dependent_libs": [
+                    "lib2"
+                ], 
+                "_lib": "lib3", 
+                "_name": "file3", 
+                "_dependent_files": [
+                    "file2"
+                ], 
+                "_defined_symbols": [], 
+                "_id": "file3", 
+                "type": 3
+            }, 
+            "index": 0, 
+            "id": "file3"
+        }, 
+        {
+            "node": {
+                "_dependent_libs": [], 
+                "_lib": "lib2", 
+                "_name": "file2", 
+                "_dependent_files": [], 
+                "_defined_symbols": [], 
+                "_id": "file2", 
+                "type": 3
+            }, 
+            "index": 1, 
+            "id": "file2"
+        }, 
+        {
+            "node": {
+                "_dependent_libs": [], 
+                "_lib": "lib1", 
+                "_name": "file1", 
+                "_dependent_files": [], 
+                "_defined_symbols": [], 
+                "_id": "file1", 
+                "type": 3
+            }, 
+            "index": 2, 
+            "id": "file1"
+        }, 
+        {
+            "node": {
+                "_dependent_libs": [
+                    "lib1"
+                ], 
+                "_lib": null, 
+                "_name": "file_sym", 
+                "_dependent_files": [
+                    "file1"
+                ], 
+                "_defined_symbols": [
+                    "sym1"
+                ], 
+                "_id": "file_sym", 
+                "type": 3
+            }, 
+            "index": 3, 
+            "id": "file_sym"
+        }, 
+        {
+            "node": {
+                "_dependent_libs": [
+                    "lib1"
+                ], 
+                "_files": [
+                    "file_sym"
+                ], 
+                "_name": "sym1", 
+                "_dependent_files": [
+                    "file1"
+                ], 
+                "_libs": [
+                    "lib_sym"
+                ], 
+                "_id": "sym1", 
+                "type": 2
+            }, 
+            "index": 4, 
+            "id": "sym1"
+        }, 
+        {
+            "node": {
+                "_dependent_files": [
+                    "file2"
+                ], 
+                "_defined_files": [
+                    "file3"
+                ], 
+                "_name": "lib3", 
+                "_dependent_libs": [
+                    "lib2"
+                ], 
+                "_defined_symbols": [], 
+                "_id": "lib3", 
+                "type": 1
+            }, 
+            "index": 5, 
+            "id": "lib3"
+        }, 
+        {
+            "node": {
+                "_dependent_files": [], 
+                "_defined_files": [
+                    "file2"
+                ], 
+                "_name": "lib2", 
+                "_dependent_libs": [], 
+                "_defined_symbols": [], 
+                "_id": "lib2", 
+                "type": 1
+            }, 
+            "index": 6, 
+            "id": "lib2"
+        }, 
+        {
+            "node": {
+                "_dependent_files": [], 
+                "_defined_files": [
+                    "file1"
+                ], 
+                "_name": "lib1", 
+                "_dependent_libs": [], 
+                "_defined_symbols": [], 
+                "_id": "lib1", 
+                "type": 1
+            }, 
+            "index": 7, 
+            "id": "lib1"
+        }, 
+        {
+            "node": {
+                "_dependent_files": [], 
+                "_defined_files": [], 
+                "_name": "lib_sym", 
+                "_dependent_libs": [
+                    "lib1"
+                ], 
+                "_defined_symbols": [
+                    "sym1"
+                ], 
+                "_id": "lib_sym", 
+                "type": 1
+            }, 
+            "index": 8, 
+            "id": "lib_sym"
+        }
+    ], 
+    "edges": [
+        {
+            "type": 1, 
+            "to_node": [
+                {
+                    "index": 5, 
+                    "id": "lib3"
+                }
+            ], 
+            "from_node": {
+                "index": 6, 
+                "id": "lib2"
+            }
+        }, 
+        {
+            "type": 1, 
+            "to_node": [
+                {
+                    "index": 8, 
+                    "id": "lib_sym"
+                }
+            ], 
+            "from_node": {
+                "index": 7, 
+                "id": "lib1"
+            }
+        }, 
+        {
+            "type": 2, 
+            "to_node": [
+                {
+                    "index": 0, 
+                    "id": "file3"
+                }
+            ], 
+            "from_node": {
+                "index": 6, 
+                "id": "lib2"
+            }
+        }, 
+        {
+            "type": 2, 
+            "to_node": [
+                {
+                    "index": 3, 
+                    "id": "file_sym"
+                }
+            ], 
+            "from_node": {
+                "index": 7, 
+                "id": "lib1"
+            }
+        }, 
+        {
+            "type": 3, 
+            "to_node": [
+                {
+                    "index": 5, 
+                    "id": "lib3"
+                }
+            ], 
+            "from_node": {
+                "index": 1, 
+                "id": "file2"
+            }
+        }, 
+        {
+            "type": 4, 
+            "to_node": [
+                {
+                    "index": 0, 
+                    "id": "file3"
+                }
+            ], 
+            "from_node": {
+                "index": 1, 
+                "id": "file2"
+            }
+        }, 
+        {
+            "type": 4, 
+            "to_node": [
+                {
+                    "index": 3, 
+                    "id": "file_sym"
+                }
+            ], 
+            "from_node": {
+                "index": 2, 
+                "id": "file1"
+            }
+        }, 
+        {
+            "type": 5, 
+            "to_node": [
+                {
+                    "index": 4, 
+                    "id": "sym1"
+                }
+            ], 
+            "from_node": {
+                "index": 2, 
+                "id": "file1"
+            }
+        }, 
+        {
+            "type": 6, 
+            "to_node": [
+                {
+                    "index": 4, 
+                    "id": "sym1"
+                }
+            ], 
+            "from_node": {
+                "index": 7, 
+                "id": "lib1"
+            }
+        }
+    ]
+}

@@ -1,0 +1,10 @@
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

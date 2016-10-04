@@ -1,0 +1,32 @@
+# -*- mode: python -*-
+
+Import("env")
+
+lib_deps = [
+    '$BUILD_DIR/mongo/base',
+]
+source_files = [
+    'posix_fadvise.cpp',
+    'process_id.cpp',
+    'shared_library.cpp',
+    'shared_library_${TARGET_OS_FAMILY}.cpp',
+    'stack_locator.cpp',
+    'stack_locator_${TARGET_OS}.cpp',
+    'strcasestr.cpp',
+]
+
+env.Library(target='platform',
+            source=source_files,
+            LIBDEPS=lib_deps
+)
+
+env.CppUnitTest('atomic_proxy_test', 'atomic_proxy_test.cpp')
+env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
+env.CppUnitTest('bits_test', 'bits_test.cpp')
+env.CppUnitTest('endian_test', 'endian_test.cpp')
+env.CppUnitTest('process_id_test', 'process_id_test.cpp', LIBDEPS=['platform'])
+env.CppUnitTest('random_test', 'random_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
+env.CppUnitTest('stack_locator_test', 'stack_locator_test.cpp', LIBDEPS=['platform'])
+env.CppUnitTest('decimal128_test', 'decimal128_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
+env.CppUnitTest('decimal128_bson_test', 'decimal128_bson_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
+env.CppUnitTest('overflow_arithmetic_test', 'overflow_arithmetic_test.cpp')

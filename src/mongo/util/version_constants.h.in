@@ -1,0 +1,62 @@
+/*    Copyright 2016 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
+
+#include <initializer_list>
+
+#include "mongo/base/string_data.h"
+
+// NOTE: You almost certainly don't want to include this file directly. Instead, access this
+// information via the VersionInfoInterface singleton. To enforce this restriction we only allow
+// inclusion of this file from files that have explicitly whitelisted it. Additionally, since this
+// file is only ever included in .cpp files, it makes some sense to use an unnamed namespace here.
+
+#ifndef MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
+#error "Cannot include mongo/util/version_constants.h"
+#endif
+
+namespace mongo {
+namespace version {
+namespace {
+
+constexpr auto kVersion = "@mongo_version@"_sd;
+constexpr int kMajorVersion = @mongo_version_major@;
+constexpr int kMinorVersion = @mongo_version_minor@;
+constexpr int kPatchVersion = @mongo_version_patch@;
+constexpr int kExtraVersion = @mongo_version_extra@;
+constexpr auto kVersionExtraStr = "@mongo_version_extra_str@"_sd;
+constexpr auto kGitVersion = "@mongo_git_hash@"_sd;
+constexpr auto kAllocator = "@buildinfo_allocator@"_sd;
+constexpr auto kJsEngine = "@buildinfo_js_engine@"_sd;
+
+// TODO: In C++14, make these constexpr too.
+const std::initializer_list<StringData> kModulesList = @buildinfo_modules@;
+const std::initializer_list<VersionInfoInterface::BuildInfoTuple> kBuildEnvironment =
+    @buildinfo_environment_data@;
+
+}  // namespace
+}  // namespace version
+}  // namespace mongo

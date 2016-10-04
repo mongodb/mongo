@@ -1,0 +1,108 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='sharding_client',
+    source=[
+        'dbclient_multi_command.cpp',
+        'shard_connection.cpp',
+        'shard_factory.cpp',
+        'shard_registry.cpp',
+        'shard_remote.cpp',
+        'version_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/client/remote_command_targeter',
+        '$BUILD_DIR/mongo/executor/connection_pool_stats',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        'shard_interface',
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with both coreshard and coredb! Also relies on some
+        # symbols that are not uniquely defined.
+        'incomplete',
+    ],
+)
+
+env.Library(
+    target='sharding_connection_hook',
+    source=[
+        'sharding_connection_hook.cpp',
+        'sharding_network_connection_hook.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/s/coreshard',
+    ],
+)
+
+env.CppUnitTest(
+    target='sharding_client_test',
+    source=[
+        'shard_connection_test.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_client',
+        'sharding_connection_hook',
+        '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/util/net/network',
+    ]
+)
+
+env.CppUnitTest(
+    target='shard_registry_test',
+    source=[
+        'shard_registry_data_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture',
+    ]
+)
+
+env.Library(
+    target='shard_interface',
+    source=[
+        'shard.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/s/shard_id',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+    ]
+)
+
+env.Library(
+    target='shard_local',
+    source=[
+        'shard_local.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        'shard_interface'
+    ],
+)
+
+env.CppUnitTest(
+    target='shard_local_test',
+    source=[
+        'shard_local_test.cpp',
+    ],
+    LIBDEPS=[
+        'shard_local',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)

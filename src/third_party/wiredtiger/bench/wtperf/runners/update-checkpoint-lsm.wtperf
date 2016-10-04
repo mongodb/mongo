@@ -1,0 +1,15 @@
+# wtperf options file: lsm with inserts/updates and checkpointing, in memory
+# Note:  The cache needs to be sized to approximate the amount of inserts
+# that will happen during the given run_time.
+conn_config="cache_size=25G"
+table_config="lsm=(chunk_size=20MB),type=lsm,os_cache_dirty_max=16MB"
+icount=5000000
+report_interval=5
+checkpoint_threads=1
+checkpoint_interval=10
+run_time=300
+populate_threads=1
+threads=((count=1,inserts=1),(count=2,reads=1),(count=2,updates=1))
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5

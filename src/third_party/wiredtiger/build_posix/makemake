@@ -1,0 +1,45 @@
+#! /bin/sh
+#
+# Build Makefile.am
+
+# Process Make.base, insert subdirs that exist from Make.subdirs
+# (in release trees, some of the subdirs might be excluded).
+(sed -n '1,/BEGIN SUBDIRS/p' Make.base
+
+echo "SUBDIRS ="
+sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | while read dir cond ; do
+	test -d ../$dir || continue
+	if test -n "$cond" ; then
+		cat <<END_CONDITIONAL
+if ${cond}
+    SUBDIRS += $dir
+endif
+END_CONDITIONAL
+	else
+		echo "SUBDIRS += $dir"
+	fi
+done
+
+# Write the rest of Make.base, up to SOURCES
+sed -n '/END SUBDIRS/,/BEGIN SOURCES/p' Make.base
+
+# Write the list of sources.
+echo
+echo "libwiredtiger_la_LDFLAGS = -release @VERSION@"
+echo "libwiredtiger_la_SOURCES ="
+sed -e '/^[a-z]/!d' < ../dist/filelist | while read file cond; do
+	if test -n "$cond"; then
+		cat <<END_CONDITIONAL
+# DO NOT indent the "libwiredtiger_la_SOURCES" lines, it breaks the build.
+if ${cond}
+libwiredtiger_la_SOURCES += $file
+endif
+END_CONDITIONAL
+	else
+		echo "libwiredtiger_la_SOURCES += $file"
+	fi
+done
+
+# Write the rest of Make.base
+sed -n '/END SOURCES/,$p' Make.base
+) > ../Makefile.am

@@ -1,0 +1,17 @@
+# wtperf options file: small btree multi-database configuration
+# Original cache was 500MB.  Shared cache is 500MB * database_count.
+conn_config="shared_cache=(name=pool,size=2500MB,chunk=1M),log=(enabled=false)"
+#conn_config="cache_size=250MB,log=(enabled=false)"
+database_count=10
+table_config="leaf_page_max=4k,internal_page_max=16k,leaf_item_max=1433,internal_item_max=3100,type=file"
+# Likewise, divide original icount by database_count.
+icount=50000
+populate_threads=1
+random_range=100000000
+checkpoint_interval=20
+checkpoint_threads=1
+report_interval=5
+run_time=20
+threads=((count=2,reads=1),(count=2,inserts=1))
+value_sz=100
+warmup=10

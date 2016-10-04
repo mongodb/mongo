@@ -1,0 +1,18 @@
+/*! @page tune_memory_allocator Memory allocator
+
+The performance of WiredTiger applications, especially heavily-threaded
+applications can be dominated by memory allocation because the WiredTiger
+engine frees and re-allocates memory as part of many queries.  Replacing
+the system's malloc implementation with one that has better threaded
+performance (for example,
+<a href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html">
+Google's tcmalloc</a>, or
+<a href="http://www.canonware.com/jemalloc">FreeBSD's jemalloc</a>),
+can dramatically improve throughput.
+
+As different memory allocators have different overhead and different
+workloads will have different heap allocation sizes and patterns,
+applications may need to set their allocator overhead using the
+\c cache_overhead configuration to the wiredtiger_open:: call.
+
+ */

@@ -1,0 +1,16 @@
+selector:
+  js_test:
+    roots:
+    - src/mongo/db/modules/enterprise/jstests/external_auth/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands
+        gssapiServiceName: "mockservice"
+        process_kwargs:
+            env_vars:
+                KRB5_TRACE: /dev/stdout
+                KRB5_CONFIG: src/mongo/db/modules/enterprise/jstests/external_auth/assets/krb5.conf

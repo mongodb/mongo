@@ -1,0 +1,51 @@
+# -*- mode: python -*-
+
+Import("env")
+
+# We only use the utf8 stemmers.
+stemming_packages = [
+    #"ISO_8859_1_danish",
+    #"ISO_8859_1_french",
+    #"ISO_8859_1_norwegian",
+    #"ISO_8859_1_swedish",
+    "UTF_8_dutch",
+    "UTF_8_german",
+    "UTF_8_porter",
+    "UTF_8_spanish",
+    #"ISO_8859_1_dutch",
+    #"ISO_8859_1_german",
+    #"ISO_8859_1_porter",
+    #"ISO_8859_2_romanian",
+    "UTF_8_english",
+    "UTF_8_hungarian",
+    "UTF_8_portuguese",
+    "UTF_8_swedish",
+    #"ISO_8859_1_english",
+    #"ISO_8859_1_hungarian",
+    #"ISO_8859_1_portuguese",
+    #"KOI8_R_russian",
+    "UTF_8_finnish",
+    "UTF_8_italian",
+    "UTF_8_romanian",
+    "UTF_8_turkish",
+    #"ISO_8859_1_finnish",
+    #"ISO_8859_1_italian",
+    #"ISO_8859_1_spanish",
+    "UTF_8_danish",
+    "UTF_8_french",
+    "UTF_8_norwegian",
+    "UTF_8_russian",
+    ]
+
+stemmer_files = [
+    'runtime/api.c',
+    'libstemmer/libstemmer_utf8.c',
+    ['src_c/stem_%s.c' % p for p in stemming_packages],
+    ]
+
+myEnv = env.Clone()
+if myEnv.ToolchainIs('GCC', 'clang'):
+    # Machine generated code generates overflow warnings.
+    myEnv.Append(CCFLAGS=['-fno-strict-overflow'])
+
+myEnv.Library( "stemmer", stemmer_files )

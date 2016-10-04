@@ -1,0 +1,96 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='batch_write_types',
+    source=[
+        'batched_command_request.cpp',
+        'batched_command_response.cpp',
+        'batched_delete_request.cpp',
+        'batched_delete_document.cpp',
+        'batched_insert_request.cpp',
+        'batched_update_request.cpp',
+        'batched_update_document.cpp',
+        'batched_upsert_detail.cpp',
+        'write_error_detail.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/s/common',
+    ],
+)
+
+env.Library(
+    target='cluster_write_op',
+    source=[
+        'write_op.cpp',
+        'batch_write_op.cpp',
+        'batch_write_exec.cpp',
+    ],
+    LIBDEPS=[
+        'batch_write_types',
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/coreshard',
+    ],
+)
+
+env.Library(
+    target='cluster_write_op_conversion',
+    source=[
+        'batch_upconvert.cpp',
+        'batch_downconvert.cpp',
+    ],
+    LIBDEPS=[
+        'cluster_write_op',
+        '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/mongo/db/lasterror',
+    ],
+)
+
+env.CppUnitTest(
+    target='batch_write_types_test',
+    source=[
+        'batched_command_request_test.cpp',
+        'batched_command_response_test.cpp',
+        'batched_delete_request_test.cpp',
+        'batched_insert_request_test.cpp',
+        'batched_update_request_test.cpp',
+    ],
+    LIBDEPS=[
+        'batch_write_types',
+    ]
+)
+
+env.CppUnitTest(
+    target='cluster_write_op_test',
+    source=[
+        'write_op_test.cpp',
+        'batch_write_op_test.cpp',
+        'batch_write_exec_test.cpp',
+    ],
+    LIBDEPS=[
+        'cluster_write_op',
+        '$BUILD_DIR/mongo/db/range_arithmetic',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
+    target='cluster_write_op_conversion_test',
+    source=[
+        'batch_upconvert_test.cpp',
+        'batch_downconvert_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/mongoscore',
+        'cluster_write_op',
+        'cluster_write_op_conversion',
+    ]
+)

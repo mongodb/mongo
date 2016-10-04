@@ -1,0 +1,12 @@
+selector:
+  js_test:
+    roots:
+    - jstests/fail_point/*.js
+
+# Failpoint tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands

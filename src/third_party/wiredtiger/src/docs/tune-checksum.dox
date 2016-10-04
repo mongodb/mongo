@@ -1,0 +1,22 @@
+/*! @page tune_checksum Checksums
+
+WiredTiger optionally checksums file reads and writes to detect storage
+failures.  In read-only applications, or when file compression provides
+any necessary checksum functionality, or when using backing storage
+systems where blocks require no validation, performance can be increased
+by turning off checksum support when calling the WT_SESSION::create
+method.
+
+Checksums can be configured to be "off" or "on", as well as "uncompressed".
+The "uncompressed" configuration checksums blocks not otherwise protected
+by compression.   For example, in a system where the compression algorithms
+provide sufficient protection against corruption, and when writing a block
+which is too small to be usefully compressed, setting the checksum
+configuration value to "uncompressed" causes WiredTiger to checksum the
+blocks which are not compressed:
+
+@snippet ex_all.c Configure checksums to uncompressed
+
+The default WiredTiger configuration is \c uncompressed.
+
+ */

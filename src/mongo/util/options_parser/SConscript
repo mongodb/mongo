@@ -1,0 +1,36 @@
+# -*- mode: python -*-
+
+Import("env")
+
+optsEnv = env.Clone()
+optsEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+
+optsEnv.Library('options_parser', ['environment.cpp',
+                               'value.cpp',
+                               'constraints.cpp',
+                               'option_section.cpp',
+                               'option_description.cpp',
+                               'options_parser.cpp',
+                               'startup_option_init.cpp',
+                               'startup_options.cpp',
+                               ],
+                              LIBDEPS=['$BUILD_DIR/mongo/base',
+                                       '$BUILD_DIR/third_party/shim_boost',
+                                       '$BUILD_DIR/third_party/shim_yaml',
+                                       '$BUILD_DIR/third_party/shim_pcrecpp'
+                              ])
+
+# This library contains the initializers to run option parsing.  This is separated into its own
+# library because some code that is shared between many different binaries needs to link against the
+# options_parser library, but not all these binaries need to actually run the option parsing.
+# Linking against this library will cause the option parsing initializer to actually be run.
+env.Library('options_parser_init', ['options_parser_init.cpp'],
+                                    LIBDEPS=['options_parser'])
+
+env.CppUnitTest('options_parser_test',
+                'options_parser_test.cpp',
+                LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])
+
+env.CppUnitTest('environment_test',
+                'environment_test.cpp',
+                LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])

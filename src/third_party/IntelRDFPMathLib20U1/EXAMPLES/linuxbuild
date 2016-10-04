@@ -1,0 +1,358 @@
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 000 **************************"
+echo ""
+echo ""
+cp main.c_000 main.c
+cp decimal.h_000 decimal.h
+cp ../LIBRARY/icc000libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 001 **************************"
+echo ""
+echo ""
+cp main.c_001 main.c
+cp decimal.h_001 decimal.h
+cp ../LIBRARY/icc001libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 010 **************************"
+echo ""
+echo ""
+cp main.c_010 main.c
+cp decimal.h_010 decimal.h
+cp ../LIBRARY/icc010libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 011 **************************"
+echo ""
+echo ""
+cp main.c_011 main.c
+cp decimal.h_011 decimal.h
+cp ../LIBRARY/icc011libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 100 **************************"
+echo ""
+echo ""
+cp main.c_100 main.c
+cp decimal.h_100 decimal.h
+cp ../LIBRARY/icc100libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 101 **************************"
+echo ""
+echo ""
+cp main.c_101 main.c
+cp decimal.h_101 decimal.h
+cp ../LIBRARY/icc101libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 110 **************************"
+echo ""
+echo ""
+cp main.c_110 main.c
+cp decimal.h_110 decimal.h
+cp ../LIBRARY/icc110libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 111 **************************"
+echo ""
+echo ""
+cp main.c_111 main.c
+cp decimal.h_111 decimal.h
+cp ../LIBRARY/icc111libbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 000 **************************"
+echo ""
+echo ""
+cp main.c_000 main.c
+cp decimal.h_000 decimal.h
+cp ../LIBRARY/gcc000libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 001 **************************"
+echo ""
+echo ""
+cp main.c_001 main.c
+cp decimal.h_001 decimal.h
+cp ../LIBRARY/gcc001libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 010 **************************"
+echo ""
+echo ""
+cp main.c_010 main.c
+cp decimal.h_010 decimal.h
+cp ../LIBRARY/gcc010libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 011 **************************"
+echo ""
+echo ""
+cp main.c_011 main.c
+cp decimal.h_011 decimal.h
+cp ../LIBRARY/gcc011libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 100 **************************"
+echo ""
+echo ""
+cp main.c_100 main.c
+cp decimal.h_100 decimal.h
+cp ../LIBRARY/gcc100libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 101 **************************"
+echo ""
+echo ""
+cp main.c_101 main.c
+cp decimal.h_101 decimal.h
+cp ../LIBRARY/gcc101libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 110 **************************"
+echo ""
+echo ""
+cp main.c_110 main.c
+cp decimal.h_110 decimal.h
+cp ../LIBRARY/gcc110libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 111 **************************"
+echo ""
+echo ""
+cp main.c_111 main.c
+cp decimal.h_111 decimal.h
+cp ../LIBRARY/gcc111libbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+rm ../LIBRARY/libbid.a
+
+
+
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 000b **************************"
+echo ""
+echo ""
+cp main.c_000 main.c
+cp decimal.h_000 decimal.h
+cp ../LIBRARY/icc000blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 001b **************************"
+echo ""
+echo ""
+cp main.c_001 main.c
+cp decimal.h_001 decimal.h
+cp ../LIBRARY/icc001blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 010b **************************"
+echo ""
+echo ""
+cp main.c_010 main.c
+cp decimal.h_010 decimal.h
+cp ../LIBRARY/icc010blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 011b **************************"
+echo ""
+echo ""
+cp main.c_011 main.c
+cp decimal.h_011 decimal.h
+cp ../LIBRARY/icc011blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 100b **************************"
+echo ""
+echo ""
+cp main.c_100 main.c
+cp decimal.h_100 decimal.h
+cp ../LIBRARY/icc100blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 101b **************************"
+echo ""
+echo ""
+cp main.c_101 main.c
+cp decimal.h_101 decimal.h
+cp ../LIBRARY/icc101blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 110b **************************"
+echo ""
+echo ""
+cp main.c_110 main.c
+cp decimal.h_110 decimal.h
+cp ../LIBRARY/icc110blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR icc 111b **************************"
+echo ""
+echo ""
+cp main.c_111 main.c
+cp decimal.h_111 decimal.h
+cp ../LIBRARY/icc111blibbid.a ../LIBRARY/libbid.a
+icc $1 main.c ../LIBRARY/libbid.a
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 000b **************************"
+echo ""
+echo ""
+cp main.c_000 main.c
+cp decimal.h_000 decimal.h
+cp ../LIBRARY/gcc000blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 001b **************************"
+echo ""
+echo ""
+cp main.c_001 main.c
+cp decimal.h_001 decimal.h
+cp ../LIBRARY/gcc001blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 010b **************************"
+echo ""
+echo ""
+cp main.c_010 main.c
+cp decimal.h_010 decimal.h
+cp ../LIBRARY/gcc010blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 011b **************************"
+echo ""
+echo ""
+cp main.c_011 main.c
+cp decimal.h_011 decimal.h
+cp ../LIBRARY/gcc011blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 100b **************************"
+echo ""
+echo ""
+cp main.c_100 main.c
+cp decimal.h_100 decimal.h
+cp ../LIBRARY/gcc100blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 101b **************************"
+echo ""
+echo ""
+cp main.c_101 main.c
+cp decimal.h_101 decimal.h
+cp ../LIBRARY/gcc101blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 110b **************************"
+echo ""
+echo ""
+cp main.c_110 main.c
+cp decimal.h_110 decimal.h
+cp ../LIBRARY/gcc110blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+echo ""
+echo ""
+echo "***************** RUNNING EXAMPLE FOR gcc 111b **************************"
+echo ""
+echo ""
+cp main.c_111 main.c
+cp decimal.h_111 decimal.h
+cp ../LIBRARY/gcc111blibbid.a ../LIBRARY/libbid.a
+gcc $1 main.c ../LIBRARY/libbid.a -lm
+./a.out
+rm a.out
+rm ../LIBRARY/libbid.a
+

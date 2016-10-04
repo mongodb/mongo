@@ -1,0 +1,89 @@
+/*! @m_page{{c,java},error_handling,Error handling}
+
+WiredTiger operations return a value of 0 on success and a non-zero
+value on error.  Error codes may be either positive or negative:
+positive error codes are standard error codes as described for
+POSIX-like systems (for example, EINVAL or EBUSY), negative error codes
+are WiredTiger-specific (for example, WT_ROLLBACK).
+
+WiredTiger-specific error codes always appear in the -31,800 to -31,999
+range.
+
+@m_if{java}
+Informational return values, like <code>wiredtiger.WT_NOTFOUND</code>
+or <code>wiredtiger.WT_DUPLICATE_KEY</code> or 0 (success),
+are directly returned by APIs.  More severe errors
+are thrown as \c WiredTigerException, which may be caught by the
+application.
+
+The \c WiredTigerRollbackException is a specific type of \c WiredTigerException,
+it is thrown when there is a conflict between concurrent operations.
+An application that catches this exception should call rollback() on
+the relevant transaction, and retry as necessary.
+
+The \c WiredTigerPanicException is a specific type of \c WiredTigerException,
+it is thrown when there is an underlying problem that requires the
+application to exit and restart.
+
+The following is a complete list of possible WiredTiger-specific
+return values, all constants defined in the com.wiredtiger.db.wiredtiger class:
+@m_else
+The following is a list of possible WiredTiger-specific errors:
+@m_endif
+
+@if IGNORE_BUILT_BY_API_ERR_BEGIN
+@endif
+
+@par <code>WT_ROLLBACK</code>
+This error is generated when an operation cannot be completed due to a conflict with concurrent operations. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
+
+@par <code>WT_DUPLICATE_KEY</code>
+This error is generated when the application attempts to insert a record with the same key as an existing record without the 'overwrite' configuration to WT_SESSION::open_cursor.
+
+@par <code>WT_ERROR</code>
+This error is returned when an error is not covered by a specific error return.
+
+@par <code>WT_NOTFOUND</code>
+This error indicates an operation did not find a value to return. This includes cursor search and other operations where no record matched the cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
+
+@par <code>WT_PANIC</code>
+This error indicates an underlying problem that requires the application exit and restart. The application can exit immediately when \c WT_PANIC is returned from a WiredTiger interface, no further WiredTiger calls are required.
+
+@par <code>WT_RUN_RECOVERY</code>
+This error is generated when wiredtiger_open is configured to return an error if recovery is required to use the database.
+
+@par <code>WT_CACHE_FULL</code>
+This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or update operation requires more than the configured cache size to complete. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
+
+@if IGNORE_BUILT_BY_API_ERR_END
+@endif
+
+@section error_translation Translating errors
+
+The WT_SESSION::strerror and ::wiredtiger_strerror functions return the
+standard text message associated with any WiredTiger, ISO C, or POSIX
+standard API.
+
+@snippet ex_all.c Display an error thread safe
+
+@snippet ex_all.c Display an error
+
+Note that ::wiredtiger_strerror is not thread-safe.
+
+@m_if{c}
+@section error_handling_event Error handling using the WT_EVENT_HANDLER
+
+More complex error handling can be configured by passing an implementation
+of WT_EVENT_HANDLER to ::wiredtiger_open or WT_CONNECTION::open_session.
+
+For example, both informational and error messages might be passed to an
+application-specific logging function that added a timestamp and logged
+the message to a file, and error messages might additionally be output to
+the \c stderr file stream.
+
+@snippet ex_event_handler.c Function event_handler
+@snippet ex_event_handler.c Configure event_handler
+
+@m_endif
+
+*/

@@ -1,0 +1,16 @@
+/*! @page tune_transparent_huge_pages Linux transparent huge pages
+
+The performance of WiredTiger applications can be adversely affected
+when transparent huge pages are enabled on Linux systems. Some Linux
+systems enable transparent huge pages by default. See the RedHat
+Enterprise Linux system documentation's
+<a href="https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Performance_Tuning_Guide/s-memory-transhuge.html">
+Huge Pages and Transparent Huge Pages</a> for more information.
+
+To disable transparent huge pages run the following command as the root user:
+
+@code
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+@endcode
+
+ */

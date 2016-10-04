@@ -1,0 +1,121 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.SConscript(
+    dirs=[
+        'unicode',
+    ],
+)
+
+stop_word_languages = [
+    'danish',
+    'dutch',
+    'english',
+    'finnish',
+    'french',
+    'german',
+    'hungarian',
+    'italian',
+    'norwegian',
+    'portuguese',
+    'romanian',
+    'russian',
+    'spanish',
+    'swedish',
+    'turkish',
+]
+
+generateStopWordsList = env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
+             [ "generate_stop_words.py"] + [ 'stop_words_%s.txt' % x for x in stop_word_languages ],
+             "$PYTHON $SOURCES $TARGETS" )
+env.Alias('generated-sources', generateStopWordsList)
+
+baseEnv=env.Clone()
+baseEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
+baseEnv.Library('base', [
+        'fts_index_format.cpp',
+        'fts_matcher.cpp',
+        'fts_query_impl.cpp',
+        'fts_query_parser.cpp',
+        'fts_spec.cpp',
+        'fts_spec_legacy.cpp',
+        'fts_language.cpp',
+        'fts_basic_phrase_matcher.cpp',
+        'fts_basic_tokenizer.cpp',
+        'fts_unicode_phrase_matcher.cpp',
+        'fts_unicode_tokenizer.cpp',
+        'fts_util.cpp',
+        'fts_element_iterator.cpp',
+        'stemmer.cpp',
+        'stop_words.cpp',
+        'stop_words_list.cpp',
+        'tokenizer.cpp',
+        ], LIBDEPS=["$BUILD_DIR/mongo/base",
+                    "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+                    "$BUILD_DIR/mongo/db/common",
+                    "$BUILD_DIR/mongo/db/fts/unicode/unicode",
+                    "$BUILD_DIR/mongo/platform/platform",
+                    "$BUILD_DIR/mongo/util/md5",
+                    "$BUILD_DIR/third_party/shim_stemmer",
+                    ])
+
+env.Library(
+    target='fts_query_noop',
+    source=[
+        'fts_query_noop.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library('ftsmongod', [
+        ], LIBDEPS=["base","$BUILD_DIR/mongo/base"])
+
+
+env.Library('ftsmongos', [
+        ], LIBDEPS=["$BUILD_DIR/mongo/base"])
+
+
+env.CppUnitTest( "fts_basic_phrase_matcher_test", "fts_basic_phrase_matcher_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_basic_tokenizer_test", "fts_basic_tokenizer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_element_iterator_test", "fts_element_iterator_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_index_format_test", "fts_index_format_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_query_impl_test", "fts_query_impl_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_query_noop_test", "fts_query_noop_test.cpp",
+                 LIBDEPS=["fts_query_noop"] )
+
+env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_stemmer_test", "stemmer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_stop_words_test", "stop_words_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_tokenizer_test", "tokenizer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_unicode_phrase_matcher_test", "fts_unicode_phrase_matcher_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_unicode_tokenizer_test", "fts_unicode_tokenizer_test.cpp",
+                 LIBDEPS=["base"] )

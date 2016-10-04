@@ -1,0 +1,11 @@
+# extlist --
+#	List of extension source files for WiredTiger library.
+
+ext/collators/reverse/reverse_collator.c
+ext/compressors/nop/nop_compress.c
+ext/compressors/snappy/snappy_compress.c
+ext/compressors/zlib/zlib_compress.c
+ext/datasources/helium/helium.c
+ext/encryptors/nop/nop_encrypt.c
+ext/encryptors/rotn/rotn_encrypt.c
+ext/extractors/csv/csv_extractor.c

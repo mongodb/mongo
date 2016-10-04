@@ -1,0 +1,31 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # The following tests fail when specifying a minimal batchSize:
+    - jstests/core/find9.js # Reduction of objsLeftInBatch.
+    - jstests/core/finda.js # Reduction of objsLeftInBatch.
+    - jstests/core/profile1.js # Extra operation for a getmore.
+    - jstests/core/profile2.js # Extra operation for a getmore.
+    - jstests/core/sortk.js # Negative limit value changes result to batchSize.
+    - jstests/core/tailable_skip_limit.js # Negative limit value changes result to batchSize.
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            batchSize: 2 # Changes the default batchSize of db.coll.find() from 0 to 2.
+        readMode: commands
+        eval: load("jstests/libs/override_methods/find_batch_size.js");
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

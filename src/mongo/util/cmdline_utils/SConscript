@@ -1,0 +1,10 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library('cmdline_utils', ['censor_cmdline.cpp'],
+                              LIBDEPS=['$BUILD_DIR/mongo/base'])
+
+env.CppUnitTest('censor_cmdline_test',
+                'censor_cmdline_test.cpp',
+                LIBDEPS=['cmdline_utils', '$BUILD_DIR/mongo/unittest/unittest'])

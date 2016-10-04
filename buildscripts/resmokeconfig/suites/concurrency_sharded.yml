@@ -1,0 +1,12 @@
+selector:
+  js_test:
+    roots:
+    - jstests/concurrency/fsm_all_sharded*.js
+
+# Concurrency tests that run against a sharded cluster start one themselves.
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands

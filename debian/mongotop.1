@@ -1,0 +1,593 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "MONGOTOP" "1" "January 30, 2015" "3.0" "mongodb-manual"
+.SH NAME
+mongotop \- MongoDB Activity Monitor
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH SYNOPSIS
+.sp
+\fBmongotop\fP provides a method to track the amount of time a
+MongoDB instance spends reading and writing data. \fBmongotop\fP
+provides statistics on a per\-collection level. By default,
+\fBmongotop\fP returns values every second.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 0.0
+.INDENT 3.5
+In order to connect to a \fBmongod\fP that enforces
+authorization with the \fI\-\-auth\fP option, the
+\fI\-\-username\fP and
+\fI\-\-password\fP options must be used, and the
+user specified must have the \fBserverStatus\fP and
+\fBtop\fP privileges.
+.sp
+The most appropriate built\-in role that has these privileges is
+\fBclusterMonitor\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
+For more information about monitoring MongoDB, see
+http://docs.mongodb.org/manual/administration/monitoring\&.
+.sp
+For additional background on various other MongoDB status outputs
+see:
+.INDENT 0.0
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/command/serverStatus
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/command/replSetGetStatus
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/command/dbStats
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/command/collStats
+.UNINDENT
+.sp
+For an additional utility that provides MongoDB metrics
+see \fBmongostat\fP\&.
+.UNINDENT
+.UNINDENT
+.SH OPTIONS
+.INDENT 0.0
+.TP
+.B mongotop
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-help
+Returns information on the options and use of \fBmongotop\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-verbose, \-v
+Increases the amount of internal reporting returned on standard output
+or in log files. Increase the verbosity with the \fB\-v\fP form by
+including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-quiet
+Runs the \fBmongotop\fP in a quiet mode that attempts to limit the amount
+of output.
+.sp
+This option suppresses:
+.INDENT 7.0
+.IP \(bu 2
+output from \fIdatabase commands\fP
+.IP \(bu 2
+replication activity
+.IP \(bu 2
+connection accepted events
+.IP \(bu 2
+connection closed events
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-version
+Returns the \fBmongotop\fP release number.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-host <hostname><:port>, \-h <hostname><:port>
+\fIDefault\fP: localhost:27017
+.sp
+Specifies a resolvable hostname for the \fBmongod\fP to which to
+connect. By default, the \fBmongotop\fP attempts to connect to a MongoDB
+instance running on the localhost on port number \fB27017\fP\&.
+.sp
+To connect to a replica set, specify the
+\fBreplSetName\fP and a seed list of set members, as in
+the following:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can always connect directly to a single MongoDB instance by
+specifying the host and port number directly.
+.sp
+Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
+enclose the portion of an address and port combination in
+brackets (e.g. \fB[<address>]\fP).
+
+.sp
+If connected to a replica set where the \fIprimary\fP is not
+reachable, \fBmongotop\fP returns an error message.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-port <port>
+\fIDefault\fP: 27017
+.sp
+Specifies the TCP port on which the MongoDB instance listens for
+client connections.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ipv6
+Enables IPv6 support and allows the \fBmongotop\fP to connect to the
+MongoDB instance using an IPv6 network. All MongoDB programs and
+processes disable IPv6 support by default.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ssl
+New in version 2.6.
+
+.sp
+Enables connection to a \fBmongod\fP or \fBmongos\fP that has
+SSL support enabled.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCAFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the root certificate chain
+from the Certificate Authority. Specify the file name of the
+\fB\&.pem\fP file using relative or absolute paths.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBmongo\fP shell or any other tool that connects to
+\fBmongos\fP or \fBmongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
+processes posing as valid \fBmongod\fP or \fBmongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+and key. Specify the file name of the \fB\&.pem\fP file using relative
+or absolute paths.
+.sp
+This option is required when using the \fI\%\-\-ssl\fP option to connect
+to a \fBmongod\fP or \fBmongos\fP that has
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyPassword <value>
+New in version 2.6.
+
+.sp
+Specifies the password to de\-crypt the certificate\-key file (i.e.
+\fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBmongotop\fP will
+redact the password from all logging and reporting output.
+.sp
+If the private key in the PEM file is encrypted and you do not specify
+the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongotop\fP will prompt for a passphrase. See
+\fIssl\-certificate\-password\fP\&.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCRLFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
+List. Specify the file name of the \fB\&.pem\fP file using relative or
+absolute paths.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidCertificates
+New in version 2.6.
+
+.sp
+Bypasses the validation checks for server certificates and allows
+the use of invalid certificates. When using the
+\fBallowInvalidCertificates\fP setting, MongoDB logs as a
+warning the use of the invalid certificate.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBmongotop\fP to connect to MongoDB instances if the hostname their
+certificates do not match the specified hostname.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslFIPSMode
+New in version 2.6.
+
+.sp
+Directs the \fBmongotop\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\%\-\-sslFIPSMode\fP option.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%MongoDB Enterprise\fP\&. See
+http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-username <username>, \-u <username>
+Specifies a username with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-password\fP and
+\fB\-\-authenticationDatabase\fP options.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-password <password>, \-p <password>
+Specifies a password with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-username\fP and
+\fB\-\-authenticationDatabase\fP options.
+.sp
+If you do not specify an argument for \fI\%\-\-password\fP, \fBmongotop\fP will
+prompt interactively for a password on the console.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationDatabase <dbname>
+New in version 2.4.
+
+.sp
+Specifies the database that holds the user\(aqs credentials.
+.sp
+Changed in version 3.0.0: \fI\%\-\-authenticationDatabase\fP is required for \fBmongod\fP
+and \fBmongos\fP instances that use \fIauthentication\fP\&.
+
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationMechanism <name>
+\fIDefault\fP: MONGODB\-CR
+.sp
+New in version 2.4.
+
+.sp
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
+mechanisms.
+
+.sp
+Specifies the authentication mechanism the \fBmongotop\fP instance uses to
+authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+MONGODB\-CR
+T}	T{
+MongoDB challenge/response authentication.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiServiceName
+New in version 2.6.
+
+.sp
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBmongodb\fP\&.
+.sp
+This option is available only in MongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in MongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-locks
+Toggles the mode of \fBmongotop\fP to report on use of per\-database
+\fIlocks\fP\&. These data are useful for measuring concurrent
+operations and lock percentage.
+.sp
+\fI\%\-\-locks\fP returns an error when called against a \fBmongod\fP instance
+that does not report lock usage.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-rowcount int, \-n int
+Number of lines of data that \fBmongotop\fP should print. "0 for indefinite"
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-json
+New in version 3.0.0.
+
+.sp
+Returns output for \fBmongotop\fP in \fIJSON\fP format.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B <sleeptime>
+The final argument is the length of time, in seconds, that
+\fBmongotop\fP waits in between calls. By default \fBmongotop\fP returns
+data every second.
+.UNINDENT
+.SH FIELDS
+.sp
+\fBmongotop\fP returns time values specified in milliseconds
+(ms.)
+.sp
+\fBmongotop\fP only reports active namespaces or databases,
+depending on the \fI\%\-\-locks\fP option. If you don\(aqt see a database
+or collection, it has received no recent activity. You can issue a
+simple operation in the \fBmongo\fP shell to generate activity to
+affect the output of \fBmongotop\fP\&.
+.INDENT 0.0
+.TP
+.B mongotop.ns
+Contains the database namespace, which combines the database name
+and collection.
+.sp
+Changed in version 2.2: If you use the \fImongotop \-\-locks\fP, the \fBns\fP field does not
+appear in the \fBmongotop\fP output.
+
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.db
+New in version 2.2.
+
+.sp
+Contains the name of the database. The database named \fB\&.\fP refers
+to the global lock, rather than a specific database.
+.sp
+This field does not appear unless you have invoked
+\fBmongotop\fP with the \fI\%\-\-locks\fP option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.total
+Provides the total amount of time that this \fBmongod\fP spent
+operating on this namespace.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.read
+Provides the amount of time that this \fBmongod\fP spent
+performing read operations on this namespace.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.write
+Provides the amount of time that this \fBmongod\fP spent
+performing write operations on this namespace.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mongotop.<timestamp>
+Provides a time stamp for the returned data.
+.UNINDENT
+.SH USE
+.sp
+By default \fBmongotop\fP connects to the MongoDB instance
+running on the localhost port \fB27017\fP\&. However, \fBmongotop\fP can optionally
+connect to remote \fBmongod\fP
+instances. See the \fI\%mongotop options\fP for more
+information.
+.sp
+To force \fBmongotop\fP to return less frequently specify a number, in
+seconds at the end of the command. In this example, \fBmongotop\fP will
+return every 15 seconds.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongotop 15
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+This command produces the following output:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+                     ns    total    read    write          2014\-12\-19T15:32:01\-05:00
+     admin.system.roles      0ms     0ms      0ms
+   admin.system.version      0ms     0ms      0ms
+               local.me      0ms     0ms      0ms
+         local.oplog.rs      0ms     0ms      0ms
+ local.replset.minvalid      0ms     0ms      0ms
+      local.startup_log      0ms     0ms      0ms
+   local.system.indexes      0ms     0ms      0ms
+local.system.namespaces      0ms     0ms      0ms
+   local.system.replset      0ms     0ms      0ms
+
+                     ns    total    read    write          2014\-12\-19T15:47:01\-05:00
+     admin.system.roles      0ms     0ms      0ms
+   admin.system.version      0ms     0ms      0ms
+               local.me      0ms     0ms      0ms
+         local.oplog.rs      0ms     0ms      0ms
+ local.replset.minvalid      0ms     0ms      0ms
+      local.startup_log      0ms     0ms      0ms
+   local.system.indexes      0ms     0ms      0ms
+local.system.namespaces      0ms     0ms      0ms
+   local.system.replset      0ms     0ms      0ms
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The output varies depending on your MongoDB setup. For example,
+\fBlocal.system.indexes\fP and \fBlocal.system.namespaces\fP only appear
+for \fBmongod\fP instances using the \fIMMAPv1\fP
+storage engine.
+.sp
+To return a \fBmongotop\fP report every 5 minutes, use the
+following command:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongotop 300
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+To report the use of per\-database locks, use \fI\%\-\-locks\fP,
+which produces the following output:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ mongotop \-\-locks
+connected to: 127.0.0.1
+
+                  db       total        read       write          2012\-08\-13T16:33:34
+               local         0ms         0ms         0ms
+               admin         0ms         0ms         0ms
+                   .         0ms         0ms         0ms
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Changed in version 3.0.0: When called against a \fBmongod\fP that does not report lock
+usage, \fI\%\-\-locks\fP will return a \fBFailed: Server does not
+support reporting locking information\fP error.
+
+.SH AUTHOR
+MongoDB Documentation Project
+.SH COPYRIGHT
+2011-2015
+.\" Generated by docutils manpage writer.
+.

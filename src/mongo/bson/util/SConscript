@@ -1,0 +1,44 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env.Library(
+    target='bson_extract',
+    source=[
+        'bson_extract.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='bson_extract_test',
+    source=[
+        'bson_extract_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'bson_extract',
+    ],
+)
+
+env.CppUnitTest(
+    target='builder_test',
+    source=[
+        'builder_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='bson_check_test',
+    source=[
+        'bson_check_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)

@@ -1,0 +1,30 @@
+/*! @page tune_file_alloc File allocation
+
+@section tuning_system_file_block_grow File growth
+
+It's faster on some filesystems to grow a file in chunks rather than to
+extend it a block at a time as new blocks are written.  By configuring
+the wiredtiger_open functions \c file_extend value, applications can
+grow files ahead of the blocks being written.
+
+@snippet ex_all.c Configure file_extend
+
+The system calls used to extend files in chunks on some systems require
+locking across the system call, which may decrease performance.  Before
+configuring a \c file_extend value, before and after throughput should
+be carefully evaluated.
+
+@section tuning_system_file_block_allocation File block allocation
+
+By default, when file blocks are being reused, WiredTiger attempts to
+avoid file fragmentation by selecting the smallest available block
+rather than splitting a larger available block into two.  The \c
+block_allocation configuration string to WT_SESSION::create can be set
+to \c first to change the algorithm to first-fit, that is, take the
+first available block in the file.  Applications where file size is more
+of an issue than file fragmentation (for example, applications with
+fixed-size blocks) might want to configure this way.
+
+@snippet ex_all.c Configure block_allocation
+
+ */

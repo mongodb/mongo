@@ -1,0 +1,9 @@
+# wtperf options file: Test the insert-rmw functionality
+conn_config="cache_size=500MB"
+table_config="type=lsm"
+icount=500000
+insert_rmw=true
+report_interval=5
+run_time=120
+populate_threads=1
+threads=((count=4,inserts=1),(count=2,reads=1))

@@ -1,0 +1,129 @@
+# -*- mode: python -*-
+
+Import('env')
+
+env.CppUnitTest(
+    target='ingress_header_test',
+    source=[
+        'ingress_header_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.Library(
+    target='transport_layer_common',
+    source=[
+        'session.cpp',
+        'ticket.cpp',
+        'transport_layer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/transport/message_compressor',
+    ],
+)
+
+env.Library(
+    target='transport_layer_manager',
+    source=[
+        'transport_layer_manager.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+    ],
+)
+
+env.Library(
+    target='transport_layer_mock',
+    source=[
+        'transport_layer_mock.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+    ],
+)
+
+env.Library(
+    target='transport_layer_legacy',
+    source=[
+        'transport_layer_legacy.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+)
+
+env.Library(
+    target='service_entry_point_test_suite',
+    source=[
+        'service_entry_point_test_suite.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_common',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.Library(
+    target='service_entry_point_utils',
+    source=[
+        'service_entry_point_utils.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context",
+        'transport_layer_common',
+    ],
+)
+
+env.CppUnitTest(
+    target='service_entry_point_mock_test',
+    source=[
+        'service_entry_point_mock.cpp',
+        'service_entry_point_mock_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_entry_point_test_suite',
+    ],
+)
+
+env.CppUnitTest(
+    target='transport_layer_mock_test',
+    source=[
+        'transport_layer_mock_test.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_mock',
+    ],
+)
+
+env.Library(
+    target='message_compressor',
+    source=[
+        'message_compressor_manager.cpp',
+        'message_compressor_metrics.cpp',
+        'message_compressor_registry.cpp',
+        'message_compressor_snappy.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/third_party/shim_snappy',
+    ]
+)
+
+env.CppUnitTest(
+    target='message_compressor_test',
+    source=[
+        'message_compressor_manager_test.cpp',
+        'message_compressor_registry_test.cpp',
+    ],
+    LIBDEPS=[
+        'message_compressor',
+    ]
+)
+

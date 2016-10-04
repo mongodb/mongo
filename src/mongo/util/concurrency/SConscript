@@ -1,0 +1,77 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='thread_pool',
+    source=[
+        'old_thread_pool.cpp',
+        'thread_pool.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.Library(
+    target='thread_pool_test_fixture',
+    source=[
+        'thread_pool_test_common.cpp',
+        'thread_pool_test_fixture.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ]
+)
+
+env.CppUnitTest(
+    target='thread_pool_test',
+    source=['thread_pool_test.cpp'],
+    LIBDEPS=[
+        'thread_pool',
+        'thread_pool_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
+    ])
+
+env.Library('ticketholder',
+            ['ticketholder.cpp'],
+            LIBDEPS=['$BUILD_DIR/mongo/base',
+                     '$BUILD_DIR/third_party/shim_boost'])
+
+env.Library(
+    target='spin_lock',
+    source=[
+        "spin_lock.cpp",
+    ],
+)
+
+env.CppUnitTest(
+    target='spin_lock_test',
+    source=[
+        'spin_lock_test.cpp',
+    ],
+    LIBDEPS=[
+        'spin_lock',
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
+
+env.Library(
+    target='task',
+    source=[
+        'task.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/background_job',
+    ],
+)
+
+env.Library(
+    target='rwlock',
+    source=[
+        'rwlockimpl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)

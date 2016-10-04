@@ -1,0 +1,29 @@
+selector:
+  js_test:
+    roots:
+    - jstestfuzz/out/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+            forceValidationWithFeatureCompatibilityVersion: "3.4"
+    fixture:
+      class: ShardedClusterFixture
+      mongos_options:
+        set_parameters:
+          enableTestCommands: 1
+        verbose: ''
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+          numInitialSyncAttempts: 1
+        verbose: ''
+      num_shards: 2

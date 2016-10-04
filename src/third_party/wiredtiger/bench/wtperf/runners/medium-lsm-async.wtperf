@@ -1,0 +1,12 @@
+# wtperf options file: medium lsm configuration using async operations
+conn_config="cache_size=1G,lsm_manager=(worker_thread_max=6)"
+async_threads=10
+table_config="lsm=(chunk_size=100MB),type=lsm,os_cache_dirty_max=16MB"
+icount=50000000
+report_interval=5
+run_time=120
+populate_threads=1
+threads=((count=5,reads=1,updates=2))
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5

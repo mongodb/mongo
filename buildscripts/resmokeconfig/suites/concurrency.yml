@@ -1,0 +1,26 @@
+selector:
+  js_test:
+    roots:
+    - jstests/concurrency/*.js
+    exclude_files:
+    # Skip replication and sharding tests because they're run in different suites
+    - jstests/concurrency/fsm_all_replication*.js
+    - jstests/concurrency/fsm_all_sharded*.js
+    # Skip fsm_all_simultaneous.js to avoid triggering the 6-hour timeout in Evergreen when this
+    # suite is run with --repeat=10 on the Linux Repeated Execution variant.
+    - jstests/concurrency/fsm_all_simultaneous.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

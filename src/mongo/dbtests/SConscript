@@ -1,0 +1,134 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env.Library(
+    target="framework_options",
+    source=[
+        "framework_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.Library(
+    target='testframework',
+    source=[
+        'framework.cpp',
+        'framework_options_init.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'framework_options',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on service_context_d.cpp which is in serveronly
+        'incomplete',
+    ],
+)
+
+env.Library(
+    target='mocklib',
+    source=[
+        'mock/mock_conn_registry.cpp',
+        'mock/mock_dbclient_connection.cpp',
+        'mock/mock_dbclient_cursor.cpp',
+        'mock/mock_remote_db_server.cpp',
+        'mock/mock_replica_set.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages'
+    ],
+)
+
+dbtest = env.Program(
+    target="dbtest",
+    source=[
+        'basictests.cpp',
+        'chunktests.cpp',
+        'clienttests.cpp',
+        'commandtests.cpp',
+        'counttests.cpp',
+        'dbhelper_tests.cpp',
+        'dbtests.cpp',
+        'directclienttests.cpp',
+        'documentsourcetests.cpp',
+        'executor_registry.cpp',
+        'extensions_callback_real_test.cpp',
+        'gle_test.cpp',
+        'index_access_method_test.cpp',
+        'indexcatalogtests.cpp',
+        'indexupdatetests.cpp',
+        'jsobjtests.cpp',
+        'jsontests.cpp',
+        'jstests.cpp',
+        'matchertests.cpp',
+        'mmaptests.cpp',
+        'mock_dbclient_conn_test.cpp',
+        'mock_replica_set_test.cpp',
+        'multikey_paths_test.cpp',
+        'namespacetests.cpp',
+        'oplogstarttests.cpp',
+        'pdfiletests.cpp',
+        'perftests.cpp',
+        'plan_ranking.cpp',
+        'query_stage_multiplan.cpp',
+        'query_plan_executor.cpp',
+        'query_stage_and.cpp',
+        'query_stage_cached_plan.cpp',
+        'query_stage_collscan.cpp',
+        'query_stage_count.cpp',
+        'query_stage_count_scan.cpp',
+        'query_stage_delete.cpp',
+        'query_stage_distinct.cpp',
+        'query_stage_ensure_sorted.cpp',
+        'query_stage_fetch.cpp',
+        'query_stage_ixscan.cpp',
+        'query_stage_keep.cpp',
+        'query_stage_limit_skip.cpp',
+        'query_stage_merge_sort.cpp',
+        'query_stage_near.cpp',
+        'query_stage_sort.cpp',
+        'query_stage_subplan.cpp',
+        'query_stage_tests.cpp',
+        'query_stage_update.cpp',
+        'querytests.cpp',
+        'replica_set_monitor_test.cpp',
+        'repltests.cpp',
+        'rollbacktests.cpp',
+        'socktests.cpp',
+        'sort_key_generator_test.cpp',
+        'threadedtests.cpp',
+        'updatetests.cpp',
+        'validate_tests.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        '$BUILD_DIR/mongo/db/pipeline/document_value_test_util',
+        "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/mongo/db/query/query",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/storage/paths",
+        "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
+        "$BUILD_DIR/mongo/db/repl/replmocks",
+        "$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils",
+        "$BUILD_DIR/mongo/platform/platform",
+        "$BUILD_DIR/mongo/db/serveronly",
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        "$BUILD_DIR/mongo/util/concurrency/rwlock",
+        "$BUILD_DIR/mongo/util/net/network",
+        "$BUILD_DIR/mongo/util/version_impl",
+        "mocklib",
+        "testframework",
+    ],
+)
+
+env.Alias("dbtest", env.Install('#/', dbtest))

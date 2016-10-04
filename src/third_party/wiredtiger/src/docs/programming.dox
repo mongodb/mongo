@@ -1,0 +1,84 @@
+/*! @m_page{{c,java},programming,Writing WiredTiger applications}
+
+This section covers topics of interest for programmers writing
+@m_if{c}
+WiredTiger applications.
+@m_else
+WiredTiger applications in Java.
+@m_endif
+
+We follow SQL terminology: a database is set of tables managed together.
+Tables consist of rows, where each row is a key and its associated
+value.  Tables may optionally have an associated schema, splitting the
+value into a set of columns.  Tables may also have associated indices,
+each of which is ordered by one or more columns.
+
+<h2>Using the API</h2>
+- @subpage basic_api
+- @subpage config_strings
+- @subpage cursors
+- @subpage transactions
+- @subpage error_handling
+
+<h2>Storage options</h2>
+- @subpage schema
+- @subpage lsm
+- @subpage file_formats
+- @subpage compression
+- @subpage encryption
+
+<h2>Programming notes</h2>
+- @subpage threads
+- @subpage namespace
+- @subpage readonly
+@m_if{c}
+- @subpage signals
+@m_endif
+
+<h2>Advanced topics</h2>
+- @subpage async
+- @subpage backup
+- @subpage compact
+- @subpage checkpoint
+- @subpage durability
+- @subpage in_memory
+- @subpage cursor_join
+- @subpage cursor_log
+- @ref transaction_named_snapshots
+- @subpage rebalance
+- @subpage shared_cache
+- @subpage statistics
+- @subpage_single upgrade
+
+@m_if{c}
+<h2>Extending WiredTiger</h2>
+- @subpage extensions
+- @subpage custom_collators
+- @subpage custom_extractors
+- @subpage custom_data_sources
+- @subpage custom_file_systems
+- @subpage helium
+@m_endif
+
+<h2>Performance monitoring and tuning</h2>
+- @subpage_single tune_statistics
+- @subpage_single wtperf
+- @subpage_single wtstats
+<p>
+- @subpage_single tune_memory_allocator
+- @subpage_single tune_page_sizes
+- @subpage_single tune_cache
+- @subpage_single tune_bulk_load
+- @subpage_single tune_cursor_persist
+- @subpage_single tune_read_only
+- @subpage_single tune_durability
+- @subpage_single tune_checksum
+- @subpage_single tune_compression
+- @subpage_single tune_file_alloc
+- @subpage_single tune_system_buffer_cache
+- @subpage_single tune_transparent_huge_pages
+- @subpage_single tune_close
+- @subpage_single tune_mutex
+- @subpage_single tune_zone_reclaim
+
+ */

@@ -1,0 +1,80 @@
+# -*- mode: python -*-
+
+Import("env")
+
+generateErrorCodes = env.Command(
+    target=['error_codes.h', 'error_codes.cpp'],
+    source=['generate_error_codes.py', 'error_codes.err'],
+    action=['$PYTHON ${SOURCES[0]} cpp ${SOURCES[1]} --cpp-header=${TARGETS[0]} --cpp-source=${TARGETS[1]}'])
+env.Alias('generated-sources', generateErrorCodes)
+
+env.CppUnitTest('base_test',
+                ['counter_test.cpp',
+                 'data_builder_test.cpp',
+                 'data_cursor_test.cpp',
+                 'data_range_cursor_test.cpp',
+                 'data_range_test.cpp',
+                 'data_type_string_data_test.cpp',
+                 'data_type_terminated_test.cpp',
+                 'data_type_validated_test.cpp',
+                 'data_view_test.cpp',
+                 'encoded_value_storage_test.cpp',
+                 'initializer_dependency_graph_test.cpp',
+                 'initializer_test.cpp',
+                 'owned_pointer_map_test.cpp',
+                 'owned_pointer_vector_test.cpp',
+                 'parse_number_test.cpp',
+                 'status_test.cpp',
+                 'status_with_test.cpp',
+                 'string_data_test.cpp',
+                ])
+
+env.Library(
+    target=[
+        'system_error'
+    ],
+    source=[
+        'system_error.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'system_error_test',
+    ],
+    source=[
+        'system_error_test.cpp',
+    ],
+    LIBDEPS=[
+        'system_error',
+    ],
+)
+
+env.Library(
+    target=[
+        'secure_allocator'
+    ],
+    source=[
+        'secure_allocator.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/processinfo',
+        '$BUILD_DIR/mongo/util/secure_zero_memory',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'secure_allocator_test',
+    ],
+    source=[
+        'secure_allocator_test.cpp',
+    ],
+    LIBDEPS=[
+        'secure_allocator',
+    ],
+)

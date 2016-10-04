@@ -1,0 +1,25 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.SConscript(
+    dirs=[
+        'tom',
+    ],
+)
+
+env.Library('crypto_tom',
+           ['crypto_tom.cpp'],
+           LIBDEPS=['tom/tomcrypt'])
+
+env.Library('crypto_openssl',
+           ['crypto_openssl.cpp'])
+
+env.Library('scramauth',
+            ['mechanism_scram.cpp'],
+            LIBDEPS=['$BUILD_DIR/mongo/base',
+                     'crypto_${MONGO_CRYPTO}'])
+
+env.CppUnitTest('crypto_test',
+                ['crypto_test.cpp'],
+                LIBDEPS=['crypto_${MONGO_CRYPTO}'])

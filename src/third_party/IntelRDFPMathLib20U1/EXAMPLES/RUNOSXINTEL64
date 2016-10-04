@@ -1,0 +1,10 @@
+echo "BEGIN BUILDING AND RUNNING EXAMPLES IN LINUX..."
+rm a.out linuxout
+./linuxbuild -m64 > linuxout
+# grep PASS linuxout
+cat linuxout
+grep FAIL linuxout
+rm linuxout main.c decimal.h
+echo "END BUILDING AND RUNNING EXAMPLES IN LINUX..."
+echo "(THE TESTS PASSED IF THE WORD 'FAIL' WAS NOT PRINTED ABOVE)"
+

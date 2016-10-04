@@ -1,0 +1,23 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target="dotted_path_support",
+    source=[
+        "dotted_path_support.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target="dotted_path_support_test",
+    source=[
+        "dotted_path_support_test.cpp",
+    ],
+    LIBDEPS=[
+        "dotted_path_support",
+    ],
+)

@@ -1,0 +1,44 @@
+#! /bin/sh
+
+# Create wtstats.template.html file
+
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+# We require npm which may not be installed.
+type npm > /dev/null 2>&1 || {
+        echo 's_wtstats: npm not found' >&2
+        echo '    npm is part of node.js from http://nodejs.org' >&2
+        exit 1
+}
+
+cd ../tools/wtstats/template || exit 1
+
+out=wtstats.html.template
+rm -f $out
+
+# Run npm install.
+test -d ./node_modules || {
+	echo 'Running: npm install'
+	npm --quiet install >$t 2>&1 || {
+		echo "s_wtstats: npm install failed" >&2
+		cat $t
+		exit 1
+	}
+}
+echo 'Running: npm run build'
+npm --quiet run build >$t 2>&1 || {
+        echo "s_wtstats: npm run build failed" >&2
+        cat $t
+        exit 1
+}
+test -f $out || {
+        echo "s_wtstats: $out not created" >&2
+        cat $t
+        exit 1
+}
+
+f=../$out
+cmp $out $f > /dev/null 2>&1 ||
+        (echo "Building $out" && rm -f $f && cp $out $f)
+exit 0

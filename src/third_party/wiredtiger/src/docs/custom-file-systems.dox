@@ -1,0 +1,62 @@
+/*! @page custom_file_systems Custom File Systems
+
+Applications can provide a custom file system implementation that will be
+used by WiredTiger to interact with the I/O subsystem using the
+WT_FILE_SYSTEM and WT_FILE_HANDLE interfaces.
+
+It is not necessary for all file system providers to implement all methods
+in the WT_FILE_SYSTEM and WT_FILE_HANDLE structures, and documentation for
+those structures indicate which methods are optional. Methods which are not
+provided should be set to NULL.
+
+Function pointers should not be cleared once a handle is created.
+(WiredTiger might check for a non-NULL method and then call it, and
+clearing the function pointer could result in a core dump.)
+
+Function pointers are not expected to be cleared or set after a handle
+is created. An exception to this are the file extension methods, because
+existing file system implementations do not know the level of support
+the underlying system provides until after file extension is attempted.
+For this reason, these methods appear in both locking and non-locking
+versions.  Custom file systems needing to discover system support before
+configuring non-locking methods should initialize only the locking
+version of the method, then either set the non-locking version of the
+method and clear the locking method (or clear both methods), after
+discovery is complete. Clearing the method value is safe because calls
+are serialized until a non-locking method is set. Note it is not
+possible to downgrade from a non-locking version of these methods to a
+locking version.
+
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods are expected to return POSIX
+1003.1 or ANSI C standard error codes on failure.  Custom file systems
+on Windows systems can use the WT_EXTENSION_API::map_windows_error
+method to translate Windows system errors into POSIX system errors for
+return to WiredTiger.
+
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail, but where future
+calls may succeed (for example, a WT_FILE_HANDLE::fh_truncate method
+call which fails because the file is currently mapped into memory),
+should return EBUSY.
+
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail, and no future
+calls will succeed, should return ENOTSUP. This failure may describe
+either the entire method being unavailable or a particular mode failure.
+For example, a WT_FILE_HANDLE::fh_advise method call with an argument of
+::WT_FILE_HANDLE_DONTNEED, where the file handle doesn't support the
+WT_FILE_HANDLE::fh_advise method at all, or only supports the method
+argument ::WT_FILE_HANDLE_WILLNEED, should return ENOTSUP.
+
+Additionally, custom file system functions  may return ::WT_PANIC to
+shut down the system.
+
+Unless explicitly stated otherwise, WiredTiger may invoke methods on the
+WT_FILE_SYSTEM and WT_FILE_HANDLE interfaces from multiple threads
+concurrently. It is the responsibility of the implementation to protect
+any shared data.
+
+See @ex_ref{ex_file_system.c} for an example implementation of a custom
+file system; the WiredTiger code for a POSIX standard file system is in
+the public domain and may also be useful as a starting point for a custom
+file system implementation.
+
+*/

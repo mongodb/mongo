@@ -1,0 +1,148 @@
+/*! @class doc_cursor_types
+
+The following are the builtin basic cursor types:
+<table>
+@hrow{URI, Type, Notes}
+@row{<tt>table:\<table name\>[\<projection\>]</tt>,
+	table cursor,
+	table key\, table value(s) with optional projection of columns}
+@row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
+	column group cursor,
+	table key\, column group value(s)}
+@row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
+	index cursor,
+	key=index key\, value=table value(s) with optional projection
+	of columns}
+@row{<tt>join:table:\<table name\>[\<projection\>]</tt>,
+	join cursor,
+	key=table key\, value=table value(s) with optional projection
+	of columns}
+</table>
+Some administrative tasks can be accomplished using the following special
+cursor types that give access to data managed by WiredTiger:
+<table>
+@hrow{URI, Type, Notes}
+@row{<tt>backup:</tt>,
+	backup cursor,
+	key=<code>string</code>\, see @ref backup for details}
+@row{<code>log:</code>,
+	log cursor,
+	key=<code>(long fileID\, long offset\, int seqno)</code>\,<br>
+	value=<code>(uint64_t txnid\, uint32_t rectype\,<br>
+	uint32_t optype\, uint32_t fileid\,<br>
+	WT_ITEM key\, WT_ITEM value)</code>\,<br>
+	see @ref cursor_log for details}
+@row{<tt>metadata:[create]</tt>,
+	metadata cursor (optionally only returning configuration strings for
+	WT_SESSION::create if <code>create</code> is appended,
+	key=<code>string</code>\, value=<code>string</code>\,<br>
+	see @ref metadata for details}
+@row{<tt>statistics:[\<data source URI\>]</tt>,
+	database, data source or join statistics cursor,
+	key=<code>int id</code>\,<br>
+	value=<code>(string description\,
+	string value\, uint64_t value)</code>\,<br>
+	see @ref data_statistics for details}
+</table>
+Advanced applications may also open the following low-level cursor types:
+<table>
+@hrow{URI, Type, Notes}
+@row{<tt>file:\<file name\></tt>,
+	file cursor,
+	file key\, file value(s)}
+@row{<tt>lsm:\<name\></tt>,
+	LSM cursor (key=LSM key\, value=LSM value), LSM key\, LSM value\,<br>
+	see @ref lsm}
+</table>
+*/
+
+/* ----------------- */
+
+/*! @m_page{{c,java},data_sources,Data Sources}
+
+WiredTiger provides access to data from a variety of sources.  At the
+lowest level, data may be stored in a file using a tree structure.  A
+relational schema supporting tables, indices and column groups is
+layered on top of file.  Additional sources include LSM trees and
+statistics, and applications can further extend the supported types by
+implementing the ::WT_DATA_SOURCE interface.
+
+Common operations on all data sources are performed using WT_CURSOR
+handles.  See @ref cursor_ops for a description of how to use
+cursors.
+
+@section data_builtin Builtin data sources
+
+@copydoc doc_cursor_types
+
+@subsection data_files Raw Files
+
+WiredTiger's schema layer can be bypassed by opening cursors with a \c
+"file:" URI, using the name of the underlying file.  This can be useful for
+seeing the contents of a column group or index without reading all of the
+columns from the table.
+
+For example, if an index becomes inconsistent with its primary, a file
+cursor can read from the index without errors (even though some of the keys
+that are returned may not exist in the primary).
+
+@subsection data_indices Table Index data
+
+When an index is created for a table, records are inserted into the index
+whenever the table is updated.  These records use a different key to the
+primary table, as specified when the index is created with the
+WT_SESSION::create method.
+
+A cursor opened on an index has the specified index columns as its key,
+accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns
+default to returning the value columns from the table, but this can be
+overridden by configuring a projection cursor (see @ref cursor_projections),
+which can access the table key columns or a subset of the value columns.
+
+@subsection data_statistics Statistics Data
+
+Statistics cursors can be used to retrieve run-time statistics about a
+WiredTiger database as well as statistics for individual data sources.
+The statistics are at two levels: per-database and per-individual data
+source.  Database-wide statistics are retrieved with the \c "statistics:"
+URI; individual data source statistics are available by specifying
+\c "statistics:<data source URI>".  Additionally, statistics about a
+join cursor can be retrieved by specifying \c "statistics:join" and
+supplying the join cursor as an argument in the SESSION::open_cursor call.
+
+The statistic key is an integer from the list of keys in
+@ref_single statistics_keys "Statistics Keys".  Statistics cursors return
+three values from the WT_CURSOR::get_value call: a printable description of
+the statistic, a printable version of the entry's value, and the entry's
+unsigned 64-bit integral value, respectively.
+
+The cursor's statistics values  are loaded when the cursor is opened and
+remain unchanged for the life of the cursor, unless the cursor is reset
+by calling the WT_CURSOR::reset method, which reloads the values.
+
+The following is an example of printing run-time statistics about the
+WiredTiger engine:
+
+@snippet ex_stat.c statistics database function
+
+The following is an example of printing statistics about a table:
+
+@snippet ex_stat.c statistics table function
+
+The following is an example of printing statistics about a join cursor:
+
+@snippet ex_stat.c statistics join cursor function
+
+These three examples can use a common display routine that iterates through the
+statistics until the cursor returns the end of the list.
+
+@snippet ex_stat.c statistics display function
+
+Individual statistics values can be retrieved by searching for the
+corresponding key, as shown in the following example:
+
+@snippet ex_stat.c statistics retrieve by key
+
+See @ref_single tune_statistics for more examples of how statistics can be
+used.
+*/

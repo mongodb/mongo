@@ -1,0 +1,23 @@
+/*! @page community WiredTiger community and contact information
+
+MongoDB Inc. and the WiredTiger community maintain and develop
+<a href="https://github.com/wiredtiger"><b>WiredTiger on GitHub</b></a>,
+and all contributors are welcome!
+
+All source code and revision histories for this software are available
+in the <a href="https://github.com/wiredtiger/wiredtiger"><b>WiredTiger
+source tree repository</b></a>.
+
+Please submit any feature suggestions and bug reports at
+<a href="http://jira.mongodb.org/browse/WT">
+<b>WiredTiger's Issues page</b></a>.
+
+Discussion of WiredTiger issues and development can also be found in
+the
+<a href="http://groups.google.com/group/wiredtiger-users"><b>WiredTiger
+Google Group</b></a>.
+
+To contact MongoDB, Inc. about WiredTiger, please send email to
+<a mailto="info@wiredtiger.com"><b>info@wiredtiger.com</b></a>.
+
+*/

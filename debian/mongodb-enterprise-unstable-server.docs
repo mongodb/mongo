@@ -1,0 +1,9 @@
+snmp/mongod.conf.master
+snmp/mongod.conf.subagent
+snmp/README-snmp.txt
+snmp/MONGOD-MIB.txt
+snmp/MONGODBINC-MIB.txt
+LICENSE.txt
+README
+THIRD-PARTY-NOTICES
+MPL-2

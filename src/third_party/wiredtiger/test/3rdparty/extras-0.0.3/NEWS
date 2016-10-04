@@ -1,0 +1,27 @@
+extras NEWS
++++++++++++
+
+Changes and improvements to extras_, grouped by release.
+
+NEXT
+~~~~
+
+0.0.3
+~~~~~
+
+* Extras setup.py would break on older testtools releases, which could break
+  installs of newer testtools due to extras then failing to install.
+  (Robert Collins)
+
+0.0.2
+~~~~~
+
+* Fix Makefile to not have cruft leftover from testtools.
+
+0.0.1
+~~~~~
+
+* Initial extraction from testtools.
+
+
+.. _extras: http://pypi.python.org/pypi/extras

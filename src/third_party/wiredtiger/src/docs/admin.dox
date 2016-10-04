@@ -1,0 +1,12 @@
+/*! @page admin Managing WiredTiger databases
+
+This section covers topics of interest for system administrators
+managing WiredTiger applications:
+
+- @subpage home
+- @subpage database_config
+- @ref backup_util
+- @subpage filesystems
+- @subpage security
+
+ */

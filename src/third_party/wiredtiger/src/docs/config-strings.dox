@@ -1,0 +1,127 @@
+/*! @m_page{{c,java},config_strings,Configuration Strings}
+
+@section config_intro Introduction
+
+Methods in WiredTiger take a configuration string to provide optional
+arguments and configure non-standard behaviors.  These strings are
+simple comma-separated lists of <code>"<key>=<value>"</code> pairs, and
+all have the same format:
+
+<pre>
+    [key['='value]][','[key['='value]]]*
+</pre>
+
+Keys and values and values that consist of alphanumeric characters can be
+specified directly.  More precisely, keys or values that match this regular
+expression do not require quotes:
+
+<pre>
+    [-_0-9A-Za-z./][^\\t\\r\\n :=,\\])}]*
+</pre>
+
+Configuration strings are case-sensitive (for example, "true" is a
+valid boolean value, but "True" is not).
+
+More complex keys and values can be specified by quoting them with double
+quotes.
+
+For example, a configuration string is used when opening a connection
+to a database to specify if the database should be created and to set
+the cache size:
+
+@snippet ex_all.c Open a connection
+
+Configuration strings are also used to configure the table schema.  For
+example, to create a table that uses C language strings for keys and
+values:
+
+@snippet ex_all.c Create a table
+
+To handle more complex schema configuration, such as specifying multiple
+columns in a table, values are nested using parentheses.  For example:
+
+@snippet ex_all.c Create a table with columns
+
+All types of parentheses are treated equivalently by the parser.
+
+When an integer values is expected, the value may have multiplier characters
+appended, as follows:
+
+<table>
+@hrow{Character, Meaning, Change to value}
+@row{\c B or \c b, byte, no change}
+@row{\c K or \c k, kilobyte, multiply by 2^10}
+@row{\c M or \c m, megabyte, multiply by 2^20}
+@row{\c G or \c g, gigabyte, multiply by 2^30}
+@row{\c T or \c t, terabyte, multiply by 2^40}
+@row{\c P or \c p, petabyte, multiply by 2^50}
+</table>
+
+For example, the value \c 500B is the same as entering the number \c 500, the
+value \c 500K is the same as \c 512000 and the string \c 500GB is the same as
+\c 536870912000.
+
+Values of type of "boolean" can be set to any of \c false, \c true, \c 0 or
+\c 1.  If no value is specified for a key, the value \c 1 is implied.  For
+example, all of the following forms of the \c overwrite configuration string
+are identical:
+
+@snippet ex_all.c boolean configuration string example
+
+Configuration strings are processed in order from left to right, with
+later settings overriding earlier ones (unless multiple settings for a
+key are supported by the method).
+
+Superfluous commas and whitespace in the configuration string are ignored
+(including at the beginning and end of the string), so it is always safe to
+combine two configuration strings by concatenating them with a comma in
+between.
+
+@m_if{c}
+Empty configuration strings may be represented in C or C++ by passing
+<code>NULL</code>.
+@m_endif
+@m_if{java}
+Empty configuration strings may be represented in Java by passing
+<code>null</code>.
+@m_endif
+
+@section config_json JavaScript Object Notation (JSON) compatibility
+
+WiredTiger configuration strings are compatible with
+<a href="http://www.json.org/">JavaScript Object Notation (JSON)</a>,
+and will accept additional formatting as follows:
+
+- parentheses may be round or square brackets or curly braces:
+  <code>'()'</code>, <code>'[]'</code> or <code>'{}'</code>
+- the whole configuration string may optionally be wrapped in parentheses
+- the key/value separator can be a colon: <code>':'</code>
+- keys and values may be in double quotes: <code>"key" = "value"</code>
+- quoted strings are interpreted as UTF-8 values
+
+The result of this relaxed parsing is that applications may pass strings
+representing valid <a href="http://json.org/">JSON objects</a> wherever
+configuration strings are required.
+
+For example, in Python, code might look as follows:
+
+\code
+  import json
+  config = json.dumps({
+      "key_format" : "r",
+      "value_format" : "5sHQ",
+      "columns" : ("id", "country", "year", "population"),
+      "colgroup.population" : ["population"],
+      "index.country_year" : ["country", "year"]
+  })
+\endcode
+
+Because JSON compatibility allows colons to be used as key/value separators,
+WiredTiger URIs may require quoting.  For example, the following
+WT_SESSION::checkpoint call specifies a set of URIs as checkpoint targets,
+using double-quote characters to keep the parser from treating the colon
+characters as JSON name/value separators:
+
+@snippet ex_all.c JSON quoting example
+
+*/

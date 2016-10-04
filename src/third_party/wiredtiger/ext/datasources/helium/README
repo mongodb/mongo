@@ -1,0 +1,125 @@
+Helium README.
+
+The data structures are "Helium sources" which map to one or more physical
+volumes; each Helium source supports any number of "WiredTiger sources",
+where a WiredTiger source is an object similar to a Btree "file:" object.
+Each WiredTiger source supports any number of WiredTiger cursors.
+
+Each Helium source is given a logical name when first referenced, and that
+logical name is subsequently used when a WiredTiger source is created.  For
+example, the logical name for a Helium source might be "dev1", and it would
+map to the Helium volumes /dev/sd0 and /dev/sd1; subsequent WT_SESSION.create
+calls specify a URI like "table:dev1/my_table".
+
+For each WiredTiger source, we create two namespaces on the underlying device,
+a "cache" and a "primary".
+
+The cache contains key/value pairs based on updates or changes that have been
+made, and includes transactional information.  So, for example, if transaction
+3 modifies key/value pair "foo/aaa", and then transaction 4 removes key "foo",
+then transaction 5 inserts key/value pair "foo/bbb", the entry in the cache
+will look something like:
+
+	Key:	foo
+	Value:	[transaction ID 3] [aaa]
+		[transaction ID 4] [remove]
+		[transaction ID 5] [bbb]
+
+Obviously, we have to marshall/unmarshall these values to/from the cache.
+
+In contrast, the primary contains only key/value pairs known to be committed
+and visible to any reader.
+
+When an insert, update or remove is done:
+	acquire a lock
+	read any matching key from the cache
+	check to see if the update can proceed
+	append a new value for this transaction
+	release the lock
+
+When a search is done:
+	if there's a matching key/value pair in the cache {
+		if there's an item visible to the reading transaction
+			return it
+	}
+	if there's a matching key/value pair in the primary {
+		return it
+	}
+
+When a next/prev is done:
+	move to the next/prev visible item in the cache
+	move to the next/prev visible item in the primary
+	return the one closest to the starting position
+
+Locks are not acquired for read operations, and no flushes are done for any of
+these operations.
+
+We also create one additional object, the transaction name space, which serves
+all of the WiredTiger and Helium objects in a WiredTiger connection.  Whenever
+a transaction involving a Helium source commits, we insert a commit record into
+the transaction name space and flush the device.  When a transaction rolls back,
+we insert an abort record into the txn name space, but don't flush the device.
+
+The visibility check is slightly different than the rest of WiredTiger: we do
+not reset anything when a transaction aborts, and so we have to check if the
+transaction has been aborted as well as check the transaction ID for visibility.
+
+We create a "cleanup" thread for every underlying Helium source.  The job of
+this thread is to migrate rows from the cache object into the primary.  Any
+committed, globally visible change in the cache can be copied into the primary
+and removed from the cache:
+
+	set BaseTxnID to the oldest transaction ID
+	    not yet visible to a running transaction
+
+	for each row in the cache:
+		if all of the updates are greater than BaseTxnID
+			copy the last update to the primary
+
+	flush the primary to stable storage
+
+	lock the cache
+	for each row in the cache:
+		if all of the updates are greater than BaseTxnID
+			remove the row from the cache
+	unlock the cache
+
+	for each row in the transaction store:
+		if the transaction ID is less than BaseTxnID
+			remove the row
+
+We only need to lock the cache when removing rows, the initial copy to the
+primary does not require locks because only the cleanup thread ever writes
+to the primary.
+
+No lock is required when removing rows from the transaction store, once the
+transaction ID is less than the BaseTxnID, it will never be read.
+
+Helium recovery is almost identical to the cleanup thread, which migrates rows
+from the cache into the primary.  For every cache/primary pair, migrate every
+commit to the primary (by definition, at recovery time it must be globally
+visible), and discard everything else (by definition, at recovery time anything
+not committed has been aborted.
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Questions, problems, whatever:
+
+* The implementation is endian-specific, that is, the WiredTiger metadata
+stored on the Helium device is on not portable to a big-endian machine.
+Helium's metadata is portable between different endian machines, so this
+should probably be fixed.
+
+* There's a problem with transactions in WiredTiger that span more than a
+single data source.   For example, consider a transaction that modifies
+both a Helium object and a Btree object.  If we commit and push the Helium
+commit record to stable storage, and then crash before committing the Btree
+change, the enclosing WiredTiger transaction will/should end up aborting,
+and there's no way for us to back out the change in Helium.  I'm leaving
+this problem alone until WiredTiger fine-grained durability is complete,
+we're going to need WiredTiger support for some kind of 2PC to solve this.
+
+* If a record in the cache gets too busy, we could end up unable to remove
+it (there would always be an active transaction), and it would grow forever.
+I suspect the solution is to clean it up when we realize we can't remove it,
+that is, we can rebuild the record, discarding the no longer needed entries,
+even if the record can't be entirely discarded.

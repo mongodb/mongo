@@ -1,0 +1,158 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env.Library(
+    target='path',
+    source=[
+        'path.cpp',
+        'path_internal.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+    ],
+)
+
+env.CppUnitTest(
+    target='path_test',
+    source=[
+        'path_test.cpp',
+    ],
+    LIBDEPS=[
+        'path',
+    ],
+)
+
+env.Library(
+    target='expressions',
+    source=[
+        'expression.cpp',
+        'expression_array.cpp',
+        'expression_leaf.cpp',
+        'expression_parser.cpp',
+        'expression_parser_tree.cpp',
+        'expression_text_base.cpp',
+        'expression_text_noop.cpp',
+        'expression_tree.cpp',
+        'expression_where_base.cpp',
+        'expression_where_noop.cpp',
+        'extensions_callback.cpp',
+        'extensions_callback_disallow_extensions.cpp',
+        'extensions_callback_noop.cpp',
+        'match_details.cpp',
+        'matchable.cpp',
+        'matcher.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/fts/fts_query_noop',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
+        'path',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_test',
+    source=[
+        'expression_array_test.cpp',
+        'expression_leaf_test.cpp',
+        'expression_test.cpp',
+        'expression_tree_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_parser_test',
+    source=[
+        'expression_parser_array_test.cpp',
+        'expression_parser_leaf_test.cpp',
+        'expression_parser_test.cpp',
+        'expression_parser_tree_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        'expressions',
+    ],
+)
+
+env.Library(
+    target='expression_algo',
+    source=[
+        'expression_algo.cpp',
+    ],
+    LIBDEPS=[
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_algo_test',
+    source=[
+        'expression_algo_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        'expression_algo',
+    ],
+)
+
+env.Library(
+    target='expressions_geo',
+    source=[
+        'expression_geo.cpp',
+        'expression_parser_geo.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/geo/geometry',
+        '$BUILD_DIR/mongo/db/geo/geoparser',
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_geo_test',
+    source=[
+        'expression_geo_test.cpp',
+        'expression_parser_geo_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions_geo',
+    ],
+)
+
+env.Library(
+    target='expressions_mongod_only',
+    source=[
+        'extensions_callback_real.cpp',
+        'expression_text.cpp',
+        'expression_where.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/catalog/catalog',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/fts/base',
+        '$BUILD_DIR/mongo/scripting/scripting_server',
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_serialization_test',
+    source=[
+        'expression_serialization_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions',
+        'expressions_geo',
+    ],
+)

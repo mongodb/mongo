@@ -1,0 +1,52 @@
+{
+  Ignore python stuff: Cond
+  Memcheck:Cond
+  obj:*python*
+}
+{
+  Ignore python stuff: Addr4
+  Memcheck:Addr4
+  obj:*python*
+}
+{
+  Ignore python stuff: Addr8
+  Memcheck:Addr8
+  obj:*python*
+}
+{
+  Ignore python stuff: Value4
+  Memcheck:Value4
+  obj:*python*
+}
+{
+  Ignore python stuff: Value8
+  Memcheck:Value8
+  obj:*python*
+}
+{
+  Ignore python stuff: Leak
+  Memcheck:Leak
+  fun:*alloc
+  obj:*python*
+}
+
+{
+  FreeBSD: shared libraries.
+  Memcheck:Addr8
+  ...
+  fun:dlopen
+}
+{
+  FreeBSD: shared libraries.
+  Memcheck:Addr8
+  ...
+  fun:__wt_dlsym
+}
+
+{
+  Berkeley DB: uninitialized writes.
+  Memcheck:Param
+  write(buf)
+  ...
+  fun:__memp_pgwrite
+}

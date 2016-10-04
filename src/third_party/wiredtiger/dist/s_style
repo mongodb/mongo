@@ -1,0 +1,187 @@
+#! /bin/sh
+
+# General style correction and cleanup.
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+# Parallelize if possible.
+xp=""
+echo date | xargs -P 20 >/dev/null 2>&1
+if test $? -eq 0; then
+	xp="-P 20"
+fi
+
+# s_style is re-entrant, when run with no parameters it calls itself
+# again for each file that needs checking.
+if [ $# -ne 1 ]; then
+	cd ..
+
+	find bench examples ext src test \
+	    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
+	sed -e '/Makefile.in/d' \
+	    -e '/build_win\/wiredtiger_config.h/d' \
+	    -e '/checksum\/power8/d' \
+	    -e '/checksum\/zseries/d' |
+	xargs $xp -n 1 -I{} sh ./dist/s_style {}
+else
+	# General style correction and cleanup for a single file
+	f=$1
+	fname=`basename $f`
+	t=__wt_s_style.$fname.$$
+
+	if [ ! -e $f ]; then
+		echo "$0 error $1 does not exist"
+		exit 1;
+	fi
+
+	egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in[^-]|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' $f > $t
+	test -s $t && {
+		echo "paired typo"
+		echo "============================"
+		cat $t
+	}
+
+	extension="${fname##*.}"
+	if [ "x$extension" = "xdox" ]; then
+		exit 0;
+	fi
+
+	if grep "^[^}]*while (0);" $f > $t; then
+		echo "$f: while (0) has trailing semi-colon"
+		cat $t
+	fi
+
+	if grep WT_DEADLOCK $f | grep -v '#define.WT_DEADLOCK' > $t; then
+		echo "$f: WT_DEADLOCK deprecated in favor of WT_ROLLBACK"
+		cat $t
+	fi
+
+	if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
+	    egrep 'STAILQ_|SLIST_|\bLIST_' $f ; then
+		echo "$f: use TAILQ for all lists"
+	fi
+
+	if ! expr "$f" : 'src/include/extern.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern_posix.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern_win.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	   ! expr "$f" : 'src/os_common/.*' > /dev/null &&
+	   ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
+	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
+	    grep '__wt_errno' $f > $t; then
+		echo "$f: upper-level code should not call __wt_errno"
+		cat $t
+	fi
+
+	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	    egrep "%[0-9]*zu" $f | grep -v 'SIZET_FMT' > $t; then
+		echo "$f: %zu needs to be fixed for Windows"
+		cat $t
+	fi
+
+	egrep -w 'off_t' $f > $t
+	test -s $t && {
+		echo "$f: off_t type declaration, use wt_off_t"
+		cat $t
+	}
+
+	if ! expr "$f" : 'src/.*/os_setvbuf.c' > /dev/null &&
+	    egrep -w 'setvbuf' $f > $t; then
+		echo "$f: setvbuf call, use WiredTiger library replacements"
+		cat $t
+	fi
+
+	# Alignment directive before "struct".
+	egrep 'WT_COMPILER_TYPE_ALIGN.*struct' $f > $t
+	test -s $t && {
+		echo "$f: compiler alignment direction must precede \"struct\""
+		cat $t
+	}
+
+	# Direct calls to functions we're not supposed to use in the library.
+	# We don't check for all of them, just a few of the common ones.
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/.*' > /dev/null &&
+	   ! expr "$f" : 'test/.*' > /dev/null &&
+	   ! expr "$f" : '.*/utilities/.*' > /dev/null; then
+		if ! expr "$f" : '.*/os_alloc.c' > /dev/null &&
+		     egrep '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]' $f > $t; then
+			test -s $t && {
+				echo "$f: call to illegal function"
+				cat $t
+			}
+		fi
+		if ! expr "$f" : '.*/os_strtouq.c' > /dev/null &&
+		     egrep '[[:space:]]strtouq[(]' $f > $t; then
+			test -s $t && {
+				echo "$f: call to illegal function"
+				cat $t
+			}
+		fi
+		if egrep '[[:space:]]exit[(]' $f > $t; then
+			test -s $t && {
+				echo "$f: call to illegal function"
+				cat $t
+			}
+		fi
+	fi
+
+	# Declaration of an integer return variable.
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
+	   ! expr "$f" : 'test/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/.*' > /dev/null; then
+		egrep -w ret $f | egrep 'int.*[, ]ret[,;]' > $t
+		test -s $t && {
+			echo "$f: explicit declaration of \"ret\""
+			cat $t
+		}
+	fi
+
+	# Use of ctype functions that sign extend their arguments.
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'test/csuite/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/.*' > /dev/null &&
+	   ! expr "$f" : 'src/include/ctype.i' > /dev/null; then
+		if egrep '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
+			test -s $t && {
+				echo "$f: direct use of ctype.h functions, instead of ctype.i equivalents"
+				cat $t
+			}
+		fi
+	fi
+
+	tr -cd '[:alnum:][:space:][:punct:]' < $f |
+	unexpand |
+	sed -e 's/){/) {/' \
+	    -e 's/\([	 ]\)for(/\1for (/' \
+	    -e 's/\([	 ]\)if(/\1if (/' \
+	    -e 's/\([	 ]\)index(/\1strchr(/' \
+	    -e 's/\([	 ]\)return(/\1return (/' \
+	    -e 's/\([	 ]\)return \([^()]*\);/\1return (\2);/' \
+	    -e 's/\([	 ]\)rindex(/\1strrchr(/' \
+	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
+	    -e 's/\([	 ]\)switch(/\1switch (/' \
+	    -e 's/\([	 ]\)while(/\1while (/' \
+	    -e 's/\([	 ,]\)uint\([	 ,]\)/\1u_int\2/g' \
+	    -e 's/\([	 ,]\)u_int8_t\([	 ,]\)/\1uint8_t\2/g' \
+	    -e 's/\([	 ,]\)u_int16_t\([	 ,]\)/\1uint16_t\2/g' \
+	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
+	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
+	    -e 's/\([	 ,]\)u_quad\([	 ,]\)/\1uint64_t\2/g' \
+	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
+	    -e 's/[	 ](void) \([a-zA-Z_]\)/(void)\1/' \
+	    -e '/for /!s/;;$/;/' \
+	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
+	    -e 's/(unsigned)/(u_int)/' \
+	    -e 's/hazard reference/hazard pointer/' \
+	    -e 's/^#define /#define	/' >$t
+
+	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
+fi
+
+exit 0

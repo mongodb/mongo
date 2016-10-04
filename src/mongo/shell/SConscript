@@ -1,0 +1,59 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+generateJSErrorCodes = env.Command(
+    target=['error_codes.js'],
+    source=['$BUILD_DIR/mongo/base/generate_error_codes.py', '$BUILD_DIR/mongo/base/error_codes.err'],
+    action=['$PYTHON ${SOURCES[0]} js ${SOURCES[1]} --js-source=${TARGETS[0]}'])
+env.Alias('generated-sources', generateJSErrorCodes)
+
+# Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
+js_header = env.JSHeader(
+    target="mongo.cpp",
+    source=[
+        "assert.js",
+        "bulk_api.js",
+        "collection.js",
+        "crud_api.js",
+        "db.js",
+        "explain_query.js",
+        "explainable.js",
+        "error_codes.js",
+        "mongo.js",
+        "mr.js",
+        "query.js",
+        "types.js",
+        "upgrade_check.js",
+        "utils.js",
+        "utils_sh.js",
+        "utils_auth.js",
+    ]
+)
+
+env.Alias('generated-sources', js_header)
+
+# Files added here need to be added in shell/shell_utils.cpp and buildscripts/vcxproj.header as
+# well.
+env.JSHeader(
+    target="mongo-server.cpp",
+    source=[
+        "servers.js",
+        "shardingtest.js",
+        "servers_misc.js",
+        "replsettest.js",
+        "bridge.js"
+    ],
+)
+
+env.Alias('generated-sources', "mongo-server.cpp")
+
+env.Library(
+    target='mongojs',
+    source=[
+        'mongo.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base"
+    ],
+)

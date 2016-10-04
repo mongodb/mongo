@@ -1,0 +1,153 @@
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 000 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_000libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 001 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_001libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 010 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_010libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 011 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_011libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 100 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_100libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 101 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_101libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 110 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_110libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 111 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_111libbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=0
+./readtest < readtest.in
+rm ../LIBRARY/libbid.a
+
+
+
+
+
+
+
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 000 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_000blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 001 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_001blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 010 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_010blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 011 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_011blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=0 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 100 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_100blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 101 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_101blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=0 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 110 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_110blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+echo ""
+echo ""
+echo "****************** RUNNING TESTS FOR cc 111 (64-bit data mode) ***************************"
+echo ""
+echo ""
+gmake clean OS_TYPE=LINUX
+cp ../LIBRARY/cc64_111blibbid.a ../LIBRARY/libbid.a
+gmake OS_TYPE=LINUX CC=cc HPUX_OS=1 DD64=1 BID_BIG_ENDIAN=1 CALL_BY_REF=1 GLOBAL_RND=1 GLOBAL_FLAGS=1 UNCHANGED_BINARY_FLAGS=1
+./readtest < readtest.in
+rm ../LIBRARY/libbid.a

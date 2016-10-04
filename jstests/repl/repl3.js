@@ -2,33 +2,51 @@
 
 var baseName = "jstests_repl3test";
 
-// spec small oplog to make slave get out of sync
-m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
-s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+soonCount = function(count) {
+    assert.soon(function() {
+        //                print( "check count" );
+        //                print( "count: " + s.getDB( baseName ).z.find().count() + ", expected: " +
+        //                count );
+        return s.getDB(baseName).a.find().itcount() == count;
+    });
+};
 
-am = m.getDB( baseName ).a
-as = s.getDB( baseName ).a
+doTest = function(signal) {
 
-am.save( { _id: new ObjectId() } );
-assert.soon( function() { return as.find().count() == 1; } );
-stopMongod( 27019 );
+    print("repl3.js doTest(" + signal + ")");
 
-big = new Array( 2000 ).toString();
-for( i = 0; i < 1000; ++i )
-    am.save( { _id: new ObjectId(), i: i, b: big } );
+    rt = new ReplTest("repl3tests");
 
-s = startMongodNoReset( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018", "--autoresync" );
+    m = rt.start(true);
+    s = rt.start(false);
 
-// after SyncException, mongod waits 10 secs.
-sleep( 12000 );
+    am = m.getDB(baseName).a;
 
-// Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.
-assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
-assert.soon( function() { return s.getDB( baseName ).getCollectionNames().indexOf( "a" ) != -1; } );
+    am.save({_id: new ObjectId()});
+    soonCount(1);
+    rt.stop(false, signal);
 
-as = s.getDB( baseName ).a
-assert.soon( function() { return 1001 == as.find().count(); } );
-assert.eq( 1, as.find( { i: 0 } ).count() );
-assert.eq( 1, as.find( { i: 999 } ).count() );
+    big = new Array(2000).toString();
+    for (i = 0; i < 1000; ++i)
+        am.save({_id: new ObjectId(), i: i, b: big});
 
-assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+    s = rt.start(false, {autoresync: null}, true);
+
+    // after SyncException, mongod waits 10 secs.
+    sleep(15000);
+
+    // Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.
+    soonCount(1001);
+    as = s.getDB(baseName).a;
+    assert.eq(1, as.find({i: 0}).count());
+    assert.eq(1, as.find({i: 999}).count());
+
+    assert.commandFailed(s.getDB("admin").runCommand({"resync": 1}));
+
+    rt.stop();
+};
+
+doTest(15);  // SIGTERM
+doTest(9);   // SIGKILL
+
+print("repl3.js OK");

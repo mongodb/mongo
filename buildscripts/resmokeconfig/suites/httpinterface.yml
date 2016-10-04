@@ -1,0 +1,16 @@
+selector:
+  js_test:
+    roots:
+    - jstests/httpinterface/*.js
+    exclude_files:
+    # SERVER-19093 No longer have proper HTTP support in the shell.
+    - jstests/httpinterface/httpinterface.js
+executor:
+  js_test:
+    hooks:
+    - class: ValidateCollections
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

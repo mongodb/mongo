@@ -1,0 +1,88 @@
+To build the Intel(R) Decimal Floating-Point Math Library v2.0
+(conforming to the IEEE Standard 754-2008 for Floating-Point Arithmetic) 
+on processors that are implementations of the IA-32 Architecture, Intel(R) 64, 
+or IA-64 Architecture:
+
+  In Linux* with icc (Intel(R) Compiler 9.1 or newer) or gcc:
+
+    make clean  
+    make CC=icc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+      - CC can be icc, gcc
+      - CALL_BY_REF, GLOBAL_RND, GLOBAL_FLAGS, UNCHANGED_BINARY_FLAGS can be any of 0000, 0001, ... , 1111
+
+  Big-endian builds require some additional command line parameters (see the
+  following files for examples: solarisbuild, hpuxbuild*)
+ 
+  In Windows** with icl (Intel(R) C++ Compiler 9.1 or newer) or cl (Microsoft
+  Visual C++ Compiler**):
+
+    nmake clean 
+    nmake -fmakefile.mak CC=icl CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0
+      -  CC can be cl, icl
+      -  CALL_BY_REF, GLOBAL_RND, GLOBAL_FLAGS, UNCHANGED_BINARY_FLAGS can be any of 0000, 0001, ... , 1111
+      -  [g]make, which stands for a GNU make-compatible make program (e.g. make from
+         cygwin) may also be used
+    
+    Note: The scripts and makefiles provided here may need adjustments, 
+        depending on the environment in which they are used; for example if 
+        moving files from Windows to Linux, running dos2unix on the Linux 
+        script files may be necessary.
+
+     The makefiles currently support these environments, but can be extended to 
+  support additional ones (such as a new Cygwin release):  Linux, FreeBSD,  
+  Darwin, SunOS, HP-UX, Windows_NT, CYGWIN_NT-5.1, CYGWIN_NT-5.2-WOW64, 
+  CYGWIN_NT-6.1-WOW64.
+  See makefile.iml_head (line 330) for more information.
+
+Note:
+=====
+  For some other operating systems and architecture combinations see the
+  following command files, as well as any command files invoked from these ones:
+        RUNLINUX
+        RUNWINDOWS_nmake.bat
+        RUNWINDOWSINTEL64.bat (for IA-64 Architecture)
+        RUNOSX
+        RUNOSXINTEL64 (for IA-64) Architecture
+        RUNSOLARIS
+        RUNHPUX32 (for HP-UX* on IA-64 Architecture, 32-bit data mode)
+        RUNHPUX64 (for HP-UX* on IA-64 Architecture, 64-bit data mode)
+  These command files build the Intel(R) Decimal Floating-Point Math Library,
+  possibly using more than one compiler. Changes may be necessary in certain
+  environments. Note that all the necessary versions of the Intel(R) Decimal 
+  Floating-Point Math Library have to be built in this directory prior to
+  executing the similar RUN* command in either of ../LIBRARY/ or ../TESTS/.
+  Check that all the expected *.a files (or *.lib in Windows) have been created
+  prior to building and running the tests or examples from ../LIBRARY/ or 
+  ../TESTS/.
+
+Note:
+=====
+If the makefile provided here is not used, the parameter passing method and 
+local/global rounding mode and status flags may be selected by editing 
+bid_conf.h:
+ 
+Parameter passing is determined by an environment variable in bid_conf.h:
+  - by value:
+        #define DECIMAL_CALL_BY_REFERENCE 0
+  - by reference:
+        #define DECIMAL_CALL_BY_REFERENCE 1
+ 
+Global variables are determined by two environment variables in bid_conf.h:
+  - rnd_mode passed as parameter
+        #define DECIMAL_GLOBAL_ROUNDING 0
+  - rnd_mode global
+        #define DECIMAL_GLOBAL_ROUNDING 1
+  - status flags *pfpsf passed as parameter
+        #define DECIMAL_GLOBAL_EXCEPTION_FLAGS 0
+  - status flags *pfpsf global
+        #define DECIMAL_GLOBAL_EXCEPTION_FLAGS 1
+ 
+For more information see ../README
+ 
+ 
+ 
+* Other names and brands may be claimed as the property of others.
+ 
+** Microsoft, Windows, and the Windows logo are trademarks, or registered
+trademarks of Microsoft Corporation in the United States and/or other countries
+
