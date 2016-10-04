@@ -1715,15 +1715,19 @@ __evict_get_ref(
 static int
 __evict_page(WT_SESSION_IMPL *session, bool is_server)
 {
+	struct timespec enter, leave;
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_REF *ref;
+	bool app_timer;
 
 	WT_RET(__evict_get_ref(session, is_server, &btree, &ref));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
+	app_timer = false;
 	cache = S2C(session)->cache;
+
 	/*
 	 * An internal session flags either the server itself or an eviction
 	 * worker thread.
@@ -1739,6 +1743,10 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 			WT_STAT_CONN_INCR(session, cache_eviction_app_dirty);
 		WT_STAT_CONN_INCR(session, cache_eviction_app);
 		cache->app_evicts++;
+		if (WT_STAT_ENABLED(session)) {
+			app_timer = true;
+			WT_RET(__wt_epoch(session, &enter));
+		}
 	}
 
 	/*
@@ -1756,6 +1764,9 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
+	if (ret == 0 && app_timer && __wt_epoch(session, &leave) == 0)
+		WT_STAT_CONN_INCRV(session,
+		    application_evict_time, WT_TIMEDIFF_US(leave, enter));
 	return (ret);
 }
 
@@ -1767,6 +1778,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 int
 __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 {
+	struct timespec enter, leave;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -1792,9 +1804,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	/* Wake the eviction server if we need to do work. */
 	__wt_evict_server_wake(session);
 
-	init_evict_count = cache->pages_evict;
+	/* Track how long application threads spend doing eviction. */
+	if (WT_STAT_ENABLED(session) && !F_ISSET(session, WT_SESSION_INTERNAL))
+		WT_RET(__wt_epoch(session, &enter));
 
-	for (;;) {
+	for (init_evict_count = cache->pages_evict;; ret = 0) {
 		/*
 		 * A pathological case: if we're the oldest transaction in the
 		 * system and the eviction server is stuck trying to find space,
@@ -1804,7 +1818,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		if (__wt_cache_stuck(session) && __wt_txn_am_oldest(session)) {
 			--cache->evict_aggressive_score;
 			WT_STAT_CONN_INCR(session, txn_fail_cache);
-			return (WT_ROLLBACK);
+			WT_ERR(WT_ROLLBACK);
 		}
 
 		/*
@@ -1825,7 +1839,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		if (!__wt_eviction_needed(session, busy, &pct_full) ||
 		    (pct_full < 100 &&
 		    cache->pages_evict > init_evict_count + max_pages_evicted))
-			return (0);
+			break;
 
 		/*
 		 * Don't make application threads participate in scrubbing for
@@ -1842,7 +1856,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		switch (ret = __evict_page(session, false)) {
 		case 0:
 			if (busy)
-				return (0);
+				goto err;
 			/* FALLTHROUGH */
 		case EBUSY:
 			break;
@@ -1853,9 +1867,17 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 			cache->app_waits++;
 			break;
 		default:
-			return (ret);
+			goto err;
 		}
 	}
+
+err:	if (WT_STAT_ENABLED(session) &&
+	    !F_ISSET(session, WT_SESSION_INTERNAL) &&
+	    __wt_epoch(session, &leave) == 0)
+		WT_STAT_CONN_INCRV(session,
+		    application_cache_time, WT_TIMEDIFF_US(leave, enter));
+
+	return (ret);
 	/* NOTREACHED */
 }
 
