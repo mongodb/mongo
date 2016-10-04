@@ -529,7 +529,7 @@ string OpDebug::report(Client* client,
         s << " protocol:" << getProtoString(networkOp);
     }
 
-    s << " " << executionTime << "ms";
+    s << " " << (executionTimeMicros / 1000) << "ms";
 
     return s.str();
 }
@@ -626,7 +626,7 @@ void OpDebug::append(const CurOp& curop,
     if (iscommand) {
         b.append("protocol", getProtoString(networkOp));
     }
-    b.append("millis", executionTime);
+    b.appendIntOrLL("millis", executionTimeMicros / 1000);
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());

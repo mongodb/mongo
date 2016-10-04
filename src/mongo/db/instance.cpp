@@ -605,7 +605,7 @@ void assembleResponse(OperationContext* txn,
 
     OpDebug& debug = currentOp.debug();
 
-    long long logThreshold = serverGlobalParams.slowMS;
+    long long logThresholdMs = serverGlobalParams.slowMS;
     bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
 
     if (op == dbQuery) {
@@ -638,7 +638,7 @@ void assembleResponse(OperationContext* txn,
         try {
             if (op == dbKillCursors) {
                 currentOp.ensureStarted();
-                logThreshold = 10;
+                logThresholdMs = 10;
                 receivedKillCursors(txn, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
                 log() << "    operation isn't supported: " << static_cast<int>(op);
@@ -685,20 +685,20 @@ void assembleResponse(OperationContext* txn,
     }
     currentOp.ensureStarted();
     currentOp.done();
-    debug.executionTime = currentOp.totalTimeMillis();
+    debug.executionTimeMicros = currentOp.totalTimeMicros();
 
-    logThreshold += currentOp.getExpectedLatencyMs();
+    logThresholdMs += currentOp.getExpectedLatencyMs();
     Top::get(txn->getServiceContext())
         .incrementGlobalLatencyStats(
             txn, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
 
-    if (shouldLogOpDebug || debug.executionTime > logThreshold) {
+    if (shouldLogOpDebug || debug.executionTimeMicros > logThresholdMs * 1000LL) {
         Locker::LockerInfo lockerInfo;
         txn->lockState()->getLockerInfo(&lockerInfo);
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
-    if (currentOp.shouldDBProfile(debug.executionTime)) {
+    if (currentOp.shouldDBProfile()) {
         // Performance profiling is on
         if (txn->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";

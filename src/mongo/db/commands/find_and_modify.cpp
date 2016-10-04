@@ -450,7 +450,7 @@ public:
                 // Fill out OpDebug with the number of deleted docs.
                 opDebug->ndeleted = getDeleteStats(exec.get())->docsDeleted;
 
-                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
@@ -554,7 +554,7 @@ public:
                 UpdateStage::recordUpdateStatsInOpDebug(getUpdateStats(exec.get()), opDebug);
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
-                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();

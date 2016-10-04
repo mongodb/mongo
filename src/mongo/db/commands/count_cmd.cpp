@@ -242,7 +242,7 @@ public:
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 
-        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+        if (curOp->shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec.get(), &execStatsBob);
             curOp->debug().execStats = execStatsBob.obj();

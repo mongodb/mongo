@@ -86,8 +86,8 @@ MONGO_FP_DECLARE(failAllRemoves);
 void finishCurOp(OperationContext* txn, CurOp* curOp) {
     try {
         curOp->done();
-        int executionTimeMs = curOp->totalTimeMillis();
-        curOp->debug().executionTime = executionTimeMs;
+        long long executionTimeMicros = curOp->totalTimeMicros();
+        curOp->debug().executionTimeMicros = executionTimeMicros;
 
         recordCurOpMetrics(txn);
         Top::get(txn->getServiceContext())
@@ -106,8 +106,8 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
 
         const bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
                                                                  logger::LogSeverity::Debug(1));
-        const bool logSlow =
-            executionTimeMs > (serverGlobalParams.slowMS + curOp->getExpectedLatencyMs());
+        const bool logSlow = executionTimeMicros >
+            (serverGlobalParams.slowMS + curOp->getExpectedLatencyMs()) * 1000LL;
 
         if (logAll || logSlow) {
             Locker::LockerInfo lockerInfo;
@@ -115,7 +115,7 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
             log() << curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats);
         }
 
-        if (curOp->shouldDBProfile(executionTimeMs)) {
+        if (curOp->shouldDBProfile()) {
             profile(txn, CurOp::get(txn)->getNetworkOp());
         }
     } catch (const DBException& ex) {
@@ -542,7 +542,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
         collection->getCollection()->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
     }
 
-    if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+    if (curOp.shouldDBProfile()) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec.get(), &execStatsBob);
         curOp.debug().execStats = execStatsBob.obj();
@@ -656,7 +656,7 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 
-    if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+    if (curOp.shouldDBProfile()) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec.get(), &execStatsBob);
         curOp.debug().execStats = execStatsBob.obj();

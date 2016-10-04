@@ -423,7 +423,7 @@ public:
         // subsequent getMore. The reason for this is that aggregation's source PlanExecutor
         // could be destroyed before we know whether we need execStats and we do not want to
         // generate for all operations due to cost.
-        if (!cursor->isAggCursor() && curOp->shouldDBProfile(curOp->elapsedMillis())) {
+        if (!cursor->isAggCursor() && curOp->shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec, &execStatsBob);
             curOp->debug().execStats = execStatsBob.obj();

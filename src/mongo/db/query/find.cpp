@@ -154,7 +154,7 @@ void endQueryOp(OperationContext* txn,
         collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
     }
 
-    if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+    if (curOp->shouldDBProfile()) {
         BSONObjBuilder statsBob;
         Explain::getWinningPlanStats(&exec, &statsBob);
         curOp->debug().execStats = statsBob.obj();
@@ -416,7 +416,7 @@ Message getMore(OperationContext* txn,
         // subsequent getMore. The reason for this is that aggregation's source PlanExecutor
         // could be destroyed before we know whether we need execStats and we do not want to
         // generate for all operations due to cost.
-        if (!cc->isAggCursor() && curOp.shouldDBProfile(curOp.elapsedMillis())) {
+        if (!cc->isAggCursor() && curOp.shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec, &execStatsBob);
             curOp.debug().execStats = execStatsBob.obj();

@@ -331,14 +331,14 @@ public:
             stats.append("avgDistance", totalDistance / results);
         }
         stats.append("maxDistance", farthestDist);
-        stats.append("time", curOp->elapsedMillis());
+        stats.appendIntOrLL("time", curOp->elapsedMicros() / 1000);
         stats.done();
 
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
         curOp->debug().setPlanSummaryMetrics(summary);
 
-        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+        if (curOp->shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec.get(), &execStatsBob);
             curOp->debug().execStats = execStatsBob.obj();
