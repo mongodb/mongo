@@ -94,7 +94,7 @@ function runTest(m) {
 
     assert.throws(function() {
         return t.group(p);
-    }, null, "write reduce didn't fail");
+    }, [], "write reduce didn't fail");
     assert.eq(1000, dbRO.jstests_auth_auth1.count(), "C3");
 
     db.getSiblingDB('admin').auth('super', 'super');

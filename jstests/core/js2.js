@@ -16,7 +16,7 @@ assert.throws(function() {
              return 1;
          }
      }).forEach(printjson);
-}, null, "can't save from $where");
+}, [], "can't save from $where");
 
 assert.eq(0, t2.find().length(), "B");
 

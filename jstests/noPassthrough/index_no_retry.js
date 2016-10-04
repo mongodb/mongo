@@ -55,7 +55,7 @@
 
     assert.throws(function() {
         t.find({}, {_id: 0, a: 1}).hint({a: 1}).next();
-    }, null, 'index {a: 1} was rebuilt in spite of --noIndexBuildRetry');
+    }, [], 'index {a: 1} was rebuilt in spite of --noIndexBuildRetry');
 
     var indexes = t.getIndexes();
     assert.eq(1, indexes.length, 'unfinished indexes in listIndexes result: ' + tojson(indexes));

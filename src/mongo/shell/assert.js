@@ -221,40 +221,95 @@ assert.time = function(f, msg, timeout /*ms*/) {
     return res;
 };
 
-assert.throws = function(func, params, msg) {
-    if (assert._debug && msg)
-        print("in assert for: " + msg);
-    if (params && typeof(params) == "string") {
-        throw("2nd argument to assert.throws has to be an array, not " + params);
-    }
-    try {
-        func.apply(null, params);
-    } catch (e) {
-        return e;
-    }
-    doassert("did not throw exception: " + msg);
-};
+(function() {
+    // Wrapping the helper function in an IIFE to avoid polluting the global namespace.
+    function assertThrowsHelper(func, params) {
+        if (typeof func !== "function")
+            throw new Error('1st argument must be a function');
 
-assert.doesNotThrow = function(func, params, msg) {
-    if (assert._debug && msg)
-        print("in assert for: " + msg);
-    if (params && typeof(params) == "string") {
-        throw("2nd argument to assert.throws has to be an array, not " + params);
+        if (arguments.length >= 2 && !Array.isArray(params) &&
+            Object.prototype.toString.call(params) !== "[object Arguments]")
+            throw new Error("2nd argument must be an Array or Arguments object");
+
+        let thisKeywordWasUsed = false;
+
+        const thisSpy = new Proxy({}, {
+            has: () => {
+                thisKeywordWasUsed = true;
+                return false;
+            },
+
+            get: () => {
+                thisKeywordWasUsed = true;
+                return undefined;
+            },
+
+            set: () => {
+                thisKeywordWasUsed = true;
+                return false;
+            },
+
+            deleteProperty: () => {
+                thisKeywordWasUsed = true;
+                return false;
+            }
+        });
+
+        let error = null;
+        let res = null;
+        try {
+            res = func.apply(thisSpy, params);
+        } catch (e) {
+            error = e;
+        }
+
+        if (thisKeywordWasUsed) {
+            doassert("Attempted to access 'this' during function call in" +
+                     " assert.throws/doesNotThrow. Instead, wrap the function argument in" +
+                     " another function.");
+        }
+
+        return {error: error, res: res};
     }
-    var res;
-    try {
-        res = func.apply(null, params);
-    } catch (e) {
-        doassert("threw unexpected exception: " + e + " : " + msg);
-    }
-    return res;
-};
+
+    assert.throws = function(func, params, msg) {
+        if (assert._debug && msg)
+            print("in assert for: " + msg);
+
+        // Use .apply() instead of calling the function directly with explicit arguments to
+        // preserve the length of the `arguments` object.
+        const {error} = assertThrowsHelper.apply(null, arguments);
+
+        if (!error)
+            doassert("did not throw exception: " + msg);
+
+        return error;
+    };
+
+    assert.doesNotThrow = function(func, params, msg) {
+        if (assert._debug && msg)
+            print("in assert for: " + msg);
+
+        // Use .apply() instead of calling the function directly with explicit arguments to
+        // preserve the length of the `arguments` object.
+        const {error, res} = assertThrowsHelper.apply(null, arguments);
+
+        if (error)
+            doassert("threw unexpected exception: " + error + " : " + msg);
+
+        return res;
+    };
+})();
 
 assert.throws.automsg = function(func, params) {
+    if (arguments.length === 1)
+        params = [];
     assert.throws(func, params, func.toString());
 };
 
 assert.doesNotThrow.automsg = function(func, params) {
+    if (arguments.length === 1)
+        params = [];
     assert.doesNotThrow(func, params, func.toString());
 };
 

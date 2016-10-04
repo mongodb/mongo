@@ -49,4 +49,4 @@ assert.throws(function() {
         verbose: 2,
         other: {configOptions: sslParams, mongosOptions: sslParams, shardOptions: sslParams}
     });
-}, null, "mongos started with x509 clusterAuthMode but no CA file");
+}, [], "mongos started with x509 clusterAuthMode but no CA file");

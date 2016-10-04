@@ -580,12 +580,12 @@ indexes.forEach(function(index) {
         // within
         assert.throws(function() {
             coll.count({geo: {$geoWithin: {$geometry: p}}});
-        }, null, "within " + p.name);
+        }, [], "within " + p.name);
 
         // intersection
         assert.throws(function() {
             coll.count({geo: {$geoIntersects: {$geometry: p}}});
-        }, null, "intersects " + p.name);
+        }, [], "intersects " + p.name);
     });
 
     // Tests for closed polygons

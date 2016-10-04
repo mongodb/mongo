@@ -40,12 +40,12 @@ objects.forEach(function(o) {
     // within
     assert.throws(function() {
         coll.count({geo: {$geoWithin: {$geometry: o}}});
-    }, null, "within " + o.name);
+    }, [], "within " + o.name);
 
     // intersection
     assert.throws(function() {
         coll.count({geo: {$geoIntersects: {$geometry: o}}});
-    }, null, "intersection " + o.name);
+    }, [], "intersection " + o.name);
 });
 
 // Big Polygon query for $nearSphere & geoNear should fail
@@ -62,7 +62,7 @@ assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}), "2dsphere index");
 // $nearSphere on big polygon should fail
 assert.throws(function() {
     coll.count({geo: {$nearSphere: {$geometry: bigPoly}}});
-}, null, "nearSphere " + bigPoly.name);
+}, [], "nearSphere " + bigPoly.name);
 
 // geoNear on big polygon should fail
 assert.commandFailed(db.runCommand({geoNear: coll.getName(), near: bigPoly, spherical: true}),

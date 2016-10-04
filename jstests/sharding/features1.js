@@ -94,7 +94,7 @@
         db.eval(function() {
             return db.foo2.findOne().a;
         });
-    }, null, "eval 2");
+    }, [], "eval 2");
 
     assert.eq(1,
               db.eval(function() {
@@ -105,7 +105,7 @@
         db.eval(function() {
             return db.foo2.count();
         });
-    }, null, "eval 4");
+    }, [], "eval 4");
 
     // ----- "eval" new command name SERVER-5588 -----
     var result;
