@@ -27,7 +27,7 @@
     });
 
     st.configRS.awaitReplication(60 * 1000);
-    var configVersion = st.configRS.getPrimary().getDB('config').getCollection('version').findOne();
+    var configVersion = st.s.getDB('config').getCollection('version').findOne();
     assert.neq(null, configVersion);
     var clusterId = configVersion.clusterId;
     assert.neq(null, clusterId);
