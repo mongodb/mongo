@@ -307,7 +307,7 @@ tasks:
 - name: shard_cluster_MMAPv1_test
   depends_on:
     - name: compile
-  exec_timeout_secs: 28800
+  exec_timeout_secs: 216000
   commands:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
