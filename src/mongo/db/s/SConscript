@@ -81,6 +81,44 @@ env.Library(
 )
 
 env.Library(
+    target='balancer',
+    source=[
+        'balancer/balancer.cpp',
+        'balancer/balancer_chunk_selection_policy.cpp',
+        'balancer/balancer_chunk_selection_policy_impl.cpp',
+        'balancer/balancer_policy.cpp',
+        'balancer/cluster_statistics.cpp',
+        'balancer/cluster_statistics_impl.cpp',
+        'balancer/migration_manager.cpp',
+        'balancer/scoped_migration_request.cpp',
+        'balancer/type_migration.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/s/coreshard',
+    ],
+)
+
+env.CppUnitTest(
+    target='balancer_test',
+    source=[
+        'balancer/balancer_policy_test.cpp',
+        'balancer/cluster_statistics_test.cpp',
+        'balancer/migration_manager_test.cpp',
+        'balancer/scoped_migration_request_test.cpp',
+        'balancer/type_migration_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/util/version_impl',
+        'balancer',
+    ]
+)
+
+env.Library(
     target='commands',
     source=[
         'check_sharding_index_command.cpp',
@@ -114,6 +152,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/s/serveronly',
+        'balancer',
         'metadata',
         'sharding',
     ],

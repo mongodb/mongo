@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 
 namespace mongo {

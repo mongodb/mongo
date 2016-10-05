@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/s/catalog/type_shard.h"

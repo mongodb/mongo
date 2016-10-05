@@ -26,23 +26,26 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer/cluster_statistics.h"
+#include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-/**
- * Default implementation for the cluster statistics gathering utility. Uses a blocking method to
- * fetch the statistics and does not perform any caching. If any of the shards fails to report
- * statistics fails the entire refresh.
- */
-class ClusterStatisticsImpl final : public ClusterStatistics {
-public:
-    ClusterStatisticsImpl();
-    ~ClusterStatisticsImpl();
+using ShardStatistics = ClusterStatistics::ShardStatistics;
 
-    StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* txn) override;
-};
+const auto emptyTagSet = std::set<std::string>();
 
+TEST(ShardStatistics, SizeMaxedTest) {
+    ASSERT(
+        !ShardStatistics(ShardId("TestShardId"), 0, 0, false, emptyTagSet, "3.2.0").isSizeMaxed());
+    ASSERT(!ShardStatistics(ShardId("TestShardId"), 100LL, 80LL, false, emptyTagSet, "3.2.0")
+                .isSizeMaxed());
+    ASSERT(ShardStatistics(ShardId("TestShardId"), 100LL, 110LL, false, emptyTagSet, "3.2.0")
+               .isSizeMaxed());
+}
+
+}  // namespace
 }  // namespace mongo

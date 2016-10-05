@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer/migration_manager.h"
+#include "mongo/db/s/balancer/migration_manager.h"
 
 #include <memory>
 
@@ -38,10 +38,10 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
+#include "mongo/db/s/balancer/scoped_migration_request.h"
+#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/balancer/scoped_migration_request.h"
-#include "mongo/s/balancer/type_migration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_registry.h"
