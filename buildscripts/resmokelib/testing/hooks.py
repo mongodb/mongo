@@ -202,7 +202,7 @@ class BackgroundInitialSync(JsCustomBehavior):
         # or by calling resync if use_resync is specified.
         def restart_init_sync():
             if self.use_resync:
-                self.logger.info("Calling resync on initial sync node...")
+                self.fixture.logger.info("Calling resync on initial sync node...")
                 cmd = bson.SON([("resync", 1), ("wait", 0)])
                 try:
                     sync_node_conn.admin.command(cmd)
@@ -214,7 +214,7 @@ class BackgroundInitialSync(JsCustomBehavior):
                 # Tear down and restart the initial sync node to start initial sync again.
                 teardown_success = sync_node.teardown()
 
-                self.logger.info("Starting the initial sync node back up again...")
+                self.fixture.logger.info("Starting the initial sync node back up again...")
                 sync_node.setup()
                 sync_node.await_ready()
                 if not teardown_success:
@@ -223,8 +223,10 @@ class BackgroundInitialSync(JsCustomBehavior):
         # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
         if self.tests_run >= self.n:
             self.tests_run = 0
-            self.logger.info("%d tests have been run against the fixture, waiting for initial sync"
-                             " node to go into SECONDARY state", self.tests_run)
+            self.fixture.logger.info(
+                "%d tests have been run against the fixture, waiting for initial sync"
+                " node to go into SECONDARY state",
+                self.tests_run)
             cmd = bson.SON([("replSetTest", 1),
                             ("waitForMemberState", 2),
                             ("timeoutMillis", 20 * 60 * 1000)])
@@ -242,29 +244,32 @@ class BackgroundInitialSync(JsCustomBehavior):
             state = sync_node_conn.admin.command("replSetGetStatus").get("myState")
             if state != 2:
                 if self.tests_run == 0:
-                    self.logger.exception("{0} failed".format(description))
+                    msg = "Initial sync node did not catch up after waiting 20 minutes"
+                    self.logger.exception("{0} failed: {1}".format(description, msg))
                     test_report.addFailure(self.hook_test_case, sys.exc_info())
-                    raise errors.TestFailure("Initial sync node did not catch up after waiting"
-                                             " 20 minutes")
+                    raise errors.TestFailure(msg)
 
-                self.logger.info("Initial sync node is in state %d, not state SECONDARY (2)."
-                                 " Skipping BackgroundInitialSync hook for %s",
-                                 state,
-                                 test.short_name())
+                self.fixture.logger.info(
+                    "Initial sync node is in state %d, not state SECONDARY (2)."
+                    " Skipping BackgroundInitialSync hook for %s",
+                    state,
+                    test.short_name())
 
                 # If we have not restarted initial sync since the last time we ran the data
                 # validation, and if we're using resync for restarts, restart initial sync with a
                 # 20% probability.
                 if self.random_restarts < 1 and self.use_resync and random.random() < 0.2:
-                    self.logger.info("Calling resync randomly in the middle of initial sync")
+                    self.fixture.logger.info(
+                        "Calling resync randomly in the middle of initial sync")
                     restart_init_sync()
                     self.random_restarts += 1
                 return
         except pymongo.errors.OperationFailure:
             # replSetGetStatus can fail if the node is in STARTUP state. The node will soon go into
             # STARTUP2 state and replSetGetStatus will succeed after the next test.
-            self.logger.info("replSetGetStatus call failed in BackgroundInitialSync hook,"
-                             " skipping hook for %s", test.short_name())
+            self.fixture.logger.info(
+                "replSetGetStatus call failed in BackgroundInitialSync hook, skipping hook for %s",
+                test.short_name())
             return
 
         self.random_restarts = 0
@@ -315,7 +320,7 @@ class IntermediateInitialSync(JsCustomBehavior):
 
         teardown_success = True
         if self.use_resync:
-            self.logger.info("Calling resync on initial sync node...")
+            self.fixture.logger.info("Calling resync on initial sync node...")
             cmd = bson.SON([("resync", 1)])
             try:
                 sync_node_conn.admin.command(cmd)
@@ -326,12 +331,12 @@ class IntermediateInitialSync(JsCustomBehavior):
         else:
             teardown_success = sync_node.teardown()
 
-            self.logger.info("Starting the initial sync node back up again...")
+            self.fixture.logger.info("Starting the initial sync node back up again...")
             sync_node.setup()
             sync_node.await_ready()
 
         # Do initial sync round.
-        self.logger.info("Waiting for initial sync node to go into SECONDARY state")
+        self.fixture.logger.info("Waiting for initial sync node to go into SECONDARY state")
         cmd = bson.SON([("replSetTest", 1),
                         ("waitForMemberState", 2),
                         ("timeoutMillis", 20 * 60 * 1000)])
