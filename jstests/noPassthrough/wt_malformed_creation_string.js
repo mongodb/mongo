@@ -48,14 +48,11 @@
 
         // Index creation with malformed string should fail
         for (var i = 0; i < malformedStrings.length; i++) {
-            assert.commandFailedWithCode(
-                testDB.coll.createIndex(
-                    {a: 1},
-                    {
-                      name: 'with_malformed_str',
-                      storageEngine: {[engine]: {configString: malformedStrings[i]}}
-                    }),
-                ErrorCodes.FailedToParse);
+            assert.commandFailedWithCode(testDB.coll.createIndex({a: 1}, {
+                name: 'with_malformed_str',
+                storageEngine: {[engine]: {configString: malformedStrings[i]}}
+            }),
+                                         ErrorCodes.FailedToParse);
         }
 
         MongoRunner.stopMongod(conn);
