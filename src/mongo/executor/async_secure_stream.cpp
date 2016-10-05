@@ -108,7 +108,7 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
 }
 
 void AsyncSecureStream::cancel() {
-    cancelStream(&_stream.lowest_layer(), _connected);
+    cancelStream(&_stream.lowest_layer());
 }
 
 bool AsyncSecureStream::isOpen() {
