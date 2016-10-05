@@ -68,7 +68,7 @@
     // Do prep work to make original primary transtion to primary again smoother by
     // waiting for all nodes to catch up to make them eligible to become primary and
     // step down the current primary to make it stop generating new oplog entries.
-    configRS.awaitReplication(60 * 1000);
+    configRS.awaitReplication();
 
     try {
         newPriConn.adminCommand({replSetStepDown: 60, force: true});
