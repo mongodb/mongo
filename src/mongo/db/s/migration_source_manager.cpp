@@ -152,7 +152,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     invariant(!_committedMetadata->getKeyPattern().isEmpty());
 
     ChunkType origChunk;
-    if (!_committedMetadata->getNextChunk(_args.getMinKey(), &origChunk)) {
+    if (!_committedMetadata->getNextChunk(_args.getMinKey(), &origChunk) ||
+        origChunk.getMin().woCompare(_args.getMinKey()) != 0) {
         // If this assertion is hit, it means that whoever called the shard moveChunk command
         // (mongos or the CSRS balancer) did not check whether the chunk actually belongs to this
         // shard. It is a benign error and does not indicate data corruption.
@@ -163,13 +164,15 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     }
 
     uassert(40146,
-            str::stream() << "Unable to find chunk with the exact bounds "
-                          << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
-                          << " at collection version "
-                          << collectionVersion.toString()
-                          << ". This indicates corrupted metadata.",
-            origChunk.getMin().woCompare(_args.getMinKey()) == 0 &&
-                origChunk.getMax().woCompare(_args.getMaxKey()) == 0);
+            str::stream()
+                << "Unable to find a chunk with the exact bounds '"
+                << ChunkRange(_args.getMinKey(), _args.getMaxKey()).toString()
+                << "' at collection version '"
+                << collectionVersion.toString()
+                << "'. Instead found chunk with bounds '"
+                << origChunk.toString()
+                << "'.  The chunk must have been split before the moveChunk command was issued.",
+            origChunk.getMax().woCompare(_args.getMaxKey()) == 0);
 }
 
 MigrationSourceManager::~MigrationSourceManager() {
