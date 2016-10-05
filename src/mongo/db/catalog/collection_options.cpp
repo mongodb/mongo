@@ -248,8 +248,6 @@ Status CollectionOptions::parse(const BSONObj& options) {
         } else if (fieldName == "writeConcern") {
             continue;
         } else if (fieldName == "maxTimeMS") {
-            // TODO SERVER-26457: Remove in 3.6. This is needed in 3.4 because a 3.2 mongos can
-            // attach maxTimeMS to a create command on the config servers.
             continue;
         } else {
             return Status(ErrorCodes::InvalidOptions,
