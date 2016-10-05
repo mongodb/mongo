@@ -716,7 +716,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     auto poolGuard = MakeGuard([] { ScriptEngine::dropScopeCache(); });
 
-    unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
+    unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
     shellMainScope = scope.get();
 
     if (shellGlobalParams.runShell)
