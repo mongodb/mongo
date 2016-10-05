@@ -39,7 +39,12 @@ namespace executor {
 
 void logCloseFailed(std::error_code ec) {
     invariant(ec);
-    log() << "failed to close stream: " << ec.message();
+    log() << "Failed to close stream: " << ec.message();
+}
+
+void logCancelFailed(std::error_code ec) {
+    invariant(ec);
+    log() << "Failed to cancel stream: " << ec.message();
 }
 
 void logFailureInSetStreamNonBlocking(std::error_code ec) {
