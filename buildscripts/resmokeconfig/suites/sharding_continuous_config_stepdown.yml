@@ -120,6 +120,9 @@ selector:
     - jstests/sharding/move_chunk_wc.js
     # Expects that connections to all shards/config servers will never close
     - jstests/sharding/shard6.js
+    # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
+    - jstests/sharding/migration_ignore_interrupts_3.js
+    - jstests/sharding/migration_ignore_interrupts_4.js
 
 executor:
   js_test:
