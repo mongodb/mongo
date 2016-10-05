@@ -189,3 +189,10 @@ env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                     'saslauth'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
                 LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('sasl_scramsha1_test',
+                'sasl_scramsha1_test.cpp',
+                LIBDEPS=[
+                    'saslauth',
+                    '$BUILD_DIR/mongo/client/sasl_client',
+                ])
+
