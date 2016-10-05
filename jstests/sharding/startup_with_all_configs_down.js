@@ -74,17 +74,22 @@
 
     jsTestLog("Should now be possible to connect to the mongos that was started while the config " +
               "servers were down");
-    var mongos2 = null;
-    assert.soon(function() {
-        try {
-            mongos2 = new Mongo(newMongosInfo.host);
-            return true;
-        } catch (e) {
-            printjson(e);
-            return false;
-        }
-    });
-    assert.eq(100, mongos2.getDB('test').foo.find().itcount());
+    var newMongosConn = null;
+    var caughtException = null;
+    assert.soon(
+        function() {
+            try {
+                newMongosConn = new Mongo(newMongosInfo.host);
+                return true;
+            } catch (e) {
+                caughtException = e;
+                return false;
+            }
+        },
+        "Failed to connect to mongos after config servers were restarted: " +
+            tojson(caughtException));
+
+    assert.eq(100, newMongosConn.getDB('test').foo.find().itcount());
 
     st.stop();
 }());
