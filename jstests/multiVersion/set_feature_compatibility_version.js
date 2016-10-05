@@ -411,4 +411,53 @@
 
     downgradeShard.stopSet();
     st.stop();
+
+    // Create a cluster running with featureCompatibilityVersion=3.4.
+    st = new ShardingTest({shards: 1, mongos: 1});
+    mongosAdminDB = st.s.getDB("admin");
+    configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
+    shardPrimaryAdminDB = st.shard0.getDB("admin");
+    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.commandWorked(res);
+    assert.eq(res.featureCompatibilityVersion, "3.4");
+    assert.eq(
+        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
+        "3.4");
+    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.commandWorked(res);
+    assert.eq(res.featureCompatibilityVersion, "3.4");
+    assert.eq(
+        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
+        "3.4");
+
+    // Ensure that a 3.2 mongos fails to join the featureCompatibilityVersion=3.4 cluster.
+    var downgradeMongos =
+        MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: downgrade});
+    assert.eq(null, downgradeMongos);
+
+    // Ensure that a 3.2 mongos can be added to a featureCompatibilityVersion=3.2 cluster.
+    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
+    res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.commandWorked(res);
+    assert.eq(res.featureCompatibilityVersion, "3.2");
+    assert.eq(
+        configPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
+        "3.2");
+    st.configRS.awaitReplication();
+    res = shardPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert.commandWorked(res);
+    assert.eq(res.featureCompatibilityVersion, "3.2");
+    assert.eq(
+        shardPrimaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
+        "3.2");
+    downgradeMongos =
+        MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: downgrade});
+    assert.neq(null, downgradeMongos);
+
+    // Ensure that the 3.2 mongos can perform reads and writes to the shards in the cluster.
+    assert.writeOK(downgradeMongos.getDB("test").foo.insert({x: 1}));
+    var foundDoc = downgradeMongos.getDB("test").foo.findOne({x: 1});
+    assert.neq(null, foundDoc);
+    assert.eq(1, foundDoc.x, tojson(foundDoc));
+    st.stop();
 })();
