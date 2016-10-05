@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 
 #include <algorithm>
 

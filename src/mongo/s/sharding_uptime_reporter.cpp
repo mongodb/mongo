@@ -34,7 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/server_options.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"

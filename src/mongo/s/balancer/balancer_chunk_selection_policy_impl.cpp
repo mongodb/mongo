@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
+#include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
 
 #include <set>
 #include <vector>

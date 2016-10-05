@@ -28,9 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/balancer/scoped_migration_request.h"
+#include "mongo/s/balancer/scoped_migration_request.h"
 
-#include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/s/balancer/type_migration.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/migration_secondary_throttle_options.h"

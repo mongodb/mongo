@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/balancer/balancer.h"
+#include "mongo/s/balancer/balancer.h"
 
 #include <algorithm>
 #include <string>
@@ -41,9 +41,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
-#include "mongo/db/s/balancer/cluster_statistics_impl.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/balancer/balancer_chunk_selection_policy_impl.h"
+#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer/cluster_statistics_impl.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
@@ -118,6 +118,7 @@ private:
  * in the cluster.
  */
 void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
+
     auto&& vii = VersionInfoInterface::instance();
 
     bool isMultiVersion = false;

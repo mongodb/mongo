@@ -38,7 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"

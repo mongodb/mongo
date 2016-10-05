@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/s/balancer/balancer_chunk_selection_policy.h"
 
 namespace mongo {
 

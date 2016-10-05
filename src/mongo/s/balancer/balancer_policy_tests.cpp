@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/balancer/balancer_policy.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"

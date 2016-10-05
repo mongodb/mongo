@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
-#include "mongo/db/s/balancer/migration_manager.h"
+#include "mongo/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/s/balancer/migration_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

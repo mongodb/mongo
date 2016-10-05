@@ -47,7 +47,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/balancer/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"

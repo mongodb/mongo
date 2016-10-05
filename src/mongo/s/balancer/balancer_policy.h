@@ -31,7 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 

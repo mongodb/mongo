@@ -45,6 +45,7 @@ env.Library(
 env.Library(
     target='common',
     source=[
+        'balancer/type_migration.cpp',
         'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',
         'catalog/type_chunk.cpp',
@@ -92,6 +93,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_mock',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
@@ -153,6 +155,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_common_test',
     source=[
+        'balancer/type_migration_test.cpp',
         'catalog/type_changelog_test.cpp',
         'catalog/type_chunk_test.cpp',
         'catalog/type_collection_test.cpp',
@@ -249,11 +252,20 @@ env.CppUnitTest('request_types_test',
     ],
 )
 
-# This library contains sharding functionality used by both mongod and mongos
+# This library contains sharding functionality used by both mongod and mongos. Certain tests,
+# which exercise this functionality also link against it.
 env.Library(
     target='coreshard',
     source=[
-        'balancer_configuration.cpp',
+        'balancer/balancer.cpp',
+        'balancer/balancer_chunk_selection_policy.cpp',
+        'balancer/balancer_chunk_selection_policy_impl.cpp',
+        'balancer/balancer_configuration.cpp',
+        'balancer/balancer_policy.cpp',
+        'balancer/cluster_statistics.cpp',
+        'balancer/cluster_statistics_impl.cpp',
+        'balancer/migration_manager.cpp',
+        'balancer/scoped_migration_request.cpp',
         'catalog/catalog_cache.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
@@ -317,11 +329,15 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='balancer_configuration_test',
+    target='balancer_test',
     source=[
-        'balancer_configuration_test.cpp',
+        'balancer/balancer_configuration_test.cpp',
+        'balancer/balancer_policy_tests.cpp',
+        'balancer/cluster_statistics_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'coreshard',
         'sharding_test_fixture',
     ]
@@ -335,6 +351,19 @@ env.CppUnitTest(
     LIBDEPS=[
         'coreshard',
         'sharding_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
+    target='migration_manager_test',
+    source=[
+        'balancer/migration_manager_test.cpp',
+        'balancer/scoped_migration_request_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/version_impl',
+        'config_server_test_fixture',
+        'coreshard',
     ]
 )
 

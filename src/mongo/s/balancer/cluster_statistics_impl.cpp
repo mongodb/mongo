@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/balancer/cluster_statistics_impl.h"
+#include "mongo/s/balancer/cluster_statistics_impl.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
