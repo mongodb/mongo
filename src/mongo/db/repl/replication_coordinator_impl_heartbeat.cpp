@@ -210,11 +210,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         }
     }
 
-    {
-        LockGuard lk(_mutex);
-        // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
-        _signalStepDownWaiter_inlock();
-    }
+    // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
+    _signalStepDownWaiter_inlock();
 
     _scheduleHeartbeatToTarget(
         target, targetIndex, std::max(now, action.getNextHeartbeatStartDate()));
