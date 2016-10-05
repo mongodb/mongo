@@ -115,7 +115,9 @@ public:
      * Note that this will also try to connect to the config servers and will block until it
      * succeeds.
      */
-    void initializeFromConfigConnString(OperationContext* txn, const std::string& configSvr);
+    void initializeFromConfigConnString(OperationContext* txn,
+                                        const std::string& configSvr,
+                                        const std::string shardName);
 
     /**
      * Initializes the sharding state of this server from the shard identity document argument.
@@ -133,18 +135,6 @@ public:
      * ConfigServerMetadata decoration attached to the OperationContext.
      */
     Status updateConfigServerOpTimeFromMetadata(OperationContext* txn);
-
-    /**
-     * Assigns a shard name to this MongoD instance.
-     * TODO: The only reason we need this method and cannot merge it together with the initialize
-     * call is the setShardVersion request being sent by the config coordinator to the config server
-     * instances. This is the only command, which does not include shard name and once we get rid of
-     * the legacy style config servers, we can merge these methods.
-     *
-     * Throws an error if shard name has always been set and the newly specified value does not
-     * match what was previously installed.
-     */
-    void setShardName(const std::string& shardName);
 
     CollectionShardingState* getNS(const std::string& ns, OperationContext* txn);
 
@@ -325,8 +315,9 @@ private:
      * terminated.
      *
      * @param configSvr Connection string of the config server to use.
+     * @param shardName the name of the shard in config.shards
      */
-    void _initializeImpl(ConnectionString configSvr);
+    void _initializeImpl(ConnectionString configSvr, std::string shardName);
 
     /**
      * Must be called only when the current state is kInitializing. Sets the current state to

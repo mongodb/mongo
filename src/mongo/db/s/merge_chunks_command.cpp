@@ -418,11 +418,10 @@ public:
         //
 
         ShardingState* gss = ShardingState::get(txn);
-
-        string config;
-        FieldParser::FieldState extracted =
-            FieldParser::extract(cmdObj, configField, &config, &errmsg);
         if (!gss->enabled()) {
+            string configConnString;
+            FieldParser::FieldState extracted =
+                FieldParser::extract(cmdObj, configField, &configConnString, &errmsg);
             if (!extracted || extracted == FieldParser::FIELD_NONE) {
                 errmsg =
                     "sharding state must be enabled or "
@@ -430,17 +429,15 @@ public:
                 return false;
             }
 
-            gss->initializeFromConfigConnString(txn, config);
-        }
+            string shardName;
+            extracted = FieldParser::extract(cmdObj, shardNameField, &shardName, &errmsg);
+            if (!extracted) {
+                errmsg =
+                    "shard name must be specified to merge chunks if sharding state not enabled";
+                return false;
+            }
 
-        // ShardName is optional, but might not be set yet
-        string shardName;
-        extracted = FieldParser::extract(cmdObj, shardNameField, &shardName, &errmsg);
-
-        if (!extracted)
-            return false;
-        if (extracted != FieldParser::FIELD_NONE) {
-            gss->setShardName(shardName);
+            gss->initializeFromConfigConnString(txn, configConnString, shardName);
         }
 
         //
@@ -455,7 +452,6 @@ public:
         auto mergeStatus = mergeChunks(txn, NamespaceString(ns), minKey, maxKey, epoch);
         return appendCommandStatus(result, mergeStatus);
     }
-
 } mergeChunksCmd;
 
 BSONField<string> MergeChunksCommand::nsField("mergeChunks");

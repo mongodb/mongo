@@ -240,11 +240,8 @@ public:
             }
 
             const string configdb = cmdObj["configdb"].String();
-            shardingState->initializeFromConfigConnString(txn, configdb);
+            shardingState->initializeFromConfigConnString(txn, configdb, shardName);
         }
-
-        // Initialize our current shard name in the shard state if needed
-        shardingState->setShardName(shardName);
 
         log() << "received splitChunk request: " << redact(cmdObj);
 

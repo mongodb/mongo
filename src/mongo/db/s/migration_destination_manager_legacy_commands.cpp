@@ -106,10 +106,14 @@ public:
             return false;
         }
 
+        const ShardId toShard(cmdObj["toShardName"].String());
+        const ShardId fromShard(cmdObj["fromShardName"].String());
+
         if (!shardingState->enabled()) {
             if (!cmdObj["configServer"].eoo()) {
                 dassert(cmdObj["configServer"].type() == String);
-                shardingState->initializeFromConfigConnString(txn, cmdObj["configServer"].String());
+                shardingState->initializeFromConfigConnString(
+                    txn, cmdObj["configServer"].String(), toShard.toString());
             } else {
                 errmsg = str::stream()
                     << "cannot start recv'ing chunk, "
@@ -120,9 +124,6 @@ public:
             }
         }
 
-        const ShardId toShard(cmdObj["toShardName"].String());
-        shardingState->setShardName(toShard.toString());
-        const ShardId fromShard(cmdObj["fromShardName"].String());
 
         const NamespaceString nss(cmdObj.firstElement().String());
 

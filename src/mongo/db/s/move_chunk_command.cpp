@@ -147,10 +147,10 @@ public:
 
         if (!shardingState->enabled()) {
             shardingState->initializeFromConfigConnString(
-                txn, moveChunkRequest.getConfigServerCS().toString());
+                txn,
+                moveChunkRequest.getConfigServerCS().toString(),
+                moveChunkRequest.getFromShardId().toString());
         }
-
-        shardingState->setShardName(moveChunkRequest.getFromShardId().toString());
 
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.

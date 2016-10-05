@@ -203,29 +203,6 @@ Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn
     return Status::OK();
 }
 
-void ShardingState::setShardName(const string& name) {
-    const string clientAddr = cc().clientAddress(true);
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_shardName.empty()) {
-        // TODO SERVER-2299 remotely verify the name is sound w.r.t IPs
-        _shardName = name;
-
-        log() << "remote client " << clientAddr << " initialized this host as shard " << name;
-        return;
-    }
-
-    if (_shardName != name) {
-        const string message = str::stream()
-            << "remote client " << clientAddr << " tried to initialize this host as shard " << name
-            << ", but shard name was previously initialized as " << _shardName;
-
-        warning() << message;
-        uassertStatusOK({ErrorCodes::AlreadyInitialized, message});
-    }
-}
-
 CollectionShardingState* ShardingState::getNS(const std::string& ns, OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     CollectionShardingStateMap::iterator it = _collections.find(ns);
@@ -339,7 +316,9 @@ Status ShardingState::refreshMetadataNow(OperationContext* txn,
     return Status::OK();
 }
 
-void ShardingState::initializeFromConfigConnString(OperationContext* txn, const string& configSvr) {
+void ShardingState::initializeFromConfigConnString(OperationContext* txn,
+                                                   const string& configSvr,
+                                                   const string shardName) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -352,7 +331,9 @@ void ShardingState::initializeFromConfigConnString(OperationContext* txn, const 
 
             _setInitializationState_inlock(InitializationState::kInitializing);
 
-            stdx::thread thread([this, configSvrConnStr] { _initializeImpl(configSvrConnStr); });
+            stdx::thread thread([this, configSvrConnStr, shardName] {
+                _initializeImpl(configSvrConnStr, shardName);
+            });
             thread.detach();
         }
     }
@@ -480,7 +461,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
     MONGO_UNREACHABLE;
 }
 
-void ShardingState::_initializeImpl(ConnectionString configSvr) {
+void ShardingState::_initializeImpl(ConnectionString configSvr, string shardName) {
     Client::initThread("ShardingState initialization");
     auto txn = cc().makeOperationContext();
 
@@ -497,6 +478,8 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
             ReplicaSetMonitor::setAsynchronousConfigChangeHook(&updateShardIdentityConfigStringCB);
 
             _initializeRangeDeleterTaskExecutor();
+
+            _shardName = shardName;
         }
 
         _signalInitializationComplete(status);

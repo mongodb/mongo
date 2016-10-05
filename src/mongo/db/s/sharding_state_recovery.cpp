@@ -278,8 +278,8 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
     // TODO(SERER-25276): Remove this after 3.4 since 3.4 shards should always have ShardingState
     // initialized by this point.
     if (!shardingState->enabled()) {
-        shardingState->initializeFromConfigConnString(txn, recoveryDoc.getConfigsvr().toString());
-        shardingState->setShardName(recoveryDoc.getShardName());
+        shardingState->initializeFromConfigConnString(
+            txn, recoveryDoc.getConfigsvr().toString(), recoveryDoc.getShardName());
     }
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
