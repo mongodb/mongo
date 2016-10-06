@@ -317,10 +317,18 @@ void BtreeKeyGeneratorV1::getKeysImpl(std::vector<const char*> fieldNames,
         BSONElement e = obj["_id"];
         if (e.eoo()) {
             keys->insert(_nullKey);
-        } else {
+        } else if (_collator) {
             BSONObjBuilder b;
             CollationIndexKey::collationAwareIndexKeyAppend(e, _collator, &b);
+
+            // Insert a copy so its buffer size fits the object size.
+            keys->insert(b.obj().copy());
+        } else {
+            int size = e.size() + 5 /* bson over head*/ - 3 /* remove _id string */;
+            BSONObjBuilder b(size);
+            b.appendAs(e, "");
             keys->insert(b.obj());
+            invariant(keys->begin()->objsize() == size);
         }
 
         // The {_id: 1} index can never be multikey because the _id field isn't allowed to be an
