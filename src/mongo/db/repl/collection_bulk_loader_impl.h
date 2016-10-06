@@ -40,7 +40,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
-#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 namespace repl {
@@ -99,7 +98,6 @@ private:
     std::unique_ptr<MultiIndexBlock> _secondaryIndexesBlock;
     BSONObj _idIndexSpec;
     Stats _stats;
-    ProgressMeter _progressMeter;
 };
 
 }  // namespace repl

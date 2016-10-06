@@ -50,6 +50,9 @@ namespace {
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
+const int kProgressMeterSecondsBetween = 60;
+const int kProgressMeterCheckInterval = 128;
+
 // The batchSize to use for the query to get all documents from the collection.
 // 16MB max batch size / 12 byte min doc size * 10 (for good measure) = batchSize to use.
 const auto batchSize = (16 * 1024 * 1024) / 12 * 10;
@@ -120,7 +123,12 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           };
           _dbWorkTaskRunner.schedule(task);
           return executor::TaskExecutor::CallbackHandle();
-      }) {
+      }),
+      _progressMeter(1U,
+                     kProgressMeterSecondsBetween,
+                     kProgressMeterCheckInterval,
+                     "documents copied",
+                     str::stream() << _sourceNss.toString() << " collection clone progress") {
     // Fetcher throws an exception on null executor.
     invariant(executor);
     uassert(ErrorCodes::BadValue,
@@ -130,6 +138,10 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
     uassert(ErrorCodes::BadValue, "storage interface cannot be null", storageInterface);
     _stats.ns = _sourceNss.ns();
+    // Hide collection size in progress output because this information is not available.
+    // Additionally, even if the collection size is known, it may change while we are copying the
+    // documents from the sync source.
+    _progressMeter.showTotal(false);
 }
 
 CollectionCloner::~CollectionCloner() {
@@ -384,6 +396,7 @@ void CollectionCloner::_insertDocumentsCallback(const executor::TaskExecutor::Ca
     _documents.swap(docs);
     _stats.documents += docs.size();
     ++_stats.fetchBatches;
+    _progressMeter.hit(int(docs.size()));
     invariant(_collLoader);
     const auto status = _collLoader->insertDocuments(docs.cbegin(), docs.cend());
     lk.unlock();
@@ -425,6 +438,7 @@ void CollectionCloner::_finishCallback(const Status& status) {
     _onCompletion(finalStatus);
     lk.lock();
     _stats.end = _executor->now();
+    _progressMeter.finished();
     _active = false;
     _condition.notify_all();
     LOG(1) << "    collection: " << _destNss << ", stats: " << _stats.toString();

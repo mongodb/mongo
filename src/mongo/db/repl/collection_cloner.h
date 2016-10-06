@@ -47,6 +47,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
@@ -203,8 +204,9 @@ private:
     std::vector<BSONObj> _documents;      // (M) Documents read from fetcher to insert.
     TaskRunner _dbWorkTaskRunner;         // (R)
     ScheduleDbWorkFn
-        _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
-    Stats _stats;           // (M) stats for this instance.
+        _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
+    Stats _stats;                  // (M) stats for this instance.
+    ProgressMeter _progressMeter;  // (M) progress meter for this instance.
 };
 
 }  // namespace repl

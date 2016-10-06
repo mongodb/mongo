@@ -51,12 +51,6 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-
-const int kProgressMeterSecondsBetween = 60;
-const int kProgressMeterCheckInterval = 128;
-}
-
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
                                                    Collection* coll,
                                                    const BSONObj idIndexSpec,
@@ -73,12 +67,7 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
       _nss{coll->ns()},
       _idIndexBlock(stdx::make_unique<MultiIndexBlock>(txn, coll)),
       _secondaryIndexesBlock(stdx::make_unique<MultiIndexBlock>(txn, coll)),
-      _idIndexSpec(idIndexSpec),
-      _progressMeter(1U,
-                     kProgressMeterSecondsBetween,
-                     kProgressMeterCheckInterval,
-                     "documents copied",
-                     str::stream() << coll->ns().toString() << " collection clone progress") {
+      _idIndexSpec(idIndexSpec) {
     invariant(txn);
     invariant(coll);
     invariant(_runner);
@@ -86,10 +75,6 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
     invariant(_autoColl);
     invariant(_autoDB->getDb());
     invariant(_autoColl->getDb() == _autoDB->getDb());
-    // Hide collection size in progress output because this information is not available.
-    // Additionally, even if the collection size is known, it may change while we are copying the
-    // documents from the sync source.
-    _progressMeter.showTotal(false);
 }
 
 CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
@@ -161,9 +146,6 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
 
                 ++count;
             }
-
-            _progressMeter.hit(count);
-
             return Status::OK();
         });
 }
@@ -234,8 +216,6 @@ Status CollectionBulkLoaderImpl::commit() {
             _stats.endBuildingIndexes = Date_t::now();
             LOG(2) << "Done creating indexes for ns: " << _nss.ns()
                    << ", stats: " << _stats.toString();
-
-            _progressMeter.finished();
 
             _releaseResources();
             return Status::OK();

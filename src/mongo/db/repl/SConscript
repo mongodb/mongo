@@ -72,7 +72,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
-        '$BUILD_DIR/mongo/util/progress_meter',
     ],
 )
 
@@ -780,6 +779,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/util/progress_meter',
     ],
 )
 
