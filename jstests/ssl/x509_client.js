@@ -29,22 +29,16 @@ function authAndTest(mongo) {
     test = mongo.getDB("test");
 
     // It should be impossible to create users with the same name as the server's subject
-    assert.throws(
-        function() {
-            external.createUser(
-                {user: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
-        },
-        {},
-        "Created user with same name as the server's x.509 subject");
+    assert.throws(function() {
+        external.createUser(
+            {user: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
+    }, [], "Created user with same name as the server's x.509 subject");
 
     // It should be impossible to create users with names recognized as cluster members
-    assert.throws(
-        function() {
-            external.createUser(
-                {user: INTERNAL_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
-        },
-        {},
-        "Created user which would be recognized as a cluster member");
+    assert.throws(function() {
+        external.createUser(
+            {user: INTERNAL_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
+    }, [], "Created user which would be recognized as a cluster member");
 
     // Add user using localhost exception
     external.createUser({
@@ -62,12 +56,9 @@ function authAndTest(mongo) {
     });
 
     // Localhost exception should not be in place anymore
-    assert.throws(
-        function() {
-            test.foo.findOne();
-        },
-        {},
-        "read without login");
+    assert.throws(function() {
+        test.foo.findOne();
+    }, [], "read without login");
 
     assert(!external.auth({user: INVALID_CLIENT_USER, mechanism: 'MONGODB-X509'}),
            "authentication with invalid user should fail");
@@ -86,12 +77,9 @@ function authAndTest(mongo) {
     test.foo.findOne();
 
     external.logout();
-    assert.throws(
-        function() {
-            test.foo.findOne();
-        },
-        {},
-        "read after logout");
+    assert.throws(function() {
+        test.foo.findOne();
+    }, [], "read after logout");
 }
 
 print("1. Testing x.509 auth to mongod");

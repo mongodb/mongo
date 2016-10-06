@@ -32,8 +32,12 @@
     assert.eq(mongo.getLogComponents().storage.journal.verbosity, 1);
 
     // setLogLevel - invalid argument
-    assert.throws(mongo.setLogLevel, [2, 24]);
-    assert.throws(db.setLogLevel, [2, ["array", "not.allowed"]]);
+    assert.throws(function() {
+        mongo.setLogLevel(2, 24);
+    });
+    assert.throws(function() {
+        db.setLogLevel(2, ["array", "not.allowed"]);
+    });
 
     // Restore originalSettings
     assert.commandWorked(
