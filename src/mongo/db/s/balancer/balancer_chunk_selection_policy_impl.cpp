@@ -50,7 +50,6 @@
 
 namespace mongo {
 
-using ChunkMinimumsSet = BSONObjSet;
 using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
 using SplitInfoVector = BalancerChunkSelectionPolicy::SplitInfoVector;
 using std::shared_ptr;
@@ -63,10 +62,9 @@ namespace {
  * Does a linear pass over the information cached in the specified chunk manager and extracts chunk
  * distrubution and chunk placement information which is needed by the balancer policy.
  */
-StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDistributionInfo(
+StatusWith<DistributionStatus> createCollectionDistributionStatus(
     OperationContext* txn, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
     ShardToChunksMap shardToChunksMap;
-    ChunkMinimumsSet chunkMinimums = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
     // be accounted for
@@ -82,9 +80,9 @@ StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDist
         chunk.setMax(chunkEntry->getMax());
         chunk.setJumbo(chunkEntry->isJumbo());
         chunk.setShard(chunkEntry->getShardId());
+        chunk.setVersion(chunkEntry->getLastmod());
 
         shardToChunksMap[chunkEntry->getShardId()].push_back(chunk);
-        chunkMinimums.insert(chunkEntry->getMin());
     }
 
     vector<TagsType> collectionTags;
@@ -114,8 +112,70 @@ StatusWith<std::pair<DistributionStatus, ChunkMinimumsSet>> createCollectionDist
         }
     }
 
-    return std::make_pair(std::move(distribution), std::move(chunkMinimums));
+    return {std::move(distribution)};
 }
+
+/**
+ * Helper class used to accumulate the split points for the same chunk together so they can be
+ * submitted to the shard as a single call versus multiple. This is necessary in order to avoid
+ * refreshing the chunk metadata after every single split point (if done one by one), because
+ * splitting a chunk does not yield the same chunk anymore.
+ */
+class SplitCandidatesBuffer {
+    MONGO_DISALLOW_COPYING(SplitCandidatesBuffer);
+
+public:
+    SplitCandidatesBuffer(NamespaceString nss, ChunkVersion collectionVersion)
+        : _nss(std::move(nss)),
+          _collectionVersion(collectionVersion),
+          _chunkSplitPoints(SimpleBSONObjComparator::kInstance
+                                .makeBSONObjIndexedMap<BalancerChunkSelectionPolicy::SplitInfo>()) {
+    }
+
+    /**
+     * Adds the specified split point to the chunk. The split points must always be within the
+     * boundaries of the chunk and must come in increasing order.
+     */
+    void addSplitPoint(shared_ptr<Chunk> chunk, const BSONObj& splitPoint) {
+        auto it = _chunkSplitPoints.find(chunk->getMin());
+        if (it == _chunkSplitPoints.end()) {
+            _chunkSplitPoints.emplace(chunk->getMin(),
+                                      BalancerChunkSelectionPolicy::SplitInfo(chunk->getShardId(),
+                                                                              _nss,
+                                                                              _collectionVersion,
+                                                                              chunk->getLastmod(),
+                                                                              chunk->getMin(),
+                                                                              chunk->getMax(),
+                                                                              {splitPoint}));
+        } else if (splitPoint.woCompare(it->second.splitKeys.back()) > 0) {
+            it->second.splitKeys.push_back(splitPoint);
+        } else {
+            // Split points must come in order
+            invariant(splitPoint.woCompare(it->second.splitKeys.back()) == 0);
+        }
+    }
+
+    /**
+     * May be called only once for the lifetime of the buffer. Moves the contents of the buffer into
+     * a vector of split infos to be passed to the split call.
+     */
+    SplitInfoVector done() {
+        BalancerChunkSelectionPolicy::SplitInfoVector splitPoints;
+        for (const auto& entry : _chunkSplitPoints) {
+            splitPoints.push_back(std::move(entry.second));
+        }
+
+        return splitPoints;
+    }
+
+private:
+    // Namespace and expected collection version
+    const NamespaceString _nss;
+    const ChunkVersion _collectionVersion;
+
+    // Chunk min key and split vector associated with that chunk
+    BSONObjIndexedMap<BalancerChunkSelectionPolicy::SplitInfo> _chunkSplitPoints;
+};
 
 }  // namespace
 
@@ -242,14 +302,14 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
 
-    auto collInfo = std::move(collInfoStatus.getValue());
+    const DistributionStatus& distribution = collInfoStatus.getValue();
 
-    return BalancerPolicy::balanceSingleChunk(chunk, shardStats, std::get<0>(collInfo));
+    return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution);
 }
 
 Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
@@ -272,14 +332,12 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
 
-    auto collInfo = std::move(collInfoStatus.getValue());
-
-    DistributionStatus distribution = std::move(std::get<0>(collInfo));
+    const DistributionStatus& distribution = collInfoStatus.getValue();
 
     auto newShardIterator =
         std::find_if(shardStats.begin(),
@@ -307,67 +365,45 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
+
+    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
 
-    auto collInfo = std::move(collInfoStatus.getValue());
-
-    DistributionStatus distribution = std::move(std::get<0>(collInfo));
-    ChunkMinimumsSet allChunkMinimums = std::move(std::get<1>(collInfo));
-
-    SplitInfoVector splitCandidates;
+    const DistributionStatus& distribution = collInfoStatus.getValue();
 
     // Accumulate split points for the same chunk together
-    shared_ptr<Chunk> currentChunk;
-    vector<BSONObj> currentSplitVector;
+    SplitCandidatesBuffer splitCandidates(nss, cm->getVersion());
 
     for (const auto& tagRangeEntry : distribution.tagRanges()) {
         const auto& tagRange = tagRangeEntry.second;
 
-        if (allChunkMinimums.count(tagRange.min)) {
+        shared_ptr<Chunk> chunkAtZoneMin =
+            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.min);
+        invariant(chunkAtZoneMin->getMax().woCompare(tagRange.min) > 0);
+
+        if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
+            splitCandidates.addSplitPoint(chunkAtZoneMin, tagRange.min);
+        }
+
+        // The global max key can never fall in the middle of a chunk
+        if (!tagRange.max.woCompare(shardKeyPattern.globalMax()))
             continue;
-        }
 
-        shared_ptr<Chunk> chunk = cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.min);
+        shared_ptr<Chunk> chunkAtZoneMax =
+            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.max);
 
-        if (!currentChunk) {
-            currentChunk = chunk;
-        }
-
-        invariant(currentChunk);
-
-        if (chunk == currentChunk) {
-            currentSplitVector.push_back(tagRange.min);
-        } else {
-            splitCandidates.emplace_back(currentChunk->getShardId(),
-                                         nss,
-                                         cm->getVersion(),
-                                         currentChunk->getLastmod(),
-                                         currentChunk->getMin(),
-                                         currentChunk->getMax(),
-                                         std::move(currentSplitVector));
-
-            currentChunk = chunk;
-            currentSplitVector.push_back(tagRange.min);
+        // We need to check that both the chunk's minKey does not match the zone's max and also that
+        // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
+        if (chunkAtZoneMax->getMin().woCompare(tagRange.max) &&
+            chunkAtZoneMax->getMax().woCompare(tagRange.max)) {
+            splitCandidates.addSplitPoint(chunkAtZoneMax, tagRange.max);
         }
     }
 
-    // Drain the current split vector if there are any entries left
-    if (currentChunk) {
-        invariant(!currentSplitVector.empty());
-
-        splitCandidates.emplace_back(currentChunk->getShardId(),
-                                     nss,
-                                     cm->getVersion(),
-                                     currentChunk->getLastmod(),
-                                     currentChunk->getMin(),
-                                     currentChunk->getMax(),
-                                     std::move(currentSplitVector));
-    }
-
-    return splitCandidates;
+    return splitCandidates.done();
 }
 
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
@@ -383,30 +419,51 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     auto scopedCM = std::move(scopedCMStatus.getValue());
     ChunkManager* const cm = scopedCM.cm();
 
-    auto collInfoStatus = createCollectionDistributionInfo(txn, shardStats, cm);
+    const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
+
+    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
 
-    auto collInfo = std::move(collInfoStatus.getValue());
-
-    DistributionStatus distribution = std::move(std::get<0>(collInfo));
-    ChunkMinimumsSet allChunkMinimums = std::move(std::get<1>(collInfo));
+    const DistributionStatus& distribution = collInfoStatus.getValue();
 
     for (const auto& tagRangeEntry : distribution.tagRanges()) {
         const auto& tagRange = tagRangeEntry.second;
 
-        if (!allChunkMinimums.count(tagRange.min)) {
-            // This tag falls somewhere at the middle of a chunk. Therefore we must skip balancing
-            // this collection until it is split at the next iteration.
-            //
-            // TODO: We should be able to just skip chunks, which straddle tags and still make some
-            // progress balancing.
+        shared_ptr<Chunk> chunkAtZoneMin =
+            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.min);
+
+        if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
                         << "Tag boundaries "
                         << tagRange.toString()
-                        << " fall in the middle of an existing chunk. Balancing for collection "
+                        << " fall in the middle of an existing chunk "
+                        << ChunkRange(chunkAtZoneMin->getMin(), chunkAtZoneMin->getMax()).toString()
+                        << ". Balancing for collection "
+                        << nss.ns()
+                        << " will be postponed until the chunk is split appropriately."};
+        }
+
+        // The global max key can never fall in the middle of a chunk
+        if (!tagRange.max.woCompare(shardKeyPattern.globalMax()))
+            continue;
+
+        shared_ptr<Chunk> chunkAtZoneMax =
+            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.max);
+
+        // We need to check that both the chunk's minKey does not match the zone's max and also that
+        // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
+        if (chunkAtZoneMax->getMin().woCompare(tagRange.max) &&
+            chunkAtZoneMax->getMax().woCompare(tagRange.max)) {
+            return {ErrorCodes::IllegalOperation,
+                    str::stream()
+                        << "Tag boundaries "
+                        << tagRange.toString()
+                        << " fall in the middle of an existing chunk "
+                        << ChunkRange(chunkAtZoneMax->getMin(), chunkAtZoneMax->getMax()).toString()
+                        << ". Balancing for collection "
                         << nss.ns()
                         << " will be postponed until the chunk is split appropriately."};
         }

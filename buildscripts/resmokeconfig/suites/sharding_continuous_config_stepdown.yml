@@ -16,8 +16,6 @@ selector:
     - jstests/sharding/auto_rebalance_parallel.js
     - jstests/sharding/auto_rebalance_parallel_replica_sets.js
     - jstests/sharding/autosplit_heuristics.js
-    - jstests/sharding/balance_tags1.js
-    - jstests/sharding/balance_tags2.js
     - jstests/sharding/basic_drop_coll.js
     - jstests/sharding/basic_merge.js
     - jstests/sharding/count1.js
@@ -57,8 +55,6 @@ selector:
     - jstests/sharding/sharding_balance3.js
     - jstests/sharding/sharding_balance4.js
     - jstests/sharding/sharding_migrate_cursor1.js
-    - jstests/sharding/tag_auto_split.js
-    - jstests/sharding/tag_auto_split_partial_key.js
     - jstests/sharding/tag_range.js
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
