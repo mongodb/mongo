@@ -424,6 +424,26 @@ TEST(BalancerPolicy, BalancerRespectsTagPolicyBeforeImbalance) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
 }
 
+TEST(BalancerPolicy, BalancerFixesIncorrectTagsWithCrossShardViolationOfTags) {
+    // The zone policy dictates that the same shard must donate and also receive chunks. The test
+    // validates that the same shard is not used as a donor and recipient as part of the same round.
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, {"b"}, emptyShardVersion), 3}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 1), "b")));
+    ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 8), kMaxBSONKey, "a")));
+
+    const auto migrations(BalancerPolicy::balance(cluster.first, distribution, false));
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId2, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+}
+
 TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedCluster) {
     // Chunks are balanced across shards, but there are wrong tags, which need to be fixed
     auto cluster = generateCluster(
@@ -548,6 +568,13 @@ TEST(DistributionStatus, ChunkTagsSelectorWithRegularKeys) {
 
     {
         ChunkType chunk;
+        chunk.setMin(BSON("x" << 30));
+        chunk.setMax(kMaxBSONKey);
+        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+    }
+
+    {
+        ChunkType chunk;
         chunk.setMin(BSON("x" << 40));
         chunk.setMax(kMaxBSONKey);
         ASSERT_EQUALS("", d.getTagForChunk(chunk));
@@ -593,6 +620,13 @@ TEST(DistributionStatus, ChunkTagsSelectorWithMinMaxKeys) {
         ChunkType chunk;
         chunk.setMin(BSON("x" << 10));
         chunk.setMax(BSON("x" << 20));
+        ASSERT_EQUALS("", d.getTagForChunk(chunk));
+    }
+
+    {
+        ChunkType chunk;
+        chunk.setMin(BSON("x" << 10));
+        chunk.setMax(BSON("x" << 100));
         ASSERT_EQUALS("", d.getTagForChunk(chunk));
     }
 

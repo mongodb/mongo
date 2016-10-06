@@ -304,6 +304,9 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
             if (!stat.isDraining)
                 continue;
 
+            if (usedShards.count(stat.shardId))
+                continue;
+
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
 
             if (chunks.empty())
@@ -349,9 +352,14 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
     // 2) Check for chunks, which are on the wrong shard and must be moved off of it
     if (!distribution.tags().empty()) {
         for (const auto& stat : shardStats) {
+            if (usedShards.count(stat.shardId))
+                continue;
+
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
+
             for (const auto& chunk : chunks) {
                 const string tag = distribution.getTagForChunk(chunk);
+
                 if (tag.empty())
                     continue;
 

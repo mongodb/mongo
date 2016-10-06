@@ -66,7 +66,11 @@ using std::vector;
 namespace {
 
 const Seconds kBalanceRoundDefaultInterval(10);
-const Seconds kShortBalanceRoundInterval(1);
+
+// Delay between balancer rounds if the last round found some chunks which needs to be balanced.
+// This value is set to 0 so that imbalanced clusters or clusters with tag range violations can be
+// processes as quickly as possible.
+const Seconds kShortBalanceRoundInterval(0);
 
 const auto getBalancer = ServiceContext::declareDecoration<std::unique_ptr<Balancer>>();
 
@@ -556,8 +560,6 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
             warning() << "Failed to enforce tag range for chunk " << redact(splitInfo.toString())
                       << causedBy(redact(splitStatus.getStatus()));
         }
-
-        cm->reload(txn);
     }
 
     return Status::OK();
