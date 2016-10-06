@@ -62,29 +62,6 @@ CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern, ChunkVersion c
 
 CollectionMetadata::~CollectionMetadata() = default;
 
-std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMigrate(
-    const ChunkType& chunk, const ChunkVersion& newCollectionVersion) const {
-    invariant(newCollectionVersion.epoch() == _collVersion.epoch());
-    invariant(newCollectionVersion > _collVersion);
-    invariant(rangeMapContains(_chunksMap, chunk.getMin(), chunk.getMax()));
-
-    unique_ptr<CollectionMetadata> metadata(stdx::make_unique<CollectionMetadata>());
-    metadata->_keyPattern = _keyPattern.getOwned();
-    metadata->fillKeyPatternFields();
-    metadata->_pendingMap = _pendingMap;
-    metadata->_chunksMap = _chunksMap;
-    metadata->_chunksMap.erase(chunk.getMin());
-
-    metadata->_shardVersion =
-        (metadata->_chunksMap.empty() ? ChunkVersion(0, 0, newCollectionVersion.epoch())
-                                      : newCollectionVersion);
-    metadata->_collVersion = newCollectionVersion;
-    metadata->fillRanges();
-
-    invariant(metadata->isValid());
-    return metadata;
-}
-
 unique_ptr<CollectionMetadata> CollectionMetadata::clonePlusChunk(
     const BSONObj& minKey, const BSONObj& maxKey, const ChunkVersion& newShardVersion) const {
     invariant(newShardVersion.epoch() == _shardVersion.epoch());

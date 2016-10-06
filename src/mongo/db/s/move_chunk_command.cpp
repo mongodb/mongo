@@ -98,6 +98,7 @@ MONGO_FP_DECLARE(moveChunkHangAtStep3);
 MONGO_FP_DECLARE(moveChunkHangAtStep4);
 MONGO_FP_DECLARE(moveChunkHangAtStep5);
 MONGO_FP_DECLARE(moveChunkHangAtStep6);
+MONGO_FP_DECLARE(moveChunkHangAtStep7);
 
 class MoveChunkCommand : public Command {
 public:
@@ -205,7 +206,7 @@ private:
                                           moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
                                           moveChunkRequest.getMaxKey(),
-                                          6,  // Total number of steps
+                                          7,  // Total number of steps
                                           &unusedErrMsg,
                                           moveChunkRequest.getToShardId(),
                                           moveChunkRequest.getFromShardId());
@@ -251,9 +252,13 @@ private:
             }
 
             uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(txn));
-            uassertStatusOKWithWarning(migrationSourceManager.commitDonateChunk(txn));
+            uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(txn));
             moveTimingHelper.done(5);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
+
+            uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(txn));
+            moveTimingHelper.done(6);
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
         }
 
         // Schedule the range deleter
@@ -289,8 +294,8 @@ private:
             }
         }
 
-        moveTimingHelper.done(6);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
+        moveTimingHelper.done(7);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep7);
     }
 
 } moveChunkCmd;

@@ -63,6 +63,7 @@ selector:
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
     - jstests/sharding/migration_failure.js
     - jstests/sharding/migration_with_source_ops.js
+    - jstests/sharding/migration_move_chunk_after_receive.js
     # Testing features that do not exist on v3.2 shards.
     - jstests/sharding/migration_server_status.js
     - jstests/sharding/movechunk_parallel.js

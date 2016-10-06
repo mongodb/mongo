@@ -57,8 +57,9 @@ var moveChunkStepNames = {
     gotDistLock: 2,
     startedMoveChunk: 3,    // called _recvChunkStart on recipient
     reachedSteadyState: 4,  // recipient reports state is "steady"
-    committed: 5,
-    done: 6
+    chunkDataCommitted: 5,  // called _recvChunkCommit on recipient
+    committed: 6,
+    done: 7
 };
 
 function numberToName(names, stepNumber) {

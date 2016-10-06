@@ -83,15 +83,6 @@ public:
     std::unique_ptr<CollectionMetadata> clonePlusPending(const ChunkType& chunk) const;
 
     /**
-     * Returns a new metadata's instance based on 'this's state by removing 'chunk'. When cloning
-     * away the last chunk, the resulting metadata's shard version will be zero.
-     *
-     * The chunk to be migrated must exist, otherwise the call will fassert.
-     */
-    std::unique_ptr<CollectionMetadata> cloneMigrate(
-        const ChunkType& chunk, const ChunkVersion& newCollectionVersion) const;
-
-    /**
      * Returns a new metadata's instance by splitting an existing 'chunk' at the points
      * described by 'splitKeys'. The first resulting chunk will have 'newShardVersion' and
      * subsequent one would have that with the minor version incremented at each chunk. The

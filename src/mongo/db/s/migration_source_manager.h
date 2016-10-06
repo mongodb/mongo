@@ -113,12 +113,21 @@ public:
     /**
      * Waits for the active clone operation to catch up and enters critical section. Once this call
      * returns successfully, no writes will be happening on this shard until the chunk donation is
-     * committed. Therefore, commitDonateChunk must be called as soon as possible after it.
+     * committed. Therefore, commitChunkOnRecipient/commitChunkMetadata must be called as soon as
+     * possible afterwards.
      *
      * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
     Status enterCriticalSection(OperationContext* txn);
+
+    /**
+     * Tells the recipient of the chunk to commit the chunk contents, which it received.
+     *
+     * Expected state: kCriticalSection
+     * Resulting state: kCloneCompleted on success, kDone on failure
+     */
+    Status commitChunkOnRecipient(OperationContext* txn);
 
     /**
      * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
@@ -129,10 +138,10 @@ public:
      *       applying the committed chunk information fails and we cannot definitely verify that the
      *       write was definitely applied or not, this call may crash the server.
      *
-     * Expected state: kCriticalSection
+     * Expected state: kCloneCompleted
      * Resulting state: kDone
      */
-    Status commitDonateChunk(OperationContext* txn);
+    Status commitChunkMetadataOnConfig(OperationContext* txn);
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
@@ -182,7 +191,7 @@ public:
 private:
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
-    enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kDone };
+    enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kCloneCompleted, kDone };
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
