@@ -62,13 +62,19 @@
 
             // Sanity check.  test1Reader can count (read) test1, but not test2.
             assert.eq(test1DB.foo.count(), 1);
-            assert.throws(test2DB.foo.count);
+            assert.throws(function() {
+                test2DB.foo.count();
+            });
 
             // Cannot examine second database from a where clause.
-            assert.throws(test1DB.foo.count, ["db.getSiblingDB('test2').foo.count() == 1"]);
+            assert.throws(function() {
+                test1DB.foo.count("db.getSiblingDB('test2').foo.count() == 1");
+            });
 
             // Cannot write test1 via tricky where clause.
-            assert.throws(test1DB.foo.count, ["db.foo.insert({b: 1})"]);
+            assert.throws(function() {
+                test1DB.foo.count("db.foo.insert({b: 1})");
+            });
             assert.eq(test1DB.foo.count(), 1);
         } finally {
             adminDB.logout();

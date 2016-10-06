@@ -120,9 +120,11 @@ assert.eq(getIDS(res), getIDS(res2));
 
 // -------------------------------------------- LANGUAGE -------------------------------------------
 
-assert.throws(tc.find({"$text": {"$search": "member", $language: "spanglish"}}));
+assert.throws(function() {
+    tc.find({"$text": {"$search": "member", $language: "spanglish"}}).hasNext();
+});
 assert.doesNotThrow(function() {
-    tc.find({"$text": {"$search": "member", $language: "english"}});
+    tc.find({"$text": {"$search": "member", $language: "english"}}).hasNext();
 });
 
 // -------------------------------------------- LIMIT RESULTS --------------------------------------

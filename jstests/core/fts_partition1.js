@@ -10,7 +10,9 @@ t.insert({_id: 4, x: 2, y: "bar"});
 
 t.ensureIndex({x: 1, y: "text"});
 
-assert.throws(t.find({"$text": {"$search": "foo"}}));
+assert.throws(function() {
+    t.find({"$text": {"$search": "foo"}}).hasNext();
+});
 
 assert.eq([1], queryIDS(t, "foo", {x: 1}));
 
