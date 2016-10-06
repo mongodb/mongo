@@ -306,6 +306,7 @@ connection_stats = [
     TxnStat('txn_checkpoint_running', 'transaction checkpoint currently running', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_scrub_target', 'transaction checkpoint scrub dirty target', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_scrub_time', 'transaction checkpoint scrub time (msecs)', 'no_clear,no_scale'),
+    TxnStat('txn_checkpoint_skipped', 'transaction checkpoints skipped because database was clean'),
     TxnStat('txn_checkpoint_time_max', 'transaction checkpoint max time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_min', 'transaction checkpoint min time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_recent', 'transaction checkpoint most recent time (msecs)', 'no_clear,no_scale'),

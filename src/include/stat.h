@@ -439,6 +439,7 @@ struct __wt_connection_stats {
 	int64_t txn_checkpoint_scrub_time;
 	int64_t txn_checkpoint_time_total;
 	int64_t txn_checkpoint;
+	int64_t txn_checkpoint_skipped;
 	int64_t txn_fail_cache;
 	int64_t txn_checkpoint_fsync_post;
 	int64_t txn_checkpoint_fsync_post_duration;

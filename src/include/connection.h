@@ -352,6 +352,12 @@ struct __wt_connection_impl {
 
 	WT_SESSION_IMPL *meta_ckpt_session;/* Metadata checkpoint session */
 
+	/*
+	 * Is there a data/schema change that needs to be the part of a
+	 * checkpoint.
+	 */
+	bool modified;
+
 	WT_SESSION_IMPL *sweep_session;	   /* Handle sweep session */
 	wt_thread_t	 sweep_tid;	   /* Handle sweep thread */
 	int		 sweep_tid_set;	   /* Handle sweep thread set */

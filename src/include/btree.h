@@ -119,7 +119,7 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_REF root;			/* Root page reference */
-	int modified;			/* If the tree ever modified */
+	bool modified;			/* If the tree ever modified */
 	bool bulk_load_ok;		/* Bulk-load is a possibility */
 
 	WT_BM	*bm;			/* Block manager reference */

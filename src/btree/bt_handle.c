@@ -353,7 +353,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
 	btree->checkpointing = WT_CKPT_OFF;		/* Not checkpointing */
-	btree->modified = 0;				/* Clean */
+	btree->modified = false;			/* Clean */
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 
 	return (0);

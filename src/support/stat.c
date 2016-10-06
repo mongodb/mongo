@@ -725,6 +725,7 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction checkpoint scrub time (msecs)",
 	"transaction: transaction checkpoint total time (msecs)",
 	"transaction: transaction checkpoints",
+	"transaction: transaction checkpoints skipped because database was clean",
 	"transaction: transaction failures due to cache overflow",
 	"transaction: transaction fsync calls for checkpoint after allocating the transaction ID",
 	"transaction: transaction fsync duration for checkpoint after allocating the transaction ID (usecs)",
@@ -971,6 +972,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing txn_checkpoint_scrub_time */
 		/* not clearing txn_checkpoint_time_total */
 	stats->txn_checkpoint = 0;
+	stats->txn_checkpoint_skipped = 0;
 	stats->txn_fail_cache = 0;
 	stats->txn_checkpoint_fsync_post = 0;
 		/* not clearing txn_checkpoint_fsync_post_duration */
@@ -1278,6 +1280,8 @@ __wt_stat_connection_aggregate(
 	to->txn_checkpoint_time_total +=
 	    WT_STAT_READ(from, txn_checkpoint_time_total);
 	to->txn_checkpoint += WT_STAT_READ(from, txn_checkpoint);
+	to->txn_checkpoint_skipped +=
+	    WT_STAT_READ(from, txn_checkpoint_skipped);
 	to->txn_fail_cache += WT_STAT_READ(from, txn_fail_cache);
 	to->txn_checkpoint_fsync_post +=
 	    WT_STAT_READ(from, txn_checkpoint_fsync_post);
