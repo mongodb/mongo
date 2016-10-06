@@ -249,10 +249,6 @@ Status CollectionOptions::parse(const BSONObj& options) {
             continue;
         } else if (fieldName == "maxTimeMS") {
             continue;
-        } else if (fieldName == "usePowerOf2Sizes") {
-            // This option used to affect the behavior of the MMAP storage engine, but is no longer
-            // enforced. We accept it for backwards compatibility.
-            continue;
         } else {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
