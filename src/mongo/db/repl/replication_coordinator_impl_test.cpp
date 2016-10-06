@@ -65,7 +65,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -114,14 +113,6 @@ void runSingleNodeElection(ServiceContext::UniqueOperationContext txn,
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 
     replCoord->signalDrainComplete(txn.get());
-}
-
-/**
- * Helper that kills an operation, taking the necessary locks.
- */
-void killOperation(OperationContext* txn) {
-    stdx::lock_guard<Client> lkClient(*txn->getClient());
-    txn->getServiceContext()->killOperation(txn);
 }
 
 TEST_F(ReplCoordTest, NodeEntersStartup2StateWhenStartingUpWithValidLocalConfig) {
@@ -1328,7 +1319,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWrite
     awaiter.start();
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
-    ASSERT_OK(getReplCoord()->stepDown(txn.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getReplCoord()->stepDown(txn.get(), true, Milliseconds(0), Milliseconds(1000));
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, statusAndDur.status);
     awaiter.reset();
@@ -1371,7 +1362,13 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
 
-    killOperation(awaiter.getOperationContext());
+    OperationContext* txn = awaiter.getOperationContext();
+    auto opID = txn->getOpID();
+    {
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        txn->markKilled(ErrorCodes::Interrupted);
+    }
+    getReplCoord()->interrupt(opID);
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
     awaiter.reset();
@@ -1379,33 +1376,6 @@ TEST_F(ReplCoordTest,
 
 class StepDownTest : public ReplCoordTest {
 protected:
-    struct SharedClientAndOperation {
-        static SharedClientAndOperation make(ServiceContext* serviceContext) {
-            SharedClientAndOperation result;
-            result.client = serviceContext->makeClient("StepDownThread");
-            result.txn = result.client->makeOperationContext();
-            return result;
-        }
-        std::shared_ptr<Client> client;
-        std::shared_ptr<OperationContext> txn;
-    };
-
-    std::pair<SharedClientAndOperation, stdx::future<boost::optional<Status>>> stepDown_nonBlocking(
-        bool force, Milliseconds waitTime, Milliseconds stepDownTime) {
-        using PromisedClientAndOperation = stdx::promise<SharedClientAndOperation>;
-        auto task = stdx::packaged_task<boost::optional<Status>(PromisedClientAndOperation)>(
-            [=](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
-                auto result = SharedClientAndOperation::make(getServiceContext());
-                operationPromise.set_value(result);
-                return getReplCoord()->stepDown(result.txn.get(), force, waitTime, stepDownTime);
-            });
-        auto result = task.get_future();
-        PromisedClientAndOperation operationPromise;
-        auto operationFuture = operationPromise.get_future();
-        stdx::thread(std::move(task), std::move(operationPromise)).detach();
-        return std::make_pair(operationFuture.get(), std::move(result));
-    }
-
     OID myRid;
     OID rid2;
     OID rid3;
@@ -1730,16 +1700,25 @@ TEST_F(StepDownTest,
 
     simulateSuccessfulV1Election();
 
+    const auto txn = makeOperationContext();
+
+
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
     // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
     // T + 2 seconds and send out a new round of heartbeats immediately.
     // This makes it unnecessary to advance the clock after entering the network to process
     // the heartbeat requests.
-    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
+    Status result(ErrorCodes::InternalError, "not mutated");
+    auto globalReadLockAndEventHandle = repl->stepDown_nonBlocking(
+        txn.get(), false, Milliseconds(10000), Milliseconds(60000), &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    ASSERT_TRUE(eventHandle);
+    ASSERT_TRUE(txn->lockState()->isReadLocked());
 
     // Make a secondary actually catch up
     enterNetwork();
     getNet()->runUntil(getNet()->now() + Milliseconds(1000));
+    ASSERT(getNet()->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     RemoteCommandRequest request = noi->getRequest();
     log() << request.target.toString() << " processing " << request.cmdObj;
@@ -1764,7 +1743,8 @@ TEST_F(StepDownTest,
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 
-    ASSERT_OK(*result.second.get());
+    getReplExec()->waitForEvent(eventHandle);
+    ASSERT_OK(result);
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -1781,16 +1761,25 @@ TEST_F(StepDownTest,
 
     simulateSuccessfulV1Election();
 
+    const auto txn = makeOperationContext();
+
+
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
     // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
     // T + 2 seconds and send out a new round of heartbeats immediately.
     // This makes it unnecessary to advance the clock after entering the network to process
     // the heartbeat requests.
-    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
+    Status result(ErrorCodes::InternalError, "not mutated");
+    auto globalReadLockAndEventHandle = repl->stepDown_nonBlocking(
+        txn.get(), false, Milliseconds(10000), Milliseconds(60000), &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    ASSERT_TRUE(eventHandle);
+    ASSERT_TRUE(txn->lockState()->isReadLocked());
 
     // Secondary has not caught up on first round of heartbeats.
     enterNetwork();
     getNet()->runUntil(getNet()->now() + Milliseconds(1000));
+    ASSERT(getNet()->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     RemoteCommandRequest request = noi->getRequest();
     log() << "HB1: " << request.target.toString() << " processing " << request.cmdObj;
@@ -1819,6 +1808,7 @@ TEST_F(StepDownTest,
     auto until = getNet()->now() + heartbeatInterval;
     getNet()->runUntil(until);
     ASSERT_EQUALS(until, getNet()->now());
+    ASSERT(getNet()->hasReadyRequests());
     noi = getNet()->getNextReadyRequest();
     request = noi->getRequest();
     log() << "HB2: " << request.target.toString() << " processing " << request.cmdObj;
@@ -1840,7 +1830,8 @@ TEST_F(StepDownTest,
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 
-    ASSERT_OK(*result.second.get());
+    getReplExec()->waitForEvent(eventHandle);
+    ASSERT_OK(result);
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -1856,12 +1847,28 @@ TEST_F(StepDownTest, NodeReturnsInterruptedWhenInterruptedDuringStepDown) {
 
     simulateSuccessfulV1Election();
 
+    const auto txn = makeOperationContext();
+
+    const unsigned int opID = txn->getOpID();
+
     ASSERT_TRUE(repl->getMemberState().primary());
 
     // stepDown where the secondary actually has to catch up before the stepDown can succeed.
-    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
-    killOperation(result.first.txn.get());
-    ASSERT_EQUALS(ErrorCodes::Interrupted, *result.second.get());
+    Status result(ErrorCodes::InternalError, "not mutated");
+    auto globalReadLockAndEventHandle = repl->stepDown_nonBlocking(
+        txn.get(), false, Milliseconds(10000), Milliseconds(60000), &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    ASSERT_TRUE(eventHandle);
+    ASSERT_TRUE(txn->lockState()->isReadLocked());
+
+    {
+        stdx::lock_guard<Client> lk(*(txn->getClient()));
+        txn->markKilled(ErrorCodes::Interrupted);
+    }
+    getReplCoord()->interrupt(opID);
+
+    getReplExec()->waitForEvent(eventHandle);
+    ASSERT_EQUALS(ErrorCodes::Interrupted, result);
     ASSERT_TRUE(repl->getMemberState().primary());
 }
 
@@ -3409,8 +3416,12 @@ TEST_F(ReplCoordTest, NodeReturnsInterruptedWhenWaitingUntilAnOpTimeIsInterrupte
     getReplCoord()->setMyLastAppliedOpTime(OpTimeWithTermZero(10, 0));
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(10, 0));
 
-    const auto txn = makeOperationContext();
-    killOperation(txn.get());
+    auto txn = makeOperationContext();
+
+    {
+        stdx::lock_guard<Client> lk(*(txn->getClient()));
+        txn->markKilled(ErrorCodes::Interrupted);
+    }
 
     auto status = getReplCoord()->waitUntilOpTimeForRead(
         txn.get(), ReadConcernArgs(OpTimeWithTermZero(50, 0), ReadConcernLevel::kLocalReadConcern));
@@ -3546,7 +3557,12 @@ TEST_F(ReplCoordTest, ReadAfterCommittedInterrupted) {
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
-    killOperation(txn.get());
+
+    {
+        stdx::lock_guard<Client> lk(*(txn->getClient()));
+        txn->markKilled(ErrorCodes::Interrupted);
+    }
+
     auto status = getReplCoord()->waitUntilOpTimeForRead(
         txn.get(),
         ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));

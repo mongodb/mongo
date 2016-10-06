@@ -985,6 +985,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         new repl::TopologyCoordinatorImpl(topoCoordOptions),
         storageInterface,
         static_cast<int64_t>(curTimeMillis64()));
+    serviceContext->registerKillOpListener(replCoord.get());
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName();
     return Status::OK();
