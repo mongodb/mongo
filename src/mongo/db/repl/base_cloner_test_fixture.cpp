@@ -50,6 +50,11 @@ const BSONObj BaseClonerTest::idIndexSpec = BSON("v" << 1 << "key" << BSON("_id"
                                                      << nss.ns());
 
 // static
+BSONObj BaseClonerTest::createCountResponse(int documentCount) {
+    return BSON("n" << documentCount << "ok" << 1);
+}
+
+// static
 BSONObj BaseClonerTest::createCursorResponse(CursorId cursorId,
                                              const std::string& ns,
                                              const BSONArray& docs,

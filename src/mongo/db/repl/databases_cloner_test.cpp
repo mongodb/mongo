@@ -628,6 +628,8 @@ TEST_F(DBsClonerTest, SingleDatabaseCopiesCompletely) {
          fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                   "{name:'a', options:{}} "
                   "]}}")},
+        // count:a
+        {"count", BSON("n" << 1 << "ok" << 1)},
         // listIndexes:a
         {
             "listIndexes",
@@ -657,6 +659,8 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
+            // count:a
+            {"count", BSON("n" << 1 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -674,6 +678,8 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'b.$cmd.listCollections', firstBatch:["
                       "{name:'b', options:{}} "
                       "]}}")},
+            // count:b
+            {"count", BSON("n" << 2 << "ok" << 1)},
             // listIndexes:b
             {"listIndexes",
              fromjson(str::stream()

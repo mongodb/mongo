@@ -34,8 +34,10 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
@@ -62,10 +64,14 @@ class CollectionCloner : public BaseCloner {
 
 public:
     struct Stats {
+        static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
+        static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
+
         std::string ns;
         Date_t start;
         Date_t end;
-        size_t documents{0};
+        size_t documentToCopy{0};
+        size_t documentsCopied{0};
         size_t indexes{0};
         size_t fetchBatches{0};
 
@@ -135,6 +141,11 @@ public:
 
 private:
     /**
+     * Read number of documents in collection from count result.
+     */
+    void _countCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& args);
+
+    /**
      * Read index specs from listIndexes result.
      */
     void _listIndexesCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
@@ -197,12 +208,13 @@ private:
     CallbackFn _onCompletion;             // (R) Invoked once when cloning completes or fails.
     StorageInterface* _storageInterface;  // (R) Not owned by us.
     bool _active;                         // (M) true when Collection Cloner is started.
-    Fetcher _listIndexesFetcher;          // (S)
-    Fetcher _findFetcher;                 // (S)
-    std::vector<BSONObj> _indexSpecs;     // (M)
-    BSONObj _idIndexSpec;                 // (M)
-    std::vector<BSONObj> _documents;      // (M) Documents read from fetcher to insert.
-    TaskRunner _dbWorkTaskRunner;         // (R)
+    RemoteCommandRetryScheduler _countScheduler;  // (S)
+    Fetcher _listIndexesFetcher;                  // (S)
+    Fetcher _findFetcher;                         // (S)
+    std::vector<BSONObj> _indexSpecs;             // (M)
+    BSONObj _idIndexSpec;                         // (M)
+    std::vector<BSONObj> _documents;              // (M) Documents read from fetcher to insert.
+    TaskRunner _dbWorkTaskRunner;                 // (R)
     ScheduleDbWorkFn
         _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
     Stats _stats;                  // (M) stats for this instance.

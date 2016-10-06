@@ -540,6 +540,7 @@ TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
                                                                                 << "options"
                                                                                 << BSONObj()))));
 
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
         processNetworkResponse(createCursorResponse(0, BSONArray()));
     }
@@ -571,11 +572,13 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     // This affects the order of the network responses.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                          << "fake message"
                                          << "code"
                                          << ErrorCodes::CursorNotFound));
 
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
         processNetworkResponse(createCursorResponse(0, BSONArray()));
     }
@@ -621,6 +624,7 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
     // This affects the order of the network responses.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(_databaseCloner->isActive());
@@ -632,6 +636,7 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(_databaseCloner->isActive());
