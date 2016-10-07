@@ -67,10 +67,11 @@ namespace {
 
 const Seconds kBalanceRoundDefaultInterval(10);
 
-// Delay between balancer rounds if the last round found some chunks which needs to be balanced.
-// This value is set to 0 so that imbalanced clusters or clusters with tag range violations can be
-// processes as quickly as possible.
-const Seconds kShortBalanceRoundInterval(0);
+// Sleep between balancer rounds in the case where the last round found some chunks which needed to
+// be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
+// reach balanced state, but setting it too low may cause CRUD operations to start failing due to
+// not being able to establish a stable shard version.
+const Seconds kShortBalanceRoundInterval(1);
 
 const auto getBalancer = ServiceContext::declareDecoration<std::unique_ptr<Balancer>>();
 
