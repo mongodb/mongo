@@ -243,6 +243,7 @@ var DB;
      *  @param name String - name of the new view to create
      *  @param viewOn String - name of the backing view or collection
      *  @param pipeline [{ $operator: {...}}, ... ] - the aggregation pipeline that defines the view
+     *  @param options { } - options on the view, e.g., collations
      */
     DB.prototype.createView = function(name, viewOn, pipeline, opt) {
         var options = opt || {};
@@ -466,7 +467,7 @@ var DB;
         print("\tdb.commandHelp(name) returns the help for the command");
         print("\tdb.copyDatabase(fromdb, todb, fromhost)");
         print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
-        print("\tdb.createView(name, viewOn, [ { $operator: {...}}, ... ] )");
+        print("\tdb.createView(name, viewOn, [ { $operator: {...}}, ... ], { viewOptions } )");
         print("\tdb.createUser(userDocument)");
         print("\tdb.currentOp() displays currently executing operations in the db");
         print("\tdb.dropDatabase()");
