@@ -26,7 +26,7 @@ var resetCollection = function() {
     // Make sure data has replicated to all config servers so freshMongos finds a sharded
     // collection: freshMongos has an older optime and won't wait to see what staleMongos did
     // (shardCollection).
-    st.configRS.awaitReplication();
+    st.configRS.awaitLastOpCommitted();
 };
 
 // Create a new sharded collection, and split data into two chunks on different shards using the
@@ -50,6 +50,8 @@ var makeStaleMongosTargetMultipleShards = function() {
     assert.commandWorked(staleMongos.adminCommand({split: collNS, middle: {x: splitPoint}}));
     assert.commandWorked(staleMongos.adminCommand(
         {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+
+    st.configRS.awaitLastOpCommitted();
 
     // Use freshMongos to consolidate the chunks on one shard.
     assert.commandWorked(freshMongos.adminCommand(
