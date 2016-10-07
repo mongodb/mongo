@@ -86,7 +86,8 @@
     assert.eq(res.initialSyncStatus.databases.databasesCloned, 2);
     assert.eq(res.initialSyncStatus.databases.test.collections, 1);
     assert.eq(res.initialSyncStatus.databases.test.clonedCollections, 1);
-    assert.eq(res.initialSyncStatus.databases.test["test.foo"].documents, 4);
+    assert.eq(res.initialSyncStatus.databases.test["test.foo"].documentsToCopy, 4);
+    assert.eq(res.initialSyncStatus.databases.test["test.foo"].documentsCopied, 4);
     assert.eq(res.initialSyncStatus.databases.test["test.foo"].indexes, 1);
     assert.eq(res.initialSyncStatus.databases.test["test.foo"].fetchedBatches, 1);
 

@@ -58,6 +58,11 @@ public:
     typedef executor::NetworkInterfaceMock::NetworkOperationIterator NetworkOperationIterator;
 
     /**
+     * Creates a count response with given document count.
+     */
+    static BSONObj createCountResponse(int documentCount);
+
+    /**
      * Creates a cursor response with given array of documents.
      */
     static BSONObj createCursorResponse(CursorId cursorId,
