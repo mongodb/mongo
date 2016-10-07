@@ -245,7 +245,7 @@ main(int argc, char *argv[])
 	if (!verify_only) {
 		testutil_make_work_dir(home);
 
-		testutil_assert(__wt_random_init_seed(NULL, &rnd) == 0);
+		__wt_random_init_seed(NULL, &rnd);
 		if (rand_time) {
 			timeout = __wt_random(&rnd) % MAX_TIME;
 			if (timeout < MIN_TIME)

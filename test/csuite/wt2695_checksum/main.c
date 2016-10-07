@@ -61,7 +61,7 @@ main(int argc, char *argv[])
 	    wiredtiger_open(opts->home, NULL, "create", &opts->conn));
 
 	/* Initialize the RNG. */
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 
 	/* Allocate aligned memory for the data. */
 	data = dcalloc(DATASIZE, sizeof(uint8_t));

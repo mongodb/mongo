@@ -233,10 +233,10 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
-	 * Ensure the cache stuck timer is initialized when starting eviction
+	 * Ensure the cache stuck timer is initialized when starting eviction.
 	 */
 	if (thread->id == 0)
-		WT_ERR(__wt_epoch(session, &cache->stuck_ts));
+		__wt_epoch(session, &cache->stuck_ts);
 #endif
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
@@ -350,10 +350,10 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	} else if (cache->pages_evicted != cache->pages_evict) {
 		cache->pages_evicted = cache->pages_evict;
 #ifdef HAVE_DIAGNOSTIC
-		WT_RET(__wt_epoch(session, &cache->stuck_ts));
+		__wt_epoch(session, &cache->stuck_ts);
 	} else {
 		/* After being stuck for 5 minutes, give up. */
-		WT_RET(__wt_epoch(session, &now));
+		__wt_epoch(session, &now);
 		if (WT_TIMEDIFF_SEC(now, cache->stuck_ts) > 300) {
 			ret = ETIMEDOUT;
 			__wt_err(session, ret,
@@ -543,7 +543,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 
 	/* Evict pages from the cache. */
 	for (loop = 0; cache->pass_intr == 0; loop++) {
-		WT_RET(__wt_epoch(session, &now));
+		__wt_epoch(session, &now);
 		if (loop == 0)
 			prev = now;
 
@@ -1745,7 +1745,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 		cache->app_evicts++;
 		if (WT_STAT_ENABLED(session)) {
 			app_timer = true;
-			WT_RET(__wt_epoch(session, &enter));
+			__wt_epoch(session, &enter);
 		}
 	}
 
@@ -1764,9 +1764,11 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
-	if (ret == 0 && app_timer && __wt_epoch(session, &leave) == 0)
+	if (app_timer) {
+		__wt_epoch(session, &leave);
 		WT_STAT_CONN_INCRV(session,
 		    application_evict_time, WT_TIMEDIFF_US(leave, enter));
+	}
 	return (ret);
 }
 
@@ -1806,7 +1808,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 
 	/* Track how long application threads spend doing eviction. */
 	if (WT_STAT_ENABLED(session) && !F_ISSET(session, WT_SESSION_INTERNAL))
-		WT_RET(__wt_epoch(session, &enter));
+		__wt_epoch(session, &enter);
 
 	for (init_evict_count = cache->pages_evict;; ret = 0) {
 		/*
@@ -1872,10 +1874,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	}
 
 err:	if (WT_STAT_ENABLED(session) &&
-	    !F_ISSET(session, WT_SESSION_INTERNAL) &&
-	    __wt_epoch(session, &leave) == 0)
+	    !F_ISSET(session, WT_SESSION_INTERNAL)) {
+		__wt_epoch(session, &leave);
 		WT_STAT_CONN_INCRV(session,
 		    application_cache_time, WT_TIMEDIFF_US(leave, enter));
+	}
 
 	return (ret);
 	/* NOTREACHED */

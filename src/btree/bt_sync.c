@@ -37,7 +37,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
-		WT_RET(__wt_epoch(session, &start));
+		__wt_epoch(session, &start);
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
@@ -205,7 +205,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	}
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
-		WT_ERR(__wt_epoch(session, &end));
+		__wt_epoch(session, &end);
 		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote: %" PRIu64
 		    " leaf pages (%" PRIu64 "B), %" PRIu64

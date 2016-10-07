@@ -70,7 +70,7 @@ setup_throttle(WTPERF_THREAD *thread)
 	throttle_cfg->ops_count = throttle_cfg->ops_per_increment;
 
 	/* Set the first timestamp of when we incremented */
-	testutil_check(__wt_epoch(NULL, &throttle_cfg->last_increment));
+	__wt_epoch(NULL, &throttle_cfg->last_increment);
 }
 
 /*
@@ -86,7 +86,7 @@ worker_throttle(WTPERF_THREAD *thread)
 
 	throttle_cfg = &thread->throttle_cfg;
 
-	testutil_check(__wt_epoch(NULL, &now));
+	__wt_epoch(NULL, &now);
 
 	/*
 	 * If we did enough operations in the current interval, sleep for
@@ -101,7 +101,7 @@ worker_throttle(WTPERF_THREAD *thread)
 		/*
 		 * After sleeping, set the interval to the current time.
 		 */
-		testutil_check(__wt_epoch(NULL, &throttle_cfg->last_increment));
+		__wt_epoch(NULL, &throttle_cfg->last_increment);
 	} else {
 		throttle_cfg->ops_count = (usecs_delta *
 		    throttle_cfg->ops_per_increment) /

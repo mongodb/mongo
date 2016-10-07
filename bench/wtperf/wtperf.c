@@ -615,10 +615,8 @@ worker(void *arg)
 		measure_latency =
 		    opts->sample_interval != 0 && trk != NULL &&
 		    trk->ops != 0 && (trk->ops % opts->sample_rate == 0);
-		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
-			lprintf(wtperf, ret, 0, "Get time call failed");
-			goto err;
-		}
+		if (measure_latency)
+			__wt_epoch(NULL, &start);
 
 		cursor->set_key(cursor, key_buf);
 
@@ -777,11 +775,7 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 		/* Gather statistics */
 		if (!wtperf->in_warmup) {
 			if (measure_latency) {
-				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-					lprintf(wtperf, ret, 0,
-					    "Get time call failed");
-					goto err;
-				}
+				__wt_epoch(NULL, &stop);
 				++trk->latency_ops;
 				usecs = WT_TIMEDIFF_US(stop, start);
 				track_operation(trk, usecs);
@@ -1035,10 +1029,8 @@ populate_thread(void *arg)
 		measure_latency =
 		    opts->sample_interval != 0 &&
 		    trk->ops != 0 && (trk->ops % opts->sample_rate == 0);
-		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
-			lprintf(wtperf, ret, 0, "Get time call failed");
-			goto err;
-		}
+		if (measure_latency)
+			__wt_epoch(NULL, &start);
 		cursor->set_key(cursor, key_buf);
 		if (opts->random_value)
 			randomize_value(thread, value_buf);
@@ -1064,10 +1056,7 @@ populate_thread(void *arg)
 		 * of them.
 		 */
 		if (measure_latency) {
-			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-				lprintf(wtperf, ret, 0, "Get time call failed");
-				goto err;
-			}
+			__wt_epoch(NULL, &stop);
 			++trk->latency_ops;
 			usecs = WT_TIMEDIFF_US(stop, start);
 			track_operation(trk, usecs);
@@ -1157,10 +1146,9 @@ populate_async(void *arg)
 	measure_latency =
 	    opts->sample_interval != 0 &&
 	    trk->ops != 0 && (trk->ops % opts->sample_rate == 0);
-	if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
-		lprintf(wtperf, ret, 0, "Get time call failed");
-		goto err;
-	}
+	if (measure_latency)
+		__wt_epoch(NULL, &start);
+
 	/* Populate the databases. */
 	for (;;) {
 		op = get_next_incr(wtperf);
@@ -1187,6 +1175,7 @@ populate_async(void *arg)
 			goto err;
 		}
 	}
+
 	/*
 	 * Gather statistics.
 	 * We measure the latency of inserting a single key.  If there
@@ -1198,10 +1187,7 @@ populate_async(void *arg)
 	if (conn->async_flush(conn) != 0)
 		goto err;
 	if (measure_latency) {
-		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-			lprintf(wtperf, ret, 0, "Get time call failed");
-			goto err;
-		}
+		__wt_epoch(NULL, &stop);
 		++trk->latency_ops;
 		usecs = WT_TIMEDIFF_US(stop, start);
 		track_operation(trk, usecs);
@@ -1235,7 +1221,7 @@ monitor(void *arg)
 	uint32_t update_avg, update_min, update_max;
 	uint32_t latency_max, level;
 	u_int i;
-	int msg_err, ret;
+	int msg_err;
 	const char *str;
 	char buf[64], *path;
 
@@ -1289,10 +1275,7 @@ monitor(void *arg)
 		if (wtperf->in_warmup)
 			continue;
 
-		if ((ret = __wt_epoch(NULL, &t)) != 0) {
-			lprintf(wtperf, ret, 0, "Get time call failed");
-			goto err;
-		}
+		__wt_epoch(NULL, &t);
 		tm = localtime_r(&t.tv_sec, &_tm);
 		(void)strftime(buf, sizeof(buf), "%b %d %H:%M:%S", tm);
 
@@ -1421,11 +1404,8 @@ checkpoint_worker(void *arg)
 		if (wtperf->stop)
 			break;
 
-		if ((ret = __wt_epoch(NULL, &s)) != 0) {
-			lprintf(wtperf,
-			    ret, 0, "Get time failed in checkpoint.");
-			goto err;
-		}
+		__wt_epoch(NULL, &s);
+
 		wtperf->ckpt = true;
 		if ((ret = session->checkpoint(session, NULL)) != 0) {
 			lprintf(wtperf, ret, 0, "Checkpoint failed.");
@@ -1434,11 +1414,7 @@ checkpoint_worker(void *arg)
 		wtperf->ckpt = false;
 		++thread->ckpt.ops;
 
-		if ((ret = __wt_epoch(NULL, &e)) != 0) {
-			lprintf(wtperf,
-			    ret, 0, "Get time failed in checkpoint.");
-			goto err;
-		}
+		__wt_epoch(NULL, &e);
 	}
 
 	if (session != NULL &&
@@ -1497,10 +1473,7 @@ execute_populate(WTPERF *wtperf)
 	    wtperf->popthreads, opts->populate_threads, pfunc)) != 0)
 		return (ret);
 
-	if ((ret = __wt_epoch(NULL, &start)) != 0) {
-		lprintf(wtperf, ret, 0, "Get time failed in populate.");
-		return (ret);
-	}
+	__wt_epoch(NULL, &start);
 	for (elapsed = 0, interval = 0, last_ops = 0;
 	    wtperf->insert_key < opts->icount && !wtperf->error;) {
 		/*
@@ -1524,10 +1497,7 @@ execute_populate(WTPERF *wtperf)
 		    opts->icount, opts->report_interval, wtperf->totalsec);
 		last_ops = wtperf->insert_ops;
 	}
-	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-		lprintf(wtperf, ret, 0, "Get time failed in populate.");
-		return (ret);
-	}
+	__wt_epoch(NULL, &stop);
 
 	/*
 	 * Move popthreads aside to narrow possible race with the monitor
@@ -1576,10 +1546,7 @@ execute_populate(WTPERF *wtperf)
 	if (opts->compact) {
 		assert(opts->async_threads > 0);
 		lprintf(wtperf, 0, 1, "Compact after populate");
-		if ((ret = __wt_epoch(NULL, &start)) != 0) {
-			lprintf(wtperf, ret, 0, "Get time failed in populate.");
-			return (ret);
-		}
+		__wt_epoch(NULL, &start);
 		tables = opts->table_count;
 		for (i = 0; i < opts->table_count; i++) {
 			/*
@@ -1604,10 +1571,7 @@ execute_populate(WTPERF *wtperf)
 			lprintf(wtperf, ret, 0, "Populate async flush failed.");
 			return (ret);
 		}
-		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-			lprintf(wtperf, ret, 0, "Get time failed in populate.");
-			return (ret);
-		}
+		__wt_epoch(NULL, &stop);
 		lprintf(wtperf, 0, 1,
 		    "Compact completed in %" PRIu64 " seconds",
 		    (uint64_t)(WT_TIMEDIFF_SEC(stop, start)));
@@ -2666,10 +2630,7 @@ start_threads(WTPERF *wtperf,
 		 * We don't want the threads executing in lock-step, seed each
 		 * one differently.
 		 */
-		if ((ret = __wt_random_init_seed(NULL, &thread->rnd)) != 0) {
-			lprintf(wtperf, ret, 0, "Error initializing RNG");
-			return (ret);
-		}
+		__wt_random_init_seed(NULL, &thread->rnd);
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -2771,7 +2732,7 @@ drop_all_tables(WTPERF *wtperf)
 		    "Error opening a session on %s", wtperf->home);
 		return (ret);
 	}
-	testutil_check(__wt_epoch(NULL, &start));
+	__wt_epoch(NULL, &start);
 	for (i = 0; i < opts->table_count; i++) {
 		if ((ret =
 		    session->drop(session, wtperf->uris[i], NULL)) != 0) {
@@ -2780,7 +2741,7 @@ drop_all_tables(WTPERF *wtperf)
 			goto err;
 		}
 	}
-	testutil_check(__wt_epoch(NULL, &stop));
+	__wt_epoch(NULL, &stop);
 	msecs = WT_TIMEDIFF_MS(stop, start);
 	lprintf(wtperf, 0, 1,
 	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",

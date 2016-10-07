@@ -424,7 +424,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			 * guaranteed, a time_t has to be an arithmetic type,
 			 * but not an integral type.
 			 */
-			WT_ERR(__wt_seconds(session, &secs));
+			__wt_seconds(session, &secs);
 			ckpt->sec = (uintmax_t)secs;
 		}
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)

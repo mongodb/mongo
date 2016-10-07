@@ -1495,14 +1495,14 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	if (timeout_ms == 0)
 		WT_ERR(ETIMEDOUT);
 
-	WT_ERR(__wt_epoch(session, &start));
+	__wt_epoch(session, &start);
 	/*
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout.
 	 */
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		__wt_cond_signal(session, conn->log_file_cond);
-		WT_ERR(__wt_epoch(session, &now));
+		__wt_epoch(session, &now);
 		waited_ms = WT_TIMEDIFF_MS(now, start);
 		if (forever || waited_ms < timeout_ms)
 			/*

@@ -34,21 +34,15 @@ check_timing(WTPERF *wtperf,
 {
 	CONFIG_OPTS *opts;
 	uint64_t last_interval;
-	int ret;
 
 	opts = wtperf->opts;
 
-	if ((ret = __wt_epoch(NULL, stop)) != 0) {
-		lprintf(wtperf, ret, 0,
-		    "Get time failed in cycle_idle_tables.");
-		wtperf->error = true;
-		return (ret);
-	}
+	__wt_epoch(NULL, stop);
 
 	last_interval = (uint64_t)(WT_TIMEDIFF_SEC(*stop, start));
 
 	if (last_interval > opts->idle_table_cycle) {
-		lprintf(wtperf, ret, 0,
+		lprintf(wtperf, ETIMEDOUT, 0,
 		    "Cycling idle table failed because %s took %" PRIu64
 		    " seconds which is longer than configured acceptable"
 		    " maximum of %" PRIu32 ".",
@@ -92,12 +86,7 @@ cycle_idle_tables(void *arg)
 		__wt_sleep(1, 0);
 
 		/* Setup a start timer. */
-		if ((ret = __wt_epoch(NULL, &start)) != 0) {
-			lprintf(wtperf, ret, 0,
-			     "Get time failed in cycle_idle_tables.");
-			wtperf->error = true;
-			return (NULL);
-		}
+		__wt_epoch(NULL, &start);
 
 		/* Create a table. */
 		if ((ret = session->create(

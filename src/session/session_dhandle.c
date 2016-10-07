@@ -8,8 +8,6 @@
 
 #include "wt_internal.h"
 
-static int __session_dhandle_sweep(WT_SESSION_IMPL *);
-
 /*
  * __session_add_dhandle --
  *	Add a handle to the session's cache.
@@ -371,7 +369,7 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
  * __session_dhandle_sweep --
  *	Discard any session dhandles that are not open.
  */
-static int
+static void
 __session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -385,9 +383,9 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	 * Periodically sweep for dead handles; if we've swept recently, don't
 	 * do it again.
 	 */
-	WT_RET(__wt_seconds(session, &now));
+	__wt_seconds(session, &now);
 	if (difftime(now, session->last_sweep) < conn->sweep_interval)
-		return (0);
+		return;
 	session->last_sweep = now;
 
 	WT_STAT_CONN_INCR(session, dh_session_sweeps);
@@ -408,7 +406,6 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		}
 		dhandle_cache = dhandle_cache_next;
 	}
-	return (0);
 }
 
 /*
@@ -446,7 +443,7 @@ __session_get_dhandle(
 	}
 
 	/* Sweep the handle list to remove any dead handles. */
-	WT_RET(__session_dhandle_sweep(session));
+	__session_dhandle_sweep(session);
 
 	/*
 	 * We didn't find a match in the session cache, search the shared
