@@ -96,11 +96,11 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	txn_state = WT_SESSION_TXN_STATE(session);
 
 	WT_ASSERT(session,
-	    txn_state->snap_min == WT_TXN_NONE ||
+	    txn_state->pinned_id == WT_TXN_NONE ||
 	    session->txn.isolation == WT_ISO_READ_UNCOMMITTED ||
-	    !__wt_txn_visible_all(session, txn_state->snap_min));
+	    !__wt_txn_visible_all(session, txn_state->pinned_id));
 
-	txn_state->snap_min = WT_TXN_NONE;
+	txn_state->pinned_id = WT_TXN_NONE;
 	F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
 }
 
@@ -117,7 +117,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
 	uint64_t current_id, id;
-	uint64_t prev_oldest_id, snap_min;
+	uint64_t prev_oldest_id, pinned_id;
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
@@ -135,21 +135,21 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		WT_PAUSE();
 	WT_RET(ret);
 
-	current_id = snap_min = txn_global->current;
+	current_id = pinned_id = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
 
 	/*
 	 * Include the checkpoint transaction, if one is running: we should
 	 * ignore any uncommitted changes the checkpoint has written to the
 	 * metadata.  We don't have to keep the checkpoint's changes pinned so
-	 * don't including it in the published snap_min.
+	 * don't including it in the published pinned ID.
 	 */
 	if ((id = txn_global->checkpoint_txnid) != WT_TXN_NONE)
 		txn->snapshot[n++] = id;
 
 	/* For pure read-only workloads, avoid scanning. */
 	if (prev_oldest_id == current_id) {
-		txn_state->snap_min = current_id;
+		txn_state->pinned_id = current_id;
 		/* Check that the oldest ID has not moved in the meantime. */
 		WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 		goto done;
@@ -172,18 +172,18 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		    (id = s->id) != WT_TXN_NONE &&
 		    WT_TXNID_LE(prev_oldest_id, id)) {
 			txn->snapshot[n++] = id;
-			if (WT_TXNID_LT(id, snap_min))
-				snap_min = id;
+			if (WT_TXNID_LT(id, pinned_id))
+				pinned_id = id;
 		}
 	}
 
 	/*
-	 * If we got a new snapshot, update the published snap_min for this
+	 * If we got a new snapshot, update the published pinned ID for this
 	 * session.
 	 */
-	WT_ASSERT(session, WT_TXNID_LE(prev_oldest_id, snap_min));
+	WT_ASSERT(session, WT_TXNID_LE(prev_oldest_id, pinned_id));
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
-	txn_state->snap_min = snap_min;
+	txn_state->pinned_id = pinned_id;
 
 done:	__wt_readunlock(session, txn_global->scan_rwlock);
 	__txn_sort_snapshot(session, n, current_id);
@@ -232,13 +232,13 @@ __txn_oldest_scan(WT_SESSION_IMPL *session,
 
 		/*
 		 * !!!
-		 * Note: Don't ignore snap_min values older than the previous
-		 * oldest ID.  Read-uncommitted operations publish snap_min
+		 * Note: Don't ignore pinned ID values older than the previous
+		 * oldest ID.  Read-uncommitted operations publish pinned ID
 		 * values without acquiring the scan lock to protect the global
-		 * table.  See the comment in __wt_txn_cursor_op for
-		 * more details.
+		 * table.  See the comment in __wt_txn_cursor_op for more
+		 * details.
 		 */
-		if ((id = s->snap_min) != WT_TXN_NONE &&
+		if ((id = s->pinned_id) != WT_TXN_NONE &&
 		    WT_TXNID_LT(id, oldest_id)) {
 			oldest_id = id;
 			oldest_session = &conn->sessions[i];
@@ -360,7 +360,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 			__wt_verbose(session, WT_VERB_TRANSACTION,
 			    "old snapshot %" PRIu64
 			    " pinned in session %" PRIu32 " [%s]"
-			    " with snap_min %" PRIu64 "\n",
+			    " with snap_min %" PRIu64,
 			    oldest_id, oldest_session->id,
 			    oldest_session->lastop,
 			    oldest_session->txn.snap_min);
@@ -673,7 +673,7 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	if (S2C(session)->txn_global.states != NULL) {
 		WT_TXN_STATE *txn_state;
 		txn_state = WT_SESSION_TXN_STATE(session);
-		WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE);
+		WT_ASSERT(session, txn_state->pinned_id == WT_TXN_NONE);
 	}
 #endif
 
@@ -773,7 +773,7 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, txn_global->states);
 
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
-		s->id = s->snap_min = WT_TXN_NONE;
+		s->id = s->pinned_id = WT_TXN_NONE;
 
 	return (0);
 }

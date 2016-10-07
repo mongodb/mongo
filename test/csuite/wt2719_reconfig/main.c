@@ -256,7 +256,7 @@ main(int argc, char *argv[])
 	    session, opts->uri, "type=lsm,key_format=S,value_format=S"));
 
 	/* Initialize the RNG. */
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 
 	/* Allocate memory for the config. */
 	len = WT_ELEMENTS(list) * 64;

@@ -24,20 +24,20 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_REF *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
-	uint64_t oldest_id, saved_snap_min;
+	uint64_t oldest_id, saved_pinned_id;
 	uint32_t flags;
 
 	conn = S2C(session);
 	btree = S2BT(session);
 	walk = NULL;
 	txn = &session->txn;
-	saved_snap_min = WT_SESSION_TXN_STATE(session)->snap_min;
+	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
-		WT_RET(__wt_epoch(session, &start));
+		__wt_epoch(session, &start);
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
@@ -205,15 +205,14 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	}
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
-		WT_ERR(__wt_epoch(session, &end));
+		__wt_epoch(session, &end);
 		__wt_verbose(session, WT_VERB_CHECKPOINT,
-		    "__sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
-		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
-		    " bytes, %" PRIu64 " pages of internal\n\t"
-		    "Took: %" PRIu64 "ms",
+		    "__sync_file WT_SYNC_%s wrote: %" PRIu64
+		    " leaf pages (%" PRIu64 "B), %" PRIu64
+		    " internal pages (%" PRIu64 "B), and took %" PRIu64 "ms",
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
-		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
+		    leaf_pages, leaf_bytes, internal_pages, internal_bytes,
 		    WT_TIMEDIFF_MS(end, start));
 	}
 
@@ -226,7 +225,7 @@ err:	/* On error, clear any left-over tree walk. */
 	 * snapshot active when we started, release it.
 	 */
 	if (txn->isolation == WT_ISO_READ_COMMITTED &&
-	    saved_snap_min == WT_TXN_NONE)
+	    saved_pinned_id == WT_TXN_NONE)
 		__wt_txn_release_snapshot(session);
 
 	/* Clear the checkpoint flag and push the change. */

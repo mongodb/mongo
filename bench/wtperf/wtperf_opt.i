@@ -38,14 +38,14 @@
 
 #ifdef OPT_DEFINE_DESC
 #define	DEF_OPT_AS_BOOL(name, initval, desc)				\
-	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG_OPTS, name) },
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
 	{ #name, desc, initval, CONFIG_STRING_TYPE,                    \
-	offsetof(CONFIG, name) },
+	offsetof(CONFIG_OPTS, name) },
 #define	DEF_OPT_AS_STRING(name, initval, desc)				\
-	{ #name, desc, initval, STRING_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, initval, STRING_TYPE, offsetof(CONFIG_OPTS, name) },
 #define	DEF_OPT_AS_UINT32(name, initval, desc)				\
-	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name) },
+	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG_OPTS, name) },
 #endif
 
 #ifdef OPT_DEFINE_DEFAULT
@@ -57,13 +57,13 @@
 
 #ifdef OPT_DEFINE_DOXYGEN
 #define	DEF_OPT_AS_BOOL(name, initval, desc)				\
-	{ #name, desc, #initval, BOOL_TYPE, 0 },
+	OPTION #name, desc, #initval, boolean
 #define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
-	{ #name, desc, initval, CONFIG_STRING_TYPE, 0 },
+	OPTION #name, desc, initval, string
 #define	DEF_OPT_AS_STRING(name, initval, desc)				\
-	{ #name, desc, initval, STRING_TYPE, 0 },
+	OPTION #name, desc, initval, string
 #define	DEF_OPT_AS_UINT32(name, initval, desc)				\
-	{ #name, desc, #initval, UINT32_TYPE, 0 },
+	OPTION #name, desc, #initval, unsigned int
 #endif
 
 /*
@@ -104,7 +104,7 @@ DEF_OPT_AS_UINT32(database_count, 1,
     "number of WiredTiger databases to use. Each database will execute the"
     " workload using a separate home directory and complete set of worker"
     " threads")
-DEF_OPT_AS_UINT32(drop_tables, 0,
+DEF_OPT_AS_BOOL(drop_tables, 0,
     "Whether to drop all tables at the end of the run, and report time taken"
     " to do the drop.")
 DEF_OPT_AS_UINT32(icount, 5000,
@@ -193,8 +193,8 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "'updates', 'truncate', 'truncate_pct' and 'truncate_count'. There are "
     "also behavior modifiers, supported modifiers are 'ops_per_txn'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
-    "transaction configuration string, relevant when populate_opts_per_txn "
-    "is nonzero")
+    "WT_SESSION.begin_transaction configuration string, applied during the "
+    "populate phase when populate_ops_per_txn is nonzero")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_BOOL(truncate_single_ops, 0,
     "Implement truncate via cursor remove instead of session API")

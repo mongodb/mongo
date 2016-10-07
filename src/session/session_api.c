@@ -68,9 +68,10 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 			 * unless the cursor is reading from a checkpoint.
 			 */
 			WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(session);
-			WT_ASSERT(session, txn_state->snap_min != WT_TXN_NONE ||
-			   (WT_PREFIX_MATCH(cursor->uri, "file:") &&
-			   F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
+			WT_ASSERT(session,
+			    txn_state->pinned_id != WT_TXN_NONE ||
+			    (WT_PREFIX_MATCH(cursor->uri, "file:") &&
+			    F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
 #endif
 
 			F_CLR(cursor, WT_CURSTD_VALUE_INT);
@@ -1417,10 +1418,10 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 
 	/* Assign pinned to the lesser of id or snap_min */
 	if (txn_state->id != WT_TXN_NONE &&
-	    WT_TXNID_LT(txn_state->id, txn_state->snap_min))
+	    WT_TXNID_LT(txn_state->id, txn_state->pinned_id))
 		pinned = txn_state->id;
 	else
-		pinned = txn_state->snap_min;
+		pinned = txn_state->pinned_id;
 
 	if (pinned == WT_TXN_NONE)
 		*prange = 0;
@@ -1494,14 +1495,14 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	if (timeout_ms == 0)
 		WT_ERR(ETIMEDOUT);
 
-	WT_ERR(__wt_epoch(session, &start));
+	__wt_epoch(session, &start);
 	/*
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout.
 	 */
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		__wt_cond_signal(session, conn->log_file_cond);
-		WT_ERR(__wt_epoch(session, &now));
+		__wt_epoch(session, &now);
 		waited_ms = WT_TIMEDIFF_MS(now, start);
 		if (forever || waited_ms < timeout_ms)
 			/*

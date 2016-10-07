@@ -1,7 +1,7 @@
 #! /bin/sh
 
 t=__wt.$$
-trap 'rm -f $t /tmp/__doxy' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # Skip this when building release packages: docs are built separately
 test -n "$WT_RELEASE_BUILD" && exit 0
@@ -30,18 +30,22 @@ wtperf_config()
 {
 	# The Linux ed command writes line numbers to stderr, redirect both
 	# stdout and stderr to keep things quiet.
-	cc -o /tmp/__doxy ../bench/wtperf/doxy.c &&
+	#
+	# The OS X cpp program injects line number output in the middle of lines
+	# and doesn't stringify #XXX entries; use the -E option to the compiler
+	# instead.
+	cat ../bench/wtperf/wtperf_opt.i |
+	${CC:-cc} -E -DOPT_DEFINE_DOXYGEN - | python wtperf_config.py > $t
 	(echo '/START_AUTO_GENERATED_WTPERF_CONFIGURATION/+3,/STOP_AUTO_GENERATED_WTPERF_CONFIGURATION/-1d'
 	 echo 'i'
 	 echo ''
 	 echo '.'
-	 echo ".r !/tmp/__doxy"
+	 echo ".r $t"
 	 echo 'a'
 	 echo ''
 	 echo '.'
 	 echo 'w'
-	 echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null &&
-	 rm -f /tmp/__doxy
+	 echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null
 }
 
 structurechk()

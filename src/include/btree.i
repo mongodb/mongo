@@ -522,13 +522,21 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * might result in an extra checkpoint that doesn't do any work but it
 	 * shouldn't cause problems; regardless, let's play it safe.)
 	 */
-	if (S2BT(session)->modified == 0) {
+	if (!S2BT(session)->modified) {
 		/* Assert we never dirty a checkpoint handle. */
 		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
-		S2BT(session)->modified = 1;
+		S2BT(session)->modified = true;
 		WT_FULL_BARRIER();
 	}
+
+	/*
+	 * There is a possibility of btree being dirty whereas connection being
+	 * clean when entering this function. So make sure to update connection
+	 * to dirty outside a condition on btree modified flag.
+	 */
+	if (!S2C(session)->modified)
+		S2C(session)->modified = true;
 
 	__wt_page_only_modify_set(session, page);
 }

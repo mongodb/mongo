@@ -546,6 +546,7 @@ wts_stats(void)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	FILE *fp;
+	size_t len;
 	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
@@ -582,8 +583,9 @@ wts_stats(void)
 
 	/* Data source statistics. */
 	fprintf(fp, "\n\n====== Data source statistics:\n");
-	stat_name = dmalloc(strlen("statistics:") + strlen(g.uri) + 1);
-	sprintf(stat_name, "statistics:%s", g.uri);
+	len = strlen("statistics:") + strlen(g.uri) + 1;
+	stat_name = dmalloc(len);
+	snprintf(stat_name, len, "statistics:%s", g.uri);
 	testutil_check(session->open_cursor(
 	    session, stat_name, NULL, NULL, &cursor));
 	free(stat_name);

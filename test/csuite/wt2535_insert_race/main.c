@@ -52,6 +52,8 @@ main(int argc, char *argv[])
 	int i;
 
 	opts = &_opts;
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 	opts->nthreads = 10;
 	opts->nrecords = 1000;

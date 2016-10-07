@@ -63,7 +63,7 @@ __wt_cond_wait_signal(
 	locked = true;
 
 	if (usecs > 0) {
-		WT_ERR(__wt_epoch(session, &ts));
+		__wt_epoch(session, &ts);
 		ts.tv_sec += (time_t)
 		    (((uint64_t)ts.tv_nsec + WT_THOUSAND * usecs) / WT_BILLION);
 		ts.tv_nsec = (long)

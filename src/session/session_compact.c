@@ -179,17 +179,16 @@ __compact_handle_append(WT_SESSION_IMPL *session, const char *cfg[])
  *	Check if the timeout has been exceeded.
  */
 static int
-__session_compact_check_timeout(
-    WT_SESSION_IMPL *session, struct timespec begin)
+__session_compact_check_timeout(WT_SESSION_IMPL *session, struct timespec begin)
 {
 	struct timespec end;
 
 	if (session->compact->max_time == 0)
 		return (0);
 
-	WT_RET(__wt_epoch(session, &end));
+	__wt_epoch(session, &end);
 	if (session->compact->max_time < WT_TIMEDIFF_SEC(end, begin))
-		WT_RET(ETIMEDOUT);
+		return (ETIMEDOUT);
 	return (0);
 }
 
@@ -219,7 +218,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *cfg[])
 	    session, t, "target=(\"%s\"),force=1", dhandle->name));
 	checkpoint_cfg[1] = t->data;
 
-	WT_ERR(__wt_epoch(session, &start_time));
+	__wt_epoch(session, &start_time);
 
 	/*
 	 * We compact 10% of the file on each pass (but the overall size of the

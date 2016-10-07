@@ -96,6 +96,22 @@ lrt(void *arg)
 			pinned = 0;
 		} else {
 			/*
+			 * Test named snapshots: create a snapshot, wait to
+			 * give the transaction state time to move forward,
+			 * then start a transaction with the named snapshot,
+			 * drop it, then commit the transaction. This exercises
+			 * most of the named snapshot logic under load.
+			 */
+			testutil_check(session->snapshot(session, "name=test"));
+			sleep(1);
+			testutil_check(session->begin_transaction(
+			    session, "snapshot=test"));
+			testutil_check(session->snapshot(
+			    session, "drop=(all)"));
+			testutil_check(session->commit_transaction(
+			    session, NULL));
+
+			/*
 			 * Begin transaction: without an explicit transaction,
 			 * the snapshot is only kept around while a cursor is
 			 * positioned. As soon as the cursor loses its position

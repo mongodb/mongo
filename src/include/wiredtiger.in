@@ -1069,6 +1069,11 @@ struct __wt_session {
 	 * Permitted values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
 	 * default \c none.}
+	 * @config{ignore_in_memory_cache_size, allow update and insert
+	 * operations to proceed even if the cache is already at capacity.  Only
+	 * valid in conjunction with in-memory databases.  Should be used with
+	 * caution - this configuration allows WiredTiger to consume memory over
+	 * the configured cache limit., a boolean flag; default \c false.}
 	 * @config{immutable, configure the index to be immutable - that is an
 	 * index is not changed by any update to a record in the table., a
 	 * boolean flag; default \c false.}
@@ -1815,14 +1820,13 @@ struct __wt_connection {
 	 * default \c 5.}
 	 * @config{eviction_dirty_target, perform eviction in worker threads
 	 * when the cache contains at least this much dirty content\, expressed
-	 * as a percentage of the total cache size.  Ignored if \c in_memory is
-	 * \c true., an integer between 1 and 99; default \c 5.}
+	 * as a percentage of the total cache size., an integer between 1 and
+	 * 99; default \c 5.}
 	 * @config{eviction_dirty_trigger, trigger application threads to
 	 * perform eviction when the cache contains at least this much dirty
 	 * content\, expressed as a percentage of the total cache size.  This
-	 * setting only alters behavior if it is lower than eviction_trigger.
-	 * Ignored if \c in_memory is \c true., an integer between 1 and 99;
-	 * default \c 20.}
+	 * setting only alters behavior if it is lower than eviction_trigger.,
+	 * an integer between 1 and 99; default \c 20.}
 	 * @config{eviction_target, perform eviction in worker threads when the
 	 * cache contains at least this much content\, expressed as a percentage
 	 * of the total cache size.  Must be less than \c eviction_trigger., an
@@ -2281,13 +2285,12 @@ struct __wt_connection {
  * is \c true., an integer between 0 and 99; default \c 5.}
  * @config{eviction_dirty_target, perform eviction in worker threads when the
  * cache contains at least this much dirty content\, expressed as a percentage
- * of the total cache size.  Ignored if \c in_memory is \c true., an integer
- * between 1 and 99; default \c 5.}
+ * of the total cache size., an integer between 1 and 99; default \c 5.}
  * @config{eviction_dirty_trigger, trigger application threads to perform
  * eviction when the cache contains at least this much dirty content\, expressed
  * as a percentage of the total cache size.  This setting only alters behavior
- * if it is lower than eviction_trigger.  Ignored if \c in_memory is \c true.,
- * an integer between 1 and 99; default \c 20.}
+ * if it is lower than eviction_trigger., an integer between 1 and 99; default
+ * \c 20.}
  * @config{eviction_target, perform eviction in worker threads when the cache
  * contains at least this much content\, expressed as a percentage of the total
  * cache size.  Must be less than \c eviction_trigger., an integer between 10
@@ -4591,67 +4594,76 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_THREAD_READ_ACTIVE			1186
 /*! thread-state: active filesystem write calls */
 #define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1187
+/*! thread-yield: application thread time evicting (usecs) */
+#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1188
+/*! thread-yield: application thread time waiting for cache (usecs) */
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1189
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1188
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1190
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1189
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1191
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1190
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1192
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1191
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1193
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1192
+#define	WT_STAT_CONN_PAGE_SLEEP				1194
 /*! transaction: number of named snapshots created */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1193
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1195
 /*! transaction: number of named snapshots dropped */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1194
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1196
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1195
+#define	WT_STAT_CONN_TXN_BEGIN				1197
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1196
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1198
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1197
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1199
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1198
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1200
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1199
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1201
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1200
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1202
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1201
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1203
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1202
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1204
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1203
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1205
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1204
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1206
+/*!
+ * transaction: transaction checkpoints skipped because database was
+ * clean
+ */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1207
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1205
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1208
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1206
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1209
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1207
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1210
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1208
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1211
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1209
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1212
 /*!
  * transaction: transaction range of IDs currently pinned by named
  * snapshots
  */
-#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1210
+#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1213
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1211
+#define	WT_STAT_CONN_TXN_SYNC				1214
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1212
+#define	WT_STAT_CONN_TXN_COMMIT				1215
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1213
+#define	WT_STAT_CONN_TXN_ROLLBACK			1216
 
 /*!
  * @}

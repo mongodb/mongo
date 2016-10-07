@@ -415,7 +415,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	conn = S2C(session);
 
 	/* Get the current local time of day. */
-	WT_RET(__wt_epoch(session, &ts));
+	__wt_epoch(session, &ts);
 	tm = localtime_r(&ts.tv_sec, &_tm);
 
 	/* Create the logging path name for this time of day. */

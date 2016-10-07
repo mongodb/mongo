@@ -139,7 +139,9 @@
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	TXN_API_CALL_NOCONF(s, WT_CURSOR, n, cur,			\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle);	\
-	if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) && __wt_cache_full(s))	\
+	if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) &&			\
+	    !F_ISSET((WT_BTREE *)(bt), WT_BTREE_IGNORE_CACHE) &&	\
+	    __wt_cache_full(s))						\
 		WT_ERR(WT_CACHE_FULL);
 
 #define	JOINABLE_CURSOR_UPDATE_API_CALL(cur, s, n, bt)			\

@@ -128,9 +128,9 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		    "log_force_sync: sync directory %s to LSN %" PRIu32
 		    "/%" PRIu32,
 		    log->log_dir_fh->name, min_lsn->l.file, min_lsn->l.offset);
-		WT_ERR(__wt_epoch(session, &fsync_start));
+		__wt_epoch(session, &fsync_start);
 		WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
-		WT_ERR(__wt_epoch(session, &fsync_stop));
+		__wt_epoch(session, &fsync_stop);
 		fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
 		log->sync_dir_lsn = *min_lsn;
 		WT_STAT_CONN_INCR(session, log_sync_dir);
@@ -152,9 +152,9 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync %s to LSN %" PRIu32 "/%" PRIu32,
 		    log_fh->name, min_lsn->l.file, min_lsn->l.offset);
-		WT_ERR(__wt_epoch(session, &fsync_start));
+		__wt_epoch(session, &fsync_start);
 		WT_ERR(__wt_fsync(session, log_fh, true));
-		WT_ERR(__wt_epoch(session, &fsync_stop));
+		__wt_epoch(session, &fsync_stop);
 		fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
 		log->sync_lsn = *min_lsn;
 		WT_STAT_CONN_INCR(session, log_sync);
@@ -1478,9 +1478,9 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    "/%" PRIu32,
 			    log->log_dir_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset);
-			WT_ERR(__wt_epoch(session, &fsync_start));
+			__wt_epoch(session, &fsync_start);
 			WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
-			WT_ERR(__wt_epoch(session, &fsync_stop));
+			__wt_epoch(session, &fsync_stop);
 			fsync_duration_usecs =
 			    WT_TIMEDIFF_US(fsync_stop, fsync_start);
 			log->sync_dir_lsn = sync_lsn;
@@ -1500,9 +1500,9 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    log->log_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset);
 			WT_STAT_CONN_INCR(session, log_sync);
-			WT_ERR(__wt_epoch(session, &fsync_start));
+			__wt_epoch(session, &fsync_start);
 			WT_ERR(__wt_fsync(session, log->log_fh, true));
-			WT_ERR(__wt_epoch(session, &fsync_stop));
+			__wt_epoch(session, &fsync_stop);
 			fsync_duration_usecs =
 			    WT_TIMEDIFF_US(fsync_stop, fsync_start);
 			WT_STAT_CONN_INCRV(session,
