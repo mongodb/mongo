@@ -107,7 +107,7 @@ TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
     ASSERT_EQUALS(commonOperation.first, i->first);
@@ -164,7 +164,7 @@ TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
     }
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
     ASSERT_EQUALS(commonOperation.first, i->first);
@@ -197,7 +197,7 @@ TEST(RollBackLocalOperationsTest, SameTimestampDifferentHashess) {
     }
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
     ASSERT_EQUALS(commonOperation.first, i->first);
@@ -269,7 +269,7 @@ TEST(SyncRollBackLocalOperationsTest, RollbackTwoOperations) {
                                                   return Status::OK();
                                               });
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
     ASSERT_EQUALS(commonOperation.first, i->first);
@@ -288,7 +288,7 @@ TEST(SyncRollBackLocalOperationsTest, SkipOneRemoteOperation) {
                                         return Status::OK();
                                     });
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
 }
 
@@ -306,7 +306,7 @@ TEST(SyncRollBackLocalOperationsTest, SameTimestampDifferentHashes) {
                                         return Status::OK();
                                     });
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_TRUE(called);
 }

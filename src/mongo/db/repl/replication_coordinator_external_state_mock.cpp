@@ -69,7 +69,7 @@ Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(Operati
     return storeLocalConfigDocument(txn, config);
 }
 
-void ReplicationCoordinatorExternalStateMock::shutdown() {}
+void ReplicationCoordinatorExternalStateMock::shutdown(OperationContext*) {}
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
 OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
@@ -233,8 +233,12 @@ bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageE
     return true;
 }
 
-void ReplicationCoordinatorExternalStateMock::logTransitionToPrimaryToOplog(OperationContext* txn) {
-    _lastOpTime = OpTime(Timestamp(1, 0), 1);
+OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* txn,
+                                                                      bool isV1ElectionProtocol) {
+    if (isV1ElectionProtocol) {
+        _lastOpTime = OpTime(Timestamp(1, 0), 1);
+    }
+    return fassertStatusOK(40297, _lastOpTime);
 }
 
 }  // namespace repl

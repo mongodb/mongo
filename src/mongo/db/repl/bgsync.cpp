@@ -325,6 +325,13 @@ void BackgroundSync::_produce(OperationContext* txn) {
     syncSourceReader.resetConnection();
     // no more references to oplog reader from here on.
 
+    // Set the applied point if unset. This is most likely the first time we've established a sync
+    // source since stepping down or otherwise clearing the applied point. We need to set this here,
+    // before the OplogWriter gets a chance to append to the oplog.
+    if (getAppliedThrough(txn).isNull()) {
+        setAppliedThrough(txn, _replCoord->getMyLastAppliedOpTime());
+    }
+
     Status fetcherReturnStatus = Status::OK();
     auto fetcherCallback = stdx::bind(&BackgroundSync::_fetcherCallback,
                                       this,
@@ -424,13 +431,13 @@ void BackgroundSync::_produce(OperationContext* txn) {
         }
         // check that we are at minvalid, otherwise we cannot roll back as we may be in an
         // inconsistent state
-        BatchBoundaries boundaries = getMinValid(txn);
-        if (!boundaries.start.isNull() || boundaries.end > lastApplied) {
+        const auto minValid = getMinValid(txn);
+        if (lastApplied < minValid) {
             fassertNoTrace(18750,
                            Status(ErrorCodes::UnrecoverableRollbackError,
                                   str::stream()
                                       << "need to rollback, but in inconsistent state. "
-                                      << "minvalid: " << boundaries.end.toString()
+                                      << "minvalid: " << minValid.toString()
                                       << " > our last optime: " << lastApplied.toString()));
         }
 

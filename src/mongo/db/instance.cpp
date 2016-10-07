@@ -1273,8 +1273,6 @@ void exitCleanly(ExitCode code) {
 
     getGlobalServiceContext()->setKillAllOperations();
 
-    repl::getGlobalReplicationCoordinator()->shutdown();
-
     Client& client = cc();
     ServiceContext::UniqueOperationContext uniqueTxn;
     OperationContext* txn = client.getOperationContext();
@@ -1283,6 +1281,8 @@ void exitCleanly(ExitCode code) {
         txn = uniqueTxn.get();
     }
 
+
+    repl::getGlobalReplicationCoordinator()->shutdown(txn);
     ShardingState::get(txn)->shutDown(txn);
 
     // We should always be able to acquire the global lock at shutdown.

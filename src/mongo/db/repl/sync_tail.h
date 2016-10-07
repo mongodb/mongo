@@ -143,6 +143,11 @@ public:
             return _deque.back();
         }
 
+        const OplogEntry& front() const {
+            invariant(!_deque.empty());
+            return _deque.front();
+        }
+
     private:
         std::deque<OplogEntry> _deque;
         size_t _size;
@@ -194,9 +199,7 @@ protected:
     // Apply a batch of operations, using multiple threads.
     // If boundries is supplied, will update minValid document at begin and end of batch.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
-    OpTime multiApply(OperationContext* txn,
-                      const OpQueue& ops,
-                      boost::optional<BatchBoundaries> boundaries = {});
+    OpTime multiApply(OperationContext* txn, const OpQueue& ops);
 
 private:
     class OpQueueBatcher;

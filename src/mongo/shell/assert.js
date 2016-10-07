@@ -3,6 +3,9 @@ doassert = function(msg, obj) {
     if (typeof(msg) == "function")
         msg = msg();
 
+    if (typeof(msg) == "object")
+        msg = tojson(msg);
+
     if (typeof(msg) == "string" && msg.indexOf("assert") == 0)
         print(msg);
     else

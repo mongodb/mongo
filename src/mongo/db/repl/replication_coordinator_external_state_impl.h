@@ -53,11 +53,11 @@ public:
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startMasterSlave(OperationContext* txn);
-    virtual void shutdown();
+    virtual void shutdown(OperationContext* txn);
     virtual Status initializeReplSetStorage(OperationContext* txn,
                                             const BSONObj& config,
                                             bool updateReplOpTime);
-    virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
+    OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);
     virtual bool isSelf(const HostAndPort& host);

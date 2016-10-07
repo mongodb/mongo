@@ -80,7 +80,7 @@ public:
      * Performs any necessary external state specific shutdown tasks, such as cleaning up
      * the threads it started.
      */
-    virtual void shutdown() = 0;
+    virtual void shutdown(OperationContext* txn) = 0;
 
     /**
      * Creates the oplog, writes the first entry and stores the replica set config document.  Sets
@@ -90,10 +90,20 @@ public:
                                             const BSONObj& config,
                                             bool updateReplOpTime) = 0;
 
+
     /**
-     * Writes a message about our transition to primary to the oplog.
+     * Called as part of the process of transitioning to primary and run with the global X lock and
+     * the replication coordinator mutex acquired, so no majoirty writes are allowed while in this
+     * state. See the call site in ReplicationCoordinatorImpl for details about when and how it is
+     * called.
+     *
+     * Among other things, this writes a message about our transition to primary to the oplog if
+     * isV1 and and returns the optime of that message. If !isV1, returns the optime of the last op
+     * in the oplog.
+     *
+     * Throws on errors.
      */
-    virtual void logTransitionToPrimaryToOplog(OperationContext* txn) = 0;
+    virtual OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) = 0;
 
     /**
      * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the

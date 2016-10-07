@@ -304,7 +304,7 @@ unique_ptr<OplogDocWriter> _logOpWriter(OperationContext* txn,
 }
 }  // end anon namespace
 
-// Truncates the oplog to and including the "truncateTimestamp" entry.
+// Truncates the oplog after and including the "truncateTimestamp" entry.
 void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
     const NamespaceString oplogNss(rsOplogName);
     ScopedTransaction transaction(txn, MODE_IX);
@@ -318,36 +318,41 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
     }
 
     // Scan through oplog in reverse, from latest entry to first, to find the truncateTimestamp.
-    bool foundSomethingToTruncate = false;
-    RecordId lastRecordId;
-    BSONObj lastOplogEntry;
+    RecordId oldestIDToDelete;  // Non-null if there is something to delete.
     auto oplogRs = oplogCollection->getRecordStore();
-    auto oplogReverseCursor = oplogRs->getCursor(txn, false);
-    bool first = true;
+    auto oplogReverseCursor = oplogRs->getCursor(txn, /*forward=*/false);
+    size_t count = 0;
     while (auto next = oplogReverseCursor->next()) {
-        lastOplogEntry = next->data.releaseToBson();
-        lastRecordId = next->id;
+        const BSONObj entry = next->data.releaseToBson();
+        const RecordId id = next->id;
+        count++;
 
-        const auto tsElem = lastOplogEntry["ts"];
-
-        if (first) {
+        const auto tsElem = entry["ts"];
+        if (count == 1) {
             if (tsElem.eoo())
-                LOG(2) << "Oplog tail entry: " << lastOplogEntry;
+                LOG(2) << "Oplog tail entry: " << entry;
             else
                 LOG(2) << "Oplog tail entry ts field: " << tsElem;
-            first = false;
         }
 
         if (tsElem.timestamp() < truncateTimestamp) {
-            break;
+            // If count == 1, that means that we have nothing to delete because everything in the
+            // oplog is < truncateTimestamp.
+            if (count != 1) {
+                invariant(!oldestIDToDelete.isNull());
+                oplogCollection->temp_cappedTruncateAfter(
+                    txn, oldestIDToDelete, /*inclusive=*/true);
+            }
+            return;
         }
 
-        foundSomethingToTruncate = true;
+        oldestIDToDelete = id;
     }
 
-    if (foundSomethingToTruncate) {
-        oplogCollection->temp_cappedTruncateAfter(txn, lastRecordId, false);
-    }
+    severe() << "Reached end of oplog looking for oplog entry before "
+             << truncateTimestamp.toStringPretty()
+             << " but couldn't find any after looking through " << count << " entries.";
+    fassertFailedNoTrace(40296);
 }
 
 /* we write to local.oplog.rs:

@@ -36,17 +36,6 @@ class OperationContext;
 
 namespace repl {
 
-struct BatchBoundaries {
-    BatchBoundaries(const OpTime s, const OpTime e) : start(s), end(e) {}
-    OpTime start;
-    OpTime end;
-};
-
-enum class DurableRequirement {
-    None,    // Does not require any durability of the write.
-    Strong,  // Requires journal or checkpoint write.
-};
-
 /**
  * Helper functions for maintaining a single document in the local.replset.minvalid collection.
  *
@@ -79,30 +68,42 @@ void setInitialSyncFlag(OperationContext* txn);
 /**
  * Returns true if the initial sync flag is set (and presumed active).
  */
+bool getInitialSyncFlag(OperationContext* txn);
 bool getInitialSyncFlag();
-
-
-/**
- * Returns the bounds of the current apply batch, if active. If start is null/missing, and
- * end is equal to the last oplog entry then we are in a consistent state and ready for reads.
- */
-BatchBoundaries getMinValid(OperationContext* txn);
 
 /**
  * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
  * consider the dataset consistent.
- *
- * This is called when a batch finishes.
- *
- * Wait for durable writes (which will block on journaling/checkpointing) when specified.
- *
  */
-void setMinValid(OperationContext* ctx, const OpTime& endOpTime, const DurableRequirement durReq);
+void setMinValid(OperationContext* txn, const OpTime& minValid);
+OpTime getMinValid(OperationContext* txn);
 
 /**
- * The bounds indicate an apply is active and we are not in a consistent state to allow reads
- * or transition from a non-visible state to primary/secondary.
+ * Sets minValid only if it is not already higher than endOpTime.
+ * Warning, this compares the term and timestamp independently. Do not use if the current
+ * minValid could be from the other fork of a rollback.
  */
-void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries);
+void setMinValidToAtLeast(OperationContext* txn, const OpTime& endOpTime);
+
+/**
+ * On startup all oplog entries with a value >= the oplog delete from point should be deleted.
+ * If null, no documents should be deleted.
+ */
+void setOplogDeleteFromPoint(OperationContext* txn, const Timestamp& timestamp);
+Timestamp getOplogDeleteFromPoint(OperationContext* txn);
+
+/**
+ * The applied through point is a persistent record of where we've applied through. If null, the
+ * applied through point is the top of the oplog.
+ */
+void setAppliedThrough(OperationContext* txn, const OpTime& optime);
+
+/**
+ * You should probably be calling ReplicationCoordinator::getLastAppliedOpTime() instead.
+ *
+ * This reads the value from storage which isn't always updated when the ReplicationCoordinator
+ * is.
+ */
+OpTime getAppliedThrough(OperationContext* txn);
 }
 }

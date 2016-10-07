@@ -368,9 +368,10 @@ void ReplCoordTest::simulateSuccessfulElection() {
 }
 
 void ReplCoordTest::shutdown() {
+    OperationContextReplMock txn;
     invariant(_callShutdown);
     _net->exitNetwork();
-    _repl->shutdown();
+    _repl->shutdown(&txn);
     _callShutdown = false;
 }
 

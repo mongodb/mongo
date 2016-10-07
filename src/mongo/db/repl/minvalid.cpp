@@ -47,121 +47,142 @@ namespace mongo {
 namespace repl {
 
 namespace {
-const char initialSyncFlagString[] = "doingInitialSync";
-const BSONObj initialSyncFlag(BSON(initialSyncFlagString << true));
-const char minvalidNS[] = "local.replset.minvalid";
-const char beginFieldName[] = "begin";
+const char kInitialSyncFlagFieldName[] = "doingInitialSync";
+const BSONObj kInitialSyncFlag(BSON(kInitialSyncFlagFieldName << true));
+NamespaceString minValidNss("local.replset.minvalid");
+const char kBeginFieldName[] = "begin";
+const char kOplogDeleteFromPointFieldName[] = "oplogDeleteFromPoint";
+
+BSONObj getMinValidDocument(OperationContext* txn) {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IS);
+        Lock::DBLock dblk(txn->lockState(), minValidNss.db(), MODE_IS);
+        Lock::CollectionLock lk(txn->lockState(), minValidNss.ns(), MODE_IS);
+        BSONObj doc;
+        bool found = Helpers::getSingleton(txn, minValidNss.ns().c_str(), doc);
+        invariant(found || doc.isEmpty());
+        return doc;
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "getMinValidDocument", minValidNss.ns());
+
+    MONGO_UNREACHABLE;
+}
+
+void updateMinValidDocument(OperationContext* txn, const BSONObj& updateSpec) {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(txn, MODE_IX);
+        // For now this needs to be MODE_X because it sometimes creates the collection.
+        Lock::DBLock dblk(txn->lockState(), minValidNss.db(), MODE_X);
+        Helpers::putSingleton(txn, minValidNss.ns().c_str(), updateSpec);
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "updateMinValidDocument", minValidNss.ns());
+}
 }  // namespace
 
 // Writes
 void clearInitialSyncFlag(OperationContext* txn) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        // TODO: Investigate correctness of taking MODE_IX for DB/Collection locks
-        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
-        Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "clearInitialSyncFlags", minvalidNS);
-
     auto replCoord = repl::ReplicationCoordinator::get(txn);
     OpTime time = replCoord->getMyLastAppliedOpTime();
+    updateMinValidDocument(txn,
+                           BSON("$unset"
+                                << kInitialSyncFlag << "$set"
+                                << BSON("ts" << time.getTimestamp() << "t" << time.getTerm()
+                                             << kBeginFieldName << time.toBSON())));
     txn->recoveryUnit()->waitUntilDurable();
     replCoord->setMyLastDurableOpTime(time);
     LOG(3) << "clearing initial sync flag";
 }
 
 void setInitialSyncFlag(OperationContext* txn) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
-        Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setInitialSyncFlags", minvalidNS);
-
+    updateMinValidDocument(txn, BSON("$set" << kInitialSyncFlag));
     txn->recoveryUnit()->waitUntilDurable();
     LOG(3) << "setting initial sync flag";
 }
 
-void setMinValid(OperationContext* txn, const OpTime& endOpTime, const DurableRequirement durReq) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
-        Helpers::putSingleton(
-            txn,
-            minvalidNS,
-            BSON("$set" << BSON("ts" << endOpTime.getTimestamp() << "t" << endOpTime.getTerm())
-                        << "$unset" << BSON(beginFieldName << 1)));
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setMinValid", minvalidNS);
-
-    if (durReq == DurableRequirement::Strong) {
-        txn->recoveryUnit()->waitUntilDurable();
-    }
-    LOG(3) << "setting minvalid: " << endOpTime.toString() << "(" << endOpTime.toBSON() << ")";
-}
-
-void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) {
-    const OpTime& start(boundaries.start);
-    const OpTime& end(boundaries.end);
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
-        Helpers::putSingleton(txn,
-                              minvalidNS,
-                              BSON("$set" << BSON("ts" << end.getTimestamp() << "t" << end.getTerm()
-                                                       << beginFieldName << start.toBSON())));
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setMinValid", minvalidNS);
-    // NOTE: No need to ensure durability here since starting a batch isn't a problem unless
-    // writes happen after, in which case this marker (minvalid) will be written already.
-    LOG(3) << "setting minvalid: " << boundaries.start.toString() << "("
-           << boundaries.start.toBSON() << ") -> " << boundaries.end.toString() << "("
-           << boundaries.end.toBSON() << ")";
-}
-
-// Reads
 bool getInitialSyncFlag() {
     OperationContextImpl txn;
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(&txn, MODE_IS);
-        Lock::DBLock dblk(txn.lockState(), "local", MODE_IS);
-        Lock::CollectionLock lk(txn.lockState(), minvalidNS, MODE_IS);
-        BSONObj mv;
-        bool found = Helpers::getSingleton(&txn, minvalidNS, mv);
+    return getInitialSyncFlag(&txn);
+}
+bool getInitialSyncFlag(OperationContext* txn) {
+    const BSONObj doc = getMinValidDocument(txn);
+    const auto flag = doc[kInitialSyncFlagFieldName].trueValue();
+    LOG(3) << "returning initial sync flag value of " << flag;
+    return flag;
+}
 
-        if (found) {
-            const auto flag = mv[initialSyncFlagString].trueValue();
-            LOG(3) << "return initial flag value of " << flag;
-            return flag;
-        }
-        LOG(3) << "return initial flag value of false";
-        return false;
+OpTime getMinValid(OperationContext* txn) {
+    const BSONObj doc = getMinValidDocument(txn);
+    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc);
+    // If any of the keys (fields) are missing from the minvalid document, we return
+    // a null OpTime.
+    if (opTimeStatus == ErrorCodes::NoSuchKey) {
+        return {};
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "getInitialSyncFlags", minvalidNS);
 
-    MONGO_UNREACHABLE;
-}
-
-BatchBoundaries getMinValid(OperationContext* txn) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IS);
-        Lock::DBLock dblk(txn->lockState(), "local", MODE_IS);
-        Lock::CollectionLock lk(txn->lockState(), minvalidNS, MODE_IS);
-        BSONObj mv;
-        bool found = Helpers::getSingleton(txn, minvalidNS, mv);
-        if (found) {
-            auto status = OpTime::parseFromOplogEntry(mv.getObjectField(beginFieldName));
-            OpTime start(status.isOK() ? status.getValue() : OpTime{});
-            OpTime end(fassertStatusOK(28771, OpTime::parseFromOplogEntry(mv)));
-            LOG(3) << "returning minvalid: " << start.toString() << "(" << start.toBSON() << ") -> "
-                   << end.toString() << "(" << end.toBSON() << ")";
-
-            return BatchBoundaries(start, end);
-        }
-        LOG(3) << "returning empty minvalid";
-        return BatchBoundaries{OpTime{}, OpTime{}};
+    if (!opTimeStatus.isOK()) {
+        severe() << "Error parsing minvalid entry: " << doc
+                 << ", with status:" << opTimeStatus.getStatus();
+        fassertFailedNoTrace(40052);
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "getMinValid", minvalidNS);
+
+    OpTime minValid = opTimeStatus.getValue();
+    LOG(3) << "returning minvalid: " << minValid.toString() << "(" << minValid.toBSON() << ")";
+
+    return minValid;
 }
+void setMinValid(OperationContext* txn, const OpTime& minValid) {
+    LOG(3) << "setting minvalid to exactly: " << minValid.toString() << "(" << minValid.toBSON()
+           << ")";
+    updateMinValidDocument(
+        txn, BSON("$set" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
 }
+
+void setMinValidToAtLeast(OperationContext* txn, const OpTime& minValid) {
+    LOG(3) << "setting minvalid to at least: " << minValid.toString() << "(" << minValid.toBSON()
+           << ")";
+    updateMinValidDocument(
+        txn, BSON("$max" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
 }
+
+void setOplogDeleteFromPoint(OperationContext* txn, const Timestamp& timestamp) {
+    LOG(3) << "setting oplog delete from point to: " << timestamp.toStringPretty();
+    updateMinValidDocument(txn, BSON("$set" << BSON(kOplogDeleteFromPointFieldName << timestamp)));
+}
+
+Timestamp getOplogDeleteFromPoint(OperationContext* txn) {
+    const BSONObj doc = getMinValidDocument(txn);
+    Timestamp out = {};
+    if (auto field = doc[kOplogDeleteFromPointFieldName]) {
+        out = field.timestamp();
+    }
+
+    LOG(3) << "returning oplog delete from point: " << out;
+    return out;
+}
+
+void setAppliedThrough(OperationContext* txn, const OpTime& optime) {
+    LOG(3) << "setting appliedThrough to: " << optime.toString() << "(" << optime.toBSON() << ")";
+    if (optime.isNull()) {
+        updateMinValidDocument(txn, BSON("$unset" << BSON(kBeginFieldName << 1)));
+    } else {
+        updateMinValidDocument(txn, BSON("$set" << BSON(kBeginFieldName << optime.toBSON())));
+    }
+}
+
+OpTime getAppliedThrough(OperationContext* txn) {
+    const BSONObj doc = getMinValidDocument(txn);
+    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc.getObjectField(kBeginFieldName));
+    if (!opTimeStatus.isOK()) {
+        // Return null OpTime on any parse failure, including if "begin" is missing.
+        return {};
+    }
+
+    OpTime appliedThrough = opTimeStatus.getValue();
+    LOG(3) << "returning appliedThrough: " << appliedThrough.toString() << "("
+           << appliedThrough.toBSON() << ")";
+
+    return appliedThrough;
+}
+
+}  // namespace repl
+}  // namespace mongo

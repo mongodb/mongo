@@ -79,8 +79,8 @@ MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
 void truncateAndResetOplog(OperationContext* txn,
                            ReplicationCoordinator* replCoord,
                            BackgroundSync* bgsync) {
-    // Clear minvalid
-    setMinValid(txn, OpTime(), DurableRequirement::None);
+    // Add field to minvalid document to tell us to restart initial sync if we crash
+    setInitialSyncFlag(txn);
 
     AutoGetDb autoDb(txn, "local", MODE_X);
     massert(28585, "no local database found", autoDb.getDb());
@@ -341,9 +341,6 @@ Status _initialSync() {
         return Status(ErrorCodes::InitialSyncFailure, msg);
     }
 
-    // Add field to minvalid document to tell us to restart initial sync if we crash
-    setInitialSyncFlag(&txn);
-
     log() << "initial sync drop all databases";
     dropAllDatabasesExceptLocal(&txn);
 
@@ -457,19 +454,10 @@ Status _initialSync() {
 
     log() << "initial sync finishing up";
 
-    {
-        ScopedTransaction scopedXact(&txn, MODE_IX);
-        AutoGetDb autodb(&txn, "local", MODE_X);
-        OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastAppliedOpTime());
-        log() << "set minValid=" << lastOpTimeWritten;
-
-        // Initial sync is now complete.  Flag this by setting minValid to the last thing we synced.
-        setMinValid(&txn, lastOpTimeWritten, DurableRequirement::None);
-        BackgroundSync::get()->setInitialSyncRequestedFlag(false);
-    }
-
+    // Initial sync is now complete.
     // Clear the initial sync flag -- cannot be done under a db lock, or recursive.
     clearInitialSyncFlag(&txn);
+    BackgroundSync::get()->setInitialSyncRequestedFlag(false);
 
     // Clear maint. mode.
     while (replCoord->getMaintenanceMode()) {

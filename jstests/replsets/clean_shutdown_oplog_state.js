@@ -57,9 +57,10 @@
     var conn = MongoRunner.runMongod(options);
     assert.neq(null, conn, "secondary failed to start");
 
-    // Following a clean shutdown of a 3.2 node, the oplog must exactly match the applied
-    // operations. Additionally, the begin field must not be in the minValid document and the ts
-    // must match the top of the oplog (SERVER-25353).
+    // Following clean shutdown of a node, the oplog must exactly match the applied operations.
+    // Additionally, the begin field must not be in the minValid document, the ts must match the
+    // top of the oplog (SERVER-25353), and the oplogDeleteFromPoint must be null (SERVER-7200 and
+    // SERVER-25071).
     var oplogDoc = conn.getCollection('local.oplog.rs')
                        .find({ns: 'test.coll'})
                        .sort({$natural: -1})
@@ -68,9 +69,20 @@
     var minValidDoc =
         conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
     printjson({oplogDoc: oplogDoc, collDoc: collDoc, minValidDoc: minValidDoc});
-    assert.eq(collDoc._id, oplogDoc.o._id);
-    assert(!('begin' in minValidDoc), 'begin in minValidDoc');
-    assert.eq(minValidDoc.ts, oplogDoc.ts);
+    try {
+        assert.eq(collDoc._id, oplogDoc.o._id);
+        assert(!('begin' in minValidDoc), 'begin in minValidDoc');
+        assert.eq(minValidDoc.ts, oplogDoc.ts);
+        if ('oplogDeleteFromPoint' in minValidDoc) {
+            // If present it must be the null timestamp.
+            assert.eq(minValidDoc.oplogDeleteFromPoint, Timestamp());
+        }
+    } catch (e) {
+        jsTest.log(
+            "Look above and make sure clean shutdown finished without resorting to SIGKILL." +
+            "\nUnfortunately that currently doesn't fail the test.");
+        throw e;
+    }
 
     rst.stopSet();
 })();

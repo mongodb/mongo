@@ -2423,9 +2423,10 @@ TEST_F(ReplCoordTest, IsMaster) {
 }
 
 TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {
+    OperationContextNoop txn;
     init();
     startCapturingLogMessages();
-    getReplCoord()->shutdown();
+    getReplCoord()->shutdown(&txn);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("shutdown() called before startReplication() finished"));
