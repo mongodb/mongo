@@ -106,7 +106,7 @@ bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
 
 Status IndexDescriptor::isIndexVersionAllowedForCreation(
     IndexVersion indexVersion,
-    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion,
+    const ServerGlobalParams::FeatureCompatibility& featureCompatibility,
     const BSONObj& indexSpec) {
     switch (indexVersion) {
         case IndexVersion::kV0:
@@ -115,7 +115,8 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
             return Status::OK();
         case IndexVersion::kV2: {
             if (ServerGlobalParams::FeatureCompatibility::Version::k32 ==
-                featureCompatibilityVersion) {
+                    featureCompatibility.version.load() &&
+                featureCompatibility.validateFeaturesAsMaster.load()) {
                 return {ErrorCodes::CannotCreateIndex,
                         str::stream() << "Invalid index specification " << indexSpec
                                       << "; cannot create an index with v="
@@ -135,10 +136,15 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
 
 IndexVersion IndexDescriptor::getDefaultIndexVersion(
     ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) {
+    ServerGlobalParams::FeatureCompatibility featureCompatibility;
+    featureCompatibility.version.store(featureCompatibilityVersion);
+    // We always pass validateFeaturesAsMaster=true since this flag should not affect our
+    // determination of the default index version.
+    featureCompatibility.validateFeaturesAsMaster.store(true);
     // We pass in an empty object for the index specification because it is only used within the
     // error reason.
     if (!IndexDescriptor::isIndexVersionAllowedForCreation(
-             IndexVersion::kV2, featureCompatibilityVersion, BSONObj())
+             IndexVersion::kV2, featureCompatibility, BSONObj())
              .isOK()) {
         // When the featureCompatibilityVersion is 3.2, we use index version v=1 as the default
         // index version.

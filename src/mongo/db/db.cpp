@@ -798,7 +798,8 @@ ExitCode _initAndListen(int listenPort) {
                 startupOpCtx.get(), repl::StorageInterface::get(getGlobalServiceContext()));
         }
 
-        if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave())) {
+        if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||
+            !internalValidateFeaturesAsMaster) {
             serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         }
     }

@@ -118,7 +118,7 @@ public:
      */
     static Status isIndexVersionAllowedForCreation(
         IndexVersion indexVersion,
-        ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion,
+        const ServerGlobalParams::FeatureCompatibility& featureCompatibility,
         const BSONObj& indexSpec);
 
     /**

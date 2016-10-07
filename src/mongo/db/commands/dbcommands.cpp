@@ -541,8 +541,10 @@ public:
         }
 
         auto featureCompatibilityVersion = serverGlobalParams.featureCompatibility.version.load();
+        auto validateFeaturesAsMaster =
+            serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load();
         if (ServerGlobalParams::FeatureCompatibility::Version::k32 == featureCompatibilityVersion &&
-            cmdObj.hasField("collation")) {
+            validateFeaturesAsMaster && cmdObj.hasField("collation")) {
             return appendCommandStatus(
                 result,
                 {ErrorCodes::InvalidOptions,

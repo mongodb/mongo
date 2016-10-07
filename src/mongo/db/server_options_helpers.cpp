@@ -576,6 +576,19 @@ Status validateServerOptions(const moe::Environment& params) {
             enableTestCommandsParameter->second.compare("1") == 0) {
             getGlobalFailPointRegistry()->registerAllFailPointsAsServerParameters();
         }
+
+        if (parameters.find("internalValidateFeaturesAsMaster") != parameters.end()) {
+            // Command line options that are disallowed when internalValidateFeaturesAsMaster is
+            // specified.
+            for (const auto& disallowedOption : {"replication.replSet", "master", "slave"}) {
+                if (params.count(disallowedOption)) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream()
+                                      << "Cannot specify both internalValidateFeaturesAsMaster and "
+                                      << disallowedOption);
+                }
+            }
+        }
     }
     if ((params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") ||

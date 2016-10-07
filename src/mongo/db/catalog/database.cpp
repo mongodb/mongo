@@ -394,7 +394,8 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
                                   "turn off profiling before dropping system.profile collection");
             } else if (nss.isSystemDotViews()) {
                 if (serverGlobalParams.featureCompatibility.version.load() !=
-                    ServerGlobalParams::FeatureCompatibility::Version::k32) {
+                        ServerGlobalParams::FeatureCompatibility::Version::k32 &&
+                    serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load()) {
                     return Status(ErrorCodes::IllegalOperation,
                                   "The featureCompatibilityVersion must be 3.2 to drop the "
                                   "system.views collection. See "

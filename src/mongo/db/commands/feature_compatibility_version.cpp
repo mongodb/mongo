@@ -375,4 +375,6 @@ public:
     }
 } featureCompatibilityVersionParameter;
 
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(internalValidateFeaturesAsMaster, bool, true);
+
 }  // namespace mongo
