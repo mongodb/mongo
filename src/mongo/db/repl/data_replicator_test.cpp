@@ -689,59 +689,54 @@ TEST_F(InitialSyncTest, Complete) {
      *
      */
 
-    auto lastOpAfterClone = BSON(
-        "ts" << Timestamp(Seconds(8), 1U) << "h" << 1LL << "v" << OplogEntry::kOplogVersion << "ns"
-             << ""
-             << "op"
-             << "i"
-             << "o"
-             << BSON("_id" << 5 << "a" << 2));
-
-    const Responses responses = {
-        {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
-        // get latest oplog ts
-        {"find",
-         fromjson(
-             str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
-                              "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
-                           << OplogEntry::kOplogVersion
-                           << ", op:'i', o:{_id:1, a:1}}]}}")},
-        // oplog fetcher find
-        {"find",
-         fromjson(
-             str::stream() << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
-                              "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
-                           << OplogEntry::kOplogVersion
-                           << ", op:'i', o:{_id:1, a:1}}]}}")},
-        // Clone Start
-        // listDatabases
-        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
-        // listCollections for "a"
-        {"listCollections",
-         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
-                  "{name:'a', options:{}} "
-                  "]}}")},
-        // count:a
-        {"count", BSON("n" << 1 << "ok" << 1)},
-        // listIndexes:a
+    const Responses responses =
         {
-            "listIndexes",
-            fromjson(str::stream()
-                     << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
-                        "{v:"
-                     << OplogEntry::kOplogVersion
-                     << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
-        // find:a
-        {"find",
-         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
-                  "{_id:1, a:1} "
-                  "]}}")},
-        // Clone Done
-        // get latest oplog ts
-        {"find", BaseClonerTest::createCursorResponse(0, BSON_ARRAY(lastOpAfterClone))},
-        {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
-        // Applier starts ...
-    };
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // oplog fetcher find
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(1), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(1,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:1, a:1}}]}}")},
+            // Clone Start
+            // listDatabases
+            {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
+            // listCollections for "a"
+            {"listCollections",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
+                      "{name:'a', options:{}} "
+                      "]}}")},
+            // listIndexes:a
+            {"listIndexes",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
+                         "{v:"
+                      << OplogEntry::kOplogVersion
+                      << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+            // find:a
+            {"find",
+             fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                      "{_id:1, a:1} "
+                      "]}}")},
+            // Clone Done
+            // get latest oplog ts
+            {"find",
+             fromjson(str::stream()
+                      << "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:["
+                         "{ts:Timestamp(7,1), h:NumberLong(1), ns:'a.a', v:"
+                      << OplogEntry::kOplogVersion
+                      << ", op:'i', o:{_id:5, a:2}}]}}")},
+            {"replSetGetRBID", fromjson(str::stream() << "{ok: 1, rbid:1}")},
+            // Applier starts ...
+        };
 
     // Initial sync flag should not be set before starting.
     auto txn = makeOpCtx();
@@ -751,7 +746,7 @@ TEST_F(InitialSyncTest, Complete) {
 
     // Play first response to ensure data replicator has entered initial sync state.
     setResponses({responses.begin(), responses.begin() + 1});
-    numGetMoreOplogEntriesMax = responses.size();
+    numGetMoreOplogEntriesMax = 6;
     playResponses();
 
     // Initial sync flag should be set.
@@ -778,7 +773,9 @@ TEST_F(InitialSyncTest, Complete) {
     ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
 
     // getMore responses are generated by playResponses().
-    ASSERT_EQUALS(OplogEntry(lastOpAfterClone).getOpTime(), _myLastOpTime);
+    ASSERT_EQUALS(OpTime(Timestamp(7, 1), OpTime::kUninitializedTerm),
+                  OplogEntry(lastGetMoreOplogEntry).getOpTime());
+    ASSERT_EQUALS(OplogEntry(lastGetMoreOplogEntry).getOpTime(), _myLastOpTime);
 }
 
 TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCloning) {
@@ -807,8 +804,6 @@ TEST_F(InitialSyncTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCl
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // count:a
-            {"count", BSON("n" << 1 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -944,8 +939,6 @@ TEST_F(InitialSyncTest, FailOnRollback) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // count:a
-            {"count", BSON("n" << 1 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -972,7 +965,7 @@ TEST_F(InitialSyncTest, FailOnRollback) {
         };
 
     startSync(1);
-    numGetMoreOplogEntriesMax = responses.size();
+    numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponses();
     verifySync(getNet(), ErrorCodes::UnrecoverableRollbackError);
@@ -1005,8 +998,6 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // count:a
-            {"count", BSON("n" << 1 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -1032,7 +1023,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
         };
 
     startSync(1);
-    numGetMoreOplogEntriesMax = responses.size();
+    numGetMoreOplogEntriesMax = 5;
     setResponses(responses);
     playResponses();
     getExecutor().shutdown();
@@ -1110,8 +1101,6 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // count:a
-            {"count", BSON("n" << 1 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -1153,7 +1142,7 @@ TEST_F(InitialSyncTest, OplogOutOfOrderOnOplogFetchFinish) {
 
     startSync(1);
 
-    numGetMoreOplogEntriesMax = responses.size();
+    numGetMoreOplogEntriesMax = 10;
     setResponses({responses.begin(), responses.end() - 4});
     playResponses();
     log() << "done playing first responses";
@@ -1193,8 +1182,6 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // count:a
-            {"count", BSON("n" << 1 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -1221,7 +1208,7 @@ TEST_F(InitialSyncTest, InitialSyncStateIsResetAfterFailure) {
 
     startSync(2);
 
-    numGetMoreOplogEntriesMax = responses.size();
+    numGetMoreOplogEntriesMax = 6;
     setResponses(responses);
     playResponses();
     log() << "done playing first responses";
@@ -1290,8 +1277,6 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
              fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listCollections', firstBatch:["
                       "{name:'a', options:{}} "
                       "]}}")},
-            // count:a
-            {"count", BSON("n" << 5 << "ok" << 1)},
             // listIndexes:a
             {"listIndexes",
              fromjson(str::stream()
@@ -1342,7 +1327,7 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     // Play first 2 responses to ensure data replicator has started the oplog fetcher.
     setResponses({failedResponses.begin(), failedResponses.begin() + 2});
-    numGetMoreOplogEntriesMax = failedResponses.size() + successfulResponses.size();
+    numGetMoreOplogEntriesMax = 10;
     playResponses();
     log() << "Done playing first failed response";
 
@@ -1412,12 +1397,7 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(1, dbProgress.getIntField("collections")) << dbProgress;
     ASSERT_EQUALS(1, dbProgress.getIntField("clonedCollections")) << dbProgress;
     auto collectionProgress = dbProgress.getObjectField("a.a");
-    ASSERT_EQUALS(
-        5, collectionProgress.getIntField(CollectionCloner::Stats::kDocumentsToCopyFieldName))
-        << collectionProgress;
-    ASSERT_EQUALS(
-        5, collectionProgress.getIntField(CollectionCloner::Stats::kDocumentsCopiedFieldName))
-        << collectionProgress;
+    ASSERT_EQUALS(5, collectionProgress.getIntField("documents")) << collectionProgress;
     ASSERT_EQUALS(1, collectionProgress.getIntField("indexes")) << collectionProgress;
     ASSERT_EQUALS(5, collectionProgress.getIntField("fetchedBatches")) << collectionProgress;
 

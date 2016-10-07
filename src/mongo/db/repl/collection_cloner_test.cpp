@@ -37,7 +37,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -179,144 +178,10 @@ TEST_F(CollectionClonerTest, FirstRemoteCommand) {
     NetworkOperationIterator noi = net->getNextReadyRequest();
     auto&& noiRequest = noi->getRequest();
     ASSERT_EQUALS(nss.db().toString(), noiRequest.dbname);
-    ASSERT_EQUALS("count", std::string(noiRequest.cmdObj.firstElementFieldName()));
+    ASSERT_EQUALS("listIndexes", std::string(noiRequest.cmdObj.firstElementFieldName()));
     ASSERT_EQUALS(nss.coll().toString(), noiRequest.cmdObj.firstElement().valuestrsafe());
     ASSERT_FALSE(net->hasReadyRequests());
     ASSERT_TRUE(collectionCloner->isActive());
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerSetsDocumentCountInStatsFromCountCommandResult) {
-    ASSERT_OK(collectionCloner->startup());
-
-    ASSERT_EQUALS(0U, collectionCloner->getStats().documentToCopy);
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(100));
-    }
-    getExecutor().shutdown();
-    collectionCloner->join();
-    ASSERT_EQUALS(100U, collectionCloner->getStats().documentToCopy);
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerPassesThroughNonRetriableErrorFromCountCommand) {
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(ErrorCodes::OperationFailed, "");
-    }
-    collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus());
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerPassesThroughCommandStatusErrorFromCountCommand) {
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(BSON("ok" << 0 << "errmsg"
-                                         << "count error"
-                                         << "code"
-                                         << int(ErrorCodes::OperationFailed)));
-    }
-    collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus());
-    ASSERT_STRING_CONTAINS(getStatus().reason(), "count error");
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerResendsCountCommandOnRetriableError) {
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(ErrorCodes::HostNotFound, "");
-        processNetworkResponse(ErrorCodes::NetworkTimeout, "");
-        processNetworkResponse(createCountResponse(100));
-    }
-    getExecutor().shutdown();
-    collectionCloner->join();
-    ASSERT_EQUALS(100U, collectionCloner->getStats().documentToCopy);
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerReturnsLastRetriableErrorOnExceedingCountAttempts) {
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(ErrorCodes::HostNotFound, "");
-        processNetworkResponse(ErrorCodes::NetworkTimeout, "");
-        processNetworkResponse(ErrorCodes::NotMaster, "");
-    }
-    collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::NotMaster, getStatus());
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerReturnsNoSuchKeyOnMissingDocumentCountFieldName) {
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(BSON("ok" << 1));
-    }
-    collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, getStatus());
-}
-
-TEST_F(CollectionClonerTest, CollectionClonerReturnsBadValueOnNegativeDocumentCount) {
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(-1));
-    }
-    collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::BadValue, getStatus());
-}
-
-class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
-public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
-
-    TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
-                                                   ShouldFailRequestFn shouldFailRequest)
-        : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
-
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
-                                                     const RemoteCommandCallbackFn& cb) override {
-        if (_shouldFailRequest(request)) {
-            return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
-        }
-        return getExecutor()->scheduleRemoteCommand(request, cb);
-    }
-
-private:
-    ShouldFailRequestFn _shouldFailRequest;
-};
-
-TEST_F(CollectionClonerTest,
-       CollectionClonerReturnsScheduleErrorOnFailingToScheduleListIndexesCommand) {
-    TaskExecutorWithFailureInScheduleRemoteCommand _executorProxy(
-        &getExecutor(), [](const executor::RemoteCommandRequest& request) {
-            return str::equals("listIndexes", request.cmdObj.firstElementFieldName());
-        });
-
-    collectionCloner = stdx::make_unique<CollectionCloner>(
-        &_executorProxy,
-        dbWorkThreadPool.get(),
-        target,
-        nss,
-        options,
-        stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-        storageInterface.get());
-
-    ASSERT_OK(collectionCloner->startup());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(100));
-    }
-    collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus());
 }
 
 TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
@@ -351,7 +216,6 @@ TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
     ASSERT_OK(collectionCloner->startup());
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSONArray()));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -385,7 +249,6 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNoIndexes) {
     // the cloner stops the fetcher from retrieving more results.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(1, BSONArray()));
     }
 
@@ -415,7 +278,6 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
     // the cloner stops the fetcher from retrieving more results.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(ErrorCodes::NamespaceNotFound, "The collection doesn't exist.");
     }
 
@@ -454,7 +316,6 @@ TEST_F(CollectionClonerTest,
     // the cloner stops the fetcher from retrieving more results.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(ErrorCodes::NamespaceNotFound, "The collection doesn't exist.");
     }
 
@@ -476,7 +337,6 @@ TEST_F(CollectionClonerTest, BeginCollectionScheduleDbWorkFailed) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -502,7 +362,6 @@ TEST_F(CollectionClonerTest, BeginCollectionCallbackCanceled) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -523,7 +382,6 @@ TEST_F(CollectionClonerTest, BeginCollectionFailed) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -566,7 +424,6 @@ TEST_F(CollectionClonerTest, BeginCollection) {
     // First batch contains the _id_ index spec.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(1, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -617,7 +474,6 @@ TEST_F(CollectionClonerTest, FindFetcherScheduleFailed) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -645,7 +501,6 @@ TEST_F(CollectionClonerTest, FindCommandAfterBeginCollection) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -670,7 +525,6 @@ TEST_F(CollectionClonerTest, FindCommandFailed) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -695,7 +549,6 @@ TEST_F(CollectionClonerTest, FindCommandCanceled) {
     ASSERT_TRUE(collectionCloner->isActive());
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         scheduleNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -733,7 +586,6 @@ TEST_F(CollectionClonerTest, InsertDocumentsScheduleDbWorkFailed) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -761,7 +613,6 @@ TEST_F(CollectionClonerTest, InsertDocumentsCallbackCanceled) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
 
@@ -795,7 +646,6 @@ TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -829,7 +679,6 @@ TEST_F(CollectionClonerTest, InsertDocumentsSingleBatch) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -860,7 +709,6 @@ TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -905,7 +753,6 @@ TEST_F(CollectionClonerTest, LastBatchContainsNoDocuments) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -958,7 +805,6 @@ TEST_F(CollectionClonerTest, MiddleBatchContainsNoDocuments) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -1020,7 +866,6 @@ TEST_F(CollectionClonerTest, CollectionClonerCanBeRestartedAfterPreviousFailure)
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
@@ -1063,7 +908,6 @@ TEST_F(CollectionClonerTest, CollectionClonerCanBeRestartedAfterPreviousFailure)
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(collectionCloner->isActive());
