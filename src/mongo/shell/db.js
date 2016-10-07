@@ -466,7 +466,7 @@ var DB;
         print("\tdb.commandHelp(name) returns the help for the command");
         print("\tdb.copyDatabase(fromdb, todb, fromhost)");
         print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
-        print("\tdb.createView(name, viewOn : ..., pipeline : [ { $operator: {...}}, ... ] )");
+        print("\tdb.createView(name, viewOn, [ { $operator: {...}}, ... ] )");
         print("\tdb.createUser(userDocument)");
         print("\tdb.currentOp() displays currently executing operations in the db");
         print("\tdb.dropDatabase()");
