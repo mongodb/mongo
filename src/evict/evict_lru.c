@@ -1077,11 +1077,11 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	 * candidate pages in cache, don't put all of them on one queue.
 	 */
 	if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
-		max_entries =
-		    WT_MIN(max_entries, 1 + __wt_cache_pages_inuse(cache) / 2);
+		max_entries = WT_MIN(max_entries,
+		    1 + (uint32_t)(__wt_cache_pages_inuse(cache) / 2));
 	else
-		max_entries =
-		    WT_MIN(max_entries, 1 + cache->pages_dirty_leaf / 2);
+		max_entries = WT_MIN(max_entries,
+		    1 + (uint32_t)(cache->pages_dirty_leaf / 2));
 
 retry:	while (slot < max_entries) {
 		/*
