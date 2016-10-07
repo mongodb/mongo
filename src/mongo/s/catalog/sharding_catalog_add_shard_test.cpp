@@ -1122,6 +1122,10 @@ TEST_F(AddShardTest, CompatibilityAddShardRetryOnGenericFailures) {
 
     expectShardIdentityUpsertReturnFailure(
         shardTarget, shardName, {ErrorCodes::HostUnreachable, "host unreachable"});
+    // Since the upsert returned failure, a (local) task to reschedule the upsert will be scheduled
+    // to run after an interval. Forward the network to just past the end of the interval so that
+    // the (local) task runs, at which point the upsert will be rescheduled to run immediately on
+    // the network.
     forwardAddShardNetwork(networkForAddShard()->now() +
                            ShardingCatalogManager::getAddShardTaskRetryInterval() +
                            Milliseconds(10));
@@ -1140,9 +1144,6 @@ TEST_F(AddShardTest, CompatibilityAddShardRetryOnGenericFailures) {
 
     // Finally, respond with success.
     expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
-    forwardAddShardNetwork(networkForAddShard()->now() +
-                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
-                           Milliseconds(10));
 
     // Since the shardIdentity upsert succeeded, the entry in config.shards should have been
     // updated to reflect that the shard is now shard aware.
@@ -1187,16 +1188,18 @@ TEST_F(AddShardTest, CompatibilityAddShardRetryOnDuplicateKeyFailure) {
     for (int i = 0; i < 3; i++) {
         expectShardIdentityUpsertReturnFailure(
             shardTarget, shardName, {ErrorCodes::DuplicateKey, "duplicate key"});
+        // Since the upsert returned failure, a (local) task to reschedule the upsert will be
+        // scheduled to run after an interval. Forward the network to just past the end of the
+        // interval so that the (local) task runs, at which point the upsert will be rescheduled
+        // to run immediately on the network.
         forwardAddShardNetwork(networkForAddShard()->now() +
                                ShardingCatalogManager::getAddShardTaskRetryInterval() +
                                Milliseconds(10));
     }
 
-    // Finally, respond with success (simulating that the shardIdentity document has been deleted).
+    // Finally, respond with success (simulating that conflicting the shardIdentity document has
+    // been deleted from the shard, and the new shardIdentity document was able to be inserted).
     expectShardIdentityUpsertReturnSuccess(shardTarget, shardName);
-    forwardAddShardNetwork(networkForAddShard()->now() +
-                           ShardingCatalogManager::getAddShardTaskRetryInterval() +
-                           Milliseconds(10));
 
     // Since the shardIdentity upsert succeeded, the entry in config.shards should have been
     // updated to reflect that the shard is now shard aware.
@@ -1206,7 +1209,7 @@ TEST_F(AddShardTest, CompatibilityAddShardRetryOnDuplicateKeyFailure) {
     assertShardExists(addedShard);
 }
 
-TEST_F(AddShardTest, CompatibilityAddShardCancelRequestCallback) {
+TEST_F(AddShardTest, CompatibilityAddShardCancelRequestCallbackBeforeTaskCompletes) {
     // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
     // relies on behavior guarded by a check that we are a primary.
     repl::ReplicationCoordinator::get(getGlobalServiceContext())
@@ -1245,6 +1248,70 @@ TEST_F(AddShardTest, CompatibilityAddShardCancelRequestCallback) {
     networkForAddShard()->runReadyNetworkOperations();
     networkForAddShard()->exitNetwork();
 
+    // If the shard exists without the "state: 1" field, the callback did not run, as expected.
+    assertShardExists(addedShard);
+}
+
+TEST_F(AddShardTest, CompatibilityAddShardCancelRequestCallbackAfterTaskCompletes) {
+    // This is a hack to set the ReplicationCoordinator's MemberState to primary, since this test
+    // relies on behavior guarded by a check that we are a primary.
+    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        ->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    HostAndPort shardTarget("StandaloneHost:12345");
+    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
+    targeter->setFindHostReturnValue(shardTarget);
+    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
+
+    std::string shardName = "StandaloneShard";
+
+    // The shard doc inserted into the config.shards collection on the config server.
+    ShardType addedShard;
+    addedShard.setName(shardName);
+    addedShard.setHost(shardTarget.toString());
+    addedShard.setMaxSizeMB(100);
+
+    // Add the shard to config.shards to trigger the OpObserver that performs shard aware
+    // initialization.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    addedShard.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Manually progress the network to schedule a response for the upsert, but stop before the
+    // response is delivered to the callback.
+    // Note: this does all the steps in NetworkTestEnv::onCommand except runReadyNetworkOperations.
+
+    networkForAddShard()->enterNetwork();
+    auto noi = networkForAddShard()->getNextReadyRequest();
+    auto request = noi->getRequest();
+
+    // Build a success response.
+    BatchedCommandResponse responseValue;
+    responseValue.setOk(true);
+    responseValue.setNModified(1);
+    Status responseStatus = Status::OK();
+    BSONObjBuilder result;
+    result.appendElements(responseValue.toBSON());
+    Command::appendCommandStatus(result, responseStatus);
+    const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
+
+    networkForAddShard()->scheduleResponse(noi, networkForAddShard()->now(), response);
+    networkForAddShard()->exitNetwork();
+
+    // Cancel the addShard task directly rather than via the OpObserver for deletes to config.shards
+    // so that we can check that the shard entry did not get updated after the callback ran
+    // (meaning the addShard task was successfully canceled and handled as such).
+    catalogManager()->cancelAddShardTaskIfNeeded(addedShard.getName());
+
+    // Now allow the network to run the callback with the response we scheduled earlier.
+    networkForAddShard()->enterNetwork();
+    networkForAddShard()->runReadyNetworkOperations();
+    networkForAddShard()->exitNetwork();
+
+    // If the shard exists without the "state: 1" field, the callback did not run, as expected.
     assertShardExists(addedShard);
 }
 

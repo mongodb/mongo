@@ -108,7 +108,15 @@ public:
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
                                 const RemoteCommandCompletionFn& onFinish);
+
+    /**
+     * If the network operation is in the _unscheduled or _processing queues, moves the operation
+     * into the _scheduled queue with ErrorCodes::CallbackCanceled. If the operation is already in
+     * the _scheduled queue, does nothing. The latter simulates the case where cancelCommand() is
+     * called after the task has already completed, but its callback has not yet been run.
+     */
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
+
     /**
      * Not implemented.
      */
@@ -246,10 +254,13 @@ public:
     void setHandshakeReplyForHost(const HostAndPort& host, RemoteCommandResponse&& reply);
 
     /**
-     * Cancel a command with specified response, e.g. NetworkTimeout or CallbackCanceled errors.
+     * Deliver the response to the callback handle if the handle is present in queuesToCheck.
+     * This represents interrupting the regular flow with, for example, a NetworkTimeout or
+     * CallbackCanceled error.
      */
-    void _cancelCommand_inlock(const TaskExecutor::CallbackHandle& cbHandle,
-                               const ResponseStatus& response);
+    void _interruptWithResponse_inlock(const TaskExecutor::CallbackHandle& cbHandle,
+                                       const std::vector<NetworkOperationList*> queuesToCheck,
+                                       const ResponseStatus& response);
 
 private:
     /**

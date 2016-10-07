@@ -150,14 +150,19 @@ void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle) {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     ResponseStatus rs(ErrorCodes::CallbackCanceled, "Network operation canceled", Milliseconds(0));
-    _cancelCommand_inlock(cbHandle, rs);
+
+    // We mimic the real NetworkInterface by only delivering the CallbackCanceled status if the
+    // operation has not already received a response (i.e., is not already in the _scheduled queue).
+    std::vector<NetworkOperationList*> queuesToCheck{&_unscheduled, &_blackHoled, &_processing};
+    _interruptWithResponse_inlock(cbHandle, queuesToCheck, rs);
 }
 
-
-void NetworkInterfaceMock::_cancelCommand_inlock(const CallbackHandle& cbHandle,
-                                                 const ResponseStatus& response) {
+void NetworkInterfaceMock::_interruptWithResponse_inlock(
+    const CallbackHandle& cbHandle,
+    const std::vector<NetworkOperationList*> queuesToCheck,
+    const ResponseStatus& response) {
     auto matchFn = stdx::bind(&NetworkOperation::isForCallback, stdx::placeholders::_1, cbHandle);
-    for (auto list : {&_unscheduled, &_blackHoled, &_scheduled}) {
+    for (auto list : queuesToCheck) {
         auto noi = std::find_if(list->begin(), list->end(), matchFn);
         if (noi == list->end()) {
             continue;
@@ -166,7 +171,6 @@ void NetworkInterfaceMock::_cancelCommand_inlock(const CallbackHandle& cbHandle,
         noi->setResponse(_now_inlock(), response);
         return;
     }
-    // No not-in-progress network command matched cbHandle.  Oh, well.
 }
 
 Status NetworkInterfaceMock::setAlarm(const Date_t when, const stdx::function<void()>& action) {
@@ -433,8 +437,12 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(
     if (op.getRequest().timeout != RemoteCommandRequest::kNoTimeout) {
         invariant(op.getRequest().timeout >= Milliseconds(0));
         ResponseStatus rs(ErrorCodes::NetworkTimeout, "Network timeout", Milliseconds(0));
-        auto action = stdx::bind(
-            &NetworkInterfaceMock::_cancelCommand_inlock, this, op.getCallbackHandle(), rs);
+        std::vector<NetworkOperationList*> queuesToCheck{&_unscheduled, &_blackHoled, &_scheduled};
+        auto action = stdx::bind(&NetworkInterfaceMock::_interruptWithResponse_inlock,
+                                 this,
+                                 op.getCallbackHandle(),
+                                 queuesToCheck,
+                                 rs);
         _alarms.emplace(_now_inlock() + op.getRequest().timeout, action);
     }
 }

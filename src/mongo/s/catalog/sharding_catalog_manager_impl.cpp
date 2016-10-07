@@ -1768,8 +1768,17 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
     std::shared_ptr<RemoteCommandTargeter> targeter) {
     stdx::unique_lock<stdx::mutex> lk(_addShardHandlesMutex);
 
+    // If the callback has been canceled (either due to shutdown or the shard being removed), we
+    // do not need to reschedule the task or update config.shards.
     Status responseStatus = cbArgs.response.status;
     if (responseStatus == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
+    // If the handle no longer exists, the shard must have been removed, but the callback must not
+    // have been canceled until after the task had completed. In this case as well, we do not need
+    // to reschedule the task or update config.shards.
+    if (!_hasAddShardHandle_inlock(shardType.getName())) {
         return;
     }
 
