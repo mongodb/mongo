@@ -54,7 +54,7 @@ __lsm_merge_aggressive_clear(WT_LSM_TREE *lsm_tree)
  * __lsm_merge_aggressive_update --
  *	Update the merge aggressiveness for an LSM tree.
  */
-static int
+static void
 __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	struct timespec now;
@@ -72,7 +72,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (!lsm_tree->modified ||
 	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
 		lsm_tree->merge_aggressiveness = 10;
-		return (0);
+		return;
 	}
 
 	/*
@@ -81,7 +81,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (lsm_tree->chunks_flushed <= lsm_tree->merge_min) {
 		__lsm_merge_aggressive_clear(lsm_tree);
-		return (0);
+		return;
 	}
 
 	/*
@@ -91,10 +91,10 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER)) {
 		F_SET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER);
-		return (__wt_epoch(session, &lsm_tree->merge_aggressive_ts));
+		__wt_epoch(session, &lsm_tree->merge_aggressive_ts);
 	}
 
-	WT_RET(__wt_epoch(session, &now));
+	__wt_epoch(session, &now);
 	msec_since_last_merge =
 	    WT_TIMEDIFF_MS(now, lsm_tree->merge_aggressive_ts);
 
@@ -113,7 +113,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * generates a variable load.
 	 */
 	if (msec_since_last_merge < msec_to_create_merge)
-		return (0);
+		return;
 
 	/*
 	 * Bump how aggressively we look for merges based on how long since
@@ -134,7 +134,6 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    msec_since_last_merge, lsm_tree->chunk_fill_ms);
 		lsm_tree->merge_aggressiveness = new_aggressive;
 	}
-	return (0);
 }
 
 /*
@@ -326,7 +325,7 @@ retry_find:
 			goto retry_find;
 		}
 		/* Consider getting aggressive if no merge was found */
-		WT_RET(__lsm_merge_aggressive_update(session, lsm_tree));
+		__lsm_merge_aggressive_update(session, lsm_tree);
 		return (WT_NOTFOUND);
 	}
 

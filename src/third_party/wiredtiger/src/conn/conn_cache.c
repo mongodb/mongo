@@ -42,47 +42,38 @@ __cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 	WT_RET(__wt_config_gets(session, cfg, "eviction_trigger", &cval));
 	cache->eviction_trigger = (u_int)cval.val;
 
-	if (F_ISSET(conn, WT_CONN_IN_MEMORY))
+	WT_RET(__wt_config_gets(
+	    session, cfg, "eviction_checkpoint_target", &cval));
+	cache->eviction_checkpoint_target = (u_int)cval.val;
+
+	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
+	cache->eviction_dirty_target = (u_int)cval.val;
+
+	/*
+	 * Don't allow the dirty target to be larger than the overall
+	 * target.
+	 */
+	if (cache->eviction_dirty_target > cache->eviction_target)
+		cache->eviction_dirty_target = cache->eviction_target;
+
+	/*
+	 * Sanity check the checkpoint target: don't allow a value
+	 * lower than the dirty target.
+	 */
+	if (cache->eviction_checkpoint_target > 0 &&
+	    cache->eviction_checkpoint_target < cache->eviction_dirty_target)
 		cache->eviction_checkpoint_target =
-		    cache->eviction_dirty_target =
-		    cache->eviction_dirty_trigger = 100U;
-	else {
-		WT_RET(__wt_config_gets(
-		    session, cfg, "eviction_checkpoint_target", &cval));
-		cache->eviction_checkpoint_target = (u_int)cval.val;
+		    cache->eviction_dirty_target;
 
-		WT_RET(__wt_config_gets(
-		    session, cfg, "eviction_dirty_target", &cval));
-		cache->eviction_dirty_target = (u_int)cval.val;
+	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_trigger", &cval));
+	cache->eviction_dirty_trigger = (u_int)cval.val;
 
-		/*
-		 * Don't allow the dirty target to be larger than the overall
-		 * target.
-		 */
-		if (cache->eviction_dirty_target > cache->eviction_target)
-			cache->eviction_dirty_target = cache->eviction_target;
-
-		/*
-		 * Sanity check the checkpoint target: don't allow a value
-		 * lower than the dirty target.
-		 */
-		if (cache->eviction_checkpoint_target > 0 &&
-		    cache->eviction_checkpoint_target <
-		    cache->eviction_dirty_target)
-			cache->eviction_checkpoint_target =
-			    cache->eviction_dirty_target;
-
-		WT_RET(__wt_config_gets(
-		    session, cfg, "eviction_dirty_trigger", &cval));
-		cache->eviction_dirty_trigger = (u_int)cval.val;
-
-		/*
-		 * Don't allow the dirty trigger to be larger than the overall
-		 * trigger or we can get stuck with a cache full of dirty data.
-		 */
-		if (cache->eviction_dirty_trigger > cache->eviction_trigger)
-			cache->eviction_dirty_trigger = cache->eviction_trigger;
-	}
+	/*
+	 * Don't allow the dirty trigger to be larger than the overall
+	 * trigger or we can get stuck with a cache full of dirty data.
+	 */
+	if (cache->eviction_dirty_trigger > cache->eviction_trigger)
+		cache->eviction_dirty_trigger = cache->eviction_trigger;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
 	WT_ASSERT(session, cval.val > 0);

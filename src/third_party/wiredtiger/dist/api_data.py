@@ -183,6 +183,12 @@ file_config = format_meta + [
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
         See @ref huffman for more information'''),
+    Config('ignore_in_memory_cache_size', 'false', r'''
+        allow update and insert operations to proceed even if the cache is
+        already at capacity. Only valid in conjunction with in-memory
+        databases. Should be used with caution - this configuration allows
+        WiredTiger to consume memory over the configured cache limit''',
+        type='boolean'),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom
@@ -410,13 +416,13 @@ connection_runtime_config = [
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
         this much dirty content, expressed as a percentage of the total cache
-        size.  Ignored if \c in_memory is \c true''',
+        size.''',
         min=1, max=99),
     Config('eviction_dirty_trigger', '20', r'''
         trigger application threads to perform eviction when the cache contains
         at least this much dirty content, expressed as a percentage of the
         total cache size. This setting only alters behavior if it is lower than
-        eviction_trigger. Ignored if \c in_memory is \c true''',
+        eviction_trigger''',
         min=1, max=99),
     Config('eviction_target', '80', r'''
         perform eviction in worker threads when the cache contains at least

@@ -62,6 +62,8 @@ main(int argc, char *argv[])
 	char joinuri[256];
 
 	opts = &_opts;
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 
 	testutil_check(testutil_parse_opts(argc, argv, opts));
@@ -159,7 +161,8 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-void populate(TEST_OPTS *opts)
+void
+populate(TEST_OPTS *opts)
 {
 	WT_CURSOR *maincur;
 	WT_SESSION *session;
@@ -167,7 +170,7 @@ void populate(TEST_OPTS *opts)
 	int balance, i, flag, post;
 	WT_RAND_STATE rnd;
 
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));

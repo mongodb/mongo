@@ -49,9 +49,9 @@
 	WT_ASSERT((s), (s)->txn.forced_iso > 0);                        \
 	(s)->txn.forced_iso--;						\
 	WT_ASSERT((s), txn_state->id == saved_state.id &&		\
-	    (txn_state->snap_min == saved_state.snap_min ||		\
-	    saved_state.snap_min == WT_TXN_NONE));			\
-	txn_state->snap_min = saved_state.snap_min;			\
+	    (txn_state->pinned_id == saved_state.pinned_id ||		\
+	    saved_state.pinned_id == WT_TXN_NONE));			\
+	txn_state->pinned_id = saved_state.pinned_id;			\
 } while (0)
 
 struct __wt_named_snapshot {
@@ -59,14 +59,14 @@ struct __wt_named_snapshot {
 
 	TAILQ_ENTRY(__wt_named_snapshot) q;
 
-	uint64_t snap_min, snap_max;
+	uint64_t pinned_id, snap_min, snap_max;
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
 };
 
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
 	volatile uint64_t id;
-	volatile uint64_t snap_min;
+	volatile uint64_t pinned_id;
 };
 
 struct __wt_txn_global {

@@ -35,8 +35,9 @@ decode_key(char *key_buf)
 }
 
 int
-setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
-
+setup_truncate(WTPERF *wtperf, WTPERF_THREAD *thread, WT_SESSION *session)
+{
+	CONFIG_OPTS *opts;
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	WORKLOAD *workload;
@@ -45,13 +46,14 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	int ret;
 	uint64_t end_point, final_stone_gap, i, start_point;
 
+	opts = wtperf->opts;
 	end_point = final_stone_gap = start_point = 0;
 	trunc_cfg = &thread->trunc_cfg;
 	workload = thread->workload;
 
 	/* We are limited to only one table when running truncate. */
 	if ((ret = session->open_cursor(
-	    session, cfg->uris[0], NULL, NULL, &cursor)) != 0)
+	    session, wtperf->uris[0], NULL, NULL, &cursor)) != 0)
 		goto err;
 
 	/*
@@ -79,14 +81,14 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	 */
 	if ((ret = cursor->next(cursor)) != 0 ||
 	    (ret = cursor->get_key(cursor, &key)) != 0) {
-		lprintf(cfg, ret, 0, "truncate setup start: failed");
+		lprintf(wtperf, ret, 0, "truncate setup start: failed");
 		goto err;
 	}
 
 	start_point = decode_key(key);
 	if ((cursor->reset(cursor)) != 0 || (ret = cursor->prev(cursor)) != 0 ||
 	    (ret = cursor->get_key(cursor, &key)) != 0) {
-		lprintf(cfg, ret, 0, "truncate setup end: failed");
+		lprintf(wtperf, ret, 0, "truncate setup end: failed");
 		goto err;
 	}
 	end_point = decode_key(key);
@@ -104,12 +106,13 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 		for (i = 1; i <= trunc_cfg->needed_stones; i++) {
 			truncate_item =
 			    dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-			truncate_item->key = dcalloc(cfg->key_sz, 1);
+			truncate_item->key = dcalloc(opts->key_sz, 1);
 			generate_key(
-			    cfg, truncate_item->key, trunc_cfg->stone_gap * i);
+			    opts, truncate_item->key, trunc_cfg->stone_gap * i);
 			truncate_item->diff =
 			    (trunc_cfg->stone_gap * i) - trunc_cfg->last_key;
-			TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
+			TAILQ_INSERT_TAIL(
+			    &wtperf->stone_head, truncate_item, q);
 			trunc_cfg->last_key = trunc_cfg->stone_gap * i;
 			trunc_cfg->num_stones++;
 		}
@@ -117,27 +120,29 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	trunc_cfg->stone_gap = final_stone_gap;
 
 err:	if ((ret = cursor->close(cursor)) != 0) {
-		lprintf(cfg, ret, 0, "truncate setup: cursor close failed");
+		lprintf(wtperf, ret, 0, "truncate setup: cursor close failed");
 	}
 	return (ret);
 }
 
 int
-run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
-    WT_CURSOR *cursor, WT_SESSION *session, int *truncatedp) {
-
+run_truncate(WTPERF *wtperf, WTPERF_THREAD *thread,
+    WT_CURSOR *cursor, WT_SESSION *session, int *truncatedp)
+{
+	CONFIG_OPTS *opts;
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	char *next_key;
 	int ret, t_ret;
 	uint64_t used_stone_gap;
 
-	ret = 0;
+	opts = wtperf->opts;
 	trunc_cfg = &thread->trunc_cfg;
+	ret = 0;
 
 	*truncatedp = 0;
 	/* Update the total inserts */
-	trunc_cfg->total_inserts = sum_insert_ops(cfg);
+	trunc_cfg->total_inserts = sum_insert_ops(wtperf);
 	trunc_cfg->expected_total +=
 	    (trunc_cfg->total_inserts - trunc_cfg->last_total_inserts);
 	trunc_cfg->last_total_inserts = trunc_cfg->total_inserts;
@@ -170,10 +175,10 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += used_stone_gap;
 		truncate_item = dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-		truncate_item->key = dcalloc(cfg->key_sz, 1);
-		generate_key(cfg, truncate_item->key, trunc_cfg->last_key);
+		truncate_item->key = dcalloc(opts->key_sz, 1);
+		generate_key(opts, truncate_item->key, trunc_cfg->last_key);
 		truncate_item->diff = used_stone_gap;
-		TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
+		TAILQ_INSERT_TAIL(&wtperf->stone_head, truncate_item, q);
 		trunc_cfg->num_stones++;
 	}
 
@@ -182,34 +187,35 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	    trunc_cfg->expected_total <= thread->workload->truncate_count)
 		return (0);
 
-	truncate_item = TAILQ_FIRST(&cfg->stone_head);
+	truncate_item = TAILQ_FIRST(&wtperf->stone_head);
 	trunc_cfg->num_stones--;
-	TAILQ_REMOVE(&cfg->stone_head, truncate_item, q);
+	TAILQ_REMOVE(&wtperf->stone_head, truncate_item, q);
 
 	/*
 	 * Truncate the content via a single truncate call or a cursor walk
 	 * depending on the configuration.
 	 */
-	if (cfg->truncate_single_ops) {
+	if (opts->truncate_single_ops) {
 		while ((ret = cursor->next(cursor)) == 0) {
 			testutil_check(cursor->get_key(cursor, &next_key));
 			if (strcmp(next_key, truncate_item->key) == 0)
 				break;
 			if ((ret = cursor->remove(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Truncate remove: failed");
+				lprintf(wtperf,
+				    ret, 0, "Truncate remove: failed");
 				goto err;
 			}
 		}
 	} else {
 		cursor->set_key(cursor,truncate_item->key);
 		if ((ret = cursor->search(cursor)) != 0) {
-			lprintf(cfg, ret, 0, "Truncate search: failed");
+			lprintf(wtperf, ret, 0, "Truncate search: failed");
 			goto err;
 		}
 
 		if ((ret = session->truncate(
 		    session, NULL, NULL, cursor, NULL)) != 0) {
-			lprintf(cfg, ret, 0, "Truncate: failed");
+			lprintf(wtperf, ret, 0, "Truncate: failed");
 			goto err;
 		}
 	}
@@ -221,19 +227,20 @@ err:	free(truncate_item->key);
 	free(truncate_item);
 	t_ret = cursor->reset(cursor);
 	if (t_ret != 0)
-		lprintf(cfg, t_ret, 0, "Cursor reset failed");
+		lprintf(wtperf, t_ret, 0, "Cursor reset failed");
 	if (ret == 0 && t_ret != 0)
 		ret = t_ret;
 	return (ret);
 }
 
 void
-cleanup_truncate_config(CONFIG *cfg) {
+cleanup_truncate_config(WTPERF *wtperf)
+{
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 
-	while (!TAILQ_EMPTY(&cfg->stone_head)) {
-		truncate_item = TAILQ_FIRST(&cfg->stone_head);
-		TAILQ_REMOVE(&cfg->stone_head, truncate_item, q);
+	while (!TAILQ_EMPTY(&wtperf->stone_head)) {
+		truncate_item = TAILQ_FIRST(&wtperf->stone_head);
+		TAILQ_REMOVE(&wtperf->stone_head, truncate_item, q);
 		free(truncate_item->key);
 		free(truncate_item);
 	}

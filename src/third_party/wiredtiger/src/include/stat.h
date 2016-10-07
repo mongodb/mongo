@@ -420,6 +420,8 @@ struct __wt_connection_stats {
 	int64_t thread_fsync_active;
 	int64_t thread_read_active;
 	int64_t thread_write_active;
+	int64_t application_evict_time;
+	int64_t application_cache_time;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
 	int64_t page_locked_blocked;
@@ -437,6 +439,7 @@ struct __wt_connection_stats {
 	int64_t txn_checkpoint_scrub_time;
 	int64_t txn_checkpoint_time_total;
 	int64_t txn_checkpoint;
+	int64_t txn_checkpoint_skipped;
 	int64_t txn_fail_cache;
 	int64_t txn_checkpoint_fsync_post;
 	int64_t txn_checkpoint_fsync_post_duration;
