@@ -71,6 +71,8 @@ selector:
     - jstests/sharding/autodiscover_config_rs_from_secondary.js
     - jstests/sharding/config_rs_change.js
     - jstests/sharding/mongos_wait_csrs_initiate.js
+    # v3.2 cluster does not support parallel migrations.
+    - jstests/sharding/migration_ignore_interrupts_1.js
 
 executor:
   js_test:

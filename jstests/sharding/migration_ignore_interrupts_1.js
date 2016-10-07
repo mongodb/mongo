@@ -48,17 +48,17 @@ load('./jstests/libs/chunk_manipulation_util.js');
         staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
-    assert.commandFailed(
+    assert.commandFailedWithCode(
         admin.runCommand({moveChunk: ns1, find: {a: -10}, to: st.shard2.shardName}),
         ErrorCodes.ConflictingOperationInProgress,
         "(1) A shard should not be able to be the donor for two ongoing migrations.");
 
-    assert.commandFailed(
+    assert.commandFailedWithCode(
         admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard1.shardName}),
         ErrorCodes.ConflictingOperationInProgress,
         "(2) A shard should not be able to be the recipient of two ongoing migrations.");
 
-    assert.commandFailed(
+    assert.commandFailedWithCode(
         admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}),
         ErrorCodes.ConflictingOperationInProgress,
         "(3) A shard should not be able to be both a donor and recipient of migrations.");
