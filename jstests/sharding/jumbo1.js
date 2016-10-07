@@ -16,22 +16,16 @@
 
     var x = 0;
     var bulk = db.foo.initializeUnorderedBulkOp();
-    for (; x < 500; x++) {
-        bulk.insert({x: x, big: big});
-    }
-
     for (var i = 0; i < 500; i++) {
         bulk.insert({x: x, big: big});
     }
 
-    for (; x < 2000; x++) {
+    for (; x < 1500; x++) {
         bulk.insert({x: x, big: big});
     }
 
     assert.writeOK(bulk.execute());
 
-    s.printShardingStatus(true);
-    assert.commandWorked(s.s0.adminCommand({moveChunk: 'test.foo', find: {x: 0}, to: 'shard0000'}));
     s.printShardingStatus(true);
 
     s.startBalancer();
@@ -48,6 +42,13 @@
         s.printShardingStatus(true);
         return d < 5;
     }, "balance didn't happen", 1000 * 60 * 5, 5000);
+
+    var jumboChunk =
+        s.getDB('config').chunks.findOne({ns: 'test.foo', min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
+    assert.eq('shard0001', jumboChunk.shard, 'jumbo chunk ' + tojson(jumboChunk) + ' was moved');
+    // TODO: SERVER-26531 Make sure that balancer marked the first chunk as jumbo.
+    // Assumption: balancer favors moving the lowest valued chunk out of a shard.
+    // assert(jumboChunk.jumbo, tojson(jumboChunk));
 
     s.stop();
 
