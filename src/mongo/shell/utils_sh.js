@@ -145,6 +145,12 @@ sh.getBalancerState = function(configDB) {
 sh.isBalancerRunning = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
+
+    var result = configDB.adminCommand({balancerStatus: 1});
+    if (result.code != ErrorCodes.CommandNotFound) {
+        return assert.commandWorked(result).inBalancerRound;
+    }
+
     var x = configDB.locks.findOne({_id: "balancer"});
     if (x == null) {
         print("config.locks collection empty or missing. be sure you are connected to a mongos");
