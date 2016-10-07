@@ -254,14 +254,6 @@ Status mergeChunks(OperationContext* txn,
         }
     }
 
-    {
-        // Ensure that the newly applied chunks would result in a correct metadata state
-        ChunkVersion mergeVersion = metadata->getCollVersion();
-        mergeVersion.incMinor();
-
-        uassertStatusOK(metadata->cloneMerge(minKey, maxKey, mergeVersion));
-    }
-
     //
     // Run _configsvrCommitChunkMerge.
     //

@@ -31,7 +31,7 @@
     };
 
     assert.commandFailedWithCode(callSplit(st.d0.getDB('admin'), {x: MinKey}, {x: 0}, [{x: 2}]),
-                                 ErrorCodes.IllegalOperation);
+                                 ErrorCodes.InvalidOptions);
 
     var chunksAfter = st.s.getDB('config').chunks.find().toArray();
     assert.eq(chunksBefore,

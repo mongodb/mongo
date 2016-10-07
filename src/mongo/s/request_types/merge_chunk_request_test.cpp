@@ -30,11 +30,9 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/request_types/merge_chunk_request_type.h"
-
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
 
 using unittest::assertGet;
@@ -209,6 +207,6 @@ TEST(MergeChunkRequest, TooFewChunkBoundariesErrors) {
              << "shard0000"));
     ASSERT_EQ(ErrorCodes::InvalidOptions, request.getStatus());
 }
-}
 
+}  // namespace
 }  // namespace mongo

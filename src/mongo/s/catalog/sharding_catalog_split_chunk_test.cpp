@@ -286,5 +286,83 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ASSERT_EQ(ErrorCodes::StaleEpoch, splitStatus);
 }
 
+TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    std::vector<BSONObj> splitPoints{BSON("a" << 5), BSON("a" << 4)};
+
+    setupChunks({chunk});
+
+    auto splitStatus = catalogManager()->commitChunkSplit(operationContext(),
+                                                          NamespaceString("TestDB.TestColl"),
+                                                          origVersion.epoch(),
+                                                          ChunkRange(chunkMin, chunkMax),
+                                                          splitPoints,
+                                                          "shard0000");
+    ASSERT_EQ(ErrorCodes::InvalidOptions, splitStatus);
+}
+
+TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    std::vector<BSONObj> splitPoints{BSON("a" << 0), BSON("a" << 5)};
+
+    setupChunks({chunk});
+
+    auto splitStatus = catalogManager()->commitChunkSplit(operationContext(),
+                                                          NamespaceString("TestDB.TestColl"),
+                                                          origVersion.epoch(),
+                                                          ChunkRange(chunkMin, chunkMax),
+                                                          splitPoints,
+                                                          "shard0000");
+    ASSERT_EQ(ErrorCodes::InvalidOptions, splitStatus);
+}
+
+TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    std::vector<BSONObj> splitPoints{BSON("a" << 5), BSON("a" << 15)};
+
+    setupChunks({chunk});
+
+    auto splitStatus = catalogManager()->commitChunkSplit(operationContext(),
+                                                          NamespaceString("TestDB.TestColl"),
+                                                          origVersion.epoch(),
+                                                          ChunkRange(chunkMin, chunkMax),
+                                                          splitPoints,
+                                                          "shard0000");
+    ASSERT_EQ(ErrorCodes::InvalidOptions, splitStatus);
+}
+
 }  // namespace
 }  // namespace mongo

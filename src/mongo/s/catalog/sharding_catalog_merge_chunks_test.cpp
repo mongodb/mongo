@@ -419,5 +419,46 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
     ASSERT_BSONOBJ_EQ(mergedChunk.toBSON(), foundChunk.toBSON());
 }
 
+TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
+    const OID epoch = OID::gen();
+    const std::vector<BSONObj> chunkBoundaries{
+        BSON("a" << 100), BSON("a" << 200), BSON("a" << 30), BSON("a" << 400)};
+
+    {
+        std::vector<ChunkType> originalChunks;
+        ChunkVersion version = ChunkVersion(1, 0, epoch);
+
+        ChunkType chunk;
+        chunk.setNS("TestDB.TestColl");
+        chunk.setShard(ShardId("shard0000"));
+
+        chunk.setVersion(version);
+        chunk.setMin(BSON("a" << 100));
+        chunk.setMax(BSON("a" << 200));
+        originalChunks.push_back(chunk);
+
+        version.incMinor();
+        chunk.setMin(BSON("a" << 200));
+        chunk.setMax(BSON("a" << 300));
+        chunk.setVersion(version);
+        originalChunks.push_back(chunk);
+
+        version.incMinor();
+        chunk.setMin(BSON("a" << 300));
+        chunk.setMax(BSON("a" << 400));
+        chunk.setVersion(version);
+        originalChunks.push_back(chunk);
+
+        setupChunks(originalChunks);
+    }
+
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              catalogManager()->commitChunkMerge(operationContext(),
+                                                 NamespaceString("TestDB.TestColl"),
+                                                 epoch,
+                                                 chunkBoundaries,
+                                                 "shard0000"));
+}
+
 }  // namespace
 }  // namespace mongo

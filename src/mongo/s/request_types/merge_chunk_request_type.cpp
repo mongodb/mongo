@@ -34,10 +34,6 @@
 #include "mongo/bson/util/bson_extract.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 const char kConfigsvrMergeChunk[] = "_configsvrCommitChunkMerge";
@@ -45,33 +41,41 @@ const char kCollEpoch[] = "collEpoch";
 const char kChunkBoundaries[] = "chunkBoundaries";
 const char kShardName[] = "shard";
 
-}  // unnamed namespace
+}  // namespace
 
 MergeChunkRequest::MergeChunkRequest(NamespaceString nss,
-                                     string shardName,
+                                     std::string shardName,
                                      OID epoch,
-                                     vector<BSONObj> chunkBoundaries)
+                                     std::vector<BSONObj> chunkBoundaries)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
       _chunkBoundaries(std::move(chunkBoundaries)),
       _shardName(std::move(shardName)) {}
 
 StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BSONObj& cmdObj) {
-    string ns;
-    auto parseNamespaceStatus = bsonExtractStringField(cmdObj, kConfigsvrMergeChunk, &ns);
+    std::string ns;
+    {
+        auto parseNamespaceStatus = bsonExtractStringField(cmdObj, kConfigsvrMergeChunk, &ns);
+        if (!parseNamespaceStatus.isOK()) {
+            return parseNamespaceStatus;
+        }
+    }
 
-    if (!parseNamespaceStatus.isOK()) {
-        return parseNamespaceStatus;
+    NamespaceString nss(ns);
+    if (!nss.isValid()) {
+        return {ErrorCodes::InvalidNamespace,
+                str::stream() << "invalid namespace '" << nss.ns() << "' specified for request"};
     }
 
     OID epoch;
-    auto parseEpochStatus = bsonExtractOIDField(cmdObj, kCollEpoch, &epoch);
-
-    if (!parseEpochStatus.isOK()) {
-        return parseEpochStatus;
+    {
+        auto parseEpochStatus = bsonExtractOIDField(cmdObj, kCollEpoch, &epoch);
+        if (!parseEpochStatus.isOK()) {
+            return parseEpochStatus;
+        }
     }
 
-    vector<BSONObj> chunkBoundaries;
+    std::vector<BSONObj> chunkBoundaries;
     {
         BSONElement chunkBoundariesElem;
         auto chunkBoundariesElemStatus =
@@ -84,23 +88,23 @@ StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BS
         while (it.more()) {
             chunkBoundaries.push_back(it.next().Obj().getOwned());
         }
+
+        if (chunkBoundaries.size() < 3) {
+            return {ErrorCodes::InvalidOptions,
+                    "need to provide at least three chunk boundaries for the chunks to be merged"};
+        }
     }
 
-    string shardName;
-    auto parseShardNameStatus = bsonExtractStringField(cmdObj, kShardName, &shardName);
-
-    if (!parseShardNameStatus.isOK()) {
-        return parseShardNameStatus;
+    std::string shardName;
+    {
+        auto parseShardNameStatus = bsonExtractStringField(cmdObj, kShardName, &shardName);
+        if (!parseShardNameStatus.isOK()) {
+            return parseShardNameStatus;
+        }
     }
 
-    auto request = MergeChunkRequest(
-        NamespaceString(ns), std::move(shardName), std::move(epoch), std::move(chunkBoundaries));
-    Status validationStatus = request._validate();
-    if (!validationStatus.isOK()) {
-        return validationStatus;
-    }
-
-    return request;
+    return MergeChunkRequest(
+        std::move(nss), std::move(shardName), std::move(epoch), std::move(chunkBoundaries));
 }
 
 BSONObj MergeChunkRequest::toConfigCommandBSON(const BSONObj& writeConcern) {
@@ -123,38 +127,6 @@ void MergeChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
         }
     }
     cmdBuilder->append(kShardName, _shardName);
-}
-
-const NamespaceString& MergeChunkRequest::getNamespace() const {
-    return _nss;
-}
-
-const OID& MergeChunkRequest::getEpoch() const {
-    return _epoch;
-}
-
-const vector<BSONObj>& MergeChunkRequest::getChunkBoundaries() const {
-    return _chunkBoundaries;
-}
-
-const string& MergeChunkRequest::getShardName() const {
-    return _shardName;
-}
-
-Status MergeChunkRequest::_validate() {
-    if (!getNamespace().isValid()) {
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "invalid namespace '" << _nss.ns()
-                                    << "' specified for request");
-    }
-
-    if (getChunkBoundaries().size() < 3) {
-        return Status(
-            ErrorCodes::InvalidOptions,
-            "need to provide at least three chunk boundaries for the chunks to be merged");
-    }
-
-    return Status::OK();
 }
 
 }  // namespace mongo
