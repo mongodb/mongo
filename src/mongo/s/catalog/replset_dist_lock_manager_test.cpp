@@ -1613,6 +1613,111 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
 }
 
 /**
+ * 1. Try to grab lock multiple times.
+ * 2. For each attempt, attempting to check the ping document results in NotMaster error.
+ * 3. All of the previous attempt should result in lock busy.
+ * 4. Try to grab lock again when the ping was not updated and lock expiration has elapsed.
+ */
+TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfNoMaster) {
+    getMockCatalog()->expectGrabLock(
+        [](StringData, const OID&, StringData, StringData, Date_t, StringData) {
+            // Don't care
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    LocksType currentLockDoc;
+    currentLockDoc.setName("bar");
+    currentLockDoc.setState(LocksType::LOCKED);
+    currentLockDoc.setProcess("otherProcess");
+    currentLockDoc.setLockID(OID("5572007fda9e476582bf3716"));
+    currentLockDoc.setWho("me");
+    currentLockDoc.setWhy("why");
+
+    Date_t currentPing;
+    LockpingsType pingDoc;
+    pingDoc.setProcess("otherProcess");
+    pingDoc.setPing(Date_t());
+
+    int getServerInfoCallCount = 0;
+
+    const LocksType& fixedLockDoc = currentLockDoc;
+    const LockpingsType& fixedPingDoc = pingDoc;
+
+    Date_t configServerLocalTime;
+    const int kLoopCount = 4;
+    OID lastElectionId;
+    for (int x = 0; x < kLoopCount; x++) {
+        configServerLocalTime += kLockExpiration;
+
+        getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
+                                              fixedLockDoc);
+
+        getMockCatalog()->expectGetPing(
+            [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, fixedPingDoc);
+
+        if (x == 0) {
+            // initialize internal ping history first.
+            lastElectionId = OID::gen();
+            getMockCatalog()->expectGetServerInfo(
+                [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+                DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
+        } else {
+            getMockCatalog()->expectGetServerInfo(
+                [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+                {ErrorCodes::NotMaster, "not master"});
+        }
+
+        auto status = distLock()->lock(operationContext(), "bar", "", Milliseconds(0)).getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
+    }
+
+    ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
+
+    getMockCatalog()->expectGetServerInfo(
+        [&getServerInfoCallCount]() { getServerInfoCallCount++; },
+        DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
+
+    OID lockTS;
+    // Make sure that overtake is now ok since electionId didn't change.
+    getMockCatalog()->expectOvertakeLock(
+        [this, &lockTS, &currentLockDoc](StringData lockID,
+                                         const OID& lockSessionID,
+                                         const OID& currentHolderTS,
+                                         StringData who,
+                                         StringData processId,
+                                         Date_t time,
+                                         StringData why) {
+            ASSERT_EQUALS("bar", lockID);
+            lockTS = lockSessionID;
+            ASSERT_EQUALS(currentLockDoc.getLockID(), currentHolderTS);
+            ASSERT_EQUALS(getProcessID(), processId);
+            ASSERT_EQUALS("foo", why);
+        },
+        currentLockDoc);  // return arbitrary valid lock document, for testing purposes only.
+
+    int unlockCallCount = 0;
+    OID unlockSessionIDPassed;
+
+    {
+        auto lockStatus = distLock()->lock(operationContext(), "bar", "foo", Milliseconds(0));
+
+        ASSERT_OK(lockStatus.getStatus());
+
+        getMockCatalog()->expectNoGrabLock();
+        getMockCatalog()->expectUnLock(
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+                unlockCallCount++;
+                unlockSessionIDPassed = lockSessionID;
+            },
+            Status::OK());
+    }
+
+    ASSERT_EQUALS(1, unlockCallCount);
+    ASSERT_EQUALS(lockTS, unlockSessionIDPassed);
+}
+
+/**
  * Test scenario:
  * 1. Attempt to grab lock fails because lock is already owned.
  * 2. Try to get ping data and config server clock.

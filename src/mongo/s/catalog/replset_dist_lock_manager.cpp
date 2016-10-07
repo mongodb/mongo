@@ -204,6 +204,10 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* txn,
     Timer timer(_serviceContext->getTickSource());
     auto serverInfoStatus = _catalog->getServerInfo(txn);
     if (!serverInfoStatus.isOK()) {
+        if (serverInfoStatus.getStatus() == ErrorCodes::NotMaster) {
+            return false;
+        }
+
         return serverInfoStatus.getStatus();
     }
 

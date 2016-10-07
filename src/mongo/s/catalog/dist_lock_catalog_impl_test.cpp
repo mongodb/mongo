@@ -1178,8 +1178,7 @@ TEST_F(DistLockCatalogFixture, GetServerBadElectionId) {
         // return invalid non-oid electionId
         return fromjson(R"({
                 localTime: { $date: "2015-05-26T13:06:27.293Z" },
-                $gleStats: {
-                    lastOpTime: { $timestamp: { t: 0, i: 0 }},
+                repl: {
                     electionId: 34
                 },
                 ok: 1
@@ -1200,8 +1199,7 @@ TEST_F(DistLockCatalogFixture, GetServerBadLocalTime) {
         // return invalid non date type for localTime field.
         return fromjson(R"({
                 localTime: "2015-05-26T13:06:27.293Z",
-                $gleStats: {
-                    lastOpTime: { $timestamp: { t: 0, i: 0 }},
+                repl: {
                     electionId: ObjectId("555fa85d4d8640862a0fc79b")
                 },
                 ok: 1
@@ -1231,6 +1229,27 @@ TEST_F(DistLockCatalogFixture, GetServerNoGLEStats) {
 TEST_F(DistLockCatalogFixture, GetServerNoElectionId) {
     auto future = launchAsync([this] {
         auto status = distLockCatalog()->getServerInfo(operationContext()).getStatus();
+        ASSERT_EQUALS(ErrorCodes::NotMaster, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return fromjson(R"({
+                localTime: { $date: "2015-05-26T13:06:27.293Z" },
+                repl: {
+                    ismaster: false,
+                    me: "me:1234"
+                },
+                ok: 1
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DistLockCatalogFixture, GetServerInvalidReplSubsectionShouldFail) {
+    auto future = launchAsync([this] {
+        auto status = distLockCatalog()->getServerInfo(operationContext()).getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1238,9 +1257,29 @@ TEST_F(DistLockCatalogFixture, GetServerNoElectionId) {
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         return fromjson(R"({
                 localTime: { $date: "2015-05-26T13:06:27.293Z" },
-                $gleStats: {
-                    lastOpTime: { $timestamp: { t: 0, i: 0 }},
-                    termNumber: 64
+                repl: {
+                    invalid: true
+                },
+                ok: 1
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DistLockCatalogFixture, GetServerNoElectionIdButMasterShouldFail) {
+    auto future = launchAsync([this] {
+        auto status = distLockCatalog()->getServerInfo(operationContext()).getStatus();
+        ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
+        ASSERT_NOT_EQUALS(std::string::npos, status.reason().find("me:1234"));
+    });
+
+    onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return fromjson(R"({
+                localTime: { $date: "2015-05-26T13:06:27.293Z" },
+                repl: {
+                    ismaster: true,
+                    me: "me:1234"
                 },
                 ok: 1
             })");

@@ -116,11 +116,41 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
         return {ErrorCodes::UnsupportedFormat, replElemStatus.reason()};
     }
 
+    const auto replSubObj = replElem.Obj();
     OID electionId;
-
-    auto electionIdStatus = bsonExtractOIDField(replElem.Obj(), "electionId", &electionId);
+    auto electionIdStatus = bsonExtractOIDField(replSubObj, "electionId", &electionId);
 
     if (!electionIdStatus.isOK()) {
+        // Secondaries don't have electionId.
+        if (electionIdStatus.code() == ErrorCodes::NoSuchKey) {
+            // Verify that the from replSubObj that this is indeed not a primary.
+            bool isPrimary = false;
+            auto isPrimaryStatus = bsonExtractBooleanField(replSubObj, "ismaster", &isPrimary);
+
+            if (!isPrimaryStatus.isOK()) {
+                return {ErrorCodes::UnsupportedFormat, isPrimaryStatus.reason()};
+            }
+
+            if (isPrimary) {
+                string hostContacted;
+                auto hostContactedStatus = bsonExtractStringField(replSubObj, "me", &hostContacted);
+
+                if (!hostContactedStatus.isOK()) {
+                    return {
+                        ErrorCodes::UnsupportedFormat,
+                        str::stream()
+                            << "failed to extract 'me' field from repl subsection of serverStatus: "
+                            << hostContactedStatus.reason()};
+                }
+
+                return {ErrorCodes::UnsupportedFormat,
+                        str::stream() << "expected primary to have electionId but not present on "
+                                      << hostContacted};
+            }
+
+            return {ErrorCodes::NotMaster, "only primary can have electionId"};
+        }
+
         return {ErrorCodes::UnsupportedFormat, electionIdStatus.reason()};
     }
 
@@ -402,7 +432,7 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(Opera
     auto electionIdStatus = extractElectionId(responseObj);
 
     if (!electionIdStatus.isOK()) {
-        return {ErrorCodes::UnsupportedFormat, electionIdStatus.getStatus().reason()};
+        return electionIdStatus.getStatus();
     }
 
     return DistLockCatalog::ServerInfo(localTimeElem.date(), electionIdStatus.getValue());
