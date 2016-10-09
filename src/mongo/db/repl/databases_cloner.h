@@ -120,10 +120,11 @@ private:
      */
     void _setStatus_inlock(Status s);
 
-    /**
-     * Will fail the cloner, unlock and call the completion function.
-     */
-    void _failed_inlock(UniqueLock& lk);
+    /** Will fail the cloner, call the completion function, and become inactive. */
+    void _fail_inlock(UniqueLock* lk, Status s);
+
+    /** Will call the completion function, and become inactive. */
+    void _succeed_inlock(UniqueLock* lk);
 
     /** Called each time a database clone is finished */
     void _onEachDBCloneFinish(const Status& status, const std::string& name);
@@ -144,8 +145,8 @@ private:
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
     OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
-    HostAndPort _source;               // (R) The source to use, until we get an error
-    bool _active = false;              // (M) false until we start
+    const HostAndPort _source;         // (R) The source to use.
+    bool _active = false;              // (M) false until we start, and true until finished.
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.

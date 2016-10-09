@@ -194,8 +194,7 @@ Status DatabasesCloner::startup() {
             RemoteCommandRetryScheduler::kAllRetriableErrors));
     auto s = _listDBsScheduler->startup();
     if (!s.isOK()) {
-        _setStatus_inlock(s);
-        _failed_inlock(lk);
+        _fail_inlock(&lk, s);
     }
 
     return _status;
@@ -215,8 +214,7 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
     UniqueLock lk(_mutex);
     if (!respStatus.isOK()) {
         LOG(1) << "listDatabases failed: " << respStatus;
-        _setStatus_inlock(respStatus);
-        _failed_inlock(lk);
+        _fail_inlock(&lk, respStatus);
         return;
     }
 
@@ -300,11 +298,9 @@ void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
 
     if (_databaseCloners.size() == 0) {
         if (_status.isOK()) {
-            _active = false;
-            lk.unlock();
-            _finishFn(_status);
+            _succeed_inlock(&lk);
         } else {
-            _failed_inlock(lk);
+            _fail_inlock(&lk, _status);
         }
     }
 }
@@ -324,8 +320,7 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
     if (!status.isOK()) {
         warning() << "database '" << name << "' (" << (_stats.databasesCloned + 1) << " of "
                   << _databaseCloners.size() << ") clone failed due to " << status.toString();
-        _setStatus_inlock(status);
-        _failed_inlock(lk);
+        _fail_inlock(&lk, status);
         return;
     }
 
@@ -345,8 +340,7 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
         }
         if (!adminStatus.isOK()) {
             LOG(1) << "Validation failed on 'admin' db due to " << adminStatus;
-            _setStatus_inlock(adminStatus);
-            _failed_inlock(lk);
+            _fail_inlock(&lk, adminStatus);
             return;
         }
     }
@@ -354,11 +348,7 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
     _stats.databasesCloned++;
 
     if (_stats.databasesCloned == _databaseCloners.size()) {
-        _active = false;
-        // All cloners are done, trigger event.
-        LOG(2) << "All database clones finished, calling _finishFn.";
-        lk.unlock();
-        _finishFn(_status);
+        _succeed_inlock(&lk);
         return;
     }
 
@@ -369,25 +359,41 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
         warning() << "failed to schedule database '" << name << "' ("
                   << (_stats.databasesCloned + 1) << " of " << _databaseCloners.size()
                   << ") due to " << startStatus.toString();
-        _setStatus_inlock(startStatus);
-        _failed_inlock(lk);
+        _fail_inlock(&lk, startStatus);
         return;
     }
 }
 
-void DatabasesCloner::_failed_inlock(UniqueLock& lk) {
-    LOG(3) << "DatabasesCloner::_failed_inlock";
+void DatabasesCloner::_fail_inlock(UniqueLock* lk, Status status) {
+    LOG(3) << "DatabasesCloner::_fail_inlock called";
     if (!_active) {
         return;
     }
-    _active = false;
 
+    _setStatus_inlock(status);
     // TODO: shutdown outstanding work, like any cloners active
     auto finish = _finishFn;
-    lk.unlock();
+    lk->unlock();
 
-    LOG(3) << "calling _finishFn with status: " << _status;
-    _finishFn(_status);
+    LOG(3) << "DatabasesCloner - calling _finishFn with status: " << _status;
+    finish(status);
+
+    lk->lock();
+    _active = false;
+}
+
+void DatabasesCloner::_succeed_inlock(UniqueLock* lk) {
+    LOG(3) << "DatabasesCloner::_succeed_inlock called";
+    const auto status = Status::OK();
+    _setStatus_inlock(status);
+    auto finish = _finishFn;
+    lk->unlock();
+
+    LOG(3) << "DatabasesCloner - calling _finishFn with status OK";
+    finish(status);
+
+    lk->lock();
+    _active = false;
 }
 
 void DatabasesCloner::_setStatus_inlock(Status s) {
