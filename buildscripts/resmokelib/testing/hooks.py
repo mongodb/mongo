@@ -207,7 +207,7 @@ class BackgroundInitialSync(JsCustomBehavior):
                 try:
                     sync_node_conn.admin.command(cmd)
                 except pymongo.errors.OperationFailure as err:
-                    self.logger.exception("{0} failed".format(description))
+                    self.fixture.logger.exception("{0} failed".format(description))
                     test_report.addFailure(self.hook_test_case, sys.exc_info())
                     raise errors.TestFailure(err.args[0])
             else:
@@ -233,7 +233,7 @@ class BackgroundInitialSync(JsCustomBehavior):
             try:
                 sync_node_conn.admin.command(cmd)
             except pymongo.errors.OperationFailure as err:
-                self.logger.exception("{0} failed".format(description))
+                self.fixture.logger.exception("{0} failed".format(description))
                 test_report.addFailure(self.hook_test_case, sys.exc_info())
                 raise errors.TestFailure(err.args[0])
 
@@ -245,7 +245,7 @@ class BackgroundInitialSync(JsCustomBehavior):
             if state != 2:
                 if self.tests_run == 0:
                     msg = "Initial sync node did not catch up after waiting 20 minutes"
-                    self.logger.exception("{0} failed: {1}".format(description, msg))
+                    self.fixture.logger.exception("{0} failed: {1}".format(description, msg))
                     test_report.addFailure(self.hook_test_case, sys.exc_info())
                     raise errors.TestFailure(msg)
 
@@ -279,7 +279,7 @@ class BackgroundInitialSync(JsCustomBehavior):
         try:
             JsCustomBehavior.after_test(self, test, test_report)
         except errors.TestFailure as err:
-            self.logger.exception("{0} failed with {1}".format(description, err.args[0]))
+            self.fixture.logger.exception("{0} failed with {1}".format(description, err.args[0]))
             restart_init_sync()
             raise errors.TestFailure(err.args[0])
 
@@ -325,7 +325,7 @@ class IntermediateInitialSync(JsCustomBehavior):
             try:
                 sync_node_conn.admin.command(cmd)
             except pymongo.errors.OperationFailure as err:
-                self.logger.exception("{0} failed".format(description))
+                self.fixture.logger.exception("{0} failed".format(description))
                 test_report.addFailure(self.hook_test_case, sys.exc_info())
                 raise errors.TestFailure(err.args[0])
         else:
@@ -343,7 +343,7 @@ class IntermediateInitialSync(JsCustomBehavior):
         try:
             sync_node_conn.admin.command(cmd)
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception("{0} failed".format(description))
+            self.fixture.logger.exception("{0} failed".format(description))
             test_report.addFailure(self.hook_test_case, sys.exc_info())
             raise errors.TestFailure(err.args[0])
 
