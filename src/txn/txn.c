@@ -659,20 +659,20 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
  *	Initialize a session's transaction data.
  */
 int
-__wt_txn_init(WT_SESSION_IMPL *session)
+__wt_txn_init(WT_SESSION_IMPL *session, WT_SESSION_IMPL *session_ret)
 {
 	WT_TXN *txn;
 
-	txn = &session->txn;
+	txn = &session_ret->txn;
 	txn->id = WT_TXN_NONE;
 
 	WT_RET(__wt_calloc_def(session,
-	    S2C(session)->session_size, &txn->snapshot));
+	    S2C(session_ret)->session_size, &txn->snapshot));
 
 #ifdef HAVE_DIAGNOSTIC
-	if (S2C(session)->txn_global.states != NULL) {
+	if (S2C(session_ret)->txn_global.states != NULL) {
 		WT_TXN_STATE *txn_state;
-		txn_state = WT_SESSION_TXN_STATE(session);
+		txn_state = WT_SESSION_TXN_STATE(session_ret);
 		WT_ASSERT(session, txn_state->pinned_id == WT_TXN_NONE);
 	}
 #endif
@@ -683,7 +683,7 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	 */
 	txn->mod = NULL;
 
-	txn->isolation = session->isolation;
+	txn->isolation = session_ret->isolation;
 	return (0);
 }
 
