@@ -38,14 +38,14 @@ static void usage(void)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-void (*custom_die)(void) = format_die;		/* Local death handler. */
-
 int
 main(int argc, char *argv[])
 {
 	time_t start;
 	int ch, onerun, reps;
 	const char *config, *home;
+
+	custom_die = format_die;		/* Local death handler. */
 
 	config = NULL;
 

@@ -49,8 +49,6 @@
  * table.
  */
 
-void (*custom_die)(void) = NULL;
-
 #define	N_RECORDS	10000
 
 static void

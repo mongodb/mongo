@@ -68,10 +68,8 @@ typedef struct {
 	 * resources.
 	 */
 	WT_CONNECTION *conn;
-	char	  *conn_config;
 	WT_SESSION    *session;
 	bool	   running;
-	char	  *table_config;
 	char	  *uri;
 	volatile uint64_t   next_threadid;
 	uint64_t   max_inserted_id;

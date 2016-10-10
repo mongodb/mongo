@@ -2329,7 +2329,6 @@ err:		if (ret == 0)
 
 extern int __wt_optind, __wt_optreset;
 extern char *__wt_optarg;
-void (*custom_die)(void) = NULL;
 
 /*
  * usage --

@@ -28,8 +28,6 @@
 
 #include "test_util.h"
 
-void (*custom_die)(void) = NULL;
-
 void test_value(int64_t);
 void test_spread(int64_t, int64_t, int64_t);
 

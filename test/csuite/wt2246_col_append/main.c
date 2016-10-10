@@ -42,8 +42,6 @@
 
 #define	MILLION		1000000
 
-void (*custom_die)(void) = NULL;
-
 /* Needs to be global for signal handling. */
 static TEST_OPTS *opts, _opts;
 
